@@ -23,6 +23,8 @@ func DefaultConfigFile() string {
 }
 
 func InitConfig(cfgFile string) {
+	fmt.Println("Initializing config")
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 	} else {
@@ -32,19 +34,20 @@ func InitConfig(cfgFile string) {
 	createConfigFileIfNotExists(cfgFile)
 	viper.SetConfigFile(cfgFile)
 
-	// bind environment variables
-	viper.BindEnv("auth.accessToken", "RUDDER_ACCESS_TOKEN")
-
 	// set defaults
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 
 	// load configuration
 	_ = viper.ReadInConfig()
+	// Once the config is read, bind the env's for the provider to make use of
+	os.Setenv("R_ACCESS_TOKEN", viper.GetString("auth.accessToken"))
+	os.Setenv("R_CONFIG_BACKEND", viper.GetString("auth.cbURL"))
 }
 
 func createConfigFileIfNotExists(cfgFile string) {
 	configPath := filepath.Dir(cfgFile)
+
 	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
 		fmt.Printf("Config file '%s' not found. Creating default configuration...\n", cfgFile)
 
@@ -65,6 +68,20 @@ func SetAccessToken(accessToken string) {
 	cobra.CheckErr(err)
 
 	newData, err := sjson.SetBytes(data, "auth.accessToken", accessToken)
+	cobra.CheckErr(err)
+
+	formattedData := pretty.Pretty(newData)
+
+	err = os.WriteFile(configFile, formattedData, 0644)
+	cobra.CheckErr(err)
+}
+
+func SetConfigBackendURL(url string) {
+	configFile := viper.ConfigFileUsed()
+	data, err := os.ReadFile(configFile)
+	cobra.CheckErr(err)
+
+	newData, err := sjson.SetBytes(data, "auth.cbURL", url)
 	cobra.CheckErr(err)
 
 	formattedData := pretty.Pretty(newData)

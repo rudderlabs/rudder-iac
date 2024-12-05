@@ -1,0 +1,10 @@
+version: rudder/0.1
+kind: events
+metadata:
+  name: web_events
+spec:
+  events:
+    - id: source_created
+      display_name: "Source Created"
+      event_type: track
+      description: "Source created by the user"

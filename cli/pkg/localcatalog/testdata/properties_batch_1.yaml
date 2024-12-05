@@ -1,0 +1,28 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: additional_props
+spec:
+  properties:
+    - id: write_key_2
+      display_name: "Write Key 1"
+      type: string
+      description: KSUID identifier for the source embedded in the SDKs
+      propConfig:
+        minLength: 24
+        maxLength: 48
+
+    - id: source_type
+      display_name: "Source Type"
+      type: string
+      description: "Type of the source"
+      propConfig:
+        enum: "['web', 'server', 'mobile', 'iot']"
+
+    - id: source_name
+      display_name: "Source name"
+      description: "Name of the source"
+      type: string
+      propConfig:
+        minLength: 2
+        maxLength: 255
