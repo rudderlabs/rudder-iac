@@ -107,7 +107,8 @@ func TestDereference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := Dereference(tt.input, state)
+			result, err := Dereference(tt.input, state)
+			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

@@ -82,7 +82,10 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) (*state.State, error) {
 	r := o.Resource
 	input := r.Data()
-	dereferenced := state.Dereference(input, st)
+	dereferenced, err := state.Dereference(input, st)
+	if err != nil {
+		return nil, err
+	}
 
 	var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData
 

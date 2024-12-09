@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
@@ -46,37 +48,59 @@ func (s *State) String() string {
 	return string(json)
 }
 
-func Dereference(data resources.ResourceData, state *State) resources.ResourceData {
-	return dereferenceValue(data, state).(resources.ResourceData)
+func Dereference(data resources.ResourceData, state *State) (resources.ResourceData, error) {
+	dereferenced, err := dereferenceValue(data, state)
+	if err != nil {
+		return nil, err
+	}
+
+	return dereferenced.(resources.ResourceData), nil
 }
 
-func dereferenceValue(v interface{}, state *State) interface{} {
+func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 	switch val := v.(type) {
 	case resources.PropertyRef:
-		resourceData := state.GetResource(val.URN).Data()
+		resource := state.GetResource(val.URN)
+		if resource == nil {
+			return nil, fmt.Errorf("referred resource '%s' does not exist", val.URN)
+		}
+
+		resourceData := resource.Data()
 		if resourceData == nil {
-			return nil
+			return nil, nil
 		}
 		return dereferenceValue(resourceData[val.Property], state)
 	case resources.ResourceData:
 		result := make(resources.ResourceData)
 		for k, v := range val {
-			result[k] = dereferenceValue(v, state)
+			dereferenced, err := dereferenceValue(v, state)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = dereferenced
 		}
-		return result
+		return result, nil
 	case map[string]interface{}:
 		result := make(map[string]interface{})
 		for k, v := range val {
-			result[k] = dereferenceValue(v, state)
+			dereferenced, err := dereferenceValue(v, state)
+			if err != nil {
+				return nil, err
+			}
+			result[k] = dereferenced
 		}
-		return result
+		return result, nil
 	case []interface{}:
 		result := make([]interface{}, len(val))
 		for i, v := range val {
-			result[i] = dereferenceValue(v, state)
+			dereferenced, err := dereferenceValue(v, state)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = dereferenced
 		}
-		return result
+		return result, nil
 	default:
-		return v
+		return v, nil
 	}
 }

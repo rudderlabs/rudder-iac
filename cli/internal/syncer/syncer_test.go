@@ -45,10 +45,9 @@ func TestSyncer(t *testing.T) {
 
 	syncer := syncer.New(provider, stateManager)
 	err := syncer.Sync(context.Background(), targetGraph)
+	assert.Nil(t, err)
 
 	outputState, _ := stateManager.Load(context.Background())
-
-	assert.Nil(t, err)
 	assert.NotNil(t, outputState)
 
 	assert.Equal(t, 3, len(outputState.Resources))

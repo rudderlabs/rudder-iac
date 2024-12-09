@@ -12,11 +12,6 @@ type Resource struct {
 
 type ResourceData map[string]interface{}
 
-type PropertyRef struct {
-	URN      string `json:"urn"`
-	Property string `json:"property"`
-}
-
 func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
 }
