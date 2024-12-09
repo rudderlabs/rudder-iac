@@ -1,0 +1,82 @@
+package state
+
+import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+)
+
+type State struct {
+	Resources map[string]*StateResource `json:"resources"`
+}
+
+func EmptyState() *State {
+	return &State{
+		Resources: make(map[string]*StateResource),
+	}
+}
+
+type StateResource struct {
+	ID           string                 `json:"id"`
+	Type         string                 `json:"type"`
+	Input        map[string]interface{} `json:"input"`
+	Output       map[string]interface{} `json:"output"`
+	Dependencies []string               `json:"dependencies"`
+}
+
+func (sr *StateResource) Data() resources.ResourceData {
+	data := make(resources.ResourceData)
+	for k, v := range sr.Input {
+		data[k] = v
+	}
+	for k, v := range sr.Output {
+		data[k] = v
+	}
+	return data
+}
+
+func (s *State) AddResource(r *StateResource) {
+	s.Resources[resources.URN(r.ID, r.Type)] = r
+}
+
+func (s *State) GetResource(urn string) *StateResource {
+	return s.Resources[urn]
+}
+
+func (s *State) String() string {
+	json, _ := ToJSON(s)
+	return string(json)
+}
+
+func Dereference(data resources.ResourceData, state *State) resources.ResourceData {
+	return dereferenceValue(data, state).(resources.ResourceData)
+}
+
+func dereferenceValue(v interface{}, state *State) interface{} {
+	switch val := v.(type) {
+	case resources.PropertyRef:
+		resourceData := state.GetResource(val.URN).Data()
+		if resourceData == nil {
+			return nil
+		}
+		return dereferenceValue(resourceData[val.Property], state)
+	case resources.ResourceData:
+		result := make(resources.ResourceData)
+		for k, v := range val {
+			result[k] = dereferenceValue(v, state)
+		}
+		return result
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for k, v := range val {
+			result[k] = dereferenceValue(v, state)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(val))
+		for i, v := range val {
+			result[i] = dereferenceValue(v, state)
+		}
+		return result
+	default:
+		return v
+	}
+}
