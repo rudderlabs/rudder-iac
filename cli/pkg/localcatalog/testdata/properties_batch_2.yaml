@@ -1,0 +1,19 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: base_props
+spec:
+  properties:
+    - id: email
+      display_name: "Email ID New"
+      type: string
+      description: "Email of the user"
+      propConfig:
+        pattern: ^[\w\-.]+@([\w-]+\.)+[\w-]{2,4}$.
+
+    - id: country
+      display_name: "Country"
+      type: string
+      description: "Location of the user"
+      propConfig:
+        enum: "['US', 'UK', 'India', 'Canada']"
