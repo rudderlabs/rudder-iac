@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -21,6 +22,10 @@ const (
 type Operation struct {
 	Type     OperationType
 	Resource *resources.Resource
+}
+
+func (o *Operation) String() string {
+	return fmt.Sprintf("%d %s", o.Type, o.Resource.URN())
 }
 
 type Plan struct {
