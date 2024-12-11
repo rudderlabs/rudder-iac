@@ -22,6 +22,15 @@ type Property struct {
 	Config      map[string]interface{} `json:"propConfig"`
 }
 
+func (p Property) GetData() map[string]interface{} {
+	return map[string]interface{}{
+		"display_name": p.Name,
+		"description":  p.Description,
+		"type":         p.Type,
+		"propConfig":   p.Config,
+	}
+}
+
 type PropertySpec struct {
 	Properties []Property `json:"properties"`
 }

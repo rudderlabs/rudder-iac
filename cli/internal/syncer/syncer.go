@@ -6,7 +6,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
+
+var log = logger.New("syncer")
 
 type ProjectSyncer struct {
 	provider     Provider
@@ -68,6 +71,8 @@ func stateToGraph(state *state.State) *resources.Graph {
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) (*state.State, error) {
 	currentState := state
 	for _, o := range plan.Operations {
+		log.Info("Executing operation", "operation", o.String())
+
 		outputState, err := s.providerOperation(ctx, o, currentState)
 		if err != nil {
 			return nil, err

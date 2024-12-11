@@ -40,3 +40,7 @@ func (s *Graph) GetResource(urn string) (*Resource, bool) {
 func (s *Graph) GetDependencies(urn string) []string {
 	return s.dependencies[urn]
 }
+
+func (s *Graph) AddDependencies(addedTo string, dependencies []string) {
+	s.dependencies[addedTo] = append(s.dependencies[addedTo], dependencies...)
+}

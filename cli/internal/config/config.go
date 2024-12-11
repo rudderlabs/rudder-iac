@@ -84,6 +84,10 @@ func SetAccessToken(accessToken string) {
 	cobra.CheckErr(err)
 }
 
+func GetAccessToken() string {
+	return viper.GetString("auth.accessToken")
+}
+
 // func SetConfigBackendURL(url string) {
 // 	configFile := viper.ConfigFileUsed()
 // 	data, err := os.ReadFile(configFile)
