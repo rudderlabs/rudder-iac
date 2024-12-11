@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/pulumi/pulumi/sdk/v3 v3.142.0
 	github.com/rudderlabs/rudder-data-catalog-provider/sdk v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.8.1
@@ -26,7 +27,6 @@ require (
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/charmbracelet/bubbles v0.16.1 // indirect
 	github.com/charmbracelet/bubbletea v0.25.0 // indirect
 	github.com/charmbracelet/lipgloss v0.7.1 // indirect

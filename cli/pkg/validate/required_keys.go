@@ -6,10 +6,13 @@ import (
 	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
 
+
 type RequiredKeysValidator struct {
 }
 
 func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
+	log.Info("validating required keys on the entities in catalog")
+
 	var errors []ValidationError
 
 	// Properties required keys
@@ -31,11 +34,20 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		for _, event := range events {
 			reference := fmt.Sprintf("#/events/%s/%s", group, event.LocalID)
 
-			if event.Name == "" || event.LocalID == "" || event.Type == "" {
+			if event.LocalID == ""  || event.Type == ""{
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id, display_name and event_type fields on event are mandatory"),
+					error:     fmt.Errorf("id and event_type fields on event are mandatory"),
 					Reference: reference,
 				})
+			}
+
+			if event.Type == "track" {
+				if event.Name == "" {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("display_name field is mandatory on track event"),
+						Reference: reference,
+					})
+				}
 			}
 		}
 	}

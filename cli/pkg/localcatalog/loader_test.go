@@ -11,7 +11,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:        make(map[EntityGroup][]Event),
 		Properties:    make(map[EntityGroup][]Property),
-		TrackingPlans: make(map[EntityGroup]TrackingPlan),
+		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 	}
 
 	t.Run("properties are extracted from customer defined yaml successfully", func(t *testing.T) {

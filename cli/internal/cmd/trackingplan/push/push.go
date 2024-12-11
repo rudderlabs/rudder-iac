@@ -14,7 +14,15 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/iac"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
+)
+
+var (
+	log = logger.New("trackingplan", logger.Attr{
+		Key:   "cmd",
+		Value: "push",
+	})
 )
 
 func NewCmdTPPush(store *iac.Store) *cobra.Command {
@@ -22,7 +30,7 @@ func NewCmdTPPush(store *iac.Store) *cobra.Command {
 		localcatalog *localcatalog.DataCatalog
 		err          error
 		catalogDir   string
-		test         bool
+		skipPreview  bool
 	)
 
 	cmd := &cobra.Command{
@@ -33,10 +41,9 @@ func NewCmdTPPush(store *iac.Store) *cobra.Command {
 			the changes based on the last recorded state. The diff is then applied to the upstream.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli tp push --test=true --loc </path/to/dir or file>
+			$ rudder-cli tp push --loc </path/to/dir or file> --skip-preview
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-
 			// Lazily setup the pulumi stack
 			if err := store.Pulumi.Setup(context.Background()); err != nil {
 				return fmt.Errorf("setting up pulumi store lazily: %w", err)
@@ -50,7 +57,12 @@ func NewCmdTPPush(store *iac.Store) *cobra.Command {
 			return validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Spinning the stack using the activation API", os.Getenv("RUDDER_ACCESS_TOKEN"))
+			log.Info("identifying changes for the upstream catalog")
+
+			// Always inflate the refs before registering the catalog
+			if err := InflateRefs(localcatalog); err != nil {
+				return fmt.Errorf("inflating refs in catalog: %w", err)
+			}
 
 			ctx := context.Background()
 			os.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
@@ -79,10 +91,10 @@ func NewCmdTPPush(store *iac.Store) *cobra.Command {
 				return fmt.Errorf("refreshing the stack: %w", err)
 			}
 
-			if test {
-				_, err = s.Preview(ctx, optpreview.ProgressStreams(os.Stdout))
-			} else {
+			if skipPreview {
 				_, err = s.Up(ctx, optup.ProgressStreams(os.Stdout))
+			} else {
+				_, err = s.Preview(ctx, optpreview.ProgressStreams(os.Stdout))
 			}
 
 			if err != nil {
@@ -94,7 +106,7 @@ func NewCmdTPPush(store *iac.Store) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
-	cmd.Flags().BoolVarP(&test, "test", "t", true, "Run the command in test mode to preview changes")
+	cmd.Flags().BoolVar(&skipPreview, "skip-preview", false, "Skip the preview step and directly apply the changes")
 	return cmd
 }
 
@@ -105,6 +117,19 @@ func ReadCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
 	}
 
 	return catalog, nil
+}
+
+func InflateRefs(catalog *localcatalog.DataCatalog) error {
+	log.Info("inflating all the references in the catalog")
+
+	// Before the actual push, we would need to expand the refs
+	// mostly held within the tracking plans
+	for _, tp := range catalog.TrackingPlans {
+		if err := tp.ExpandRefs(catalog); err != nil {
+			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
+		}
+	}
+	return nil
 }
 
 func RegisterCatalog(ctx *pulumi.Context, dc *localcatalog.DataCatalog) error {
@@ -183,7 +208,7 @@ func registerEvents(
 
 func registerTrackingPlans(
 	ctx *pulumi.Context,
-	toAdd map[localcatalog.EntityGroup]localcatalog.TrackingPlan,
+	toAdd map[localcatalog.EntityGroup]*localcatalog.TrackingPlan,
 	eventResources map[string]pulumi.Resource,
 	propResources map[string]pulumi.Resource) error {
 

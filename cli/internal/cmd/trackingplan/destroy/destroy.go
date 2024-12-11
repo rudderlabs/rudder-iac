@@ -9,8 +9,16 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/iac"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/utils"
 	"github.com/spf13/cobra"
+)
+
+var (
+	log = logger.New("trackingplan", logger.Attr{
+		Key:   "cmd",
+		Value: "destroy",
+	})
 )
 
 func NewCmdTPDestroy(store *iac.Store) *cobra.Command {
@@ -31,13 +39,17 @@ func NewCmdTPDestroy(store *iac.Store) *cobra.Command {
 			$ rudder-cli tp destroy --skip-check=true
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			log.Info("setting up the iac tool stack lazily")
+
 			// Lazily setup the pulumi stack
 			if err := store.Pulumi.Setup(context.Background()); err != nil {
-				return fmt.Errorf("setting up pulumi store lazily: %w", err)
+				return fmt.Errorf("setting up iac stack lazily: %w", err)
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Info("destroying the upstream resources whose state is managed by the tool")
+
 			ctx := context.Background()
 			os.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
 			// TODO: Remove the hardcoded value

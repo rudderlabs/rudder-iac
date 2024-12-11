@@ -7,16 +7,16 @@ import (
 )
 
 var (
-	propRegex    = regexp.MustCompile(`^#\/properties\/(.*)\/(.*)$`)
-	eventRegex   = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
-	includeRegex = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	PropRegex    = regexp.MustCompile(`^#\/properties\/(.*)\/(.*)$`)
+	EventRegex   = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
+	IncludeRegex = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
 )
 
 type CatalogResourceFetcher interface {
 	Event(group, id string) *Event
 	Property(group, id string) *Property
-	TPRule(group, id string) *TPRule
-	TPRules(group string) []*TPRule
+	TPEventRule(group, id string) *TPRule
+	TPEventRules(group string) ([]*TPRule, bool)
 }
 
 type TrackingPlan struct {
@@ -72,6 +72,7 @@ type TPRuleIncludes struct {
 // ExpandRefs simply expands the references being held
 // when reading the tracking plan with the actual events and properties
 func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
+	log.Debug("expanding refs for the tracking plan", "id", tp.LocalID)
 
 	expandedEvents := make([]*TPEvent, 0)
 	for _, rule := range tp.Rules {
@@ -109,11 +110,13 @@ func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
 // expandIncludeRefs expands the include references in the tracking plan rule definition
 // TODO: Make this function recursive to allow for multiple levels of include
 func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent, error) {
+	log.Debug("expanding include refs within the rule", "ruleID", rule.LocalID)
+
 	if rule.Includes == nil {
 		return nil, fmt.Errorf("empty rule includes")
 	}
 
-	matches := includeRegex.FindStringSubmatch(rule.Includes.Ref)
+	matches := IncludeRegex.FindStringSubmatch(rule.Includes.Ref)
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("includes ref: %s invalid as failed regex match", rule.Includes.Ref)
 	}
@@ -122,9 +125,10 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 	rules := make([]*TPRule, 0)
 
 	if ruleID == "*" {
-		rules = append(rules, fetcher.TPRules(tpGroup)...) // fetch all the tp rules in the group
+		eventRules, _ := fetcher.TPEventRules(tpGroup)
+		rules = append(rules, eventRules...) // fetch all the tp rules in the group
 	} else {
-		rules = append(rules, fetcher.TPRule(tpGroup, ruleID)) // fetch the specific rule with the tpGroup
+		rules = append(rules, fetcher.TPEventRule(tpGroup, ruleID)) // fetch the specific rule with the tpGroup
 	}
 
 	toReturn := make([]*TPEvent, 0)
@@ -150,11 +154,13 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 
 // expandEventRefs expands the direct event references in the tracking plan rule definition
 func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, error) {
+	log.Debug("expanding event refs within the rule", "ruleID", rule.LocalID)
+
 	if rule.Event == nil {
 		return nil, fmt.Errorf("empty rule event")
 	}
 
-	matches := eventRegex.FindStringSubmatch(rule.Event.Ref)
+	matches := EventRegex.FindStringSubmatch(rule.Event.Ref)
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("event ref: %s invalid as failed regex match", rule.Event.Ref)
 	}
@@ -177,7 +183,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	// Load the properties from the data catalog
 	// into corresponding event on the tracking plan
 	for _, prop := range rule.Properties {
-		matches = propRegex.FindStringSubmatch(prop.Ref)
+		matches = PropRegex.FindStringSubmatch(prop.Ref)
 		if len(matches) != 3 {
 			return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
 		}
@@ -202,6 +208,8 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 }
 
 func ExtractTrackingPlan(rd *ResourceDefinition) (TrackingPlan, error) {
+	log.Debug("extracting tracking plan from resource definition", "metadata.name", rd.Metadata.Name)
+
 	// The spec is the tracking plan in its enterity
 	tp := TrackingPlan{}
 

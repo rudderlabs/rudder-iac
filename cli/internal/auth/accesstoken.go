@@ -20,15 +20,5 @@ func Login() error {
 	accessToken = strings.TrimSpace(accessToken)
 	config.SetAccessToken(accessToken)
 
-	fmt.Print("Enter config backend url: ")
-	cb, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading access token:", err)
-		return err
-	}
-
-	cb = strings.TrimSpace(cb)
-	config.SetConfigBackendURL(cb)
-
 	return nil
 }

@@ -3,6 +3,7 @@ package validate
 import (
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
 
@@ -10,22 +11,27 @@ type DuplicateNameIDKeysValidator struct {
 }
 
 func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
+	log.Info("validating duplicate name and id keys on the entities in catalog")
+
 	var errors []ValidationError
 
 	var (
-		propName = make(map[string]interface{})
-		propID   = make(map[string]interface{})
+		propName = make(map[string]*localcatalog.Property)
+		propID   = make(map[string]*localcatalog.Property)
 	)
 
 	// Checking duplicate id and name keys in properties
 	for group, props := range dc.Properties {
 		for _, prop := range props {
 
-			if _, ok := propName[prop.Name]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate name key %s", prop.Name),
-					Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
-				})
+			if lookup, ok := propName[prop.Name]; ok {
+				// If name and type on the property are same, then it's a duplicate
+				if lookup.Type == prop.Type {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("duplicate name key %s", prop.Name),
+						Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
+					})
+				}
 			}
 
 			if _, ok := propID[prop.LocalID]; ok {
@@ -35,8 +41,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 				})
 			}
 
-			propName[prop.Name] = nil
-			propID[prop.LocalID] = nil
+			propName[prop.Name] = &prop
+			propID[prop.LocalID] = &prop
 		}
 	}
 
@@ -48,6 +54,10 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 	// Checking duplicate id and name keys in events
 	for group, events := range dc.Events {
 		for _, event := range events {
+
+			if event.Type != "track" {
+				continue
+			}
 
 			if _, ok := eventName[event.Name]; ok {
 				errors = append(errors, ValidationError{
@@ -71,6 +81,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 	var (
 		tpName = make(map[string]interface{})
 		tpID   = make(map[string]interface{})
+		tpRuleID = make(map[string]interface{})
 	)
 
 	// Checking duplicate id and name keys of trackingplans
@@ -82,7 +93,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 			})
 		}
 
-		if _, ok := eventID[tp.LocalID]; ok {
+		if _, ok := tpID[tp.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s", tp.LocalID),
 				Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
@@ -91,6 +102,18 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 
 		tpName[tp.Name] = nil
 		tpID[tp.LocalID] = nil
+
+
+		for _, rule := range tp.Rules {
+			if _, ok := tpRuleID[rule.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
+					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+				})
+			}
+
+			tpRuleID[rule.LocalID] = nil
+		}
 	}
 
 	return errors

@@ -17,11 +17,16 @@ const (
 	Error Level = 8
 )
 
-func GetLogger(pkgName string) *slog.Logger {
-	return GetLoggerWithLevel(pkgName, Warn)
+type Attr struct {
+	Key   string
+	Value string
 }
 
-func GetLoggerWithLevel(pkgName string, l Level) *slog.Logger {
+func New(pkgName string, attrs ...Attr) *slog.Logger {
+	return NewWithLevel(pkgName, Info, attrs...)
+}
+
+func NewWithLevel(pkgName string, l Level, attrs ...Attr) *slog.Logger {
 	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			// Anything other than time key
@@ -37,10 +42,18 @@ func GetLoggerWithLevel(pkgName string, l Level) *slog.Logger {
 		Level: slog.Level(l),
 	})
 
-	return slog.New(h.WithAttrs([]slog.Attr{
+	slogAttrs := []slog.Attr{
 		{
 			Key:   "pkg",
 			Value: slog.StringValue(pkgName),
 		},
-	}))
+	}
+	for _, attr := range attrs {
+		slogAttrs = append(slogAttrs, slog.Attr{
+			Key:   attr.Key,
+			Value: slog.StringValue(attr.Value),
+		})
+	}
+
+	return slog.New(h.WithAttrs(slogAttrs))
 }

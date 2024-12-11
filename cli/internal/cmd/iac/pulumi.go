@@ -10,6 +10,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
 
 //go:embed data/credentials.json
@@ -17,6 +18,8 @@ var credentials embed.FS
 
 //go:embed data/pulumi-resource-rudder-data-catalog
 var provider embed.FS
+
+var log = logger.New("iac")
 
 type ErrAlreadyExists struct {
 	error
@@ -32,6 +35,7 @@ type PulumiHelper struct {
 }
 
 func NewPulumiHelper(ctx context.Context, conf *PulumiConfig) (*PulumiHelper, error) {
+
 	h := &PulumiHelper{
 		baseDIR:     conf.PulumiHome,
 		conf:        conf,
@@ -87,7 +91,7 @@ func (h *PulumiHelper) PulumiCommand() auto.PulumiCommand {
 }
 
 func (h *PulumiHelper) Setup(ctx context.Context) error {
-	fmt.Println("Setting up the dependency")
+	log.Info("setting up iac provider instance")
 
 	// 1. setup all the dirs
 	for _, dir := range []string{h.baseDIR, h.versionsDIR, h.workDIR, h.pluginsDIR} {
@@ -131,7 +135,7 @@ func copyEmbeds(source embed.FS, sourceName, dest string) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}
-	fmt.Printf("Copying %s to %s\n", sourceName, dest)
+	log.Info("Copying files", "source", sourceName, "destination", dest)
 
 	sourceF, err := source.Open(sourceName)
 	if err != nil {

@@ -6,8 +6,16 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 	"github.com/spf13/cobra"
+)
+
+var (
+	log = logger.New("trackingplan", logger.Attr{
+		Key:   "cmd",
+		Value: "validate",
+	})
 )
 
 func NewCmdTPValidate() *cobra.Command {
@@ -29,7 +37,7 @@ func NewCmdTPValidate() *cobra.Command {
 
 			err = ValidateCatalog(validators, dc)
 			if err == nil {
-				fmt.Println("validated ok !")
+				log.Info("successfully validated the catalog")
 				return nil
 			}
 
@@ -42,8 +50,9 @@ func NewCmdTPValidate() *cobra.Command {
 }
 
 func ValidateCatalog(validators []validate.CatalogValidator, dc *localcatalog.DataCatalog) (toReturn error) {
-	combinedErrs := make([]validate.ValidationError, 0)
+	log.Info("running validators on the catalog")
 
+	combinedErrs := make([]validate.ValidationError, 0)
 	for _, validator := range validators {
 		errs := validator.Validate(dc)
 		if len(errs) > 0 {
@@ -67,5 +76,6 @@ func DefaultValidators() []validate.CatalogValidator {
 	return []validate.CatalogValidator{
 		&validate.RequiredKeysValidator{},
 		&validate.DuplicateNameIDKeysValidator{},
+		&validate.RefValidator{},
 	}
 }

@@ -6,7 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	log = logger.New("localcatalog")
 )
 
 // entity group is logical grouping of entities defined
@@ -15,9 +20,9 @@ type EntityGroup string
 
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties    map[EntityGroup][]Property   `json:"properties"`
-	Events        map[EntityGroup][]Event      `json:"events"`
-	TrackingPlans map[EntityGroup]TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
+	Properties    map[EntityGroup][]Property    `json:"properties"`
+	Events        map[EntityGroup][]Event       `json:"events"`
+	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
 }
 
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
@@ -42,14 +47,14 @@ func (dc *DataCatalog) Event(groupName string, id string) *Event {
 	return nil
 }
 
-func (dc *DataCatalog) TPRule(tpGroup, ruleID string) *TPRule {
+func (dc *DataCatalog) TPEventRule(tpGroup, ruleID string) *TPRule {
 	tp, ok := dc.TrackingPlans[EntityGroup(tpGroup)]
 	if !ok {
 		return nil
 	}
 
 	for _, rule := range tp.Rules {
-		if rule.LocalID == ruleID {
+		if rule.LocalID == ruleID && rule.Type == "event_rule" {
 			return &rule
 		}
 	}
@@ -57,24 +62,28 @@ func (dc *DataCatalog) TPRule(tpGroup, ruleID string) *TPRule {
 	return nil
 }
 
-func (dc *DataCatalog) TPRules(tpGroup string) []*TPRule {
+func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 	tp, ok := dc.TrackingPlans[EntityGroup(tpGroup)]
 	if !ok {
-		return nil
+		return nil, false
 	}
 
 	var toReturn []*TPRule
 	for _, rule := range tp.Rules {
+		if rule.Type != "event_rule" {
+			continue
+		}
 		toReturn = append(toReturn, &rule)
 	}
 
-	return toReturn
+	return toReturn, true
 }
 
 // Read simply reads the directory for files which contain
 // data catalog entities defined. It parses all the folders for files which can contain resource
 // definitions
 func Read(loc string) (*DataCatalog, error) {
+	log.Info("reading data catalog entities", "location", loc)
 
 	var abspath = loc
 
@@ -104,10 +113,12 @@ func Read(loc string) (*DataCatalog, error) {
 	dc := &DataCatalog{
 		Properties:    map[EntityGroup][]Property{},
 		Events:        map[EntityGroup][]Event{},
-		TrackingPlans: map[EntityGroup]TrackingPlan{},
+		TrackingPlans: map[EntityGroup]*TrackingPlan{},
 	}
 
 	for _, file := range files {
+		log.Debug("loading entities from file into catalog", "file", file)
+
 		byt, err := getFileBytes(file)
 		if err != nil {
 			return nil, fmt.Errorf("fetching file: %s data: %w", file, err)
@@ -118,7 +129,7 @@ func Read(loc string) (*DataCatalog, error) {
 		}
 	}
 
-	// We might wanna do macro substitution here
+	// Once the entities are extracted, we need to inflate the references
 	return dc, nil
 }
 
@@ -152,12 +163,7 @@ func extractEntities(byt []byte, dc *DataCatalog) error {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
-		// Inflate the references in the tracking plan mentioned
-		if err := tp.ExpandRefs(dc); err != nil {
-			return fmt.Errorf("expanding refs in tracking plan: %w", err)
-		} // TODO: Do we need to do it here ?
-
-		dc.TrackingPlans[EntityGroup(def.Metadata.Name)] = tp
+		dc.TrackingPlans[EntityGroup(def.Metadata.Name)] = &tp
 
 	default:
 		return fmt.Errorf("unknown kind: %s", def.Kind)
