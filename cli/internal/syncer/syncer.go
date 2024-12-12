@@ -17,9 +17,9 @@ type ProjectSyncer struct {
 }
 
 type Provider interface {
-	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData
-	Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData
+	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
+	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
+	Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 }
 
 type StateManager interface {
@@ -92,7 +92,7 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 		return nil, err
 	}
 
-	var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData
+	var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 
 	switch o.Type {
 	case planner.Create:
@@ -103,7 +103,10 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 		f = s.provider.Delete
 	}
 
-	output := f(ctx, r.ID(), r.Type(), dereferenced)
+	output, err := f(ctx, r.ID(), r.Type(), dereferenced)
+	if err != nil {
+		return nil, err
+	}
 
 	sr := st.GetResource(r.URN())
 	if sr == nil {

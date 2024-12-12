@@ -28,7 +28,7 @@ func NewMockTrackingPlan(ID string, data resources.ResourceData) *resources.Reso
 type DataCatalogProvider struct {
 }
 
-func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
+func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 
 	for k, v := range data {
@@ -38,10 +38,10 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
 	payload["operation"] = "create"
 
-	return &payload
+	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
+func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 
 	for k, v := range data {
@@ -50,10 +50,10 @@ func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType 
 
 	payload["operation"] = "update"
 
-	return &payload
+	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
+func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 
 	for k, v := range data {
@@ -62,5 +62,5 @@ func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType 
 
 	payload["operation"] = "delete"
 
-	return &payload
+	return &payload, nil
 }

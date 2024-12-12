@@ -18,7 +18,7 @@ func NewPropertyProvider(dc client.DataCatalog) syncer.Provider {
 	}
 }
 
-func (p *PropertyProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
+func (p *PropertyProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 
 	payload := client.PropertyCreate{
 		Name:        data["display_name"].(string),
@@ -27,17 +27,21 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, resourceType s
 		Config:      data["propConfig"].(map[string]interface{}),
 	}
 
-	property, _ := p.client.CreateProperty(ctx, payload)
+	property, err := p.client.CreateProperty(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
 	data["id"] = property.ID
 	data["workspaceID"] = property.WorkspaceId
 
-	return &data
+	return &data, nil
 }
 
-func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
-	return nil
+func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+	return nil, nil
 }
 
-func (p *PropertyProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) *resources.ResourceData {
-	return nil
+func (p *PropertyProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+	return nil, nil
 }
