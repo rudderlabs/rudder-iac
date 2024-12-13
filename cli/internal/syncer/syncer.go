@@ -108,18 +108,23 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 		return nil, err
 	}
 
-	sr := st.GetResource(r.URN())
-	if sr == nil {
-		sr = &state.StateResource{
-			ID:   r.ID(),
-			Type: r.Type(),
+	if o.Type == planner.Delete {
+		st.RemoveResource(r.URN())
+		return st, nil
+	} else {
+		sr := st.GetResource(r.URN())
+		if sr == nil {
+			sr = &state.StateResource{
+				ID:   r.ID(),
+				Type: r.Type(),
+			}
 		}
+
+		sr.Input = input
+		sr.Output = *output
+
+		st.AddResource(sr)
 	}
-
-	sr.Input = input
-	sr.Output = *output
-
-	st.AddResource(sr)
 
 	return st, nil
 }
