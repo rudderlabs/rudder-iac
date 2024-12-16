@@ -4,14 +4,11 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/iac"
 	tpApplyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/apply"
-	tpDestroyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/destroy"
-	tpPushCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/push"
 	tpValidateCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 )
 
-func NewCmdTrackingPlan(store *iac.Store) *cobra.Command {
+func NewCmdTrackingPlan() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "tp <command>",
@@ -25,8 +22,6 @@ func NewCmdTrackingPlan(store *iac.Store) *cobra.Command {
 	}
 
 	cmd.AddCommand(tpValidateCmd.NewCmdTPValidate())
-	cmd.AddCommand(tpPushCmd.NewCmdTPPush(store))
-	cmd.AddCommand(tpDestroyCmd.NewCmdTPDestroy(store))
 	cmd.AddCommand(tpApplyCmd.NewCmdTPApply())
 
 	return cmd
