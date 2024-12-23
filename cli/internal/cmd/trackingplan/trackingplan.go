@@ -14,10 +14,9 @@ func NewCmdTrackingPlan() *cobra.Command {
 		Use:   "tp <command>",
 		Short: "Manage datacatalog resources",
 		Long:  "Manage the lifecycle of datacatalog resources using user defined state",
-
 		Example: heredoc.Doc(`
 			$ rudder-cli tp validate
-			$ rudder-cli tp push
+			$ rudder-cli tp apply
 		`),
 	}
 

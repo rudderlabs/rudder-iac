@@ -1,23 +1,18 @@
 package auth
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 func Login() error {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter access token: ")
-	accessToken, err := reader.ReadString('\n')
+	accessToken, err := ui.AskSecret("Enter your access token:")
 	if err != nil {
-		fmt.Println("Error reading access token:", err)
-		return err
+		return fmt.Errorf("error reading access token: %w", err)
 	}
-	accessToken = strings.TrimSpace(accessToken)
+
 	config.SetAccessToken(accessToken)
 
 	return nil
