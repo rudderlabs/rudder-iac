@@ -1,8 +1,10 @@
 package logger
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 // Writing a wrapper over the slog
@@ -10,24 +12,38 @@ import (
 // for implementation.
 type Level int
 
-const (
-	Debug Level = -4
-	Info  Level = 0
-	Warn  Level = 4
-	Error Level = 8
-)
-
 type Attr struct {
 	Key   string
 	Value string
 }
 
-func New(pkgName string, attrs ...Attr) *slog.Logger {
-	return NewWithLevel(pkgName, Info, attrs...)
+var logFile *os.File
+var levelVar = new(slog.LevelVar)
+
+func init() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("Error getting home directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	logPath := filepath.Join(homeDir, ".rudder", "cli.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+		fmt.Printf("Error creating log directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	lf, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening log file: %v\n", err)
+		os.Exit(1)
+	}
+
+	logFile = lf
 }
 
-func NewWithLevel(pkgName string, l Level, attrs ...Attr) *slog.Logger {
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+func New(pkgName string, attrs ...Attr) *slog.Logger {
+	h := slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			// Anything other than time key
 			// return
@@ -39,7 +55,7 @@ func NewWithLevel(pkgName string, l Level, attrs ...Attr) *slog.Logger {
 				a.Value.Time().Format("2006-01-02T15:04:05.000Z"),
 			)
 		},
-		Level: slog.Level(l),
+		Level: levelVar,
 	})
 
 	slogAttrs := []slog.Attr{
@@ -56,4 +72,8 @@ func NewWithLevel(pkgName string, l Level, attrs ...Attr) *slog.Logger {
 	}
 
 	return slog.New(h.WithAttrs(slogAttrs))
+}
+
+func SetLogLevel(l slog.Level) {
+	levelVar.Set(l)
 }

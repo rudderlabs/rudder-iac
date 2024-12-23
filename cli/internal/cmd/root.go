@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,6 +18,7 @@ var (
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initLogger)
 
 	rootCmd.PersistentFlags().StringVarP(
 		&cfgFile,
@@ -38,6 +41,12 @@ func initConfig() {
 	// only add debug command if enabled in config
 	if viper.GetBool("debug") {
 		debugCmd.Hidden = false
+	}
+}
+
+func initLogger() {
+	if viper.GetBool("debug") {
+		logger.SetLogLevel(slog.LevelDebug)
 	}
 }
 
