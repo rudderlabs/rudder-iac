@@ -26,6 +26,7 @@ func NewMockTrackingPlan(ID string, data resources.ResourceData) *resources.Reso
 }
 
 type DataCatalogProvider struct {
+	OperationLog []string
 }
 
 func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
@@ -38,6 +39,8 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
 	payload["operation"] = "create"
 
+	p.logOperation(fmt.Sprintf("create %s %s", resourceType, ID))
+
 	return &payload, nil
 }
 
@@ -49,18 +52,23 @@ func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType 
 	}
 
 	payload["operation"] = "update"
+	p.logOperation(fmt.Sprintf("update %s %s", resourceType, ID))
 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) error {
 	payload := make(resources.ResourceData)
 
 	for k, v := range data {
 		payload[k] = v
 	}
 
-	payload["operation"] = "delete"
+	p.logOperation(fmt.Sprintf("delete %s %s", resourceType, ID))
 
-	return &payload, nil
+	return nil
+}
+
+func (p *DataCatalogProvider) logOperation(operation string) {
+	p.OperationLog = append(p.OperationLog, operation)
 }

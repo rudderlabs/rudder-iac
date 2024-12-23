@@ -19,7 +19,7 @@ type ProjectSyncer struct {
 type Provider interface {
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
+	Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error
 }
 
 type StateManager interface {
@@ -63,6 +63,8 @@ func stateToGraph(state *state.State) *resources.Graph {
 	for _, stateResource := range state.Resources {
 		resource := resources.NewResource(stateResource.ID, stateResource.Type, stateResource.Input)
 		graph.AddResource(resource)
+		// add any explicit dependencies, not mentioned through references
+		graph.AddDependencies(resource.URN(), stateResource.Dependencies)
 	}
 
 	return graph
@@ -71,8 +73,6 @@ func stateToGraph(state *state.State) *resources.Graph {
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) (*state.State, error) {
 	currentState := state
 	for _, o := range plan.Operations {
-		log.Info("Executing operation", "operation", o.String())
-
 		outputState, err := s.providerOperation(ctx, o, currentState)
 		if err != nil {
 			return nil, err
@@ -92,26 +92,26 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 		return nil, err
 	}
 
-	var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-
-	switch o.Type {
-	case planner.Create:
-		f = s.provider.Create
-	case planner.Update:
-		f = s.provider.Update
-	case planner.Delete:
-		f = s.provider.Delete
-	}
-
-	output, err := f(ctx, r.ID(), r.Type(), dereferenced)
-	if err != nil {
-		return nil, err
-	}
-
 	if o.Type == planner.Delete {
+		err := s.provider.Delete(ctx, r.ID(), r.Type(), dereferenced)
+		if err != nil {
+			return nil, err
+		}
+
 		st.RemoveResource(r.URN())
-		return st, nil
 	} else {
+		var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
+		if o.Type == planner.Create {
+			f = s.provider.Create
+		} else if o.Type == planner.Update {
+			f = s.provider.Update
+		}
+
+		output, err := f(ctx, r.ID(), r.Type(), dereferenced)
+		if err != nil {
+			return nil, err
+		}
+
 		sr := st.GetResource(r.URN())
 		if sr == nil {
 			sr = &state.StateResource{

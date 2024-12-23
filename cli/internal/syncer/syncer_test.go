@@ -97,6 +97,12 @@ func TestSyncerCreate(t *testing.T) {
 			"operation": "create",
 		},
 	}, outputState.GetResource(trackingPlan.URN()))
+
+	assert.ElementsMatch(t, []string{
+		"create event event1",
+		"create property property1",
+		"create tracking_plan trackingPlan1",
+	}, provider.OperationLog)
 }
 
 func TestSyncerDelete(t *testing.T) {
@@ -108,6 +114,18 @@ func TestSyncerDelete(t *testing.T) {
 	property := testutils.NewMockProperty("property1", resources.ResourceData{
 		"name":        "Test Property",
 		"description": "This is a test property",
+	})
+
+	trackingPlan := testutils.NewMockTrackingPlan("trackingPlan1", resources.ResourceData{
+		"name":        "Test Tracking Plan",
+		"description": "This is a test tracking plan",
+		"event_id":    resources.PropertyRef{URN: event.URN(), Property: "id"},
+		"rules": []interface{}{
+			map[string]interface{}{
+				"event":    resources.PropertyRef{URN: event.URN(), Property: "id"},
+				"property": resources.PropertyRef{URN: property.URN(), Property: "id"},
+			},
+		},
 	})
 
 	// Create initial state with resources
@@ -130,18 +148,6 @@ func TestSyncerDelete(t *testing.T) {
 			"id":          "generated-property-property1",
 			"name":        "Test Property",
 			"description": "This is a test property",
-		},
-	})
-
-	trackingPlan := testutils.NewMockTrackingPlan("trackingPlan1", resources.ResourceData{
-		"name":        "Test Tracking Plan",
-		"description": "This is a test tracking plan",
-		"event_id":    resources.PropertyRef{URN: event.URN(), Property: "id"},
-		"rules": []interface{}{
-			map[string]interface{}{
-				"event":    resources.PropertyRef{URN: event.URN(), Property: "id"},
-				"property": resources.PropertyRef{URN: property.URN(), Property: "id"},
-			},
 		},
 	})
 
@@ -182,4 +188,10 @@ func TestSyncerDelete(t *testing.T) {
 	assert.Nil(t, outputState.GetResource(trackingPlan.URN()))
 	assert.Nil(t, outputState.GetResource(event.URN()))
 	assert.Nil(t, outputState.GetResource(property.URN()))
+
+	assert.Equal(t, []string{
+		"delete tracking_plan trackingPlan1",
+		"delete property property1",
+		"delete event event1",
+	}, provider.OperationLog)
 }
