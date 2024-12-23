@@ -7,6 +7,7 @@ import (
 )
 
 type State struct {
+	Version   int                       `json:"version"`
 	Resources map[string]*StateResource `json:"resources"`
 }
 
