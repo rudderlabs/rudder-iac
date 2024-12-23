@@ -3,6 +3,7 @@ package planner
 import (
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -25,7 +26,17 @@ type Operation struct {
 }
 
 func (o *Operation) String() string {
-	return fmt.Sprintf("%d %s", o.Type, o.Resource.URN())
+	var typeString string
+	switch o.Type {
+	case Create:
+		typeString = "Create"
+	case Update:
+		typeString = "Update"
+	case Delete:
+		typeString = "Delete"
+	}
+
+	return fmt.Sprintf("%s %s", typeString, o.Resource.URN())
 }
 
 type Plan struct {
@@ -63,8 +74,12 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 }
 
 // sortByDependencies returns resources ordered by their dependencies,
-// so that resources that depend on others are visited after their dependencies
+// so that resources that depend on others are visited after their dependencies.
+// Resources with the same dependencies are sorted alphabetically for consistent ordering.
 func sortByDependencies(urns []string, g *resources.Graph) []string {
+	// Sort URNs alphabetically first
+	sort.Strings(urns)
+
 	visited := make(map[string]bool)
 	sorted := make([]string, 0, len(urns))
 

@@ -42,6 +42,6 @@ func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType str
 	return nil, nil
 }
 
-func (p *PropertyProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, nil
+func (p *PropertyProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) error {
+	return nil
 }
