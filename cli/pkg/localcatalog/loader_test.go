@@ -177,39 +177,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 					},
 				},
 			},
-			EventProps: []*TPEvent{
-				{
-					Name:           "User Signed Up",
-					LocalID:        "user_signed_up",
-					AllowUnplanned: true,
-					Description:    "Triggered when user successfully signed up",
-					Type:           "track",
-					Properties: []TPEventProperty{
-						{
-							LocalID:     "username",
-							Name:        "Username of the customer",
-							Type:        "string",
-							Description: "Username of the customer used for login",
-							Config: map[string]interface{}{
-								"minLength": float64(10),
-								"maxLength": float64(63),
-							},
-							Required: true,
-						},
-						{
-							LocalID:     "button_signin",
-							Name:        "Button used for signin in the app",
-							Description: "Button used for signin in the app",
-							Type:        "string",
-							Config: map[string]interface{}{
-								"enum": `["Sign In", "Sign Up"]`,
-							},
-							Required: false,
-						},
-					},
-				},
-			},
-		}, emptyCatalog.TrackingPlans["my_first_tp"])
+		}, *emptyCatalog.TrackingPlans["my_first_tp"])
 	})
 
 }
