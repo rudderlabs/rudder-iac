@@ -11,7 +11,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/spf13/cobra"
@@ -52,8 +51,9 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("creating resource graph: %w", err)
 			}
 
-			stateManager := &testutils.MemoryStateManager{}
-			stateManager.Save(context.Background(), state.EmptyState())
+			stateManager := &state.LocalManager{
+				BaseDir: config.GetConfigDir(),
+			}
 
 			p, err := newProvider()
 			if err != nil {
