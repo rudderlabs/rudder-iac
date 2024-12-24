@@ -27,7 +27,8 @@ func NewCmdTPApply() *cobra.Command {
 		localcatalog *localcatalog.DataCatalog
 		err          error
 		catalogDir   string
-		skipPreview  bool
+		dryRun       bool
+		confirm      bool
 	)
 
 	cmd := &cobra.Command{
@@ -67,6 +68,9 @@ func NewCmdTPApply() *cobra.Command {
 			}
 
 			syncer := syncer.New(p, stateManager)
+			syncer.DryRun = dryRun
+			syncer.Confirm = confirm
+
 			if err := syncer.Sync(context.Background(), graph); err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
@@ -76,7 +80,8 @@ func NewCmdTPApply() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
-	cmd.Flags().BoolVar(&skipPreview, "dry-run", false, "Only show the changes and not apply them")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
+	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
 	return cmd
 }
 

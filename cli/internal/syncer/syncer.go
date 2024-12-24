@@ -4,12 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 type ProjectSyncer struct {
+	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
+	DryRun bool
+	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
+	Confirm bool
+
 	provider     Provider
 	stateManager StateManager
 }
@@ -42,6 +49,28 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 
 	p := planner.New()
 	plan := p.Plan(source, target)
+
+	differ.PrintDiff(plan.Diff)
+
+	if s.DryRun {
+		return nil
+	}
+
+	if len(plan.Operations) == 0 {
+		fmt.Println("No changes to apply")
+		return nil
+	}
+
+	if s.Confirm {
+		confirm, err := ui.Confirm("Do you want to apply these changes?")
+		if err != nil {
+			return err
+		}
+
+		if !confirm {
+			return nil
+		}
+	}
 
 	outputState, err := s.executePlan(ctx, state, plan)
 	if err != nil {
