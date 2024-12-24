@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/iac"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/spf13/cobra"
@@ -29,24 +25,10 @@ func init() {
 		fmt.Sprintf("config file (default is '%s')", config.DefaultConfigFile()),
 	)
 
-	store, err := iac.NewStore(
-		context.Background(),
-		&iac.PulumiConfig{
-			Project: "defaultproject",
-			Stack: "dev",
-			PulumiHome: filepath.Join(filepath.Dir(config.DefaultConfigFile()), "iac/pulumi"),
-			ToolVersion: "3.137.0",
-		},
-	)
-
-	if err != nil {
-		log.Fatalf("unable to setup store: %s", err)
-	}
-
 	// Add subcommands to the root command
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
-	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan(store))
+	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 
 }
 

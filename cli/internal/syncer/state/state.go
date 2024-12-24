@@ -39,6 +39,10 @@ func (s *State) AddResource(r *StateResource) {
 	s.Resources[resources.URN(r.ID, r.Type)] = r
 }
 
+func (s *State) RemoveResource(urn string) {
+	delete(s.Resources, urn)
+}
+
 func (s *State) GetResource(urn string) *StateResource {
 	return s.Resources[urn]
 }

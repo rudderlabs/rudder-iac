@@ -90,9 +90,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		for _, prop := range props {
 			fmt.Println("adding property to graph", prop.LocalID)
 
-			if err := graph.AddResource(resources.NewResource(prop.LocalID, "property", prop.GetData())); err != nil {
-				return nil, fmt.Errorf("adding property to graph: %w", err)
-			}
+			graph.AddResource(resources.NewResource(prop.LocalID, "property", prop.GetData()))
 		}
 	}
 
