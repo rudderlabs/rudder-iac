@@ -2,6 +2,7 @@ package syncer_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -103,6 +104,14 @@ func TestSyncerCreate(t *testing.T) {
 		"create property property1",
 		"create tracking_plan trackingPlan1",
 	}, provider.OperationLog)
+
+	savedStates := statesFromSavedLog(stateManager.SaveLog)
+	assert.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
+
+	// each save adds one resource, last log entry should be the final state
+	assert.Equal(t, 1, len(savedStates[1].Resources))
+	assert.Equal(t, 2, len(savedStates[2].Resources))
+	assert.Equal(t, outputState, savedStates[3])
 }
 
 func TestSyncerDelete(t *testing.T) {
@@ -194,4 +203,21 @@ func TestSyncerDelete(t *testing.T) {
 		"delete property property1",
 		"delete event event1",
 	}, provider.OperationLog)
+
+	savedStates := statesFromSavedLog(stateManager.SaveLog)
+	assert.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
+
+	// each save removes one resource, last log entry should be the final state
+	assert.Equal(t, 2, len(savedStates[1].Resources))
+	assert.Equal(t, 1, len(savedStates[2].Resources))
+	assert.Equal(t, outputState, savedStates[3])
+}
+
+func statesFromSavedLog(log []json.RawMessage) []*state.State {
+	states := make([]*state.State, 0, len(log))
+	for _, entry := range log {
+		s, _ := state.FromJSON(entry)
+		states = append(states, s)
+	}
+	return states
 }
