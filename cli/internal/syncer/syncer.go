@@ -100,10 +100,18 @@ func stateToGraph(state *state.State) *resources.Graph {
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) (*state.State, error) {
 	currentState := state
 	for _, o := range plan.Operations {
+		operationString := o.String()
+		spinner := ui.NewSpinner(operationString)
+		spinner.Start()
+
 		outputState, err := s.providerOperation(ctx, o, currentState)
+		spinner.Stop()
 		if err != nil {
+			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
 			return nil, err
 		}
+
+		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
 
 		currentState = outputState
 	}

@@ -26,17 +26,20 @@ type Operation struct {
 }
 
 func (o *Operation) String() string {
-	var typeString string
-	switch o.Type {
-	case Create:
-		typeString = "Create"
-	case Update:
-		typeString = "Update"
-	case Delete:
-		typeString = "Delete"
-	}
+	return fmt.Sprintf("%s %s", o.Type.String(), o.Resource.URN())
+}
 
-	return fmt.Sprintf("%s %s", typeString, o.Resource.URN())
+func (t *OperationType) String() string {
+	switch *t {
+	case Create:
+		return "Create"
+	case Update:
+		return "Update"
+	case Delete:
+		return "Delete"
+	default:
+		return "Unknown"
+	}
 }
 
 type Plan struct {
