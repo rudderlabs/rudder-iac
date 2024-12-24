@@ -7,6 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -55,9 +56,11 @@ func SetVersion(v string) {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "rudder-cli",
-	Short: "Rudder CLI",
-	Long:  `Rudder is a CLI tool for managing your projects.`,
+	Use:           "rudder-cli",
+	Short:         "Rudder CLI",
+	Long:          `Rudder is a CLI tool for managing your projects.`,
+	SilenceUsage:  true,
+	SilenceErrors: true, // We will handle errors directly in Execute
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -65,7 +68,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		ui.ShowError(err)
 		os.Exit(1)
 	}
 }
