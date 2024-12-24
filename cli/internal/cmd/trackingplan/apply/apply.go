@@ -75,7 +75,8 @@ func NewCmdTPApply() *cobra.Command {
 }
 
 func newProvider() (syncer.Provider, error) {
-	rawClient, err := client.New(config.GetAccessToken(), client.WithBaseURL("https://api.staging.rudderlabs.com/v2"))
+	cfg := config.GetConfig()
+	rawClient, err := client.New(cfg.Auth.AccessToken, client.WithBaseURL(cfg.APIURL))
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
