@@ -12,9 +12,15 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/spf13/cobra"
 )
+
+var log = logger.New("trackingplan", logger.Attr{
+	Key:   "cmd",
+	Value: "apply",
+})
 
 func NewCmdTPApply() *cobra.Command {
 	var (
@@ -38,12 +44,12 @@ func NewCmdTPApply() *cobra.Command {
 			// Here we might need to do validate
 			localcatalog, err = ReadCatalog(catalogDir)
 			if err != nil {
-				fmt.Println("reading catalog failed in pre-step: %w", err)
+				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 			return validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("identifying changes for the upstream catalog")
+			log.Debug("identifying changes for the upstream catalog")
 			// Always inflate the refs before registering the catalog
 			//
 			graph, err := createResourceGraph(localcatalog)
@@ -88,7 +94,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 	for _, props := range catalog.Properties {
 		for _, prop := range props {
-			fmt.Println("adding property to graph", prop.LocalID)
+			log.Debug("adding property to graph", "id", prop.LocalID)
 
 			graph.AddResource(resources.NewResource(prop.LocalID, "property", prop.GetData()))
 		}
