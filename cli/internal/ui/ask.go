@@ -23,3 +23,16 @@ func AskSecret(question string) (string, error) {
 
 	return response, nil
 }
+
+func Confirm(question string) (bool, error) {
+	response := false
+	prompt := &survey.Confirm{
+		Message: question,
+	}
+
+	if err := survey.AskOne(prompt, &response); err != nil {
+		return false, fmt.Errorf("error reading response: %w", err)
+	}
+
+	return response, nil
+}

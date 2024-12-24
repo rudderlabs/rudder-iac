@@ -8,7 +8,7 @@ import (
 
 func ShowError(err error) {
 	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("9")).
+		Foreground(lipgloss.Color(Red)).
 		Bold(true).
 		Render
 
