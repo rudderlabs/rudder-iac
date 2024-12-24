@@ -102,3 +102,7 @@ func GetConfig() Config {
 
 	return config
 }
+
+func GetConfigDir() string {
+	return filepath.Dir(viper.ConfigFileUsed())
+}

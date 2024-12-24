@@ -2,14 +2,22 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
+const LatestVersion = 1
+
 func ToJSON(state *State) (json.RawMessage, error) {
 	// Create a copy of state to avoid modifying the original
 	stateCopy := &State{
+		Version:   state.Version,
 		Resources: make(map[string]*StateResource),
+	}
+
+	if stateCopy.Version == 0 {
+		stateCopy.Version = LatestVersion
 	}
 
 	for urn, res := range state.Resources {
@@ -31,8 +39,13 @@ func FromJSON(data json.RawMessage) (*State, error) {
 		return nil, err
 	}
 
+	if state.Version != LatestVersion {
+		return nil, fmt.Errorf("unsupported state version: %d", state.Version)
+	}
+
 	// Decode references in a new state copy
 	decodedState := &State{
+		Version:   state.Version,
 		Resources: make(map[string]*StateResource),
 	}
 
