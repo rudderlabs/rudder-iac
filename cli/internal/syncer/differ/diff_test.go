@@ -21,22 +21,22 @@ func TestCompareData(t *testing.T) {
 		"key4": "value4",
 	}
 
-	diff := differ.CompareData(data1, data2)
+	diffs := differ.CompareData(data1, data2)
 
-	assert.Len(t, diff.Diffs, 3)
+	assert.Len(t, diffs, 3)
 
-	assert.Contains(t, diff.Diffs, "key2")
-	assert.Contains(t, diff.Diffs, "key3")
-	assert.Contains(t, diff.Diffs, "key4")
+	assert.Contains(t, diffs, "key2")
+	assert.Contains(t, diffs, "key3")
+	assert.Contains(t, diffs, "key4")
 
-	assert.Equal(t, diff.Diffs["key2"].SourceValue, "value2")
-	assert.Equal(t, diff.Diffs["key2"].TargetValue, "value3")
+	assert.Equal(t, diffs["key2"].SourceValue, "value2")
+	assert.Equal(t, diffs["key2"].TargetValue, "value3")
 
-	assert.Equal(t, diff.Diffs["key3"].SourceValue, "value3")
-	assert.Nil(t, diff.Diffs["key3"].TargetValue)
+	assert.Equal(t, diffs["key3"].SourceValue, "value3")
+	assert.Nil(t, diffs["key3"].TargetValue)
 
-	assert.Nil(t, diff.Diffs["key4"].SourceValue)
-	assert.Equal(t, diff.Diffs["key4"].TargetValue, "value4")
+	assert.Nil(t, diffs["key4"].SourceValue)
+	assert.Equal(t, diffs["key4"].TargetValue, "value4")
 }
 
 func TestComputeDiff(t *testing.T) {
@@ -59,7 +59,7 @@ func TestComputeDiff(t *testing.T) {
 	assert.Len(t, diff.UnmodifiedResources, 1)
 
 	assert.Contains(t, diff.NewResources, "some-type:r3")
-	assert.Contains(t, diff.UpdatedResources, "some-type:r1")
+	assert.Equal(t, diff.UpdatedResources["some-type:r1"], differ.ResourceDiff{URN: "some-type:r1", Diffs: map[string]differ.PropertyDiff{"key2": {Property: "key2", SourceValue: "value2", TargetValue: "value3"}}})
 	assert.Contains(t, diff.RemovedResources, "some-type:r2")
 	assert.Contains(t, diff.UnmodifiedResources, "some-type:r0")
 }

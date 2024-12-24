@@ -40,6 +40,7 @@ func (o *Operation) String() string {
 }
 
 type Plan struct {
+	Diff       *differ.Diff
 	Operations []*Operation
 }
 
@@ -49,7 +50,9 @@ func New() *Planner {
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	diff := differ.ComputeDiff(source, target)
-	plan := &Plan{}
+	plan := &Plan{
+		Diff: diff,
+	}
 
 	sortedNew := sortByDependencies(diff.NewResources, target)
 	for _, urn := range sortedNew {
@@ -57,7 +60,11 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
 	}
 
-	sortedUpdated := sortByDependencies(diff.UpdatedResources, target)
+	updatedURNs := make([]string, 0, len(diff.UpdatedResources))
+	for r := range diff.UpdatedResources {
+		updatedURNs = append(updatedURNs, r)
+	}
+	sortedUpdated := sortByDependencies(updatedURNs, target)
 	for _, urn := range sortedUpdated {
 		resource, _ := target.GetResource(urn)
 		plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})

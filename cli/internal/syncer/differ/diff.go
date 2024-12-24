@@ -1,13 +1,17 @@
 package differ
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+import (
+	"reflect"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+)
 
 // Diff represents the differences between two resource graphs
 type Diff struct {
 	// NewResources contains URNs of resources that exist in target but not in source
 	NewResources []string
 	// UpdatedResources contains URNs of resources that exist in both graphs but have different data
-	UpdatedResources []string
+	UpdatedResources map[string]ResourceDiff
 	// RemovedResources contains URNs of resources that exist in source but not in target
 	RemovedResources []string
 	// UnmodifiedResources contains URNs of resources that exist in both graphs with identical data
@@ -15,6 +19,7 @@ type Diff struct {
 }
 
 type ResourceDiff struct {
+	URN   string
 	Diffs map[string]PropertyDiff
 }
 
@@ -33,7 +38,7 @@ type PropertyDiff struct {
 func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 	newResources := []string{}
 	removedResources := []string{}
-	updatedResources := []string{}
+	updatedResources := map[string]ResourceDiff{}
 	unmodifiedResources := []string{}
 
 	// Iterate over target resources to find new and updated resources
@@ -43,9 +48,9 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 			newResources = append(newResources, urn)
 		} else {
 			// Check if resource is updated or unmodified
-			resourceDiff := CompareData(r.Data(), sourceResource.Data())
-			if len(resourceDiff.Diffs) > 0 {
-				updatedResources = append(updatedResources, urn)
+			propertyDiffs := CompareData(sourceResource.Data(), r.Data())
+			if len(propertyDiffs) > 0 {
+				updatedResources[urn] = ResourceDiff{URN: urn, Diffs: propertyDiffs}
 			} else {
 				unmodifiedResources = append(unmodifiedResources, urn)
 			}
@@ -69,24 +74,55 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 }
 
 // compareData compares the data of two resources and returns the differences
-func CompareData(r1, r2 resources.ResourceData) *ResourceDiff {
+func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	diffs := make(map[string]PropertyDiff)
+
+	// Helper function to compare values recursively
+	var compareValues func(key string, v1, v2 interface{})
+	compareValues = func(key string, v1, v2 interface{}) {
+		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
+			diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			return
+		}
+
+		switch v1Typed := v1.(type) {
+		case map[string]interface{}:
+			v2Typed := v2.(map[string]interface{})
+			subDiffs := CompareData(v1Typed, v2Typed)
+			if len(subDiffs) > 0 {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			}
+		case []interface{}:
+			v2Typed := v2.([]interface{})
+			if len(v1Typed) != len(v2Typed) {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				return
+			}
+			for i := range v1Typed {
+				compareValues(key, v1Typed[i], v2Typed[i])
+			}
+		default:
+			if v1 != v2 {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			}
+		}
+	}
 
 	// Iterate over properties in r1 to find differences
 	for key, value1 := range r1 {
-		if value2, exists := r2[key]; !exists || value1 != value2 {
-			// Property is different if it doesn't exist in r2 or values are not equal
-			diffs[key] = PropertyDiff{Property: key, SourceValue: value1, TargetValue: value2}
+		if value2, exists := r2[key]; !exists {
+			diffs[key] = PropertyDiff{Property: key, SourceValue: value1, TargetValue: nil}
+		} else {
+			compareValues(key, value1, value2)
 		}
 	}
 
 	// Iterate over properties in r2 to find properties that are not in r1
 	for key, value2 := range r2 {
-		if value1, exists := r1[key]; !exists {
-			// Property is different if it doesn't exist in r1
-			diffs[key] = PropertyDiff{Property: key, SourceValue: value1, TargetValue: value2}
+		if _, exists := r1[key]; !exists {
+			diffs[key] = PropertyDiff{Property: key, SourceValue: nil, TargetValue: value2}
 		}
 	}
 
-	return &ResourceDiff{Diffs: diffs}
+	return diffs
 }
