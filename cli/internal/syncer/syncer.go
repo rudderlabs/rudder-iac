@@ -2,14 +2,12 @@ package syncer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
-
-var log = logger.New("syncer")
 
 type ProjectSyncer struct {
 	provider     Provider
@@ -18,8 +16,8 @@ type ProjectSyncer struct {
 
 type Provider interface {
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error
+	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
+	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
 }
 
 type StateManager interface {
@@ -84,47 +82,86 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 	return currentState, nil
 }
 
-func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) (*state.State, error) {
-	r := o.Resource
+func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
 	input := r.Data()
 	dereferenced, err := state.Dereference(input, st)
 	if err != nil {
 		return nil, err
 	}
 
-	if o.Type == planner.Delete {
-		err := s.provider.Delete(ctx, r.ID(), r.Type(), dereferenced)
-		if err != nil {
-			return nil, err
-		}
-
-		st.RemoveResource(r.URN())
-	} else {
-		var f func(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-		if o.Type == planner.Create {
-			f = s.provider.Create
-		} else if o.Type == planner.Update {
-			f = s.provider.Update
-		}
-
-		output, err := f(ctx, r.ID(), r.Type(), dereferenced)
-		if err != nil {
-			return nil, err
-		}
-
-		sr := st.GetResource(r.URN())
-		if sr == nil {
-			sr = &state.StateResource{
-				ID:   r.ID(),
-				Type: r.Type(),
-			}
-		}
-
-		sr.Input = input
-		sr.Output = *output
-
-		st.AddResource(sr)
+	output, err := s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
+	if err != nil {
+		return nil, err
 	}
 
+	sr := &state.StateResource{
+		ID:     r.ID(),
+		Type:   r.Type(),
+		Input:  input,
+		Output: *output,
+	}
+
+	st.AddResource(sr)
+
 	return st, nil
+}
+
+func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+	input := r.Data()
+	dereferenced, err := state.Dereference(input, st)
+	if err != nil {
+		return nil, err
+	}
+
+	sr := st.GetResource(r.URN())
+	if sr == nil {
+		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+	}
+
+	output, err := s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
+	if err != nil {
+		return nil, err
+	}
+
+	sr = &state.StateResource{
+		ID:     sr.ID,
+		Type:   sr.Type,
+		Input:  input,
+		Output: *output,
+	}
+
+	st.AddResource(sr)
+
+	return st, nil
+}
+
+func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+	sr := st.GetResource(r.URN())
+	if sr == nil {
+		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+	}
+
+	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())
+	if err != nil {
+		return nil, err
+	}
+
+	st.RemoveResource(r.URN())
+
+	return st, nil
+}
+
+func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) (*state.State, error) {
+	r := o.Resource
+
+	switch o.Type {
+	case planner.Create:
+		return s.createOperation(ctx, r, st)
+	case planner.Update:
+		return s.updateOperation(ctx, r, st)
+	case planner.Delete:
+		return s.deleteOperation(ctx, r, st)
+	default:
+		return nil, fmt.Errorf("unknown operation type with code: %d", o.Type)
+	}
 }

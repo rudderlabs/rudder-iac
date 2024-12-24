@@ -6,7 +6,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
+
+var log = logger.New("provider")
 
 type PropertyProvider struct {
 	client client.DataCatalog
@@ -38,10 +41,16 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, resourceType s
 	return &data, nil
 }
 
-func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	return nil, nil
 }
 
-func (p *PropertyProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) error {
+func (p *PropertyProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+	log.Info("Deleting property", "data", state)
+	id := state["id"].(string)
+	log.Info("Deleting property", "id", id)
+	if err := p.client.DeleteProperty(ctx, id); err != nil {
+		return err
+	}
 	return nil
 }
