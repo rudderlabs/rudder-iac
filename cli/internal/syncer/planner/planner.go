@@ -26,20 +26,24 @@ type Operation struct {
 }
 
 func (o *Operation) String() string {
-	var typeString string
-	switch o.Type {
-	case Create:
-		typeString = "Create"
-	case Update:
-		typeString = "Update"
-	case Delete:
-		typeString = "Delete"
-	}
+	return fmt.Sprintf("%s %s", o.Type.String(), o.Resource.URN())
+}
 
-	return fmt.Sprintf("%s %s", typeString, o.Resource.URN())
+func (t *OperationType) String() string {
+	switch *t {
+	case Create:
+		return "Create"
+	case Update:
+		return "Update"
+	case Delete:
+		return "Delete"
+	default:
+		return "Unknown"
+	}
 }
 
 type Plan struct {
+	Diff       *differ.Diff
 	Operations []*Operation
 }
 
@@ -49,7 +53,9 @@ func New() *Planner {
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	diff := differ.ComputeDiff(source, target)
-	plan := &Plan{}
+	plan := &Plan{
+		Diff: diff,
+	}
 
 	sortedNew := sortByDependencies(diff.NewResources, target)
 	for _, urn := range sortedNew {
@@ -57,7 +63,11 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
 	}
 
-	sortedUpdated := sortByDependencies(diff.UpdatedResources, target)
+	updatedURNs := make([]string, 0, len(diff.UpdatedResources))
+	for r := range diff.UpdatedResources {
+		updatedURNs = append(updatedURNs, r)
+	}
+	sortedUpdated := sortByDependencies(updatedURNs, target)
 	for _, urn := range sortedUpdated {
 		resource, _ := target.GetResource(urn)
 		plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})

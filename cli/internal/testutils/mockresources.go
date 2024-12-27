@@ -44,7 +44,7 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 
 	for k, v := range data {
@@ -57,10 +57,10 @@ func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, data resources.ResourceData) error {
+func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	payload := make(resources.ResourceData)
 
-	for k, v := range data {
+	for k, v := range state {
 		payload[k] = v
 	}
 
