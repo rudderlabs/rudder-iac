@@ -2,55 +2,103 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 )
 
-var log = logger.New("provider")
-
-type PropertyProvider struct {
+type propertyProvider struct {
 	client client.DataCatalog
+	log    logger.Logger
 }
 
-func NewPropertyProvider(dc client.DataCatalog) syncer.Provider {
-	return &PropertyProvider{
+func newPropertyProvider(dc client.DataCatalog) syncer.Provider {
+	return &propertyProvider{
 		client: dc,
+		log: logger.Logger{
+			Logger: logger.New("provider").With("type", "property"),
+		},
 	}
 }
 
-func (p *PropertyProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *propertyProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+	p.log.With("provider", "property").Debug("creating property resource in upstream catalog", "id", ID)
 
-	payload := client.PropertyCreate{
-		Name:        data["display_name"].(string),
-		Description: data["description"].(string),
-		Type:        data["type"].(string),
-		Config:      data["propConfig"].(map[string]interface{}),
-	}
+	toArgs := state.PropertyArgs{}
+	toArgs.FromResourceData(&data)
 
-	property, err := p.client.CreateProperty(ctx, payload)
+	property, err := p.client.CreateProperty(ctx, client.PropertyCreate{
+		Name:        toArgs.Name,
+		Description: toArgs.Description,
+		Type:        toArgs.Type,
+		Config:      toArgs.Config,
+	})
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating property resource in upstream catalog: %w", err)
 	}
 
-	data["id"] = property.ID
-	data["workspaceID"] = property.WorkspaceId
-
-	return &data, nil
-}
-
-func (p *PropertyProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, nil
-}
-
-func (p *PropertyProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
-	log.Info("Deleting property", "data", state)
-	id := state["id"].(string)
-	log.Info("Deleting property", "id", id)
-	if err := p.client.DeleteProperty(ctx, id); err != nil {
-		return err
+	propertyState := state.PropertyState{
+		ID:          property.ID,
+		Name:        property.Name,
+		Description: property.Description,
+		Type:        property.Type,
+		Config:      property.Config,
+		WorkspaceID: property.WorkspaceId,
+		CreatedAt:   property.CreatedAt.UTC().String(),
+		UpdatedAt:   property.UpdatedAt.UTC().String(),
 	}
+
+	return propertyState.ToResourceData(), nil
+}
+
+func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
+	p.log.Debug("updating property resource in upstream catalog", "id", ID)
+
+	toArgs := state.PropertyArgs{}
+	toArgs.FromResourceData(&input)
+
+	oldState := state.PropertyState{}
+	oldState.FromResourceData(&olds)
+
+	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &client.Property{
+		ID:          oldState.ID,
+		Name:        toArgs.Name,
+		Description: toArgs.Description,
+		Type:        toArgs.Type,
+		Config:      toArgs.Config,
+		WorkspaceId: oldState.WorkspaceID,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("updating property resource in upstream catalog: %w", err)
+	}
+
+	toState := state.PropertyState{
+		ID:          updated.ID,
+		Name:        updated.Name,
+		Description: updated.Description,
+		Type:        updated.Type,
+		Config:      updated.Config,
+		WorkspaceID: updated.WorkspaceId,
+		CreatedAt:   updated.CreatedAt.String(),
+		UpdatedAt:   updated.UpdatedAt.String(),
+	}
+
+	return toState.ToResourceData(), nil
+}
+
+func (p *propertyProvider) Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {
+	p.log.Debug("deleting property resource in upstream catalog", "id", ID)
+
+	err := p.client.DeleteProperty(ctx, data["id"].(string))
+	if err != nil {
+		return fmt.Errorf("deleting property resource in upstream catalog: %w", err)
+	}
+
 	return nil
 }

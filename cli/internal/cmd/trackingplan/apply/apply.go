@@ -5,19 +5,22 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
+	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/spf13/cobra"
 )
 
-var log = logger.New("trackingplan", logger.Attr{
-	Key:   "cmd",
-	Value: "apply",
-})
+var (
+	log = logger.New("trackingplan.apply")
+)
 
 func NewCmdTPApply() *cobra.Command {
 	var (
@@ -44,21 +47,24 @@ func NewCmdTPApply() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
-			return validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
+
+			if err := validate.ValidateCatalog(validate.DefaultValidators(), localcatalog); err != nil {
+				return fmt.Errorf("validating catalog: %w", err)
+			}
+
+			return inflateRefs(localcatalog)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
 			log.Debug("identifying changes for the upstream catalog")
-			// Always inflate the refs before registering the catalog
-			graph, err := createResourceGraph(localcatalog)
-			if err != nil {
-				return fmt.Errorf("creating resource graph: %w", err)
-			}
 
-			if err := app.Syncer().Sync(context.Background(), graph, syncer.SyncOptions{
-				DryRun:  dryRun,
-				Confirm: confirm,
-			}); err != nil {
+			if err := app.Syncer().Sync(
+				context.Background(),
+				createResourceGraph(localcatalog),
+				syncer.SyncOptions{
+					DryRun:  dryRun,
+					Confirm: confirm,
+				}); err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 
@@ -72,18 +78,94 @@ func NewCmdTPApply() *cobra.Command {
 	return cmd
 }
 
-func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
+func catalogProvider() (syncer.Provider, error) {
+	cfg := config.GetConfig()
+
+	rawClient, err := client.New(cfg.Auth.AccessToken, client.WithBaseURL(cfg.APIURL))
+	if err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
+	}
+
+	return provider.NewCatalogProvider(client.NewRudderDataCatalog(rawClient)), nil
+}
+
+func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	graph := resources.NewGraph()
 
-	for _, props := range catalog.Properties {
+	propIDToURN := make(map[string]string)
+	for group, props := range catalog.Properties {
 		for _, prop := range props {
-			log.Debug("adding property to graph", "id", prop.LocalID)
+			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
 
-			graph.AddResource(resources.NewResource(prop.LocalID, "property", prop.GetData()))
+			args := pstate.PropertyArgs{
+				Name:        prop.Name,
+				Description: prop.Description,
+				Type:        prop.Type,
+				Config:      prop.Config,
+			}
+
+			resource := resources.NewResource(prop.LocalID, pstate.EntityTypeProperty, *args.ToResourceData())
+			graph.AddResource(resource)
+
+			propIDToURN[prop.LocalID] = resource.URN()
 		}
 	}
 
-	return graph, nil
+	eventIDToURN := make(map[string]string)
+	for group, events := range catalog.Events {
+		for _, event := range events {
+			log.Debug("adding event under group to graph", "event", event.LocalID, "group", group)
+
+			categoryID := "random-category-id"
+			args := pstate.EventArgs{
+				Name:        event.Name,
+				Description: event.Description,
+				EventType:   event.Type,
+				CategoryID:  &categoryID,
+			}
+			resource := resources.NewResource(event.LocalID, pstate.EntityTypeEvent, *args.ToResourceData())
+			graph.AddResource(resource)
+
+			eventIDToURN[event.LocalID] = resource.URN()
+		}
+	}
+
+	for group, tp := range catalog.TrackingPlans {
+		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
+
+		args := pstate.TrackingPlanArgs{
+			TrackingPlan: *tp,
+		}
+
+		resource := resources.NewResource(tp.LocalID, pstate.EntityTypeTrackingPlan, *args.ToResourceData())
+		graph.AddResource(resource)
+
+		for urn := range getDependencies(tp, propIDToURN, eventIDToURN) {
+			graph.AddDependency(resource.URN(), urn)
+		}
+	}
+
+	return graph
+}
+
+// getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
+// of the properties and events that are used in the tracking plan
+func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) map[string]bool {
+	dependencies := make(map[string]bool)
+
+	for _, event := range tp.EventProps {
+		if urn, ok := eventIDToURN[event.LocalID]; ok {
+			dependencies[urn] = true
+		}
+
+		for _, prop := range event.Properties {
+			if urn, ok := propIDToURN[prop.LocalID]; ok {
+				dependencies[urn] = true
+			}
+		}
+	}
+
+	return dependencies
 }
 
 func readCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
@@ -93,4 +175,16 @@ func readCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
 	}
 
 	return catalog, nil
+}
+
+func inflateRefs(catalog *localcatalog.DataCatalog) error {
+	log.Debug("inflating all the references in the catalog")
+
+	for _, tp := range catalog.TrackingPlans {
+		if err := tp.ExpandRefs(catalog); err != nil {
+			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
+		}
+	}
+
+	return nil
 }

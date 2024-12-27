@@ -43,7 +43,7 @@ func newProvider() (syncer.Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
-	return provider.NewPropertyProvider(client.NewRudderDataCatalog(rawClient)), nil
+	return provider.NewCatalogProvider(client.NewRudderDataCatalog(rawClient)), nil
 }
 
 func StateManager() syncer.StateManager {

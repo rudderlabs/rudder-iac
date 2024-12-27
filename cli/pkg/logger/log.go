@@ -42,7 +42,11 @@ func init() {
 	logFile = lf
 }
 
-func New(pkgName string, attrs ...Attr) *slog.Logger {
+type Logger struct {
+	*slog.Logger
+}
+
+func New(pkgName string, attrs ...Attr) *Logger {
 	h := slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			// Anything other than time key
@@ -71,7 +75,7 @@ func New(pkgName string, attrs ...Attr) *slog.Logger {
 		})
 	}
 
-	return slog.New(h.WithAttrs(slogAttrs))
+	return &Logger{slog.New(h.WithAttrs(slogAttrs))}
 }
 
 func SetLogLevel(l slog.Level) {

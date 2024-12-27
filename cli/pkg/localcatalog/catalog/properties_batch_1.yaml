@@ -12,17 +12,10 @@ spec:
         minLength: 24
         maxLength: 48
 
-    - id: source_type
-      display_name: "Source Type"
+    - id: write_key_1
+      display_name: "Write Key 3"
       type: string
-      description: "Type of the source"
+      description: KSUID identifier for the source embedded in the SDKs
       propConfig:
-        enum: "['web', 'server', 'mobile', 'iot']"
-
-    - id: source_name
-      display_name: "Source name"
-      description: "Name of the source"
-      type: string
-      propConfig:
-        minLength: 2
-        maxLength: 255
+        minLength: 24
+        maxLength: 48

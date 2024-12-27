@@ -55,7 +55,7 @@ func (dc *DataCatalog) TPEventRule(tpGroup, ruleID string) *TPRule {
 
 	for _, rule := range tp.Rules {
 		if rule.LocalID == ruleID && rule.Type == "event_rule" {
-			return &rule
+			return rule
 		}
 	}
 
@@ -73,7 +73,7 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 		if rule.Type != "event_rule" {
 			continue
 		}
-		toReturn = append(toReturn, &rule)
+		toReturn = append(toReturn, rule)
 	}
 
 	return toReturn, true
@@ -118,6 +118,13 @@ func Read(loc string) (*DataCatalog, error) {
 
 	for _, file := range files {
 		log.Debug("loading entities from file into catalog", "file", file)
+
+		log.Info("extension", "file", file, "ext", filepath.Ext(file))
+
+		if filepath.Ext(file) != ".yaml" && filepath.Ext(file) != ".yml" {
+			log.Debug("skipping file, not a yaml file", "file", file)
+			continue
+		}
 
 		byt, err := getFileBytes(file)
 		if err != nil {

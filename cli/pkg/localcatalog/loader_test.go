@@ -157,7 +157,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Name:        "Rudderstack First Tracking Plan",
 			LocalID:     "my_first_tp",
 			Description: "This is my first tracking plan",
-			Rules: []TPRule{
+			Rules: []*TPRule{
 				{
 					LocalID: "rule_01",
 					Type:    "event_rule",
@@ -165,7 +165,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 						Ref:            "#/events/mobile_events/user_signed_up",
 						AllowUnplanned: true,
 					},
-					Properties: []TPRuleProperty{
+					Properties: []*TPRuleProperty{
 						{
 							Ref:      "#/properties/base_mobile_props/username",
 							Required: true,

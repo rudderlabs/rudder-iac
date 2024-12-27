@@ -1,0 +1,10 @@
+version: rudder/0.1
+kind: events
+metadata:
+  name: app_events
+spec:
+  events:
+    - id: user_signed_up
+      display_name: "User Signed Up Again"
+      event_type: track
+      description: "User signed up for the app"

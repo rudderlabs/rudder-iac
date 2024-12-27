@@ -21,7 +21,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	for _, tp := range dc.TrackingPlans {
 		// Iterate over all the rules in the tracking plan
 		for _, rule := range tp.Rules {
-			refsErrs := rv.handleRefs(&rule, dc)
+			refsErrs := rv.handleRefs(rule, dc)
 			if len(refsErrs) == 0 {
 				continue
 			}
