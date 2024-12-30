@@ -80,6 +80,10 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	// Helper function to compare values recursively
 	var compareValues func(key string, v1, v2 interface{})
 	compareValues = func(key string, v1, v2 interface{}) {
+		if isNil(v1) || isNil(v2) {
+			return
+		}
+
 		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
 			diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			return
@@ -125,4 +129,16 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	}
 
 	return diffs
+}
+
+func isNil(val interface{}) bool {
+	if val == nil {
+		return true
+	}
+
+	if reflect.ValueOf(val).Kind() == reflect.Pointer {
+		return reflect.ValueOf(val).IsNil()
+	}
+
+	return false
 }

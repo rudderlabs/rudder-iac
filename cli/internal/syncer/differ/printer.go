@@ -2,6 +2,7 @@ package differ
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -20,7 +21,13 @@ func PrintDiff(diff *Diff) {
 			r := diff.UpdatedResources[urn]
 			details := ""
 			for _, d := range r.Diffs {
-				details += fmt.Sprintf("    - %s: %v %s %v\n", ui.Color(d.Property, ui.White), d.SourceValue, ui.Color("=>", ui.Yellow), d.TargetValue)
+				details += fmt.Sprintf(
+					"    - %s: %s %s %s\n",
+					ui.Color(d.Property, ui.White),
+					printable(d.SourceValue),
+					ui.Color("=>", ui.Yellow),
+					printable(d.TargetValue),
+				)
 			}
 			return details
 		})
@@ -40,4 +47,16 @@ func listResources(label string, resources []string, detailFn func(string) strin
 		}
 	}
 	fmt.Println()
+}
+
+func printable(val interface{}) string {
+	if val == nil {
+		return ui.Color("<nil>", ui.Blue)
+	}
+
+	if reflect.ValueOf(val).Kind() == reflect.Pointer {
+		return fmt.Sprintf("%v", reflect.ValueOf(val).Elem())
+	}
+
+	return fmt.Sprintf("%v", val)
 }
