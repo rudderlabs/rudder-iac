@@ -80,7 +80,7 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	// Helper function to compare values recursively
 	var compareValues func(key string, v1, v2 interface{})
 	compareValues = func(key string, v1, v2 interface{}) {
-		if isNil(v1) || isNil(v2) {
+		if isNil(v1) && isNil(v2) {
 			return
 		}
 
