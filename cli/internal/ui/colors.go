@@ -5,4 +5,5 @@ const (
 	Green  string = "10"
 	Yellow string = "11"
 	White  string = "15"
+	Blue   string = "23"
 )
