@@ -12,6 +12,9 @@ import (
 // the behavior of a persistent state store which would have to persist a JSON instead of a Go struct.
 type MemoryStateManager struct {
 	json json.RawMessage
+	// SaveLog is a log of all the states, in JSON format, that have been saved to the manager.
+	// This can be used in tests to check how many times the state has been saved and what the state was at each point.
+	SaveLog []json.RawMessage
 }
 
 func (m *MemoryStateManager) Load(_ context.Context) (*state.State, error) {
@@ -29,5 +32,6 @@ func (m *MemoryStateManager) Save(_ context.Context, s *state.State) error {
 		return err
 	}
 	m.json = json
+	m.SaveLog = append(m.SaveLog, json)
 	return nil
 }

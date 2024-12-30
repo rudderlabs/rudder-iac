@@ -72,12 +72,8 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 		}
 	}
 
-	outputState, err := s.executePlan(ctx, state, plan)
+	err = s.executePlan(ctx, state, plan)
 	if err != nil {
-		return err
-	}
-
-	if err = s.stateManager.Save(ctx, outputState); err != nil {
 		return err
 	}
 
@@ -97,7 +93,7 @@ func stateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) (*state.State, error) {
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) error {
 	currentState := state
 	for _, o := range plan.Operations {
 		operationString := o.String()
@@ -108,7 +104,12 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		spinner.Stop()
 		if err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			return nil, err
+			return err
+		}
+
+		if err = s.stateManager.Save(ctx, outputState); err != nil {
+			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
+			return err
 		}
 
 		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
@@ -116,7 +117,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		currentState = outputState
 	}
 
-	return currentState, nil
+	return nil
 }
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
