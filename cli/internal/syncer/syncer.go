@@ -12,11 +12,6 @@ import (
 )
 
 type ProjectSyncer struct {
-	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
-	DryRun bool
-	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
-	Confirm bool
-
 	provider     Provider
 	stateManager StateManager
 }
@@ -39,19 +34,26 @@ func New(p Provider, sm StateManager) *ProjectSyncer {
 	}
 }
 
-func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error {
-	errs := s.apply(ctx, target, false)
+type SyncOptions struct {
+	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
+	DryRun bool
+	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
+	Confirm bool
+}
+
+func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph, options SyncOptions) error {
+	errs := s.apply(ctx, target, options, false)
 	if len(errs) > 0 {
 		return errs[0]
 	}
 	return nil
 }
 
-func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
-	return s.apply(ctx, resources.NewGraph(), true)
+func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []error {
+	return s.apply(ctx, resources.NewGraph(), options, true)
 }
 
-func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
+func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
 	state, err := s.stateManager.Load(ctx)
 	if err != nil {
 		return []error{err}
@@ -64,7 +66,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	differ.PrintDiff(plan.Diff)
 
-	if s.DryRun {
+	if options.DryRun {
 		return nil
 	}
 
@@ -73,7 +75,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		return nil
 	}
 
-	if s.Confirm {
+	if options.Confirm {
 		confirm, err := ui.Confirm("Do you want to apply these changes?")
 		if err != nil {
 			return []error{err}

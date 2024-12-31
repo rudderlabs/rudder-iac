@@ -33,11 +33,11 @@ func NewCmdTPDestroy() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Debug("tp destroy", "dryRun", dryRun, "confirm", confirm)
-			syncer := syncer.New(app.Provider(), app.StateManager())
-			syncer.DryRun = dryRun
-			syncer.Confirm = confirm
 
-			errors := syncer.Destroy(context.Background())
+			errors := app.Syncer().Destroy(context.Background(), syncer.SyncOptions{
+				DryRun:  dryRun,
+				Confirm: confirm,
+			})
 			if len(errors) > 0 {
 				return fmt.Errorf("syncing the state: %w", errors[0])
 			}

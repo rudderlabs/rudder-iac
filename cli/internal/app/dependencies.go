@@ -13,6 +13,7 @@ import (
 var (
 	p  syncer.Provider
 	sm syncer.StateManager
+	s  *syncer.ProjectSyncer
 )
 
 func Initialise() error {
@@ -24,6 +25,8 @@ func Initialise() error {
 	if err != nil {
 		return fmt.Errorf("creating provider: %w", err)
 	}
+
+	s = syncer.New(p, sm)
 
 	return nil
 }
@@ -49,4 +52,8 @@ func StateManager() syncer.StateManager {
 
 func Provider() syncer.Provider {
 	return p
+}
+
+func Syncer() *syncer.ProjectSyncer {
+	return s
 }

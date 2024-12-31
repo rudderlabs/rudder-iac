@@ -55,11 +55,10 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("creating resource graph: %w", err)
 			}
 
-			syncer := syncer.New(app.Provider(), app.StateManager())
-			syncer.DryRun = dryRun
-			syncer.Confirm = confirm
-
-			if err := syncer.Sync(context.Background(), graph); err != nil {
+			if err := app.Syncer().Sync(context.Background(), graph, syncer.SyncOptions{
+				DryRun:  dryRun,
+				Confirm: confirm,
+			}); err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 
