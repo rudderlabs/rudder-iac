@@ -40,9 +40,21 @@ func New(p Provider, sm StateManager) *ProjectSyncer {
 }
 
 func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error {
+	errs := s.apply(ctx, target, false)
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
+	return s.apply(ctx, resources.NewGraph(), true)
+}
+
+func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
 	state, err := s.stateManager.Load(ctx)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 
 	source := stateToGraph(state)
@@ -64,7 +76,7 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 	if s.Confirm {
 		confirm, err := ui.Confirm("Do you want to apply these changes?")
 		if err != nil {
-			return err
+			return []error{err}
 		}
 
 		if !confirm {
@@ -72,12 +84,7 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 		}
 	}
 
-	err = s.executePlan(ctx, state, plan)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.executePlan(ctx, state, plan, continueOnFail)
 }
 
 func stateToGraph(state *state.State) *resources.Graph {
@@ -93,8 +100,23 @@ func stateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) error {
+type OperationError struct {
+	Operation *planner.Operation
+	Err       error
+}
+
+func (e *OperationError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *OperationError) Unwrap() error {
+	return e.Err
+}
+
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
+	var errors []error
 	currentState := state
+
 	for _, o := range plan.Operations {
 		operationString := o.String()
 		spinner := ui.NewSpinner(operationString)
@@ -104,12 +126,18 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		spinner.Stop()
 		if err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			return err
+			errors = append(errors, &OperationError{Operation: o, Err: err})
+			if !continueOnFail {
+				return errors
+			}
 		}
 
 		if err = s.stateManager.Save(ctx, outputState); err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			return err
+			errors = append(errors, &OperationError{Operation: o, Err: err})
+			if !continueOnFail {
+				return errors
+			}
 		}
 
 		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
@@ -117,7 +145,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		currentState = outputState
 	}
 
-	return nil
+	return errors
 }
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
