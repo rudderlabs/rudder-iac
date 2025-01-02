@@ -12,11 +12,6 @@ import (
 )
 
 type ProjectSyncer struct {
-	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
-	DryRun bool
-	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
-	Confirm bool
-
 	provider     Provider
 	stateManager StateManager
 }
@@ -39,10 +34,29 @@ func New(p Provider, sm StateManager) *ProjectSyncer {
 	}
 }
 
-func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error {
+type SyncOptions struct {
+	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
+	DryRun bool
+	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
+	Confirm bool
+}
+
+func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph, options SyncOptions) error {
+	errs := s.apply(ctx, target, options, false)
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []error {
+	return s.apply(ctx, resources.NewGraph(), options, true)
+}
+
+func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
 	state, err := s.stateManager.Load(ctx)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 
 	source := stateToGraph(state)
@@ -52,7 +66,7 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 
 	differ.PrintDiff(plan.Diff)
 
-	if s.DryRun {
+	if options.DryRun {
 		return nil
 	}
 
@@ -61,10 +75,10 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 		return nil
 	}
 
-	if s.Confirm {
+	if options.Confirm {
 		confirm, err := ui.Confirm("Do you want to apply these changes?")
 		if err != nil {
-			return err
+			return []error{err}
 		}
 
 		if !confirm {
@@ -72,12 +86,7 @@ func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error
 		}
 	}
 
-	err = s.executePlan(ctx, state, plan)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.executePlan(ctx, state, plan, continueOnFail)
 }
 
 func stateToGraph(state *state.State) *resources.Graph {
@@ -93,8 +102,23 @@ func stateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan) error {
+type OperationError struct {
+	Operation *planner.Operation
+	Err       error
+}
+
+func (e *OperationError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *OperationError) Unwrap() error {
+	return e.Err
+}
+
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
+	var errors []error
 	currentState := state
+
 	for _, o := range plan.Operations {
 		operationString := o.String()
 		spinner := ui.NewSpinner(operationString)
@@ -104,12 +128,18 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		spinner.Stop()
 		if err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			return err
+			errors = append(errors, &OperationError{Operation: o, Err: err})
+			if !continueOnFail {
+				return errors
+			}
 		}
 
 		if err = s.stateManager.Save(ctx, outputState); err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			return err
+			errors = append(errors, &OperationError{Operation: o, Err: err})
+			if !continueOnFail {
+				return errors
+			}
 		}
 
 		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
@@ -117,7 +147,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 		currentState = outputState
 	}
 
-	return nil
+	return errors
 }
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {

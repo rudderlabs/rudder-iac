@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	tpApplyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/apply"
+	tpDestroyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/destroy"
 	tpValidateCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 )
 
@@ -22,6 +23,7 @@ func NewCmdTrackingPlan() *cobra.Command {
 
 	cmd.AddCommand(tpValidateCmd.NewCmdTPValidate())
 	cmd.AddCommand(tpApplyCmd.NewCmdTPApply())
+	cmd.AddCommand(tpDestroyCmd.NewCmdTPDestroy())
 
 	return cmd
 }

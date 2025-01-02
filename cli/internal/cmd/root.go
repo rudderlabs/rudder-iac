@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -20,6 +21,7 @@ var (
 func init() {
 	cobra.OnInitialize(initConfig)
 	cobra.OnInitialize(initLogger)
+	cobra.OnInitialize(initAppDependencies)
 
 	rootCmd.PersistentFlags().StringVarP(
 		&cfgFile,
@@ -48,6 +50,13 @@ func initConfig() {
 func initLogger() {
 	if viper.GetBool("debug") {
 		logger.SetLogLevel(slog.LevelDebug)
+	}
+}
+
+func initAppDependencies() {
+	if err := app.Initialise(); err != nil {
+		ui.ShowError(err)
+		os.Exit(1)
 	}
 }
 

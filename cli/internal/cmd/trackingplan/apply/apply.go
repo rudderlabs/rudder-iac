@@ -5,15 +5,12 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/spf13/cobra"
 )
 
@@ -43,35 +40,25 @@ func NewCmdTPApply() *cobra.Command {
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Here we might need to do validate
-			localcatalog, err = ReadCatalog(catalogDir)
+			localcatalog, err = readCatalog(catalogDir)
 			if err != nil {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 			return validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
 			log.Debug("identifying changes for the upstream catalog")
 			// Always inflate the refs before registering the catalog
-			//
 			graph, err := createResourceGraph(localcatalog)
 			if err != nil {
 				return fmt.Errorf("creating resource graph: %w", err)
 			}
 
-			stateManager := &state.LocalManager{
-				BaseDir: config.GetConfigDir(),
-			}
-
-			p, err := newProvider()
-			if err != nil {
-				return fmt.Errorf("creating provider: %w", err)
-			}
-
-			syncer := syncer.New(p, stateManager)
-			syncer.DryRun = dryRun
-			syncer.Confirm = confirm
-
-			if err := syncer.Sync(context.Background(), graph); err != nil {
+			if err := app.Syncer().Sync(context.Background(), graph, syncer.SyncOptions{
+				DryRun:  dryRun,
+				Confirm: confirm,
+			}); err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 
@@ -83,15 +70,6 @@ func NewCmdTPApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
 	return cmd
-}
-
-func newProvider() (syncer.Provider, error) {
-	cfg := config.GetConfig()
-	rawClient, err := client.New(cfg.Auth.AccessToken, client.WithBaseURL(cfg.APIURL))
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-	return provider.NewPropertyProvider(client.NewRudderDataCatalog(rawClient)), nil
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
@@ -108,7 +86,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 	return graph, nil
 }
 
-func ReadCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
+func readCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
 	catalog, err := localcatalog.Read(dirLoc)
 	if err != nil {
 		return nil, fmt.Errorf("reading catalog at location: %w", err)
