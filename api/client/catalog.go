@@ -12,7 +12,7 @@ type PropertyCreate struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"propConfig"`
+	Config      map[string]interface{} `json:"propConfig,omitempty"`
 }
 
 type Property struct {

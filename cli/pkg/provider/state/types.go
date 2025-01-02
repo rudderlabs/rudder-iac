@@ -24,6 +24,14 @@ func MustInt(from map[string]interface{}, key string) int {
 	return MustMapValue[string, interface{}, int](from, key)
 }
 
+func Float64(from map[string]interface{}, key string, defaultval float64) float64 {
+	return SafeMapValue(from, key, defaultval)
+}
+
+func MustFloat64(from map[string]interface{}, key string) float64 {
+	return MustMapValue[string, interface{}, float64](from, key)
+}
+
 func Bool(from map[string]interface{}, key string, defaultval bool) bool {
 	return SafeMapValue(from, key, defaultval)
 }
@@ -34,6 +42,18 @@ func MustBool(from map[string]interface{}, key string) bool {
 
 func MapStringInterface(from map[string]interface{}, key string, defaultval map[string]interface{}) map[string]interface{} {
 	return SafeMapValue(from, key, defaultval)
+}
+
+func MapStringInterfacePtr(from map[string]interface{}, key string, defaultval *map[string]interface{}) *map[string]interface{} {
+	return SafeMapValue(from, key, defaultval)
+}
+
+func MustMapStringInterface(from map[string]interface{}, key string) map[string]interface{} {
+	return MustMapValue[string, interface{}, map[string]interface{}](from, key)
+}
+
+func MustMapStringInterfacePtr(from map[string]interface{}, key string) *map[string]interface{} {
+	return MustMapValue[string, interface{}, *map[string]interface{}](from, key)
 }
 
 func MapStringInterfaceSlice(from map[string]interface{}, key string, defaultval []map[string]interface{}) []map[string]interface{} {

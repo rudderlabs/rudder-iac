@@ -12,6 +12,7 @@ var (
 )
 
 type TrackingPlanState struct {
+	TrackingPlanArgs
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
 	Description  string                    `json:"description,omitempty"`
@@ -21,6 +22,15 @@ type TrackingPlanState struct {
 	CreatedAt    string                    `json:"created_at"`
 	UpdatedAt    string                    `json:"updated_at"`
 	Events       []*TrackingPlanEventState `json:"events"`
+}
+
+func (t *TrackingPlanState) CatalogEventIDForLocalID(localID string) string {
+	for _, event := range t.Events {
+		if event.LocalID == localID {
+			return event.EventID
+		}
+	}
+	return ""
 }
 
 type TrackingPlanEventState struct {
@@ -62,12 +72,12 @@ type TrackingPlanPropertyState struct {
 }
 
 type TrackingPlanStateDiff struct {
-	Added   []*localcatalog.TPEvent // Newly added won't have any upstream ID
-	Updated []*localcatalog.TPEvent
-	Deleted []*TrackingPlanEventState
+	Added   []*TrackingPlanEventArgs
+	Updated []*TrackingPlanEventArgs
+	Deleted []*TrackingPlanEventArgs
 }
 
-func (t *TrackingPlanState) ToResourceData() *resources.ResourceData {
+func (t *TrackingPlanState) ToResourceData() resources.ResourceData {
 
 	var (
 		events []map[string]interface{}
@@ -96,37 +106,51 @@ func (t *TrackingPlanState) ToResourceData() *resources.ResourceData {
 		})
 	}
 
-	return &resources.ResourceData{
-		"id":           t.ID,
-		"name":         t.Name,
-		"description":  t.Description,
-		"version":      t.Version,
-		"creationType": t.CreationType,
-		"workspaceId":  t.WorkspaceID,
-		"created_at":   t.CreatedAt,
-		"updated_at":   t.UpdatedAt,
-		"events":       events,
+	return resources.ResourceData{
+		"id":                t.ID,
+		"name":              t.Name,
+		"description":       t.Description,
+		"version":           t.Version,
+		"creationType":      t.CreationType,
+		"workspaceId":       t.WorkspaceID,
+		"created_at":        t.CreatedAt,
+		"updated_at":        t.UpdatedAt,
+		"events":            events,
+		"trackingplan_args": t.TrackingPlanArgs.ToResourceData(),
 	}
 }
 
-func (t *TrackingPlanState) FromResourceData(from *resources.ResourceData) {
+func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 
-	t.ID = MustString(*from, "id")
-	t.Name = MustString(*from, "name")
-	t.Description = MustString(*from, "description")
-	t.Version = MustInt(*from, "version")
-	t.CreationType = MustString(*from, "creationType")
-	t.WorkspaceID = MustString(*from, "workspaceId")
-	t.CreatedAt = MustString(*from, "created_at")
-	t.UpdatedAt = MustString(*from, "updated_at")
+	t.ID = MustString(from, "id")
+	t.Name = MustString(from, "name")
+	t.Description = MustString(from, "description")
+	t.Version = int(MustFloat64(from, "version"))
+	t.CreationType = MustString(from, "creationType")
+	t.WorkspaceID = MustString(from, "workspaceId")
+	t.CreatedAt = MustString(from, "created_at")
+	t.UpdatedAt = MustString(from, "updated_at")
+	t.TrackingPlanArgs.FromResourceData(
+		MustMapStringInterface(from, "trackingplan_args"),
+	)
 
-	events := MapStringInterfaceSlice(*from, "events", nil)
+	events := MapStringInterfaceSlice(from, "events", nil)
 	if len(events) == 0 {
 		return
 	}
 
 	tpEvents := make([]*TrackingPlanEventState, len(events))
 	for idx, event := range events {
+
+		tpEvents[idx] = &TrackingPlanEventState{
+			ID:             MustString(event, "id"),
+			EventID:        MustString(event, "eventId"),
+			Name:           MustString(event, "name"),
+			Description:    MustString(event, "description"),
+			EventType:      MustString(event, "eventType"),
+			AllowUnplanned: MustBool(event, "allowUnplanned"),
+			Properties:     make([]*TrackingPlanPropertyState, 0),
+		}
 
 		properties := MapStringInterfaceSlice(event, "properties", nil)
 		if len(properties) == 0 {
@@ -139,20 +163,11 @@ func (t *TrackingPlanState) FromResourceData(from *resources.ResourceData) {
 				Name:        MustString(property, "name"),
 				Description: MustString(property, "description"),
 				Type:        MustString(property, "type"),
-				Config:      MapStringInterface(property, "config", nil),
+				Config:      MapStringInterface(property, "config", make(map[string]interface{})),
 				Required:    MustBool(property, "required"),
 			}
 		}
-
-		tpEvents[idx] = &TrackingPlanEventState{
-			ID:             MustString(event, "id"),
-			EventID:        MustString(event, "eventId"),
-			Name:           MustString(event, "name"),
-			Description:    MustString(event, "description"),
-			EventType:      MustString(event, "eventType"),
-			AllowUnplanned: MustBool(event, "allowUnplanned"),
-			Properties:     tpProperties,
-		}
+		tpEvents[idx].Properties = tpProperties
 	}
 
 	t.Events = tpEvents
@@ -161,11 +176,74 @@ func (t *TrackingPlanState) FromResourceData(from *resources.ResourceData) {
 // Encapsulates the catalog argument which is added as a resource
 // when registering the tracking plan
 type TrackingPlanArgs struct {
-	localcatalog.TrackingPlan
+	Name        string                   `json:"display_name"`
+	LocalID     string                   `json:"id"`
+	Description string                   `json:"description"`
+	Events      []*TrackingPlanEventArgs `json:"events"`
 }
 
-func (args *TrackingPlanArgs) EventByLocalID(id string) *localcatalog.TPEvent {
-	for _, event := range args.TrackingPlan.EventProps {
+type TrackingPlanEventArgs struct {
+	Name           string                      `json:"name"`
+	LocalID        string                      `json:"id"`
+	Description    string                      `json:"description"`
+	Type           string                      `json:"type"`
+	AllowUnplanned bool                        `json:"allow_unplanned"`
+	Properties     []*TrackingPlanPropertyArgs `json:"properties"`
+}
+
+func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPropertyArgs {
+	for _, prop := range args.Properties {
+		if prop.LocalID == id {
+			return prop
+		}
+	}
+	return nil
+}
+
+type TrackingPlanPropertyArgs struct {
+	Name        string                 `json:"name"`
+	LocalID     string                 `json:"id"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"config"`
+	Required    bool                   `json:"required"`
+}
+
+func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan) {
+
+	args.Name = from.Name
+	args.LocalID = from.LocalID
+	args.Description = from.Description
+
+	events := make([]*TrackingPlanEventArgs, 0, len(from.EventProps))
+	for _, event := range from.EventProps {
+		properties := make([]*TrackingPlanPropertyArgs, 0, len(event.Properties))
+		for _, prop := range event.Properties {
+			properties = append(properties, &TrackingPlanPropertyArgs{
+				Name:        prop.Name,
+				Description: prop.Description,
+				LocalID:     prop.LocalID,
+				Type:        prop.Type,
+				Config:      prop.Config,
+				Required:    prop.Required,
+			})
+		}
+
+		events = append(events, &TrackingPlanEventArgs{
+			Name:           event.Name,
+			LocalID:        event.LocalID,
+			Description:    event.Description,
+			Type:           event.Type,
+			AllowUnplanned: event.AllowUnplanned,
+			Properties:     properties,
+		})
+	}
+
+	args.Events = events
+}
+
+func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
+	for _, event := range args.Events {
 		if event.LocalID == id {
 			return event
 		}
@@ -173,7 +251,7 @@ func (args *TrackingPlanArgs) EventByLocalID(id string) *localcatalog.TPEvent {
 	return nil
 }
 
-func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *localcatalog.TPEventProperty {
+func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *TrackingPlanPropertyArgs {
 	event := args.EventByLocalID(eventID)
 	if event == nil {
 		return nil
@@ -187,58 +265,61 @@ func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *localcatalo
 	return nil
 }
 
-func (args *TrackingPlanArgs) FromResourceData(from *resources.ResourceData) {
-	args.TrackingPlan = localcatalog.TrackingPlan{
-		Name:        MustString(*from, "display_name"),
-		Description: MustString(*from, "description"),
-	}
+func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 
-	events := MapStringInterfaceSlice(*from, "event_props", nil)
+	args.Name = MustString(from, "display_name")
+	args.Description = MustString(from, "description")
+	args.LocalID = MustString(from, "local_id")
+
+	events := MapStringInterfaceSlice(from, "events", nil)
 	if len(events) == 0 {
 		return
 	}
 
-	eventProps := make([]*localcatalog.TPEvent, len(events))
+	eventProps := make([]*TrackingPlanEventArgs, len(events))
 	for idx, event := range events {
+
+		eventProps[idx] = &TrackingPlanEventArgs{
+			Name:           MustString(event, "name"),
+			Description:    MustString(event, "description"),
+			LocalID:        MustString(event, "local_id"),
+			Type:           MustString(event, "type"),
+			AllowUnplanned: MustBool(event, "allow_unplanned"),
+			Properties:     make([]*TrackingPlanPropertyArgs, 0),
+		}
+
 		properties := MapStringInterfaceSlice(event, "properties", nil)
 		if len(properties) == 0 {
 			continue
 		}
 
-		tpProperties := make([]*localcatalog.TPEventProperty, len(properties))
+		tpProperties := make([]*TrackingPlanPropertyArgs, len(properties))
 		for idx, property := range properties {
-			tpProperties[idx] = &localcatalog.TPEventProperty{
+			tpProperties[idx] = &TrackingPlanPropertyArgs{
+				LocalID:     MustString(property, "local_id"),
 				Name:        MustString(property, "name"),
 				Description: MustString(property, "description"),
 				Type:        MustString(property, "type"),
-				Config:      MapStringInterface(property, "config", nil),
+				Config:      MapStringInterface(property, "config", make(map[string]interface{})),
 				Required:    MustBool(property, "required"),
 			}
 		}
-
-		eventProps[idx] = &localcatalog.TPEvent{
-			Name:           MustString(event, "name"),
-			Description:    MustString(event, "description"),
-			LocalID:        MustString(event, "id"),
-			Type:           MustString(event, "type"),
-			AllowUnplanned: MustBool(event, "allow_unplanned"),
-			Properties:     tpProperties,
-		}
+		eventProps[idx].Properties = tpProperties
 	}
-
-	args.TrackingPlan.EventProps = eventProps
+	args.Events = eventProps
 }
 
-func (args *TrackingPlanArgs) ToResourceData() *resources.ResourceData {
+func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 
 	events := make([]map[string]interface{}, 0)
-	for _, event := range args.TrackingPlan.EventProps {
+	for _, event := range args.Events {
 
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
 			properties = append(properties, map[string]interface{}{
 				"name":        property.Name,
 				"description": property.Description,
+				"local_id":    property.LocalID,
 				"type":        property.Type,
 				"config":      property.Config,
 				"required":    property.Required,
@@ -246,7 +327,7 @@ func (args *TrackingPlanArgs) ToResourceData() *resources.ResourceData {
 		}
 
 		events = append(events, map[string]interface{}{
-			"id":              event.LocalID,
+			"local_id":        event.LocalID,
 			"name":            event.Name,
 			"description":     event.Description,
 			"type":            event.Type,
@@ -255,14 +336,15 @@ func (args *TrackingPlanArgs) ToResourceData() *resources.ResourceData {
 		})
 	}
 
-	return &resources.ResourceData{
-		"display_name": args.TrackingPlan.Name,
-		"description":  args.TrackingPlan.Description,
-		"event_props":  events,
+	return resources.ResourceData{
+		"display_name": args.Name,
+		"description":  args.Description,
+		"local_id":     args.LocalID,
+		"events":       events,
 	}
 }
 
-func GetUpsertEventPayload(from *localcatalog.TPEvent) client.TrackingPlanUpsertEvent {
+func GetUpsertEventPayload(from *TrackingPlanEventArgs) client.TrackingPlanUpsertEvent {
 	// Get the properties in correct shape before we can
 	// send it to the catalog
 	var (
@@ -275,7 +357,7 @@ func GetUpsertEventPayload(from *localcatalog.TPEvent) client.TrackingPlanUpsert
 		propLookup[prop.Name] = map[string]interface{}{
 			"type": prop.Type,
 		}
-		// Whatever is in the config add it as it is
+
 		for k, v := range prop.Config {
 			propLookup[prop.Name].(map[string]interface{})[k] = v
 		}
@@ -318,13 +400,14 @@ func GetUpsertEventPayload(from *localcatalog.TPEvent) client.TrackingPlanUpsert
 
 // ConstructTPEventState constructs the tracking plan event state from the catalog event and with the event created
 // upstream in the upsert event request
-func ConstructTPEventState(localEvent *localcatalog.TPEvent, catalogEvent *client.TrackingPlanEvent) *TrackingPlanEventState {
+func ConstructTPEventState(localEvent *TrackingPlanEventArgs, catalogEvent *client.TrackingPlanEvent) *TrackingPlanEventState {
 
 	properties := make([]*TrackingPlanPropertyState, 0, len(localEvent.Properties))
 	for _, prop := range localEvent.Properties {
 		properties = append(properties, &TrackingPlanPropertyState{
 			Name:        prop.Name,
 			Description: prop.Description,
+			LocalID:     prop.LocalID,
 			Type:        prop.Type,
 			Config:      prop.Config,
 			Required:    prop.Required,
@@ -334,6 +417,7 @@ func ConstructTPEventState(localEvent *localcatalog.TPEvent, catalogEvent *clien
 	return &TrackingPlanEventState{
 		ID:             catalogEvent.ID,
 		EventID:        catalogEvent.EventID,
+		LocalID:        localEvent.LocalID,
 		Name:           localEvent.Name,
 		Description:    localEvent.Description,
 		EventType:      localEvent.Type,

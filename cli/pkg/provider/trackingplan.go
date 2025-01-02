@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 )
@@ -30,7 +29,7 @@ func (p *trackingPlanProvider) Create(ctx context.Context, ID string, resourceTy
 	p.log.Debug("creating tracking plan", "id", ID)
 
 	args := state.TrackingPlanArgs{}
-	args.FromResourceData(&input)
+	args.FromResourceData(input)
 
 	created, err := p.client.CreateTrackingPlan(ctx, client.TrackingPlanCreate{
 		Name:        args.Name,
@@ -47,7 +46,7 @@ func (p *trackingPlanProvider) Create(ctx context.Context, ID string, resourceTy
 
 	// FIXME: This is a hacky way to construct the state from each event upsert
 	// which can fail in the middle itself and leave the system in a inconsistent state
-	for _, event := range args.EventProps {
+	for _, event := range args.Events {
 		lastupserted, err := p.client.UpsertTrackingPlan(
 			ctx,
 			created.ID,
@@ -63,34 +62,36 @@ func (p *trackingPlanProvider) Create(ctx context.Context, ID string, resourceTy
 	}
 
 	tpState := state.TrackingPlanState{
-		ID:          created.ID,
-		Name:        created.Name,
-		Description: *created.Description,
-		WorkspaceID: created.WorkspaceID,
-		CreatedAt:   created.CreatedAt.String(),
-		UpdatedAt:   created.UpdatedAt.String(),
-		Events:      eventStates,
+		TrackingPlanArgs: args,
+		ID:               created.ID,
+		Name:             created.Name,
+		Description:      *created.Description,
+		WorkspaceID:      created.WorkspaceID,
+		CreatedAt:        created.CreatedAt.String(),
+		UpdatedAt:        created.UpdatedAt.String(),
+		Events:           eventStates,
 	}
 
-	return tpState.ToResourceData(), nil
+	resourceData := tpState.ToResourceData()
+	return &resourceData, nil
 
 }
 
 func (p *trackingPlanProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating tracking plan", "id", ID)
 
-	prevState := &state.TrackingPlanState{}
-	prevState.FromResourceData(&olds)
+	prevState := state.TrackingPlanState{}
+	prevState.FromResourceData(olds)
 
-	toArgs := &state.TrackingPlanArgs{}
-	toArgs.FromResourceData(&input)
+	toArgs := state.TrackingPlanArgs{}
+	toArgs.FromResourceData(input)
 
 	var (
 		updated *client.TrackingPlan
 		err     error
 	)
 
-	if prevState.Name != toArgs.Name || prevState.Description != toArgs.Description {
+	if prevState.TrackingPlanArgs.Name != toArgs.Name || prevState.TrackingPlanArgs.Description != toArgs.Description {
 		if updated, err = p.client.UpdateTrackingPlan(
 			ctx,
 			prevState.ID,
@@ -100,17 +101,23 @@ func (p *trackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 		}
 	}
 
-	diff := p.diff(toArgs, prevState)
+	diff := p.diff(&toArgs, &prevState.TrackingPlanArgs)
 	updatedEventStates := make([]*state.TrackingPlanEventState, 0)
 
 	for _, event := range diff.Deleted {
-		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, event.LocalID); err != nil {
+
+		catalogEventID := prevState.CatalogEventIDForLocalID(event.LocalID)
+		if catalogEventID == "" {
+			return nil, fmt.Errorf("state discrepancy as upstream event id not found for local id: %s", event.LocalID)
+		}
+
+		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, catalogEventID); err != nil {
 			return nil, fmt.Errorf("deleting tracking plan event in catalog: %w", err)
 		}
 	}
 
 	for _, event := range diff.Added {
-		lastupserted, err := p.client.UpsertTrackingPlan(
+		updated, err = p.client.UpsertTrackingPlan(
 			ctx,
 			prevState.ID,
 			state.GetUpsertEventPayload(event),
@@ -122,7 +129,7 @@ func (p *trackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 
 		updatedEventStates = append(updatedEventStates, state.ConstructTPEventState(
 			event,
-			&lastupserted.Events[len(lastupserted.Events)-1]))
+			&updated.Events[len(updated.Events)-1]))
 	}
 
 	for _, event := range diff.Updated {
@@ -142,16 +149,18 @@ func (p *trackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 	}
 
 	tpState := state.TrackingPlanState{
-		ID:          updated.ID,
-		Name:        updated.Name,
-		Description: *updated.Description,
-		WorkspaceID: updated.WorkspaceID,
-		CreatedAt:   updated.CreatedAt.String(),
-		UpdatedAt:   updated.UpdatedAt.String(),
-		Events:      updatedEventStates,
+		TrackingPlanArgs: toArgs,
+		ID:               updated.ID,
+		Name:             updated.Name,
+		Description:      *updated.Description,
+		WorkspaceID:      updated.WorkspaceID,
+		CreatedAt:        updated.CreatedAt.String(),
+		UpdatedAt:        updated.UpdatedAt.String(),
+		Events:           updatedEventStates,
 	}
 
-	return tpState.ToResourceData(), nil
+	resourceData := tpState.ToResourceData()
+	return &resourceData, nil
 }
 
 func (p *trackingPlanProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
@@ -164,14 +173,14 @@ func (p *trackingPlanProvider) Delete(ctx context.Context, ID string, resourceTy
 	return nil
 }
 
-func (p *trackingPlanProvider) diff(input *state.TrackingPlanArgs, old *state.TrackingPlanState) state.TrackingPlanStateDiff {
+func (p *trackingPlanProvider) diff(current *state.TrackingPlanArgs, old *state.TrackingPlanArgs) state.TrackingPlanStateDiff {
 	diffResponse := state.TrackingPlanStateDiff{
-		Added:   make([]*localcatalog.TPEvent, 0),
-		Deleted: make([]*state.TrackingPlanEventState, 0),
-		Updated: make([]*localcatalog.TPEvent, 0),
+		Added:   make([]*state.TrackingPlanEventArgs, 0),
+		Updated: make([]*state.TrackingPlanEventArgs, 0),
+		Deleted: make([]*state.TrackingPlanEventArgs, 0),
 	}
 
-	for _, event := range input.EventProps {
+	for _, event := range current.Events {
 		// In new but not in old ->  Added
 		if oldEvent := old.EventByLocalID(event.LocalID); oldEvent != nil {
 			continue
@@ -181,10 +190,10 @@ func (p *trackingPlanProvider) diff(input *state.TrackingPlanArgs, old *state.Tr
 
 	// Updated / Deleted calculation
 	for _, event := range old.Events {
-		var inputEvent *localcatalog.TPEvent
+		var inputEvent *state.TrackingPlanEventArgs
 
 		// In old but not in new ->  Deleted
-		if inputEvent = input.EventByLocalID(event.LocalID); inputEvent == nil {
+		if inputEvent = current.EventByLocalID(event.LocalID); inputEvent == nil {
 			diffResponse.Deleted = append(diffResponse.Deleted, event)
 			continue
 		}
@@ -203,8 +212,8 @@ func (p *trackingPlanProvider) diff(input *state.TrackingPlanArgs, old *state.Tr
 
 		for _, prop := range event.Properties {
 
-			var inputProp *localcatalog.TPEventProperty
-			if inputProp = inputEvent.PropertyByLocalID(prop.LocalID); inputProp == nil {
+			var inputProp *state.TrackingPlanPropertyArgs
+			if inputProp = event.PropertyByLocalID(prop.LocalID); inputProp == nil {
 				diffResponse.Updated = append(diffResponse.Updated, inputEvent)
 				break
 			}

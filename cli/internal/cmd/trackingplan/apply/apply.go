@@ -5,15 +5,12 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/spf13/cobra"
 )
@@ -78,17 +75,6 @@ func NewCmdTPApply() *cobra.Command {
 	return cmd
 }
 
-func catalogProvider() (syncer.Provider, error) {
-	cfg := config.GetConfig()
-
-	rawClient, err := client.New(cfg.Auth.AccessToken, client.WithBaseURL(cfg.APIURL))
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-
-	return provider.NewCatalogProvider(client.NewRudderDataCatalog(rawClient)), nil
-}
-
 func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	graph := resources.NewGraph()
 
@@ -97,14 +83,17 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		for _, prop := range props {
 			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
 
+			// fmt.Printf("property fromlocal: %+v\n", prop.Config == nil)
 			args := pstate.PropertyArgs{
 				Name:        prop.Name,
 				Description: prop.Description,
 				Type:        prop.Type,
 				Config:      prop.Config,
 			}
+			// fmt.Printf("property inargs: %#v\n", args.Config == nil)
+			// fmt.Printf("toresourcedata: %#v\n", args.ToResourceData()["config"] == nil)
 
-			resource := resources.NewResource(prop.LocalID, pstate.EntityTypeProperty, *args.ToResourceData())
+			resource := resources.NewResource(prop.LocalID, pstate.EntityTypeProperty, args.ToResourceData())
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -116,14 +105,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		for _, event := range events {
 			log.Debug("adding event under group to graph", "event", event.LocalID, "group", group)
 
-			categoryID := "random-category-id"
 			args := pstate.EventArgs{
 				Name:        event.Name,
 				Description: event.Description,
 				EventType:   event.Type,
-				CategoryID:  &categoryID,
+				CategoryID:  nil,
 			}
-			resource := resources.NewResource(event.LocalID, pstate.EntityTypeEvent, *args.ToResourceData())
+			resource := resources.NewResource(event.LocalID, pstate.EntityTypeEvent, args.ToResourceData())
 			graph.AddResource(resource)
 
 			eventIDToURN[event.LocalID] = resource.URN()
@@ -133,16 +121,12 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	for group, tp := range catalog.TrackingPlans {
 		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
 
-		args := pstate.TrackingPlanArgs{
-			TrackingPlan: *tp,
-		}
+		args := pstate.TrackingPlanArgs{}
+		args.FromCatalogTrackingPlan(tp)
 
-		resource := resources.NewResource(tp.LocalID, pstate.EntityTypeTrackingPlan, *args.ToResourceData())
+		resource := resources.NewResource(tp.LocalID, pstate.EntityTypeTrackingPlan, args.ToResourceData())
 		graph.AddResource(resource)
-
-		for urn := range getDependencies(tp, propIDToURN, eventIDToURN) {
-			graph.AddDependency(resource.URN(), urn)
-		}
+		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}
 
 	return graph
@@ -150,17 +134,17 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
 // of the properties and events that are used in the tracking plan
-func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) map[string]bool {
-	dependencies := make(map[string]bool)
+func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) []string {
+	dependencies := make([]string, 0)
 
 	for _, event := range tp.EventProps {
 		if urn, ok := eventIDToURN[event.LocalID]; ok {
-			dependencies[urn] = true
+			dependencies = append(dependencies, urn)
 		}
 
 		for _, prop := range event.Properties {
 			if urn, ok := propIDToURN[prop.LocalID]; ok {
-				dependencies[urn] = true
+				dependencies = append(dependencies, urn)
 			}
 		}
 	}
@@ -173,7 +157,6 @@ func readCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading catalog at location: %w", err)
 	}
-
 	return catalog, nil
 }
 
@@ -185,6 +168,5 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
 		}
 	}
-
 	return nil
 }

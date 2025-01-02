@@ -29,7 +29,7 @@ func (p *propertyProvider) Create(ctx context.Context, ID string, resourceType s
 	p.log.With("provider", "property").Debug("creating property resource in upstream catalog", "id", ID)
 
 	toArgs := state.PropertyArgs{}
-	toArgs.FromResourceData(&data)
+	toArgs.FromResourceData(data)
 
 	property, err := p.client.CreateProperty(ctx, client.PropertyCreate{
 		Name:        toArgs.Name,
@@ -43,27 +43,29 @@ func (p *propertyProvider) Create(ctx context.Context, ID string, resourceType s
 	}
 
 	propertyState := state.PropertyState{
-		ID:          property.ID,
-		Name:        property.Name,
-		Description: property.Description,
-		Type:        property.Type,
-		Config:      property.Config,
-		WorkspaceID: property.WorkspaceId,
-		CreatedAt:   property.CreatedAt.UTC().String(),
-		UpdatedAt:   property.UpdatedAt.UTC().String(),
+		PropertyArgs: toArgs,
+		ID:           property.ID,
+		Name:         property.Name,
+		Description:  property.Description,
+		Type:         property.Type,
+		Config:       property.Config,
+		WorkspaceID:  property.WorkspaceId,
+		CreatedAt:    property.CreatedAt.UTC().String(),
+		UpdatedAt:    property.UpdatedAt.UTC().String(),
 	}
 
-	return propertyState.ToResourceData(), nil
+	resourceData := propertyState.ToResourceData()
+	return &resourceData, nil
 }
 
 func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating property resource in upstream catalog", "id", ID)
 
 	toArgs := state.PropertyArgs{}
-	toArgs.FromResourceData(&input)
+	toArgs.FromResourceData(input)
 
 	oldState := state.PropertyState{}
-	oldState.FromResourceData(&olds)
+	oldState.FromResourceData(olds)
 
 	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &client.Property{
 		ID:          oldState.ID,
@@ -79,17 +81,19 @@ func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType s
 	}
 
 	toState := state.PropertyState{
-		ID:          updated.ID,
-		Name:        updated.Name,
-		Description: updated.Description,
-		Type:        updated.Type,
-		Config:      updated.Config,
-		WorkspaceID: updated.WorkspaceId,
-		CreatedAt:   updated.CreatedAt.String(),
-		UpdatedAt:   updated.UpdatedAt.String(),
+		PropertyArgs: toArgs,
+		ID:           updated.ID,
+		Name:         updated.Name,
+		Description:  updated.Description,
+		Type:         updated.Type,
+		Config:       updated.Config,
+		WorkspaceID:  updated.WorkspaceId,
+		CreatedAt:    updated.CreatedAt.String(),
+		UpdatedAt:    updated.UpdatedAt.String(),
 	}
 
-	return toState.ToResourceData(), nil
+	resourceData := toState.ToResourceData()
+	return &resourceData, nil
 }
 
 func (p *propertyProvider) Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {

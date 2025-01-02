@@ -25,6 +25,15 @@ type DataCatalog struct {
 	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
 }
 
+func (dc *DataCatalog) ExpandRefs() error {
+	for _, tp := range dc.TrackingPlans {
+		if err := tp.ExpandRefs(dc); err != nil {
+			return fmt.Errorf("inflating refs for tracking plan: %w", err)
+		}
+	}
+	return nil
+}
+
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
 	if props, ok := dc.Properties[EntityGroup(groupName)]; ok {
 		for _, prop := range props {

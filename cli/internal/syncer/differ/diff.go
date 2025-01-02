@@ -4,6 +4,11 @@ import (
 	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/samber/lo"
+)
+
+var (
+	isNilTypes = []reflect.Kind{reflect.Map, reflect.Slice, reflect.Pointer}
 )
 
 // Diff represents the differences between two resource graphs
@@ -85,16 +90,34 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 			return
 		}
 
+		newV1, ok := rewriteCompatibleType(v1)
+		if ok {
+			v1 = newV1
+		}
+
 		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
 			diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			return
 		}
 
 		switch v1Typed := v1.(type) {
+
+		case []map[string]interface{}:
+			v2Typed := v2.([]map[string]interface{})
+			if len(v1Typed) != len(v2Typed) {
+				// fmt.Printf("key: %s, v1: %v v2: %v \n", key, v1Typed, v2Typed)
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				return
+			}
+			for i := range v1Typed {
+				compareValues(key, v1Typed[i], v2Typed[i])
+			}
+
 		case map[string]interface{}:
 			v2Typed := v2.(map[string]interface{})
 			subDiffs := CompareData(v1Typed, v2Typed)
 			if len(subDiffs) > 0 {
+				// fmt.Printf("key: %s, v1: %v v2: %v \n", key, v1Typed, v2Typed)
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			}
 		case []interface{}:
@@ -132,12 +155,33 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	return diffs
 }
 
+// rewrite []interface{} ->  map[string]interface{} if possible
+// and return back the response.
+func rewriteCompatibleType(input interface{}) (interface{}, bool) {
+
+	if _, ok := input.([]interface{}); !ok {
+		return nil, false
+	}
+
+	slice := input.([]interface{})
+
+	output := make([]map[string]interface{}, len(slice))
+	for i, item := range slice {
+		if _, ok := item.(map[string]interface{}); !ok {
+			return nil, false
+		}
+		output[i] = item.(map[string]interface{})
+	}
+
+	return output, true
+}
+
 func isNil(val interface{}) bool {
 	if val == nil {
 		return true
 	}
 
-	if reflect.ValueOf(val).Kind() == reflect.Pointer {
+	if lo.Contains(isNilTypes, reflect.ValueOf(val).Kind()) {
 		return reflect.ValueOf(val).IsNil()
 	}
 

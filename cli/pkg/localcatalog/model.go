@@ -22,15 +22,6 @@ type Property struct {
 	Config      map[string]interface{} `json:"propConfig"`
 }
 
-func (p Property) GetData() map[string]interface{} {
-	return map[string]interface{}{
-		"display_name": p.Name,
-		"description":  p.Description,
-		"type":         p.Type,
-		"propConfig":   p.Config,
-	}
-}
-
 type PropertySpec struct {
 	Properties []Property `json:"properties"`
 }
@@ -57,15 +48,6 @@ type Event struct {
 	Type        string   `json:"event_type"`
 	Description string   `json:"description"`
 	Categories  []string `json:"categories"`
-}
-
-func (e Event) GetData() map[string]interface{} {
-	return map[string]interface{}{
-		"display_name": e.Name,
-		"event_type":   e.Type,
-		"description":  e.Description,
-	}
-	// attach the category for the event
 }
 
 type EventSpec struct {

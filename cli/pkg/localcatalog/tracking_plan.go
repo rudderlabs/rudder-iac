@@ -78,43 +78,6 @@ type TPRuleIncludes struct {
 	Ref string `json:"$ref"`
 }
 
-// GetData returns the trackingplan extracted fromt the
-// yamls in a format which is consumable by the catalog
-func (tp *TrackingPlan) GetData() map[string]interface{} {
-
-	eventProps := make([]map[string]interface{}, len(tp.EventProps))
-	for i, event := range tp.EventProps {
-
-		props := make([]map[string]interface{}, len(event.Properties))
-		for j, prop := range event.Properties {
-			props[j] = map[string]interface{}{
-				"name":        prop.Name,
-				"id":          prop.LocalID,
-				"description": prop.Description,
-				"type":        prop.Type,
-				"required":    prop.Required,
-				"config":      prop.Config,
-			}
-		}
-
-		eventProps[i] = map[string]interface{}{
-			"name":            event.Name,
-			"id":              event.LocalID,
-			"description":     event.Description,
-			"type":            event.Type,
-			"allow_unplanned": event.AllowUnplanned,
-			"properties":      props,
-		}
-	}
-
-	return map[string]interface{}{
-		"display_name": tp.Name,
-		"id":           tp.LocalID,
-		"description":  tp.Description,
-		"event_props":  eventProps,
-	}
-}
-
 // ExpandRefs simply expands the references being held
 // when reading the tracking plan with the actual events and properties
 func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {

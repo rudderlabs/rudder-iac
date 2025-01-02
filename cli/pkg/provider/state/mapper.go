@@ -9,6 +9,6 @@ const (
 )
 
 type StateMapper interface {
-	ToResourceData() *resources.ResourceData
-	FromResourceData(*resources.ResourceData)
+	ToResourceData() resources.ResourceData
+	FromResourceData(resources.ResourceData)
 }

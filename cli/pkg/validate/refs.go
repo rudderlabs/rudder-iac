@@ -13,19 +13,16 @@ var invalidRefFormat = fmt.Errorf("invalid reference format")
 type RefValidator struct {
 }
 
-// This is gonna be a tricky one, not sure how to implement this ?
 func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	log.Info("validating references lookup in entities in the catalog")
 
 	errs := make([]ValidationError, 0)
 	for _, tp := range dc.TrackingPlans {
-		// Iterate over all the rules in the tracking plan
 		for _, rule := range tp.Rules {
-			refsErrs := rv.handleRefs(rule, dc)
-			if len(refsErrs) == 0 {
-				continue
-			}
-			errs = append(errs, refsErrs...) // simply append to the errors
+			errs = append(
+				errs,
+				rv.handleRefs(rule, dc)...,
+			)
 		}
 	}
 	return errs
@@ -69,7 +66,6 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.Catalog
 		}
 	}
 	if rule.Includes != nil {
-
 		matches := catalog.IncludeRegex.FindStringSubmatch(rule.Includes.Ref)
 		if len(matches) != 3 {
 			errs = append(errs, ValidationError{
