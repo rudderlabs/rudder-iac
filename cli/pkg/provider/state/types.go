@@ -56,6 +56,10 @@ func MustMapStringInterfacePtr(from map[string]interface{}, key string) *map[str
 	return MustMapValue[string, interface{}, *map[string]interface{}](from, key)
 }
 
+func InterfaceSlice(from map[string]interface{}, key string, defaultval []interface{}) []interface{} {
+	return SafeMapValue(from, key, defaultval)
+}
+
 func MapStringInterfaceSlice(from map[string]interface{}, key string, defaultval []map[string]interface{}) []map[string]interface{} {
 	return SafeMapValue(from, key, defaultval)
 }

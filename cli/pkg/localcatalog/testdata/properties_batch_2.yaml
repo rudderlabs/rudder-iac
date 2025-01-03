@@ -16,4 +16,8 @@ spec:
       type: string
       description: "Location of the user"
       propConfig:
-        enum: "['US', 'UK', 'India', 'Canada']"
+        enum: 
+        - US
+        - UK
+        - India
+        - Canada

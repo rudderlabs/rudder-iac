@@ -8,64 +8,64 @@ var (
 )
 
 type EventArgs struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	EventType   string  `json:"eventType"`
-	CategoryID  *string `json:"categoryId"`
+	Name        string
+	Description string
+	EventType   string
+	CategoryID  *string
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
-		"display_name": args.Name,
-		"description":  args.Description,
-		"event_type":   args.EventType,
-		"categoryId":   args.CategoryID,
+		"name":        args.Name,
+		"description": args.Description,
+		"eventType":   args.EventType,
+		"categoryId":  args.CategoryID,
 	}
 }
 
 func (args *EventArgs) FromResourceData(from resources.ResourceData) {
-	args.Name = MustString(from, "display_name")
+	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
-	args.EventType = MustString(from, "event_type")
+	args.EventType = MustString(from, "eventType")
 	args.CategoryID = StringPtr(from, "categoryId", nil)
 }
 
 type EventState struct {
 	EventArgs
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	EventType   string  `json:"eventType"`
-	WorkspaceID string  `json:"workspaceId"`
-	CategoryID  *string `json:"categoryId"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID          string
+	Name        string
+	Description string
+	EventType   string
+	WorkspaceID string
+	CategoryID  *string
+	CreatedAt   string
+	UpdatedAt   string
 }
 
 func (e *EventState) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
-		"id":           e.ID,
-		"display_name": e.Name,
-		"description":  e.Description,
-		"event_type":   e.EventType,
-		"workspaceId":  e.WorkspaceID,
-		"categoryId":   e.CategoryID,
-		"created_at":   e.CreatedAt,
-		"updated_at":   e.UpdatedAt,
-		"event_args":   e.EventArgs.ToResourceData(),
+		"id":          e.ID,
+		"name":        e.Name,
+		"description": e.Description,
+		"eventType":   e.EventType,
+		"workspaceId": e.WorkspaceID,
+		"categoryId":  e.CategoryID,
+		"createdAt":   e.CreatedAt,
+		"updatedAt":   e.UpdatedAt,
+		"eventArgs":   map[string]interface{}(e.EventArgs.ToResourceData()),
 	}
 }
 
 func (e *EventState) FromResourceData(from resources.ResourceData) {
 	e.ID = MustString(from, "id")
-	e.Name = MustString(from, "display_name")
+	e.Name = MustString(from, "name")
 	e.Description = MustString(from, "description")
-	e.EventType = MustString(from, "event_type")
+	e.EventType = MustString(from, "eventType")
 	e.WorkspaceID = MustString(from, "workspaceId")
-	e.CreatedAt = MustString(from, "created_at")
-	e.UpdatedAt = MustString(from, "updated_at")
+	e.CreatedAt = MustString(from, "createdAt")
+	e.UpdatedAt = MustString(from, "updatedAt")
 	e.CategoryID = StringPtr(from, "categoryId", nil)
 	e.EventArgs.FromResourceData(resources.ResourceData(
-		MustMapStringInterface(from, "event_args"),
+		MustMapStringInterface(from, "eventArgs"),
 	))
 }

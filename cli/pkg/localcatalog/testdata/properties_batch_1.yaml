@@ -17,7 +17,11 @@ spec:
       type: string
       description: "Type of the source"
       propConfig:
-        enum: "['web', 'server', 'mobile', 'iot']"
+        enum:
+        - web
+        - server
+        - mobile
+        - iot
 
     - id: source_name
       display_name: "Source name"

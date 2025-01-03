@@ -29,9 +29,9 @@ func NewCatalogProvider(dc client.DataCatalog) syncer.Provider {
 	return &CatalogProvider{
 		client: dc,
 		providerStore: map[string]syncer.Provider{
-			PropertyResourceType:     newPropertyProvider(dc),
-			EventResourceType:        newEventProvider(dc),
-			TrackingPlanResourceType: newTrackingPlanProvider(dc),
+			PropertyResourceType:     NewPropertyProvider(dc),
+			EventResourceType:        NewEventProvider(dc),
+			TrackingPlanResourceType: NewTrackingPlanProvider(dc),
 		},
 	}
 }

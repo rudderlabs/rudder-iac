@@ -13,15 +13,24 @@ var (
 
 type TrackingPlanState struct {
 	TrackingPlanArgs
-	ID           string                    `json:"id"`
-	Name         string                    `json:"name"`
-	Description  string                    `json:"description,omitempty"`
-	Version      int                       `json:"version"`
-	CreationType string                    `json:"creationType"`
-	WorkspaceID  string                    `json:"workspaceId"`
-	CreatedAt    string                    `json:"created_at"`
-	UpdatedAt    string                    `json:"updated_at"`
-	Events       []*TrackingPlanEventState `json:"events"`
+	ID           string
+	Name         string
+	Description  string
+	Version      int
+	CreationType string
+	WorkspaceID  string
+	CreatedAt    string
+	UpdatedAt    string
+	Events       []*TrackingPlanEventState
+}
+
+func (t *TrackingPlanState) LocalIDForCatalogEventID(eventID string) string {
+	for _, event := range t.Events {
+		if event.EventID == eventID {
+			return event.LocalID
+		}
+	}
+	return ""
 }
 
 func (t *TrackingPlanState) CatalogEventIDForLocalID(localID string) string {
@@ -34,41 +43,41 @@ func (t *TrackingPlanState) CatalogEventIDForLocalID(localID string) string {
 }
 
 type TrackingPlanEventState struct {
-	ID             string                       `json:"id"`
-	EventID        string                       `json:"eventId"`
-	LocalID        string                       `json:"localId"`
-	Name           string                       `json:"name"`
-	Description    string                       `json:"description"`
-	EventType      string                       `json:"eventType"`
-	AllowUnplanned bool                         `json:"allowUnplanned"`
-	Properties     []*TrackingPlanPropertyState `json:"properties"`
+	ID      string
+	LocalID string
+	EventID string
+	// Name           string
+	// Description    string
+	// EventType      string
+	// AllowUnplanned bool
+	// Properties     []*TrackingPlanPropertyState
 }
 
-func (t *TrackingPlanState) EventByLocalID(id string) *TrackingPlanEventState {
+func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
 	for _, event := range t.Events {
-		if event.ID == id {
+		if event.LocalID == localID {
 			return event
 		}
 	}
 	return nil
 }
 
-func (t *TrackingPlanEventState) PropertyByLocalID(id string) *TrackingPlanPropertyState {
-	for _, property := range t.Properties {
-		if property.LocalID == id {
-			return property
-		}
-	}
-	return nil
-}
+// func (t *TrackingPlanEventState) PropertyByLocalID(id string) *TrackingPlanPropertyState {
+// 	for _, property := range t.Properties {
+// 		if property.LocalID == id {
+// 			return property
+// 		}
+// 	}
+// 	return nil
+// }
 
 type TrackingPlanPropertyState struct {
-	Name        string                 `json:"name"`
-	LocalID     string                 `json:"localId"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Required    bool                   `json:"required"`
+	Name        string
+	LocalID     string
+	Description string
+	Type        string
+	Config      map[string]interface{}
+	Required    bool
 }
 
 type TrackingPlanStateDiff struct {
@@ -85,38 +94,24 @@ func (t *TrackingPlanState) ToResourceData() resources.ResourceData {
 
 	for _, event := range t.Events {
 
-		var properties []map[string]interface{}
-		for _, property := range event.Properties {
-			properties = append(properties, map[string]interface{}{
-				"name":        property.Name,
-				"description": property.Description,
-				"type":        property.Type,
-				"config":      property.Config,
-				"required":    property.Required,
-			})
-		}
 		events = append(events, map[string]interface{}{
-			"id":             event.ID,
-			"eventId":        event.EventID,
-			"name":           event.Name,
-			"description":    event.Description,
-			"eventType":      event.EventType,
-			"allowUnplanned": event.AllowUnplanned,
-			"properties":     properties,
+			"id":      event.ID,
+			"eventId": event.EventID,
+			"localId": event.LocalID,
 		})
 	}
 
 	return resources.ResourceData{
-		"id":                t.ID,
-		"name":              t.Name,
-		"description":       t.Description,
-		"version":           t.Version,
-		"creationType":      t.CreationType,
-		"workspaceId":       t.WorkspaceID,
-		"created_at":        t.CreatedAt,
-		"updated_at":        t.UpdatedAt,
-		"events":            events,
-		"trackingplan_args": t.TrackingPlanArgs.ToResourceData(),
+		"id":               t.ID,
+		"name":             t.Name,
+		"description":      t.Description,
+		"version":          t.Version,
+		"creationType":     t.CreationType,
+		"workspaceId":      t.WorkspaceID,
+		"createdAt":        t.CreatedAt,
+		"updatedAt":        t.UpdatedAt,
+		"events":           events,
+		"trackingPlanArgs": map[string]interface{}(t.TrackingPlanArgs.ToResourceData()),
 	}
 }
 
@@ -128,46 +123,26 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	t.Version = int(MustFloat64(from, "version"))
 	t.CreationType = MustString(from, "creationType")
 	t.WorkspaceID = MustString(from, "workspaceId")
-	t.CreatedAt = MustString(from, "created_at")
-	t.UpdatedAt = MustString(from, "updated_at")
+	t.CreatedAt = MustString(from, "createdAt")
+	t.UpdatedAt = MustString(from, "updatedAt")
 	t.TrackingPlanArgs.FromResourceData(
-		MustMapStringInterface(from, "trackingplan_args"),
+		MustMapStringInterface(from, "trackingPlanArgs"),
 	)
 
-	events := MapStringInterfaceSlice(from, "events", nil)
+	events := InterfaceSlice(from, "events", nil)
 	if len(events) == 0 {
 		return
 	}
 
 	tpEvents := make([]*TrackingPlanEventState, len(events))
 	for idx, event := range events {
+		event := event.(map[string]interface{})
 
 		tpEvents[idx] = &TrackingPlanEventState{
-			ID:             MustString(event, "id"),
-			EventID:        MustString(event, "eventId"),
-			Name:           MustString(event, "name"),
-			Description:    MustString(event, "description"),
-			EventType:      MustString(event, "eventType"),
-			AllowUnplanned: MustBool(event, "allowUnplanned"),
-			Properties:     make([]*TrackingPlanPropertyState, 0),
+			ID:      MustString(event, "id"),
+			EventID: MustString(event, "eventId"),
+			LocalID: MustString(event, "localId"),
 		}
-
-		properties := MapStringInterfaceSlice(event, "properties", nil)
-		if len(properties) == 0 {
-			continue
-		}
-
-		tpProperties := make([]*TrackingPlanPropertyState, 0, len(properties))
-		for idx, property := range properties {
-			tpProperties[idx] = &TrackingPlanPropertyState{
-				Name:        MustString(property, "name"),
-				Description: MustString(property, "description"),
-				Type:        MustString(property, "type"),
-				Config:      MapStringInterface(property, "config", make(map[string]interface{})),
-				Required:    MustBool(property, "required"),
-			}
-		}
-		tpEvents[idx].Properties = tpProperties
 	}
 
 	t.Events = tpEvents
@@ -176,19 +151,19 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 // Encapsulates the catalog argument which is added as a resource
 // when registering the tracking plan
 type TrackingPlanArgs struct {
-	Name        string                   `json:"display_name"`
-	LocalID     string                   `json:"id"`
-	Description string                   `json:"description"`
-	Events      []*TrackingPlanEventArgs `json:"events"`
+	Name        string
+	LocalID     string
+	Description string
+	Events      []*TrackingPlanEventArgs
 }
 
 type TrackingPlanEventArgs struct {
-	Name           string                      `json:"name"`
-	LocalID        string                      `json:"id"`
-	Description    string                      `json:"description"`
-	Type           string                      `json:"type"`
-	AllowUnplanned bool                        `json:"allow_unplanned"`
-	Properties     []*TrackingPlanPropertyArgs `json:"properties"`
+	Name           string
+	LocalID        string
+	Description    string
+	Type           string
+	AllowUnplanned bool
+	Properties     []*TrackingPlanPropertyArgs
 }
 
 func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPropertyArgs {
@@ -201,12 +176,12 @@ func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPro
 }
 
 type TrackingPlanPropertyArgs struct {
-	Name        string                 `json:"name"`
-	LocalID     string                 `json:"id"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Required    bool                   `json:"required"`
+	Name        string
+	LocalID     string
+	Description string
+	Type        string
+	Config      map[string]interface{}
+	Required    bool
 }
 
 func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan) {
@@ -267,36 +242,51 @@ func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *TrackingPla
 
 func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 
-	args.Name = MustString(from, "display_name")
+	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
-	args.LocalID = MustString(from, "local_id")
+	args.LocalID = MustString(from, "localId")
 
-	events := MapStringInterfaceSlice(from, "events", nil)
+	var (
+		events []interface{}
+	)
+
+	events = InterfaceSlice(from, "events", nil)
+	// When loading the args from the state []map[string]interface{} is treated as []interface{}
+	// but when we have events from catalog being registered as a resource, it is []map[string]interface{}
 	if len(events) == 0 {
-		return
+		eventsMap := MapStringInterfaceSlice(from, "events", nil)
+		for _, event := range eventsMap {
+			events = append(events, event)
+		}
 	}
 
 	eventProps := make([]*TrackingPlanEventArgs, len(events))
 	for idx, event := range events {
+		event := event.(map[string]interface{})
 
 		eventProps[idx] = &TrackingPlanEventArgs{
 			Name:           MustString(event, "name"),
 			Description:    MustString(event, "description"),
-			LocalID:        MustString(event, "local_id"),
+			LocalID:        MustString(event, "localId"),
 			Type:           MustString(event, "type"),
-			AllowUnplanned: MustBool(event, "allow_unplanned"),
+			AllowUnplanned: MustBool(event, "allowUnplanned"),
 			Properties:     make([]*TrackingPlanPropertyArgs, 0),
 		}
 
-		properties := MapStringInterfaceSlice(event, "properties", nil)
+		// Same issue as the events
+		properties := InterfaceSlice(event, "properties", nil)
 		if len(properties) == 0 {
-			continue
+			propertiesMap := MapStringInterfaceSlice(event, "properties", nil)
+			for _, prop := range propertiesMap {
+				properties = append(properties, prop)
+			}
 		}
 
 		tpProperties := make([]*TrackingPlanPropertyArgs, len(properties))
 		for idx, property := range properties {
+			property := property.(map[string]interface{})
 			tpProperties[idx] = &TrackingPlanPropertyArgs{
-				LocalID:     MustString(property, "local_id"),
+				LocalID:     MustString(property, "localId"),
 				Name:        MustString(property, "name"),
 				Description: MustString(property, "description"),
 				Type:        MustString(property, "type"),
@@ -319,7 +309,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			properties = append(properties, map[string]interface{}{
 				"name":        property.Name,
 				"description": property.Description,
-				"local_id":    property.LocalID,
+				"localId":     property.LocalID,
 				"type":        property.Type,
 				"config":      property.Config,
 				"required":    property.Required,
@@ -327,20 +317,20 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		}
 
 		events = append(events, map[string]interface{}{
-			"local_id":        event.LocalID,
-			"name":            event.Name,
-			"description":     event.Description,
-			"type":            event.Type,
-			"allow_unplanned": event.AllowUnplanned,
-			"properties":      properties,
+			"localId":        event.LocalID,
+			"name":           event.Name,
+			"description":    event.Description,
+			"type":           event.Type,
+			"allowUnplanned": event.AllowUnplanned,
+			"properties":     properties,
 		})
 	}
 
 	return resources.ResourceData{
-		"display_name": args.Name,
-		"description":  args.Description,
-		"local_id":     args.LocalID,
-		"events":       events,
+		"name":        args.Name,
+		"description": args.Description,
+		"localId":     args.LocalID,
+		"events":      events,
 	}
 }
 
@@ -395,33 +385,5 @@ func GetUpsertEventPayload(from *TrackingPlanEventArgs) client.TrackingPlanUpser
 				},
 			},
 		},
-	}
-}
-
-// ConstructTPEventState constructs the tracking plan event state from the catalog event and with the event created
-// upstream in the upsert event request
-func ConstructTPEventState(localEvent *TrackingPlanEventArgs, catalogEvent *client.TrackingPlanEvent) *TrackingPlanEventState {
-
-	properties := make([]*TrackingPlanPropertyState, 0, len(localEvent.Properties))
-	for _, prop := range localEvent.Properties {
-		properties = append(properties, &TrackingPlanPropertyState{
-			Name:        prop.Name,
-			Description: prop.Description,
-			LocalID:     prop.LocalID,
-			Type:        prop.Type,
-			Config:      prop.Config,
-			Required:    prop.Required,
-		})
-	}
-
-	return &TrackingPlanEventState{
-		ID:             catalogEvent.ID,
-		EventID:        catalogEvent.EventID,
-		LocalID:        localEvent.LocalID,
-		Name:           localEvent.Name,
-		Description:    localEvent.Description,
-		EventType:      localEvent.Type,
-		AllowUnplanned: localEvent.AllowUnplanned,
-		Properties:     properties,
 	}
 }

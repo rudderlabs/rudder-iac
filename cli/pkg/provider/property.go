@@ -16,7 +16,7 @@ type propertyProvider struct {
 	log    logger.Logger
 }
 
-func newPropertyProvider(dc client.DataCatalog) syncer.Provider {
+func NewPropertyProvider(dc client.DataCatalog) syncer.Provider {
 	return &propertyProvider{
 		client: dc,
 		log: logger.Logger{
