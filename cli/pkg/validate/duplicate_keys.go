@@ -79,8 +79,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 	}
 
 	var (
-		tpName = make(map[string]interface{})
-		tpID   = make(map[string]interface{})
+		tpName   = make(map[string]interface{})
+		tpID     = make(map[string]interface{})
 		tpRuleID = make(map[string]interface{})
 	)
 
@@ -102,7 +102,6 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 
 		tpName[tp.Name] = nil
 		tpID[tp.LocalID] = nil
-
 
 		for _, rule := range tp.Rules {
 			if _, ok := tpRuleID[rule.LocalID]; ok {

@@ -26,7 +26,9 @@ func (m *LocalManager) Load(ctx context.Context) (*State, error) {
 	data, err := os.ReadFile(m.stateFilePath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &State{}, nil
+			return &State{
+				Resources: make(map[string]*StateResource),
+			}, nil
 		}
 		return nil, err
 	}

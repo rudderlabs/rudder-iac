@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSyncerCreate(t *testing.T) {
@@ -106,7 +107,7 @@ func TestSyncerCreate(t *testing.T) {
 	}, provider.OperationLog)
 
 	savedStates := statesFromSavedLog(stateManager.SaveLog)
-	assert.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
+	require.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
 
 	// each save adds one resource, last log entry should be the final state
 	assert.Equal(t, 1, len(savedStates[1].Resources))
@@ -205,7 +206,7 @@ func TestSyncerDelete(t *testing.T) {
 	}, provider.OperationLog)
 
 	savedStates := statesFromSavedLog(stateManager.SaveLog)
-	assert.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
+	require.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
 
 	// each save removes one resource, last log entry should be the final state
 	assert.Equal(t, 2, len(savedStates[1].Resources))

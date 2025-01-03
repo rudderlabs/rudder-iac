@@ -25,6 +25,15 @@ type DataCatalog struct {
 	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
 }
 
+func (dc *DataCatalog) ExpandRefs() error {
+	for _, tp := range dc.TrackingPlans {
+		if err := tp.ExpandRefs(dc); err != nil {
+			return fmt.Errorf("inflating refs for tracking plan: %w", err)
+		}
+	}
+	return nil
+}
+
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
 	if props, ok := dc.Properties[EntityGroup(groupName)]; ok {
 		for _, prop := range props {
@@ -55,7 +64,7 @@ func (dc *DataCatalog) TPEventRule(tpGroup, ruleID string) *TPRule {
 
 	for _, rule := range tp.Rules {
 		if rule.LocalID == ruleID && rule.Type == "event_rule" {
-			return &rule
+			return rule
 		}
 	}
 
@@ -73,7 +82,7 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 		if rule.Type != "event_rule" {
 			continue
 		}
-		toReturn = append(toReturn, &rule)
+		toReturn = append(toReturn, rule)
 	}
 
 	return toReturn, true
@@ -118,6 +127,13 @@ func Read(loc string) (*DataCatalog, error) {
 
 	for _, file := range files {
 		log.Debug("loading entities from file into catalog", "file", file)
+
+		log.Info("extension", "file", file, "ext", filepath.Ext(file))
+
+		if filepath.Ext(file) != ".yaml" && filepath.Ext(file) != ".yml" {
+			log.Debug("skipping file, not a yaml file", "file", file)
+			continue
+		}
 
 		byt, err := getFileBytes(file)
 		if err != nil {

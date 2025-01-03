@@ -4,8 +4,8 @@ metadata:
   name: additional_props
 spec:
   properties:
-    - id: write_key_2
-      display_name: "Write Key 1"
+    - id: write_key
+      display_name: "Write Key"
       type: string
       description: KSUID identifier for the source embedded in the SDKs
       propConfig:

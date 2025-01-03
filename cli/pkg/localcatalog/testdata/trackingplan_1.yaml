@@ -7,19 +7,14 @@ spec:
   display_name: "first tracking plan"
   description: "main tracking plan for the application"
   rules:
-    - type: include_rules
-      id: all_base_rules
-      includes:
-        $ref: "#/tp/base_tracking_plan/event_rule/*"
-
     - type: event_rule
-      id: rule_02
+      id: rule_01
       event:
-        $ref: "#/events/app_events/source_created"
+        $ref: "#/events/web_events/source_created"
       properties:
-        - $ref: "#properties/base_props/write_key"
+        - $ref: "#/properties/additional_props/write_key"
           required: true
-        - $ref: "#properties/base_props/source_type"
+        - $ref: "#/properties/additional_props/source_type"
           required: false
-        - $ref: "#properties/base_props/source_name"
+        - $ref: "#/properties/additional_props/source_name"
           required: false
