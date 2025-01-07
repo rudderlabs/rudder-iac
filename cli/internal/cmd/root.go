@@ -25,6 +25,8 @@ func recovery() {
 	if r := recover(); r != nil {
 		fmt.Println(emoji.Sprintf(":skull:Oops! Unexpected error occurred. Please contact tech support."))
 		log.Error("panic detected", "stacktrace", string(debug.Stack()))
+
+		os.Exit(1)
 	}
 }
 
