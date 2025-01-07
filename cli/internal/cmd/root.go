@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 
+	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -16,7 +18,15 @@ import (
 
 var (
 	cfgFile string
+	log     = logger.New("root")
 )
+
+func recovery() {
+	if r := recover(); r != nil {
+		fmt.Println(emoji.Sprintf(":skull:Oops! Unexpected error occurred. Please contact tech support."))
+		log.Error("panic detected", "stacktrace", string(debug.Stack()))
+	}
+}
 
 func init() {
 	cobra.OnInitialize(initConfig)
@@ -76,6 +86,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+
+	defer recovery()
+
 	if err := rootCmd.Execute(); err != nil {
 		ui.ShowError(err)
 		os.Exit(1)
