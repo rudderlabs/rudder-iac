@@ -80,3 +80,7 @@ func (f *TrackingPlanCatalogFactory) WithEvent(event client.TrackingPlanEvent) *
 func (f *TrackingPlanCatalogFactory) Build() client.TrackingPlan {
 	return f.trackingplan
 }
+
+func strptr(s string) *string {
+	return &s
+}
