@@ -1,9 +1,12 @@
 package state
 
 import (
+	"strings"
+
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	"github.com/samber/lo"
 )
 
 var (
@@ -344,8 +347,13 @@ func GetUpsertEventPayload(from *TrackingPlanEventArgs) client.TrackingPlanUpser
 
 	// Only for simple types
 	for _, prop := range from.Properties {
+
+		typ := lo.Map(strings.Split(prop.Type, ","), func(t string, _ int) string {
+			return strings.TrimSpace(t)
+		})
+
 		propLookup[prop.Name] = map[string]interface{}{
-			"type": prop.Type,
+			"type": typ,
 		}
 
 		for k, v := range prop.Config {
