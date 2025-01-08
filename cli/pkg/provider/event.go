@@ -17,7 +17,7 @@ type eventProvider struct {
 	log    *logger.Logger
 }
 
-func newEventProvider(client client.DataCatalog) syncer.Provider {
+func NewEventProvider(client client.DataCatalog) syncer.Provider {
 	return &eventProvider{
 		client: client,
 		log: &logger.Logger{
@@ -51,8 +51,8 @@ func (p *eventProvider) Create(ctx context.Context, ID string, resourceType stri
 		EventType:   event.EventType,
 		WorkspaceID: event.WorkspaceId,
 		CategoryID:  event.CategoryId,
-		CreatedAt:   event.CreatedAt.UTC().String(),
-		UpdatedAt:   event.UpdatedAt.UTC().String(),
+		CreatedAt:   event.CreatedAt.String(),
+		UpdatedAt:   event.UpdatedAt.String(),
 	}
 
 	resourceData := eventState.ToResourceData()
