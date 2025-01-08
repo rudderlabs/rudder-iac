@@ -248,7 +248,7 @@ func (p *TrackingPlanProvider) Diff(current *state.TrackingPlanArgs, old *state.
 		for _, prop := range event.Properties {
 
 			var inputProp *state.TrackingPlanPropertyArgs
-			if inputProp = event.PropertyByLocalID(prop.LocalID); inputProp == nil {
+			if inputProp = inputEvent.PropertyByLocalID(prop.LocalID); inputProp == nil {
 				diffResponse.Updated = append(diffResponse.Updated, inputEvent)
 				break
 			}
