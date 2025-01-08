@@ -118,7 +118,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 			return nil, fmt.Errorf("state discrepancy as upstream event not found for local id: %s", event.LocalID)
 		}
 
-		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, upstreamEvent.EventID); err != nil {
+		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, upstreamEvent.EventID); err != nil && !IsNotFound(err) {
 			return nil, fmt.Errorf("deleting tracking plan event in catalog: %w", err)
 		}
 
@@ -201,7 +201,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	p.log.Debug("deleting tracking plan", "id", ID)
 
-	if err := p.client.DeleteTrackingPlan(ctx, state["id"].(string)); err != nil {
+	if err := p.client.DeleteTrackingPlan(ctx, state["id"].(string)); err != nil && !IsNotFound(err) {
 		return fmt.Errorf("deleting tracking plan in catalog: %w", err)
 	}
 
