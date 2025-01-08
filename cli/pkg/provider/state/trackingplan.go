@@ -49,11 +49,6 @@ type TrackingPlanEventState struct {
 	ID      string
 	LocalID string
 	EventID string
-	// Name           string
-	// Description    string
-	// EventType      string
-	// AllowUnplanned bool
-	// Properties     []*TrackingPlanPropertyState
 }
 
 func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
@@ -64,15 +59,6 @@ func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventSta
 	}
 	return nil
 }
-
-// func (t *TrackingPlanEventState) PropertyByLocalID(id string) *TrackingPlanPropertyState {
-// 	for _, property := range t.Properties {
-// 		if property.LocalID == id {
-// 			return property
-// 		}
-// 	}
-// 	return nil
-// }
 
 type TrackingPlanPropertyState struct {
 	Name        string
@@ -357,7 +343,15 @@ func GetUpsertEventPayload(from *TrackingPlanEventArgs) client.TrackingPlanUpser
 		}
 
 		for k, v := range prop.Config {
-			propLookup[prop.Name].(map[string]interface{})[k] = v
+
+			if k == "itemTypes" {
+				propLookup[prop.Name].(map[string]interface{})["items"] = map[string]interface{}{
+					"type": v,
+				}
+			} else {
+				propLookup[prop.Name].(map[string]interface{})[k] = v
+			}
+
 		}
 
 		// keep on updating the required properties

@@ -265,6 +265,7 @@ func (c *RudderDataCatalog) UpdateTrackingPlan(ctx context.Context, id string, n
 }
 
 func (c *RudderDataCatalog) UpsertTrackingPlan(ctx context.Context, id string, event TrackingPlanUpsertEvent) (*TrackingPlan, error) {
+
 	byt, err := json.Marshal(event)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
