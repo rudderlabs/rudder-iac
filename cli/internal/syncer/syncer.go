@@ -116,17 +116,31 @@ func (e *OperationError) Unwrap() error {
 }
 
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var errors []error
-	currentState := state
+	var (
+		errors       []error
+		currentState = state
+	)
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
 		spinner := ui.NewSpinner(operationString)
 		spinner.Start()
 
-		outputState, err := s.providerOperation(ctx, o, currentState)
+		outputState, providerErr := s.providerOperation(ctx, o, currentState)
 		spinner.Stop()
-		if err != nil {
+		if providerErr != nil {
+			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
+			errors = append(errors, &OperationError{Operation: o, Err: providerErr})
+			if !continueOnFail {
+				return errors
+			}
+		}
+
+		if outputState == nil {
+			outputState = currentState
+		}
+
+		if err := s.stateManager.Save(ctx, outputState); err != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
 			errors = append(errors, &OperationError{Operation: o, Err: err})
 			if !continueOnFail {
@@ -134,15 +148,9 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 			}
 		}
 
-		if err = s.stateManager.Save(ctx, outputState); err != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			errors = append(errors, &OperationError{Operation: o, Err: err})
-			if !continueOnFail {
-				return errors
-			}
+		if providerErr == nil {
+			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
 		}
-
-		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
 
 		currentState = outputState
 	}
