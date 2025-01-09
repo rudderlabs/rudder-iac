@@ -26,7 +26,7 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 		Config:      nil,
 	}
 
-	t.Run("converting to resource data", func(t *testing.T) {
+	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
 		resourceData := argsWithConfig.ToResourceData()
@@ -48,7 +48,7 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 		}, resourceData)
 	})
 
-	t.Run("converting from resource data", func(t *testing.T) {
+	t.Run("from resource data", func(t *testing.T) {
 		t.Parallel()
 
 		loopback := state.PropertyArgs{}
@@ -81,7 +81,7 @@ func TestPropertyState_ResourceData(t *testing.T) {
 		Config:      nil,
 	}
 
-	t.Run("converting to resource data", func(t *testing.T) {
+	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
 		resourceData := propertyState.ToResourceData()
@@ -103,7 +103,7 @@ func TestPropertyState_ResourceData(t *testing.T) {
 		}, resourceData)
 	})
 
-	t.Run("converting from resource data", func(t *testing.T) {
+	t.Run("from resource data", func(t *testing.T) {
 		t.Parallel()
 
 		loopback := state.PropertyState{}

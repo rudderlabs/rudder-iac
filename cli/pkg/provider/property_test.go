@@ -69,7 +69,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Config:      map[string]interface{}{"key": "value"},
 		}
 
-		resourceData, err := propertyProvider.Create(ctx, "property-id", "property", toArgs.ToResourceData())
+		resourceData, err := propertyProvider.Create(ctx, "property-id", typeProperty, toArgs.ToResourceData())
 		require.Nil(t, err)
 		assert.Equal(t, resources.ResourceData{
 			"id":          "upstream-catalog-id",
@@ -133,7 +133,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 		err = json.Unmarshal(byt, &prevState)
 		require.Nil(t, err)
 
-		updatedResource, err := propertyProvider.Update(ctx, "property-id", "property", toArgs.ToResourceData(), olds)
+		updatedResource, err := propertyProvider.Update(ctx, "property-id", typeProperty, toArgs.ToResourceData(), olds)
 		require.Nil(t, err)
 		assert.Equal(t, resources.ResourceData{
 			"id":          "upstream-catalog-id",
@@ -160,7 +160,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 		}
 		catalog.SetError(nil)
 
-		err := propertyProvider.Delete(ctx, "property-id", "property", prevState.ToResourceData())
+		err := propertyProvider.Delete(ctx, "property-id", typeProperty, prevState.ToResourceData())
 		require.Nil(t, err)
 	})
 }

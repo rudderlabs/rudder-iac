@@ -54,20 +54,31 @@ type TrackingPlanCreate struct {
 type TrackingPlanUpsertEventRules struct {
 	Type       string `json:"type"`
 	Properties struct {
-		Properties struct {
-			Type                 string                 `json:"type"`
-			AdditionalProperties bool                   `json:"additionalProperties"`
-			Properties           map[string]interface{} `json:"properties"`
-			Required             []string               `json:"required"`
-		} `json:"properties"`
+		Properties *TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
+		Traits     *TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
+		Context    *TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
+	} `json:"properties"`
+}
+
+type TrackingPlanUpsertEventProperties struct {
+	Type                 string                 `json:"type"`
+	AdditionalProperties bool                   `json:"additionalProperties"`
+	Properties           map[string]interface{} `json:"properties"`
+	Required             []string               `json:"required"`
+}
+
+type TrackingPlanUpsertEventContextTraitsIdentity struct {
+	Properties struct {
+		Traits TrackingPlanUpsertEventProperties `json:"traits,omitempty"`
 	} `json:"properties"`
 }
 
 type TrackingPlanUpsertEvent struct {
-	Name        string                       `json:"name"`
-	Description string                       `json:"description"`
-	EventType   string                       `json:"eventType"`
-	Rules       TrackingPlanUpsertEventRules `json:"rules"`
+	Name            string                       `json:"name"`
+	Description     string                       `json:"description"`
+	EventType       string                       `json:"eventType"`
+	IdentitySection string                       `json:"identitySection"`
+	Rules           TrackingPlanUpsertEventRules `json:"rules"`
 }
 
 type TrackingPlan struct {
@@ -141,7 +152,7 @@ func (c *RudderDataCatalog) CreateEvent(ctx context.Context, input EventCreate) 
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", fmt.Sprintf("catalog/events"), bytes.NewReader(body))
+	resp, err := c.client.Do(ctx, "POST", "catalog/events", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -206,7 +217,7 @@ func (c *RudderDataCatalog) CreateProperty(ctx context.Context, input PropertyCr
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", fmt.Sprintf("catalog/properties"), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "POST", "catalog/properties", bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -226,7 +237,7 @@ func (c *RudderDataCatalog) CreateTrackingPlan(ctx context.Context, input Tracki
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", fmt.Sprintf("catalog/tracking-plans"), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "POST", "catalog/tracking-plans", bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}

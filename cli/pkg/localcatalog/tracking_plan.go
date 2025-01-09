@@ -30,12 +30,13 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name           string             `json:"name"`
-	LocalID        string             `json:"id"`
-	Description    string             `json:"description"`
-	Type           string             `json:"type"`
-	AllowUnplanned bool               `json:"allow_unplanned"`
-	Properties     []*TPEventProperty `json:"properties"`
+	Name            string
+	LocalID         string
+	Description     string
+	Type            string
+	AllowUnplanned  bool
+	IdentitySection string
+	Properties      []*TPEventProperty
 }
 
 func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
@@ -65,8 +66,9 @@ type TPRule struct {
 }
 
 type TPRuleEvent struct {
-	Ref            string `json:"$ref"`
-	AllowUnplanned bool   `json:"allow_unplanned"`
+	Ref             string `json:"$ref"`
+	AllowUnplanned  bool   `json:"allow_unplanned"`
+	IdentitySection string `json:"identity_section"`
 }
 
 type TPRuleProperty struct {
@@ -181,12 +183,13 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	}
 
 	toReturn := TPEvent{
-		Name:           event.Name,
-		LocalID:        event.LocalID,
-		Description:    event.Description,
-		Type:           event.Type,
-		AllowUnplanned: rule.Event.AllowUnplanned,
-		Properties:     make([]*TPEventProperty, 0),
+		Name:            event.Name,
+		LocalID:         event.LocalID,
+		Description:     event.Description,
+		Type:            event.Type,
+		AllowUnplanned:  rule.Event.AllowUnplanned,
+		IdentitySection: rule.Event.IdentitySection,
+		Properties:      make([]*TPEventProperty, 0),
 	}
 
 	// Load the properties from the data catalog
