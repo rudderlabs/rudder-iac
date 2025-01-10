@@ -101,7 +101,7 @@ func (p *eventProvider) Delete(ctx context.Context, ID string, resourceType stri
 
 	err := p.client.DeleteEvent(ctx, state["id"].(string))
 
-	if err != nil && !IsNotFound(err) {
+	if err != nil && !client.IsCatalogNotFoundError(err) {
 		return fmt.Errorf("deleting event in upstream catalog: %w", err)
 	}
 

@@ -101,7 +101,7 @@ func (p *propertyProvider) Delete(ctx context.Context, ID string, resourceType s
 
 	err := p.client.DeleteProperty(ctx, data["id"].(string))
 
-	if err != nil && !IsNotFound(err) {
+	if err != nil && !client.IsCatalogNotFoundError(err) {
 		return fmt.Errorf("deleting property resource in upstream catalog: %w", err)
 	}
 
