@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -298,4 +300,13 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 		return fmt.Errorf("sending delete request: %w", err)
 	}
 	return nil
+}
+
+func IsCatalogNotFoundError(err error) bool {
+	var apiErr *APIError
+
+	if ok := errors.As(err, &apiErr); !ok {
+		return false
+	}
+	return apiErr.HTTPStatusCode == 400 && strings.Contains(apiErr.Message, "not found")
 }
