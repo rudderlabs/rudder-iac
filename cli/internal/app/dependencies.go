@@ -16,12 +16,12 @@ var (
 	s  *syncer.ProjectSyncer
 )
 
-func Initialise() error {
+func Initialise(version string) error {
 	var err error
 
 	sm = newStateManager()
 
-	p, err = newProvider()
+	p, err = newProvider(version)
 	if err != nil {
 		return fmt.Errorf("creating provider: %w", err)
 	}
@@ -37,9 +37,14 @@ func newStateManager() syncer.StateManager {
 	}
 }
 
-func newProvider() (syncer.Provider, error) {
+func newProvider(version string) (syncer.Provider, error) {
 	cfg := config.GetConfig()
-	rawClient, err := client.New(cfg.Auth.AccessToken, client.WithBaseURL(cfg.APIURL))
+	rawClient, err := client.New(
+		cfg.Auth.AccessToken,
+		client.WithBaseURL(cfg.APIURL),
+		client.WithUserAgent("rudder-cli/"+version),
+	)
+
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}

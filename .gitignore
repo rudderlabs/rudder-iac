@@ -30,3 +30,6 @@ go.work.sum
 
 # Log files
 *.log
+
+# Added by goreleaser init:
+dist/
