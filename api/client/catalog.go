@@ -79,7 +79,7 @@ type TrackingPlanUpsertEvent struct {
 	Name            string                       `json:"name"`
 	Description     string                       `json:"description"`
 	EventType       string                       `json:"eventType"`
-	IdentitySection string                       `json:"identitySection"`
+	IdentityApplied string                       `json:"identitySection"`
 	Rules           TrackingPlanUpsertEventRules `json:"rules"`
 }
 

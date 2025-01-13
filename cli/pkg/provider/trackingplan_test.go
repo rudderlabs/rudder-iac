@@ -58,7 +58,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 					"description":     "event-description",
 					"type":            "event-type",
 					"allowUnplanned":  false,
-					"identitySection": "",
+					"identityApplied": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property",
@@ -163,7 +163,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 					"description":     "event-description",
 					"type":            "event-type",
 					"allowUnplanned":  false,
-					"identitySection": "",
+					"identityApplied": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property",
@@ -267,7 +267,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 					"description":     "event-description-1",
 					"type":            "event-type-1",
 					"allowUnplanned":  true,
-					"identitySection": "",
+					"identityApplied": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property-1",

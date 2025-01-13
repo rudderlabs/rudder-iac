@@ -223,12 +223,12 @@ func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsert
 	var (
 		requiredProps   = make([]string, 0)
 		propLookup      = make(map[string]interface{})
-		identitySection = from.IdentitySection
+		identityApplied = from.IdentityApplied
 	)
 
 	// If the identity section empty, default to properties
-	if from.IdentitySection == "" {
-		identitySection = PropertiesIdentity
+	if from.IdentityApplied == "" {
+		identityApplied = PropertiesIdentity
 	}
 
 	// Only for simple types
@@ -264,8 +264,8 @@ func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsert
 		Name:            from.Name,
 		Description:     from.Description,
 		EventType:       from.Type,
-		IdentitySection: identitySection,
-		Rules: getRulesBasedonIdentity(identitySection, &client.TrackingPlanUpsertEventProperties{
+		IdentityApplied: identityApplied,
+		Rules: getRulesBasedonIdentity(identityApplied, &client.TrackingPlanUpsertEventProperties{
 			Type:                 "object",
 			AdditionalProperties: from.AllowUnplanned,
 			Required:             requiredProps,

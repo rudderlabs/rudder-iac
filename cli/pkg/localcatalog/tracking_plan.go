@@ -35,7 +35,7 @@ type TPEvent struct {
 	Description     string
 	Type            string
 	AllowUnplanned  bool
-	IdentitySection string
+	IdentityApplied string
 	Properties      []*TPEventProperty
 }
 
@@ -68,7 +68,7 @@ type TPRule struct {
 type TPRuleEvent struct {
 	Ref             string `json:"$ref"`
 	AllowUnplanned  bool   `json:"allow_unplanned"`
-	IdentitySection string `json:"identity_section"`
+	IdentityApplied string `json:"identity_applied"`
 }
 
 type TPRuleProperty struct {
@@ -188,7 +188,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 		Description:     event.Description,
 		Type:            event.Type,
 		AllowUnplanned:  rule.Event.AllowUnplanned,
-		IdentitySection: rule.Event.IdentitySection,
+		IdentityApplied: rule.Event.IdentityApplied,
 		Properties:      make([]*TPEventProperty, 0),
 	}
 
