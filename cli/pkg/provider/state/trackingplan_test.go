@@ -49,7 +49,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 				Type:            "event-type",
 				LocalID:         "event-local-id-updated", // added
 				AllowUnplanned:  false,
-				IdentitySection: "traits",
+				IdentityApplied: "traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
 				Name:            "event-name-1",
@@ -57,7 +57,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 				Type:            "event-type-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  true, // updated
-				IdentitySection: "",
+				IdentityApplied: "",
 			}).Build()
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().
@@ -67,7 +67,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 				Type:            "event-type",
 				LocalID:         "event-local-id",
 				AllowUnplanned:  true,
-				IdentitySection: "context.traits",
+				IdentityApplied: "context.traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
 				Name:            "event-name-1",
@@ -75,7 +75,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 				Type:            "event-type-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  false,
-				IdentitySection: "",
+				IdentityApplied: "",
 			}).Build()
 
 		diffed := fromArgs.Diff(toArgs)

@@ -186,7 +186,7 @@ type TrackingPlanEventArgs struct {
 	Description     string
 	Type            string
 	AllowUnplanned  bool
-	IdentitySection string
+	IdentityApplied string
 	Properties      []*TrackingPlanPropertyArgs
 }
 
@@ -199,7 +199,7 @@ func (args *TrackingPlanEventArgs) Diff(other *TrackingPlanEventArgs) bool {
 		return true
 	}
 
-	if args.IdentitySection != other.IdentitySection {
+	if args.IdentityApplied != other.IdentityApplied {
 		return true
 	}
 
@@ -274,7 +274,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			Description:     event.Description,
 			Type:            event.Type,
 			AllowUnplanned:  event.AllowUnplanned,
-			IdentitySection: event.IdentitySection,
+			IdentityApplied: event.IdentityApplied,
 			Properties:      properties,
 		})
 	}
@@ -336,7 +336,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 			LocalID:         MustString(event, "localId"),
 			Type:            MustString(event, "type"),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
-			IdentitySection: String(event, "identitySection", ""),
+			IdentityApplied: String(event, "identityApplied", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
 		}
 
@@ -389,7 +389,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			"description":     event.Description,
 			"type":            event.Type,
 			"allowUnplanned":  event.AllowUnplanned,
-			"identitySection": event.IdentitySection,
+			"identityApplied": event.IdentityApplied,
 			"properties":      properties,
 		})
 	}
