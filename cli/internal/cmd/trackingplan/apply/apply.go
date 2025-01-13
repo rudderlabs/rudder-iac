@@ -60,8 +60,7 @@ func NewCmdTPApply() *cobra.Command {
 			return inflateRefs(localcatalog)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
-			log.Debug("identifying changes for the upstream catalog")
+			log.Info("applying changes in catalog", "cmd", "tp apply", "dryRun", dryRun, "confirm", confirm)
 
 			if err := app.Syncer().Sync(
 				context.Background(),

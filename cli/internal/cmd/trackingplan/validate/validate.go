@@ -13,10 +13,7 @@ import (
 )
 
 var (
-	log = logger.New("trackingplan", logger.Attr{
-		Key:   "cmd",
-		Value: "validate",
-	})
+	log = logger.New("trackingplan.validate")
 )
 
 func NewCmdTPValidate() *cobra.Command {
@@ -32,6 +29,7 @@ func NewCmdTPValidate() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println()
+			log.Info("validating the catalog", "cmd", "tp validate", "dir", catalogDir)
 
 			dc, err := localcatalog.Read(catalogDir)
 			if err != nil {
@@ -56,34 +54,3 @@ func NewCmdTPValidate() *cobra.Command {
 	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files or catalog file itself")
 	return cmd
 }
-
-func ValidateCatalog(validators []validate.CatalogEntityValidator, dc *localcatalog.DataCatalog) (toReturn error) {
-	log.Info("running validators on the catalog")
-
-	combinedErrs := make([]validate.ValidationError, 0)
-	for _, validator := range validators {
-		errs := validator.Validate(dc)
-		if len(errs) > 0 {
-			combinedErrs = append(combinedErrs, errs...)
-		}
-	}
-
-	errStr := ""
-	for _, err := range combinedErrs {
-		errStr += fmt.Sprintf("\nreference: %s, error: %s\n\n", err.Reference, err.Error())
-	}
-
-	if len(errStr) == 0 {
-		return nil
-	}
-
-	return errors.New(errStr)
-}
-
-// func DefaultValidators() []validate.CatalogEntityValidator {
-// 	return []validate.CatalogEntityValidator{
-// 		&validate.RequiredKeysValidator{},
-// 		&validate.DuplicateNameIDKeysValidator{},
-// 		&validate.RefValidator{},
-// 	}
-// }

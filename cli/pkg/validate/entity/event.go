@@ -7,25 +7,23 @@ import (
 	"github.com/samber/lo"
 )
 
-var _ CatalogEntityValidator = &EventValidator{}
-
 var (
 	TrackEventTypes    = []string{"track"}
 	NonTrackEventTypes = []string{"identify", "group", "page", "screen"}
 )
 
-type EventValidationRule interface {
-	Validate(ref string, ev *localcatalog.Event, dc *localcatalog.DataCatalog) []ValidationError
-}
+var (
+	_ TypedCatalogEntityValidator[*localcatalog.Event] = &EventValidator{}
+	_ ValidationRule[*localcatalog.Event]              = &EventRequiredKeysRule{}
+	_ ValidationRule[*localcatalog.Event]              = &EventDuplicateKeysRule{}
+)
 
 type EventValidator struct {
-	rules []EventValidationRule
+	rules []ValidationRule[*localcatalog.Event]
 }
 
-func NewEventValidator(rules []EventValidationRule) CatalogEntityValidator {
-	return &EventValidator{
-		rules,
-	}
+func (ev *EventValidator) RegisterRule(rule ValidationRule[*localcatalog.Event]) {
+	ev.rules = append(ev.rules, rule)
 }
 
 func (ev *EventValidator) Validate(dc *localcatalog.DataCatalog) (errs []ValidationError) {
