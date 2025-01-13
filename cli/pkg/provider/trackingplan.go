@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -16,6 +17,12 @@ type TrackingPlanProvider struct {
 	client client.DataCatalog
 	log    *logger.Logger
 }
+
+const (
+	PropertiesIdentity    = "properties"
+	TraitsIdentity        = "traits"
+	ContextTraitsIdentity = "context.traits"
+)
 
 func NewTrackingPlanProvider(client client.DataCatalog) syncer.Provider {
 	return &TrackingPlanProvider{
@@ -49,7 +56,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, resourceTy
 		lastupserted, err := p.client.UpsertTrackingPlan(
 			ctx,
 			created.ID,
-			state.GetUpsertEventPayload(event),
+			getUpsertEvent(event),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
@@ -108,7 +115,9 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 		}
 	}
 
-	diff := p.Diff(&toArgs, &prevState.TrackingPlanArgs)
+	diff := prevState.Diff(toArgs)
+
+	// diff := p.Diff(&toArgs, &prevState.TrackingPlanArgs)
 
 	var deletedEvents []string
 	for _, event := range diff.Deleted {
@@ -131,7 +140,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 		updated, err = p.client.UpsertTrackingPlan(
 			ctx,
 			prevState.ID,
-			state.GetUpsertEventPayload(event),
+			getUpsertEvent(event),
 		)
 
 		if err != nil {
@@ -149,7 +158,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 		updated, err = p.client.UpsertTrackingPlan(
 			ctx,
 			prevState.ID,
-			state.GetUpsertEventPayload(event),
+			getUpsertEvent(event),
 		)
 
 		if err != nil {
@@ -208,57 +217,101 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, resourceTy
 	return nil
 }
 
-func (p *TrackingPlanProvider) Diff(current *state.TrackingPlanArgs, old *state.TrackingPlanArgs) state.TrackingPlanStateDiff {
-	diffResponse := state.TrackingPlanStateDiff{
-		Added:   make([]*state.TrackingPlanEventArgs, 0),
-		Updated: make([]*state.TrackingPlanEventArgs, 0),
-		Deleted: make([]*state.TrackingPlanEventArgs, 0),
+func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsertEvent {
+	// Get the properties in correct shape before we can
+	// send it to the catalog
+	var (
+		requiredProps   = make([]string, 0)
+		propLookup      = make(map[string]interface{})
+		identitySection = from.IdentitySection
+	)
+
+	// If the identity section empty, default to properties
+	if from.IdentitySection == "" {
+		identitySection = PropertiesIdentity
 	}
 
-	for _, event := range current.Events {
-		// In new but not in old ->  Added
-		if oldEvent := old.EventByLocalID(event.LocalID); oldEvent != nil {
-			continue
-		}
-		diffResponse.Added = append(diffResponse.Added, event)
-	}
+	// Only for simple types
+	for _, prop := range from.Properties {
 
-	// Updated / Deleted calculation
-	for _, event := range old.Events {
-		var inputEvent *state.TrackingPlanEventArgs
+		typ := lo.Map(strings.Split(prop.Type, ","), func(t string, _ int) string {
+			return strings.TrimSpace(t)
+		})
 
-		// In old but not in new ->  Deleted
-		if inputEvent = current.EventByLocalID(event.LocalID); inputEvent == nil {
-			diffResponse.Deleted = append(diffResponse.Deleted, event)
-			continue
+		propLookup[prop.Name] = map[string]interface{}{
+			"type": typ,
 		}
 
-		// Change in values local to event
-		if event.AllowUnplanned != inputEvent.AllowUnplanned {
-			diffResponse.Updated = append(diffResponse.Updated, inputEvent)
-			continue
-		}
+		for k, v := range prop.Config {
 
-		// Change in values local to properties
-		if len(event.Properties) != len(inputEvent.Properties) {
-			diffResponse.Updated = append(diffResponse.Updated, inputEvent)
-			continue
-		}
-
-		for _, prop := range event.Properties {
-
-			var inputProp *state.TrackingPlanPropertyArgs
-			if inputProp = inputEvent.PropertyByLocalID(prop.LocalID); inputProp == nil {
-				diffResponse.Updated = append(diffResponse.Updated, inputEvent)
-				break
+			if k == "itemTypes" {
+				propLookup[prop.Name].(map[string]interface{})["items"] = map[string]interface{}{
+					"type": v,
+				}
+			} else {
+				propLookup[prop.Name].(map[string]interface{})[k] = v
 			}
 
-			if prop.Required != inputProp.Required {
-				diffResponse.Updated = append(diffResponse.Updated, inputEvent)
-				break
-			}
+		}
+
+		// keep on updating the required properties
+		if prop.Required {
+			requiredProps = append(requiredProps, prop.Name)
 		}
 	}
 
-	return diffResponse
+	return client.TrackingPlanUpsertEvent{
+		Name:            from.Name,
+		Description:     from.Description,
+		EventType:       from.Type,
+		IdentitySection: identitySection,
+		Rules: getRulesBasedonIdentity(identitySection, &client.TrackingPlanUpsertEventProperties{
+			Type:                 "object",
+			AdditionalProperties: from.AllowUnplanned,
+			Required:             requiredProps,
+			Properties:           propLookup,
+		}),
+	}
+}
+
+func getRulesBasedonIdentity(identity string, properties *client.TrackingPlanUpsertEventProperties) client.TrackingPlanUpsertEventRules {
+	var (
+		propertiesIdentity *client.TrackingPlanUpsertEventProperties
+		traitsIdentity     *client.TrackingPlanUpsertEventProperties
+		contextIdentity    *client.TrackingPlanUpsertEventContextTraitsIdentity
+	)
+
+	switch identity {
+
+	case PropertiesIdentity:
+		propertiesIdentity = properties
+
+	case TraitsIdentity:
+		traitsIdentity = properties
+
+	case ContextTraitsIdentity:
+		contextIdentity = &client.TrackingPlanUpsertEventContextTraitsIdentity{
+			Properties: struct {
+				Traits client.TrackingPlanUpsertEventProperties `json:"traits,omitempty"`
+			}{
+				Traits: *properties,
+			},
+		}
+
+	default:
+		propertiesIdentity = properties // fallback to properties
+	}
+
+	return client.TrackingPlanUpsertEventRules{
+		Type: "object",
+		Properties: struct {
+			Properties *client.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
+			Traits     *client.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
+			Context    *client.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
+		}{
+			Properties: propertiesIdentity,
+			Traits:     traitsIdentity,
+			Context:    contextIdentity,
+		},
+	}
 }

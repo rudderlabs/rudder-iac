@@ -27,7 +27,7 @@ func TestEventState_ResourceData(t *testing.T) {
 		},
 	}
 
-	t.Run("converting to resource data", func(t *testing.T) {
+	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
 		var categoryID *string
@@ -50,7 +50,7 @@ func TestEventState_ResourceData(t *testing.T) {
 		}, resourceData)
 	})
 
-	t.Run("converting from resource data", func(t *testing.T) {
+	t.Run("from resource data", func(t *testing.T) {
 		t.Parallel()
 
 		loopback := state.EventState{}
@@ -69,7 +69,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 		CategoryID:  nil,
 	}
 
-	t.Run("converting to resource data", func(t *testing.T) {
+	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
 		var categoryID *string
@@ -83,7 +83,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 
 	})
 
-	t.Run("converting from resource data", func(t *testing.T) {
+	t.Run("from resource data", func(t *testing.T) {
 		t.Parallel()
 
 		loopback := state.EventArgs{}

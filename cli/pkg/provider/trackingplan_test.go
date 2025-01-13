@@ -53,11 +53,12 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 			"description": "tracking-plan-description",
 			"events": []map[string]interface{}{
 				{
-					"name":           "event",
-					"localId":        "event-id",
-					"description":    "event-description",
-					"type":           "event-type",
-					"allowUnplanned": false,
+					"name":            "event",
+					"localId":         "event-id",
+					"description":     "event-description",
+					"type":            "event-type",
+					"allowUnplanned":  false,
+					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property",
@@ -157,11 +158,12 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"name":           "event",
-					"localId":        "event-id",
-					"description":    "event-description",
-					"type":           "event-type",
-					"allowUnplanned": false,
+					"name":            "event",
+					"localId":         "event-id",
+					"description":     "event-description",
+					"type":            "event-type",
+					"allowUnplanned":  false,
+					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property",
@@ -260,11 +262,12 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"name":           "event-1",
-					"localId":        "event-id-1",
-					"description":    "event-description-1",
-					"type":           "event-type-1",
-					"allowUnplanned": true,
+					"name":            "event-1",
+					"localId":         "event-id-1",
+					"description":     "event-description-1",
+					"type":            "event-type-1",
+					"allowUnplanned":  true,
+					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
 							"name":        "property-1",
@@ -284,10 +287,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 
 func TestTrackingPlanProvider_Diff(t *testing.T) {
 	t.Parallel()
-
-	var (
-		provider = provider.NewTrackingPlanProvider(&MockTrackingPlanCatalog{}).(*provider.TrackingPlanProvider)
-	)
 
 	// 2 Added 1 Removed 1 Updated
 	oldArgs := defaultTrackingPlanArgsFactory().
@@ -371,7 +370,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 			},
 		}).Build()
 
-	diffed := provider.Diff(&newArgs, &oldArgs)
+	diffed := oldArgs.Diff(newArgs)
 	require.Equal(t, 1, len(diffed.Added))
 	require.Equal(t, 1, len(diffed.Updated))
 	require.Equal(t, 1, len(diffed.Deleted))

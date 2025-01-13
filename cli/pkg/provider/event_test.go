@@ -71,7 +71,7 @@ func TestEventProviderOperations(t *testing.T) {
 			UpdatedAt:   updated,
 		})
 
-		createdResource, err := eventProvider.Create(ctx, "event-id-1", "event", toArgs.ToResourceData())
+		createdResource, err := eventProvider.Create(ctx, "event-id-1", typeEvent, toArgs.ToResourceData())
 		require.Nil(t, err)
 
 		assert.Equal(t, resources.ResourceData{
@@ -141,7 +141,7 @@ func TestEventProviderOperations(t *testing.T) {
 			UpdatedAt:   updated,
 		})
 
-		updatedResource, err := eventProvider.Update(ctx, "event-id-1", "event", newArgs.ToResourceData(), olds)
+		updatedResource, err := eventProvider.Update(ctx, "event-id-1", typeEvent, newArgs.ToResourceData(), olds)
 		require.Nil(t, err)
 
 		assert.Equal(t, resources.ResourceData{
@@ -168,7 +168,7 @@ func TestEventProviderOperations(t *testing.T) {
 		err := eventProvider.Delete(
 			ctx,
 			"event-id-1",
-			"event",
+			typeEvent,
 			resources.ResourceData{
 				"id": "upstream-event-catalog-id",
 			})

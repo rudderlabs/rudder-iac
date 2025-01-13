@@ -11,7 +11,7 @@ var _ client.DataCatalog = &EmptyCatalog{}
 type EmptyCatalog struct {
 }
 
-var (
+const (
 	typeEvent        = "event"
 	typeProperty     = "property"
 	typeTrackingPlan = "tracking-plan"
