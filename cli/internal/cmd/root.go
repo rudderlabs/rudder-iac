@@ -66,7 +66,7 @@ func initLogger() {
 }
 
 func initAppDependencies() {
-	if err := app.Initialise(); err != nil {
+	if err := app.Initialise(rootCmd.Version); err != nil {
 		ui.ShowError(err)
 		os.Exit(1)
 	}
@@ -88,7 +88,6 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
