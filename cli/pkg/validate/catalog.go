@@ -12,31 +12,30 @@ var (
 	log = logger.New("validate")
 )
 
-type ValidationError struct {
-	error
-	Reference string
-}
-
-type CatalogEntityValidator interface {
-	Validate(*catalog.DataCatalog) []ValidationError
-}
-
+// CatalogValidator is a validator for the entire catalog
+// which includes setting up entity validators with their rules for better
+// validation control
 func NewCatalogValidator() *CatalogValidator {
 
-	var validators []entity.CatalogEntityValidator
+	eventValidator := &entity.EventValidator{}
+	eventValidator.RegisterRule(&entity.EventRequiredKeysRule{})
+	eventValidator.RegisterRule(&entity.EventDuplicateKeysRule{})
 
-	validators = append(validators, entity.NewEventValidator([]entity.EventValidationRule{
-		&entity.EventRequiredKeysRule{},
-		&entity.EventDuplicateKeysRule{},
-	}))
+	propValidator := &entity.PropertyEntityValidator{}
+	propValidator.RegisterRule(&entity.PropertyRequiredKeysRule{})
+	propValidator.RegisterRule(&entity.PropertyDuplicateKeysRule{})
 
-	validators = append(validators, entity.NewPropertyEntityValidator([]entity.PropertyValdationRules{
-		&entity.PropertyRequiredKeysRule{},
-		&entity.PropertyDuplicateKeysRule{},
-	}))
+	tpValidator := &entity.TrackingPlanEntityValidator{}
+	tpValidator.RegisterRule(&entity.TrackingPlanRequiredKeysRule{})
+	tpValidator.RegisterRule(&entity.TrackingPlanRefRule{})
+	tpValidator.RegisterRule(&entity.TrackingPlanDuplicateKeysRule{})
 
 	return &CatalogValidator{
-		validators: validators,
+		validators: []entity.CatalogEntityValidator{
+			eventValidator,
+			tpValidator,
+			propValidator,
+		},
 	}
 }
 

@@ -31,7 +31,9 @@ var (
 	ErrInvalidTrackingPlanEventRuleType = errors.New("invalid / missing required key type in rule")
 	ErrMissingRequiredKeysRuleEvent     = errors.New("missing required key event in rule")
 	ErrInvalidRefFormat                 = errors.New("invalid reference format")
-	ErrMissingEntityFromRef             = errors.New("missing entity from reference")
+	ErrMissingEntityFromRef             = errors.New("missing entity from reference") // TODO: Fix this ?
+	ErrInvalidIdentityApplied           = errors.New("identity section only for non-track events")
+	ErrDuplicateEntityRefs              = errors.New("duplicate entity refs")
 )
 
 const (
@@ -46,6 +48,19 @@ type ValidationError struct {
 	Reference  string
 }
 
+type CatalogEntity interface {
+	*localcatalog.Event | *localcatalog.Property | *localcatalog.TrackingPlan
+}
+
 type CatalogEntityValidator interface {
 	Validate(*localcatalog.DataCatalog) []ValidationError
+}
+
+type TypedCatalogEntityValidator[T CatalogEntity] interface {
+	Validate(*localcatalog.DataCatalog) []ValidationError
+	RegisterRule(ValidationRule[T])
+}
+
+type ValidationRule[T CatalogEntity] interface {
+	Validate(string, T, *localcatalog.DataCatalog) []ValidationError
 }

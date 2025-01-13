@@ -9,16 +9,19 @@ import (
 )
 
 var (
-	validPropertyTypes                        = []string{"string", "number", "boolean", "object", "array"}
-	_                  CatalogEntityValidator = &PropertyEntityValidator{}
+	_ TypedCatalogEntityValidator[*localcatalog.Property] = &PropertyEntityValidator{}
+	_ ValidationRule[*localcatalog.Property]              = &PropertyRequiredKeysRule{}
+	_ ValidationRule[*localcatalog.Property]              = &PropertyDuplicateKeysRule{}
 )
 
+var validPropertyTypes = []string{"string", "number", "boolean", "object", "array"}
+
 type PropertyEntityValidator struct {
-	rules []PropertyValdationRules
+	rules []ValidationRule[*localcatalog.Property]
 }
 
-type PropertyValdationRules interface {
-	Validate(reference string, property *localcatalog.Property, dc *localcatalog.DataCatalog) []ValidationError
+func (v *PropertyEntityValidator) RegisterRule(rule ValidationRule[*localcatalog.Property]) {
+	v.rules = append(v.rules, rule)
 }
 
 func (pv *PropertyEntityValidator) Validate(dc *localcatalog.DataCatalog) []ValidationError {
@@ -41,12 +44,6 @@ func (pv *PropertyEntityValidator) Validate(dc *localcatalog.DataCatalog) []Vali
 	}
 
 	return errors
-}
-
-func NewPropertyEntityValidator(rules []PropertyValdationRules) CatalogEntityValidator {
-	return &PropertyEntityValidator{
-		rules,
-	}
 }
 
 type PropertyRequiredKeysRule struct {

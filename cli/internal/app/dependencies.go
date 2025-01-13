@@ -16,9 +16,7 @@ var (
 	s  *syncer.ProjectSyncer
 )
 
-func Initialise(version string) error {
-	var err error
-
+func Initialise(version string) (err error) {
 	sm = newStateManager()
 
 	p, err = newProvider(version)
@@ -27,8 +25,7 @@ func Initialise(version string) error {
 	}
 
 	s = syncer.New(p, sm)
-
-	return nil
+	return
 }
 
 func newStateManager() syncer.StateManager {
