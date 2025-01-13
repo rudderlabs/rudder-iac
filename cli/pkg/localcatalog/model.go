@@ -23,11 +23,11 @@ type Property struct {
 }
 
 type PropertySpec struct {
-	Properties []Property `json:"properties"`
+	Properties []*Property `json:"properties"`
 }
 
 // This method is used to extract the entity from the byte representation of it
-func ExtractProperties(rd *ResourceDefinition) ([]Property, error) {
+func ExtractProperties(rd *ResourceDefinition) ([]*Property, error) {
 	spec := PropertySpec{}
 
 	jsonByt, err := json.Marshal(rd.Spec)
@@ -51,12 +51,12 @@ type Event struct {
 }
 
 type EventSpec struct {
-	Events []Event `json:"events"`
+	Events []*Event `json:"events"`
 }
 
 // ExtractEvents simply parses the whole file defined as resource definition
 // and returns the events from it.
-func ExtractEvents(rd *ResourceDefinition) ([]Event, error) {
+func ExtractEvents(rd *ResourceDefinition) ([]*Event, error) {
 	spec := EventSpec{}
 
 	jsonByt, err := json.Marshal(rd.Spec)

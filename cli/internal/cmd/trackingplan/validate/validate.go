@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
@@ -21,7 +22,7 @@ var (
 func NewCmdTPValidate() *cobra.Command {
 	var catalogDir string
 
-	validators := DefaultValidators()
+	// validators := DefaultValidators()
 	cmd := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate locally defined catalog",
@@ -30,18 +31,25 @@ func NewCmdTPValidate() *cobra.Command {
 			$ rudder-cli tp validate --loc <path-to-catalog-dir or file>
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println()
+
 			dc, err := localcatalog.Read(catalogDir)
 			if err != nil {
 				return fmt.Errorf("reading catalog: %s", err.Error())
 			}
 
-			err = ValidateCatalog(validators, dc)
-			if err == nil {
-				log.Info("successfully validated the catalog")
-				return nil
+			validator := validate.NewCatalogValidator()
+			errs := validator.Validate(dc)
+
+			if errs != nil {
+				fmt.Println("catalog errors:")
+				fmt.Printf("\n%s\n", errs.Error())
+
+				return errors.New(emoji.Sprintf("catalog invalid :x:"))
 			}
 
-			return fmt.Errorf("catalog is invalid: %s", err.Error())
+			fmt.Println(emoji.Sprintf("catalog valid :white_check_mark:"))
+			return nil
 		},
 	}
 
@@ -49,7 +57,7 @@ func NewCmdTPValidate() *cobra.Command {
 	return cmd
 }
 
-func ValidateCatalog(validators []validate.CatalogValidator, dc *localcatalog.DataCatalog) (toReturn error) {
+func ValidateCatalog(validators []validate.CatalogEntityValidator, dc *localcatalog.DataCatalog) (toReturn error) {
 	log.Info("running validators on the catalog")
 
 	combinedErrs := make([]validate.ValidationError, 0)
@@ -72,10 +80,10 @@ func ValidateCatalog(validators []validate.CatalogValidator, dc *localcatalog.Da
 	return errors.New(errStr)
 }
 
-func DefaultValidators() []validate.CatalogValidator {
-	return []validate.CatalogValidator{
-		&validate.RequiredKeysValidator{},
-		&validate.DuplicateNameIDKeysValidator{},
-		&validate.RefValidator{},
-	}
-}
+// func DefaultValidators() []validate.CatalogEntityValidator {
+// 	return []validate.CatalogEntityValidator{
+// 		&validate.RequiredKeysValidator{},
+// 		&validate.DuplicateNameIDKeysValidator{},
+// 		&validate.RefValidator{},
+// 	}
+// }

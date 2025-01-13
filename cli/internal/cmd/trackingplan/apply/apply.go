@@ -2,16 +2,19 @@ package apply
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -39,14 +42,19 @@ func NewCmdTPApply() *cobra.Command {
 			$ rudder-cli tp apply --loc </path/to/dir or file> --dry-run
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println()
+
 			// Here we might need to do validate
 			localcatalog, err = readCatalog(catalogDir)
 			if err != nil {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 
-			if err := validate.ValidateCatalog(validate.DefaultValidators(), localcatalog); err != nil {
-				return fmt.Errorf("validating catalog: %w", err)
+			if errs := validate.NewCatalogValidator().Validate(localcatalog); errs != nil {
+				fmt.Println("catalog errors:")
+				fmt.Println(errs.Error())
+
+				return errors.New(emoji.Sprintf("catalog invalid :x:"))
 			}
 
 			return inflateRefs(localcatalog)
@@ -62,7 +70,9 @@ func NewCmdTPApply() *cobra.Command {
 					DryRun:  dryRun,
 					Confirm: confirm,
 				}); err != nil {
-				return fmt.Errorf("syncing the state: %w", err)
+
+				fmt.Println(pprint(err))
+				return errors.New(emoji.Sprintf("catalog syncing failed :x:"))
 			}
 
 			return nil
@@ -73,6 +83,23 @@ func NewCmdTPApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
 	return cmd
+}
+
+func pprint(err error) string {
+	stages := strings.Split(err.Error(), ":")
+
+	str := ""
+	for idx, stageErr := range stages {
+
+		if idx == 0 {
+			str += stageErr + "\n"
+			continue
+		}
+
+		str += emoji.Sprintf("%s→%s\n", strings.Repeat(" ", (idx+1)*2), stageErr)
+	}
+
+	return str
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {

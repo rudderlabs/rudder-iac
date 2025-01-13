@@ -9,8 +9,8 @@ import (
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
-		Events:        make(map[EntityGroup][]Event),
-		Properties:    make(map[EntityGroup][]Property),
+		Events:        make(map[EntityGroup][]*Event),
+		Properties:    make(map[EntityGroup][]*Property),
 		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 	}
 
@@ -36,7 +36,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, len(emptyCatalog.Properties), 1)
 		assert.Equal(t, len(emptyCatalog.Properties["base_props"]), 1)
-		assert.Equal(t, Property{
+		assert.Equal(t, &Property{
 			LocalID:     "write_key",
 			Name:        "Write Key",
 			Type:        "string",
@@ -71,7 +71,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 		assert.Equal(t, 1, len(emptyCatalog.Events))
 		assert.Equal(t, 1, len(emptyCatalog.Events["app_events"]))
-		assert.Equal(t, Event{
+		assert.Equal(t, &Event{
 			LocalID:     "user_signed_up",
 			Name:        "User Signed Up",
 			Type:        "track",
@@ -153,7 +153,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(emptyCatalog.TrackingPlans))
-		assert.Equal(t, TrackingPlan{
+		assert.Equal(t, &TrackingPlan{
 			Name:        "Rudderstack First Tracking Plan",
 			LocalID:     "my_first_tp",
 			Description: "This is my first tracking plan",
@@ -177,7 +177,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 					},
 				},
 			},
-		}, *emptyCatalog.TrackingPlans["my_first_tp"])
+		}, emptyCatalog.TrackingPlans["my_first_tp"])
 	})
 
 }
