@@ -1,0 +1,19 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: app_properties
+spec:
+  properties:
+    - display_name: "Write Key" #  error: missing id
+      type: string
+      description: KSUID identifier for the source embedded in the SDKs
+    
+    - id: user_id
+      type: numeral # error: invalid type, missing display_name
+
+    - id: user_name
+      display_name: "User Name"
+      type: string
+      description: "Name of the user"
+      propConfig:
+        maxLength: 100

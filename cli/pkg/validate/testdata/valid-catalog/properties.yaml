@@ -1,0 +1,13 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: app_properties
+spec:
+  properties:
+    - id: write_key
+      display_name: "Write Key"
+      type: string
+      description: KSUID identifier for the source embedded in the SDKs
+      propConfig:
+        minLength: 24
+        maxLength: 48

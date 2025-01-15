@@ -1,0 +1,28 @@
+version: rudder/0.1
+kind: events
+metadata:
+  name: app_events
+spec:
+  events:
+    - id: user_signed_up
+      display_name: "User Signed Up"
+      event_type: track
+      description: "User signed up for the app"
+
+    - id: user_signed_out
+      display_name: "User Signed Up" # error: duplicate display_name
+      event_type: track
+      description: "User signed up for the app"
+
+    - id: page
+      display_name: "Page" # error: invalid display_name for non-track events
+      event_type: page
+      description: "User visited a page"
+
+    - id: alias
+      event_type: alias
+      description: "User visited a page"
+    
+    - event_type: track # error: missing id
+      display_name: "User Page Visit"
+      description: "User visited a page"

@@ -33,8 +33,8 @@ func NewCatalogValidator() *CatalogValidator {
 	return &CatalogValidator{
 		validators: []entity.CatalogEntityValidator{
 			eventValidator,
-			tpValidator,
 			propValidator,
+			tpValidator,
 		},
 	}
 }

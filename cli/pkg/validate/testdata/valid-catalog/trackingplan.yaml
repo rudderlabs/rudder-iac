@@ -1,0 +1,16 @@
+version: rudder/0.1
+kind: tp
+metadata:
+  name: trackingplan
+spec:
+  id: first_tracking_plan
+  display_name: "first tracking plan"
+  description: "main tracking plan for the application"
+  rules:
+    - type: event_rule
+      id: rule_01
+      event:
+        $ref: "#/events/app_events/user_signed_up"
+      properties:
+        - $ref: "#/properties/app_properties/write_key"
+          required: true
