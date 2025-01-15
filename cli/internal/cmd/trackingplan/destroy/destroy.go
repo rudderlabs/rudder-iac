@@ -32,7 +32,7 @@ func NewCmdTPDestroy() *cobra.Command {
 			$ rudder-cli tp destroy --dry-run
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Debug("tp destroy", "dryRun", dryRun, "confirm", confirm)
+			log.Debug("removing upstream resources", "cmd", "tp destroy", "dryRun", dryRun, "confirm", confirm)
 
 			errors := app.Syncer().Destroy(context.Background(), syncer.SyncOptions{
 				DryRun:  dryRun,

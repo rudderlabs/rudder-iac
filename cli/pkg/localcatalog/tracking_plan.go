@@ -127,12 +127,11 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 		return nil, fmt.Errorf("empty rule includes")
 	}
 
-	matches := IncludeRegex.FindStringSubmatch(rule.Includes.Ref)
-	if len(matches) != 3 {
-		return nil, fmt.Errorf("includes ref: %s invalid as failed regex match", rule.Includes.Ref)
+	tpGroup, ruleID, err := expandIncludeRef(rule.Includes.Ref)
+	if err != nil {
+		return nil, fmt.Errorf("expanding include ref: %s failed, err: %w", rule.Includes.Ref, err)
 	}
 
-	tpGroup, ruleID := matches[1], matches[2]
 	rules := make([]*TPRule, 0)
 
 	if ruleID == "*" {
@@ -171,12 +170,11 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 		return nil, fmt.Errorf("empty rule event")
 	}
 
-	matches := EventRegex.FindStringSubmatch(rule.Event.Ref)
-	if len(matches) != 3 {
-		return nil, fmt.Errorf("event ref: %s invalid as failed regex match", rule.Event.Ref)
+	eventGroup, eventID, err := ExpandEventRef(rule.Event.Ref)
+	if err != nil {
+		return nil, fmt.Errorf("expanding event ref: %s failed, err: %w", rule.Event.Ref, err)
 	}
 
-	eventGroup, eventID := matches[1], matches[2]
 	event := fetcher.Event(eventGroup, eventID)
 	if event == nil {
 		return nil, fmt.Errorf("looking up event: %s in group: %s failed", eventID, eventGroup)
@@ -195,12 +193,12 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	// Load the properties from the data catalog
 	// into corresponding event on the tracking plan
 	for _, prop := range rule.Properties {
-		matches = PropRegex.FindStringSubmatch(prop.Ref)
-		if len(matches) != 3 {
-			return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
+
+		propertyGroup, propertyID, err := ExpandPropertyRef(prop.Ref)
+		if err != nil {
+			return nil, fmt.Errorf("expanding property ref: %s failed, err: %w", prop.Ref, err)
 		}
 
-		propertyGroup, propertyID := matches[1], matches[2]
 		property := fetcher.Property(propertyGroup, propertyID)
 		if property == nil {
 			return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
@@ -235,4 +233,24 @@ func ExtractTrackingPlan(rd *ResourceDefinition) (TrackingPlan, error) {
 	}
 
 	return tp, nil
+}
+
+func ExpandEventRef(reference string) (group, id string, err error) {
+	return extractLocationFromRef(reference, EventRegex)
+}
+
+func ExpandPropertyRef(reference string) (group, id string, err error) {
+	return extractLocationFromRef(reference, PropRegex)
+}
+
+func expandIncludeRef(reference string) (group, id string, err error) {
+	return extractLocationFromRef(reference, IncludeRegex)
+}
+
+func extractLocationFromRef(reference string, regex *regexp.Regexp) (group, id string, err error) {
+	matches := regex.FindStringSubmatch(reference)
+	if len(matches) != 3 {
+		return "", "", fmt.Errorf("ref: %s invalid as failed regex match", reference)
+	}
+	return matches[1], matches[2], nil
 }
