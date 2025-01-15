@@ -125,10 +125,18 @@ func (rule *TrackingPlanRefRule) Validate(ref string, tp *localcatalog.TrackingP
 					Reference:  ref,
 					EntityType: TrackingPlan,
 				})
+				return
 			}
 
-			// IdentitySection applied only to non-track events
-			if r.Event.IdentitySection != "" && !lo.Contains(NonTrackEventTypes, event.Type) {
+			if lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection == "" {
+				errs = append(errs, ValidationError{
+					Err:        fmt.Errorf("%w: rule: %s event: %s", ErrMissingIdentityApplied, r.LocalID, r.Event.Ref),
+					Reference:  ref,
+					EntityType: TrackingPlan,
+				})
+			}
+
+			if !lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection != "" {
 				errs = append(errs, ValidationError{
 					Err:        fmt.Errorf("%w: rule: %s event: %s", ErrInvalidIdentityApplied, r.LocalID, r.Event.Ref),
 					Reference:  ref,

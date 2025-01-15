@@ -33,6 +33,7 @@ var (
 	ErrInvalidRefFormat                 = errors.New("invalid reference format")
 	ErrMissingEntityFromRef             = errors.New("missing entity from reference") // TODO: Fix this ?
 	ErrInvalidIdentityApplied           = errors.New("identity section only for non-track events")
+	ErrMissingIdentityApplied           = errors.New("missing identity section for non-track events")
 	ErrDuplicateEntityRefs              = errors.New("duplicate entity refs")
 )
 
