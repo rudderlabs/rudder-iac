@@ -17,7 +17,7 @@ clean:
 
 .PHONY: test
 test: ## Run all unit tests
-	go test ./...
+	go test --race --covermode=atomic --coverprofile=coverage.out ./...
 
 .PHONY: test-it
 test-it: ## Run all test, including integration tests
