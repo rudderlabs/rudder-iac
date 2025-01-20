@@ -88,7 +88,7 @@ func (rule *TrackingPlanRequiredKeysRule) Validate(
 			})
 		}
 
-		if rule.Event == nil {
+		if rule.Type == "event_rule" && rule.Event == nil {
 			errs = append(errs, ValidationError{
 				Err:        fmt.Errorf("%w: %s", ErrMissingRequiredKeysRuleEvent, rule.LocalID),
 				Reference:  ref,
@@ -115,35 +115,32 @@ func (rule *TrackingPlanRefRule) Validate(ref string, tp *localcatalog.TrackingP
 					Reference:  ref,
 					EntityType: TrackingPlan,
 				})
-				return
+			} else {
+				// if event found in catalog
+				event := rule.eventFromRef(group, eventID, dc)
+				if event == nil {
+					errs = append(errs, ValidationError{
+						Err:        fmt.Errorf("%w: rule: %s event: %s", ErrMissingEntityFromRef, r.LocalID, r.Event.Ref),
+						Reference:  ref,
+						EntityType: TrackingPlan,
+					})
+					return
+				}
+				if lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection == "" {
+					errs = append(errs, ValidationError{
+						Err:        fmt.Errorf("%w: rule: %s event: %s", ErrMissingIdentityApplied, r.LocalID, r.Event.Ref),
+						Reference:  ref,
+						EntityType: TrackingPlan,
+					})
+				}
+				if !lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection != "" {
+					errs = append(errs, ValidationError{
+						Err:        fmt.Errorf("%w: rule: %s event: %s", ErrInvalidIdentityApplied, r.LocalID, r.Event.Ref),
+						Reference:  ref,
+						EntityType: TrackingPlan,
+					})
+				}
 			}
-
-			event := rule.eventFromRef(group, eventID, dc)
-			if event == nil {
-				errs = append(errs, ValidationError{
-					Err:        fmt.Errorf("%w: rule: %s event: %s", ErrMissingEntityFromRef, r.LocalID, r.Event.Ref),
-					Reference:  ref,
-					EntityType: TrackingPlan,
-				})
-				return
-			}
-
-			if lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection == "" {
-				errs = append(errs, ValidationError{
-					Err:        fmt.Errorf("%w: rule: %s event: %s", ErrMissingIdentityApplied, r.LocalID, r.Event.Ref),
-					Reference:  ref,
-					EntityType: TrackingPlan,
-				})
-			}
-
-			if !lo.Contains(NonTrackEventTypes, event.Type) && r.Event.IdentitySection != "" {
-				errs = append(errs, ValidationError{
-					Err:        fmt.Errorf("%w: rule: %s event: %s", ErrInvalidIdentityApplied, r.LocalID, r.Event.Ref),
-					Reference:  ref,
-					EntityType: TrackingPlan,
-				})
-			}
-
 		}
 
 		for _, prop := range r.Properties {
@@ -155,7 +152,8 @@ func (rule *TrackingPlanRefRule) Validate(ref string, tp *localcatalog.TrackingP
 					Reference:  ref,
 					EntityType: TrackingPlan,
 				})
-				return
+
+				continue
 			}
 
 			if property := rule.propertyFromRef(group, propID, dc); property == nil {
@@ -212,10 +210,13 @@ func (rule *TrackingPlanRefRule) propertyFromRef(groupName, id string, dc *local
 	return nil
 }
 
+// TrackingPlanDuplicateKeysRule validates that the tracking plan does not have duplicate keys
+// within the catalog and also within the trackingplan itself (rules, properties)
 type TrackingPlanDuplicateKeysRule struct {
 }
 
 func (rule *TrackingPlanDuplicateKeysRule) Validate(ref string, tp *localcatalog.TrackingPlan, dc *localcatalog.DataCatalog) (errs []ValidationError) {
+	// same tracking plan id should not be used in the catalog
 	tps := rule.getByID(tp.LocalID, dc)
 	if len(tps) > 1 {
 		errs = append(errs, ValidationError{
@@ -225,6 +226,7 @@ func (rule *TrackingPlanDuplicateKeysRule) Validate(ref string, tp *localcatalog
 		})
 	}
 
+	// same tracking plan name should not be used in the catalog
 	tps = rule.getByName(tp.Name, dc)
 	if len(tps) > 1 {
 		errs = append(errs, ValidationError{
@@ -234,6 +236,22 @@ func (rule *TrackingPlanDuplicateKeysRule) Validate(ref string, tp *localcatalog
 		})
 	}
 
+	// same rule id should not be used in any other tracking plan
+	for _, tpRule := range tp.Rules {
+		tps = rule.getByRuleID(tpRule.LocalID, dc)
+		if len(tps) <= 1 {
+			continue
+		}
+
+		errs = append(errs, ValidationError{
+			Err:        fmt.Errorf("%w: rule: %s", ErrDuplicateByID, tpRule.LocalID),
+			Reference:  ref,
+			EntityType: TrackingPlan,
+		})
+	}
+
+	// multiple event blocks shouldn't contain ref to the same event as it will try
+	// and upsert the same event multiple times on the trackingplan
 	for eventRef, rules := range rule.eventRefRulesMap(tp) {
 		if len(rules) <= 1 {
 			continue
@@ -248,34 +266,32 @@ func (rule *TrackingPlanDuplicateKeysRule) Validate(ref string, tp *localcatalog
 		})
 	}
 
+	// same properties on every rule should not be used
+	// as it will try and attach same property multiple times
+	// on the same event
 	for _, rule := range tp.Rules {
 
-		var (
-			propRefsCount = make(map[string]int)
-		)
-
-		lo.ForEach(rule.Properties, func(prop *localcatalog.TPRuleProperty, idx int) {
-
-			if _, ok := propRefsCount[prop.Ref]; !ok {
-				propRefsCount[prop.Ref] = 0
+		// simple reduce which keeps on counting the number of times
+		// property with same refs are occurring within the rule
+		propRefCount := lo.Reduce(rule.Properties, func(acc map[string]int, prop *localcatalog.TPRuleProperty, idx int) map[string]int {
+			if _, ok := acc[prop.Ref]; !ok {
+				acc[prop.Ref] = 0
 			}
 
-			propRefsCount[prop.Ref] = propRefsCount[prop.Ref] + 1
-		})
+			acc[prop.Ref] = acc[prop.Ref] + 1
+			return acc
+		}, map[string]int{})
 
-		for propRef, count := range propRefsCount {
-
+		for propRef, count := range propRefCount {
 			if count <= 1 {
 				continue
 			}
-
 			errs = append(errs, ValidationError{
 				Err:        fmt.Errorf("%w: rule: %s property: %s", ErrDuplicateEntityRefs, rule.LocalID, propRef),
 				Reference:  ref,
 				EntityType: TrackingPlan,
 			})
 		}
-
 	}
 
 	return errs
@@ -296,6 +312,19 @@ func (rule *TrackingPlanDuplicateKeysRule) getByName(name string, dc *localcatal
 	for _, tp := range dc.TrackingPlans {
 		if tp.Name == name {
 			tps = append(tps, tp)
+		}
+	}
+	return tps
+}
+
+func (rule *TrackingPlanDuplicateKeysRule) getByRuleID(ruleID string, dc *localcatalog.DataCatalog) []*localcatalog.TrackingPlan {
+	var tps []*localcatalog.TrackingPlan
+
+	for _, tp := range dc.TrackingPlans {
+		for _, rule := range tp.Rules {
+			if rule.LocalID == ruleID {
+				tps = append(tps, tp)
+			}
 		}
 	}
 	return tps
