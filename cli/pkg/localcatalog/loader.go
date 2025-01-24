@@ -20,8 +20,8 @@ type EntityGroup string
 
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties    map[EntityGroup][]Property    `json:"properties"`
-	Events        map[EntityGroup][]Event       `json:"events"`
+	Properties    map[EntityGroup][]*Property   `json:"properties"`
+	Events        map[EntityGroup][]*Event      `json:"events"`
 	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
 }
 
@@ -38,7 +38,7 @@ func (dc *DataCatalog) Property(groupName string, id string) *Property {
 	if props, ok := dc.Properties[EntityGroup(groupName)]; ok {
 		for _, prop := range props {
 			if prop.LocalID == id {
-				return &prop
+				return prop
 			}
 		}
 	}
@@ -49,7 +49,7 @@ func (dc *DataCatalog) Event(groupName string, id string) *Event {
 	if events, ok := dc.Events[EntityGroup(groupName)]; ok {
 		for _, event := range events {
 			if event.LocalID == id {
-				return &event
+				return event
 			}
 		}
 	}
@@ -120,8 +120,8 @@ func Read(loc string) (*DataCatalog, error) {
 	}
 
 	dc := &DataCatalog{
-		Properties:    map[EntityGroup][]Property{},
-		Events:        map[EntityGroup][]Event{},
+		Properties:    map[EntityGroup][]*Property{},
+		Events:        map[EntityGroup][]*Event{},
 		TrackingPlans: map[EntityGroup]*TrackingPlan{},
 	}
 
