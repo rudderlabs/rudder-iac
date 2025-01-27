@@ -27,11 +27,19 @@ type StateManager interface {
 	Save(context.Context, *state.State) error
 }
 
-func New(p Provider, sm StateManager) *ProjectSyncer {
+func New(p Provider, sm StateManager) (*ProjectSyncer, error) {
+	if p == nil {
+		return nil, fmt.Errorf("provider is required")
+	}
+
+	if sm == nil {
+		return nil, fmt.Errorf("state manager is required")
+	}
+
 	return &ProjectSyncer{
 		provider:     p,
 		stateManager: sm,
-	}
+	}, nil
 }
 
 type SyncOptions struct {

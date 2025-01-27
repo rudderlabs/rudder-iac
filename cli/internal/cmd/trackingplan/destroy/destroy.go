@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
@@ -34,7 +34,12 @@ func NewCmdTPDestroy() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Debug("tp destroy", "dryRun", dryRun, "confirm", confirm)
 
-			errors := app.Syncer().Destroy(context.Background(), syncer.SyncOptions{
+			s, err := common.NewSyncer()
+			if err != nil {
+				return err
+			}
+
+			errors := s.Destroy(context.Background(), syncer.SyncOptions{
 				DryRun:  dryRun,
 				Confirm: confirm,
 			})
