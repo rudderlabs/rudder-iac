@@ -45,7 +45,7 @@ func TestSyncerCreate(t *testing.T) {
 	stateManager.Save(context.Background(), state.EmptyState())
 	provider := &testutils.DataCatalogProvider{}
 
-	s := syncer.New(provider, stateManager)
+	s, _ := syncer.New(provider, stateManager)
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
@@ -186,7 +186,7 @@ func TestSyncerDelete(t *testing.T) {
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s := syncer.New(provider, stateManager)
+	s, _ := syncer.New(provider, stateManager)
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 

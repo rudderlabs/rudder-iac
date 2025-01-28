@@ -66,10 +66,7 @@ func initLogger() {
 }
 
 func initAppDependencies() {
-	if err := app.Initialise(rootCmd.Version); err != nil {
-		ui.ShowError(err)
-		os.Exit(1)
-	}
+	app.Initialise(rootCmd.Version)
 }
 
 func SetVersion(v string) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -55,7 +55,12 @@ func NewCmdTPApply() *cobra.Command {
 			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
 			log.Debug("identifying changes for the upstream catalog")
 
-			if err := app.Syncer().Sync(
+			s, err := common.NewSyncer()
+			if err != nil {
+				return err
+			}
+
+			if err := s.Sync(
 				context.Background(),
 				createResourceGraph(localcatalog),
 				syncer.SyncOptions{

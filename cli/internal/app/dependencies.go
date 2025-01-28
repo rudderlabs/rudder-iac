@@ -11,24 +11,43 @@ import (
 )
 
 var (
-	p  syncer.Provider
-	sm syncer.StateManager
-	s  *syncer.ProjectSyncer
+	v string
 )
 
-func Initialise(version string) error {
-	var err error
+type Deps struct {
+	p  syncer.Provider
+	sm syncer.StateManager
+}
 
-	sm = newStateManager()
+func Initialise(version string) {
+	v = version
+}
 
-	p, err = newProvider(version)
-	if err != nil {
-		return fmt.Errorf("creating provider: %w", err)
+func validateDependencies() error {
+	cfg := config.GetConfig()
+	if cfg.Auth.AccessToken == "" {
+		return fmt.Errorf("access token is required, please run `rudder-cli auth login`")
 	}
 
-	s = syncer.New(p, sm)
-
 	return nil
+}
+
+func NewDeps() (*Deps, error) {
+	if err := validateDependencies(); err != nil {
+		return nil, err
+	}
+
+	sm := newStateManager()
+
+	p, err := newProvider(v)
+	if err != nil {
+		return nil, fmt.Errorf("creating provider: %w", err)
+	}
+
+	return &Deps{
+		p:  p,
+		sm: sm,
+	}, nil
 }
 
 func newStateManager() syncer.StateManager {
@@ -51,14 +70,10 @@ func newProvider(version string) (syncer.Provider, error) {
 	return provider.NewCatalogProvider(client.NewRudderDataCatalog(rawClient)), nil
 }
 
-func StateManager() syncer.StateManager {
-	return sm
+func (d *Deps) StateManager() syncer.StateManager {
+	return d.sm
 }
 
-func Provider() syncer.Provider {
-	return p
-}
-
-func Syncer() *syncer.ProjectSyncer {
-	return s
+func (d *Deps) Provider() syncer.Provider {
+	return d.p
 }
