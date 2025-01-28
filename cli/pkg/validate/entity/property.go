@@ -14,7 +14,7 @@ var (
 	_ ValidationRule[*localcatalog.Property]              = &PropertyDuplicateKeysRule{}
 )
 
-var validPropertyTypes = []string{"string", "number", "boolean", "object", "array"}
+var validPropertyTypes = []string{"string", "number", "boolean", "object", "array", "integer"}
 
 type PropertyEntityValidator struct {
 	rules []ValidationRule[*localcatalog.Property]

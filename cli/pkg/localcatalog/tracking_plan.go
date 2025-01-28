@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+
+	"github.com/samber/lo"
 )
 
 var (
@@ -65,10 +67,34 @@ type TPRule struct {
 	Includes   *TPRuleIncludes   `json:"includes"`
 }
 
+func (r *TPRule) Copy() *TPRule {
+	return &TPRule{
+		Type:    r.Type,
+		LocalID: r.LocalID,
+		Event:   r.Event.Copy(),
+		Properties: lo.Map(r.Properties, func(prop *TPRuleProperty, idx int) *TPRuleProperty {
+			return prop.Copy()
+		}),
+		Includes: r.Includes.Copy(),
+	}
+}
+
 type TPRuleEvent struct {
 	Ref             string `json:"$ref"`
 	AllowUnplanned  bool   `json:"allow_unplanned"`
 	IdentitySection string `json:"identity_section"`
+}
+
+func (r *TPRuleEvent) Copy() *TPRuleEvent {
+	if r == nil {
+		return nil
+	}
+
+	return &TPRuleEvent{
+		Ref:             r.Ref,
+		AllowUnplanned:  r.AllowUnplanned,
+		IdentitySection: r.IdentitySection,
+	}
 }
 
 type TPRuleProperty struct {
@@ -76,8 +102,24 @@ type TPRuleProperty struct {
 	Required bool   `json:"required"`
 }
 
+func (r *TPRuleProperty) Copy() *TPRuleProperty {
+	return &TPRuleProperty{
+		Ref:      r.Ref,
+		Required: r.Required,
+	}
+}
+
 type TPRuleIncludes struct {
 	Ref string `json:"$ref"`
+}
+
+func (r *TPRuleIncludes) Copy() *TPRuleIncludes {
+	if r == nil {
+		return nil
+	}
+	return &TPRuleIncludes{
+		Ref: r.Ref,
+	}
 }
 
 // ExpandRefs simply expands the references being held
@@ -119,7 +161,6 @@ func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
 }
 
 // expandIncludeRefs expands the include references in the tracking plan rule definition
-// TODO: Make this function recursive to allow for multiple levels of include
 func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent, error) {
 	log.Debug("expanding include refs within the rule", "ruleID", rule.LocalID)
 
@@ -132,34 +173,45 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 		return nil, fmt.Errorf("expanding include ref: %s failed, err: %w", rule.Includes.Ref, err)
 	}
 
-	rules := make([]*TPRule, 0)
+	var (
+		rules      = make([]*TPRule, 0)
+		ruleEvents = make([]*TPEvent, 0)
+	)
 
-	if ruleID == "*" {
+	switch ruleID {
+
+	case "*":
 		eventRules, _ := fetcher.TPEventRules(tpGroup)
 		rules = append(rules, eventRules...) // fetch all the tp rules in the group
-	} else {
-		rules = append(rules, fetcher.TPEventRule(tpGroup, ruleID)) // fetch the specific rule with the tpGroup
+
+	default:
+		eventRule := fetcher.TPEventRule(tpGroup, ruleID)
+		if eventRule == nil {
+			return nil, fmt.Errorf("looking up event rule: %s in group: %s failed", ruleID, tpGroup)
+		}
+		// merge the extra-properties within the original rule if any
+		// in case we are deriving from a base upstream event_rule
+		copied := eventRule.Copy() // copy to prevent changing the original
+		copied.Properties = append(eventRule.Properties, rule.Properties...)
+
+		rules = append(rules, copied)
 	}
 
-	toReturn := make([]*TPEvent, 0)
-	// Assume rules are now actual rules and not indirections
 	for _, rule := range rules {
-
+		// Assume rules are now actual rules and not indirections
 		if rule.Event == nil {
 			continue
 		}
-
 		// This rule should have event ref only
 		// which we can expand now
 		event, err := expandEventRefs(rule, fetcher)
 		if err != nil {
 			return nil, fmt.Errorf("expanding event ref of the expanded include rule: %s failed, err: %w", rule.LocalID, err)
 		}
-
-		toReturn = append(toReturn, event)
+		ruleEvents = append(ruleEvents, event)
 	}
 
-	return toReturn, nil
+	return ruleEvents, nil
 }
 
 // expandEventRefs expands the direct event references in the tracking plan rule definition
@@ -167,7 +219,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	log.Debug("expanding event refs within the rule", "ruleID", rule.LocalID)
 
 	if rule.Event == nil {
-		return nil, fmt.Errorf("empty rule event")
+		return nil, fmt.Errorf("empty eventref in rule: %s", rule.LocalID)
 	}
 
 	eventGroup, eventID, err := ExpandEventRef(rule.Event.Ref)

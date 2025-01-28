@@ -7,8 +7,13 @@ import (
 	"github.com/samber/lo"
 )
 
+const (
+	eventRuleType    = "event_rule"
+	includesRuleType = "include_rules"
+)
+
 var (
-	validRuleTypes = []string{"includes", "event_rule"}
+	validRuleTypes = []string{eventRuleType, includesRuleType}
 )
 
 var (
@@ -88,7 +93,15 @@ func (rule *TrackingPlanRequiredKeysRule) Validate(
 			})
 		}
 
-		if rule.Type == "event_rule" && rule.Event == nil {
+		if rule.Type == includesRuleType && rule.Includes == nil {
+			errs = append(errs, ValidationError{
+				Err:        fmt.Errorf("%w: %s", ErrMissingRequiredKeysRuleIncludes, rule.LocalID),
+				Reference:  ref,
+				EntityType: TrackingPlan,
+			})
+		}
+
+		if rule.Type == eventRuleType && rule.Event == nil {
 			errs = append(errs, ValidationError{
 				Err:        fmt.Errorf("%w: %s", ErrMissingRequiredKeysRuleEvent, rule.LocalID),
 				Reference:  ref,

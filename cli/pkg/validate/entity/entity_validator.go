@@ -30,6 +30,7 @@ var (
 	ErrMissingRequiredKeysRuleID        = errors.New("missing required key id in rule")
 	ErrInvalidTrackingPlanEventRuleType = errors.New("invalid / missing required key type in rule")
 	ErrMissingRequiredKeysRuleEvent     = errors.New("missing required key event in rule")
+	ErrMissingRequiredKeysRuleIncludes  = errors.New("missing required key includes in rule")
 	ErrInvalidRefFormat                 = errors.New("invalid reference format")
 	ErrMissingEntityFromRef             = errors.New("missing entity from reference") // TODO: Fix this ?
 	ErrInvalidIdentityApplied           = errors.New("identity section only for non-track events")

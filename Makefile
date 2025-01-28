@@ -11,6 +11,10 @@ help: ## Show the available commands
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/rudder-cli ./cli/cmd/rudder-cli
 
+.PHONY: install
+install:
+	go build -ldflags "-X main.version=$(VERSION)" -o ${GOPATH}/bin ./cli/cmd/rudder-cli
+
 .PHONY: clean
 clean:
 	rm -rf bin
