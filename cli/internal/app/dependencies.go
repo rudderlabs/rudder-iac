@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 )
 
@@ -15,8 +15,7 @@ var (
 )
 
 type Deps struct {
-	p  syncer.Provider
-	sm syncer.StateManager
+	p syncer.Provider
 }
 
 func Initialise(version string) {
@@ -26,7 +25,7 @@ func Initialise(version string) {
 func validateDependencies() error {
 	cfg := config.GetConfig()
 	if cfg.Auth.AccessToken == "" {
-		return fmt.Errorf("access token is required, please run `rudder-cli auth login`")
+		return fmt.Errorf("access token is required, please run `rudder-cli auth login`, or set the access token via the RUDDERSTACK_ACCESS_TOKEN environment variable")
 	}
 
 	return nil
@@ -37,23 +36,14 @@ func NewDeps() (*Deps, error) {
 		return nil, err
 	}
 
-	sm := newStateManager()
-
 	p, err := newProvider(v)
 	if err != nil {
 		return nil, fmt.Errorf("creating provider: %w", err)
 	}
 
 	return &Deps{
-		p:  p,
-		sm: sm,
+		p: p,
 	}, nil
-}
-
-func newStateManager() syncer.StateManager {
-	return &state.LocalManager{
-		BaseDir: config.GetConfigDir(),
-	}
 }
 
 func newProvider(version string) (syncer.Provider, error) {
@@ -67,11 +57,7 @@ func newProvider(version string) (syncer.Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
-	return provider.NewCatalogProvider(client.NewRudderDataCatalog(rawClient)), nil
-}
-
-func (d *Deps) StateManager() syncer.StateManager {
-	return d.sm
+	return provider.NewCatalogProvider(catalog.NewRudderDataCatalog(rawClient)), nil
 }
 
 func (d *Deps) Provider() syncer.Provider {
