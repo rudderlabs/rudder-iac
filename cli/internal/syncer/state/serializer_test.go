@@ -18,14 +18,14 @@ func TestToJSON(t *testing.T) {
 		{
 			name: "empty state",
 			state: &State{
-				Resources: map[string]*StateResource{},
+				Resources: map[string]*ResourceState{},
 			},
-			expected: `{"resources":{}, "version": 1}`,
+			expected: `{"resources":{}, "version": "1.0.0"}`,
 		},
 		{
 			name: "basic resource",
 			state: &State{
-				Resources: map[string]*StateResource{
+				Resources: map[string]*ResourceState{
 					"test:resource": {
 						ID:   "123",
 						Type: "test",
@@ -39,12 +39,12 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"name":"test-resource"},"output":{"id":"123"},"dependencies":["test:dep1"]}}, "version": 1}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"name":"test-resource"},"output":{"id":"123"},"dependencies":["test:dep1"]}}, "version": "1.0.0"}`,
 		},
 		{
 			name: "with property references",
 			state: &State{
-				Resources: map[string]*StateResource{
+				Resources: map[string]*ResourceState{
 					"test:resource": {
 						ID:   "123",
 						Type: "test",
@@ -58,12 +58,12 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$ref":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": 1}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$ref":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
 		},
 		{
 			name: "with nested structures",
 			state: &State{
-				Resources: map[string]*StateResource{
+				Resources: map[string]*ResourceState{
 					"test:resource": {
 						ID:   "123",
 						Type: "test",
@@ -88,7 +88,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$ref":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$ref":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": 1}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$ref":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$ref":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
 		},
 	}
 
@@ -109,98 +109,120 @@ func TestToJSON(t *testing.T) {
 	}
 }
 
-func TestFromJSON(t *testing.T) {
+func TestEncodeDecodeResourceState(t *testing.T) {
 	tests := []struct {
-		name     string
-		json     string
-		expected *State
+		name            string
+		resource        *ResourceState
+		expectedEncoded *ResourceState
 	}{
 		{
-			name: "empty state",
-			json: `{"resources":{}, "version": 1}`,
-			expected: &State{
-				Version:   1,
-				Resources: map[string]*StateResource{},
-			},
-		},
-		{
 			name: "basic resource",
-			json: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"name":"test-resource"},"output":{"id":"123"},"dependencies":["test:dep1"]}}, "version": 1}`,
-			expected: &State{
-				Version: 1,
-				Resources: map[string]*StateResource{
-					"test:resource": {
-						ID:   "123",
-						Type: "test",
-						Input: map[string]interface{}{
-							"name": "test-resource",
-						},
-						Output: map[string]interface{}{
-							"id": "123",
-						},
-						Dependencies: []string{"test:dep1"},
-					},
+			resource: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"name": "test-resource",
 				},
+				Output: map[string]interface{}{
+					"id": "123",
+				},
+				Dependencies: []string{"test:dep1"},
+			},
+			expectedEncoded: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"name": "test-resource",
+				},
+				Output: map[string]interface{}{
+					"id": "123",
+				},
+				Dependencies: []string{"test:dep1"},
 			},
 		},
 		{
 			name: "with property references",
-			json: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$ref":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": 1}`,
-			expected: &State{
-				Version: 1,
-				Resources: map[string]*StateResource{
-					"test:resource": {
-						ID:   "123",
-						Type: "test",
-						Input: map[string]interface{}{
-							"ref": resources.PropertyRef{
-								URN:      "test:dep1",
-								Property: "id",
-							},
-						},
-						Output: map[string]interface{}{},
+			resource: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"ref": resources.PropertyRef{
+						URN:      "test:dep1",
+						Property: "id",
 					},
 				},
+				Output: map[string]interface{}{},
+			},
+			expectedEncoded: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"ref": map[string]interface{}{
+						"$ref":     "test:dep1",
+						"property": "id",
+					},
+				},
+				Output: map[string]interface{}{},
 			},
 		},
 		{
 			name: "with nested structures",
-			json: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$ref":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$ref":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": 1}`,
-			expected: &State{
-				Version: 1,
-				Resources: map[string]*StateResource{
-					"test:resource": {
-						ID:   "123",
-						Type: "test",
-						Input: map[string]interface{}{
-							"nested": map[string]interface{}{
-								"ref": resources.PropertyRef{
-									URN:      "test:dep1",
-									Property: "id",
-								},
-							},
-							"array": []interface{}{
-								map[string]interface{}{
-									"ref": resources.PropertyRef{
-										URN:      "test:dep2",
-										Property: "name",
-									},
-								},
-								"simple-value",
+			resource: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"nested": map[string]interface{}{
+						"ref": resources.PropertyRef{
+							URN:      "test:dep1",
+							Property: "id",
+						},
+					},
+					"array": []interface{}{
+						map[string]interface{}{
+							"ref": resources.PropertyRef{
+								URN:      "test:dep2",
+								Property: "name",
 							},
 						},
-						Output: map[string]interface{}{},
+						"simple-value",
 					},
 				},
+				Output: map[string]interface{}{},
+			},
+			expectedEncoded: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"nested": map[string]interface{}{
+						"ref": map[string]interface{}{
+							"$ref":     "test:dep1",
+							"property": "id",
+						},
+					},
+					"array": []interface{}{
+						map[string]interface{}{
+							"ref": map[string]interface{}{
+								"$ref":     "test:dep2",
+								"property": "name",
+							},
+						},
+						"simple-value",
+					},
+				},
+				Output: map[string]interface{}{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := FromJSON([]byte(tt.json))
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			// Test encoding
+			encoded := EncodeResourceState(tt.resource)
+			assert.Equal(t, tt.expectedEncoded, encoded)
+
+			// Test decoding
+			decoded := DecodeResourceState(encoded)
+			assert.Equal(t, tt.resource, decoded)
 		})
 	}
 }

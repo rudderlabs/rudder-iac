@@ -7,17 +7,17 @@ import (
 )
 
 type State struct {
-	Version   int                       `json:"version"`
-	Resources map[string]*StateResource `json:"resources"`
+	Version   string                    `json:"version"`
+	Resources map[string]*ResourceState `json:"resources"`
 }
 
 func EmptyState() *State {
 	return &State{
-		Resources: make(map[string]*StateResource),
+		Resources: make(map[string]*ResourceState),
 	}
 }
 
-type StateResource struct {
+type ResourceState struct {
 	ID           string                 `json:"id"`
 	Type         string                 `json:"type"`
 	Input        map[string]interface{} `json:"input"`
@@ -25,7 +25,7 @@ type StateResource struct {
 	Dependencies []string               `json:"dependencies"`
 }
 
-func (sr *StateResource) Data() resources.ResourceData {
+func (sr *ResourceState) Data() resources.ResourceData {
 	data := make(resources.ResourceData)
 	for k, v := range sr.Input {
 		data[k] = v
@@ -36,7 +36,7 @@ func (sr *StateResource) Data() resources.ResourceData {
 	return data
 }
 
-func (s *State) AddResource(r *StateResource) {
+func (s *State) AddResource(r *ResourceState) {
 	s.Resources[resources.URN(r.ID, r.Type)] = r
 }
 
@@ -44,7 +44,7 @@ func (s *State) RemoveResource(urn string) {
 	delete(s.Resources, urn)
 }
 
-func (s *State) GetResource(urn string) *StateResource {
+func (s *State) GetResource(urn string) *ResourceState {
 	return s.Resources[urn]
 }
 

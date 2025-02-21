@@ -4,35 +4,34 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 )
 
 // TODO: implement on the same lines as the propertyProvider
-type eventProvider struct {
-	client client.DataCatalog
-	log    *logger.Logger
+type EventProvider struct {
+	catalog catalog.DataCatalog
+	log     *logger.Logger
 }
 
-func NewEventProvider(client client.DataCatalog) syncer.Provider {
-	return &eventProvider{
-		client: client,
+func NewEventProvider(catalog catalog.DataCatalog) *EventProvider {
+	return &EventProvider{
+		catalog: catalog,
 		log: &logger.Logger{
 			Logger: log.With("type", "event"),
 		},
 	}
 }
 
-func (p *eventProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *EventProvider) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("creating event in upstream catalog", "id", ID)
 
 	toArgs := state.EventArgs{}
 	toArgs.FromResourceData(data)
 
-	event, err := p.client.CreateEvent(ctx, client.EventCreate{
+	event, err := p.catalog.CreateEvent(ctx, catalog.EventCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
@@ -56,10 +55,11 @@ func (p *eventProvider) Create(ctx context.Context, ID string, resourceType stri
 	}
 
 	resourceData := eventState.ToResourceData()
+
 	return &resourceData, nil
 }
 
-func (p *eventProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
+func (p *EventProvider) Update(ctx context.Context, ID string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating event in upstream catalog", "id", ID)
 
 	toArgs := state.EventArgs{}
@@ -68,7 +68,7 @@ func (p *eventProvider) Update(ctx context.Context, ID string, resourceType stri
 	prevState := state.EventState{}
 	prevState.FromResourceData(olds)
 
-	updatedEvent, err := p.client.UpdateEvent(ctx, prevState.ID, &client.Event{
+	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.Event{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
@@ -96,12 +96,12 @@ func (p *eventProvider) Update(ctx context.Context, ID string, resourceType stri
 	return &resourceData, nil
 }
 
-func (p *eventProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
 	p.log.Debug("deleting event in upstream catalog", "id", ID)
 
-	err := p.client.DeleteEvent(ctx, state["id"].(string))
-
-	if err != nil && !client.IsCatalogNotFoundError(err) {
+	remoteID := state["id"].(string)
+	err := p.catalog.DeleteEvent(ctx, remoteID)
+	if err != nil && !catalog.IsCatalogNotFoundError(err) {
 		return fmt.Errorf("deleting event in upstream catalog: %w", err)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
@@ -19,17 +19,17 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx      = context.Background()
-		catalog  = &MockTrackingPlanCatalog{}
-		provider = provider.NewTrackingPlanProvider(catalog)
+		ctx         = context.Background()
+		mockCatalog = &MockTrackingPlanCatalog{}
+		provider    = provider.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
 		toArgs = getTrackingPlanArgs()
 	)
 
-	catalog.SetTrackingPlan(getTestTrackingPlan())
-	newState, err := provider.Create(ctx, "tracking-plan-id", typeTrackingPlan, toArgs.ToResourceData())
+	mockCatalog.SetTrackingPlan(getTestTrackingPlan())
+	newState, err := provider.Create(ctx, "tracking-plan-id", toArgs.ToResourceData())
 	require.Nil(t, err)
 	assert.Equal(t, resources.ResourceData{
 		"id":           "upstream-tracking-plan-id",
@@ -80,9 +80,9 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx      = context.Background()
-		catalog  = &MockTrackingPlanCatalog{}
-		provider = provider.NewTrackingPlanProvider(catalog)
+		ctx         = context.Background()
+		mockCatalog = &MockTrackingPlanCatalog{}
+		provider    = provider.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
@@ -101,7 +101,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	// // the default tracking plan with version
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
-		WithEvent(client.TrackingPlanEvent{
+		WithEvent(catalog.TrackingPlanEvent{
 			ID:             "upstream-tracking-plan-event-id",
 			TrackingPlanID: "tracking-plan-id",
 			SchemaID:       "upstream-schema-id",
@@ -110,7 +110,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		WithVersion(2).
 		Build()
 
-	catalog.SetTrackingPlan(&updatedTP)
+	mockCatalog.SetTrackingPlan(&updatedTP)
 
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
@@ -133,7 +133,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		}).Build()
 
 	olds := marshalUnmarshal(t, oldsState.ToResourceData())
-	newState, err := provider.Update(ctx, "tracking-plan-id", typeTrackingPlan, toArgs.ToResourceData(), olds)
+	newState, err := provider.Update(ctx, "tracking-plan-id", toArgs.ToResourceData(), olds)
 	require.Nil(t, err)
 
 	assert.Equal(t, resources.ResourceData{
@@ -184,9 +184,9 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx      = context.Background()
-		catalog  = &MockTrackingPlanCatalog{}
-		provider = provider.NewTrackingPlanProvider(catalog)
+		ctx         = context.Background()
+		mockCatalog = &MockTrackingPlanCatalog{}
+		provider    = provider.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
@@ -225,19 +225,19 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithVersion(2).
-		WithEvent(client.TrackingPlanEvent{
+		WithEvent(catalog.TrackingPlanEvent{
 			ID:             "upstream-tracking-plan-event-id-1",
 			TrackingPlanID: "tracking-plan-id",
 			SchemaID:       "upstream-schema-id-1",
 			EventID:        "upsream-event-id-1",
 		}).Build()
 
-	catalog.SetError(nil)
-	catalog.SetTrackingPlan(&updatedTP)
+	mockCatalog.SetError(nil)
+	mockCatalog.SetTrackingPlan(&updatedTP)
 
 	olds := marshalUnmarshal(t, oldsState.ToResourceData())
 
-	newState, err := provider.Update(ctx, "tracking-plan-id", typeTrackingPlan, toArgs.ToResourceData(), olds)
+	newState, err := provider.Update(ctx, "tracking-plan-id", toArgs.ToResourceData(), olds)
 	require.Nil(t, err)
 
 	require.Equal(t, resources.ResourceData{
@@ -458,21 +458,21 @@ func TestTrackingPlanProvider_Delete(t *testing.T) {
 		provider = provider.NewTrackingPlanProvider(&MockTrackingPlanCatalog{})
 	)
 
-	err := provider.Delete(ctx, "tracking-plan-id", typeTrackingPlan, resources.ResourceData{"id": "upstream-tracking-plan-id"})
+	err := provider.Delete(ctx, "tracking-plan-id", resources.ResourceData{"id": "upstream-tracking-plan-id"})
 	require.Nil(t, err)
 }
 
 type MockTrackingPlanCatalog struct {
 	EmptyCatalog
-	tp  *client.TrackingPlan
+	tp  *catalog.TrackingPlan
 	err error
 }
 
-func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate client.TrackingPlanCreate) (*client.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*client.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
 	return m.tp, m.err
 }
 
@@ -484,11 +484,11 @@ func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, t
 	return m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent client.TrackingPlanUpsertEvent) (*client.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent catalog.TrackingPlanUpsertEvent) (*catalog.TrackingPlan, error) {
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *client.TrackingPlan) {
+func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *catalog.TrackingPlan) {
 	m.tp = tp
 }
 
@@ -554,9 +554,9 @@ func defaultTrackingPlanStateFactory() *factory.TrackingPlanStateFactory {
 
 }
 
-func getTestTrackingPlan() *client.TrackingPlan {
+func getTestTrackingPlan() *catalog.TrackingPlan {
 	f := defaultTrackingPlanFactory()
-	f.WithEvent(client.TrackingPlanEvent{
+	f.WithEvent(catalog.TrackingPlanEvent{
 		ID:             "upstream-tracking-plan-event-id",
 		TrackingPlanID: "tracking-plan-id",
 		SchemaID:       "upstream-schema-id",

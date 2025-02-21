@@ -11,11 +11,6 @@ const (
 	ContextTraitsIdentity = "context.traits"
 )
 
-var (
-	_ StateMapper = &TrackingPlanState{}
-	_ StateMapper = &TrackingPlanArgs{}
-)
-
 type TrackingPlanState struct {
 	TrackingPlanArgs
 	ID           string
