@@ -131,5 +131,5 @@ func newResource(id string, name string, dependency *resources.PropertyRef) *res
 	if dependency != nil {
 		data["dependency"] = *dependency
 	}
-	return resources.NewResource(id, "some-type", data)
+	return resources.NewResource(id, "some-type", data, []string{})
 }
