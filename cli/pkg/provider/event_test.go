@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
@@ -14,15 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ client.DataCatalog = &MockEventCatalog{}
+var _ catalog.DataCatalog = &MockEventCatalog{}
 
 type MockEventCatalog struct {
 	EmptyCatalog
-	mockEvent *client.Event
+	mockEvent *catalog.Event
 	err       error
 }
 
-func (m *MockEventCatalog) SetEvent(event *client.Event) {
+func (m *MockEventCatalog) SetEvent(event *catalog.Event) {
 	m.mockEvent = event
 }
 
@@ -30,11 +30,11 @@ func (m *MockEventCatalog) SetError(err error) {
 	m.err = err
 }
 
-func (m *MockEventCatalog) CreateEvent(ctx context.Context, eventCreate client.EventCreate) (*client.Event, error) {
+func (m *MockEventCatalog) CreateEvent(ctx context.Context, eventCreate catalog.EventCreate) (*catalog.Event, error) {
 	return m.mockEvent, m.err
 }
 
-func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *client.Event) (*client.Event, error) {
+func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
 	return m.mockEvent, m.err
 }
 
@@ -46,8 +46,8 @@ func TestEventProviderOperations(t *testing.T) {
 
 	var (
 		ctx           = context.Background()
-		catalog       = &MockEventCatalog{}
-		eventProvider = provider.NewEventProvider(catalog)
+		mockCatalog   = &MockEventCatalog{}
+		eventProvider = provider.NewEventProvider(mockCatalog)
 		created, _    = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updated, _    = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)
@@ -60,7 +60,7 @@ func TestEventProviderOperations(t *testing.T) {
 	}
 
 	t.Run("Create", func(t *testing.T) {
-		catalog.SetEvent(&client.Event{
+		mockCatalog.SetEvent(&catalog.Event{
 			ID:          "upstream-event-catalog-id",
 			Name:        "event",
 			Description: "event description",
@@ -71,7 +71,7 @@ func TestEventProviderOperations(t *testing.T) {
 			UpdatedAt:   updated,
 		})
 
-		createdResource, err := eventProvider.Create(ctx, "event-id-1", typeEvent, toArgs.ToResourceData())
+		createdResource, err := eventProvider.Create(ctx, "event-id-1", toArgs.ToResourceData())
 		require.Nil(t, err)
 
 		assert.Equal(t, resources.ResourceData{
@@ -130,7 +130,7 @@ func TestEventProviderOperations(t *testing.T) {
 		require.Nil(t, err)
 
 		// set the updated event which will be returned by the mock catalog
-		catalog.SetEvent(&client.Event{
+		mockCatalog.SetEvent(&catalog.Event{
 			ID:          "upstream-event-catalog-id",
 			Name:        "event",
 			Description: "event new description",
@@ -141,7 +141,7 @@ func TestEventProviderOperations(t *testing.T) {
 			UpdatedAt:   updated,
 		})
 
-		updatedResource, err := eventProvider.Update(ctx, "event-id-1", typeEvent, newArgs.ToResourceData(), olds)
+		updatedResource, err := eventProvider.Update(ctx, "event-id-1", newArgs.ToResourceData(), olds)
 		require.Nil(t, err)
 
 		assert.Equal(t, resources.ResourceData{
@@ -164,11 +164,10 @@ func TestEventProviderOperations(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		catalog.SetError(nil)
+		mockCatalog.SetError(nil)
 		err := eventProvider.Delete(
 			ctx,
 			"event-id-1",
-			typeEvent,
 			resources.ResourceData{
 				"id": "upstream-event-catalog-id",
 			})

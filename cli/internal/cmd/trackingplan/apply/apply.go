@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/spf13/cobra"
 )
@@ -98,7 +99,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 			// fmt.Printf("property inargs: %#v\n", args.Config == nil)
 			// fmt.Printf("toresourcedata: %#v\n", args.ToResourceData()["config"] == nil)
 
-			resource := resources.NewResource(prop.LocalID, pstate.EntityTypeProperty, args.ToResourceData())
+			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -116,7 +117,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 				EventType:   event.Type,
 				CategoryID:  nil,
 			}
-			resource := resources.NewResource(event.LocalID, pstate.EntityTypeEvent, args.ToResourceData())
+			resource := resources.NewResource(event.LocalID, provider.EventResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			eventIDToURN[event.LocalID] = resource.URN()
@@ -129,7 +130,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		args := pstate.TrackingPlanArgs{}
 		args.FromCatalogTrackingPlan(tp)
 
-		resource := resources.NewResource(tp.LocalID, pstate.EntityTypeTrackingPlan, args.ToResourceData())
+		resource := resources.NewResource(tp.LocalID, provider.TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}

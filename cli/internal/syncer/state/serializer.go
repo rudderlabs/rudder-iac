@@ -2,64 +2,38 @@ package state
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-const LatestVersion = 1
+const LatestVersion = "1.0.0"
 
 func ToJSON(state *State) (json.RawMessage, error) {
 	// Create a copy of state to avoid modifying the original
 	stateCopy := &State{
 		Version:   state.Version,
-		Resources: make(map[string]*StateResource),
+		Resources: make(map[string]*ResourceState),
 	}
 
-	if stateCopy.Version == 0 {
+	if stateCopy.Version == "" {
 		stateCopy.Version = LatestVersion
 	}
 
 	for urn, res := range state.Resources {
-		stateCopy.Resources[urn] = &StateResource{
-			ID:           res.ID,
-			Type:         res.Type,
-			Input:        encodeReferences(res.Input),
-			Output:       encodeReferences(res.Output),
-			Dependencies: res.Dependencies,
-		}
+		stateCopy.Resources[urn] = EncodeResourceState(res)
 	}
 
 	return json.Marshal(stateCopy)
 }
 
-func FromJSON(data json.RawMessage) (*State, error) {
-	state := &State{}
-	if err := json.Unmarshal(data, state); err != nil {
-		return nil, err
+func EncodeResourceState(state *ResourceState) *ResourceState {
+	return &ResourceState{
+		ID:           state.ID,
+		Type:         state.Type,
+		Input:        encodeReferences(state.Input),
+		Output:       encodeReferences(state.Output),
+		Dependencies: state.Dependencies,
 	}
-
-	if state.Version != LatestVersion {
-		return nil, fmt.Errorf("unsupported state version: %d", state.Version)
-	}
-
-	// Decode references in a new state copy
-	decodedState := &State{
-		Version:   state.Version,
-		Resources: make(map[string]*StateResource),
-	}
-
-	for urn, res := range state.Resources {
-		decodedState.Resources[urn] = &StateResource{
-			ID:           res.ID,
-			Type:         res.Type,
-			Input:        decodeReferences(res.Input),
-			Output:       decodeReferences(res.Output),
-			Dependencies: res.Dependencies,
-		}
-	}
-
-	return decodedState, nil
 }
 
 func encodeReferences(data map[string]interface{}) map[string]interface{} {
@@ -68,7 +42,7 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 	for k, v := range data {
 		switch val := v.(type) {
 		case resources.PropertyRef:
-			result[k] = map[string]string{
+			result[k] = map[string]interface{}{
 				"$ref":     val.URN,
 				"property": val.Property,
 			}
@@ -90,6 +64,16 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 	}
 
 	return result
+}
+
+func DecodeResourceState(res *ResourceState) *ResourceState {
+	return &ResourceState{
+		ID:           res.ID,
+		Type:         res.Type,
+		Input:        decodeReferences(res.Input),
+		Output:       decodeReferences(res.Output),
+		Dependencies: res.Dependencies,
+	}
 }
 
 func decodeReferences(data map[string]interface{}) map[string]interface{} {

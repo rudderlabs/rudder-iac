@@ -11,7 +11,7 @@ func NewSyncer() (*syncer.ProjectSyncer, error) {
 		return nil, err
 	}
 
-	s, err := syncer.New(d.Provider(), d.StateManager())
+	s, err := syncer.New(d.Provider())
 	if err != nil {
 		return nil, err
 	}
