@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
@@ -35,6 +36,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	cobra.OnInitialize(initLogger)
 	cobra.OnInitialize(initAppDependencies)
+	cobra.OnInitialize(initTelemetry)
 
 	rootCmd.PersistentFlags().StringVarP(
 		&cfgFile,
@@ -48,7 +50,7 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
-
+	rootCmd.AddCommand(telemetryCmd)
 }
 
 func initConfig() {
@@ -68,6 +70,10 @@ func initLogger() {
 
 func initAppDependencies() {
 	app.Initialise(rootCmd.Version)
+}
+
+func initTelemetry() {
+	telemetry.Initialise()
 }
 
 func SetVersion(v string) {
