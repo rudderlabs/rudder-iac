@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -63,7 +64,15 @@ func track(event string, properties analytics.Properties) error {
 		dataplaneURL = config.GetTelemetryDataplaneURL()
 	)
 
-	client := analytics.New(writeKey, dataplaneURL)
+	client, err := analytics.NewWithConfig(writeKey, analytics.Config{
+		DataPlaneUrl: dataplaneURL,
+		Logger:       NewTelemetryLogger(),
+	})
+
+	if err != nil {
+		fmt.Println("Error when creating the client: %s", err.Error())
+	}
+
 	defer client.Close()
 
 	userID := config.GetTelemetryUserID()
@@ -72,4 +81,14 @@ func track(event string, properties analytics.Properties) error {
 		UserId:     userID,
 		Properties: properties,
 	})
+}
+
+func TrackEvent(event string, props map[string]interface{}) error {
+	properties := analytics.NewProperties()
+
+	for k, v := range props {
+		properties.Set(k, v)
+	}
+
+	return track(event, properties)
 }

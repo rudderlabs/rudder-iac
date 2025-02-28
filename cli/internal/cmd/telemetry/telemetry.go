@@ -1,4 +1,4 @@
-package cmd
+package telemetry
 
 import (
 	"fmt"
@@ -6,8 +6,34 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
+
+var log = logger.New("telemetry")
+
+const (
+	CommandExecutedEvent = "Command Executed"
+)
+
+type KV struct {
+	K string
+	V interface{}
+}
+
+func TrackCommand(command string, err error, extras ...KV) {
+
+	props := map[string]interface{}{
+		"command": command,
+		"errored": err != nil,
+	}
+
+	for _, extra := range extras {
+		props[extra.K] = extra.V
+	}
+
+	telemetry.TrackEvent(CommandExecutedEvent, props)
+}
 
 var telemetryCmd = &cobra.Command{
 	Use:   "telemetry",
@@ -63,8 +89,10 @@ var telemetryStatusCmd = &cobra.Command{
 	},
 }
 
-func init() {
+func NewCmdTelemetry() *cobra.Command {
 	telemetryCmd.AddCommand(telemetryEnableCmd)
 	telemetryCmd.AddCommand(telemetryDisableCmd)
 	telemetryCmd.AddCommand(telemetryStatusCmd)
+
+	return telemetryCmd
 }

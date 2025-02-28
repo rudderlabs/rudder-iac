@@ -57,8 +57,8 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL_V2)
-	viper.SetDefault("telemetry.writeKey", "< to add >")
-	viper.SetDefault("telemetry.dataplaneURL", "< to add >")
+	viper.SetDefault("telemetry.writeKey", "<to add>")
+	viper.SetDefault("telemetry.dataplaneURL", "<to add>")
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
