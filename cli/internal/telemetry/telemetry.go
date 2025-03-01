@@ -70,7 +70,7 @@ func track(event string, properties analytics.Properties) error {
 	})
 
 	if err != nil {
-		fmt.Println("Error when creating the client: %s", err.Error())
+		return fmt.Errorf("failed to create analytics client: %w", err)
 	}
 
 	defer client.Close()

@@ -32,7 +32,9 @@ func TrackCommand(command string, err error, extras ...KV) {
 		props[extra.K] = extra.V
 	}
 
-	telemetry.TrackEvent(CommandExecutedEvent, props)
+	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
+		log.Error("failed to track command", "error", err)
+	}
 }
 
 var telemetryCmd = &cobra.Command{
