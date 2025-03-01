@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -23,6 +24,7 @@ var (
 func NewCmdTPApply() *cobra.Command {
 	var (
 		localcatalog *localcatalog.DataCatalog
+		s            *syncer.ProjectSyncer
 		err          error
 		catalogDir   string
 		dryRun       bool
@@ -46,28 +48,39 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 
-			if err := validate.ValidateCatalog(validate.DefaultValidators(), localcatalog); err != nil {
+			err = validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
+			if err != nil {
 				return fmt.Errorf("validating catalog: %w", err)
 			}
 
-			return inflateRefs(localcatalog)
+			err = inflateRefs(localcatalog)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
 			log.Debug("identifying changes for the upstream catalog")
 
-			s, err := common.NewSyncer()
+			defer func() {
+				telemetry.TrackCommand("tp apply", err, []telemetry.KV{
+					{K: "dryRun", V: dryRun},
+					{K: "confirm", V: confirm},
+				}...)
+			}()
+
+			s, err = common.NewSyncer()
 			if err != nil {
 				return err
 			}
 
-			if err := s.Sync(
+			err = s.Sync(
 				context.Background(),
 				createResourceGraph(localcatalog),
 				syncer.SyncOptions{
 					DryRun:  dryRun,
 					Confirm: confirm,
-				}); err != nil {
+				})
+
+			if err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 

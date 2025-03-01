@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/auth"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +19,14 @@ var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login with an access token",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		auth.Login()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+
+		defer func() {
+			telemetry.TrackCommand("auth login", err)
+		}()
+
+		err = auth.Login()
+		return err
 	},
 }
