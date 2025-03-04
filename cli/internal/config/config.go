@@ -13,7 +13,11 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-var log = logger.New("config")
+var (
+	log                   = logger.New("config")
+	TelemetryWriteKey     = ""
+	TelemetryDataplaneURL = ""
+)
 
 type Config = struct {
 	Debug   bool   `mapstructure:"debug"`
@@ -57,8 +61,8 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL_V2)
-	viper.SetDefault("telemetry.writeKey", "<to add>")
-	viper.SetDefault("telemetry.dataplaneURL", "<to add>")
+	viper.SetDefault("telemetry.writeKey", "")
+	viper.SetDefault("telemetry.dataplaneURL", "")
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
@@ -135,12 +139,28 @@ func GetTelemetryUserID() string {
 	return viper.GetString("telemetry.userId")
 }
 
-func GetTelemetryWriteKey() string {
-	return viper.GetString("telemetry.writeKey")
+func GetTelemetryWriteKey() (writeKey string) {
+	// Always prefer the value overriden by customer using env var
+	writeKey = viper.GetString("telemetry.writeKey")
+	if writeKey == "" {
+		// fallback to the default value
+		// which might be provided through ldflags when
+		// building the binary
+		writeKey = TelemetryWriteKey
+	}
+	return
 }
 
-func GetTelemetryDataplaneURL() string {
-	return viper.GetString("telemetry.dataplaneURL")
+func GetTelemetryDataplaneURL() (dataplaneURL string) {
+	// Always prefer the value overriden by customer using env var
+	dataplaneURL = viper.GetString("telemetry.dataplaneURL")
+	if dataplaneURL == "" {
+		// fallback to the default value
+		// which might be provided through ldflags when
+		// building the binary
+		dataplaneURL = TelemetryDataplaneURL
+	}
+	return
 }
 
 func GetConfig() Config {

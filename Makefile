@@ -9,7 +9,7 @@ help: ## Show the available commands
 
 .PHONY: build
 build:
-	go build -ldflags "-X main.version=$(VERSION)" -o bin/rudder-cli ./cli/cmd/rudder-cli
+	go build -ldflags "-X 'main.version=$(VERSION)' -X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryWriteKey=${{ secrets.TELEMETRY_WRITE_KEY }}' -X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryDataplaneURL=${{ secrets.TELEMETRY_DATAPLANE_URL }}'" -o bin/rudder-cli ./cli/cmd/rudder-cli
 
 .PHONY: clean
 clean:

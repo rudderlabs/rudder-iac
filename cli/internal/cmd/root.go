@@ -74,7 +74,7 @@ func initAppDependencies() {
 }
 
 func initTelemetry() {
-	telemetry.Initialise()
+	telemetry.Initialise(rootCmd.Version)
 }
 
 func SetVersion(v string) {

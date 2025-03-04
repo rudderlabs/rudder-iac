@@ -12,6 +12,7 @@ import (
 
 var (
 	once              sync.Once
+	v                 string
 	telemetryDisabled bool
 )
 
@@ -22,10 +23,11 @@ func getEnvWithFallback(key, fallback string) string {
 	return fallback
 }
 
-func Initialise() {
+func Initialise(version string) {
 	once.Do(func() {
 		conf := config.GetConfig()
 
+		v = version
 		if conf.Telemetry.Disabled {
 			telemetryDisabled = true
 			return
@@ -78,8 +80,14 @@ func track(event string, properties analytics.Properties) error {
 	userID := config.GetTelemetryUserID()
 	return client.Enqueue(analytics.Track{
 		Event:      event,
-		UserId:     userID,
 		Properties: properties,
+		UserId:     userID,
+		Context: &analytics.Context{
+			App: analytics.AppInfo{
+				Name:    "rudder-cli",
+				Version: v,
+			},
+		},
 	})
 }
 
