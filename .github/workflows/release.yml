@@ -33,3 +33,5 @@ jobs:
           args: release --clean -f ./cli/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEMETRY_WRITE_KEY: ${{ vars.TELEMETRY_WRITE_KEY }}
+          TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
