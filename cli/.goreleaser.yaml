@@ -25,6 +25,11 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryWriteKey={{ .Env.TELEMETRY_WRITE_KEY }}
+      - -X github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryDatalaplaneURL={{ .Env.TELEMETRY_DATAPLANE_URL }}
 
 archives:
   - formats: [ 'tar.gz' ]

@@ -11,6 +11,7 @@ help: ## Show the available commands
 build:
 	go build \
 		-ldflags "\
+			-s -w \
 			-X 'main.version=$(VERSION)' \
 			-X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryWriteKey=$(TELEMETRY_WRITE_KEY)' \
 			-X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryDataplaneURL=$(TELEMETRY_DATAPLANE_URL)' \
