@@ -4,11 +4,13 @@ ARG VERSION=0.0.0
 RUN apk add --no-cache make
 WORKDIR /build
 COPY . .
-RUN make build VERSION=$VERSION
+RUN CGO_ENABLED=0 make build VERSION=$VERSION
 
-# Final stage
-FROM alpine:3.19
-WORKDIR /app
-COPY --from=builder /build/bin/rudder-cli /usr/local/bin/
+# Final stage - using scratch (empty) base image
+FROM scratch
+COPY --from=builder /build/bin/rudder-cli /rudder-cli
+# Copy CA certificates for HTTPS requests
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Create config directory
 VOLUME /root/.rudder
-ENTRYPOINT ["rudder-cli"]
+ENTRYPOINT ["/rudder-cli"]
