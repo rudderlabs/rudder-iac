@@ -1,4 +1,6 @@
 VERSION ?= 0.1
+REGISTRY ?= rudderlabs
+IMAGE_NAME ?= rudder-cli
 
 .PHONY: all
 all: build
@@ -30,3 +32,16 @@ test: ## Run all unit tests
 .PHONY: test-it
 test-it: ## Run all test, including integration tests
 	go test -tags integrationtest ./...
+
+.PHONY: docker-build
+docker-build: ## Build Docker image
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		-t $(REGISTRY)/$(IMAGE_NAME):$(VERSION) \
+		-t $(REGISTRY)/$(IMAGE_NAME):latest \
+		-f cli/Dockerfile .
+
+.PHONY: docker-push
+docker-push: ## Push Docker image to registry
+	docker push $(REGISTRY)/$(IMAGE_NAME):$(VERSION)
+	docker push $(REGISTRY)/$(IMAGE_NAME):latest
