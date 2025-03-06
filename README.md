@@ -8,6 +8,7 @@
     - [Apple Silicon](#apple-silicon)
     - [Intel-based](#intel-based)
   - [Linux](#linux)
+  - [Docker](#docker)
   - [Build from Source](#build-from-source)
 
 ## ⚠️ Work in Progress
@@ -41,6 +42,20 @@ curl -L https://github.com/rudderlabs/rudder-iac/releases/download/v0.2.0/rudder
 sudo mv rudder-cli /usr/local/bin/
 ```
 
+### Docker
+
+You can run the CLI directly using Docker:
+
+```sh
+docker run rudderlabs/rudder-cli
+```
+
+If you need to persist your configuration, or provide an external configuration file, you can mount your local config directory into the container. Assuming your config directory is located at `~/.rudder`, you can run the following command:
+
+```sh
+docker run -v ~/.rudder:/root/.rudder rudderlabs/rudder-cli
+```
+
 ### Build from Source
 
 To build the `rudder-cli` from source, you need to have Go installed. Then, run the following commands:
@@ -50,4 +65,10 @@ git clone https://github.com/rudderlabs/rudder-iac.git
 cd rudder-iac
 make build
 sudo mv bin/rudder-cli /usr/local/bin/
+```
+
+To build the Docker image locally:
+
+```sh
+make docker-build
 ```
