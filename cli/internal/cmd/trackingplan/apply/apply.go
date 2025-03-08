@@ -37,7 +37,7 @@ func NewCmdTPApply() *cobra.Command {
 			the changes based on the last recorded state. The diff is then applied to the upstream.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli tp apply --loc </path/to/dir or file> --dry-run
+			$ rudder-cli tp apply --location </path/to/dir or file> --dry-run
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Here we might need to do validate
@@ -75,7 +75,7 @@ func NewCmdTPApply() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
+	cmd.Flags().StringVarP(&catalogDir, "location", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
 	return cmd

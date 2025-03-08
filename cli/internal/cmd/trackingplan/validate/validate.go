@@ -27,7 +27,7 @@ func NewCmdTPValidate() *cobra.Command {
 		Short: "Validate locally defined catalog",
 		Long:  "Validate locally defined catalog",
 		Example: heredoc.Doc(`
-			$ rudder-cli tp validate --loc <path-to-catalog-dir or file>
+			$ rudder-cli tp validate --location <path-to-catalog-dir or file>
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dc, err := localcatalog.Read(catalogDir)
@@ -45,7 +45,7 @@ func NewCmdTPValidate() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files or catalog file itself")
+	cmd.Flags().StringVarP(&catalogDir, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
 	return cmd
 }
 
