@@ -5,6 +5,6 @@ metadata:
 spec:
   events:
     - id: user_signed_up
-      display_name: "User Signed Up"
+      name: "User Signed Up"
       event_type: track
       description: "User signed up for the app"

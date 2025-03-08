@@ -5,7 +5,7 @@ metadata:
 spec:
   properties:
     - id: write_key
-      display_name: "Write Key"
+      name: "Write Key"
       type: string
       description: KSUID identifier for the source embedded in the SDKs
       propConfig:
@@ -13,18 +13,18 @@ spec:
         maxLength: 48
 
     - id: source_type
-      display_name: "Source Type"
+      name: "Source Type"
       type: string
       description: "Type of the source"
       propConfig:
         enum:
-        - web
-        - server
-        - mobile
-        - iot
+          - web
+          - server
+          - mobile
+          - iot
 
     - id: source_name
-      display_name: "Source name"
+      name: "Source name"
       description: "Name of the source"
       type: string
       propConfig:

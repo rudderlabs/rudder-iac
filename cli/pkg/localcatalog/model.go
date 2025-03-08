@@ -16,7 +16,7 @@ type ResourceDefinition struct {
 
 type Property struct {
 	LocalID     string                 `json:"id"`
-	Name        string                 `json:"display_name"`
+	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"propConfig"`
@@ -44,7 +44,7 @@ func ExtractProperties(rd *ResourceDefinition) ([]Property, error) {
 
 type Event struct {
 	LocalID     string   `json:"id"`
-	Name        string   `json:"display_name"`
+	Name        string   `json:"name"`
 	Type        string   `json:"event_type"`
 	Description string   `json:"description"`
 	Categories  []string `json:"categories"`

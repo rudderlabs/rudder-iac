@@ -5,19 +5,19 @@ metadata:
 spec:
   properties:
     - id: email
-      display_name: "Email ID New"
+      name: "Email ID New"
       type: string
       description: "Email of the user"
       propConfig:
         pattern: ^[\w\-.]+@([\w-]+\.)+[\w-]{2,4}$.
 
     - id: country
-      display_name: "Country"
+      name: "Country"
       type: string
       description: "Location of the user"
       propConfig:
-        enum: 
-        - US
-        - UK
-        - India
-        - Canada
+        enum:
+          - US
+          - UK
+          - India
+          - Canada
