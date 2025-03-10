@@ -56,11 +56,12 @@ var telemetryStatusCmd = &cobra.Command{
 	Short: "Show current telemetry status",
 	Long:  "Display whether telemetry collection is currently enabled or disabled",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		conf := config.GetConfig()
 		status := "enabled"
-		if conf.Telemetry.Disabled {
+
+		if config.GetTelemetryDisabled() {
 			status = "disabled"
 		}
+
 		fmt.Printf("telemetry is currently %s\n", status)
 		return nil
 	},

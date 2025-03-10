@@ -25,21 +25,14 @@ func getEnvWithFallback(key, fallback string) string {
 
 func Initialise(version string) {
 	once.Do(func() {
-		conf := config.GetConfig()
+
+		if config.GetTelemetryDisabled() {
+			return
+		}
 
 		v = version
-		if conf.Telemetry.Disabled {
-			telemetryDisabled = true
-			return
-		}
 
-		disabled := getEnvWithFallback("RUDDER_CLI_TELEMETRY_DISABLED", "")
-		if disabled != "" && disabled == "1" {
-			telemetryDisabled = true
-			return
-		}
-
-		if conf.Telemetry.UserID == "" {
+		if config.GetTelemetryUserID() == "" {
 			userID := uuid.New().String()
 			config.SetTelemetryUserID(userID)
 		}
@@ -47,17 +40,15 @@ func Initialise(version string) {
 }
 
 func DisableTelemetry() {
-	telemetryDisabled := true
-	config.SetTelemetryDisabled(telemetryDisabled)
+	config.SetTelemetryDisabled("1")
 }
 
 func EnableTelemetry() {
-	telemetryDisabled := false
-	config.SetTelemetryDisabled(telemetryDisabled)
+	config.SetTelemetryDisabled("0")
 }
 
 func track(event string, properties analytics.Properties) error {
-	if telemetryDisabled {
+	if config.GetTelemetryDisabled() {
 		return nil
 	}
 

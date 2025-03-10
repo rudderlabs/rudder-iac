@@ -3,7 +3,7 @@ package telemetry
 import "github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 
 const (
-	CommandExecutedEvent = "Command Executed"
+	CommandExecutedEvent = "CLI Command Executed"
 )
 
 type KV struct {
