@@ -152,7 +152,6 @@ func GetTelemetryWriteKey() (writeKey string) {
 }
 
 func GetTelemetryDataplaneURL() (dataplaneURL string) {
-	// Always prefer the value overriden by customer using env var
 	return viper.GetString("telemetry.dataplaneURL")
 }
 
