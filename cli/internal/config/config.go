@@ -30,8 +30,10 @@ type Config = struct {
 		AccessToken string `mapstructure:"accessToken"`
 	} `mapstructure:"auth"`
 	Telemetry struct {
-		Disabled string `mapstructure:"disabled"`
-		UserID   string `mapstructure:"userId"`
+		Disabled     bool   `mapstructure:"disabled"`
+		UserID       string `mapstructure:"userId"`
+		WriteKey     string `mapstructure:"writeKey"`
+		DataplaneURL string `mapstructure:"dataplaneURL"`
 	} `mapstructure:"telemetry"`
 }
 
@@ -64,13 +66,14 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL_V2)
+	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
-	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_TELEMETRY_WRITE_KEY")
-	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_TELEMETRY_DATAPLANE_URL")
+	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
+	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 
 	// load configuration
@@ -111,7 +114,7 @@ func SetAccessToken(accessToken string) {
 	cobra.CheckErr(err)
 }
 
-func SetTelemetryDisabled(disabled string) {
+func SetTelemetryDisabled(disabled bool) {
 	configFile := viper.ConfigFileUsed()
 	data, err := os.ReadFile(configFile)
 	cobra.CheckErr(err)
@@ -137,22 +140,6 @@ func SetTelemetryUserID(userID string) {
 
 	err = os.WriteFile(configFile, formattedData, 0644)
 	cobra.CheckErr(err)
-}
-
-func GetTelemetryUserID() string {
-	return viper.GetString("telemetry.userId")
-}
-
-func GetTelemetryDisabled() bool {
-	return viper.GetString("telemetry.disabled") == "1"
-}
-
-func GetTelemetryWriteKey() (writeKey string) {
-	return viper.GetString("telemetry.writeKey")
-}
-
-func GetTelemetryDataplaneURL() (dataplaneURL string) {
-	return viper.GetString("telemetry.dataplaneURL")
 }
 
 func GetConfig() Config {

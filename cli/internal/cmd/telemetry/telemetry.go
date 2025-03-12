@@ -58,7 +58,7 @@ var telemetryStatusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		status := "enabled"
 
-		if config.GetTelemetryDisabled() {
+		if config.GetConfig().Telemetry.Disabled {
 			status = "disabled"
 		}
 
