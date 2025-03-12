@@ -24,7 +24,7 @@ func TestExtractCatalogEntity(t *testing.T) {
         spec:
           properties:
             - id: write_key
-              display_name: "Write Key"
+              name: "Write Key"
               type: string
               description: KSUID identifier for the source embedded in the SDKs
               propConfig:
@@ -58,7 +58,7 @@ func TestExtractCatalogEntity(t *testing.T) {
         spec:
           events:
             - id: user_signed_up
-              display_name: "User Signed Up"
+              name: "User Signed Up"
               event_type: track
               description: "Triggered when user successfully signed up"
               categories:
@@ -90,7 +90,7 @@ func TestExtractCatalogEntity(t *testing.T) {
         spec:
           events:
             - id: user_signed_up
-              display_name: "User Signed Up"
+              name: "User Signed Up"
               event_type: track
               description: "Triggered when user successfully signed up"
               categories:
@@ -109,14 +109,14 @@ func TestExtractCatalogEntity(t *testing.T) {
         spec:
           properties:
             - id: username
-              display_name: "Username of the customer"
+              name: "Username of the customer"
               type: string
               description: "Username of the customer used for login"
               propConfig:
                 minLength: 10
                 maxLength: 63
             - id: button_signin
-              display_name: "Button used for signin in the app"
+              name: "Button used for signin in the app"
               type: string
               description: "Button used for signin in the app"
               propConfig:
