@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/google/uuid"
@@ -11,50 +10,45 @@ import (
 )
 
 var (
-	once              sync.Once
-	v                 string
-	telemetryDisabled bool
+	once sync.Once
+	v    string
 )
-
-func getEnvWithFallback(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
 
 func Initialise(version string) {
 	once.Do(func() {
 
-		if config.GetTelemetryDisabled() {
+		if config.GetConfig().Telemetry.Disabled {
 			return
 		}
 
 		v = version
 
-		if config.GetTelemetryUserID() == "" {
+		if config.GetConfig().Telemetry.UserID == "" {
 			userID := uuid.New().String()
+			cfg := config.GetConfig()
+			cfg.Telemetry.UserID = userID
 			config.SetTelemetryUserID(userID)
 		}
 	})
 }
 
 func DisableTelemetry() {
-	config.SetTelemetryDisabled("1")
+	config.SetTelemetryDisabled(true)
 }
 
 func EnableTelemetry() {
-	config.SetTelemetryDisabled("0")
+	config.SetTelemetryDisabled(false)
 }
 
 func track(event string, properties analytics.Properties) error {
-	if config.GetTelemetryDisabled() {
+	if config.GetConfig().Telemetry.Disabled {
 		return nil
 	}
 
 	var (
-		writeKey     = config.GetTelemetryWriteKey()
-		dataplaneURL = config.GetTelemetryDataplaneURL()
+		userID       = config.GetConfig().Telemetry.UserID
+		writeKey     = config.GetConfig().Telemetry.WriteKey
+		dataplaneURL = config.GetConfig().Telemetry.DataplaneURL
 	)
 
 	client, err := analytics.NewWithConfig(writeKey, analytics.Config{
@@ -68,7 +62,6 @@ func track(event string, properties analytics.Properties) error {
 
 	defer client.Close()
 
-	userID := config.GetTelemetryUserID()
 	return client.Enqueue(analytics.Track{
 		Event:      event,
 		Properties: properties,
