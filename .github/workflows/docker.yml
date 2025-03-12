@@ -47,4 +47,11 @@ jobs:
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
         run: |
           make docker-build
-          make docker-push
+          if [[ ${{ github.event_name }} == 'release' ]]; then
+            # For releases, also tag and push latest
+            docker tag rudderlabs/rudder-cli:$VERSION rudderlabs/rudder-cli:latest
+            docker push rudderlabs/rudder-cli:$VERSION
+            docker push rudderlabs/rudder-cli:latest
+          else
+            docker push rudderlabs/rudder-cli:$VERSION
+          fi
