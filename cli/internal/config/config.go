@@ -13,7 +13,14 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-var log = logger.New("config")
+var (
+	log = logger.New("config")
+	// Below variables are set during build time using ldflags
+	// and locations are defined in the Makefile. Any changes
+	// to the below variables should be reflected in the Makefile
+	TelemetryWriteKey     = ""
+	TelemetryDataplaneURL = ""
+)
 
 type Config = struct {
 	Debug   bool   `mapstructure:"debug"`
@@ -22,6 +29,12 @@ type Config = struct {
 	Auth    struct {
 		AccessToken string `mapstructure:"accessToken"`
 	} `mapstructure:"auth"`
+	Telemetry struct {
+		Disabled     bool   `mapstructure:"disabled"`
+		UserID       string `mapstructure:"userId"`
+		WriteKey     string `mapstructure:"writeKey"`
+		DataplaneURL string `mapstructure:"dataplaneURL"`
+	} `mapstructure:"telemetry"`
 }
 
 func defaultConfigPath() string {
@@ -53,9 +66,15 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL_V2)
+	viper.SetDefault("telemetry.disabled", false)
+	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
+	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
+	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
+	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 
 	// load configuration
 	_ = viper.ReadInConfig()
@@ -87,6 +106,34 @@ func SetAccessToken(accessToken string) {
 	cobra.CheckErr(err)
 
 	newData, err := sjson.SetBytes(data, "auth.accessToken", accessToken)
+	cobra.CheckErr(err)
+
+	formattedData := pretty.Pretty(newData)
+
+	err = os.WriteFile(configFile, formattedData, 0644)
+	cobra.CheckErr(err)
+}
+
+func SetTelemetryDisabled(disabled bool) {
+	configFile := viper.ConfigFileUsed()
+	data, err := os.ReadFile(configFile)
+	cobra.CheckErr(err)
+
+	newData, err := sjson.SetBytes(data, "telemetry.disabled", disabled)
+	cobra.CheckErr(err)
+
+	formattedData := pretty.Pretty(newData)
+
+	err = os.WriteFile(configFile, formattedData, 0644)
+	cobra.CheckErr(err)
+}
+
+func SetTelemetryUserID(userID string) {
+	configFile := viper.ConfigFileUsed()
+	data, err := os.ReadFile(configFile)
+	cobra.CheckErr(err)
+
+	newData, err := sjson.SetBytes(data, "telemetry.userId", userID)
 	cobra.CheckErr(err)
 
 	formattedData := pretty.Pretty(newData)
