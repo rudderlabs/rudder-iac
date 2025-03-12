@@ -1,6 +1,8 @@
 # Build stage
 FROM golang:1.23-alpine AS builder
 ARG VERSION=0.0.0
+ARG TELEMETRY_WRITE_KEY=""
+ARG TELEMETRY_DATAPLANE_URL=""
 RUN apk add --no-cache make
 WORKDIR /build
 COPY . .

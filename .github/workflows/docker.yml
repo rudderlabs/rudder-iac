@@ -3,6 +3,11 @@ name: Docker Build and Push
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
   docker:
@@ -19,7 +24,27 @@ jobs:
           username: rudderlabs
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Set Docker Tag
+        id: docker_tag
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v} make docker-build
+          if [[ ${{ github.event_name }} == 'release' ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          else
+            # For both main pushes and PRs, use branch name
+            if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+              BRANCH=$GITHUB_HEAD_REF
+            else
+              BRANCH=$GITHUB_REF_NAME
+            fi
+            # Sanitize branch name for docker tag
+            SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
+            echo "VERSION=$SAFE_BRANCH" >> $GITHUB_ENV
+          fi
+
+      - name: Build and Push
+        env:
+          TELEMETRY_WRITE_KEY: ${{ vars.TELEMETRY_WRITE_KEY }}
+          TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
+        run: |
+          make docker-build
           make docker-push
