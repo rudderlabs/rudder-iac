@@ -24,21 +24,21 @@
 #### Apple Silicon
 
 ```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/download/v0.2.0/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
+curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
 #### Intel-based
 
 ```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/download/v0.2.0/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
+curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
 ### Linux
 
 ```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/download/v0.2.0/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
+curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
