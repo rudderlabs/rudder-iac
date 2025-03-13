@@ -23,9 +23,9 @@ func Initialise(version string) {
 
 		v = version
 
-		if config.GetConfig().Telemetry.UserID == "" {
-			userID := uuid.New().String()
-			config.SetTelemetryUserID(userID)
+		if config.GetConfig().Telemetry.AnonymousID == "" {
+			anonymousID := uuid.New().String()
+			config.SetTelemetryAnonymousID(anonymousID)
 		}
 	})
 }
@@ -44,7 +44,7 @@ func track(event string, properties analytics.Properties) error {
 	}
 
 	var (
-		userID       = config.GetConfig().Telemetry.UserID
+		anonymousID  = config.GetConfig().Telemetry.AnonymousID
 		writeKey     = config.GetConfig().Telemetry.WriteKey
 		dataplaneURL = config.GetConfig().Telemetry.DataplaneURL
 	)
@@ -61,9 +61,9 @@ func track(event string, properties analytics.Properties) error {
 	defer client.Close()
 
 	return client.Enqueue(analytics.Track{
-		Event:      event,
-		Properties: properties,
-		UserId:     userID,
+		Event:       event,
+		Properties:  properties,
+		AnonymousId: anonymousID,
 		Context: &analytics.Context{
 			App: analytics.AppInfo{
 				Name:    "rudder-cli",

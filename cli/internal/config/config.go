@@ -31,7 +31,7 @@ type Config = struct {
 	} `mapstructure:"auth"`
 	Telemetry struct {
 		Disabled     bool   `mapstructure:"disabled"`
-		UserID       string `mapstructure:"userId"`
+		AnonymousID  string `mapstructure:"anonymousId"`
 		WriteKey     string `mapstructure:"writeKey"`
 		DataplaneURL string `mapstructure:"dataplaneURL"`
 	} `mapstructure:"telemetry"`
@@ -112,9 +112,9 @@ func SetTelemetryDisabled(disabled bool) {
 	})
 }
 
-func SetTelemetryUserID(userID string) {
+func SetTelemetryAnonymousID(anonymousID string) {
 	updateConfig(func(data []byte) ([]byte, error) {
-		return sjson.SetBytes(data, "telemetry.userId", userID)
+		return sjson.SetBytes(data, "telemetry.anonymousID", anonymousID)
 	})
 }
 
