@@ -101,45 +101,37 @@ func createConfigFileIfNotExists(cfgFile string) error {
 }
 
 func SetAccessToken(accessToken string) {
-	configFile := viper.ConfigFileUsed()
-	data, err := os.ReadFile(configFile)
-	cobra.CheckErr(err)
-
-	newData, err := sjson.SetBytes(data, "auth.accessToken", accessToken)
-	cobra.CheckErr(err)
-
-	formattedData := pretty.Pretty(newData)
-
-	err = os.WriteFile(configFile, formattedData, 0644)
-	cobra.CheckErr(err)
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.SetBytes(data, "auth.accessToken", accessToken)
+	})
 }
 
 func SetTelemetryDisabled(disabled bool) {
-	configFile := viper.ConfigFileUsed()
-	data, err := os.ReadFile(configFile)
-	cobra.CheckErr(err)
-
-	newData, err := sjson.SetBytes(data, "telemetry.disabled", disabled)
-	cobra.CheckErr(err)
-
-	formattedData := pretty.Pretty(newData)
-
-	err = os.WriteFile(configFile, formattedData, 0644)
-	cobra.CheckErr(err)
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.SetBytes(data, "telemetry.disabled", disabled)
+	})
 }
 
 func SetTelemetryUserID(userID string) {
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.SetBytes(data, "telemetry.userId", userID)
+	})
+}
+
+func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
 	data, err := os.ReadFile(configFile)
 	cobra.CheckErr(err)
 
-	newData, err := sjson.SetBytes(data, "telemetry.userId", userID)
+	newData, err := f(data)
 	cobra.CheckErr(err)
 
 	formattedData := pretty.Pretty(newData)
 
 	err = os.WriteFile(configFile, formattedData, 0644)
 	cobra.CheckErr(err)
+
+	_ = viper.ReadInConfig()
 }
 
 func GetConfig() Config {

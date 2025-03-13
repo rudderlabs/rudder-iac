@@ -25,8 +25,6 @@ func Initialise(version string) {
 
 		if config.GetConfig().Telemetry.UserID == "" {
 			userID := uuid.New().String()
-			cfg := config.GetConfig()
-			cfg.Telemetry.UserID = userID
 			config.SetTelemetryUserID(userID)
 		}
 	})
