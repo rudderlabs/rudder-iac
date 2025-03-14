@@ -9,9 +9,9 @@ import (
 func TestDependencies(t *testing.T) {
 	g := NewGraph()
 
-	r1 := NewResource("test:resource1", "test", map[string]interface{}{})
-	r2 := NewResource("test:resource2", "test", map[string]interface{}{})
-	r3 := NewResource("test:resource3", "test", map[string]interface{}{})
+	r1 := NewResource("test:resource1", "test", map[string]interface{}{}, []string{})
+	r2 := NewResource("test:resource2", "test", map[string]interface{}{}, []string{})
+	r3 := NewResource("test:resource3", "test", map[string]interface{}{}, []string{})
 
 	g.AddResource(r1)
 	g.AddResource(r2)

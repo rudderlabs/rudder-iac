@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
@@ -14,7 +13,7 @@ import (
 )
 
 type TrackingPlanProvider struct {
-	client client.DataCatalog
+	client catalog.DataCatalog
 	log    *logger.Logger
 }
 
@@ -24,7 +23,7 @@ const (
 	ContextTraitsIdentity = "context.traits"
 )
 
-func NewTrackingPlanProvider(client client.DataCatalog) syncer.Provider {
+func NewTrackingPlanProvider(client catalog.DataCatalog) *TrackingPlanProvider {
 	return &TrackingPlanProvider{
 		client: client,
 		log: &logger.Logger{
@@ -33,13 +32,13 @@ func NewTrackingPlanProvider(client client.DataCatalog) syncer.Provider {
 	}
 }
 
-func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, resourceType string, input resources.ResourceData) (*resources.ResourceData, error) {
+func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("creating tracking plan", "id", ID)
 
 	args := state.TrackingPlanArgs{}
 	args.FromResourceData(input)
 
-	created, err := p.client.CreateTrackingPlan(ctx, client.TrackingPlanCreate{
+	created, err := p.client.CreateTrackingPlan(ctx, catalog.TrackingPlanCreate{
 		Name:        args.Name,
 		Description: args.Description,
 	})
@@ -88,7 +87,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, resourceTy
 
 }
 
-func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
+func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating tracking plan", "id", ID)
 
 	prevState := state.TrackingPlanState{}
@@ -98,7 +97,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 	toArgs.FromResourceData(input)
 
 	var (
-		updated            *client.TrackingPlan
+		updated            *catalog.TrackingPlan
 		err                error
 		updatedEventStates = make([]*state.TrackingPlanEventState, 0)
 	)
@@ -127,7 +126,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 			return nil, fmt.Errorf("state discrepancy as upstream event not found for local id: %s", event.LocalID)
 		}
 
-		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, upstreamEvent.EventID); err != nil && !client.IsCatalogNotFoundError(err) {
+		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, upstreamEvent.EventID); err != nil && !catalog.IsCatalogNotFoundError(err) {
 			return nil, fmt.Errorf("deleting tracking plan event in catalog: %w", err)
 		}
 
@@ -207,17 +206,17 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, resourceTy
 	return &resourceData, nil
 }
 
-func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
 	p.log.Debug("deleting tracking plan", "id", ID)
 
-	if err := p.client.DeleteTrackingPlan(ctx, state["id"].(string)); err != nil && !client.IsCatalogNotFoundError(err) {
+	if err := p.client.DeleteTrackingPlan(ctx, state["id"].(string)); err != nil && !catalog.IsCatalogNotFoundError(err) {
 		return fmt.Errorf("deleting tracking plan in catalog: %w", err)
 	}
 
 	return nil
 }
 
-func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsertEvent {
+func getUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpsertEvent {
 	// Get the properties in correct shape before we can
 	// send it to the catalog
 	var (
@@ -260,12 +259,12 @@ func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsert
 		}
 	}
 
-	return client.TrackingPlanUpsertEvent{
+	return catalog.TrackingPlanUpsertEvent{
 		Name:            from.Name,
 		Description:     from.Description,
 		EventType:       from.Type,
 		IdentitySection: identitySection,
-		Rules: getRulesBasedonIdentity(identitySection, &client.TrackingPlanUpsertEventProperties{
+		Rules: getRulesBasedonIdentity(identitySection, &catalog.TrackingPlanUpsertEventProperties{
 			Type:                 "object",
 			AdditionalProperties: from.AllowUnplanned,
 			Required:             requiredProps,
@@ -274,11 +273,11 @@ func getUpsertEvent(from *state.TrackingPlanEventArgs) client.TrackingPlanUpsert
 	}
 }
 
-func getRulesBasedonIdentity(identity string, properties *client.TrackingPlanUpsertEventProperties) client.TrackingPlanUpsertEventRules {
+func getRulesBasedonIdentity(identity string, properties *catalog.TrackingPlanUpsertEventProperties) catalog.TrackingPlanUpsertEventRules {
 	var (
-		propertiesIdentity *client.TrackingPlanUpsertEventProperties
-		traitsIdentity     *client.TrackingPlanUpsertEventProperties
-		contextIdentity    *client.TrackingPlanUpsertEventContextTraitsIdentity
+		propertiesIdentity *catalog.TrackingPlanUpsertEventProperties
+		traitsIdentity     *catalog.TrackingPlanUpsertEventProperties
+		contextIdentity    *catalog.TrackingPlanUpsertEventContextTraitsIdentity
 	)
 
 	switch identity {
@@ -290,9 +289,9 @@ func getRulesBasedonIdentity(identity string, properties *client.TrackingPlanUps
 		traitsIdentity = properties
 
 	case ContextTraitsIdentity:
-		contextIdentity = &client.TrackingPlanUpsertEventContextTraitsIdentity{
+		contextIdentity = &catalog.TrackingPlanUpsertEventContextTraitsIdentity{
 			Properties: struct {
-				Traits client.TrackingPlanUpsertEventProperties `json:"traits,omitempty"`
+				Traits catalog.TrackingPlanUpsertEventProperties `json:"traits,omitempty"`
 			}{
 				Traits: *properties,
 			},
@@ -302,12 +301,12 @@ func getRulesBasedonIdentity(identity string, properties *client.TrackingPlanUps
 		propertiesIdentity = properties // fallback to properties
 	}
 
-	return client.TrackingPlanUpsertEventRules{
+	return catalog.TrackingPlanUpsertEventRules{
 		Type: "object",
 		Properties: struct {
-			Properties *client.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-			Traits     *client.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-			Context    *client.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
+			Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
+			Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
+			Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
 		}{
 			Properties: propertiesIdentity,
 			Traits:     traitsIdentity,

@@ -5,12 +5,14 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +24,7 @@ var (
 func NewCmdTPApply() *cobra.Command {
 	var (
 		localcatalog *localcatalog.DataCatalog
+		s            *syncer.ProjectSyncer
 		err          error
 		catalogDir   string
 		dryRun       bool
@@ -36,7 +39,7 @@ func NewCmdTPApply() *cobra.Command {
 			the changes based on the last recorded state. The diff is then applied to the upstream.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli tp apply --loc </path/to/dir or file> --dry-run
+			$ rudder-cli tp apply --location </path/to/dir or file> --dry-run
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Here we might need to do validate
@@ -45,28 +48,39 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 
-			if err := validate.ValidateCatalog(validate.DefaultValidators(), localcatalog); err != nil {
+			err = validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
+			if err != nil {
 				return fmt.Errorf("validating catalog: %w", err)
 			}
 
-			return inflateRefs(localcatalog)
+			err = inflateRefs(localcatalog)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Debug("tp apply", "dryRun", dryRun, "confirm", confirm)
 			log.Debug("identifying changes for the upstream catalog")
 
-			s, err := common.NewSyncer()
+			defer func() {
+				telemetry.TrackCommand("tp apply", err, []telemetry.KV{
+					{K: "dryRun", V: dryRun},
+					{K: "confirm", V: confirm},
+				}...)
+			}()
+
+			s, err = common.NewSyncer()
 			if err != nil {
 				return err
 			}
 
-			if err := s.Sync(
+			err = s.Sync(
 				context.Background(),
 				createResourceGraph(localcatalog),
 				syncer.SyncOptions{
 					DryRun:  dryRun,
 					Confirm: confirm,
-				}); err != nil {
+				})
+
+			if err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 
@@ -74,7 +88,7 @@ func NewCmdTPApply() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
+	cmd.Flags().StringVarP(&catalogDir, "location", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
 	return cmd
@@ -98,7 +112,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 			// fmt.Printf("property inargs: %#v\n", args.Config == nil)
 			// fmt.Printf("toresourcedata: %#v\n", args.ToResourceData()["config"] == nil)
 
-			resource := resources.NewResource(prop.LocalID, pstate.EntityTypeProperty, args.ToResourceData())
+			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -116,7 +130,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 				EventType:   event.Type,
 				CategoryID:  nil,
 			}
-			resource := resources.NewResource(event.LocalID, pstate.EntityTypeEvent, args.ToResourceData())
+			resource := resources.NewResource(event.LocalID, provider.EventResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			eventIDToURN[event.LocalID] = resource.URN()
@@ -129,7 +143,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		args := pstate.TrackingPlanArgs{}
 		args.FromCatalogTrackingPlan(tp)
 
-		resource := resources.NewResource(tp.LocalID, pstate.EntityTypeTrackingPlan, args.ToResourceData())
+		resource := resources.NewResource(tp.LocalID, provider.TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}

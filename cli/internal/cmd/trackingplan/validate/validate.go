@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
@@ -19,7 +20,11 @@ var (
 )
 
 func NewCmdTPValidate() *cobra.Command {
-	var catalogDir string
+	var (
+		catalogDir string
+		err        error
+		dc         *localcatalog.DataCatalog
+	)
 
 	validators := DefaultValidators()
 	cmd := &cobra.Command{
@@ -27,10 +32,14 @@ func NewCmdTPValidate() *cobra.Command {
 		Short: "Validate locally defined catalog",
 		Long:  "Validate locally defined catalog",
 		Example: heredoc.Doc(`
-			$ rudder-cli tp validate --loc <path-to-catalog-dir or file>
+			$ rudder-cli tp validate --location <path-to-catalog-dir or file>
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dc, err := localcatalog.Read(catalogDir)
+			defer func() {
+				telemetry.TrackCommand("tp validate", err)
+			}()
+
+			dc, err = localcatalog.Read(catalogDir)
 			if err != nil {
 				return fmt.Errorf("reading catalog: %s", err.Error())
 			}
@@ -41,11 +50,12 @@ func NewCmdTPValidate() *cobra.Command {
 				return nil
 			}
 
-			return fmt.Errorf("catalog is invalid: %s", err.Error())
+			err = fmt.Errorf("catalog is invalid: %s", err.Error())
+			return err
 		},
 	}
 
-	cmd.Flags().StringVarP(&catalogDir, "loc", "l", "", "Path to the directory containing the catalog files or catalog file itself")
+	cmd.Flags().StringVarP(&catalogDir, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
 	return cmd
 }
 

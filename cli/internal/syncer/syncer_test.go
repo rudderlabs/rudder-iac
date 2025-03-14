@@ -2,7 +2,6 @@ package syncer_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -10,7 +9,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSyncerCreate(t *testing.T) {
@@ -41,52 +39,37 @@ func TestSyncerCreate(t *testing.T) {
 	targetGraph.AddResource(property)
 	targetGraph.AddResource(trackingPlan)
 
-	stateManager := &testutils.MemoryStateManager{}
-	stateManager.Save(context.Background(), state.EmptyState())
-	provider := &testutils.DataCatalogProvider{}
+	provider := &testutils.DataCatalogProvider{
+		InitialState: state.EmptyState(),
+	}
 
-	s, _ := syncer.New(provider, stateManager)
+	s, _ := syncer.New(provider)
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
-	outputState, _ := stateManager.Load(context.Background())
-	assert.NotNil(t, outputState)
-
-	assert.Equal(t, 3, len(outputState.Resources))
-
-	assert.NotNil(t, outputState.GetResource(event.URN()))
-	assert.Equal(t, &state.StateResource{
-		ID:    event.ID(),
-		Type:  event.Type(),
-		Input: event.Data(),
-		Output: resources.ResourceData{
-			"id":          "generated-event-event1",
-			"name":        "Test Event",
-			"description": "This is a test event",
-			"operation":   "create",
-		},
-	}, outputState.GetResource(event.URN()))
-
-	assert.NotNil(t, outputState.GetResource(property.URN()))
-	assert.Equal(t, &state.StateResource{
-		ID:    property.ID(),
-		Type:  property.Type(),
-		Input: property.Data(),
-		Output: resources.ResourceData{
-			"id":          "generated-property-property1",
-			"name":        "Test Property",
-			"description": "This is a test property",
-			"operation":   "create",
-		},
-	}, outputState.GetResource(property.URN()))
-
-	assert.NotNil(t, outputState.GetResource(trackingPlan.URN()))
-	assert.Equal(t, &state.StateResource{
-		ID:    trackingPlan.ID(),
-		Type:  trackingPlan.Type(),
-		Input: trackingPlan.Data(),
-		Output: resources.ResourceData{
-			"id":          "generated-tracking_plan-trackingPlan1",
+	assert.Len(t, provider.OperationLog, 6)
+	assert.ElementsMatch(t, []testutils.OperationLogEntry{
+		{Operation: "Create", Args: []interface{}{event.ID(), event.Type(), event.Data()}},
+		{Operation: "PutResourceState", Args: []interface{}{event.URN(), &state.ResourceState{
+			ID:    event.ID(),
+			Type:  event.Type(),
+			Input: event.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-event-event1",
+			},
+			Dependencies: []string{},
+		}}},
+		{Operation: "Create", Args: []interface{}{property.ID(), property.Type(), property.Data()}},
+		{Operation: "PutResourceState", Args: []interface{}{property.URN(), &state.ResourceState{
+			ID:    property.ID(),
+			Type:  property.Type(),
+			Input: property.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-property-property1",
+			},
+			Dependencies: []string{},
+		}}},
+		{Operation: "Create", Args: []interface{}{trackingPlan.ID(), trackingPlan.Type(), resources.ResourceData{
 			"name":        "Test Tracking Plan",
 			"description": "This is a test tracking plan",
 			"event_id":    "generated-event-event1",
@@ -96,23 +79,17 @@ func TestSyncerCreate(t *testing.T) {
 					"property": "generated-property-property1",
 				},
 			},
-			"operation": "create",
-		},
-	}, outputState.GetResource(trackingPlan.URN()))
-
-	assert.ElementsMatch(t, []string{
-		"create event event1",
-		"create property property1",
-		"create tracking_plan trackingPlan1",
+		}}},
+		{Operation: "PutResourceState", Args: []interface{}{trackingPlan.URN(), &state.ResourceState{
+			ID:    trackingPlan.ID(),
+			Type:  trackingPlan.Type(),
+			Input: trackingPlan.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-tracking-plan-trackingPlan1",
+			},
+			Dependencies: []string{},
+		}}},
 	}, provider.OperationLog)
-
-	savedStates := statesFromSavedLog(stateManager.SaveLog)
-	require.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
-
-	// each save adds one resource, last log entry should be the final state
-	assert.Equal(t, 1, len(savedStates[1].Resources))
-	assert.Equal(t, 2, len(savedStates[2].Resources))
-	assert.Equal(t, outputState, savedStates[3])
 }
 
 func TestSyncerDelete(t *testing.T) {
@@ -140,85 +117,87 @@ func TestSyncerDelete(t *testing.T) {
 
 	// Create initial state with resources
 	initialState := state.EmptyState()
-	initialState.AddResource(&state.StateResource{
+	initialState.AddResource(&state.ResourceState{
 		ID:    event.ID(),
 		Type:  event.Type(),
 		Input: event.Data(),
 		Output: resources.ResourceData{
-			"id":          "generated-event-event1",
-			"name":        "Test Event",
-			"description": "This is a test event",
+			"id": "generated-event-event1",
 		},
 	})
-	initialState.AddResource(&state.StateResource{
+	initialState.AddResource(&state.ResourceState{
 		ID:    property.ID(),
 		Type:  property.Type(),
 		Input: property.Data(),
 		Output: resources.ResourceData{
-			"id":          "generated-property-property1",
-			"name":        "Test Property",
-			"description": "This is a test property",
+			"id": "generated-property-property1",
 		},
 	})
 
-	initialState.AddResource(&state.StateResource{
+	initialState.AddResource(&state.ResourceState{
 		ID:    trackingPlan.ID(),
 		Type:  trackingPlan.Type(),
 		Input: trackingPlan.Data(),
 		Output: resources.ResourceData{
-			"id":          "generated-tracking_plan-trackingPlan1",
-			"name":        "Test Tracking Plan",
-			"description": "This is a test tracking plan",
-			"event_id":    "generated-event-event1",
-			"rules": []interface{}{
-				map[string]interface{}{
-					"event":    "generated-event-event1",
-					"property": "generated-property-property1",
-				},
-			},
+			"id": "generated-tracking-plan-trackingPlan1",
 		},
 	})
 
-	stateManager := &testutils.MemoryStateManager{}
-	stateManager.Save(context.Background(), initialState)
-	provider := &testutils.DataCatalogProvider{}
+	provider := &testutils.DataCatalogProvider{
+		InitialState: initialState,
+	}
 
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, _ := syncer.New(provider, stateManager)
+	s, _ := syncer.New(provider)
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
-	outputState, _ := stateManager.Load(context.Background())
-	assert.NotNil(t, outputState)
-
-	// Verify all resources were deleted
-	assert.Equal(t, 0, len(outputState.Resources))
-	assert.Nil(t, outputState.GetResource(trackingPlan.URN()))
-	assert.Nil(t, outputState.GetResource(event.URN()))
-	assert.Nil(t, outputState.GetResource(property.URN()))
-
-	assert.Equal(t, []string{
-		"delete tracking_plan trackingPlan1",
-		"delete property property1",
-		"delete event event1",
+	assert.Len(t, provider.OperationLog, 6)
+	assert.ElementsMatch(t, []testutils.OperationLogEntry{
+		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
+			ID:    trackingPlan.ID(),
+			Type:  trackingPlan.Type(),
+			Input: trackingPlan.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-tracking-plan-trackingPlan1",
+			}}}},
+		{Operation: "Delete", Args: []interface{}{trackingPlan.ID(), trackingPlan.Type(), resources.ResourceData{
+			"name":        "Test Tracking Plan",
+			"description": "This is a test tracking plan",
+			"event_id":    resources.PropertyRef{URN: event.URN(), Property: "id"},
+			"rules": []interface{}{
+				map[string]interface{}{
+					"event":    resources.PropertyRef{URN: event.URN(), Property: "id"},
+					"property": resources.PropertyRef{URN: property.URN(), Property: "id"},
+				},
+			},
+			"id": "generated-tracking-plan-trackingPlan1",
+		}}},
+		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
+			ID:    property.ID(),
+			Type:  property.Type(),
+			Input: property.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-property-property1",
+			}}}},
+		{Operation: "Delete", Args: []interface{}{property.ID(), property.Type(), resources.ResourceData{
+			"name":        "Test Property",
+			"description": "This is a test property",
+			"id":          "generated-property-property1",
+		}}},
+		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
+			ID:    event.ID(),
+			Type:  event.Type(),
+			Input: event.Data(),
+			Output: resources.ResourceData{
+				"id": "generated-event-event1",
+			}}}},
+		{Operation: "Delete", Args: []interface{}{event.ID(), event.Type(), resources.ResourceData{
+			"name":        "Test Event",
+			"description": "This is a test event",
+			"id":          "generated-event-event1",
+		}}},
 	}, provider.OperationLog)
-
-	savedStates := statesFromSavedLog(stateManager.SaveLog)
-	require.Equal(t, 4, len(savedStates)) // Initial state + 3 saves, one for each resource
-
-	// each save removes one resource, last log entry should be the final state
-	assert.Equal(t, 2, len(savedStates[1].Resources))
-	assert.Equal(t, 1, len(savedStates[2].Resources))
-	assert.Equal(t, outputState, savedStates[3])
-}
-
-func statesFromSavedLog(log []json.RawMessage) []*state.State {
-	states := make([]*state.State, 0, len(log))
-	for _, entry := range log {
-		s, _ := state.FromJSON(entry)
-		states = append(states, s)
-	}
-	return states
 }
