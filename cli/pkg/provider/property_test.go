@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
@@ -16,15 +16,15 @@ import (
 
 type MockPropertyCatalog struct {
 	EmptyCatalog
-	property *client.Property
+	property *catalog.Property
 	err      error
 }
 
-func (m *MockPropertyCatalog) CreateProperty(ctx context.Context, propertyCreate client.PropertyCreate) (*client.Property, error) {
+func (m *MockPropertyCatalog) CreateProperty(ctx context.Context, propertyCreate catalog.PropertyCreate) (*catalog.Property, error) {
 	return m.property, m.err
 }
 
-func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *client.Property) (*client.Property, error) {
+func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
 	return m.property, m.err
 }
 
@@ -32,7 +32,7 @@ func (m *MockPropertyCatalog) DeleteProperty(ctx context.Context, propertyID str
 	return m.err
 }
 
-func (m *MockPropertyCatalog) SetProperty(property *client.Property) {
+func (m *MockPropertyCatalog) SetProperty(property *catalog.Property) {
 	m.property = property
 }
 
@@ -44,14 +44,14 @@ func TestPropertyProviderOperations(t *testing.T) {
 
 	var (
 		ctx              = context.Background()
-		catalog          = &MockPropertyCatalog{}
-		propertyProvider = provider.NewPropertyProvider(catalog)
+		mockCatalog      = &MockPropertyCatalog{}
+		propertyProvider = provider.NewPropertyProvider(mockCatalog)
 		createdAt, _     = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updatedAt, _     = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)
 
 	t.Run("Create", func(t *testing.T) {
-		catalog.SetProperty(&client.Property{
+		mockCatalog.SetProperty(&catalog.Property{
 			ID:          "upstream-catalog-id",
 			Name:        "property",
 			Description: "property description",
@@ -69,7 +69,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Config:      map[string]interface{}{"key": "value"},
 		}
 
-		resourceData, err := propertyProvider.Create(ctx, "property-id", typeProperty, toArgs.ToResourceData())
+		resourceData, err := propertyProvider.Create(ctx, "property-id", toArgs.ToResourceData())
 		require.Nil(t, err)
 		assert.Equal(t, resources.ResourceData{
 			"id":          "upstream-catalog-id",
@@ -114,7 +114,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Config:      map[string]interface{}{"key": "value", "key2": "value2"},
 		}
 
-		catalog.SetProperty(&client.Property{
+		mockCatalog.SetProperty(&catalog.Property{
 			ID:          "upstream-catalog-id",
 			Name:        "property",
 			Description: "property new description",
@@ -133,7 +133,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 		err = json.Unmarshal(byt, &prevState)
 		require.Nil(t, err)
 
-		updatedResource, err := propertyProvider.Update(ctx, "property-id", typeProperty, toArgs.ToResourceData(), olds)
+		updatedResource, err := propertyProvider.Update(ctx, "property-id", toArgs.ToResourceData(), olds)
 		require.Nil(t, err)
 		assert.Equal(t, resources.ResourceData{
 			"id":          "upstream-catalog-id",
@@ -158,9 +158,9 @@ func TestPropertyProviderOperations(t *testing.T) {
 		prevState := state.PropertyState{
 			ID: "upstream-catalog-id",
 		}
-		catalog.SetError(nil)
+		mockCatalog.SetError(nil)
 
-		err := propertyProvider.Delete(ctx, "property-id", typeProperty, prevState.ToResourceData())
+		err := propertyProvider.Delete(ctx, "property-id", prevState.ToResourceData())
 		require.Nil(t, err)
 	})
 }

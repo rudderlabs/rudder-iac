@@ -4,16 +4,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 )
 
 type TrackingPlanCatalogFactory struct {
-	trackingplan client.TrackingPlan
+	trackingplan catalog.TrackingPlan
 }
 
 func NewTrackingPlanCatalogFactory() *TrackingPlanCatalogFactory {
 
-	tp := client.TrackingPlan{
+	tp := catalog.TrackingPlan{
 		ID:           uuid.New().String(),
 		Name:         "default-tracking-plan",
 		Version:      1,
@@ -69,15 +69,15 @@ func (f *TrackingPlanCatalogFactory) WithVersion(version int) *TrackingPlanCatal
 	return f
 }
 
-func (f *TrackingPlanCatalogFactory) WithEvent(event client.TrackingPlanEvent) *TrackingPlanCatalogFactory {
+func (f *TrackingPlanCatalogFactory) WithEvent(event catalog.TrackingPlanEvent) *TrackingPlanCatalogFactory {
 	if f.trackingplan.Events == nil {
-		f.trackingplan.Events = make([]client.TrackingPlanEvent, 0)
+		f.trackingplan.Events = make([]catalog.TrackingPlanEvent, 0)
 	}
 	f.trackingplan.Events = append(f.trackingplan.Events, event)
 	return f
 }
 
-func (f *TrackingPlanCatalogFactory) Build() client.TrackingPlan {
+func (f *TrackingPlanCatalogFactory) Build() catalog.TrackingPlan {
 	return f.trackingplan
 }
 

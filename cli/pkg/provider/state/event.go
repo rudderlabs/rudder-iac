@@ -2,11 +2,6 @@ package state
 
 import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 
-var (
-	_ StateMapper = &EventState{}
-	_ StateMapper = &EventArgs{}
-)
-
 type EventArgs struct {
 	Name        string
 	Description string

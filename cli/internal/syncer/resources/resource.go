@@ -16,13 +16,14 @@ func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
 }
 
-func NewResource(id string, resourceType string, data ResourceData) *Resource {
+func NewResource(id string, resourceType string, data ResourceData, dependencies []string) *Resource {
 	return &Resource{
 		r: &internal.Resource{
-			URN:  URN(id, resourceType),
-			ID:   id,
-			Type: resourceType,
-			Data: data,
+			URN:          URN(id, resourceType),
+			ID:           id,
+			Type:         resourceType,
+			Data:         data,
+			Dependencies: dependencies,
 		},
 	}
 }
@@ -41,4 +42,8 @@ func (r *Resource) Data() ResourceData {
 
 func (r *Resource) URN() string {
 	return r.r.URN
+}
+
+func (r *Resource) Dependencies() []string {
+	return r.r.Dependencies
 }

@@ -42,7 +42,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			if event.Type == "track" {
 				if event.Name == "" {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("display_name field is mandatory on track event"),
+						error:     fmt.Errorf("name field is mandatory on track event"),
 						Reference: reference,
 					})
 				}

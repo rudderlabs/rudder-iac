@@ -4,20 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 )
 
-type propertyProvider struct {
-	client client.DataCatalog
+type PropertyProvider struct {
+	client catalog.DataCatalog
 	log    logger.Logger
 }
 
-func NewPropertyProvider(dc client.DataCatalog) syncer.Provider {
-	return &propertyProvider{
+func NewPropertyProvider(dc catalog.DataCatalog) *PropertyProvider {
+	return &PropertyProvider{
 		client: dc,
 		log: logger.Logger{
 			Logger: logger.New("provider").With("type", "property"),
@@ -25,13 +24,13 @@ func NewPropertyProvider(dc client.DataCatalog) syncer.Provider {
 	}
 }
 
-func (p *propertyProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.With("provider", "property").Debug("creating property resource in upstream catalog", "id", ID)
 
 	toArgs := state.PropertyArgs{}
 	toArgs.FromResourceData(data)
 
-	property, err := p.client.CreateProperty(ctx, client.PropertyCreate{
+	property, err := p.client.CreateProperty(ctx, catalog.PropertyCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
@@ -58,7 +57,7 @@ func (p *propertyProvider) Create(ctx context.Context, ID string, resourceType s
 	return &resourceData, nil
 }
 
-func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
+func (p *PropertyProvider) Update(ctx context.Context, ID string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating property resource in upstream catalog", "id", ID)
 
 	toArgs := state.PropertyArgs{}
@@ -67,7 +66,7 @@ func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType s
 	oldState := state.PropertyState{}
 	oldState.FromResourceData(olds)
 
-	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &client.Property{
+	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &catalog.Property{
 		ID:          oldState.ID,
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
@@ -96,12 +95,12 @@ func (p *propertyProvider) Update(ctx context.Context, ID string, resourceType s
 	return &resourceData, nil
 }
 
-func (p *propertyProvider) Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {
+func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources.ResourceData) error {
 	p.log.Debug("deleting property resource in upstream catalog", "id", ID)
 
 	err := p.client.DeleteProperty(ctx, data["id"].(string))
 
-	if err != nil && !client.IsCatalogNotFoundError(err) {
+	if err != nil && !catalog.IsCatalogNotFoundError(err) {
 		return fmt.Errorf("deleting property resource in upstream catalog: %w", err)
 	}
 

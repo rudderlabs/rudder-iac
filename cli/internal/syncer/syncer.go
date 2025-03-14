@@ -12,33 +12,25 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider     Provider
-	stateManager StateManager
+	provider Provider
 }
 
 type Provider interface {
+	LoadState(ctx context.Context) (*state.State, error)
+	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
+	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
 }
 
-type StateManager interface {
-	Load(context.Context) (*state.State, error)
-	Save(context.Context, *state.State) error
-}
-
-func New(p Provider, sm StateManager) (*ProjectSyncer, error) {
+func New(p Provider) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
 
-	if sm == nil {
-		return nil, fmt.Errorf("state manager is required")
-	}
-
 	return &ProjectSyncer{
-		provider:     p,
-		stateManager: sm,
+		provider: p,
 	}, nil
 }
 
@@ -62,7 +54,7 @@ func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []erro
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
-	state, err := s.stateManager.Load(ctx)
+	state, err := s.provider.LoadState(ctx)
 	if err != nil {
 		return []error{err}
 	}
@@ -101,7 +93,7 @@ func stateToGraph(state *state.State) *resources.Graph {
 	graph := resources.NewGraph()
 
 	for _, stateResource := range state.Resources {
-		resource := resources.NewResource(stateResource.ID, stateResource.Type, stateResource.Input)
+		resource := resources.NewResource(stateResource.ID, stateResource.Type, stateResource.Input, stateResource.Dependencies)
 		graph.AddResource(resource)
 		// add any explicit dependencies, not mentioned through references
 		graph.AddDependencies(resource.URN(), stateResource.Dependencies)
@@ -148,14 +140,6 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 			outputState = currentState
 		}
 
-		if err := s.stateManager.Save(ctx, outputState); err != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			errors = append(errors, &OperationError{Operation: o, Err: err})
-			if !continueOnFail {
-				return errors
-			}
-		}
-
 		if providerErr == nil {
 			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
 		}
@@ -178,11 +162,16 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 		return nil, err
 	}
 
-	sr := &state.StateResource{
-		ID:     r.ID(),
-		Type:   r.Type(),
-		Input:  input,
-		Output: *output,
+	sr := &state.ResourceState{
+		ID:           r.ID(),
+		Type:         r.Type(),
+		Input:        input,
+		Output:       *output,
+		Dependencies: r.Dependencies(),
+	}
+
+	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
+		return nil, fmt.Errorf("failed to update resource state: %w", err)
 	}
 
 	st.AddResource(sr)
@@ -207,11 +196,16 @@ func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resour
 		return nil, err
 	}
 
-	sr = &state.StateResource{
-		ID:     sr.ID,
-		Type:   sr.Type,
-		Input:  input,
-		Output: *output,
+	sr = &state.ResourceState{
+		ID:           sr.ID,
+		Type:         sr.Type,
+		Input:        input,
+		Output:       *output,
+		Dependencies: r.Dependencies(),
+	}
+
+	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
+		return nil, fmt.Errorf("failed to update resource state: %w", err)
 	}
 
 	st.AddResource(sr)
@@ -223,6 +217,10 @@ func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resour
 	sr := st.GetResource(r.URN())
 	if sr == nil {
 		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+	}
+
+	if err := s.provider.DeleteResourceState(ctx, sr); err != nil {
+		return nil, fmt.Errorf("failed to delete resource state: %w", err)
 	}
 
 	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())

@@ -5,6 +5,6 @@ metadata:
 spec:
   events:
     - id: source_created
-      display_name: "Source Created"
+      name: "Source Created"
       event_type: track
       description: "Source created by the user"

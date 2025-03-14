@@ -3,25 +3,19 @@ package provider_test
 import (
 	"context"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 )
 
-var _ client.DataCatalog = &EmptyCatalog{}
+var _ catalog.DataCatalog = &EmptyCatalog{}
 
 type EmptyCatalog struct {
 }
 
-const (
-	typeEvent        = "event"
-	typeProperty     = "property"
-	typeTrackingPlan = "tracking-plan"
-)
-
-func (m *EmptyCatalog) CreateEvent(ctx context.Context, eventCreate client.EventCreate) (*client.Event, error) {
+func (m *EmptyCatalog) CreateEvent(ctx context.Context, eventCreate catalog.EventCreate) (*catalog.Event, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *client.Event) (*client.Event, error) {
+func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
 	return nil, nil
 }
 
@@ -29,12 +23,12 @@ func (m *EmptyCatalog) DeleteEvent(ctx context.Context, eventID string) error {
 	return nil
 }
 
-func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate client.PropertyCreate) (*client.Property, error) {
+func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate catalog.PropertyCreate) (*catalog.Property, error) {
 
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *client.Property) (*client.Property, error) {
+func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
 	return nil, nil
 }
 
@@ -42,15 +36,15 @@ func (m *EmptyCatalog) DeleteProperty(ctx context.Context, propertyID string) er
 	return nil
 }
 
-func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate client.TrackingPlanCreate) (*client.TrackingPlan, error) {
+func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent client.TrackingPlanUpsertEvent) (*client.TrackingPlan, error) {
+func (m *EmptyCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent catalog.TrackingPlanUpsertEvent) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*client.TrackingPlan, error) {
+func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
@@ -59,5 +53,17 @@ func (m *EmptyCatalog) DeleteTrackingPlan(ctx context.Context, trackingPlanID st
 }
 
 func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) ReadState(ctx context.Context) (*catalog.State, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) PutResourceState(ctx context.Context, _ catalog.PutStateRequest) error {
+	return nil
+}
+
+func (m *EmptyCatalog) DeleteResourceState(ctx context.Context, _ catalog.DeleteStateRequest) error {
 	return nil
 }

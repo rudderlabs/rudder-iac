@@ -4,11 +4,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-var (
-	_ StateMapper = &PropertyArgs{}
-	_ StateMapper = &PropertyState{}
-)
-
 type PropertyArgs struct {
 	Name        string
 	Description string

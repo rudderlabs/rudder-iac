@@ -12,7 +12,7 @@ func TestDereference(t *testing.T) {
 	state := EmptyState()
 
 	// Add some resources to the state
-	state.AddResource(&StateResource{
+	state.AddResource(&ResourceState{
 		ID:   "source1",
 		Type: "source",
 		Output: map[string]interface{}{
@@ -25,7 +25,7 @@ func TestDereference(t *testing.T) {
 		},
 	})
 
-	state.AddResource(&StateResource{
+	state.AddResource(&ResourceState{
 		ID:   "dest1",
 		Type: "destination",
 		Output: map[string]interface{}{
