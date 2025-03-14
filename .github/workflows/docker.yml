@@ -1,9 +1,10 @@
 name: Docker Build and Push
 
 on:
-  release:
-    types: [published]
   push:
+    # Run on version tags and main branch
+    tags:
+      - "v*"
     branches:
       - main
   pull_request:
@@ -27,13 +28,15 @@ jobs:
       - name: Set Docker Tag
         id: docker_tag
         run: |
-          if [[ ${{ github.event_name }} == 'release' ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          if [[ ${{ github.ref_type }} == 'tag' ]]; then
+            # For version tags (v0.1.0), use version number (0.1.0)
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           else
-            # For both main pushes and PRs, use branch name
+            # For PR, use PR branch name
             if [[ ${{ github.event_name }} == 'pull_request' ]]; then
               BRANCH=$GITHUB_HEAD_REF
             else
+              # For main branch push
               BRANCH=$GITHUB_REF_NAME
             fi
             # Sanitize branch name for docker tag
@@ -47,11 +50,12 @@ jobs:
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
         run: |
           make docker-build
-          if [[ ${{ github.event_name }} == 'release' ]]; then
-            # For releases, also tag and push latest
+          if [[ ${{ github.ref_type }} == 'tag' ]]; then
+            # For version tags, also push as latest
             docker tag rudderlabs/rudder-cli:$VERSION rudderlabs/rudder-cli:latest
             docker push rudderlabs/rudder-cli:$VERSION
             docker push rudderlabs/rudder-cli:latest
           else
+            # For branches and PRs just push with version tag
             docker push rudderlabs/rudder-cli:$VERSION
           fi
