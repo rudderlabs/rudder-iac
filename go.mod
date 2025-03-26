@@ -11,7 +11,7 @@ require (
 	github.com/kyokomi/emoji/v2 v2.2.13
 	github.com/samber/lo v1.49.1
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/pretty v1.2.1
 	github.com/tidwall/sjson v1.2.5
