@@ -105,5 +105,12 @@ func ExtractCustomTypes(rd *ResourceDefinition) ([]CustomType, error) {
 		return nil, fmt.Errorf("extracting custom types spec: %w", err)
 	}
 
+	// Ensure config is initialized as an empty map when nil
+	for i := range spec.Types {
+		if spec.Types[i].Config == nil {
+			spec.Types[i].Config = make(map[string]interface{})
+		}
+	}
+
 	return spec.Types, nil
 }
