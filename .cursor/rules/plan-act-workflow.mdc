@@ -1,5 +1,4 @@
 ---
-<<<<<<< HEAD
 description: PLAN / ACT workflow
 globs: 
 alwaysApply: false
@@ -39,9 +38,3 @@ The assistant should never start implementing code changes without first obtaini
 **User**: "Yes, please implement it."
 
 **Assistant**: [Proceeds with implementation]
-=======
-description:
-globs:
-alwaysApply: false
----
->>>>>>> 80f8c5e (chore: added tests along with update to cursor rules)
