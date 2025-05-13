@@ -38,4 +38,3 @@ The assistant should never start implementing code changes without first obtaini
 **User**: "Yes, please implement it."
 
 **Assistant**: [Proceeds with implementation]
-
