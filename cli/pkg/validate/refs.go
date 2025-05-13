@@ -17,6 +17,8 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	log.Info("validating references lookup in entities in the catalog")
 
 	errs := make([]ValidationError, 0)
+
+	// Validate tracking plan references
 	for _, tp := range dc.TrackingPlans {
 		for _, rule := range tp.Rules {
 			errs = append(
@@ -25,6 +27,39 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 			)
 		}
 	}
+
+	// Validate custom type references
+	for group, customTypes := range dc.CustomTypes {
+		for _, customType := range customTypes {
+			// Only object types with properties need validation
+			if customType.Type == "object" && len(customType.Properties) > 0 {
+				reference := fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID)
+
+				for i, prop := range customType.Properties {
+
+					// Validate property reference format
+					matches := catalog.PropRegex.FindStringSubmatch(prop.ID)
+					if len(matches) != 3 {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("property reference at index %d has invalid format. Should be '#/properties/<group>/<id>'", i),
+						})
+						continue
+					}
+
+					// Validate property existence
+					groupName, propID := matches[1], matches[2]
+					if property := dc.Property(groupName, propID); property == nil {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("property reference '%s' at index %d not found in catalog", prop.ID, i),
+						})
+					}
+				}
+			}
+		}
+	}
+
 	return errs
 }
 

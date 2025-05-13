@@ -14,6 +14,7 @@ alwaysApply: false
 - Keep functions small and focused on a single responsibility
 - Use meaningful variable and function names
 - Document public functions and packages with comments
+- Use `any` instead of `interface{}`
 
 ## Error Handling
 
