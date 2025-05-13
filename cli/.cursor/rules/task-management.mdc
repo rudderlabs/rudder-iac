@@ -11,3 +11,4 @@ When user asks to plan out the steps to implement a specific linear issue, the r
 4. Only when it's agreed that the PLAN looks good, move towards ACT mode which is simply to start implement the changes.
 5. Based on the progress of task implementation, keep on updating the `Progress` section with the state of the tasks.
 6. Before making any updates to the Linear ticket (such as updating TBD sections, changing descriptions, or adding comments), always draft the changes and get explicit approval from the user before submitting.
+
