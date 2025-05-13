@@ -1,0 +1,25 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CLI Commands Structure
+
+> This rule documents the command-line interface (CLI) structure and organization. It helps developers understand how commands are hierarchically organized, how to locate specific command implementations, and provides guidance on implementing new commands in the project.
+
+The CLI uses Cobra for command-line parsing and is structured as follows:
+
+## Command Hierarchy
+
+- Root command in [cli/internal/cmd/root.go](mdc:cli/internal/cmd/root.go)
+- Authentication commands in [cli/internal/cmd/auth.go](mdc:cli/internal/cmd/auth.go)
+- Tracking plan commands in [cli/internal/cmd/trackingplan/trackingplan.go](mdc:cli/internal/cmd/trackingplan/trackingplan.go)
+  - Apply commands in [cli/internal/cmd/trackingplan/apply](mdc:cli/internal/cmd/trackingplan/apply)
+  - Validate commands in [cli/internal/cmd/trackingplan/validate](mdc:cli/internal/cmd/trackingplan/validate)
+  - Destroy commands in [cli/internal/cmd/trackingplan/destroy](mdc:cli/internal/cmd/trackingplan/destroy)
+
+## Adding New Commands
+
+1. Create a new directory under `cli/internal/cmd` if it's a command group
+2. Implement your command using the Cobra framework
+3. Register your command with the root command or appropriate parent command

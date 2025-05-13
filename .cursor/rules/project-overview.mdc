@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project Overview
+
+> A comprehensive guide to the rudder-cli project structure. This rule provides a high-level overview of the codebase organization, main components, and documentation locations to help developers quickly understand the project layout.
+
+This repository contains `rudder-cli`, a command-line tool for interacting with RudderStack services.
+
+## Main Components
+
+- The main entry point is in [cli/cmd/rudder-cli/main.go](mdc:cli/cmd/rudder-cli/main.go)
+- Commands are implemented in [cli/internal/cmd](mdc:cli/internal/cmd)
+- Core business logic is in [cli/internal/app](mdc:cli/internal/app)
+
+## Project Structure
+- `/cli` - Contains all CLI-related code
+  - `/cmd` - CLI entry points
+  - `/internal` - Internal implementation details
+  - `/pkg` - Public packages that can be imported by other projects
+
+## Documentation
+- [README.md](mdc:README.md) - Installation and usage information
+- [CONTRIBUTING.md](mdc:CONTRIBUTING.md) - Contribution guidelines

@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Code Styling Conventions
+
+> This rule defines the project's coding standards and best practices. It covers Go code style, error handling patterns, testing approaches, and CLI design principles to ensure consistent, maintainable, and high-quality code throughout the codebase.
+
+## Go Code Style
+
+- Follow standard Go formatting (use `gofmt` or `go fmt`)
+- Follow [Effective Go](mdc:https:/golang.org/doc/effective_go) guidelines
+- Keep functions small and focused on a single responsibility
+- Use meaningful variable and function names
+- Document public functions and packages with comments
+
+## Error Handling
+
+- Always check errors and handle them appropriately
+- Use descriptive error messages
+- Consider using structured errors where appropriate
+
+## Testing
+
+- Write unit tests for all non-trivial functions
+- Use table-driven tests where appropriate
+- Mock external dependencies in tests
+- Aim for high test coverage (see [coverage.out](mdc:coverage.out))
+
+## Command Line Interface
+
+- Use consistent flag naming across commands
+- Provide clear help text for all commands and flags
+- Support both flags and environment variables for configuration

@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Contribution Workflow
+
+> This rule describes the complete contribution process for the project, from getting started to release. It provides a step-by-step guide for new contributors, explains the development workflow, code review expectations, and release procedures to ensure smooth collaboration.
+
+This rule outlines the workflow for contributing to the rudder-cli project.
+
+## Getting Started
+
+1. Read the [CONTRIBUTING.md](mdc:CONTRIBUTING.md) file for guidelines
+2. Check the [CODE_OF_CONDUCT.md](mdc:CODE_OF_CONDUCT.md) for community standards
+
+## Development Workflow
+
+1. Fork the repository and create a feature branch
+2. Make your changes following the project's coding standards
+3. Write tests for your changes
+4. Run tests with `make test`
+5. Build the CLI with `make build`
+6. Submit a pull request
+
+## Code Review Process
+
+- All pull requests must pass CI checks
+- Code owners will review your PR as specified in [CODEOWNERS](mdc:CODEOWNERS)
+- Address review comments and update your PR as needed
+
+## Release Process
+
+- Releases are managed using the [.goreleaser.yaml](mdc:cli/.goreleaser.yaml) configuration
+- Releases are automatically built and published for multiple platforms

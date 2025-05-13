@@ -1,0 +1,31 @@
+---
+description: Adding new command in CLI
+globs: 
+alwaysApply: false
+---
+Framework Used: Cobra https://github.com/spf13/cobra
+
+In cobra we build the commands hierarchically. Whenever we want to add a new command, we identify:
+1. If this command needs to be added in the root command [root.go](mdc:cli/internal/cmd/root.go) or any other command under root. Popularly, we have trackingplan subcommand defined in [trackingplan.go](mdc:cli/internal/cmd/trackingplan/trackingplan.go)
+2. Once the location for a command is idenfified, we need to identify if any flags are being used with the command.
+3. In addition to flags being identified, below structure is most command way to define a command in cobra
+```go
+cmd := &cobra.Command{
+		Use:   "tp <command>",
+		Short: "Manage datacatalog resources",
+		Long:  "Manage the lifecycle of datacatalog resources using user defined state",
+		Example: heredoc.Doc(`
+			$ rudder-cli tp validate
+			$ rudder-cli tp apply
+		`),
+	}
+```
+
+4. Each command / subcommand is implemented in it's own subfolder and returns back an instance of the command to above command in hierarchy like this with usage
+```go
+// command definition like this
+func NewCmdTPApply() *cobra.Command {
+}
+// command addition to tp above in hierarchy like this
+cmd.AddCommand(tpApplyCmd.NewCmdTPApply())
+```
