@@ -7,15 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
-)
-
-var (
-	log = logger.New("trackingplan", logger.Attr{
-		Key:   "cmd",
-		Value: "validate",
-	})
 )
 
 func NewCmdTPValidate() *cobra.Command {
