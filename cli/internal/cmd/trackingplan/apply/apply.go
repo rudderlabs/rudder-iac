@@ -8,13 +8,14 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,7 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("reading catalog failed in pre-step: %w", err)
 			}
 
-			err = validate.ValidateCatalog(validate.DefaultValidators(), localcatalog)
+			err = validate.ValidateCatalog(localcatalog)
 			if err != nil {
 				return fmt.Errorf("validating catalog: %w", err)
 			}
@@ -234,7 +235,13 @@ func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN ma
 }
 
 func readCatalog(dirLoc string) (*localcatalog.DataCatalog, error) {
-	catalog, err := localcatalog.Read(dirLoc)
+	loader := loader.New(dirLoc)
+	specs, err := loader.Load()
+	if err != nil {
+		return nil, fmt.Errorf("loading catalog: %w", err)
+	}
+
+	catalog, err := localcatalog.New(specs)
 	if err != nil {
 		return nil, fmt.Errorf("reading catalog at location: %w", err)
 	}
