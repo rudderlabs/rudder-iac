@@ -70,3 +70,40 @@ func ExtractEvents(rd *ResourceDefinition) ([]Event, error) {
 
 	return spec.Events, nil
 }
+
+// CustomType represents a user-defined custom type
+type CustomType struct {
+	LocalID     string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"config"`
+	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+}
+
+// CustomTypeProperty represents a property reference within a custom type
+type CustomTypeProperty struct {
+	ID       string `json:"id"`
+	Required bool   `json:"required"`
+}
+
+// CustomTypeSpec represents the spec section of a custom-types resource
+type CustomTypeSpec struct {
+	Types []CustomType `json:"types"`
+}
+
+// ExtractCustomTypes parses a resource definition and extracts custom types
+func ExtractCustomTypes(rd *ResourceDefinition) ([]CustomType, error) {
+	spec := CustomTypeSpec{}
+
+	jsonByt, err := json.Marshal(rd.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling the spec: %w", err)
+	}
+
+	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+		return nil, fmt.Errorf("extracting custom types spec: %w", err)
+	}
+
+	return spec.Types, nil
+}

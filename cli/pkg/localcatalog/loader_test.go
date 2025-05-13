@@ -12,6 +12,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		Events:        make(map[EntityGroup][]Event),
 		Properties:    make(map[EntityGroup][]Property),
 		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+		CustomTypes:   make(map[EntityGroup][]CustomType),
 	}
 
 	t.Run("properties are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -180,4 +181,109 @@ func TestExtractCatalogEntity(t *testing.T) {
 		}, *emptyCatalog.TrackingPlans["my_first_tp"])
 	})
 
+	t.Run("custom types are extracted from customer defined yaml successfully", func(t *testing.T) {
+
+		byt := []byte(`
+        version: "rudder/v0.1"
+        kind: "custom-types"
+        metadata:
+          name: "email-types"
+        spec:
+          types:
+            - id: "EmailType"
+              name: "Email Type"
+              description: "Custom type for email validation"
+              type: "string"
+              config:
+                format: "email"
+                minLength: 5
+                maxLength: 255
+                pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+            - id: "ProductIdType"
+              name: "Product ID Type"
+              description: "Custom type for product identifiers"
+              type: "string"
+              config:
+                minLength: 10
+                maxLength: 20
+                pattern: "^PROD-[0-9]{7}$"
+        `)
+
+		err := extractEntities(byt, &emptyCatalog)
+		require.Nil(t, err)
+
+		assert.Equal(t, 1, len(emptyCatalog.CustomTypes))
+		assert.Equal(t, 2, len(emptyCatalog.CustomTypes["email-types"]))
+
+		// Verify first custom type (EmailType)
+		assert.Equal(t, CustomType{
+			LocalID:     "EmailType",
+			Name:        "Email Type",
+			Description: "Custom type for email validation",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"format":    "email",
+				"minLength": float64(5),
+				"maxLength": float64(255),
+				"pattern":   "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+			},
+		}, emptyCatalog.CustomTypes["email-types"][0])
+
+		// Verify second custom type (ProductIdType)
+		assert.Equal(t, CustomType{
+			LocalID:     "ProductIdType",
+			Name:        "Product ID Type",
+			Description: "Custom type for product identifiers",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": float64(10),
+				"maxLength": float64(20),
+				"pattern":   "^PROD-[0-9]{7}$",
+			},
+		}, emptyCatalog.CustomTypes["email-types"][1])
+	})
+
+	t.Run("custom types with property references are extracted successfully", func(t *testing.T) {
+
+		byt := []byte(`
+        version: "rudder/v0.1"
+        kind: "custom-types"
+        metadata:
+          name: "object-types"
+        spec:
+          types:
+            - id: "UserAddressType"
+              name: "User Address Type"
+              description: "Custom type for user address information"
+              type: "object"
+              properties: [
+                { id: "street", required: true },
+                { id: "city", required: true },
+                { id: "state", required: false },
+                { id: "zip", required: true }
+              ]
+        `)
+
+		err := extractEntities(byt, &emptyCatalog)
+		require.Nil(t, err)
+
+		assert.Equal(t, 2, len(emptyCatalog.CustomTypes))
+		assert.Equal(t, 1, len(emptyCatalog.CustomTypes["object-types"]))
+
+		// Verify object custom type with properties
+		customType := emptyCatalog.CustomTypes["object-types"][0]
+		assert.Equal(t, "UserAddressType", customType.LocalID)
+		assert.Equal(t, "User Address Type", customType.Name)
+		assert.Equal(t, "Custom type for user address information", customType.Description)
+		assert.Equal(t, "object", customType.Type)
+
+		// Verify properties array
+		require.Equal(t, 4, len(customType.Properties))
+
+		// Check each property reference
+		assert.Equal(t, CustomTypeProperty{ID: "street", Required: true}, customType.Properties[0])
+		assert.Equal(t, CustomTypeProperty{ID: "city", Required: true}, customType.Properties[1])
+		assert.Equal(t, CustomTypeProperty{ID: "state", Required: false}, customType.Properties[2])
+		assert.Equal(t, CustomTypeProperty{ID: "zip", Required: true}, customType.Properties[3])
+	})
 }
