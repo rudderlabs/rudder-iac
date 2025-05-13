@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	PropRegex    = regexp.MustCompile(`^#\/properties\/(.*)\/(.*)$`)
-	EventRegex   = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
-	IncludeRegex = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	PropRegex       = regexp.MustCompile(`^#\/properties\/(.*)\/(.*)$`)
+	EventRegex      = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
+	IncludeRegex    = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	CustomTypeRegex = regexp.MustCompile(`^#\/custom-types\/(.*)\/(.*)$`)
 )
 
 type CatalogResourceFetcher interface {
