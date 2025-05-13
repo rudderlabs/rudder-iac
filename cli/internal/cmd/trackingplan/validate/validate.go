@@ -1,11 +1,11 @@
 package validate
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
@@ -21,12 +21,11 @@ var (
 
 func NewCmdTPValidate() *cobra.Command {
 	var (
-		catalogDir string
-		err        error
-		dc         *localcatalog.DataCatalog
+		location string
+		err      error
+		dc       *localcatalog.DataCatalog
 	)
 
-	validators := DefaultValidators()
 	cmd := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate locally defined catalog",
@@ -39,12 +38,18 @@ func NewCmdTPValidate() *cobra.Command {
 				telemetry.TrackCommand("tp validate", err)
 			}()
 
-			dc, err = localcatalog.Read(catalogDir)
+			loader := loader.New(location)
+			specs, err := loader.Load()
+			if err != nil {
+				return fmt.Errorf("loading catalog: %s", err.Error())
+			}
+
+			dc, err = localcatalog.New(specs)
 			if err != nil {
 				return fmt.Errorf("reading catalog: %s", err.Error())
 			}
 
-			err = ValidateCatalog(validators, dc)
+			err = validate.ValidateCatalog(dc)
 			if err == nil {
 				log.Info("successfully validated the catalog")
 				return nil
@@ -55,37 +60,6 @@ func NewCmdTPValidate() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&catalogDir, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
+	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
 	return cmd
-}
-
-func ValidateCatalog(validators []validate.CatalogValidator, dc *localcatalog.DataCatalog) (toReturn error) {
-	log.Info("running validators on the catalog")
-
-	combinedErrs := make([]validate.ValidationError, 0)
-	for _, validator := range validators {
-		errs := validator.Validate(dc)
-		if len(errs) > 0 {
-			combinedErrs = append(combinedErrs, errs...)
-		}
-	}
-
-	errStr := ""
-	for _, err := range combinedErrs {
-		errStr += fmt.Sprintf("\nreference: %s, error: %s\n\n", err.Reference, err.Error())
-	}
-
-	if len(errStr) == 0 {
-		return nil
-	}
-
-	return errors.New(errStr)
-}
-
-func DefaultValidators() []validate.CatalogValidator {
-	return []validate.CatalogValidator{
-		&validate.RequiredKeysValidator{},
-		&validate.DuplicateNameIDKeysValidator{},
-		&validate.RefValidator{},
-	}
 }
