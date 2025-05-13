@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 )
 
 var (
@@ -230,13 +232,13 @@ func shallowCopy(input map[string]any) map[string]any {
 	return output
 }
 
-func ExtractTrackingPlan(rd *ResourceDefinition) (TrackingPlan, error) {
-	log.Debug("extracting tracking plan from resource definition", "metadata.name", rd.Metadata.Name)
+func ExtractTrackingPlan(s *specs.Spec) (TrackingPlan, error) {
+	log.Debug("extracting tracking plan from resource definition", "metadata.name", s.Metadata["name"])
 
 	// The spec is the tracking plan in its enterity
 	tp := TrackingPlan{}
 
-	byt, err := json.Marshal(rd.Spec)
+	byt, err := json.Marshal(s.Spec)
 	if err != nil {
 		return TrackingPlan{}, fmt.Errorf("marshalling the spec")
 	}

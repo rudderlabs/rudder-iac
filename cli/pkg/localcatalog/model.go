@@ -3,16 +3,9 @@ package localcatalog
 import (
 	"encoding/json"
 	"fmt"
-)
 
-type ResourceDefinition struct {
-	Version  string `yaml:"version"`
-	Kind     string `yaml:"kind"`
-	Metadata struct {
-		Name string `yaml:"name"`
-	} `yaml:"metadata"`
-	Spec map[string]interface{} `yaml:"spec"`
-}
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+)
 
 type Property struct {
 	LocalID     string                 `json:"id"`
@@ -27,10 +20,10 @@ type PropertySpec struct {
 }
 
 // This method is used to extract the entity from the byte representation of it
-func ExtractProperties(rd *ResourceDefinition) ([]Property, error) {
+func ExtractProperties(s *specs.Spec) ([]Property, error) {
 	spec := PropertySpec{}
 
-	jsonByt, err := json.Marshal(rd.Spec)
+	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
@@ -56,10 +49,10 @@ type EventSpec struct {
 
 // ExtractEvents simply parses the whole file defined as resource definition
 // and returns the events from it.
-func ExtractEvents(rd *ResourceDefinition) ([]Event, error) {
+func ExtractEvents(s *specs.Spec) ([]Event, error) {
 	spec := EventSpec{}
 
-	jsonByt, err := json.Marshal(rd.Spec)
+	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
