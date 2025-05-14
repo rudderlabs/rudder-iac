@@ -56,6 +56,18 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
+func (m *EmptyCatalog) CreateCustomType(ctx context.Context, customTypeCreate catalog.CustomTypeCreate) (*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomType) (*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) DeleteCustomType(ctx context.Context, customTypeID string) error {
+	return nil
+}
+
 func (m *EmptyCatalog) ReadState(ctx context.Context) (*catalog.State, error) {
 	return nil, nil
 }
