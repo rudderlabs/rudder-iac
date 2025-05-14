@@ -225,7 +225,9 @@ func TestExtractCatalogEntity(t *testing.T) {
                 pattern: "^PROD-[0-9]{7}$"
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.CustomTypes))
@@ -280,7 +282,9 @@ func TestExtractCatalogEntity(t *testing.T) {
               ]
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		assert.Equal(t, 2, len(emptyCatalog.CustomTypes))

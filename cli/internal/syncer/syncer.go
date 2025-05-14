@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -12,19 +13,10 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider Provider
+	provider project.SyncProvider
 }
 
-type Provider interface {
-	LoadState(ctx context.Context) (*state.State, error)
-	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
-	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
-	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
-}
-
-func New(p Provider) (*ProjectSyncer, error) {
+func New(p project.SyncProvider) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}

@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
@@ -32,9 +33,22 @@ func NewCmdTPDestroy() *cobra.Command {
 			$ rudder-cli tp destroy --dry-run
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
 			log.Debug("tp destroy", "dryRun", dryRun, "confirm", confirm)
 
-			s, err := common.NewSyncer()
+			defer func() {
+				telemetry.TrackCommand("tp destroy", err, []telemetry.KV{
+					{K: "dryRun", V: dryRun},
+					{K: "confirm", V: confirm},
+				}...)
+			}()
+
+			deps, err := app.NewDeps()
+			if err != nil {
+				return fmt.Errorf("initialising dependencies: %w", err)
+			}
+
+			s, err := syncer.New(deps.CompositeProvider())
 			if err != nil {
 				return err
 			}
@@ -44,7 +58,7 @@ func NewCmdTPDestroy() *cobra.Command {
 				Confirm: confirm,
 			})
 			if len(errors) > 0 {
-				return fmt.Errorf("syncing the state: %w", errors[0])
+				return fmt.Errorf("destroying resources: %w", errors[0])
 			}
 
 			return nil

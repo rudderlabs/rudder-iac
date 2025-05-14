@@ -86,10 +86,10 @@ type CustomTypeSpec struct {
 }
 
 // ExtractCustomTypes parses a resource definition and extracts custom types
-func ExtractCustomTypes(rd *ResourceDefinition) ([]CustomType, error) {
+func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
 	spec := CustomTypeSpec{}
 
-	jsonByt, err := json.Marshal(rd.Spec)
+	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}

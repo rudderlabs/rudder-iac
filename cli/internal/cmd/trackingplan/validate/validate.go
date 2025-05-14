@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +22,6 @@ func NewCmdTPValidate() *cobra.Command {
 	var (
 		location string
 		err      error
-		dc       *localcatalog.DataCatalog
 	)
 
 	cmd := &cobra.Command{
@@ -38,25 +36,18 @@ func NewCmdTPValidate() *cobra.Command {
 				telemetry.TrackCommand("tp validate", err)
 			}()
 
-			loader := loader.New(location)
-			specs, err := loader.Load()
+			deps, err := app.NewDeps()
 			if err != nil {
-				return fmt.Errorf("loading catalog: %s", err.Error())
+				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			dc, err = localcatalog.New(specs)
-			if err != nil {
-				return fmt.Errorf("reading catalog: %s", err.Error())
+			p := project.New(location, deps.CompositeProvider())
+
+			if err := p.Load(); err != nil {
+				return fmt.Errorf("loading project: %w", err)
 			}
 
-			err = validate.ValidateCatalog(dc)
-			if err == nil {
-				log.Info("successfully validated the catalog")
-				return nil
-			}
-
-			err = fmt.Errorf("catalog is invalid: %s", err.Error())
-			return err
+			return nil
 		},
 	}
 
