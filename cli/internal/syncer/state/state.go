@@ -11,6 +11,8 @@ type State struct {
 	Resources map[string]*ResourceState `json:"resources"`
 }
 
+var ErrIncompatibleState = fmt.Errorf("incompatible state version")
+
 func EmptyState() *State {
 	return &State{
 		Resources: make(map[string]*ResourceState),
@@ -108,4 +110,16 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 	default:
 		return v, nil
 	}
+}
+
+func (s *State) Merge(other *State) error {
+	if s.Version != other.Version {
+		return ErrIncompatibleState
+	}
+
+	for k, v := range other.Resources {
+		s.Resources[k] = v
+	}
+
+	return nil
 }

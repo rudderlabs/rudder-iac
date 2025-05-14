@@ -35,3 +35,11 @@ func New(data []byte) (*Spec, error) {
 
 	return &spec, nil
 }
+
+type ErrUnsupportedKind struct {
+	Kind string
+}
+
+func (e ErrUnsupportedKind) Error() string {
+	return fmt.Sprintf("unsupported kind: %s", e.Kind)
+}
