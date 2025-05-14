@@ -6,7 +6,7 @@ import (
 	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
 
-var invalidRefFormat = fmt.Errorf("invalid reference format")
+var errInvalidRefFormat = fmt.Errorf("invalid reference format")
 
 // RefValidator checks the references in tracking plan to other
 // events and properties in data catalog and verifies if the refs are valid
@@ -36,7 +36,7 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.Catalog
 		if len(matches) != 3 {
 			errs = append(errs, ValidationError{
 				Reference: rule.Event.Ref,
-				error:     invalidRefFormat,
+				error:     errInvalidRefFormat,
 			})
 		} else {
 			if event := fetcher.Event(matches[1], matches[2]); event == nil {
@@ -53,7 +53,7 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.Catalog
 			if len(matches) != 3 {
 				errs = append(errs, ValidationError{
 					Reference: prop.Ref,
-					error:     invalidRefFormat,
+					error:     errInvalidRefFormat,
 				})
 			} else {
 				if property := fetcher.Property(matches[1], matches[2]); property == nil {
@@ -70,7 +70,7 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.Catalog
 		if len(matches) != 3 {
 			errs = append(errs, ValidationError{
 				Reference: rule.Includes.Ref,
-				error:     invalidRefFormat,
+				error:     errInvalidRefFormat,
 			})
 		} else {
 			group, id := matches[1], matches[2]
