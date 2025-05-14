@@ -166,7 +166,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			// Type validation
 			if !slices.Contains(validTypes, customType.Type) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("invalid data type. Acceptable values are string, number, integer, boolean, null, array, and object"),
+					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(validTypes, ",")),
 					Reference: reference,
 				})
 			}
@@ -308,20 +308,6 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 				Reference: reference,
 			})
 		}
-		// } else if len(itemTypesArray) != 1 {
-		// 	errors = append(errors, ValidationError{
-		// 		error:     fmt.Errorf("itemTypes must contain exactly one custom type"),
-		// 		Reference: reference,
-		// 	})
-		// } else {
-		// 	// Check the item is a string
-		// 	if _, ok := itemTypesArray[0].(string); !ok {
-		// 		errors = append(errors, ValidationError{
-		// 			error:     fmt.Errorf("itemTypes must contain string values"),
-		// 			Reference: reference,
-		// 		})
-		// 	}
-		// }
 
 		for idx, itemType := range itemTypesArray {
 			val, ok := itemType.(string)
