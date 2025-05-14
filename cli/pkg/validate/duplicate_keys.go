@@ -47,8 +47,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 	}
 
 	var (
-		eventName = make(map[string]interface{})
-		eventID   = make(map[string]interface{})
+		eventName = make(map[string]any)
+		eventID   = make(map[string]any)
 	)
 
 	// Checking duplicate id and name keys in events
@@ -79,9 +79,9 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 	}
 
 	var (
-		tpName   = make(map[string]interface{})
-		tpID     = make(map[string]interface{})
-		tpRuleID = make(map[string]interface{})
+		tpName   = make(map[string]any)
+		tpID     = make(map[string]any)
+		tpRuleID = make(map[string]any)
 	)
 
 	// Checking duplicate id and name keys of trackingplans
@@ -112,6 +112,33 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 			}
 
 			tpRuleID[rule.LocalID] = nil
+		}
+	}
+
+	var (
+		customTypeName = make(map[string]any)
+		customTypeID   = make(map[string]any)
+	)
+
+	// Checking duplicate id and name keys in custom types
+	for group, customTypes := range dc.CustomTypes {
+		for _, customType := range customTypes {
+			if _, ok := customTypeName[customType.Name]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate name key %s in custom types", customType.Name),
+					Reference: fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID),
+				})
+			}
+
+			if _, ok := customTypeID[customType.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s in custom types", customType.LocalID),
+					Reference: fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID),
+				})
+			}
+
+			customTypeName[customType.Name] = nil
+			customTypeID[customType.LocalID] = nil
 		}
 	}
 
