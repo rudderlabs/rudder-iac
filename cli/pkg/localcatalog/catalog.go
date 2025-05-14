@@ -89,25 +89,21 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 	return toReturn, true
 }
 
-// New creates a DataCatalog from a map of specs. It extracts all entities
-// (properties, events, tracking plans) from the provided specs and organizes
-// them in the catalog structure.
-func New(specs map[string]*specs.Spec) (*DataCatalog, error) {
-	dc := &DataCatalog{
+func New() *DataCatalog {
+	return &DataCatalog{
 		Properties:    map[EntityGroup][]Property{},
 		Events:        map[EntityGroup][]Event{},
 		TrackingPlans: map[EntityGroup]*TrackingPlan{},
 		CustomTypes:   map[EntityGroup][]CustomType{},
 	}
+}
 
-	for path, spec := range specs {
-		if err := extractEntities(spec, dc); err != nil {
-			return nil, fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
-		}
+func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
+	if err := extractEntities(s, dc); err != nil {
+		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
 	}
 
-	// Once the entities are extracted, we need to inflate the references
-	return dc, nil
+	return nil
 }
 
 // extractEntities parses the entity from file bytes

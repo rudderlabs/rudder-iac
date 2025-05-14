@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
+
+var log = logger.New("loader")
 
 type Loader struct {
 	// Location is the root directory of the project
@@ -15,13 +18,19 @@ type Loader struct {
 }
 
 func New(location string) *Loader {
+	if location == "" {
+		location = "."
+	}
+
 	return &Loader{
 		Location: location,
 	}
 }
 
 func (l *Loader) Load() (map[string]*specs.Spec, error) {
-	var allSpecs map[string]*specs.Spec
+	var allSpecs map[string]*specs.Spec = make(map[string]*specs.Spec)
+
+	log.Info("loading specs", "location", l.Location)
 
 	err := filepath.WalkDir(l.Location, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
