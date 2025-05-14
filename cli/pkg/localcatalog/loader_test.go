@@ -257,10 +257,10 @@ func TestExtractCatalogEntity(t *testing.T) {
               description: "Custom type for user address information"
               type: "object"
               properties: [
-                { id: "street", required: true },
-                { id: "city", required: true },
-                { id: "state", required: false },
-                { id: "zip", required: true }
+                { $ref: "#/properties/address/street", required: true },
+                { $ref: "#/properties/address/city", required: true },
+                { $ref: "#/properties/address/state", required: false },
+                { $ref: "#/properties/address/zip", required: true }
               ]
         `)
 
@@ -281,9 +281,9 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Equal(t, 4, len(customType.Properties))
 
 		// Check each property reference
-		assert.Equal(t, CustomTypeProperty{ID: "street", Required: true}, customType.Properties[0])
-		assert.Equal(t, CustomTypeProperty{ID: "city", Required: true}, customType.Properties[1])
-		assert.Equal(t, CustomTypeProperty{ID: "state", Required: false}, customType.Properties[2])
-		assert.Equal(t, CustomTypeProperty{ID: "zip", Required: true}, customType.Properties[3])
+		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/street", Required: true}, customType.Properties[0])
+		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/city", Required: true}, customType.Properties[1])
+		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/state", Required: false}, customType.Properties[2])
+		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/zip", Required: true}, customType.Properties[3])
 	})
 }

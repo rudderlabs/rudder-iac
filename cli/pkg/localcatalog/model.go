@@ -83,7 +83,7 @@ type CustomType struct {
 
 // CustomTypeProperty represents a property reference within a custom type
 type CustomTypeProperty struct {
-	ID       string `json:"id"`
+	Ref      string `json:"$ref"`
 	Required bool   `json:"required"`
 }
 
