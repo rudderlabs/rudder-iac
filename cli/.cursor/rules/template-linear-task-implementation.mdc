@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Linear Ticket: DAW-<number>
+
+## Requirements
+Based on the requirements in the ticket along with refinement with user
+
+## Solution
+Though through and refined solution which is properly discussed with user
+
+## Acceptance Criteria
+A checklist of points which completed would mean the requirements are met
+
+## Testing
+The Testing strategy employed for the change
+
+## Progress
+A checklist of the state of the changes identified to be implemented which needs to be regularly updated as and when they are handled. They should be added in clear and concise way
+
+## Miscellaneous
+Any miscellaneous points recorded during the implementation of the ticket

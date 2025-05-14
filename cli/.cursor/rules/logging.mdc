@@ -1,0 +1,10 @@
+---
+description: general logging instruction
+globs: 
+alwaysApply: false
+---
+As this is CLI application, we want the logging to be very minimal and concise which needs to be displayed to the user. We distinguish the logs with the intent
+1. Important informational logs are written to console using `fmt.Println()`. Example of the same is in [syncer.go](mdc:cli/internal/syncer/syncer.go)
+2. Logs captured by the logger in a log file with default log level and ability to override in [root.go](mdc:cli/internal/cmd/root.go). The logger can then be used as `logger.Debug()` etc as used in file [apply.go](mdc:cli/internal/cmd/trackingplan/apply/apply.go)
+
+The ideology of logging is that we capture the logs with default level as `INFO` in log file and this includes every big operation the customer is doing with the CLI. The `Debug` logging logs the internal execution specifics of the command and other necessary information when an issue happens and we want to specifically turn on the debugging.

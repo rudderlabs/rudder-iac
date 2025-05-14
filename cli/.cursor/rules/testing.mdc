@@ -1,0 +1,54 @@
+---
+description: Testing
+globs: 
+alwaysApply: false
+---
+It is our aim to make sure any change we do is backed by appropriate test cases to provide developer the confidence that the change is working as intended. Rules for testing are as follows:
+
+1. Tests to be added alongside the files that implement the feature. If we have `abc.go`, we would add tests for it in `abc_test.go`.
+
+2. We extensively use subtests to define scenarios within a bigger test. If the subtest can be executed parallely with other tests, it is marked as `t.Parallel()`. For example:
+```go
+func TestEventProviderOperations(t *testing.T) {
+    // common setup
+
+    // subtests
+	t.Run("Create", func(t *testing.T) {}
+    t.Run("Update", func(t *testing.T) {}
+}
+```
+
+3. In addition to subtests, whevener we have multiple scenarios to be tested for a condition, we use table driven tests along with subtests with proper names for each scenario which becomes the name of the subtest. For example:
+```go 
+func TestSomeOperations(t *testing.T) {
+    // table driven tests with subtests
+	cases := []struct {}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+        }
+    }
+}
+```
+
+4. ONE IMPORTANT POINT  to remember is whenever new testcase(s) are added, we need to make sure the overall tests are passing. We always run, `make test` defined in [Makefile](mdc:Makefile) to make sure the state of the codebase is valid by having passing ✅ tests.
+
+
+## Important Information
+1. The CLI helps managing resources through providers which allows to capture the state of the resource and manage lifecycle of the state through mainly it's CRUD operations. Any changes in the state and / or provider operations, needs to be backed by corresponding test cases always. Examples are: 
+
+Provider [property.go](mdc:cli/pkg/provider/property.go) with state [property.go](mdc:cli/pkg/provider/state/property.go) are both backed by testcases
+
+2. Any change in the core module of the system like `internal/syncer` needs to have corresponding test cases.
+3. There are two states being referenced in the CLI. One is the [state.go](mdc:cli/internal/syncer/state/state.go) and other is the [property.go](mdc:cli/pkg/provider/state/property.go). Understanding the distinction between which state is being talked about is necessary.
+
+
+
+
+
+
+
+
+
+
+

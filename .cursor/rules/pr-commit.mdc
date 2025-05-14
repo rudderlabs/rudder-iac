@@ -1,0 +1,11 @@
+---
+description: Git PR create, commit
+globs: 
+alwaysApply: false
+---
+We use conventional commits to define good proper commit messages. This is absolutely a MUST whenever we are adding commits to a branch. Some important rules are as follows:
+
+- Use conventional commits format
+- Type prefix based on module (e.g. `feat(cli)`, `fix(api)`)
+- Don't include Linear issue in commit title (it's in branch name)
+- First commit's title becomes PR title when squash merged
