@@ -17,26 +17,26 @@ type CustomTypeCreate struct {
 }
 
 type CustomType struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Version     int                    `json:"version"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	DataType    string                 `json:"dataType"`
-	WorkspaceId string                 `json:"workspaceId"`
-	Config      map[string]interface{} `json:"config"`
-	Rules       map[string]interface{}      `json:"rules"`
-	Properties  []CustomTypeProperty   `json:"properties"`
-	ItemDefinitions []string             `json:"itemDefinitions"`
-	CreatedAt   time.Time              `json:"createdAt"`
-	UpdatedAt   time.Time              `json:"updatedAt"`
-	CreatedBy   string                 `json:"createdBy"`
-	UpdatedBy   string                 `json:"updatedBy"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Version         int                    `json:"version"`
+	Description     string                 `json:"description"`
+	Type            string                 `json:"type"`
+	DataType        string                 `json:"dataType"`
+	WorkspaceId     string                 `json:"workspaceId"`
+	Config          map[string]interface{} `json:"config"`
+	Rules           map[string]interface{} `json:"rules"`
+	Properties      []CustomTypeProperty   `json:"properties"`
+	ItemDefinitions []string               `json:"itemDefinitions"`
+	CreatedAt       time.Time              `json:"createdAt"`
+	UpdatedAt       time.Time              `json:"updatedAt"`
+	CreatedBy       string                 `json:"createdBy"`
+	UpdatedBy       string                 `json:"updatedBy"`
 }
 
 type CustomTypeProperty struct {
-	ID        string                 `json:"id"`
-	Required  bool                   `json:"required"`
+	ID       string `json:"id"`
+	Required bool   `json:"required"`
 }
 
 type CustomTypeStore interface {
@@ -80,7 +80,7 @@ func (c *RudderDataCatalog) CreateCustomType(ctx context.Context, input CustomTy
 
 	resp, err := c.client.Do(ctx, "POST", "catalog/custom-types", bytes.NewReader(byt))
 	if err != nil {
-		return nil, fmt.Errorf("executing http request: %w", err)	
+		return nil, fmt.Errorf("executing http request: %w", err)
 	}
 
 	customType := CustomType{} // Create a holder for response object
