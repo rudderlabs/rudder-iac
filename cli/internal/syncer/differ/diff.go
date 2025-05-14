@@ -105,7 +105,6 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 		case []map[string]interface{}:
 			v2Typed := v2.([]map[string]interface{})
 			if len(v1Typed) != len(v2Typed) {
-				// fmt.Printf("key: %s, v1: %v v2: %v \n", key, v1Typed, v2Typed)
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 				return
 			}
@@ -117,7 +116,6 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 			v2Typed := v2.(map[string]interface{})
 			subDiffs := CompareData(v1Typed, v2Typed)
 			if len(subDiffs) > 0 {
-				// fmt.Printf("key: %s, v1: %v v2: %v \n", key, v1Typed, v2Typed)
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			}
 		case []interface{}:

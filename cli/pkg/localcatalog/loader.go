@@ -23,6 +23,7 @@ type DataCatalog struct {
 	Properties    map[EntityGroup][]Property    `json:"properties"`
 	Events        map[EntityGroup][]Event       `json:"events"`
 	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
+	CustomTypes   map[EntityGroup][]CustomType  `json:"customTypes"`   // Custom types grouped by entity group
 }
 
 func (dc *DataCatalog) ExpandRefs() error {
@@ -50,6 +51,18 @@ func (dc *DataCatalog) Event(groupName string, id string) *Event {
 		for _, event := range events {
 			if event.LocalID == id {
 				return &event
+			}
+		}
+	}
+	return nil
+}
+
+// CustomType returns a custom type by group name and ID
+func (dc *DataCatalog) CustomType(groupName string, id string) *CustomType {
+	if types, ok := dc.CustomTypes[EntityGroup(groupName)]; ok {
+		for _, customType := range types {
+			if customType.LocalID == id {
+				return &customType
 			}
 		}
 	}
@@ -123,6 +136,7 @@ func Read(loc string) (*DataCatalog, error) {
 		Properties:    map[EntityGroup][]Property{},
 		Events:        map[EntityGroup][]Event{},
 		TrackingPlans: map[EntityGroup]*TrackingPlan{},
+		CustomTypes:   map[EntityGroup][]CustomType{},
 	}
 
 	for _, file := range files {
@@ -180,6 +194,13 @@ func extractEntities(byt []byte, dc *DataCatalog) error {
 		}
 
 		dc.TrackingPlans[EntityGroup(def.Metadata.Name)] = &tp
+
+	case "custom-types":
+		customTypes, err := ExtractCustomTypes(&def)
+		if err != nil {
+			return fmt.Errorf("extracting custom types: %w", err)
+		}
+		dc.CustomTypes[EntityGroup(def.Metadata.Name)] = customTypes
 
 	default:
 		return fmt.Errorf("unknown kind: %s", def.Kind)

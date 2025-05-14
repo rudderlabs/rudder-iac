@@ -102,15 +102,12 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		for _, prop := range props {
 			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
 
-			// fmt.Printf("property fromlocal: %+v\n", prop.Config == nil)
 			args := pstate.PropertyArgs{
 				Name:        prop.Name,
 				Description: prop.Description,
 				Type:        prop.Type,
 				Config:      prop.Config,
 			}
-			// fmt.Printf("property inargs: %#v\n", args.Config == nil)
-			// fmt.Printf("toresourcedata: %#v\n", args.ToResourceData()["config"] == nil)
 
 			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
