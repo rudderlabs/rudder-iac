@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"

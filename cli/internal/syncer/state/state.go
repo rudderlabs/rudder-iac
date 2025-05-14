@@ -11,6 +11,8 @@ type State struct {
 	Resources map[string]*ResourceState `json:"resources"`
 }
 
+var ErrIncompatibleState = fmt.Errorf("incompatible state version")
+
 func EmptyState() *State {
 	return &State{
 		Resources: make(map[string]*ResourceState),
