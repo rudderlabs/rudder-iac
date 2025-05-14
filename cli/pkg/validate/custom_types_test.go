@@ -102,7 +102,7 @@ func TestCustomTypeValidation(t *testing.T) {
 					},
 				},
 				expectedErrs:  1,
-				errorContains: []string{"id field is mandatory for property at index 0 in custom type"},
+				errorContains: []string{"$ref field is mandatory for property at index 0 in custom type"},
 			},
 			{
 				name: "invalid name format",
@@ -243,7 +243,7 @@ func TestCustomTypeValidation(t *testing.T) {
 							Config:      map[string]any{},
 							Properties: []catalog.CustomTypeProperty{
 								{
-									ID:       "#/properties/test-group/testProp",
+									Ref:      "#/properties/test-group/testProp",
 									Required: true,
 								},
 							},
@@ -264,7 +264,7 @@ func TestCustomTypeValidation(t *testing.T) {
 							Config:      map[string]any{},
 							Properties: []catalog.CustomTypeProperty{
 								{
-									ID:       "invalid-reference", // Not in the correct format
+									Ref:      "invalid-reference", // Not in the correct format
 									Required: true,
 								},
 							},
@@ -286,7 +286,7 @@ func TestCustomTypeValidation(t *testing.T) {
 							Config:      map[string]any{},
 							Properties: []catalog.CustomTypeProperty{
 								{
-									ID:       "#/properties/test-group/nonexistent", // Property doesn't exist
+									Ref:      "#/properties/test-group/nonexistent", // Property doesn't exist
 									Required: true,
 								},
 							},

@@ -39,7 +39,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				for i, prop := range customType.Properties {
 
 					// Validate property reference format
-					matches := catalog.PropRegex.FindStringSubmatch(prop.ID)
+					matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
 					if len(matches) != 3 {
 						errs = append(errs, ValidationError{
 							Reference: reference,
@@ -53,7 +53,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 					if property := dc.Property(groupName, propID); property == nil {
 						errs = append(errs, ValidationError{
 							Reference: reference,
-							error:     fmt.Errorf("property reference '%s' at index %d not found in catalog", prop.ID, i),
+							error:     fmt.Errorf("property reference '%s' at index %d not found in catalog", prop.Ref, i),
 						})
 					}
 				}

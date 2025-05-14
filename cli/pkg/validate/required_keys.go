@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
@@ -145,9 +146,9 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			// Check each property in properties has id field
 			if customType.Type == "object" {
 				for i, prop := range customType.Properties {
-					if prop.ID == "" {
+					if prop.Ref == "" {
 						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("id field is mandatory for property at index %d in custom type", i),
+							error:     fmt.Errorf("$ref field is mandatory for property at index %d in custom type", i),
 							Reference: reference,
 						})
 					}
@@ -245,7 +246,7 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 			})
 		} else if !slices.Contains(validFormatValues, formatStr) {
 			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("invalid format value. Acceptable values are datetime, date, time, email, uuid, hostname, ipv4, and ipv6"),
+				error:     fmt.Errorf("invalid format value, acceptable values are %s", strings.Join(validFormatValues, ",")),
 				Reference: reference,
 			})
 		}
@@ -306,19 +307,51 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 				error:     fmt.Errorf("itemTypes must be an array"),
 				Reference: reference,
 			})
-		} else if len(itemTypesArray) != 1 {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("itemTypes must contain exactly one custom type"),
-				Reference: reference,
-			})
-		} else {
-			// Check the item is a string
-			if _, ok := itemTypesArray[0].(string); !ok {
+		}
+		// } else if len(itemTypesArray) != 1 {
+		// 	errors = append(errors, ValidationError{
+		// 		error:     fmt.Errorf("itemTypes must contain exactly one custom type"),
+		// 		Reference: reference,
+		// 	})
+		// } else {
+		// 	// Check the item is a string
+		// 	if _, ok := itemTypesArray[0].(string); !ok {
+		// 		errors = append(errors, ValidationError{
+		// 			error:     fmt.Errorf("itemTypes must contain string values"),
+		// 			Reference: reference,
+		// 		})
+		// 	}
+		// }
+
+		for idx, itemType := range itemTypesArray {
+			val, ok := itemType.(string)
+			if !ok {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes must contain string values"),
+					error:     fmt.Errorf("itemTypes at idx: %d must be string value", idx),
+					Reference: reference,
+				})
+
+				continue
+			}
+
+			if catalog.CustomTypeRegex.Match([]byte(val)) {
+				if len(itemTypesArray) != 1 {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("itemTypes containing custom type at idx: %d cannot be paired with other types", idx),
+						Reference: reference,
+					})
+				}
+
+				continue
+			}
+
+			if !slices.Contains(validTypes, val) {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(validTypes, ",")),
 					Reference: reference,
 				})
 			}
+
 		}
 	}
 
