@@ -208,6 +208,15 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	return graph
 }
 
+// Helper functions for reference checking
+func isCustomTypeRef(ref string) bool {
+	return strings.HasPrefix(ref, "#/custom-types/")
+}
+
+func isPropertyRef(ref string) bool {
+	return strings.HasPrefix(ref, "#/properties/")
+}
+
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
 // of the properties and events that are used in the tracking plan
 func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) []string {
