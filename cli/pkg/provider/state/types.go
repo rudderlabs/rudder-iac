@@ -64,6 +64,15 @@ func MapStringInterfaceSlice(from map[string]interface{}, key string, defaultval
 	return SafeMapValue(from, key, defaultval)
 }
 
+func MustStringSlice(from map[string]interface{}, key string) []string {
+	items := InterfaceSlice(from, key, nil)
+	result := make([]string, len(items))
+	for i, v := range items {
+		result[i] = v.(string)
+	}
+	return result
+}
+
 func SafeMapValue[K comparable, T any, V any](from map[K]T, key K, defaultval V) V {
 	if val, ok := from[key]; ok {
 		if v, ok := any(val).(V); ok {

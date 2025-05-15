@@ -21,12 +21,14 @@ func TestMapValues(t *testing.T) {
 		"address":  &address,
 		"empCount": 84,
 		"hiring":   true,
+		"enum":     []interface{}{"value1", "value2"},
 	}
 
 	t.Run("string values are extracted from map successfully", func(t *testing.T) {
 		assert.Equal(t, "Rudderstack", state.MustString(defaultmap, "name"))
 		assert.Equal(t, address, *state.MustStringPtr(defaultmap, "address"))
 		assert.Equal(t, "Invalid", state.String(defaultmap, "invalid", "Invalid"))
+		assert.Equal(t, []string{"value1", "value2"}, state.MustStringSlice(defaultmap, "enum"))
 	})
 
 	t.Run("bool values are extracted from map successfully", func(t *testing.T) {
