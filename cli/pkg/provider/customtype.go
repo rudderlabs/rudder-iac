@@ -70,7 +70,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 
 	for _, prop := range toArgs.Properties {
 		customTypeState.Properties = append(customTypeState.Properties, &state.CustomTypePropertyState{
-			LocalID:    toArgs.LocalID,
+			LocalID:    prop.RefID,
 			PropertyID: prop.PropertyID,
 			Required:   prop.Required,
 		})
@@ -128,7 +128,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 
 	for _, prop := range toArgs.Properties {
 		toState.Properties = append(toState.Properties, &state.CustomTypePropertyState{
-			LocalID:    toArgs.LocalID,
+			LocalID:    prop.RefID,
 			PropertyID: prop.PropertyID,
 			Required:   prop.Required,
 		})
