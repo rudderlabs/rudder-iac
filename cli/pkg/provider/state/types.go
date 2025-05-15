@@ -16,6 +16,15 @@ func MustString(from map[string]interface{}, key string) string {
 	return MustMapValue[string, interface{}, string](from, key)
 }
 
+func MustStringSlice(from map[string]interface{}, key string) []string {
+	items := InterfaceSlice(from, key, nil)
+	result := make([]string, len(items))
+	for i, v := range items {
+		result[i] = v.(string)
+	}
+	return result
+}
+
 func Int(from map[string]interface{}, key string, defaultval int) int {
 	return SafeMapValue(from, key, defaultval)
 }
