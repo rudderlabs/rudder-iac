@@ -18,6 +18,7 @@ const (
 	ResourceCollectionEvents        ResourceCollection = "events"
 	ResourceCollectionProperties    ResourceCollection = "properties"
 	ResourceCollectionTrackingPlans ResourceCollection = "tracking-plans"
+	ResourceCollectionCustomTypes   ResourceCollection = "custom-types"
 )
 
 type ResourceState struct {

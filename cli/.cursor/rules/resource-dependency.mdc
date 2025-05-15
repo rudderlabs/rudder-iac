@@ -1,0 +1,11 @@
+---
+description: resource depending on other resource
+globs: 
+alwaysApply: false
+---
+In managing the state of the resources, there would often be situations where the output of one resource would need to be piped into the input of another resource as there is a dependency between the two resources. The `rudder-iac` manages these dependencies through something called `PropertyRef` where a field in entity A to be created would depend upong field in output of entity B. In this case the entity A would add itself to the resources in dependency graph depending upon the field and providing the `URN()` of the resource along with the property name.
+
+In depending upon the output of resource, you automatically add the resource with a particular URN as your dependency. This means that the state which manages the resource graph will make sure the order of creation and deletion which would be reverse of first.
+
+
+The implementation resides in [state.go](mdc:cli/internal/syncer/state/state.go) and example of usage is provided in the [syncer_test.go](mdc:cli/internal/syncer/syncer_test.go)
