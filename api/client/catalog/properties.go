@@ -15,6 +15,13 @@ type PropertyCreate struct {
 	Config      map[string]interface{} `json:"propConfig,omitempty"`
 }
 
+type PropertiesResponse struct {
+	Data        []*Property `json:"data"`
+	Total       int         `json:"total"`
+	CurrentPage int         `json:"currentPage"`
+	PageSize    int         `json:"pageSize"`
+}
+
 type Property struct {
 	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
@@ -30,8 +37,36 @@ type Property struct {
 
 type PropertyStore interface {
 	CreateProperty(ctx context.Context, input PropertyCreate) (*Property, error)
+	ReadProperty(ctx context.Context, id string) (*Property, error)
+	ListProperties(ctx context.Context) ([]*Property, error)
 	UpdateProperty(ctx context.Context, id string, input *Property) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
+}
+
+func (c *RudderDataCatalog) ListProperties(ctx context.Context) ([]*Property, error) {
+	resp, err := c.client.Do(ctx, "GET", "catalog/properties", nil)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	var response PropertiesResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return response.Data, nil
+}
+
+func (c *RudderDataCatalog) ReadProperty(ctx context.Context, id string) (*Property, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/properties/%s", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+
+	var property Property
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&property); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &property, nil
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {

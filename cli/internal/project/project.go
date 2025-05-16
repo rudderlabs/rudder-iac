@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -27,6 +28,7 @@ type ProjectProvider interface {
 type Provider interface {
 	ProjectProvider
 	syncer.SyncProvider
+	importer.ImportProvider
 }
 
 type Project interface {

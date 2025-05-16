@@ -16,8 +16,17 @@ import (
 
 type MockPropertyCatalog struct {
 	EmptyCatalog
-	property *catalog.Property
-	err      error
+	property   *catalog.Property
+	properties []*catalog.Property
+	err        error
+}
+
+func (m *MockPropertyCatalog) ListProperties(ctx context.Context) ([]*catalog.Property, error) {
+	return m.properties, m.err
+}
+
+func (m *MockPropertyCatalog) SetProperties(properties []*catalog.Property) {
+	m.properties = properties
 }
 
 func (m *MockPropertyCatalog) CreateProperty(ctx context.Context, propertyCreate catalog.PropertyCreate) (*catalog.Property, error) {

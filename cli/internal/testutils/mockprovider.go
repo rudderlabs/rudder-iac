@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/workspace"
 )
 
 // MockProvider is a mock implementation of the project.Provider interface for testing.
@@ -25,6 +26,12 @@ type MockProvider struct {
 	UpdateVal              *resources.ResourceData
 	UpdateErr              error
 	DeleteErr              error
+	ImportStateVal         *state.ResourceState
+	ImportStateErr         error
+	ListVal                []*workspace.Resource
+	ListErr                error
+	TemplateVal            []byte
+	TemplateErr            error
 
 	// Tracking calls
 	ValidateCalledCount              int
@@ -36,6 +43,9 @@ type MockProvider struct {
 	CreateCalledWithArg              CreateArgs
 	UpdateCalledWithArg              UpdateArgs
 	DeleteCalledWithArg              DeleteArgs
+	ImportStateCalledWithArg         *workspace.Resource
+	ListCalledWithArg                string
+	TemplateCalledWithArg            *workspace.Resource
 }
 
 // LoadSpecArgs stores arguments for LoadSpec calls
@@ -132,6 +142,21 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 	return m.DeleteErr
 }
 
+func (m *MockProvider) ImportState(ctx context.Context, resource *workspace.Resource) (*state.ResourceState, error) {
+	m.ImportStateCalledWithArg = resource
+	return m.ImportStateVal, m.ImportStateErr
+}
+
+func (m *MockProvider) List(ctx context.Context, resourceType string) ([]*workspace.Resource, error) {
+	m.ListCalledWithArg = resourceType
+	return m.ListVal, m.ListErr
+}
+
+func (m *MockProvider) Template(ctx context.Context, resource *workspace.Resource) ([]byte, error) {
+	m.TemplateCalledWithArg = resource
+	return m.TemplateVal, m.TemplateErr
+}
+
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
@@ -143,4 +168,7 @@ func (m *MockProvider) ResetCallCounters() {
 	m.CreateCalledWithArg = CreateArgs{}
 	m.UpdateCalledWithArg = UpdateArgs{}
 	m.DeleteCalledWithArg = DeleteArgs{}
+	m.ImportStateCalledWithArg = nil
+	m.ListCalledWithArg = ""
+	m.TemplateCalledWithArg = nil
 }

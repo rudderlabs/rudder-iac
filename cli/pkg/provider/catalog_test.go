@@ -23,6 +23,14 @@ func (m *EmptyCatalog) DeleteEvent(ctx context.Context, eventID string) error {
 	return nil
 }
 
+func (m *EmptyCatalog) ListProperties(ctx context.Context) ([]*catalog.Property, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ReadProperty(ctx context.Context, id string) (*catalog.Property, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate catalog.PropertyCreate) (*catalog.Property, error) {
 
 	return nil, nil
