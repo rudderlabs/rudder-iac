@@ -1,0 +1,14 @@
+version: rudder/0.1
+kind: properties
+metadata:
+  name: {{ .Resource.Name }}
+spec:
+  properties:
+    - id: "{{ .LocalID }}"
+      name: "{{ .Resource.Data.Name }}"
+      type: "{{ .Resource.Data.Type }}"
+      description: "{{ .Resource.Data.Description }}"
+      {{- if .Resource.Data.Config }}
+      propConfig:
+{{ .Resource.Data.Config | toYAML | indent 8 }}
+      {{- end }}

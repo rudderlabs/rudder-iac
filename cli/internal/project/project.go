@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/workspace"
 )
 
 type ProjectProvider interface {
@@ -15,6 +16,12 @@ type ProjectProvider interface {
 	Validate() error
 	LoadSpec(path string, s *specs.Spec) error
 	GetResourceGraph() (*resources.Graph, error)
+}
+
+type ImportProvider interface {
+	List(ctx context.Context, resourceType string) ([]*workspace.Resource, error)
+	Template(ctx context.Context, resource *workspace.Resource) ([]byte, error)
+	ImportState(ctx context.Context, resource *workspace.Resource) (*state.ResourceState, error)
 }
 
 type SyncProvider interface {
@@ -28,6 +35,7 @@ type SyncProvider interface {
 
 type Provider interface {
 	ProjectProvider
+	ImportProvider
 	SyncProvider
 }
 

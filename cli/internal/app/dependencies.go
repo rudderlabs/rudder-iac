@@ -17,8 +17,8 @@ var (
 )
 
 type Providers struct {
-	DataCatalog project.Provider
-	RETL        project.Provider
+	DataCatalog *datacatalog.Provider
+	RETL        *retl.Provider
 }
 
 type deps struct {
@@ -90,5 +90,5 @@ func (d *deps) Providers() *Providers {
 }
 
 func (d *deps) CompositeProvider() project.Provider {
-	return providers.NewCompositeProvider(d.providers.DataCatalog, d.providers.RETL)
+	return providers.NewCompositeProvider(d.providers.DataCatalog)
 }
