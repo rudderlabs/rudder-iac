@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
@@ -12,6 +13,7 @@ import (
 
 // TODO: implement on the same lines as the propertyProvider
 type EventProvider struct {
+	providers.DefaultResourceProvider
 	catalog catalog.DataCatalog
 	log     *logger.Logger
 }
