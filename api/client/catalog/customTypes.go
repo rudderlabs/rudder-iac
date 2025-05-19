@@ -12,7 +12,7 @@ type CustomTypeCreate struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config,omitempty"`
+	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
 }
 

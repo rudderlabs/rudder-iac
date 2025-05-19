@@ -74,16 +74,12 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 			RefToID:  MustString(propMap, "refToId"),
 		}
 		inst.ID = inst.RefToID.(string)
-
 		customTypeProperties[idx] = inst
 	}
 
 	args.Properties = customTypeProperties
 }
 
-// CatalogCustomType ->  state.CustomTypeArgs ->  ResourcesData ->  Syncer ->  Provider ( Create (ResourcesData) (CustomTypeArgs FromResourcesData )) [ ID ]
-
-// FromCatalogCustomType populates CustomTypeArgs from a localcatalog.CustomType
 func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) {
 	args.LocalID = from.LocalID
 	args.Name = from.Name
@@ -106,14 +102,15 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	itemTypes, ok := args.Config["itemTypes"]
 	if ok {
 
-		for idx, item := range itemTypes.([]string) {
-			if !localcatalog.CustomTypeRegex.Match([]byte(item)) {
+		for idx, item := range itemTypes.([]any) {
+
+			if !localcatalog.CustomTypeRegex.Match([]byte(item.(string))) {
 				continue
 			}
 
-			typesWithPropRef := make([]any, len(itemTypes.([]string)))
+			typesWithPropRef := make([]any, len(itemTypes.([]any)))
 			typesWithPropRef[idx] = resources.PropertyRef{
-				URN:      urnFromRef(item),
+				URN:      urnFromRef(item.(string)),
 				Property: "name",
 			}
 
@@ -123,4 +120,89 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	}
 
 	args.Properties = properties
+}
+
+type CustomTypeState struct {
+	CustomTypeArgs
+	ID              string
+	LocalID         string
+	Name            string
+	Description     string
+	Type            string
+	Config          map[string]any
+	Version         int
+	ItemDefinitions []string
+	Rules           map[string]any
+	WorkspaceID     string
+	CreatedAt       string
+	UpdatedAt       string
+	Properties      []*CustomTypePropertyState
+}
+
+type CustomTypePropertyState struct {
+	ID       string
+	Required bool
+}
+
+func (s *CustomTypeState) ToResourceData() resources.ResourceData {
+	properties := make([]map[string]interface{}, 0, len(s.Properties))
+	for _, property := range s.Properties {
+		properties = append(properties, map[string]any{
+			"id":       property.ID,
+			"required": property.Required,
+		})
+	}
+
+	return resources.ResourceData{
+		"id":              s.ID,
+		"localId":         s.LocalID,
+		"name":            s.Name,
+		"description":     s.Description,
+		"type":            s.Type,
+		"config":          s.Config,
+		"version":         s.Version,
+		"itemDefinitions": s.ItemDefinitions,
+		"rules":           s.Rules,
+		"workspaceId":     s.WorkspaceID,
+		"createdAt":       s.CreatedAt,
+		"updatedAt":       s.UpdatedAt,
+		"properties":      properties,
+		"customTypeArgs":  map[string]interface{}(s.CustomTypeArgs.ToResourceData()),
+	}
+}
+
+func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
+	s.ID = MustString(from, "id")
+	s.LocalID = MustString(from, "localId")
+	s.Name = MustString(from, "name")
+	s.Description = MustString(from, "description")
+	s.Type = MustString(from, "type")
+	s.Config = MapStringInterface(from, "config", make(map[string]any))
+	s.Version = MustInt(from, "version")
+	s.ItemDefinitions = MustStringSlice(from, "itemDefinitions")
+	s.Rules = MapStringInterface(from, "rules", make(map[string]any))
+	s.WorkspaceID = MustString(from, "workspaceId")
+	s.CreatedAt = MustString(from, "createdAt")
+	s.UpdatedAt = MustString(from, "updatedAt")
+
+	properties := InterfaceSlice(from, "properties", nil)
+	if len(properties) == 0 {
+		propertiesMap := MapStringInterfaceSlice(from, "properties", nil)
+		for _, prop := range propertiesMap {
+			properties = append(properties, prop)
+		}
+	}
+
+	s.Properties = make([]*CustomTypePropertyState, len(properties))
+	for idx, property := range properties {
+		property := property.(map[string]any)
+		s.Properties[idx] = &CustomTypePropertyState{
+			ID:       MustString(property, "id"),
+			Required: MustBool(property, "required"),
+		}
+	}
+
+	s.CustomTypeArgs.FromResourceData(
+		MustMapStringInterface(from, "customTypeArgs"),
+	)
 }

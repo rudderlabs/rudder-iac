@@ -146,7 +146,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	// Add properties to the graph
 	for group, props := range catalog.Properties {
 		for _, prop := range props {
-			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
+			log.Info("adding property to graph", "id", prop.LocalID, "group", group)
 
 			args := pstate.PropertyArgs{
 				Name:        prop.Name,
@@ -188,43 +188,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 			// Add CustomTypeArgs
 			args := pstate.CustomTypeArgs{}
 			args.FromCatalogCustomType(&customType, getURNFromRef)
-			// args := pstate.CustomTypeArgs{
-			// 	LocalID:     customType.LocalID,
-			// 	Name:        customType.Name,
-			// 	Description: customType.Description,
-			// 	Type:        customType.Type,
-			// 	Config:      customType.Config,
-			// }
-
-			// Handle property references for object type
-			// if customType.Type == "object" && len(customType.Properties) > 0 {
-			// 	args.FromCatalogCustomType(&customType, getURNFromRef)
-			// Add property dependencies
-			// 	for _, prop := range customType.Properties {
-			// 		if isPropertyRef(prop.Ref) {
-			// 			propURN := getURNFromRef(prop.Ref)
-			// 			if propURN != "" {
-			// 				dependencies = append(dependencies, propURN)
-			// 			}
-			// 		}
-			// 	}
-			// }
-
-			// Handle array type with itemTypes referencing custom types
-			// if customType.Type == "array" && customType.Config != nil {
-			// 	if itemTypes, ok := customType.Config["itemTypes"].([]interface{}); ok {
-			// 		for _, itemType := range itemTypes {
-			// 			if refStr, ok := itemType.(string); ok && isCustomTypeRef(refStr) {
-			// 				refURN := getURNFromRef(refStr)
-			// 				if refURN != "" {
-			// 					dependencies = append(dependencies, refURN)
-			// 				}
-			// 			}
-			// 		}
-			// 	}
-			// }
-
-			resource := resources.NewResource(customType.LocalID, provider.CustomTypeResourceType, args.ToResourceData(), nil)
+			resource := resources.NewResource(customType.LocalID, provider.CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 		}
 	}
@@ -242,15 +206,6 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	}
 
 	return graph
-}
-
-// Helper functions for reference checking
-func isCustomTypeRef(ref string) bool {
-	return strings.HasPrefix(ref, "#/custom-types/")
-}
-
-func isPropertyRef(ref string) bool {
-	return strings.HasPrefix(ref, "#/properties/")
 }
 
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
