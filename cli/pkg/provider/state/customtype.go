@@ -178,7 +178,7 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.Description = MustString(from, "description")
 	s.Type = MustString(from, "type")
 	s.Config = MapStringInterface(from, "config", make(map[string]any))
-	s.Version = MustInt(from, "version")
+	s.Version = int(MustFloat64(from, "version"))
 	s.ItemDefinitions = MustStringSlice(from, "itemDefinitions")
 	s.Rules = MapStringInterface(from, "rules", make(map[string]any))
 	s.WorkspaceID = MustString(from, "workspaceId")

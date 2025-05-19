@@ -15,6 +15,7 @@ alwaysApply: false
 - Use meaningful variable and function names
 - Document public functions and packages with comments
 - Use `any` instead of `interface{}`
+- When writing comments for the changes, you should always comment on the `why` and `not the what`
 
 ## Error Handling
 
