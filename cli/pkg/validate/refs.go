@@ -82,7 +82,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
 					errs = append(errs, ValidationError{
 						Reference: reference,
-						error:     fmt.Errorf("custom type reference '%s' not found in catalog", prop.Type),
+						error:     fmt.Errorf("custom type reference '%s' not found in catalog. Make sure the custom type exists before using it in a property", prop.Type),
 					})
 				}
 			}
