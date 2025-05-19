@@ -146,7 +146,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	// Add properties to the graph
 	for group, props := range catalog.Properties {
 		for _, prop := range props {
-			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
+			log.Info("adding property to graph", "id", prop.LocalID, "group", group)
 
 			args := pstate.PropertyArgs{
 				Name:        prop.Name,
@@ -206,15 +206,6 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	}
 
 	return graph
-}
-
-// Helper functions for reference checking
-func isCustomTypeRef(ref string) bool {
-	return strings.HasPrefix(ref, "#/custom-types/")
-}
-
-func isPropertyRef(ref string) bool {
-	return strings.HasPrefix(ref, "#/properties/")
 }
 
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
