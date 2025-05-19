@@ -2,7 +2,6 @@ package state
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -95,7 +94,6 @@ func DecodeResourceState(res *ResourceState) *ResourceState {
 }
 
 func decodeReferences(data map[string]interface{}) map[string]interface{} {
-	fmt.Printf("%#v\n", data)
 
 	result := make(map[string]interface{})
 
