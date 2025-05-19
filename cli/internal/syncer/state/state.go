@@ -105,6 +105,18 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 			result[i] = dereferenced
 		}
 		return result, nil
+
+	case []map[string]interface{}:
+		result := make([]map[string]interface{}, len(val))
+		for i, v := range val {
+			deferenced, err := dereferenceValue(v, state)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = deferenced.(map[string]interface{})
+		}
+		return result, nil
+
 	default:
 		return v, nil
 	}
