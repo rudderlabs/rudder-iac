@@ -46,11 +46,28 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 				"$ref":     val.URN,
 				"property": val.Property,
 			}
+
+		case []map[string]interface{}:
+			newArray := make([]map[string]interface{}, len(val))
+			for i, item := range val {
+				newArray[i] = encodeReferences(item)
+			}
+			result[k] = newArray
+
 		case map[string]interface{}:
 			result[k] = encodeReferences(val)
+
 		case []interface{}:
 			newArray := make([]interface{}, len(val))
 			for i, item := range val {
+
+				if m, ok := item.(resources.PropertyRef); ok {
+					newArray[i] = map[string]interface{}{
+						"$ref":     m.URN,
+						"property": m.Property,
+					}
+					continue
+				}
 				if m, ok := item.(map[string]interface{}); ok {
 					newArray[i] = encodeReferences(m)
 				} else {
@@ -77,6 +94,7 @@ func DecodeResourceState(res *ResourceState) *ResourceState {
 }
 
 func decodeReferences(data map[string]interface{}) map[string]interface{} {
+
 	result := make(map[string]interface{})
 
 	for k, v := range data {
@@ -90,11 +108,27 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 			} else {
 				result[k] = decodeReferences(val)
 			}
+
+		case []map[string]interface{}:
+			newMap := make([]map[string]interface{}, len(val))
+			for i, item := range val {
+				newMap[i] = decodeReferences(item)
+			}
+
+			result[k] = newMap
+
 		case []interface{}:
 			newArray := make([]interface{}, len(val))
 			for i, item := range val {
 				if m, ok := item.(map[string]interface{}); ok {
-					newArray[i] = decodeReferences(m)
+					if isReference(m) {
+						newArray[i] = resources.PropertyRef{
+							URN:      m["$ref"].(string),
+							Property: m["property"].(string),
+						}
+					} else {
+						newArray[i] = decodeReferences(m)
+					}
 				} else {
 					newArray[i] = item
 				}
@@ -114,5 +148,7 @@ func isReference(v interface{}) bool {
 		return false
 	}
 	_, hasRef := m["$ref"]
-	return hasRef
+	_, hasProperty := m["property"]
+
+	return hasRef && hasProperty
 }

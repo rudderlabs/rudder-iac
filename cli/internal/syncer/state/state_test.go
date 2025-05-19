@@ -103,6 +103,26 @@ func TestDereference(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "nested property reference in array of maps defined through map[string]interface{}",
+			input: resources.ResourceData{
+				"sourceName": []map[string]interface{}{
+					{
+						"nested": resources.PropertyRef{
+							URN:      resources.URN("source1", "source"),
+							Property: "name",
+						},
+					},
+				},
+			},
+			expected: resources.ResourceData{
+				"sourceName": []map[string]interface{}{
+					{
+						"nested": "test source",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

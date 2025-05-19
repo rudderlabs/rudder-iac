@@ -212,6 +212,65 @@ func TestEncodeDecodeResourceState(t *testing.T) {
 				Output: map[string]interface{}{},
 			},
 		},
+		{
+			name: "with advanced nested structures",
+			resource: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"nested": []map[string]interface{}{
+						{
+							"ref": resources.PropertyRef{
+								URN:      "test:dep1",
+								Property: "id",
+							},
+						},
+						{
+							"ref": resources.PropertyRef{
+								URN:      "test:dep2",
+								Property: "id",
+							},
+						},
+					},
+					"array": []interface{}{
+						resources.PropertyRef{
+							URN:      "test:dep3",
+							Property: "name",
+						},
+						"simple-value",
+					},
+				},
+				Output: map[string]interface{}{},
+			},
+			expectedEncoded: &ResourceState{
+				ID:   "123",
+				Type: "test",
+				Input: map[string]interface{}{
+					"nested": []map[string]interface{}{
+						{
+							"ref": map[string]interface{}{
+								"$ref":     "test:dep1",
+								"property": "id",
+							},
+						},
+						{
+							"ref": map[string]interface{}{
+								"$ref":     "test:dep2",
+								"property": "id",
+							},
+						},
+					},
+					"array": []interface{}{
+						map[string]interface{}{
+							"$ref":     "test:dep3",
+							"property": "name",
+						},
+						"simple-value",
+					},
+				},
+				Output: map[string]interface{}{},
+			},
+		},
 	}
 
 	for _, tt := range tests {

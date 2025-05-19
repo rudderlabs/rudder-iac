@@ -9,6 +9,10 @@ func CollectReferences(v interface{}) []*PropertyRef {
 	var refs []*PropertyRef
 
 	switch v := v.(type) {
+	case []map[string]interface{}:
+		for _, vv := range v {
+			refs = append(refs, CollectReferences(vv)...)
+		}
 	case map[string]interface{}:
 		for _, vv := range v {
 			refs = append(refs, CollectReferences(vv)...)

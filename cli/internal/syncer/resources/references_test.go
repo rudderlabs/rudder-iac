@@ -112,6 +112,33 @@ func TestCollectReferences(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "array of maps with references",
+			input: []map[string]interface{}{
+				{
+					"ref1": &resources.PropertyRef{
+						URN:      "test:urn1",
+						Property: "prop1",
+					},
+				},
+				{
+					"ref2": &resources.PropertyRef{
+						URN:      "test:urn2",
+						Property: "prop2",
+					},
+				},
+			},
+			expected: []*resources.PropertyRef{
+				{
+					URN:      "test:urn1",
+					Property: "prop1",
+				},
+				{
+					URN:      "test:urn2",
+					Property: "prop2",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
