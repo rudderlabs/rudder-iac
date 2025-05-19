@@ -47,6 +47,7 @@ func NewCatalogProvider(dc catalog.DataCatalog) syncer.Provider {
 			PropertyResourceType:     NewPropertyProvider(dc),
 			EventResourceType:        NewEventProvider(dc),
 			TrackingPlanResourceType: NewTrackingPlanProvider(dc),
+			CustomTypeResourceType:   NewCustomTypeProvider(dc),
 		},
 	}
 }

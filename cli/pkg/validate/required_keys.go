@@ -128,7 +128,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Check if config is present
-			if customType.Config == nil {
+			if customType.Config == nil && customType.Type != "object" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("config field is mandatory on custom type"),
 					Reference: reference,
@@ -368,9 +368,12 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 }
 
 func isNumber(val any) bool {
+
 	switch val.(type) {
-	case int, int32, int64:
+	case int, int32, int64, float32, float64:
 		return true
+	default:
+		fmt.Printf("value is of type: %T\n", val)
 	}
 
 	return false
