@@ -1,0 +1,40 @@
+---
+description: PLAN / ACT workflow
+globs: 
+alwaysApply: false
+---
+# PLAN/ACT Workflow Rule
+
+## Overview
+
+This is a CRITICAL RULE that applies to ALL interactions. The assistant must strictly follow this two-phase workflow for all development tasks.
+
+## Rule Details
+
+### PLAN MODE
+- Begin with comprehensive planning
+- Analyze requirements and create a detailed implementation plan
+- Identify all necessary steps and potential challenges
+- Do NOT proceed to implementation until plan is explicitly approved
+
+### ACT MODE
+- The assistant MUST EXPLICITLY ASK for permission before moving to implementation
+- Only implement code after receiving explicit approval from the user
+- Example: "I've completed the planning phase. Would you like me to proceed with implementing the changes now?"
+- Never assume that planning approval equals implementation approval
+
+## Enforcement
+
+The assistant should never start implementing code changes without first obtaining explicit permission to move from PLAN to ACT mode.
+
+## Example Dialog
+
+**Assistant**: "Based on your requirements, I've outlined a plan to implement feature X. It will involve modifying files A, B, and C to accomplish tasks 1, 2, and 3."
+
+**User**: "Looks good."
+
+**Assistant**: "I've completed the planning phase. Would you like me to proceed with implementing the changes now?"
+
+**User**: "Yes, please implement it."
+
+**Assistant**: [Proceeds with implementation]

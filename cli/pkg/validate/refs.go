@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"strings"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
@@ -17,6 +18,8 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	log.Info("validating references lookup in entities in the catalog")
 
 	errs := make([]ValidationError, 0)
+
+	// Validate tracking plan references
 	for _, tp := range dc.TrackingPlans {
 		for _, rule := range tp.Rules {
 			errs = append(
@@ -25,6 +28,67 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 			)
 		}
 	}
+
+	// Validate custom type references
+	for group, customTypes := range dc.CustomTypes {
+		for _, customType := range customTypes {
+			// Only object types with properties need validation
+			if customType.Type == "object" && len(customType.Properties) > 0 {
+				reference := fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID)
+
+				for i, prop := range customType.Properties {
+
+					// Validate property reference format
+					matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
+					if len(matches) != 3 {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("property reference at index %d has invalid format. Should be '#/properties/<group>/<id>'", i),
+						})
+						continue
+					}
+
+					// Validate property existence
+					groupName, propID := matches[1], matches[2]
+					if property := dc.Property(groupName, propID); property == nil {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("property reference '%s' at index %d not found in catalog", prop.Ref, i),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// Validate property type custom type references
+	for group, props := range dc.Properties {
+		for _, prop := range props {
+			reference := fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID)
+
+			// Check if the type field contains a custom type reference
+			if strings.HasPrefix(prop.Type, "#/custom-types/") {
+				matches := catalog.CustomTypeRegex.FindStringSubmatch(prop.Type)
+				if len(matches) != 3 {
+					errs = append(errs, ValidationError{
+						Reference: reference,
+						error:     fmt.Errorf("custom type reference in type field has invalid format. Should be '#/custom-types/<group>/<id>'"),
+					})
+					continue
+				}
+
+				// Validate custom type existence
+				customTypeGroup, customTypeID := matches[1], matches[2]
+				if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
+					errs = append(errs, ValidationError{
+						Reference: reference,
+						error:     fmt.Errorf("custom type reference '%s' not found in catalog", prop.Type),
+					})
+				}
+			}
+		}
+	}
+
 	return errs
 }
 
