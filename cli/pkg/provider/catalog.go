@@ -15,6 +15,7 @@ const (
 	PropertyResourceType     = "property"
 	EventResourceType        = "event"
 	TrackingPlanResourceType = "tracking-plan"
+	CustomTypeResourceType   = "custom-type"
 )
 
 var (
@@ -25,6 +26,7 @@ var resourceTypeCollection = map[string]catalog.ResourceCollection{
 	PropertyResourceType:     catalog.ResourceCollectionProperties,
 	EventResourceType:        catalog.ResourceCollectionEvents,
 	TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
+	CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
 }
 
 type CatalogProvider struct {
@@ -45,6 +47,7 @@ func NewCatalogProvider(dc catalog.DataCatalog) syncer.Provider {
 			PropertyResourceType:     NewPropertyProvider(dc),
 			EventResourceType:        NewEventProvider(dc),
 			TrackingPlanResourceType: NewTrackingPlanProvider(dc),
+			CustomTypeResourceType:   NewCustomTypeProvider(dc),
 		},
 	}
 }

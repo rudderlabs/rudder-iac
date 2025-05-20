@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -97,7 +98,52 @@ func NewCmdTPApply() *cobra.Command {
 func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	graph := resources.NewGraph()
 
+	// First, pre-calculate all URNs to use for references
 	propIDToURN := make(map[string]string)
+	for _, props := range catalog.Properties {
+		for _, prop := range props {
+			propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, provider.PropertyResourceType)
+		}
+	}
+
+	eventIDToURN := make(map[string]string)
+	for _, events := range catalog.Events {
+		for _, event := range events {
+			eventIDToURN[event.LocalID] = resources.URN(event.LocalID, provider.EventResourceType)
+		}
+	}
+
+	customTypeIDToURN := make(map[string]string)
+	for _, customTypes := range catalog.CustomTypes {
+		for _, customType := range customTypes {
+			customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, provider.CustomTypeResourceType)
+		}
+	}
+
+	// Helper function to get URN from reference
+	getURNFromRef := func(ref string) string {
+		// Format: #/entities/group/id
+		parts := strings.Split(ref, "/")
+		if len(parts) < 4 {
+			return ""
+		}
+
+		var (
+			entityType = parts[1]
+			id         = parts[3]
+		)
+
+		switch entityType {
+		case "properties":
+			return propIDToURN[id]
+		case "custom-types":
+			return customTypeIDToURN[id]
+		default:
+			return ""
+		}
+	}
+
+	// Add properties to the graph
 	for group, props := range catalog.Properties {
 		for _, prop := range props {
 			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
@@ -116,7 +162,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		}
 	}
 
-	eventIDToURN := make(map[string]string)
+	// Add events to the graph
 	for group, events := range catalog.Events {
 		for _, event := range events {
 			log.Debug("adding event under group to graph", "event", event.LocalID, "group", group)
@@ -134,6 +180,20 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		}
 	}
 
+	// Add custom types to the graph with dependencies on properties or other custom types
+	for group, customTypes := range catalog.CustomTypes {
+		for _, customType := range customTypes {
+			log.Debug("adding custom type to graph", "id", customType.LocalID, "group", group)
+
+			// Add CustomTypeArgs
+			args := pstate.CustomTypeArgs{}
+			args.FromCatalogCustomType(&customType, getURNFromRef)
+			resource := resources.NewResource(customType.LocalID, provider.CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
+			graph.AddResource(resource)
+		}
+	}
+
+	// Add tracking plans to the graph
 	for group, tp := range catalog.TrackingPlans {
 		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
 
