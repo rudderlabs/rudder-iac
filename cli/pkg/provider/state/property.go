@@ -7,7 +7,7 @@ import (
 type PropertyArgs struct {
 	Name        string
 	Description string
-	Type        string
+	Type        any
 	Config      map[string]interface{}
 }
 

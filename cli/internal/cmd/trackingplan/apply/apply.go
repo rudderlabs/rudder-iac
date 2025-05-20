@@ -155,6 +155,20 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 				Config:      prop.Config,
 			}
 
+			if strings.HasPrefix(prop.Type, "#/custom-types/") {
+				customTypeURN := getURNFromRef(prop.Type)
+
+				if customTypeURN != "" {
+					log.Debug("property references custom type", "property", prop.LocalID, "customTypeRef", prop.Type, "customTypeURN", customTypeURN)
+					args.Type = resources.PropertyRef{
+						URN:      customTypeURN,
+						Property: "name",
+					}
+				} else {
+					log.Error("could not resolve custom type reference urn", "property", prop.LocalID, "type", prop.Type)
+				}
+			}
+
 			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
