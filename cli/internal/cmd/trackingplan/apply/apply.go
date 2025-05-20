@@ -146,7 +146,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	// Add properties to the graph
 	for group, props := range catalog.Properties {
 		for _, prop := range props {
-			log.Info("adding property to graph", "id", prop.LocalID, "group", group)
+			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
 
 			args := pstate.PropertyArgs{
 				Name:        prop.Name,

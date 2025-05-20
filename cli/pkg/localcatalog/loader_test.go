@@ -257,17 +257,10 @@ func TestExtractCatalogEntity(t *testing.T) {
               description: "Custom type for user address information"
               type: "object"
               properties: [
-<<<<<<< HEAD
                 { $ref: "#/properties/address/street", required: true },
                 { $ref: "#/properties/address/city", required: true },
                 { $ref: "#/properties/address/state", required: false },
                 { $ref: "#/properties/address/zip", required: true }
-=======
-                { id: "street", required: true },
-                { id: "city", required: true },
-                { id: "state", required: false },
-                { id: "zip", required: true }
->>>>>>> 2ebb769 (chore: add support for custom types in loader module)
               ]
         `)
 
