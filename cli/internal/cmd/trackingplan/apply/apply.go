@@ -73,9 +73,14 @@ func NewCmdTPApply() *cobra.Command {
 				return err
 			}
 
+			graph, err := createResourceGraph(localcatalog)
+			if err != nil {
+				return err
+			}
+
 			err = s.Sync(
 				context.Background(),
-				createResourceGraph(localcatalog),
+				graph,
 				syncer.SyncOptions{
 					DryRun:  dryRun,
 					Confirm: confirm,
@@ -95,7 +100,7 @@ func NewCmdTPApply() *cobra.Command {
 	return cmd
 }
 
-func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
+func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
 	graph := resources.NewGraph()
 
 	// First, pre-calculate all URNs to use for references
@@ -148,25 +153,9 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		for _, prop := range props {
 			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
 
-			args := pstate.PropertyArgs{
-				Name:        prop.Name,
-				Description: prop.Description,
-				Type:        prop.Type,
-				Config:      prop.Config,
-			}
-
-			if strings.HasPrefix(prop.Type, "#/custom-types/") {
-				customTypeURN := getURNFromRef(prop.Type)
-
-				if customTypeURN != "" {
-					log.Debug("property references custom type", "property", prop.LocalID, "customTypeRef", prop.Type, "customTypeURN", customTypeURN)
-					args.Type = resources.PropertyRef{
-						URN:      customTypeURN,
-						Property: "name",
-					}
-				} else {
-					log.Error("could not resolve custom type reference urn", "property", prop.LocalID, "type", prop.Type)
-				}
+			args := &pstate.PropertyArgs{}
+			if err := args.FromCatalogPropertyType(prop, getURNFromRef); err != nil {
+				return nil, fmt.Errorf("creating property args from catalog property: %s, err:%w", prop.LocalID, err)
 			}
 
 			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
@@ -179,7 +168,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 	// Add events to the graph
 	for group, events := range catalog.Events {
 		for _, event := range events {
-			log.Debug("adding event under group to graph", "event", event.LocalID, "group", group)
+			log.Debug("adding event to graph", "event", event.LocalID, "group", group)
 
 			args := pstate.EventArgs{
 				Name:        event.Name,
@@ -219,7 +208,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) *resources.Graph {
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}
 
-	return graph
+	return graph, nil
 }
 
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's

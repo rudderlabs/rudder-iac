@@ -45,6 +45,40 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 					Reference: reference,
 				})
 			}
+
+			// Validate array type properties with custom type references in itemTypes
+			if prop.Type == "array" && prop.Config != nil {
+				if itemTypes, ok := prop.Config["itemTypes"]; ok {
+					itemTypesArray, ok := itemTypes.([]any)
+					if !ok {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("itemTypes must be an array"),
+							Reference: reference,
+						})
+						continue
+					}
+
+					for idx, itemType := range itemTypesArray {
+						val, ok := itemType.(string)
+						if !ok {
+							errors = append(errors, ValidationError{
+								error:     fmt.Errorf("itemTypes at idx: %d must be string value", idx),
+								Reference: reference,
+							})
+							continue
+						}
+
+						if catalog.CustomTypeRegex.Match([]byte(val)) {
+							if len(itemTypesArray) != 1 {
+								errors = append(errors, ValidationError{
+									error:     fmt.Errorf("itemTypes containing custom type at idx: %d cannot be paired with other types", idx),
+									Reference: reference,
+								})
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
