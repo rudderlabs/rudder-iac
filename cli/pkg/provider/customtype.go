@@ -27,8 +27,6 @@ func NewCustomTypeProvider(dc catalog.DataCatalog) *CustomTypeProvider {
 func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("creating custom type in upstream catalog", "id", ID)
 
-	p.log.Info(fmt.Sprintf("%#v\n", data))
-
 	toArgs := state.CustomTypeArgs{}
 	toArgs.FromResourceData(data)
 
@@ -67,14 +65,6 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		WorkspaceID:     customType.WorkspaceId,
 		CreatedAt:       customType.CreatedAt.String(),
 		UpdatedAt:       customType.UpdatedAt.String(),
-		Properties:      make([]*state.CustomTypePropertyState, 0, len(customType.Properties)),
-	}
-
-	for _, prop := range toArgs.Properties {
-		customTypeState.Properties = append(customTypeState.Properties, &state.CustomTypePropertyState{
-			ID:       prop.ID,
-			Required: prop.Required,
-		})
 	}
 
 	resourceData := customTypeState.ToResourceData()
@@ -124,14 +114,6 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		WorkspaceID:     updated.WorkspaceId,
 		CreatedAt:       updated.CreatedAt.String(),
 		UpdatedAt:       updated.UpdatedAt.String(),
-		Properties:      make([]*state.CustomTypePropertyState, 0, len(updated.Properties)),
-	}
-
-	for _, prop := range toArgs.Properties {
-		toState.Properties = append(toState.Properties, &state.CustomTypePropertyState{
-			ID:       prop.ID,
-			Required: prop.Required,
-		})
 	}
 
 	resourceData := toState.ToResourceData()

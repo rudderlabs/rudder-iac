@@ -136,7 +136,6 @@ type CustomTypeState struct {
 	WorkspaceID     string
 	CreatedAt       string
 	UpdatedAt       string
-	Properties      []*CustomTypePropertyState
 }
 
 type CustomTypePropertyState struct {
@@ -145,13 +144,6 @@ type CustomTypePropertyState struct {
 }
 
 func (s *CustomTypeState) ToResourceData() resources.ResourceData {
-	properties := make([]map[string]interface{}, 0, len(s.Properties))
-	for _, property := range s.Properties {
-		properties = append(properties, map[string]any{
-			"id":       property.ID,
-			"required": property.Required,
-		})
-	}
 
 	return resources.ResourceData{
 		"id":              s.ID,
@@ -166,7 +158,6 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 		"workspaceId":     s.WorkspaceID,
 		"createdAt":       s.CreatedAt,
 		"updatedAt":       s.UpdatedAt,
-		"properties":      properties,
 		"customTypeArgs":  map[string]interface{}(s.CustomTypeArgs.ToResourceData()),
 	}
 }
@@ -184,23 +175,6 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.WorkspaceID = MustString(from, "workspaceId")
 	s.CreatedAt = MustString(from, "createdAt")
 	s.UpdatedAt = MustString(from, "updatedAt")
-
-	properties := InterfaceSlice(from, "properties", nil)
-	if len(properties) == 0 {
-		propertiesMap := MapStringInterfaceSlice(from, "properties", nil)
-		for _, prop := range propertiesMap {
-			properties = append(properties, prop)
-		}
-	}
-
-	s.Properties = make([]*CustomTypePropertyState, len(properties))
-	for idx, property := range properties {
-		property := property.(map[string]any)
-		s.Properties[idx] = &CustomTypePropertyState{
-			ID:       MustString(property, "id"),
-			Required: MustBool(property, "required"),
-		}
-	}
 
 	s.CustomTypeArgs.FromResourceData(
 		MustMapStringInterface(from, "customTypeArgs"),
