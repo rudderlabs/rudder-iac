@@ -201,7 +201,9 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
 
 		args := pstate.TrackingPlanArgs{}
-		args.FromCatalogTrackingPlan(tp)
+		if err := args.FromCatalogTrackingPlan(tp, getURNFromRef); err != nil {
+			return nil, fmt.Errorf("creating tracking plan args: %w", err)
+		}
 
 		resource := resources.NewResource(tp.LocalID, provider.TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
 		graph.AddResource(resource)
