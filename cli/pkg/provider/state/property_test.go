@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,6 +61,127 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 		assert.Equal(t, argsWithoutConfig, loopback)
 	})
 
+}
+
+func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
+	t.Run("standard property", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.Property{
+			LocalID:     "test-prop",
+			Name:        "Test Property",
+			Description: "A test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": 5,
+				"maxLength": 10,
+			},
+		}
+
+		urnFromRef := func(string) string {
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+		assert.Equal(t, "Test Property", args.Name)
+		assert.Equal(t, "A test property", args.Description)
+		assert.Equal(t, "string", args.Type)
+		assert.Equal(t, prop.Config, args.Config)
+	})
+
+	t.Run("custom type reference in type field", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.Property{
+			LocalID:     "test-email",
+			Name:        "Test Email",
+			Description: "A test email property",
+			Type:        "#/custom-types/email-types/EmailType",
+			Config:      map[string]interface{}{},
+		}
+
+		urnFromRef := func(ref string) string {
+			if ref == "#/custom-types/email-types/EmailType" {
+				return "custom-type:EmailType"
+			}
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+		assert.Equal(t, "Test Email", args.Name)
+		assert.Equal(t, "A test email property", args.Description)
+
+		// Check that the type field is correctly converted to a PropertyRef
+		propRef, ok := args.Type.(resources.PropertyRef)
+		assert.True(t, ok, "Type should be a PropertyRef")
+		assert.Equal(t, "custom-type:EmailType", propRef.URN)
+		assert.Equal(t, "name", propRef.Property)
+	})
+
+	t.Run("custom type reference in itemTypes", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.Property{
+			LocalID:     "test-email-list",
+			Name:        "Test Email List",
+			Description: "A list of emails",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"itemTypes": []interface{}{"#/custom-types/email-types/EmailType"},
+			},
+		}
+
+		urnFromRef := func(ref string) string {
+			if ref == "#/custom-types/email-types/EmailType" {
+				return "custom-type:EmailType"
+			}
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+		assert.Equal(t, "Test Email List", args.Name)
+		assert.Equal(t, "A list of emails", args.Description)
+		assert.Equal(t, "array", args.Type)
+
+		// Check that the itemTypes field is correctly converted to contain a PropertyRef
+		itemTypes, ok := args.Config["itemTypes"].([]interface{})
+		assert.True(t, ok, "itemTypes should be an array")
+		assert.Len(t, itemTypes, 1)
+
+		propRef, ok := itemTypes[0].(resources.PropertyRef)
+		assert.True(t, ok, "itemTypes[0] should be a PropertyRef")
+		assert.Equal(t, "custom-type:EmailType", propRef.URN)
+		assert.Equal(t, "name", propRef.Property)
+	})
+
+	t.Run("itemTypes reference resolution error", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.Property{
+			LocalID:     "test-email-list",
+			Name:        "Test Email List",
+			Description: "A list of emails",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"itemTypes": []interface{}{"#/custom-types/email-types/NonExistentType"},
+			},
+		}
+
+		urnFromRef := func(ref string) string {
+			return "" // No URN found
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to resolve ref to the custom type urn")
+	})
 }
 
 func TestPropertyState_ResourceData(t *testing.T) {
