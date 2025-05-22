@@ -7,6 +7,7 @@ import (
 )
 
 const LatestVersion = "1.0.0"
+const RUDDER_REF = "$__rudderRef"
 
 func ToJSON(state *State) (json.RawMessage, error) {
 	// Create a copy of state to avoid modifying the original
@@ -43,7 +44,7 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 		switch val := v.(type) {
 		case resources.PropertyRef:
 			result[k] = map[string]interface{}{
-				"$ref":     val.URN,
+				RUDDER_REF: val.URN,
 				"property": val.Property,
 			}
 
@@ -63,7 +64,7 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 
 				if m, ok := item.(resources.PropertyRef); ok {
 					newArray[i] = map[string]interface{}{
-						"$ref":     m.URN,
+						RUDDER_REF: m.URN,
 						"property": m.Property,
 					}
 					continue
@@ -102,7 +103,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 		case map[string]interface{}:
 			if isReference(val) {
 				result[k] = resources.PropertyRef{
-					URN:      val["$ref"].(string),
+					URN:      val[RUDDER_REF].(string),
 					Property: val["property"].(string),
 				}
 			} else {
@@ -123,7 +124,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 				if m, ok := item.(map[string]interface{}); ok {
 					if isReference(m) {
 						newArray[i] = resources.PropertyRef{
-							URN:      m["$ref"].(string),
+							URN:      m[RUDDER_REF].(string),
 							Property: m["property"].(string),
 						}
 					} else {
@@ -147,7 +148,7 @@ func isReference(v interface{}) bool {
 	if !ok {
 		return false
 	}
-	_, hasRef := m["$ref"]
+	_, hasRef := m[RUDDER_REF]
 	_, hasProperty := m["property"]
 
 	return hasRef && hasProperty
