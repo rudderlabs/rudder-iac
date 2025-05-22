@@ -46,6 +46,16 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
+			if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
+				if prop.Config != nil {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+						Reference: reference,
+					})
+				}
+
+			}
+
 			// Validate array type properties with custom type references in itemTypes
 			if prop.Type == "array" && prop.Config != nil {
 				if itemTypes, ok := prop.Config["itemTypes"]; ok {
