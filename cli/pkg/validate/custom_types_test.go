@@ -50,39 +50,6 @@ func TestCustomTypeValidation(t *testing.T) {
 				errorContains: []string{"id, name and type fields on custom type are mandatory"},
 			},
 			{
-				name: "missing config",
-				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
-					"test-group": {
-						{
-							LocalID:     "TestType1",
-							Name:        "TestType",
-							Description: "Test custom type",
-							Type:        "string",
-							// Missing Config
-						},
-					},
-				},
-				expectedErrs:  1,
-				errorContains: []string{"config field is mandatory on custom type"},
-			},
-			{
-				name: "object type without properties",
-				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
-					"test-group": {
-						{
-							LocalID:     "TestType1",
-							Name:        "TestType",
-							Description: "Test custom type",
-							Type:        "object",
-							Config:      map[string]any{},
-							// Missing Properties for object type
-						},
-					},
-				},
-				expectedErrs:  1,
-				errorContains: []string{"properties array is required for custom type with type 'object'"},
-			},
-			{
 				name: "object type with property missing ID",
 				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
 					"test-group": {

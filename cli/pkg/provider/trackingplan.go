@@ -55,7 +55,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		lastupserted, err := p.client.UpsertTrackingPlan(
 			ctx,
 			created.ID,
-			getUpsertEvent(event),
+			GetUpsertEvent(event),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
@@ -116,8 +116,6 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 
 	diff := prevState.Diff(toArgs)
 
-	// diff := p.Diff(&toArgs, &prevState.TrackingPlanArgs)
-
 	var deletedEvents []string
 	for _, event := range diff.Deleted {
 
@@ -139,7 +137,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		updated, err = p.client.UpsertTrackingPlan(
 			ctx,
 			prevState.ID,
-			getUpsertEvent(event),
+			GetUpsertEvent(event),
 		)
 
 		if err != nil {
@@ -157,7 +155,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		updated, err = p.client.UpsertTrackingPlan(
 			ctx,
 			prevState.ID,
-			getUpsertEvent(event),
+			GetUpsertEvent(event),
 		)
 
 		if err != nil {
@@ -216,7 +214,7 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 	return nil
 }
 
-func getUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpsertEvent {
+func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpsertEvent {
 	// Get the properties in correct shape before we can
 	// send it to the catalog
 	var (
@@ -230,30 +228,48 @@ func getUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 		identitySection = PropertiesIdentity
 	}
 
-	// Only for simple types
 	for _, prop := range from.Properties {
+		propMap := make(map[string]any)
 
-		typ := lo.Map(strings.Split(prop.Type, ","), func(t string, _ int) string {
-			return strings.TrimSpace(t)
-		})
+		// Handle Type field based on HasCustomTypeRef flag
+		if prop.HasCustomTypeRef {
+			// This is a custom type reference, use $ref format
+			// The Type has been dereferenced by the syncer to the actual name
+			typValue := fmt.Sprint(prop.Type)
+			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", typValue)
+		} else {
+			// Regular type handling
+			typValue, ok := prop.Type.(string)
+			if !ok {
+				// If not a string but something else, convert to string
+				typValue = fmt.Sprint(prop.Type)
+			}
 
-		propLookup[prop.Name] = map[string]interface{}{
-			"type": typ,
+			typ := lo.Map(strings.Split(typValue, ","), func(t string, _ int) string {
+				return strings.TrimSpace(t)
+			})
+			propMap["type"] = typ
 		}
 
 		for k, v := range prop.Config {
+			if k == "itemTypes" && prop.HasItemTypesRef {
+				refValue := v.([]any)[0].(string)
 
-			if k == "itemTypes" {
-				propLookup[prop.Name].(map[string]interface{})["items"] = map[string]interface{}{
+				propMap["items"] = map[string]any{
+					"$ref": fmt.Sprintf("#/$defs/%s", refValue),
+				}
+			} else if k == "itemTypes" {
+				propMap["items"] = map[string]interface{}{
 					"type": v,
 				}
 			} else {
-				propLookup[prop.Name].(map[string]interface{})[k] = v
+				// Other config fields
+				propMap[k] = v
 			}
-
 		}
 
-		// keep on updating the required properties
+		propLookup[prop.Name] = propMap
+
 		if prop.Required {
 			requiredProps = append(requiredProps, prop.Name)
 		}
