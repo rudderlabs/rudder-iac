@@ -43,8 +43,8 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 		switch val := v.(type) {
 		case resources.PropertyRef:
 			result[k] = map[string]interface{}{
-				"$ref":     val.URN,
-				"property": val.Property,
+				"$__rudderRef": val.URN,
+				"property":     val.Property,
 			}
 
 		case []map[string]interface{}:
@@ -63,8 +63,8 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 
 				if m, ok := item.(resources.PropertyRef); ok {
 					newArray[i] = map[string]interface{}{
-						"$ref":     m.URN,
-						"property": m.Property,
+						"$__rudderRef": m.URN,
+						"property":     m.Property,
 					}
 					continue
 				}
@@ -102,7 +102,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 		case map[string]interface{}:
 			if isReference(val) {
 				result[k] = resources.PropertyRef{
-					URN:      val["$ref"].(string),
+					URN:      val["$__rudderRef"].(string),
 					Property: val["property"].(string),
 				}
 			} else {
@@ -123,7 +123,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 				if m, ok := item.(map[string]interface{}); ok {
 					if isReference(m) {
 						newArray[i] = resources.PropertyRef{
-							URN:      m["$ref"].(string),
+							URN:      m["$__rudderRef"].(string),
 							Property: m["property"].(string),
 						}
 					} else {
@@ -147,7 +147,7 @@ func isReference(v interface{}) bool {
 	if !ok {
 		return false
 	}
-	_, hasRef := m["$ref"]
+	_, hasRef := m["$__rudderRef"]
 	_, hasProperty := m["property"]
 
 	return hasRef && hasProperty

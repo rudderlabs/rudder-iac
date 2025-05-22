@@ -58,7 +58,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$ref":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$__rudderRef":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
 		},
 		{
 			name: "with nested structures",
@@ -88,7 +88,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$ref":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$ref":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$__rudderRef":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$__rudderRef":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
 		},
 	}
 
@@ -158,8 +158,8 @@ func TestEncodeDecodeResourceState(t *testing.T) {
 				Type: "test",
 				Input: map[string]interface{}{
 					"ref": map[string]interface{}{
-						"$ref":     "test:dep1",
-						"property": "id",
+							"$__rudderRef": "test:dep1",
+						"property":     "id",
 					},
 				},
 				Output: map[string]interface{}{},
@@ -195,15 +195,15 @@ func TestEncodeDecodeResourceState(t *testing.T) {
 				Input: map[string]interface{}{
 					"nested": map[string]interface{}{
 						"ref": map[string]interface{}{
-							"$ref":     "test:dep1",
-							"property": "id",
+							"$__rudderRef": "test:dep1",
+							"property":     "id",
 						},
 					},
 					"array": []interface{}{
 						map[string]interface{}{
 							"ref": map[string]interface{}{
-								"$ref":     "test:dep2",
-								"property": "name",
+								"$__rudderRef": "test:dep2",
+								"property":     "name",
 							},
 						},
 						"simple-value",
@@ -249,21 +249,21 @@ func TestEncodeDecodeResourceState(t *testing.T) {
 					"nested": []map[string]interface{}{
 						{
 							"ref": map[string]interface{}{
-								"$ref":     "test:dep1",
-								"property": "id",
+								"$__rudderRef": "test:dep1",
+								"property":     "id",
 							},
 						},
 						{
 							"ref": map[string]interface{}{
-								"$ref":     "test:dep2",
-								"property": "id",
+								"$__rudderRef": "test:dep2",
+								"property":     "id",
 							},
 						},
 					},
 					"array": []interface{}{
 						map[string]interface{}{
-							"$ref":     "test:dep3",
-							"property": "name",
+							"$__rudderRef": "test:dep3",
+							"property":     "name",
 						},
 						"simple-value",
 					},
