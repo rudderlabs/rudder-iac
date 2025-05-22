@@ -213,11 +213,21 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 			Description: property.Description,
 			Type:        property.Type,
 			Required:    prop.Required,
-			Config:      property.Config,
+			Config:      shallowCopy(property.Config),
 		})
 	}
 
 	return &toReturn, nil
+}
+
+func shallowCopy(input map[string]any) map[string]any {
+	output := make(map[string]any, len(input))
+
+	for k, v := range input {
+		output[k] = v
+	}
+
+	return output
 }
 
 func ExtractTrackingPlan(rd *ResourceDefinition) (TrackingPlan, error) {
