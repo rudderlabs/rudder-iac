@@ -171,24 +171,16 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				continue
 			}
 
-			// Check if config is present
-			if customType.Config == nil && customType.Type != "object" {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("config field is mandatory on custom type"),
-					Reference: reference,
-				})
-			}
-
-			// If type is object, properties is required
-			if customType.Type == "object" && len(customType.Properties) == 0 {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("properties array is required for custom type with type 'object'"),
-					Reference: reference,
-				})
-			}
-
 			// Check each property in properties has id field
 			if customType.Type == "object" {
+
+				if len(customType.Config) > 0 {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("config is not allowed on custom type of type object"),
+						Reference: reference,
+					})
+				}
+
 				for i, prop := range customType.Properties {
 					if prop.Ref == "" {
 						errors = append(errors, ValidationError{
@@ -210,7 +202,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			// Type validation
 			if !slices.Contains(validTypes, customType.Type) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(validTypes, ",")),
+					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(validTypes, ", ")),
 					Reference: reference,
 				})
 			}
@@ -290,7 +282,7 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 			})
 		} else if !slices.Contains(validFormatValues, formatStr) {
 			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("invalid format value, acceptable values are %s", strings.Join(validFormatValues, ",")),
+				error:     fmt.Errorf("invalid format value, acceptable values are %s", strings.Join(validFormatValues, ", ")),
 				Reference: reference,
 			})
 		}
