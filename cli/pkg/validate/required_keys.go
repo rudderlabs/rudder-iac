@@ -406,11 +406,14 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 func isInteger(val any) bool {
 
 	switch v := val.(type) {
-	case int, int32, int64:
+	case int, int8, int16, int32, int64:
 		return true
+	case uint, uint8, uint16, uint32, uint64:
+		return true
+	case float32:
+		return float32(int(v)) == v
 	case float64:
-		return v == float64(int64(v))
+		return float64(int64(v)) == v
 	}
-
 	return false
 }

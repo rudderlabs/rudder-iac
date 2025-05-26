@@ -196,7 +196,7 @@ func Test_IsInteger(t *testing.T) {
 		{
 			name:     "float32 type",
 			input:    float32(42.0),
-			expected: false,
+			expected: true,
 		},
 	}
 
