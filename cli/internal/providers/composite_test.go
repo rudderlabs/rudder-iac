@@ -1,4 +1,4 @@
-package providers
+package providers_test
 
 import (
 	"context"
@@ -11,126 +11,21 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
-
-// mockProvider is a mock implementation of the project.Provider interface for testing.
-type mockProvider struct {
-	supportedKinds         []string
-	supportedTypes         []string
-	validateErr            error
-	loadSpecErr            error
-	getResourceGraphVal    *resources.Graph
-	getResourceGraphErr    error
-	loadStateVal           *state.State
-	loadStateErr           error
-	putResourceStateErr    error
-	deleteResourceStateErr error
-	createVal              *resources.ResourceData
-	createErr              error
-	updateVal              *resources.ResourceData
-	updateErr              error
-	deleteErr              error
-
-	// Tracking calls
-	validateCalled     bool
-	loadSpecCalledWith struct {
-		path string
-		spec *specs.Spec
-	}
-	getResourceGraphCalled     bool
-	loadStateCalled            bool
-	putResourceStateCalledWith struct {
-		urn   string
-		state *state.ResourceState
-	}
-	deleteResourceStateCalledWith *state.ResourceState
-	createCalledWith              struct {
-		id           string
-		resourceType string
-		data         resources.ResourceData
-	}
-	updateCalledWith struct {
-		id           string
-		resourceType string
-		data         resources.ResourceData
-		state        resources.ResourceData
-	}
-	deleteCalledWith struct {
-		id           string
-		resourceType string
-		state        resources.ResourceData
-	}
-}
-
-func (m *mockProvider) GetSupportedKinds() []string {
-	return m.supportedKinds
-}
-
-func (m *mockProvider) GetSupportedTypes() []string {
-	return m.supportedTypes
-}
-
-func (m *mockProvider) Validate() error {
-	m.validateCalled = true
-	return m.validateErr
-}
-
-func (m *mockProvider) LoadSpec(path string, s *specs.Spec) error {
-	m.loadSpecCalledWith.path = path
-	m.loadSpecCalledWith.spec = s
-	return m.loadSpecErr
-}
-
-func (m *mockProvider) GetResourceGraph() (*resources.Graph, error) {
-	m.getResourceGraphCalled = true
-	return m.getResourceGraphVal, m.getResourceGraphErr
-}
-
-func (m *mockProvider) LoadState(ctx context.Context) (*state.State, error) {
-	m.loadStateCalled = true
-	return m.loadStateVal, m.loadStateErr
-}
-
-func (m *mockProvider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	m.putResourceStateCalledWith.urn = URN
-	m.putResourceStateCalledWith.state = s
-	return m.putResourceStateErr
-}
-
-func (m *mockProvider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
-	m.deleteResourceStateCalledWith = s
-	return m.deleteResourceStateErr
-}
-
-func (m *mockProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	m.createCalledWith.id = ID
-	m.createCalledWith.resourceType = resourceType
-	m.createCalledWith.data = data
-	return m.createVal, m.createErr
-}
-
-func (m *mockProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, s resources.ResourceData) (*resources.ResourceData, error) {
-	m.updateCalledWith.id = ID
-	m.updateCalledWith.resourceType = resourceType
-	m.updateCalledWith.data = data
-	m.updateCalledWith.state = s
-	return m.updateVal, m.updateErr
-}
-
-func (m *mockProvider) Delete(ctx context.Context, ID string, resourceType string, s resources.ResourceData) error {
-	m.deleteCalledWith.id = ID
-	m.deleteCalledWith.resourceType = resourceType
-	m.deleteCalledWith.state = s
-	return m.deleteErr
-}
 
 func TestNewCompositeProvider(t *testing.T) {
 	t.Run("successful creation with multiple providers", func(t *testing.T) {
-		p1 := &mockProvider{supportedKinds: []string{"kindA"}, supportedTypes: []string{"typeA"}}
-		p2 := &mockProvider{supportedKinds: []string{"kindB"}, supportedTypes: []string{"typeB"}}
-		cp, err := NewCompositeProvider(p1, p2)
+		p1 := testutils.NewMockProvider()
+		p1.SupportedKinds = []string{"kindA"}
+		p1.SupportedTypes = []string{"typeA"}
+		p2 := testutils.NewMockProvider()
+		p2.SupportedKinds = []string{"kindB"}
+		p2.SupportedTypes = []string{"typeB"}
+		cp, err := providers.NewCompositeProvider(p1, p2)
 
 		assert.NoError(t, err, "NewCompositeProvider returned an error")
 		assert.NotNil(t, cp, "NewCompositeProvider returned nil")
@@ -140,33 +35,39 @@ func TestNewCompositeProvider(t *testing.T) {
 	})
 
 	t.Run("error when no providers are given", func(t *testing.T) {
-		cp, err := NewCompositeProvider()
+		cp, err := providers.NewCompositeProvider()
 		assert.Error(t, err, "NewCompositeProvider should return an error for no providers")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for no providers")
 		assert.EqualError(t, err, "at least one provider must be specified")
 	})
 
 	t.Run("error when providers support duplicate kinds", func(t *testing.T) {
-		p1 := &mockProvider{supportedKinds: []string{"kindA", "kindB"}}
-		p2 := &mockProvider{supportedKinds: []string{"kindB", "kindC"}} // kindB is duplicate
-		cp, err := NewCompositeProvider(p1, p2)
+		p1 := testutils.NewMockProvider()
+		p1.SupportedKinds = []string{"kindA", "kindB"}
+		p2 := testutils.NewMockProvider()
+		p2.SupportedKinds = []string{"kindB", "kindC"} // kindB is duplicate
+		cp, err := providers.NewCompositeProvider(p1, p2)
 		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate kinds")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate kinds")
 		assert.EqualError(t, err, "duplicate kind 'kindB' supported by multiple providers")
 	})
 
 	t.Run("error when providers support duplicate types", func(t *testing.T) {
-		p1 := &mockProvider{supportedTypes: []string{"typeA", "typeB"}}
-		p2 := &mockProvider{supportedTypes: []string{"typeB", "typeC"}} // typeB is duplicate
-		cp, err := NewCompositeProvider(p1, p2)
+		p1 := testutils.NewMockProvider()
+		p1.SupportedTypes = []string{"typeA", "typeB"}
+		p2 := testutils.NewMockProvider()
+		p2.SupportedTypes = []string{"typeB", "typeC"} // typeB is duplicate
+		cp, err := providers.NewCompositeProvider(p1, p2)
 		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate types")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate types")
 		assert.EqualError(t, err, "duplicate type 'typeB' supported by multiple providers")
 	})
 
 	t.Run("successful creation with one provider", func(t *testing.T) {
-		p1 := &mockProvider{supportedKinds: []string{"kindA"}, supportedTypes: []string{"typeA"}}
-		cp, err := NewCompositeProvider(p1)
+		p1 := testutils.NewMockProvider()
+		p1.SupportedKinds = []string{"kindA"}
+		p1.SupportedTypes = []string{"typeA"}
+		cp, err := providers.NewCompositeProvider(p1)
 		assert.NoError(t, err)
 		assert.NotNil(t, cp)
 		assert.Len(t, cp.Providers, 1)
@@ -182,31 +83,23 @@ func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
 		{
 			name: "single provider",
 			providers: []project.Provider{
-				&mockProvider{supportedKinds: []string{"kindA", "kindB"}},
+				&testutils.MockProvider{SupportedKinds: []string{"kindA", "kindB"}},
 			},
 			expected: []string{"kindA", "kindB"},
 		},
 		{
 			name: "multiple providers with unique kinds",
 			providers: []project.Provider{
-				&mockProvider{supportedKinds: []string{"kindA"}},
-				&mockProvider{supportedKinds: []string{"kindB"}},
+				&testutils.MockProvider{SupportedKinds: []string{"kindA"}},
+				&testutils.MockProvider{SupportedKinds: []string{"kindB"}},
 			},
 			expected: []string{"kindA", "kindB"},
-		},
-		{
-			name: "multiple providers with overlapping kinds",
-			providers: []project.Provider{
-				&mockProvider{supportedKinds: []string{"kindA", "kindB"}},
-				&mockProvider{supportedKinds: []string{"kindB", "kindC"}},
-			},
-			expected: []string{"kindA", "kindB", "kindC"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp, err := NewCompositeProvider(tt.providers...)
+			cp, err := providers.NewCompositeProvider(tt.providers...)
 			assert.NoError(t, err)
 			assert.NotNil(t, cp)
 			actual := cp.GetSupportedKinds()
@@ -226,31 +119,23 @@ func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
 		{
 			name: "single provider",
 			providers: []project.Provider{
-				&mockProvider{supportedTypes: []string{"typeA", "typeB"}},
+				&testutils.MockProvider{SupportedTypes: []string{"typeA", "typeB"}},
 			},
 			expected: []string{"typeA", "typeB"},
 		},
 		{
 			name: "multiple providers with unique types",
 			providers: []project.Provider{
-				&mockProvider{supportedTypes: []string{"typeA"}},
-				&mockProvider{supportedTypes: []string{"typeB"}},
+				&testutils.MockProvider{SupportedTypes: []string{"typeA"}},
+				&testutils.MockProvider{SupportedTypes: []string{"typeB"}},
 			},
 			expected: []string{"typeA", "typeB"},
-		},
-		{
-			name: "multiple providers with overlapping types",
-			providers: []project.Provider{
-				&mockProvider{supportedTypes: []string{"typeA", "typeB"}},
-				&mockProvider{supportedTypes: []string{"typeB", "typeC"}},
-			},
-			expected: []string{"typeA", "typeB", "typeC"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp, err := NewCompositeProvider(tt.providers...)
+			cp, err := providers.NewCompositeProvider(tt.providers...)
 			assert.NoError(t, err)
 			assert.NotNil(t, cp)
 			actual := cp.GetSupportedTypes()
@@ -267,44 +152,44 @@ func TestCompositeProvider_Validate(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		providers   []*mockProvider
+		providers   []*testutils.MockProvider
 		expectedErr error
 	}{
 		{
 			name: "single provider, no error",
-			providers: []*mockProvider{
-				{validateErr: nil},
+			providers: []*testutils.MockProvider{
+				testutils.NewMockProvider(),
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "single provider, with error",
-			providers: []*mockProvider{
-				{validateErr: errTest},
+			providers: []*testutils.MockProvider{
+				{ValidateErr: errTest},
 			},
 			expectedErr: errTest,
 		},
 		{
 			name: "multiple providers, no error",
-			providers: []*mockProvider{
-				{validateErr: nil},
-				{validateErr: nil},
+			providers: []*testutils.MockProvider{
+				testutils.NewMockProvider(),
+				testutils.NewMockProvider(),
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "multiple providers, first errors",
-			providers: []*mockProvider{
-				{validateErr: errTest},
-				{validateErr: errTest2}, // This one won't be called
+			providers: []*testutils.MockProvider{
+				{ValidateErr: errTest},
+				{ValidateErr: errTest2}, // This one won't be called
 			},
 			expectedErr: errTest,
 		},
 		{
 			name: "multiple providers, second errors",
-			providers: []*mockProvider{
-				{validateErr: nil},
-				{validateErr: errTest},
+			providers: []*testutils.MockProvider{
+				testutils.NewMockProvider(),
+				{ValidateErr: errTest},
 			},
 			expectedErr: errTest,
 		},
@@ -314,9 +199,10 @@ func TestCompositeProvider_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			providerInterfaces := make([]project.Provider, len(tt.providers))
 			for i, p := range tt.providers {
+				p.ResetCallCounters() // Reset for each test run
 				providerInterfaces[i] = p
 			}
-			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 			err := cp.Validate()
@@ -324,17 +210,14 @@ func TestCompositeProvider_Validate(t *testing.T) {
 			assert.ErrorIs(t, err, tt.expectedErr)
 
 			for i, p := range tt.providers {
-				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.validateErr) {
-					// If this provider was the one that errored, it should have been called
-					assert.True(t, p.validateCalled, "Provider %d Validate() not called when it should have errored", i)
-					// Subsequent providers should not be called if a previous one errored
+				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.ValidateErr) {
+					assert.Equal(t, 1, p.ValidateCalledCount, "Provider %d Validate() not called once when it should have errored", i)
 					for j := i + 1; j < len(tt.providers); j++ {
-						assert.False(t, tt.providers[j].validateCalled, "Provider %d Validate() called after a previous provider errored", j)
+						assert.Equal(t, 0, tt.providers[j].ValidateCalledCount, "Provider %d Validate() called after a previous provider errored", j)
 					}
-					break // Stop checking further providers if one errored as expected
+					break
 				} else if tt.expectedErr == nil {
-					// If no error was expected, all providers should have been called
-					assert.True(t, p.validateCalled, "Provider %d Validate() not called when no error was expected", i)
+					assert.Equal(t, 1, p.ValidateCalledCount, "Provider %d Validate() not called once when no error was expected", i)
 				}
 			}
 		})
@@ -347,8 +230,12 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 	specUnknown := &specs.Spec{Kind: "unknownKind"}
 	errTest := errors.New("test loadspec error")
 
-	pA := &mockProvider{supportedKinds: []string{"kindA"}}
-	pB := &mockProvider{supportedKinds: []string{"kindB"}, loadSpecErr: errTest}
+	pA := testutils.NewMockProvider()
+	pA.SupportedKinds = []string{"kindA"}
+
+	pB := testutils.NewMockProvider()
+	pB.SupportedKinds = []string{"kindB"}
+	pB.LoadSpecErr = errTest
 
 	tests := []struct {
 		name         string
@@ -356,7 +243,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 		path         string
 		spec         *specs.Spec
 		expectedErr  error
-		expectCallOn *mockProvider // which provider should be called
+		expectCallOn *testutils.MockProvider // which provider should be called
 		expectedPath string
 		expectedSpec *specs.Spec
 	}{
@@ -391,13 +278,10 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset call trackers for mocks
-			pA.loadSpecCalledWith.path = ""
-			pA.loadSpecCalledWith.spec = nil
-			pB.loadSpecCalledWith.path = ""
-			pB.loadSpecCalledWith.spec = nil
+			pA.ResetCallCounters()
+			pB.ResetCallCounters()
 
-			cp, errCp := NewCompositeProvider(tt.providers...)
+			cp, errCp := providers.NewCompositeProvider(tt.providers...)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 
@@ -410,12 +294,14 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 			}
 
 			if tt.expectCallOn != nil {
-				assert.Equal(t, tt.expectedPath, tt.expectCallOn.loadSpecCalledWith.path)
-				assert.Equal(t, tt.expectedSpec, tt.expectCallOn.loadSpecCalledWith.spec)
+				assert.Len(t, tt.expectCallOn.LoadSpecCalledWithArgs, 1, "Expected LoadSpec to be called once on the target provider")
+				if len(tt.expectCallOn.LoadSpecCalledWithArgs) > 0 {
+					assert.Equal(t, tt.expectedPath, tt.expectCallOn.LoadSpecCalledWithArgs[0].Path)
+					assert.Equal(t, tt.expectedSpec, tt.expectCallOn.LoadSpecCalledWithArgs[0].Spec)
+				}
 			} else {
-				// Ensure no provider was called if none was expected
-				assert.Nil(t, pA.loadSpecCalledWith.spec, "pA.LoadSpec called unexpectedly")
-				assert.Nil(t, pB.loadSpecCalledWith.spec, "pB.LoadSpec called unexpectedly")
+				assert.Empty(t, pA.LoadSpecCalledWithArgs, "pA.LoadSpec called unexpectedly")
+				assert.Empty(t, pB.LoadSpecCalledWithArgs, "pB.LoadSpec called unexpectedly")
 			}
 		})
 	}
@@ -430,40 +316,40 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		providers    []*mockProvider
+		providers    []*testutils.MockProvider
 		expectedURNs []string // URNs in the final graph
 		expectedErr  error
 	}{
 		{
 			name: "single provider, no error",
-			providers: []*mockProvider{
-				{getResourceGraphVal: graph1},
+			providers: []*testutils.MockProvider{
+				{GetResourceGraphVal: graph1},
 			},
 			expectedURNs: []string{"typeA:id1"},
 			expectedErr:  nil,
 		},
 		{
 			name: "single provider, with error",
-			providers: []*mockProvider{
-				{getResourceGraphErr: errTest},
+			providers: []*testutils.MockProvider{
+				{GetResourceGraphErr: errTest},
 			},
 			expectedURNs: nil,
 			expectedErr:  errTest,
 		},
 		{
 			name: "multiple providers, no error, merged graph",
-			providers: []*mockProvider{
-				{getResourceGraphVal: graph1},
-				{getResourceGraphVal: graph2},
+			providers: []*testutils.MockProvider{
+				{GetResourceGraphVal: graph1},
+				{GetResourceGraphVal: graph2},
 			},
 			expectedURNs: []string{"typeA:id1", "typeB:id2"},
 			expectedErr:  nil,
 		},
 		{
 			name: "multiple providers, first errors",
-			providers: []*mockProvider{
-				{getResourceGraphErr: errTest},
-				{getResourceGraphVal: graph2}, // This one won't be called
+			providers: []*testutils.MockProvider{
+				{GetResourceGraphErr: errTest},
+				{GetResourceGraphVal: graph2}, // This one won't be called
 			},
 			expectedURNs: nil,
 			expectedErr:  errTest,
@@ -474,10 +360,10 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			providerInterfaces := make([]project.Provider, len(tt.providers))
 			for i, p := range tt.providers {
-				p.getResourceGraphCalled = false // Reset tracker
+				p.ResetCallCounters()
 				providerInterfaces[i] = p
 			}
-			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 			graph, err := cp.GetResourceGraph()
@@ -498,14 +384,14 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 			}
 
 			for i, p := range tt.providers {
-				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.getResourceGraphErr) {
-					assert.True(t, p.getResourceGraphCalled, "Provider %d GetResourceGraph() not called when it should have errored", i)
+				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.GetResourceGraphErr) {
+					assert.Equal(t, 1, p.GetResourceGraphCalledCount, "Provider %d GetResourceGraph() not called once when it should have errored", i)
 					for j := i + 1; j < len(tt.providers); j++ {
-						assert.False(t, tt.providers[j].getResourceGraphCalled, "Provider %d GetResourceGraph() called after a previous provider errored", j)
+						assert.Equal(t, 0, tt.providers[j].GetResourceGraphCalledCount, "Provider %d GetResourceGraph() called after a previous provider errored", j)
 					}
 					break
 				} else if tt.expectedErr == nil {
-					assert.True(t, p.getResourceGraphCalled, "Provider %d GetResourceGraph() not called when no error was expected", i)
+					assert.Equal(t, 1, p.GetResourceGraphCalledCount, "Provider %d GetResourceGraph() not called once when no error was expected", i)
 				}
 			}
 		})
@@ -521,40 +407,40 @@ func TestCompositeProvider_LoadState(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		providers    []*mockProvider
+		providers    []*testutils.MockProvider
 		expectedURNs []string // URNs in the final state
 		expectedErr  error
 	}{
 		{
 			name: "single provider, no error",
-			providers: []*mockProvider{
-				{loadStateVal: state1},
+			providers: []*testutils.MockProvider{
+				{LoadStateVal: state1},
 			},
 			expectedURNs: []string{"typeA:id1"},
 			expectedErr:  nil,
 		},
 		{
 			name: "single provider, with error",
-			providers: []*mockProvider{
-				{loadStateErr: errTest},
+			providers: []*testutils.MockProvider{
+				{LoadStateErr: errTest},
 			},
 			expectedURNs: nil,
 			expectedErr:  errTest,
 		},
 		{
 			name: "multiple providers, no error, merged state",
-			providers: []*mockProvider{
-				{loadStateVal: state1},
-				{loadStateVal: state2},
+			providers: []*testutils.MockProvider{
+				{LoadStateVal: state1},
+				{LoadStateVal: state2},
 			},
 			expectedURNs: []string{"typeA:id1", "typeB:id2"},
 			expectedErr:  nil,
 		},
 		{
 			name: "multiple providers, first errors",
-			providers: []*mockProvider{
-				{loadStateErr: errTest},
-				{loadStateVal: state2}, // This one won't be called
+			providers: []*testutils.MockProvider{
+				{LoadStateErr: errTest},
+				{LoadStateVal: state2}, // This one won't be called
 			},
 			expectedURNs: nil,
 			expectedErr:  errTest,
@@ -565,10 +451,10 @@ func TestCompositeProvider_LoadState(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			providerInterfaces := make([]project.Provider, len(tt.providers))
 			for i, p := range tt.providers {
-				p.loadStateCalled = false // Reset tracker
+				p.ResetCallCounters()
 				providerInterfaces[i] = p
 			}
-			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
 			assert.NoError(t, errCp, "NewCompositeProvider failed unexpectedly for test: %s", tt.name)
 			assert.NotNil(t, cp, "NewCompositeProvider returned nil unexpectedly for test: %s", tt.name)
 
@@ -577,31 +463,30 @@ func TestCompositeProvider_LoadState(t *testing.T) {
 			assert.ErrorIs(t, err, tt.expectedErr)
 
 			if tt.expectedErr == nil {
-				if len(tt.providers) == 0 { // Special case for no providers
-					assert.Nil(t, s, "Expected nil state for no providers")
-				} else {
-					assert.NotNil(t, s, "Expected state, got nil")
-					actualURNs := []string{}
+				assert.NotNil(t, s, "Expected state, got nil")
+				actualURNs := []string{}
+				if s != nil { // s can be nil ifproviders.NewCompositeProvider fails
 					for urn := range s.Resources {
 						actualURNs = append(actualURNs, urn)
 					}
-					sort.Strings(actualURNs)
-					sort.Strings(tt.expectedURNs)
-					assert.Equal(t, tt.expectedURNs, actualURNs)
 				}
+				sort.Strings(actualURNs)
+				sort.Strings(tt.expectedURNs)
+				assert.Equal(t, tt.expectedURNs, actualURNs)
+
 			} else {
 				assert.Nil(t, s, "Expected nil state on error")
 			}
 
 			for i, p := range tt.providers {
-				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.loadStateErr) {
-					assert.True(t, p.loadStateCalled, "Provider %d LoadState() not called when it should have errored", i)
+				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.LoadStateErr) {
+					assert.Equal(t, 1, p.LoadStateCalledCount, "Provider %d LoadState() not called once when it should have errored", i)
 					for j := i + 1; j < len(tt.providers); j++ {
-						assert.False(t, tt.providers[j].loadStateCalled, "Provider %d LoadState() called after a previous provider errored", j)
+						assert.Equal(t, 0, tt.providers[j].LoadStateCalledCount, "Provider %d LoadState() called after a previous provider errored", j)
 					}
 					break
 				} else if tt.expectedErr == nil && len(tt.providers) > 0 {
-					assert.True(t, p.loadStateCalled, "Provider %d LoadState() not called when no error was expected", i)
+					assert.Equal(t, 1, p.LoadStateCalledCount, "Provider %d LoadState() not called once when no error was expected", i)
 				}
 			}
 		})
@@ -616,8 +501,16 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	resDataB := resources.ResourceData{"key": "valB"}
 	errTest := errors.New("test resource op error")
 
-	pA := &mockProvider{supportedTypes: []string{"typeA"}}
-	pB := &mockProvider{supportedTypes: []string{"typeB"}, createErr: errTest, updateErr: errTest, deleteErr: errTest, putResourceStateErr: errTest, deleteResourceStateErr: errTest}
+	pA := testutils.NewMockProvider()
+	pA.SupportedTypes = []string{"typeA"}
+
+	pB := testutils.NewMockProvider()
+	pB.SupportedTypes = []string{"typeB"}
+	pB.CreateErr = errTest
+	pB.UpdateErr = errTest
+	pB.DeleteErr = errTest
+	pB.PutResourceStateErr = errTest
+	pB.DeleteResourceStateErr = errTest
 
 	tests := []struct {
 		name           string
@@ -629,8 +522,8 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		stateData      resources.ResourceData // for Update
 		resourceState  *state.ResourceState   // for Put/DeleteResourceState
 		expectedErr    error
-		expectCallOn   *mockProvider // which provider should be called
-		expectedReturn any           // for Create/Update
+		expectCallOn   *testutils.MockProvider // which provider should be called
+		expectedReturn any                     // for Create/Update
 	}{
 		// PutResourceState
 		{name: "PutResourceState no provider for type", op: "PutResourceState", providers: []project.Provider{pA}, urn: resources.URN(resStateB.ID, resStateB.Type), resourceState: resStateB, expectedErr: fmt.Errorf("no provider found for resource type %s", resStateB.Type)},
@@ -656,25 +549,25 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset call trackers for mocks
-			pA.putResourceStateCalledWith.urn = ""
-			pA.putResourceStateCalledWith.state = nil
-			pA.deleteResourceStateCalledWith = nil
-			pA.createCalledWith.id = ""
-			pA.updateCalledWith.id = ""
-			pA.deleteCalledWith.id = ""
-			pB.putResourceStateCalledWith.urn = ""
-			pB.putResourceStateCalledWith.state = nil
-			pB.deleteResourceStateCalledWith = nil
-			pB.createCalledWith.id = ""
-			pB.updateCalledWith.id = ""
-			pB.deleteCalledWith.id = ""
+			pA.ResetCallCounters()
+			pB.ResetCallCounters()
 
-			// Set return values for successful calls on pA
-			pA.createVal = &resDataA
-			pA.updateVal = &resDataA
+			// Set return values for successful calls on pA if it's the expected one
+			if tt.expectCallOn == pA {
+				if tt.expectedReturn != nil {
+					pA.CreateVal = tt.expectedReturn.(*resources.ResourceData)
+					pA.UpdateVal = tt.expectedReturn.(*resources.ResourceData)
+				} else {
+					pA.CreateVal = nil
+					pA.UpdateVal = nil
+				}
+			} else {
+				pA.CreateVal = nil // Ensure pA doesn't return values if not expected
+				pA.UpdateVal = nil
+			}
+			// pB already has error values set if it's the target for error cases
 
-			cp, errCp := NewCompositeProvider(tt.providers...)
+			cp, errCp := providers.NewCompositeProvider(tt.providers...)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 
@@ -709,34 +602,34 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			if tt.expectCallOn != nil {
 				switch tt.op {
 				case "PutResourceState":
-					assert.Equal(t, tt.urn, tt.expectCallOn.putResourceStateCalledWith.urn)
-					assert.Equal(t, tt.resourceState, tt.expectCallOn.putResourceStateCalledWith.state)
+					assert.Equal(t, tt.urn, tt.expectCallOn.PutResourceStateCalledWithArg.URN)
+					assert.Equal(t, tt.resourceState, tt.expectCallOn.PutResourceStateCalledWithArg.State)
 				case "DeleteResourceState":
-					assert.Equal(t, tt.resourceState, tt.expectCallOn.deleteResourceStateCalledWith)
+					assert.Equal(t, tt.resourceState, tt.expectCallOn.DeleteResourceStateCalledWithArg)
 				case "Create":
-					assert.Equal(t, tt.resourceType, tt.expectCallOn.createCalledWith.resourceType)
-					assert.Equal(t, tt.data, tt.expectCallOn.createCalledWith.data)
+					assert.Equal(t, tt.resourceType, tt.expectCallOn.CreateCalledWithArg.ResourceType)
+					assert.Equal(t, tt.data, tt.expectCallOn.CreateCalledWithArg.Data)
 				case "Update":
-					assert.Equal(t, tt.resourceType, tt.expectCallOn.updateCalledWith.resourceType)
-					assert.Equal(t, tt.data, tt.expectCallOn.updateCalledWith.data)
-					assert.Equal(t, tt.stateData, tt.expectCallOn.updateCalledWith.state)
+					assert.Equal(t, tt.resourceType, tt.expectCallOn.UpdateCalledWithArg.ResourceType)
+					assert.Equal(t, tt.data, tt.expectCallOn.UpdateCalledWithArg.Data)
+					assert.Equal(t, tt.stateData, tt.expectCallOn.UpdateCalledWithArg.State)
 				case "Delete":
-					assert.Equal(t, tt.resourceType, tt.expectCallOn.deleteCalledWith.resourceType)
-					assert.Equal(t, tt.stateData, tt.expectCallOn.deleteCalledWith.state)
+					assert.Equal(t, tt.resourceType, tt.expectCallOn.DeleteCalledWithArg.ResourceType)
+					assert.Equal(t, tt.stateData, tt.expectCallOn.DeleteCalledWithArg.State)
 				}
 			} else {
-				// Ensure no provider was called if none was expected
-				assert.Nil(t, pA.putResourceStateCalledWith.state, "pA.PutResourceState called unexpectedly for op %s", tt.op)
-				assert.Nil(t, pA.deleteResourceStateCalledWith, "pA.DeleteResourceState called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pA.createCalledWith.id, "pA.Create called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pA.updateCalledWith.id, "pA.Update called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pA.deleteCalledWith.id, "pA.Delete called unexpectedly for op %s", tt.op)
+				// Ensure no provider was called if none was expected (check one field from each relevant arg struct)
+				assert.Empty(t, pA.PutResourceStateCalledWithArg.URN, "pA.PutResourceState called unexpectedly for op %s", tt.op)
+				assert.Nil(t, pA.DeleteResourceStateCalledWithArg, "pA.DeleteResourceState called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pA.CreateCalledWithArg.ID, "pA.Create called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pA.UpdateCalledWithArg.ID, "pA.Update called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pA.DeleteCalledWithArg.ID, "pA.Delete called unexpectedly for op %s", tt.op)
 
-				assert.Nil(t, pB.putResourceStateCalledWith.state, "pB.PutResourceState called unexpectedly for op %s", tt.op)
-				assert.Nil(t, pB.deleteResourceStateCalledWith, "pB.DeleteResourceState called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pB.createCalledWith.id, "pB.Create called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pB.updateCalledWith.id, "pB.Update called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pB.deleteCalledWith.id, "pB.Delete called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pB.PutResourceStateCalledWithArg.URN, "pB.PutResourceState called unexpectedly for op %s", tt.op)
+				assert.Nil(t, pB.DeleteResourceStateCalledWithArg, "pB.DeleteResourceState called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pB.CreateCalledWithArg.ID, "pB.Create called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pB.UpdateCalledWithArg.ID, "pB.Update called unexpectedly for op %s", tt.op)
+				assert.Empty(t, pB.DeleteCalledWithArg.ID, "pB.Delete called unexpectedly for op %s", tt.op)
 			}
 		})
 	}

@@ -1,26 +1,14 @@
-package loader
+package loader_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestNew(t *testing.T) {
-	t.Run("with specific location", func(t *testing.T) {
-		loc := "testdata/projectA"
-		loader := New(loc)
-		assert.Equal(t, loc, loader.Location)
-	})
-
-	t.Run("with empty location", func(t *testing.T) {
-		loader := New("")
-		assert.Equal(t, ".", loader.Location)
-	})
-}
 
 func TestLoader_Load(t *testing.T) {
 	// Helper to create a temporary test directory with files
@@ -149,8 +137,8 @@ spec:
 			tmpDir := setupTestDir(t, tc.files)
 			defer os.RemoveAll(tmpDir)
 
-			loader := New(tmpDir)
-			loadedSpecs, err := loader.Load()
+			l := &loader.Loader{}
+			loadedSpecs, err := l.Load(tmpDir)
 
 			if tc.expectError {
 				require.Error(t, err, "Expected an error for test case: %s", tc.name)
@@ -179,8 +167,8 @@ spec:
 	t.Run("Non-existent Location", func(t *testing.T) {
 		// Create a path that is highly unlikely to exist
 		nonExistentPath := filepath.Join(os.TempDir(), "non_existent_loader_test_dir_12345abcde")
-		loader := New(nonExistentPath)
-		_, err := loader.Load()
+		l := &loader.Loader{}
+		_, err := l.Load(nonExistentPath)
 		require.Error(t, err, "Expected an error for non-existent location")
 		// filepath.WalkDir returns an error that includes the path.
 		// The exact error message can vary slightly by OS (e.g., "no such file or directory" vs "cannot find the path specified").
