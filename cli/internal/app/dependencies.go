@@ -22,8 +22,9 @@ type Providers struct {
 }
 
 type deps struct {
-	client    *client.Client
-	providers *Providers
+	client            *client.Client
+	providers         *Providers
+	compositeProvider project.Provider
 }
 
 type Deps interface {
@@ -56,9 +57,16 @@ func NewDeps() (Deps, error) {
 	}
 
 	p := setupProviders(c)
+
+	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
+	}
+
 	return &deps{
-		client:    c,
-		providers: p,
+		client:            c,
+		providers:         p,
+		compositeProvider: cp,
 	}, nil
 }
 
@@ -90,5 +98,5 @@ func (d *deps) Providers() *Providers {
 }
 
 func (d *deps) CompositeProvider() project.Provider {
-	return providers.NewCompositeProvider(d.providers.DataCatalog, d.providers.RETL)
+	return d.compositeProvider
 }

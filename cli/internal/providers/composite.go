@@ -12,33 +12,47 @@ import (
 )
 
 type CompositeProvider struct {
-	Providers []project.Provider
+	Providers       []project.Provider
+	registeredKinds map[string]project.Provider
+	registeredTypes map[string]project.Provider
 }
 
-func NewCompositeProvider(providers ...project.Provider) *CompositeProvider {
-	return &CompositeProvider{
-		Providers: providers,
+func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, error) {
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("at least one provider must be specified")
 	}
+
+	registeredKinds := make(map[string]project.Provider)
+	registeredTypes := make(map[string]project.Provider)
+
+	for _, provider := range providers {
+		for _, kind := range provider.GetSupportedKinds() {
+			if _, ok := registeredKinds[kind]; ok {
+				return nil, fmt.Errorf("duplicate kind '%s' supported by multiple providers", kind)
+			}
+			registeredKinds[kind] = provider
+		}
+		for _, t := range provider.GetSupportedTypes() {
+			if _, ok := registeredTypes[t]; ok {
+				return nil, fmt.Errorf("duplicate type '%s' supported by multiple providers", t)
+			}
+			registeredTypes[t] = provider
+		}
+	}
+
+	return &CompositeProvider{
+		Providers:       providers,
+		registeredKinds: registeredKinds,
+		registeredTypes: registeredTypes,
+	}, nil
 }
 
 func (p *CompositeProvider) GetSupportedKinds() []string {
-	kinds := make(map[string]bool)
-	for _, provider := range p.Providers {
-		for _, kind := range provider.GetSupportedKinds() {
-			kinds[kind] = true
-		}
-	}
-	return maps.Keys(kinds)
+	return maps.Keys(p.registeredKinds)
 }
 
 func (p *CompositeProvider) GetSupportedTypes() []string {
-	types := make(map[string]bool)
-	for _, provider := range p.Providers {
-		for _, t := range provider.GetSupportedTypes() {
-			types[t] = true
-		}
-	}
-	return maps.Keys(types)
+	return maps.Keys(p.registeredTypes)
 }
 
 func (p *CompositeProvider) Validate() error {
@@ -129,23 +143,9 @@ func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType 
 
 // Helper methods
 func (p *CompositeProvider) providerForKind(kind string) project.Provider {
-	for _, provider := range p.Providers {
-		for _, k := range provider.GetSupportedKinds() {
-			if k == kind {
-				return provider
-			}
-		}
-	}
-	return nil
+	return p.registeredKinds[kind]
 }
 
 func (p *CompositeProvider) providerForType(resourceType string) project.Provider {
-	for _, provider := range p.Providers {
-		for _, t := range provider.GetSupportedTypes() {
-			if t == resourceType {
-				return provider
-			}
-		}
-	}
-	return nil
+	return p.registeredTypes[resourceType]
 }

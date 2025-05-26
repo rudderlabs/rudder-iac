@@ -127,18 +127,50 @@ func (m *mockProvider) Delete(ctx context.Context, ID string, resourceType strin
 }
 
 func TestNewCompositeProvider(t *testing.T) {
-	p1 := &mockProvider{}
-	p2 := &mockProvider{}
-	cp := NewCompositeProvider(p1, p2)
+	t.Run("successful creation with multiple providers", func(t *testing.T) {
+		p1 := &mockProvider{supportedKinds: []string{"kindA"}, supportedTypes: []string{"typeA"}}
+		p2 := &mockProvider{supportedKinds: []string{"kindB"}, supportedTypes: []string{"typeB"}}
+		cp, err := NewCompositeProvider(p1, p2)
 
-	assert.NotNil(t, cp, "NewCompositeProvider returned nil")
-	assert.Len(t, cp.Providers, 2, "Expected 2 providers")
-	assert.Equal(t, p1, cp.Providers[0], "Provider 1 not set correctly")
-	assert.Equal(t, p2, cp.Providers[1], "Provider 2 not set correctly")
+		assert.NoError(t, err, "NewCompositeProvider returned an error")
+		assert.NotNil(t, cp, "NewCompositeProvider returned nil")
+		assert.Len(t, cp.Providers, 2, "Expected 2 providers")
+		assert.Equal(t, p1, cp.Providers[0], "Provider 1 not set correctly")
+		assert.Equal(t, p2, cp.Providers[1], "Provider 2 not set correctly")
+	})
 
-	cpEmpty := NewCompositeProvider()
-	assert.NotNil(t, cpEmpty, "NewCompositeProvider with no args returned nil")
-	assert.Len(t, cpEmpty.Providers, 0, "Expected 0 providers for empty NewCompositeProvider")
+	t.Run("error when no providers are given", func(t *testing.T) {
+		cp, err := NewCompositeProvider()
+		assert.Error(t, err, "NewCompositeProvider should return an error for no providers")
+		assert.Nil(t, cp, "NewCompositeProvider should return nil for no providers")
+		assert.EqualError(t, err, "at least one provider must be specified")
+	})
+
+	t.Run("error when providers support duplicate kinds", func(t *testing.T) {
+		p1 := &mockProvider{supportedKinds: []string{"kindA", "kindB"}}
+		p2 := &mockProvider{supportedKinds: []string{"kindB", "kindC"}} // kindB is duplicate
+		cp, err := NewCompositeProvider(p1, p2)
+		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate kinds")
+		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate kinds")
+		assert.EqualError(t, err, "duplicate kind 'kindB' supported by multiple providers")
+	})
+
+	t.Run("error when providers support duplicate types", func(t *testing.T) {
+		p1 := &mockProvider{supportedTypes: []string{"typeA", "typeB"}}
+		p2 := &mockProvider{supportedTypes: []string{"typeB", "typeC"}} // typeB is duplicate
+		cp, err := NewCompositeProvider(p1, p2)
+		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate types")
+		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate types")
+		assert.EqualError(t, err, "duplicate type 'typeB' supported by multiple providers")
+	})
+
+	t.Run("successful creation with one provider", func(t *testing.T) {
+		p1 := &mockProvider{supportedKinds: []string{"kindA"}, supportedTypes: []string{"typeA"}}
+		cp, err := NewCompositeProvider(p1)
+		assert.NoError(t, err)
+		assert.NotNil(t, cp)
+		assert.Len(t, cp.Providers, 1)
+	})
 }
 
 func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
@@ -147,11 +179,6 @@ func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
 		providers []project.Provider
 		expected  []string
 	}{
-		{
-			name:      "no providers",
-			providers: []project.Provider{},
-			expected:  []string{},
-		},
 		{
 			name: "single provider",
 			providers: []project.Provider{
@@ -179,7 +206,9 @@ func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp := NewCompositeProvider(tt.providers...)
+			cp, err := NewCompositeProvider(tt.providers...)
+			assert.NoError(t, err)
+			assert.NotNil(t, cp)
 			actual := cp.GetSupportedKinds()
 			sort.Strings(actual)
 			sort.Strings(tt.expected)
@@ -194,11 +223,6 @@ func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
 		providers []project.Provider
 		expected  []string
 	}{
-		{
-			name:      "no providers",
-			providers: []project.Provider{},
-			expected:  []string{},
-		},
 		{
 			name: "single provider",
 			providers: []project.Provider{
@@ -226,7 +250,9 @@ func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp := NewCompositeProvider(tt.providers...)
+			cp, err := NewCompositeProvider(tt.providers...)
+			assert.NoError(t, err)
+			assert.NotNil(t, cp)
 			actual := cp.GetSupportedTypes()
 			sort.Strings(actual)
 			sort.Strings(tt.expected)
@@ -244,11 +270,6 @@ func TestCompositeProvider_Validate(t *testing.T) {
 		providers   []*mockProvider
 		expectedErr error
 	}{
-		{
-			name:        "no providers",
-			providers:   []*mockProvider{},
-			expectedErr: nil,
-		},
 		{
 			name: "single provider, no error",
 			providers: []*mockProvider{
@@ -295,7 +316,9 @@ func TestCompositeProvider_Validate(t *testing.T) {
 			for i, p := range tt.providers {
 				providerInterfaces[i] = p
 			}
-			cp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			assert.NoError(t, errCp)
+			assert.NotNil(t, cp)
 			err := cp.Validate()
 
 			assert.ErrorIs(t, err, tt.expectedErr)
@@ -338,13 +361,6 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 		expectedSpec *specs.Spec
 	}{
 		{
-			name:        "no providers",
-			providers:   []project.Provider{},
-			path:        "path/to/spec.yaml",
-			spec:        specKindA,
-			expectedErr: fmt.Errorf("no provider found for kind %s", specKindA.Kind),
-		},
-		{
 			name:         "provider found, no error",
 			providers:    []project.Provider{pA, pB},
 			path:         "pathA.yaml",
@@ -381,7 +397,10 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 			pB.loadSpecCalledWith.path = ""
 			pB.loadSpecCalledWith.spec = nil
 
-			cp := NewCompositeProvider(tt.providers...)
+			cp, errCp := NewCompositeProvider(tt.providers...)
+			assert.NoError(t, errCp)
+			assert.NotNil(t, cp)
+
 			err := cp.LoadSpec(tt.path, tt.spec)
 
 			if tt.expectedErr != nil {
@@ -415,12 +434,6 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 		expectedURNs []string // URNs in the final graph
 		expectedErr  error
 	}{
-		{
-			name:         "no providers",
-			providers:    []*mockProvider{},
-			expectedURNs: []string{},
-			expectedErr:  nil,
-		},
 		{
 			name: "single provider, no error",
 			providers: []*mockProvider{
@@ -464,7 +477,9 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 				p.getResourceGraphCalled = false // Reset tracker
 				providerInterfaces[i] = p
 			}
-			cp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			assert.NoError(t, errCp)
+			assert.NotNil(t, cp)
 			graph, err := cp.GetResourceGraph()
 
 			assert.ErrorIs(t, err, tt.expectedErr)
@@ -511,12 +526,6 @@ func TestCompositeProvider_LoadState(t *testing.T) {
 		expectedErr  error
 	}{
 		{
-			name:         "no providers",
-			providers:    []*mockProvider{},
-			expectedURNs: nil, // NewCompositeProvider.LoadState returns nil state if no providers
-			expectedErr:  nil,
-		},
-		{
 			name: "single provider, no error",
 			providers: []*mockProvider{
 				{loadStateVal: state1},
@@ -559,7 +568,10 @@ func TestCompositeProvider_LoadState(t *testing.T) {
 				p.loadStateCalled = false // Reset tracker
 				providerInterfaces[i] = p
 			}
-			cp := NewCompositeProvider(providerInterfaces...)
+			cp, errCp := NewCompositeProvider(providerInterfaces...)
+			assert.NoError(t, errCp, "NewCompositeProvider failed unexpectedly for test: %s", tt.name)
+			assert.NotNil(t, cp, "NewCompositeProvider returned nil unexpectedly for test: %s", tt.name)
+
 			s, err := cp.LoadState(context.Background())
 
 			assert.ErrorIs(t, err, tt.expectedErr)
@@ -662,7 +674,10 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			pA.createVal = &resDataA
 			pA.updateVal = &resDataA
 
-			cp := NewCompositeProvider(tt.providers...)
+			cp, errCp := NewCompositeProvider(tt.providers...)
+			assert.NoError(t, errCp)
+			assert.NotNil(t, cp)
+
 			var actualReturn any
 			var err error
 
