@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader" // Will be used for default loader
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
