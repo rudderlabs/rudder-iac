@@ -115,3 +115,97 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		})
 	}
 }
+
+func Test_IsInteger(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    any
+		expected bool
+	}{
+		// Valid integer types
+		{
+			name:     "int type",
+			input:    42,
+			expected: true,
+		},
+		{
+			name:     "int32 type",
+			input:    int32(42),
+			expected: true,
+		},
+		{
+			name:     "int64 type",
+			input:    int64(42),
+			expected: true,
+		},
+		{
+			name:     "negative int",
+			input:    -42,
+			expected: true,
+		},
+		{
+			name:     "zero int",
+			input:    0,
+			expected: true,
+		},
+		{
+			name:     "float64 representing positive integer",
+			input:    float64(42),
+			expected: true,
+		},
+		{
+			name:     "float64 representing negative integer",
+			input:    float64(-42),
+			expected: true,
+		},
+		{
+			name:     "float64 representing zero",
+			input:    float64(0),
+			expected: true,
+		},
+		{
+			name:     "float64 with decimal part",
+			input:    42.5,
+			expected: false,
+		},
+		{
+			name:     "string type",
+			input:    "42",
+			expected: false,
+		},
+		{
+			name:     "boolean type",
+			input:    true,
+			expected: false,
+		},
+		{
+			name:     "nil value",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name:     "slice type",
+			input:    []int{1, 2, 3},
+			expected: false,
+		},
+		{
+			name:     "map type",
+			input:    map[string]int{"key": 42},
+			expected: false,
+		},
+		{
+			name:     "float32 type",
+			input:    float32(42.0),
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := isInteger(tc.input)
+			assert.Equal(t, tc.expected, result, "isInteger(%v) should return %v", tc.input, tc.expected)
+		})
+	}
+}

@@ -244,7 +244,7 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 
 	// Check minLength is a number
 	if minLength, ok := config["minLength"]; ok {
-		if !isNumber(minLength) {
+		if !isInteger(minLength) {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("minLength must be a number"),
 				Reference: reference,
@@ -254,7 +254,7 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 
 	// Check maxLength is a number
 	if maxLength, ok := config["maxLength"]; ok {
-		if !isNumber(maxLength) {
+		if !isInteger(maxLength) {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("maxLength must be a number"),
 				Reference: reference,
@@ -305,7 +305,7 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 			})
 		} else {
 			for i, val := range enumArray {
-				if !isNumber(val) {
+				if !isInteger(val) {
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("enum value at index %d must be a number", i),
 						Reference: reference,
@@ -319,7 +319,7 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 	numericFields := []string{"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
-			if !isNumber(val) {
+			if !isInteger(val) {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("%s must be a number", field),
 					Reference: reference,
@@ -381,7 +381,7 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 	numericFields := []string{"minItems", "maxItems"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
-			if !isNumber(val) {
+			if !isInteger(val) {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("%s must be a number", field),
 					Reference: reference,
@@ -403,13 +403,13 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 	return errors
 }
 
-func isNumber(val any) bool {
+func isInteger(val any) bool {
 
-	switch val.(type) {
-	case int, int32, int64, float32, float64:
+	switch v := val.(type) {
+	case int, int32, int64:
 		return true
-	default:
-		fmt.Printf("value is of type: %T\n", val)
+	case float64:
+		return v == float64(int64(v))
 	}
 
 	return false
