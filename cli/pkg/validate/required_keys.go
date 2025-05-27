@@ -207,17 +207,13 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
-			// Type-specific config validations
 			if customType.Config != nil {
 				switch customType.Type {
 				case "string":
-					// Validate string type config
 					errors = append(errors, rk.validateStringConfig(customType.Config, reference)...)
 				case "number", "integer":
-					// Validate number/integer type config
-					errors = append(errors, rk.validateNumberConfig(customType.Config, reference)...)
+					errors = append(errors, rk.validateNumberConfig(customType.Config, reference, customType.Type)...)
 				case "array":
-					// Validate array type config
 					errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
 				}
 			}
@@ -292,8 +288,18 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 }
 
 // validateNumberConfig validates config fields for number/integer type
-func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, reference string) []ValidationError {
-	var errors []ValidationError
+func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, reference string, ctType string) []ValidationError {
+
+	var (
+		errors    []ValidationError
+		typeCheck func(val any) bool = isNumber
+	)
+
+	// integer custom type has a stricter
+	// check for the same items within the config
+	if ctType == "integer" {
+		typeCheck = isInteger
+	}
 
 	// Check enum is an array of numbers
 	if enum, ok := config["enum"]; ok {
@@ -305,9 +311,9 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 			})
 		} else {
 			for i, val := range enumArray {
-				if !isNumber(val) {
+				if !typeCheck(val) {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("enum value at index %d must be a number", i),
+						error:     fmt.Errorf("enum value at index %d must be a %s", i, ctType),
 						Reference: reference,
 					})
 				}
@@ -319,9 +325,9 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 	numericFields := []string{"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
-			if !isNumber(val) {
+			if !typeCheck(val) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("%s must be a number", field),
+					error:     fmt.Errorf("%s must be a %s", field, ctType),
 					Reference: reference,
 				})
 			}
