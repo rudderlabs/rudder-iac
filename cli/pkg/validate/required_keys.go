@@ -305,7 +305,7 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 			})
 		} else {
 			for i, val := range enumArray {
-				if !isInteger(val) {
+				if !isNumber(val) {
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("enum value at index %d must be a number", i),
 						Reference: reference,
@@ -319,7 +319,7 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 	numericFields := []string{"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
-			if !isInteger(val) {
+			if !isNumber(val) {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("%s must be a number", field),
 					Reference: reference,
@@ -401,6 +401,19 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 	}
 
 	return errors
+}
+
+func isNumber(val any) bool {
+	switch val.(type) {
+	case int, int8, int16, int32, int64:
+		return true
+	case uint, uint8, uint16, uint32, uint64:
+		return true
+	case float32, float64:
+		return true
+	}
+
+	return false
 }
 
 func isInteger(val any) bool {
