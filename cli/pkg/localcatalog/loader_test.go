@@ -3,6 +3,7 @@ package localcatalog
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +34,10 @@ func TestExtractCatalogEntity(t *testing.T) {
                 maxLength: 28
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 		assert.Equal(t, len(emptyCatalog.Properties), 1)
 		assert.Equal(t, len(emptyCatalog.Properties["base_props"]), 1)
@@ -67,7 +71,10 @@ func TestExtractCatalogEntity(t *testing.T) {
                 - "Marketing Team"
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.Events))
@@ -99,7 +106,10 @@ func TestExtractCatalogEntity(t *testing.T) {
                 - "Marketing Team"
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		byt = []byte(`
@@ -124,7 +134,10 @@ func TestExtractCatalogEntity(t *testing.T) {
                 enum: '["Sign In", "Sign Up"]'
        `)
 
-		err = extractEntities(byt, &emptyCatalog)
+		s, err = specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		byt = []byte(`
@@ -150,7 +163,10 @@ func TestExtractCatalogEntity(t *testing.T) {
                   required: false
         `)
 
-		err = extractEntities(byt, &emptyCatalog)
+		s, err = specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(emptyCatalog.TrackingPlans))
@@ -209,7 +225,9 @@ func TestExtractCatalogEntity(t *testing.T) {
                 pattern: "^PROD-[0-9]{7}$"
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.CustomTypes))
@@ -264,7 +282,9 @@ func TestExtractCatalogEntity(t *testing.T) {
               ]
         `)
 
-		err := extractEntities(byt, &emptyCatalog)
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
 		assert.Equal(t, 2, len(emptyCatalog.CustomTypes))

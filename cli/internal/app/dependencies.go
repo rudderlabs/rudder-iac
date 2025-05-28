@@ -6,16 +6,31 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 )
 
 var (
 	v string
 )
 
-type Deps struct {
-	p syncer.Provider
+type Providers struct {
+	DataCatalog project.Provider
+	RETL        project.Provider
+}
+
+type deps struct {
+	client            *client.Client
+	providers         *Providers
+	compositeProvider project.Provider
+}
+
+type Deps interface {
+	Client() *client.Client
+	Providers() *Providers
+	CompositeProvider() project.Provider
 }
 
 func Initialise(version string) {
@@ -31,35 +46,57 @@ func validateDependencies() error {
 	return nil
 }
 
-func NewDeps() (*Deps, error) {
+func NewDeps() (Deps, error) {
 	if err := validateDependencies(); err != nil {
 		return nil, err
 	}
 
-	p, err := newProvider(v)
+	c, err := setupClient(v)
 	if err != nil {
-		return nil, fmt.Errorf("creating provider: %w", err)
+		return nil, fmt.Errorf("setup client: %w", err)
 	}
 
-	return &Deps{
-		p: p,
+	p := setupProviders(c)
+
+	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
+	}
+
+	return &deps{
+		client:            c,
+		providers:         p,
+		compositeProvider: cp,
 	}, nil
 }
 
-func newProvider(version string) (syncer.Provider, error) {
+func setupClient(version string) (*client.Client, error) {
 	cfg := config.GetConfig()
-	rawClient, err := client.New(
+	return client.New(
 		cfg.Auth.AccessToken,
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
-
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-	return provider.NewCatalogProvider(catalog.NewRudderDataCatalog(rawClient)), nil
 }
 
-func (d *Deps) Provider() syncer.Provider {
-	return d.p
+func setupProviders(c *client.Client) *Providers {
+	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c))
+	retlp := retl.New()
+
+	return &Providers{
+		DataCatalog: dcp,
+		RETL:        retlp,
+	}
+}
+
+func (d *deps) Client() *client.Client {
+	return d.client
+}
+
+func (d *deps) Providers() *Providers {
+	return d.providers
+}
+
+func (d *deps) CompositeProvider() project.Provider {
+	return d.compositeProvider
 }

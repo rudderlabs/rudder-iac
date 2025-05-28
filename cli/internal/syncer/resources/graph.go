@@ -49,3 +49,15 @@ func (s *Graph) AddDependencies(addedTo string, dependencies []string) {
 		s.AddDependency(addedTo, dep)
 	}
 }
+
+func (s *Graph) Merge(g *Graph) {
+	for _, r := range g.resources {
+		s.AddResource(r)
+	}
+
+	for k, v := range g.dependencies {
+		for _, dep := range v {
+			s.AddDependency(k, dep)
+		}
+	}
+}

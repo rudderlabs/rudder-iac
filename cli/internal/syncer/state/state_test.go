@@ -133,3 +133,48 @@ func TestDereference(t *testing.T) {
 		})
 	}
 }
+
+func TestMerge(t *testing.T) {
+	state1 := EmptyState()
+	resource1 := &ResourceState{
+		ID:   "source1",
+		Type: "source",
+		Input: map[string]any{
+			"name": "input test source",
+		},
+		Output: map[string]any{
+			"name": "test source",
+			"id":   "src1",
+		},
+	}
+	state1.AddResource(resource1)
+
+	state2 := EmptyState()
+	resource2 := &ResourceState{
+		ID:   "dest1",
+		Type: "destination",
+		Input: map[string]any{
+			"name": "input test destination",
+		},
+		Output: map[string]any{
+			"name":     "test destination",
+			"sourceId": "src1",
+		},
+	}
+	state2.AddResource(resource2)
+
+	state1.Merge(state2)
+
+	assert.Equal(t, 2, len(state1.Resources))
+	assert.NotNil(t, state1.GetResource(resources.URN(resource1.ID, resource1.Type)))
+	assert.NotNil(t, state1.GetResource(resources.URN(resource2.ID, resource2.Type)))
+	assert.Equal(t, resource1.Data(), state1.GetResource(resources.URN(resource1.ID, resource1.Type)).Data())
+	assert.Equal(t, resource2.Data(), state1.GetResource(resources.URN(resource2.ID, resource2.Type)).Data())
+
+	state3 := EmptyState()
+	state3.Version = "incompatible_version"
+
+	err := state1.Merge(state3)
+	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, ErrIncompatibleState)
+}
