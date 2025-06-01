@@ -95,9 +95,13 @@ func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error)
 		if state == nil {
 			state = s
 		} else {
-			state.Merge(s)
+			state, err = state.Merge(s)
+			if err != nil {
+				return nil, fmt.Errorf("error merging provider states")
+			}
 		}
 	}
+
 	return state, nil
 }
 

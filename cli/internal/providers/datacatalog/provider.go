@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
@@ -18,7 +18,7 @@ import (
 var log = logger.New("datacatalogprovider")
 
 type Provider struct {
-	project.SyncProvider
+	syncer.SyncProvider
 	client catalog.DataCatalog
 	dc     *localcatalog.DataCatalog
 }

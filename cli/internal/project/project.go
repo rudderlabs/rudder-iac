@@ -1,13 +1,13 @@
 package project
 
 import (
-	"context"
 	"fmt"
+	"slices"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader" // Will be used for default loader
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // SpecLoader defines the interface for loading project specifications.
@@ -24,18 +24,9 @@ type ProjectProvider interface {
 	GetResourceGraph() (*resources.Graph, error)
 }
 
-type SyncProvider interface {
-	LoadState(ctx context.Context) (*state.State, error)
-	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
-	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
-	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
-}
-
 type Provider interface {
 	ProjectProvider
-	SyncProvider
+	syncer.SyncProvider
 }
 
 type Project interface {
@@ -91,7 +82,7 @@ func (p *project) Load() error {
 
 	// The rest of the logic from old loadSpecs
 	for path, spec := range loadedSpecs {
-		if !p.providerSupportsKind(spec.Kind) {
+		if !slices.Contains(p.Provider.GetSupportedKinds(), spec.Kind) {
 			return specs.ErrUnsupportedKind{
 				Kind: spec.Kind,
 			}
@@ -102,15 +93,6 @@ func (p *project) Load() error {
 	}
 
 	return p.Provider.Validate()
-}
-
-func (p *project) providerSupportsKind(kind string) bool {
-	for _, k := range p.Provider.GetSupportedKinds() {
-		if k == kind {
-			return true
-		}
-	}
-	return false
 }
 
 func (p *project) GetResourceGraph() (*resources.Graph, error) {
