@@ -35,6 +35,13 @@ test: ## Run all unit tests
 test-it: ## Run all test, including integration tests
 	go test -tags integrationtest ./...
 
+# Run all E2E tests in the tests directory with verbose output
+.PHONY: test-e2e
+test-e2e:
+	go test -v ./tests/...
+
+# (You can add filtering by test name or file in the future if needed)
+
 .PHONY: docker-build
 docker-build: ## Build Docker image
 	docker build \

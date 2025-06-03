@@ -1,0 +1,85 @@
+version: "rudder/0.1"
+kind: "tp"
+metadata:
+  name: "public_api_tracking_plan"
+spec:
+  id: "public_api_tracking_plan"
+  display_name: "Public API Tracking Plan"
+  description: "Tracking plan for an rudderstack public APIs"
+  rules:
+    - type: "event_rule"
+      id: "public_api_requested_rule"
+      event:
+        $ref: "#/events/api_tracking_new/public_api_requested"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/api_tracking/apiMethod"
+          required: true
+        - $ref: "#/properties/api_tracking/apiPath"
+          required: true
+        - $ref: "#/properties/api_tracking/authTokenType"
+          required: true
+        - $ref: "#/properties/api_tracking/ipAddress"
+          required: true
+        - $ref: "#/properties/api_tracking/organizationId"
+          required: true
+        - $ref: "#/properties/api_tracking/referrer"
+          required: true
+        - $ref: "#/properties/api_tracking/userAgent"
+          required: true
+        - $ref: "#/properties/api_tracking/userId"
+          required: true
+        - $ref: "#/properties/api_tracking/workspaceId"
+          required: true
+    - type: "event_rule"
+      id: "public_api_response_rule"
+      event:
+        $ref: "#/events/api_tracking_new/public_api_response"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/api_tracking/apiMethod"
+          required: true
+        - $ref: "#/properties/api_tracking/apiPath"
+          required: true
+        - $ref: "#/properties/api_tracking/authTokenType"
+          required: true
+        - $ref: "#/properties/api_tracking/ipAddress"
+          required: true
+        - $ref: "#/properties/api_tracking/organizationId"
+          required: true
+        - $ref: "#/properties/api_tracking/referrer"
+          required: true
+        - $ref: "#/properties/api_tracking/userAgent"
+          required: true
+        - $ref: "#/properties/api_tracking/userId"
+          required: true
+        - $ref: "#/properties/api_tracking/workspaceId"
+          required: true
+        - $ref: "#/properties/api_tracking/userName"
+          required: true
+    - type: "event_rule"
+      id: "public_api_update_rule"
+      event:
+        $ref: "#/events/api_tracking_new/public_api_update"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/api_tracking/apiMethod"
+          required: true
+        - $ref: "#/properties/api_tracking/apiPath"
+          required: true
+        - $ref: "#/properties/api_tracking/authTokenType"
+          required: true
+        - $ref: "#/properties/api_tracking/ipAddress"
+          required: true
+        - $ref: "#/properties/api_tracking/organizationId"
+          required: true
+        - $ref: "#/properties/api_tracking/referrer"
+          required: true
+        - $ref: "#/properties/api_tracking/userAgent"
+          required: true
+        - $ref: "#/properties/api_tracking/userId"
+          required: true
+        - $ref: "#/properties/api_tracking/workspaceId"
+          required: true
+        - $ref: "#/properties/api_tracking/userName"
+          required: true

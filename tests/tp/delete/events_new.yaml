@@ -1,0 +1,6 @@
+version: "rudder/0.1"
+kind: "events"
+metadata:
+  name: api_tracking_new
+spec:
+  events:

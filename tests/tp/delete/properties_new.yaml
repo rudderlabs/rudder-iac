@@ -1,0 +1,6 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: api_tracking
+spec:
+  properties:

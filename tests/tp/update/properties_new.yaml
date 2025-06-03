@@ -1,0 +1,78 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: api_tracking
+spec:
+  properties:
+    - id: apiMethod
+      name: "apiMethod"
+      type: string
+      description: "http method of the api called"
+      propConfig:
+        enum:
+          - GET
+          - PUT
+          - POST
+          - DELETE
+
+    - id: apiPath
+      name: "apiPath"
+      type: string
+      description: "subpath of the api requested"
+
+    - id: authTokenType
+      name: "authTokenType"
+      type: string
+      description: "token type used in authentication"
+      propConfig:
+        enum:
+          - SAT
+          - PAT
+
+    - id: ipAddress
+      name: "ipAddress"
+      type: string
+      description: "ip address of the user"
+      propConfig:
+        format: ipv4
+
+    - id: organizationId
+      name: organizationId
+      type: string
+      description: "organization identifier of the caller"
+
+    - id: referrer
+      name: referrer
+      type: string
+      description: "URL of the source initiating the request"
+
+    - id: userAgent
+      name: userAgent
+      type: string
+      description: "user agent of the request"
+
+    - id: userId
+      name: userId
+      type: string
+      description: "user identifier of the caller"
+
+    - id: workspaceId
+      name: workspaceId
+      type: string
+      description: "workspace identifier of the caller"
+
+    - id: userName
+      name: userName
+      type: string
+      description: "user name of the caller"
+      propConfig:
+        pattern: ^([a-zA-Z]{2,}\s[a-zA-Z]{1,}'?-?[a-zA-Z]{2,}\s?([a-zA-Z]{1,})?)
+  
+    - id: Devices
+      name: Devices
+      type: object
+      description: "device name"
+        
+  
+
+

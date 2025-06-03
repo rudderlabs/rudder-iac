@@ -1,0 +1,10 @@
+version: "rudder/0.1"
+kind: "tp"
+metadata:
+  name: "public_api_tracking_plan"
+spec:
+  id: "public_api_tracking_plan"
+  display_name: "Public API Tracking Plan"
+  description: "Tracking plan for an rudderstack public APIs."
+  
+ 

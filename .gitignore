@@ -39,3 +39,6 @@ memory-bank
 
 
 **/linear-task-**.mdc
+
+# Local environment variables for tests
+.env
