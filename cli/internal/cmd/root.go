@@ -50,6 +50,7 @@ func init() {
 	// Add subcommands to the root command
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(experimentalCmd)
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 }
@@ -60,6 +61,11 @@ func initConfig() {
 	// only add debug command if enabled in config
 	if viper.GetBool("debug") {
 		debugCmd.Hidden = false
+	}
+
+	// only add experimental command if enabled in config
+	if viper.GetBool("experimental") {
+		experimentalCmd.Hidden = false
 	}
 }
 
