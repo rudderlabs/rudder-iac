@@ -12,10 +12,10 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider Provider
+	provider SyncProvider
 }
 
-type Provider interface {
+type SyncProvider interface {
 	LoadState(ctx context.Context) (*state.State, error)
 	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
 	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
@@ -24,7 +24,7 @@ type Provider interface {
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
 }
 
-func New(p Provider) (*ProjectSyncer, error) {
+func New(p SyncProvider) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
