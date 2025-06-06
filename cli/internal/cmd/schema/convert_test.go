@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -215,6 +216,34 @@ func TestConvertCommand_ErrorScenarios(t *testing.T) {
 			},
 			expectError: "conversion failed",
 		},
+		{
+			name: "ReadOnlyOutputDirectory",
+			setupFiles: func(tempDir string) (string, string) {
+				inputFile := filepath.Join(tempDir, "test_schemas.json")
+				outputDir := filepath.Join(tempDir, "readonly_output")
+
+				// Create valid input file
+				testData := `{
+					"schemas": [
+						{
+							"uid": "test-uid",
+							"writeKey": "test-write-key",
+							"eventType": "track",
+							"eventIdentifier": "test_event",
+							"schema": {"event": "string"}
+						}
+					]
+				}`
+				os.WriteFile(inputFile, []byte(testData), 0644)
+
+				// Create read-only output directory
+				os.MkdirAll(outputDir, 0444)
+				os.Chmod(outputDir, 0444)
+
+				return inputFile, outputDir
+			},
+			expectError: "conversion failed",
+		},
 	}
 
 	for _, c := range cases {
@@ -229,6 +258,102 @@ func TestConvertCommand_ErrorScenarios(t *testing.T) {
 			assert.Contains(t, err.Error(), c.expectError)
 		})
 	}
+}
+
+func TestConvertCommand_CommandFlags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("IndentFlag", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		inputFile := filepath.Join(tempDir, "test_schemas.json")
+		outputDir := filepath.Join(tempDir, "output")
+
+		testData := `{
+			"schemas": [
+				{
+					"uid": "test-uid",
+					"writeKey": "test-write-key",
+					"eventType": "track",
+					"eventIdentifier": "test_event",
+					"schema": {
+						"event": "string",
+						"userId": "string"
+					}
+				}
+			]
+		}`
+
+		err := os.WriteFile(inputFile, []byte(testData), 0644)
+		require.NoError(t, err)
+
+		// Test with different indent values
+		indentCases := []int{1, 2, 4, 8}
+		for _, indent := range indentCases {
+			t.Run(fmt.Sprintf("Indent_%d", indent), func(t *testing.T) {
+				currentOutputDir := filepath.Join(outputDir, fmt.Sprintf("indent_%d", indent))
+				err := runConvert(inputFile, currentOutputDir, false, false, indent)
+				assert.NoError(t, err)
+				assert.FileExists(t, filepath.Join(currentOutputDir, "events.yaml"))
+			})
+		}
+	})
+
+	t.Run("InvalidIndent", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		inputFile := filepath.Join(tempDir, "test_schemas.json")
+		outputDir := filepath.Join(tempDir, "output")
+
+		testData := `{
+			"schemas": [
+				{
+					"uid": "test-uid",
+					"writeKey": "test-write-key",
+					"eventType": "track",
+					"eventIdentifier": "test_event",
+					"schema": {"event": "string"}
+				}
+			]
+		}`
+
+		err := os.WriteFile(inputFile, []byte(testData), 0644)
+		require.NoError(t, err)
+
+		// Test with negative indent (should still work, converter should handle it)
+		err = runConvert(inputFile, outputDir, false, false, -1)
+		assert.NoError(t, err) // Should not error, converter handles edge cases
+	})
+}
+
+func TestNewCmdConvert(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CommandCreation", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdConvert()
+
+		assert.NotNil(t, cmd)
+		assert.Equal(t, "convert", cmd.Name())
+		assert.Equal(t, "Convert unflattened schemas to YAML files", cmd.Short)
+		assert.Contains(t, cmd.Long, "Convert unflattened schemas to RudderStack Data Catalog YAML files")
+
+		// Check that flags are properly set
+		dryRunFlag := cmd.Flags().Lookup("dry-run")
+		assert.NotNil(t, dryRunFlag)
+		assert.Equal(t, "false", dryRunFlag.DefValue)
+
+		verboseFlag := cmd.Flags().Lookup("verbose")
+		assert.NotNil(t, verboseFlag)
+		assert.Equal(t, "v", verboseFlag.Shorthand)
+
+		indentFlag := cmd.Flags().Lookup("indent")
+		assert.NotNil(t, indentFlag)
+		assert.Equal(t, "2", indentFlag.DefValue)
+	})
 }
 
 func TestConvertCommand_MultipleWriteKeys(t *testing.T) {
