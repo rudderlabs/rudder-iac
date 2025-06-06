@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 )
 
 // SchemaAnalyzer analyzes schemas to extract events, properties, and custom types

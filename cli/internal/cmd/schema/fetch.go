@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/config"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/client"
 	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
 	"github.com/spf13/cobra"
@@ -32,9 +32,9 @@ Authentication and Configuration:
 - API URL: Set via RUDDERSTACK_API_URL environment variable (defaults to RudderStack API)
 
 Examples:
-  rudder-cli experimental schema fetch schemas.json
-  rudder-cli experimental schema fetch schemas.json --write-key=YOUR_WRITE_KEY
-  rudder-cli experimental schema fetch schemas.json --verbose --dry-run`,
+  rudder-cli schema fetch schemas.json
+  rudder-cli schema fetch schemas.json --write-key=YOUR_WRITE_KEY
+  rudder-cli schema fetch schemas.json --verbose --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runFetch(args[0], writeKey, dryRun, verbose, indent)

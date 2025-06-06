@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"

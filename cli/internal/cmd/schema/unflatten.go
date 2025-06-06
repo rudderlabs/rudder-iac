@@ -3,7 +3,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/unflatten"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/utils"
 	"github.com/spf13/cobra"
 )
@@ -24,8 +24,8 @@ Input file should contain schemas with flattened keys using dot notation.
 Output file will contain the same schemas with properly nested structures.
 
 Examples:
-  rudder-cli experimental schema unflatten input.json output.json
-  rudder-cli experimental schema unflatten input.json output.json --verbose --dry-run`,
+  rudder-cli schema unflatten input.json output.json
+  rudder-cli schema unflatten input.json output.json --verbose --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUnflatten(args[0], args[1], dryRun, verbose, indent)
