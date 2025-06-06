@@ -1,3 +1,0 @@
-[submodule "import-yaml-from-source"]
-	path = import-yaml-from-source
-	url = git@github.com:rudderlabs/import-yaml-from-source.git
