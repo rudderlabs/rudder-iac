@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/jsonpath"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
 	"github.com/spf13/cobra"
@@ -13,24 +14,30 @@ import (
 // NewCmdUnflatten creates the unflatten command
 func NewCmdUnflatten() *cobra.Command {
 	var (
-		dryRun  bool
-		verbose bool
-		indent  int
+		dryRun     bool
+		verbose    bool
+		indent     int
+		jsonPath   string
+		skipFailed bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "unflatten [input-file] [output-file]",
-		Short: "Unflatten schema JSON files",
+		Short: "Unflatten schema JSON files with optional JSONPath extraction",
 		Long: `Unflatten converts flattened schema keys back to nested JSON structures.
-Input file should contain schemas with flattened keys using dot notation.
-Output file will contain the same schemas with properly nested structures.
+Optionally extract specific parts of the schema using JSONPath expressions.
+
+The command first unflattens all schemas (converting dot notation to nested structures),
+then applies JSONPath extraction if specified.
 
 Examples:
   rudder-cli schema unflatten input.json output.json
+  rudder-cli schema unflatten input.json output.json --jsonpath "$.properties"
+  rudder-cli schema unflatten input.json output.json --jsonpath "$.context.traits" --skip-failed=false
   rudder-cli schema unflatten input.json output.json --verbose --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUnflatten(args[0], args[1], dryRun, verbose, indent)
+			return runUnflatten(args[0], args[1], dryRun, verbose, indent, jsonPath, skipFailed)
 		},
 	}
 
@@ -38,6 +45,8 @@ Examples:
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without writing output file")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	cmd.Flags().IntVar(&indent, "indent", 2, "Number of spaces for JSON indentation")
+	cmd.Flags().StringVar(&jsonPath, "jsonpath", "", "JSONPath expression to extract value from schema (relative to schema field)")
+	cmd.Flags().BoolVar(&skipFailed, "skip-failed", true, "Skip schemas where JSONPath fails (false: leave schema intact)")
 
 	return cmd
 }
@@ -89,8 +98,14 @@ func writeSchemasFile(filePath string, schemasFile *models.SchemasFile, indent i
 	return nil
 }
 
+// ProcessingError tracks errors during schema processing
+type ProcessingError struct {
+	SchemaUID string
+	Error     error
+}
+
 // runUnflatten handles the unflatten command execution
-func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int) error {
+func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int, jsonPath string, skipFailed bool) error {
 	if verbose {
 		fmt.Printf("Processing %s...\n", inputFile)
 	}
@@ -107,29 +122,104 @@ func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int
 	}
 
 	if verbose {
-		fmt.Printf("Found %d schemas to unflatten\n", len(schemasFile.Schemas))
-	}
-
-	// Process each schema
-	processedCount := 0
-	for i := range schemasFile.Schemas {
-		if len(schemasFile.Schemas[i].Schema) > 0 {
-			schemasFile.Schemas[i].Schema = unflatten.UnflattenSchema(schemasFile.Schemas[i].Schema)
-			processedCount++
+		fmt.Printf("Found %d schemas to process\n", len(schemasFile.Schemas))
+		if jsonPath != "" {
+			fmt.Printf("Using JSONPath: %s\n", jsonPath)
+			fmt.Printf("Skip failed: %v\n", skipFailed)
 		}
 	}
 
-	if verbose {
-		fmt.Printf("Successfully unflattened %d schemas\n", processedCount)
+	// Create JSONPath processor if needed
+	var processor *jsonpath.Processor
+	if jsonPath != "" {
+		processor = jsonpath.NewProcessor(jsonPath, skipFailed)
+	}
+
+	// Process each schema
+	var processedSchemas []models.Schema
+	var processingErrors []ProcessingError
+	processedCount := 0
+	skippedCount := 0
+
+	for i := range schemasFile.Schemas {
+		originalSchema := &schemasFile.Schemas[i]
+
+		// Step 1: Always unflatten first
+		if len(originalSchema.Schema) > 0 {
+			originalSchema.Schema = unflatten.UnflattenSchema(originalSchema.Schema)
+		}
+
+		// Step 2: Apply JSONPath extraction if specified
+		if processor != nil && !processor.IsRootPath() {
+			result := processor.ProcessSchema(originalSchema.Schema)
+			if result.Error != nil {
+				// Handle error based on skip-failed setting
+				processingErrors = append(processingErrors, ProcessingError{
+					SchemaUID: originalSchema.UID,
+					Error:     result.Error,
+				})
+
+				if processor.ShouldSkipOnError() {
+					// Skip this schema
+					skippedCount++
+					continue
+				}
+				// else: keep the unflattened schema and continue
+			} else {
+				// Replace schema with extracted value
+				// The result might be any type (map, array, primitive), so we need to handle it properly
+				switch v := result.Value.(type) {
+				case map[string]interface{}:
+					originalSchema.Schema = v
+				case []interface{}:
+					// For arrays, keep them as arrays but we need to convert to map[string]interface{}
+					// Since schema must be map[string]interface{}, we wrap it
+					originalSchema.Schema = map[string]interface{}{
+						"items": v,
+					}
+				case string, float64, bool, nil:
+					// For primitive types, wrap them in a map to maintain schema structure
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				default:
+					// Fallback: convert to map
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				}
+			}
+		}
+
+		processedSchemas = append(processedSchemas, *originalSchema)
+		processedCount++
+	}
+
+	// Update the schemas file with processed schemas
+	schemasFile.Schemas = processedSchemas
+
+	// Report processing results
+	if verbose || len(processingErrors) > 0 {
+		fmt.Printf("✓ Successfully processed %d schemas\n", processedCount)
+		if skippedCount > 0 {
+			fmt.Printf("⚠ Skipped %d schemas due to JSONPath errors\n", skippedCount)
+		}
+		if len(processingErrors) > 0 {
+			fmt.Printf("⚠ JSONPath processing errors:\n")
+			for _, err := range processingErrors {
+				fmt.Printf("  - Schema UID %s: %s\n", err.SchemaUID, err.Error.Error())
+			}
+		}
 	}
 
 	if dryRun {
 		fmt.Printf("DRY RUN: Would write output to %s\n", outputFile)
 		if verbose {
-			fmt.Printf("DRY RUN: First schema preview:\n")
+			fmt.Printf("DRY RUN: Final output preview:\n")
 			if len(schemasFile.Schemas) > 0 {
-				fmt.Printf("  Event: %s\n", schemasFile.Schemas[0].EventIdentifier)
-				fmt.Printf("  Schema keys count: %d\n", countKeys(schemasFile.Schemas[0].Schema))
+				fmt.Printf("  Schemas count: %d\n", len(schemasFile.Schemas))
+				fmt.Printf("  First schema event: %s\n", schemasFile.Schemas[0].EventIdentifier)
+				fmt.Printf("  First schema keys count: %d\n", countKeys(schemasFile.Schemas[0].Schema))
 			}
 		}
 		return nil
@@ -140,7 +230,10 @@ func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	fmt.Printf("✓ Successfully unflattened %d schemas\n", processedCount)
+	fmt.Printf("✓ Successfully processed %d schemas\n", processedCount)
+	if skippedCount > 0 {
+		fmt.Printf("⚠ Skipped %d schemas due to JSONPath errors\n", skippedCount)
+	}
 	fmt.Printf("✓ Output written to %s\n", outputFile)
 
 	return nil

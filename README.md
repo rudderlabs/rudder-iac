@@ -92,6 +92,11 @@ docker run -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
   -e RUDDERSTACK_ACCESS_TOKEN="your-access-token" \
   rudderlabs/rudder-cli schema fetch /workspace/schemas.json
+
+# Unflatten with JSONPath extraction
+docker run -v $(pwd):/workspace \
+  -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
+  rudderlabs/rudder-cli schema unflatten /workspace/schemas.json /workspace/properties.json --jsonpath "$.properties" --verbose
 ```
 
 ### Build from Source
@@ -160,7 +165,7 @@ Schema commands use the main CLI's authentication system:
 | Command | Description |
 |---------|-------------|
 | `fetch` | Fetch event schemas from the Event Audit API |
-| `unflatten` | Convert flattened schema keys to nested JSON structures |
+| `unflatten` | Convert flattened schema keys to nested JSON structures with optional JSONPath extraction |
 | `convert` | Convert schemas to RudderStack Data Catalog YAML files |
 
 #### Complete Workflow
@@ -174,6 +179,9 @@ rudder-cli schema fetch schemas.json --verbose
 
 # 2. Unflatten dot-notation keys to nested structures
 rudder-cli schema unflatten schemas.json unflattened.json --verbose
+
+# 2a. (Optional) Extract specific schema parts using JSONPath
+rudder-cli schema unflatten schemas.json properties.json --jsonpath "$.properties" --verbose
 
 # 3. Convert to Data Catalog YAML files
 rudder-cli schema convert unflattened.json output/ --verbose
@@ -201,12 +209,36 @@ rudder-cli schema fetch schemas.json --dry-run --verbose
 
 **Unflatten Schemas**:
 ```bash
-# Unflatten flattened schema keys
+# Basic unflatten - convert dot-notation keys to nested structures
 rudder-cli schema unflatten input.json output.json
 
 # With verbose output and custom indentation
 rudder-cli schema unflatten input.json output.json --verbose --indent 4
+
+# Extract specific parts using JSONPath expressions
+rudder-cli schema unflatten input.json output.json --jsonpath "$.properties"
+
+# Extract nested data
+rudder-cli schema unflatten input.json output.json --jsonpath "$.context.traits"
+
+# Extract array elements
+rudder-cli schema unflatten input.json output.json --jsonpath "$.properties.categories"
+
+# Control error handling - keep original schemas when JSONPath fails
+rudder-cli schema unflatten input.json output.json --jsonpath "$.properties" --skip-failed=false
+
+# Preview changes without writing output file
+rudder-cli schema unflatten input.json output.json --jsonpath "$.properties" --dry-run --verbose
 ```
+
+**JSONPath Features**:
+- **Processing Flow**: Always unflattens schemas first, then applies JSONPath extraction
+- **Root Paths**: Using `$`, `$.`, or empty path behaves same as no JSONPath (returns full unflattened schema)
+- **Error Handling**: 
+  - `--skip-failed=true` (default): Skips schemas where JSONPath fails, reports errors
+  - `--skip-failed=false`: Keeps original unflattened schema when JSONPath fails, reports errors
+- **Supported JSONPath Expressions**: `$.properties`, `$.context.traits`, `$.properties.categories.0`, etc.
+- **Data Type Support**: Objects, arrays, primitives, and null values
 
 **Convert to YAML**:
 ```bash
