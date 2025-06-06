@@ -3,6 +3,7 @@ package converter
 import (
 	"crypto/md5"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
 
@@ -14,6 +15,11 @@ type SchemaAnalyzer struct {
 	Events      map[string]*EventInfo
 	Properties  map[string]*PropertyInfo
 	CustomTypes map[string]*CustomTypeInfo
+
+	// Uniqueness tracking
+	UsedCustomTypeNames map[string]bool
+	UsedPropertyIDs     map[string]bool
+	UsedEventIDs        map[string]bool
 }
 
 // EventInfo holds information about an extracted event
@@ -49,9 +55,12 @@ type CustomTypeInfo struct {
 // NewSchemaAnalyzer creates a new schema analyzer
 func NewSchemaAnalyzer() *SchemaAnalyzer {
 	return &SchemaAnalyzer{
-		Events:      make(map[string]*EventInfo),
-		Properties:  make(map[string]*PropertyInfo),
-		CustomTypes: make(map[string]*CustomTypeInfo),
+		Events:              make(map[string]*EventInfo),
+		Properties:          make(map[string]*PropertyInfo),
+		CustomTypes:         make(map[string]*CustomTypeInfo),
+		UsedCustomTypeNames: make(map[string]bool),
+		UsedPropertyIDs:     make(map[string]bool),
+		UsedEventIDs:        make(map[string]bool),
 	}
 }
 
@@ -75,20 +84,38 @@ func (sa *SchemaAnalyzer) AnalyzeSchemas(schemas []models.Schema) error {
 
 // extractEvent extracts event information from a schema
 func (sa *SchemaAnalyzer) extractEvent(schema models.Schema) {
-	eventID := sanitizeID(schema.EventIdentifier)
+	eventIdentifier := schema.EventIdentifier
 
-	// Skip if already processed
-	if _, exists := sa.Events[eventID]; exists {
-		return
+	// Handle empty or invalid event identifiers
+	if eventIdentifier == "" {
+		eventIdentifier = "unknown_event"
 	}
 
-	sa.Events[eventID] = &EventInfo{
+	// Sanitize the event identifier to ensure it's valid
+	eventID := sanitizeEventID(eventIdentifier)
+
+	// If sanitization results in empty or very short ID, use fallback
+	if len(eventID) < 3 {
+		eventID = fmt.Sprintf("event_%s", generateRandomID())
+	}
+
+	// Check for uniqueness
+	if _, exists := sa.Events[eventID]; exists {
+		return // Event already processed
+	}
+
+	eventName := generateEventName(eventIdentifier)
+
+	event := &EventInfo{
 		ID:          eventID,
-		Name:        generateEventName(schema.EventIdentifier),
-		EventType:   schema.EventType,
-		Description: fmt.Sprintf("Extracted from eventIdentifier: %s", schema.EventIdentifier),
+		Name:        eventName,
+		EventType:   "track", // Default type
+		Description: fmt.Sprintf("Extracted from eventIdentifier: %s", eventIdentifier),
 		Original:    schema,
 	}
+
+	sa.Events[eventID] = event
+	sa.UsedEventIDs[eventID] = true
 }
 
 // analyzeProperties recursively analyzes schema properties
@@ -203,11 +230,13 @@ func (sa *SchemaAnalyzer) createCustomTypeForObject(obj map[string]interface{}, 
 		}
 	}
 
-	// Create new custom type
+	// Create new custom type with unique name
 	customTypeID := generateCustomTypeID(path, "object", hash)
+	customTypeName := sa.generateUniqueCustomTypeName(path, "object")
+
 	customType := &CustomTypeInfo{
 		ID:          customTypeID,
-		Name:        generateCustomTypeName(path, "object"),
+		Name:        customTypeName,
 		Type:        "object",
 		Description: fmt.Sprintf("Custom object type for %s", path),
 		Structure:   structure,
@@ -226,9 +255,11 @@ func (sa *SchemaAnalyzer) createCustomTypeForArray(arr []interface{}, path strin
 		hash := generateArrayHash(itemType)
 
 		customTypeID := generateCustomTypeID(path, "array", hash)
+		customTypeName := sa.generateUniqueCustomTypeName(path, "array")
+
 		customType := &CustomTypeInfo{
 			ID:            customTypeID,
-			Name:          generateCustomTypeName(path, "array"),
+			Name:          customTypeName,
 			Type:          "array",
 			Description:   fmt.Sprintf("Custom array type for %s", path),
 			ArrayItemType: itemType,
@@ -243,15 +274,24 @@ func (sa *SchemaAnalyzer) createCustomTypeForArray(arr []interface{}, path strin
 	firstItem := arr[0]
 	itemType := getJSONType(firstItem)
 
-	// For object arrays, we need to analyze the object structure
+	// For object arrays, we need to create a custom type for the object
+	// and then reference it properly
 	if itemType == "object" {
 		if objMap, ok := firstItem.(map[string]interface{}); ok {
-			structure := make(map[string]string)
-			for key, value := range objMap {
-				structure[key] = getJSONType(value)
+			// Create custom type for the object
+			objectCustomType, err := sa.createCustomTypeForObject(objMap, path+"_item")
+			if err != nil {
+				return nil, err
 			}
-			itemType = fmt.Sprintf("object_%s", generateStructureHash(structure))
+			// Set itemType to reference the custom object type
+			itemType = fmt.Sprintf("#/custom-types/extracted_custom_types/%s", objectCustomType.ID)
+		} else {
+			// Fallback to generic object type
+			itemType = "object"
 		}
+	} else {
+		// For primitive types, use the YAML type mapping
+		itemType = mapJSONTypeToYAML(itemType)
 	}
 
 	hash := generateArrayHash(itemType)
@@ -265,9 +305,11 @@ func (sa *SchemaAnalyzer) createCustomTypeForArray(arr []interface{}, path strin
 
 	// Create new custom type
 	customTypeID := generateCustomTypeID(path, "array", hash)
+	customTypeName := sa.generateUniqueCustomTypeName(path, "array")
+
 	customType := &CustomTypeInfo{
 		ID:            customTypeID,
-		Name:          generateCustomTypeName(path, "array"),
+		Name:          customTypeName,
 		Type:          "array",
 		Description:   fmt.Sprintf("Custom array type for %s", path),
 		ArrayItemType: itemType,
@@ -287,17 +329,28 @@ func (sa *SchemaAnalyzer) createProperty(path string, value interface{}) error {
 	jsonType := getJSONType(value)
 	yamlType := mapJSONTypeToYAML(jsonType)
 
-	propertyKey := generatePropertyKey(path, yamlType)
+	// Extract property name from path
+	propertyName := extractPropertyName(path)
 
-	// Skip if property already exists
+	// Skip if property name is empty (e.g., from malformed paths like "context.traits.")
+	if propertyName == "" {
+		return nil
+	}
+
+	// Create property key based on name + type for deduplication
+	propertyKey := fmt.Sprintf("%s_%s", sanitizeID(propertyName), sanitizeID(yamlType))
+
+	// Skip if property with same name+type already exists
 	if _, exists := sa.Properties[propertyKey]; exists {
 		return nil
 	}
 
-	propertyID := sanitizeID(path)
+	// Generate unique property ID based on name and type combination
+	propertyID := sa.generateUniquePropertyID(propertyName, yamlType)
+
 	property := &PropertyInfo{
 		ID:          propertyID,
-		Name:        extractPropertyName(path),
+		Name:        propertyName,
 		Type:        yamlType,
 		Description: fmt.Sprintf("Property extracted from path: %s", path),
 		Path:        path,
@@ -315,17 +368,29 @@ func (sa *SchemaAnalyzer) createPropertyWithCustomType(path string, customType *
 	}
 
 	typeRef := fmt.Sprintf("#/custom-types/extracted_custom_types/%s", customType.ID)
-	propertyKey := generatePropertyKey(path, typeRef)
 
-	// Skip if property already exists
+	// Extract property name from path
+	propertyName := extractPropertyName(path)
+
+	// Skip if property name is empty (e.g., from malformed paths like "context.traits.")
+	if propertyName == "" {
+		return nil
+	}
+
+	// Create property key based on name + type for deduplication (same as primitive properties)
+	propertyKey := fmt.Sprintf("%s_%s", sanitizeID(propertyName), sanitizeID(typeRef))
+
+	// Skip if property with same name+type already exists
 	if _, exists := sa.Properties[propertyKey]; exists {
 		return nil
 	}
 
-	propertyID := sanitizeID(path)
+	// Generate unique property ID based on name and type combination
+	propertyID := sa.generateUniquePropertyID(propertyName, typeRef)
+
 	property := &PropertyInfo{
 		ID:          propertyID,
-		Name:        extractPropertyName(path),
+		Name:        propertyName,
 		Type:        typeRef,
 		Description: fmt.Sprintf("Property with custom type from path: %s", path),
 		Path:        path,
@@ -433,21 +498,69 @@ func generateCustomTypeID(path, baseType, hash string) string {
 }
 
 func generateCustomTypeName(path, baseType string) string {
-	cleanPath := strings.ReplaceAll(path, ".", " ")
-	cleanPath = strings.ReplaceAll(cleanPath, "_", " ")
-	parts := strings.Fields(cleanPath)
+	// Clean the path to only contain letters
+	cleanPath := strings.ReplaceAll(path, ".", "")
+	cleanPath = strings.ReplaceAll(cleanPath, "_", "")
+	cleanPath = strings.ReplaceAll(cleanPath, "-", "")
+	cleanPath = strings.ReplaceAll(cleanPath, " ", "")
 
-	for i, part := range parts {
-		if len(part) > 0 {
-			parts[i] = strings.ToUpper(part[:1]) + part[1:]
+	// Remove any non-letter characters
+	var letterOnly strings.Builder
+	for _, char := range cleanPath {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
+			letterOnly.WriteRune(char)
 		}
 	}
 
-	typeName := strings.Join(parts, " ")
-	if baseType == "array" {
-		return typeName + " Array Type"
+	cleanPath = letterOnly.String()
+
+	// Ensure we have at least some letters to work with
+	if cleanPath == "" {
+		cleanPath = "Generated"
 	}
-	return typeName + " Type"
+
+	// Capitalize first letter
+	if len(cleanPath) > 0 {
+		cleanPath = strings.ToUpper(cleanPath[:1]) + strings.ToLower(cleanPath[1:])
+	}
+
+	// Add type suffix
+	var typeName string
+	if baseType == "array" {
+		typeName = cleanPath + "Array"
+	} else {
+		typeName = cleanPath + "Type"
+	}
+
+	// Ensure the name is between 3 and 65 characters
+	if len(typeName) < 3 {
+		// Pad with "Type" if too short
+		typeName = typeName + "Type"
+		if len(typeName) < 3 {
+			typeName = "GeneratedType"
+		}
+	}
+
+	if len(typeName) > 65 {
+		// Truncate if too long, but ensure it ends properly
+		if baseType == "array" {
+			maxBase := 65 - 5 // Reserve 5 chars for "Array"
+			if maxBase > 0 {
+				typeName = typeName[:maxBase] + "Array"
+			} else {
+				typeName = "GenArray"
+			}
+		} else {
+			maxBase := 65 - 4 // Reserve 4 chars for "Type"
+			if maxBase > 0 {
+				typeName = typeName[:maxBase] + "Type"
+			} else {
+				typeName = "GenType"
+			}
+		}
+	}
+
+	return typeName
 }
 
 func generateStructureHash(structure map[string]string) string {
@@ -471,4 +584,180 @@ func generateStructureHash(structure map[string]string) string {
 func generateArrayHash(itemType string) string {
 	hash := md5.Sum([]byte("array_" + itemType))
 	return fmt.Sprintf("%x", hash)[:8]
+}
+
+func generateUniquePropertyID(name, propType string) string {
+	cleanName := sanitizeID(name)
+
+	// If propType is a custom type reference, extract a clean identifier
+	if strings.HasPrefix(propType, "#/custom-types/") {
+		// Extract the custom type ID from the reference
+		parts := strings.Split(propType, "/")
+		if len(parts) >= 3 {
+			cleanType := sanitizeID(parts[len(parts)-1])
+			return fmt.Sprintf("%s_%s", cleanName, cleanType)
+		}
+		// Fallback if parsing fails
+		return fmt.Sprintf("%s_customtype", cleanName)
+	}
+
+	// For primitive types, sanitize normally
+	cleanType := sanitizeID(propType)
+	return fmt.Sprintf("%s_%s", cleanName, cleanType)
+}
+
+func (sa *SchemaAnalyzer) generateUniqueCustomTypeName(path, baseType string) string {
+	baseName := generateCustomTypeName(path, baseType)
+
+	// If the name is not used, return it
+	if !sa.UsedCustomTypeNames[baseName] {
+		sa.UsedCustomTypeNames[baseName] = true
+		return baseName
+	}
+
+	// If it's already used, add letter suffixes to maintain letter-only requirement
+	letterSuffixes := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+
+	for _, suffix := range letterSuffixes {
+		candidateName := baseName + suffix
+
+		// Ensure it doesn't exceed 65 characters
+		if len(candidateName) > 65 {
+			// Truncate base name to make room for suffix
+			maxBaseLen := 65 - len(suffix)
+			if maxBaseLen > 3 { // Ensure minimum length
+				candidateName = baseName[:maxBaseLen] + suffix
+			} else {
+				candidateName = "GenType" + suffix
+			}
+		}
+
+		if !sa.UsedCustomTypeNames[candidateName] {
+			sa.UsedCustomTypeNames[candidateName] = true
+			return candidateName
+		}
+	}
+
+	// If all single letters are used, try double letters
+	for _, suffix1 := range letterSuffixes {
+		for _, suffix2 := range letterSuffixes {
+			suffix := suffix1 + suffix2
+			candidateName := baseName + suffix
+
+			// Ensure it doesn't exceed 65 characters
+			if len(candidateName) > 65 {
+				// Truncate base name to make room for suffix
+				maxBaseLen := 65 - len(suffix)
+				if maxBaseLen > 3 { // Ensure minimum length
+					candidateName = baseName[:maxBaseLen] + suffix
+				} else {
+					candidateName = "GenType" + suffix
+				}
+			}
+
+			if !sa.UsedCustomTypeNames[candidateName] {
+				sa.UsedCustomTypeNames[candidateName] = true
+				return candidateName
+			}
+		}
+	}
+
+	// Fallback - this should rarely happen
+	return "UniqueGenType"
+}
+
+func (sa *SchemaAnalyzer) generateUniquePropertyID(name, propType string) string {
+	baseID := generateUniquePropertyID(name, propType)
+
+	// If the ID is not used, return it
+	if !sa.UsedPropertyIDs[baseID] {
+		sa.UsedPropertyIDs[baseID] = true
+		return baseID
+	}
+
+	// If it's already used, add a counter
+	counter := 1
+	for {
+		candidateID := fmt.Sprintf("%s_%d", baseID, counter)
+		if !sa.UsedPropertyIDs[candidateID] {
+			sa.UsedPropertyIDs[candidateID] = true
+			return candidateID
+		}
+		counter++
+	}
+}
+
+func generateRandomID() string {
+	const length = 10
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(result)
+}
+
+func sanitizeEventID(input string) string {
+	// Remove or replace problematic characters
+	result := input
+
+	// Replace common problematic characters
+	replacements := map[string]string{
+		"/":  "_",
+		"\\": "_",
+		"?":  "_",
+		"<":  "_",
+		">":  "_",
+		"\"": "_",
+		"'":  "_",
+		"(":  "_",
+		")":  "_",
+		"[":  "_",
+		"]":  "_",
+		"{":  "_",
+		"}":  "_",
+		"|":  "_",
+		"#":  "_",
+		"%":  "_",
+		"&":  "_",
+		"*":  "_",
+		"+":  "_",
+		"=":  "_",
+		"@":  "_",
+		"!":  "_",
+		" ":  "_",
+		"\t": "_",
+		"\n": "_",
+		"\r": "_",
+	}
+
+	for old, new := range replacements {
+		result = strings.ReplaceAll(result, old, new)
+	}
+
+	// Remove any remaining non-alphanumeric characters except underscores and hyphens
+	var clean strings.Builder
+	for _, char := range result {
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-' {
+			clean.WriteRune(char)
+		}
+	}
+
+	result = clean.String()
+
+	// Remove consecutive underscores
+	for strings.Contains(result, "__") {
+		result = strings.ReplaceAll(result, "__", "_")
+	}
+
+	// Trim underscores from start and end
+	result = strings.Trim(result, "_")
+
+	// Ensure lowercase for consistency
+	result = strings.ToLower(result)
+
+	return result
 }

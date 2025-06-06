@@ -3,6 +3,7 @@ package converter
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	internalModels "github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/models"
 	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
@@ -117,10 +118,10 @@ func (sa *SchemaAnalyzer) GenerateCustomTypesYAML() *yamlModels.CustomTypesYAML 
 
 			for _, structKey := range structKeys {
 				// Find the corresponding property
-				propertyPath := findPropertyForStructField(sa, structKey, typeInfo)
-				if propertyPath != "" {
+				propertyID := findPropertyForStructField(sa, structKey, typeInfo)
+				if propertyID != "" {
 					propertyRef := yamlModels.PropertyRef{
-						Ref:      fmt.Sprintf("#/properties/extracted_properties/%s", sanitizeID(propertyPath)),
+						Ref:      fmt.Sprintf("#/properties/extracted_properties/%s", propertyID),
 						Required: false, // Default to optional
 					}
 					propertyRefs = append(propertyRefs, propertyRef)
@@ -158,6 +159,9 @@ func (sa *SchemaAnalyzer) GenerateTrackingPlansYAML(schemas []internalModels.Sch
 
 	trackingPlans := make(map[string]*yamlModels.TrackingPlanYAML)
 
+	// Keep track of used rule IDs globally to ensure uniqueness
+	usedRuleIDs := make(map[string]bool)
+
 	for writeKey, groupSchemas := range writeKeyGroups {
 		planID := fmt.Sprintf("tracking_plan_%s", sanitizeID(writeKey))
 		displayName := fmt.Sprintf("Tracking Plan for WriteKey %s", writeKey)
@@ -165,9 +169,17 @@ func (sa *SchemaAnalyzer) GenerateTrackingPlansYAML(schemas []internalModels.Sch
 		var rules []yamlModels.EventRule
 
 		// Create rules for each schema in the group
-		for _, schema := range groupSchemas {
-			eventID := sanitizeID(schema.EventIdentifier)
-			ruleID := fmt.Sprintf("%s_rule", eventID)
+		for i, schema := range groupSchemas {
+			// Find the actual event ID that was created for this schema
+			eventID := sa.findEventIDForSchema(schema)
+
+			// Skip if no event was created for this schema (e.g., due to filtering)
+			if eventID == "" {
+				continue
+			}
+
+			// Generate globally unique rule ID
+			ruleID := generateUniqueRuleID(writeKey, eventID, i, usedRuleIDs)
 
 			// Get properties for this schema
 			properties := sa.extractPropertiesForSchema(schema)
@@ -292,14 +304,61 @@ func (sa *SchemaAnalyzer) isPropertyRequired(path string) bool {
 	return requiredFields[propertyName]
 }
 
-// findPropertyForStructField finds the property path for a structure field
+// findPropertyForStructField finds the property ID for a structure field
 func findPropertyForStructField(sa *SchemaAnalyzer, fieldName string, typeInfo *CustomTypeInfo) string {
-	// Look for properties that match this field name within the context
+	// Look for properties that match the field name in the context of the custom type path
 	for _, property := range sa.Properties {
+		// Check if the property path ends with the field name
+		// This handles nested paths like "properties.user.name" matching field "name"
+		pathParts := strings.Split(property.Path, ".")
+		if len(pathParts) > 0 && pathParts[len(pathParts)-1] == fieldName {
+			return property.ID
+		}
+
+		// Also check if the property name matches
 		if property.Name == fieldName {
-			return property.Path
+			return property.ID
 		}
 	}
+	return ""
+}
 
-	return fieldName // Fallback to field name
+// generateUniqueRuleID generates globally unique rule IDs across all tracking plans
+func generateUniqueRuleID(writeKey, eventID string, index int, usedRuleIDs map[string]bool) string {
+	sanitizedWriteKey := sanitizeID(writeKey)
+
+	// Try the basic pattern first
+	baseRuleID := fmt.Sprintf("%s_%s_rule", sanitizedWriteKey, eventID)
+
+	// If it's not used, return it
+	if !usedRuleIDs[baseRuleID] {
+		usedRuleIDs[baseRuleID] = true
+		return baseRuleID
+	}
+
+	// If the base ID is already used, add index to make it unique
+	var finalRuleID string
+	counter := index
+	for {
+		finalRuleID = fmt.Sprintf("%s_%s_rule_%d", sanitizedWriteKey, eventID, counter)
+		if !usedRuleIDs[finalRuleID] {
+			usedRuleIDs[finalRuleID] = true
+			break
+		}
+		counter++
+	}
+
+	return finalRuleID
+}
+
+// findEventIDForSchema finds the event ID that was created for a given schema
+func (sa *SchemaAnalyzer) findEventIDForSchema(schema internalModels.Schema) string {
+	// Look through all events to find the one that matches this schema
+	for _, event := range sa.Events {
+		if event.Original.EventIdentifier == schema.EventIdentifier &&
+			event.Original.WriteKey == schema.WriteKey {
+			return event.ID
+		}
+	}
+	return ""
 }
