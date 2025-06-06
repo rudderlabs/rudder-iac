@@ -40,7 +40,7 @@ type resourceProvider interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 }
 
-func NewCatalogProvider(dc catalog.DataCatalog) syncer.Provider {
+func NewCatalogProvider(dc catalog.DataCatalog) syncer.SyncProvider {
 	return &CatalogProvider{
 		client: dc,
 		providerStore: map[string]resourceProvider{
