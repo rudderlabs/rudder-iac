@@ -52,7 +52,7 @@ func TestRootCommand_Structure(t *testing.T) {
 }
 
 func TestSetVersion(t *testing.T) {
-	t.Parallel()
+	// Removed t.Parallel() to avoid race conditions with global rootCmd.Version
 
 	cases := []struct {
 		name    string
@@ -74,7 +74,7 @@ func TestSetVersion(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
+			// Removed t.Parallel() to avoid race conditions with global rootCmd.Version
 
 			SetVersion(c.version)
 			assert.Equal(t, c.version, rootCmd.Version)
@@ -132,7 +132,7 @@ func TestInitFunctions(t *testing.T) {
 
 	t.Run("InitConfig", func(t *testing.T) {
 		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "test_config.json")
+		_ = filepath.Join(tempDir, "test_config.json") // We create a temp path but don't use it
 
 		// Set a temporary config file to avoid affecting global state
 		originalViper := viper.GetViper()

@@ -1,10 +1,12 @@
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +42,53 @@ Examples:
 	return cmd
 }
 
+// fileExists checks if a file exists
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	return !os.IsNotExist(err)
+}
+
+// readSchemasFile reads a schemas JSON file and returns the parsed structure
+func readSchemasFile(filePath string) (*models.SchemasFile, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	var schemasFile models.SchemasFile
+	if err := json.Unmarshal(data, &schemasFile); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON from %s: %w", filePath, err)
+	}
+
+	return &schemasFile, nil
+}
+
+// writeSchemasFile writes the schemas structure to a JSON file with proper formatting
+func writeSchemasFile(filePath string, schemasFile *models.SchemasFile, indent int) error {
+	var data []byte
+	var err error
+
+	if indent > 0 {
+		indentStr := ""
+		for i := 0; i < indent; i++ {
+			indentStr += " "
+		}
+		data, err = json.MarshalIndent(schemasFile, "", indentStr)
+	} else {
+		data, err = json.Marshal(schemasFile)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+
+	return nil
+}
+
 // runUnflatten handles the unflatten command execution
 func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int) error {
 	if verbose {
@@ -47,12 +96,12 @@ func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int
 	}
 
 	// Check if input file exists
-	if !utils.FileExists(inputFile) {
+	if !fileExists(inputFile) {
 		return fmt.Errorf("input file %s does not exist", inputFile)
 	}
 
 	// Read the input file
-	schemasFile, err := utils.ReadSchemasFile(inputFile)
+	schemasFile, err := readSchemasFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
@@ -87,7 +136,7 @@ func runUnflatten(inputFile, outputFile string, dryRun, verbose bool, indent int
 	}
 
 	// Write the output file
-	if err := utils.WriteSchemasFile(outputFile, schemasFile, indent); err != nil {
+	if err := writeSchemasFile(outputFile, schemasFile, indent); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 

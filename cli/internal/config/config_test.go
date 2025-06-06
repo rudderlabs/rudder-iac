@@ -166,14 +166,38 @@ func TestConfigDefaults(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "defaults_config.json")
 
-		// Initialize config with the temporary file
-		originalViper := viper.GetViper()
+		// Save and clear environment variables that might affect defaults
+		envVars := []string{
+			"RUDDERSTACK_ACCESS_TOKEN",
+			"RUDDERSTACK_API_URL",
+			"RUDDERSTACK_CLI_EXPERIMENTAL",
+			"RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY",
+			"RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL",
+			"RUDDERSTACK_CLI_TELEMETRY_DISABLED",
+		}
+
+		originalEnvs := make(map[string]string)
+		for _, envVar := range envVars {
+			originalEnvs[envVar] = os.Getenv(envVar)
+			os.Unsetenv(envVar)
+		}
+
 		defer func() {
-			viper.Reset()
-			for key, value := range originalViper.AllSettings() {
-				viper.Set(key, value)
+			// Restore environment variables
+			for envVar, value := range originalEnvs {
+				if value != "" {
+					os.Setenv(envVar, value)
+				}
 			}
 		}()
+
+		// Initialize config with the temporary file
+		// Completely reset viper state to avoid interference from global config
+		viper.Reset()
+
+		// Write an empty JSON file to ensure clean state
+		err := os.WriteFile(configFile, []byte("{}"), 0644)
+		require.NoError(t, err)
 
 		InitConfig(configFile)
 

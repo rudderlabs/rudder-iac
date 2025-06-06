@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
@@ -20,8 +19,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// viperMutex protects concurrent access to viper configuration
+var viperMutex sync.Mutex
+
 // setupViperForTests initializes viper with environment variable bindings for tests
 func setupViperForTests() {
+	// Use a mutex to prevent race conditions on viper.Reset()
+	viperMutex.Lock()
+	defer viperMutex.Unlock()
+
 	viper.Reset()
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
@@ -252,7 +258,7 @@ func TestFetchWithPagination(t *testing.T) {
 
 // TestDryRunMode tests that dry run mode doesn't create files
 func TestDryRunMode(t *testing.T) {
-	t.Parallel()
+	// Removed t.Parallel() to avoid race conditions with viper
 
 	// Initialize viper for test
 	setupViperForTests()
@@ -300,7 +306,7 @@ func TestDryRunMode(t *testing.T) {
 
 // TestErrorHandling tests various error conditions
 func TestErrorHandling(t *testing.T) {
-	t.Parallel()
+	// Removed t.Parallel() to avoid race conditions with viper
 
 	// Initialize viper for test
 	setupViperForTests()
@@ -409,20 +415,8 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 		return nil // Don't create file in dry run
 	}
 
-	// Convert pkg models to internal models
-	internalSchemas := make([]models.Schema, len(pkgSchemas))
-	for i, pkgSchema := range pkgSchemas {
-		internalSchemas[i] = models.Schema{
-			UID:             pkgSchema.UID,
-			WriteKey:        pkgSchema.WriteKey,
-			EventType:       pkgSchema.EventType,
-			EventIdentifier: pkgSchema.EventIdentifier,
-			Schema:          pkgSchema.Schema,
-			CreatedAt:       pkgSchema.CreatedAt.Format(time.RFC3339),
-			LastSeen:        pkgSchema.LastSeen.Format(time.RFC3339),
-			Count:           pkgSchema.Count,
-		}
-	}
+	// Since we're now using unified models, no conversion needed
+	internalSchemas := pkgSchemas
 
 	// Create output structure
 	output := models.SchemasFile{

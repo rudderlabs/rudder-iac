@@ -1,13 +1,13 @@
 package converter
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,6 +35,76 @@ type SchemaConverter struct {
 	options  ConversionOptions
 }
 
+// readSchemasFile reads a schemas JSON file and returns the parsed structure
+func readSchemasFile(filePath string) (*models.SchemasFile, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	var schemasFile models.SchemasFile
+	if err := json.Unmarshal(data, &schemasFile); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON from %s: %w", filePath, err)
+	}
+
+	return &schemasFile, nil
+}
+
+// writeYAMLFile writes YAML data to a file with specified indentation
+func writeYAMLFile(filename string, data interface{}, indent int) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(indent)
+	defer encoder.Close()
+
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("failed to encode YAML: %w", err)
+	}
+
+	return nil
+}
+
+// printEventsPreview shows a preview of events (simplified version)
+func printEventsPreview(eventsYAML *yamlModels.EventsYAML, maxItems int) {
+	fmt.Printf("Events preview (%d total):\n", len(eventsYAML.Spec.Events))
+	for i, event := range eventsYAML.Spec.Events {
+		if i >= maxItems {
+			fmt.Printf("  ... and %d more\n", len(eventsYAML.Spec.Events)-maxItems)
+			break
+		}
+		fmt.Printf("  - %s (%s)\n", event.Name, event.EventType)
+	}
+}
+
+// printPropertiesPreview shows a preview of properties (simplified version)
+func printPropertiesPreview(propertiesYAML *yamlModels.PropertiesYAML, maxItems int) {
+	fmt.Printf("Properties preview (%d total):\n", len(propertiesYAML.Spec.Properties))
+	for i, prop := range propertiesYAML.Spec.Properties {
+		if i >= maxItems {
+			fmt.Printf("  ... and %d more\n", len(propertiesYAML.Spec.Properties)-maxItems)
+			break
+		}
+		fmt.Printf("  - %s (%s)\n", prop.Name, prop.Type)
+	}
+}
+
+// printCustomTypesPreview shows a preview of custom types (simplified version)
+func printCustomTypesPreview(customTypesYAML *yamlModels.CustomTypesYAML, maxItems int) {
+	fmt.Printf("Custom types preview (%d total):\n", len(customTypesYAML.Spec.Types))
+	for i, ctype := range customTypesYAML.Spec.Types {
+		if i >= maxItems {
+			fmt.Printf("  ... and %d more\n", len(customTypesYAML.Spec.Types)-maxItems)
+			break
+		}
+		fmt.Printf("  - %s (%s)\n", ctype.Name, ctype.Type)
+	}
+}
+
 // NewSchemaConverter creates a new schema converter
 func NewSchemaConverter(options ConversionOptions) *SchemaConverter {
 	// Set default YAML indent if not specified or invalid
@@ -55,7 +125,7 @@ func (sc *SchemaConverter) Convert() (*ConversionResult, error) {
 	}
 
 	// Read and parse input file
-	schemasFile, err := utils.ReadSchemasFile(sc.options.InputFile)
+	schemasFile, err := readSchemasFile(sc.options.InputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read input file: %w", err)
 	}
@@ -131,14 +201,14 @@ func (sc *SchemaConverter) performDryRun(eventsYAML *yamlModels.EventsYAML, prop
 
 	if sc.options.Verbose {
 		fmt.Printf("\nDRY RUN: Preview of events.yaml:\n")
-		sc.printYAMLPreview(eventsYAML, 3)
+		printEventsPreview(eventsYAML, 3)
 
 		fmt.Printf("\nDRY RUN: Preview of first few properties:\n")
-		sc.printPropertiesPreview(propertiesYAML, 3)
+		printPropertiesPreview(propertiesYAML, 3)
 
 		if len(customTypesYAML.Spec.Types) > 0 {
 			fmt.Printf("\nDRY RUN: Preview of first custom type:\n")
-			sc.printCustomTypesPreview(customTypesYAML, 1)
+			printCustomTypesPreview(customTypesYAML, 1)
 		}
 	}
 
@@ -197,90 +267,5 @@ func (sc *SchemaConverter) writeYAMLFiles(eventsYAML *yamlModels.EventsYAML, pro
 
 // writeYAMLFile writes a YAML structure to a file
 func (sc *SchemaConverter) writeYAMLFile(filename string, data interface{}) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", filename, err)
-	}
-	defer file.Close()
-
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(sc.options.YAMLIndent)
-	defer encoder.Close()
-
-	err = encoder.Encode(data)
-	if err != nil {
-		return fmt.Errorf("failed to encode YAML to %s: %w", filename, err)
-	}
-
-	if sc.options.Verbose {
-		fmt.Printf("  ✓ Created %s\n", filename)
-	}
-
-	return nil
-}
-
-// printYAMLPreview prints a preview of YAML content
-func (sc *SchemaConverter) printYAMLPreview(data interface{}, maxItems int) {
-	yamlData, err := yaml.Marshal(data)
-	if err != nil {
-		fmt.Printf("Error generating preview: %v\n", err)
-		return
-	}
-
-	lines := strings.Split(string(yamlData), "\n")
-	count := 0
-	for _, line := range lines {
-		if count >= 20 { // Limit preview length
-			fmt.Printf("    ... (truncated)\n")
-			break
-		}
-		fmt.Printf("    %s\n", line)
-		count++
-	}
-}
-
-// printPropertiesPreview prints a preview of properties
-func (sc *SchemaConverter) printPropertiesPreview(propertiesYAML *yamlModels.PropertiesYAML, maxItems int) {
-	fmt.Printf("    version: %s\n", propertiesYAML.Version)
-	fmt.Printf("    kind: %s\n", propertiesYAML.Kind)
-	fmt.Printf("    spec:\n")
-	fmt.Printf("      properties:\n")
-
-	count := 0
-	for _, prop := range propertiesYAML.Spec.Properties {
-		if count >= maxItems {
-			fmt.Printf("        ... (showing %d of %d properties)\n", maxItems, len(propertiesYAML.Spec.Properties))
-			break
-		}
-		fmt.Printf("        - id: %s\n", prop.ID)
-		fmt.Printf("          name: %s\n", prop.Name)
-		fmt.Printf("          type: %s\n", prop.Type)
-		if prop.Description != "" {
-			fmt.Printf("          description: %s\n", prop.Description)
-		}
-		count++
-	}
-}
-
-// printCustomTypesPreview prints a preview of custom types
-func (sc *SchemaConverter) printCustomTypesPreview(customTypesYAML *yamlModels.CustomTypesYAML, maxItems int) {
-	fmt.Printf("    version: %s\n", customTypesYAML.Version)
-	fmt.Printf("    kind: %s\n", customTypesYAML.Kind)
-	fmt.Printf("    spec:\n")
-	fmt.Printf("      types:\n")
-
-	count := 0
-	for _, customType := range customTypesYAML.Spec.Types {
-		if count >= maxItems {
-			fmt.Printf("        ... (showing %d of %d custom types)\n", maxItems, len(customTypesYAML.Spec.Types))
-			break
-		}
-		fmt.Printf("        - id: %s\n", customType.ID)
-		fmt.Printf("          name: %s\n", customType.Name)
-		fmt.Printf("          type: %s\n", customType.Type)
-		if customType.Description != "" {
-			fmt.Printf("          description: %s\n", customType.Description)
-		}
-		count++
-	}
+	return writeYAMLFile(filename, data, sc.options.YAMLIndent)
 }

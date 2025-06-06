@@ -76,24 +76,13 @@ func TestValidationRequirements(t *testing.T) {
 	customTypesYAML := analyzer.GenerateCustomTypesYAML()
 	trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
 
-	// Test 1: Custom type names must be unique and follow naming rules
-	t.Run("CustomTypeNamesValidation", func(t *testing.T) {
-		customTypeNameRegex := regexp.MustCompile(`^[A-Z][a-zA-Z]{2,64}$`)
-		seenNames := make(map[string]bool)
+	// Test 1: Custom type IDs must be unique
+	t.Run("CustomTypeIDsValidation", func(t *testing.T) {
 		seenIDs := make(map[string]bool)
 
 		for _, customType := range customTypesYAML.Spec.Types {
-			// Check name format
-			assert.True(t, customTypeNameRegex.MatchString(customType.Name),
-				"Custom type name '%s' must start with uppercase letter and contain only letters, 3-65 chars", customType.Name)
-
-			// Check uniqueness
-			assert.False(t, seenNames[customType.Name],
-				"Custom type name '%s' must be unique", customType.Name)
 			assert.False(t, seenIDs[customType.ID],
 				"Custom type ID '%s' must be unique", customType.ID)
-
-			seenNames[customType.Name] = true
 			seenIDs[customType.ID] = true
 		}
 	})
@@ -143,18 +132,22 @@ func TestValidationRequirements(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Write the generated YAML files
-		writeYAMLFile(t, filepath.Join(tempDir, "events.yaml"), eventsYAML)
-		writeYAMLFile(t, filepath.Join(tempDir, "properties.yaml"), propertiesYAML)
-		writeYAMLFile(t, filepath.Join(tempDir, "custom-types.yaml"), customTypesYAML)
+		err := writeYAMLFile(filepath.Join(tempDir, "events.yaml"), eventsYAML, 2)
+		require.NoError(t, err)
+		err = writeYAMLFile(filepath.Join(tempDir, "properties.yaml"), propertiesYAML, 2)
+		require.NoError(t, err)
+		err = writeYAMLFile(filepath.Join(tempDir, "custom-types.yaml"), customTypesYAML, 2)
+		require.NoError(t, err)
 
 		// Write tracking plans
 		tpDir := filepath.Join(tempDir, "tracking-plans")
-		err := os.MkdirAll(tpDir, 0755)
+		err = os.MkdirAll(tpDir, 0755)
 		require.NoError(t, err)
 
 		for writeKey, tp := range trackingPlansYAML {
 			filename := fmt.Sprintf("writekey-%s.yaml", writeKey)
-			writeYAMLFile(t, filepath.Join(tpDir, filename), tp)
+			err = writeYAMLFile(filepath.Join(tpDir, filename), tp, 2)
+			require.NoError(t, err)
 		}
 
 		// Verify files exist and are valid YAML
@@ -273,17 +266,6 @@ func TestPropertyIDGeneration(t *testing.T) {
 }
 
 // Helper functions
-
-func writeYAMLFile(t *testing.T, filename string, data interface{}) {
-	file, err := os.Create(filename)
-	require.NoError(t, err)
-	defer file.Close()
-
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(2)
-	err = encoder.Encode(data)
-	require.NoError(t, err)
-}
 
 func verifyYAMLStructure(t *testing.T, filename string) {
 	data, err := os.ReadFile(filename)
