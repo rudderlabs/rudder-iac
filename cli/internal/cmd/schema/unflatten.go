@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/utils"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/utils"
 	"github.com/spf13/cobra"
 )
 

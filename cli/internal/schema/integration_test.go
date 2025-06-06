@@ -13,8 +13,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/client"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

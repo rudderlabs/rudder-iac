@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/utils"
+	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/utils"
 	"gopkg.in/yaml.v3"
 )
 
