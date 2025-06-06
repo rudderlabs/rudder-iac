@@ -11,12 +11,23 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// setupViperForTests initializes viper with environment variable bindings for tests
+func setupViperForTests() {
+	viper.Reset()
+	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
+	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+}
+
 func TestFetchCommand_Integration(t *testing.T) {
 	t.Parallel()
+
+	// Initialize viper for test
+	setupViperForTests()
 
 	// Create test response
 	testSchemas := []models.Schema{
@@ -112,6 +123,9 @@ func TestFetchCommand_Integration(t *testing.T) {
 }
 
 func TestFetchCommand_Scenarios(t *testing.T) {
+	// Initialize viper for test
+	setupViperForTests()
+
 	cases := []struct {
 		name        string
 		writeKey    string
@@ -150,6 +164,9 @@ func TestFetchCommand_Scenarios(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			// Remove t.Parallel() to avoid test contamination
 			// t.Parallel()
+
+			// Initialize viper for subtest
+			setupViperForTests()
 
 			// Create test server that verifies writeKey parameter if specified
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +236,9 @@ func TestFetchCommand_Scenarios(t *testing.T) {
 }
 
 func TestFetchCommand_ErrorScenarios(t *testing.T) {
+	// Initialize viper for test
+	setupViperForTests()
+
 	cases := []struct {
 		name        string
 		setupEnv    func()
@@ -249,6 +269,9 @@ func TestFetchCommand_ErrorScenarios(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			// Remove t.Parallel() to avoid test contamination
 			// t.Parallel()
+
+			// Initialize viper for subtest
+			setupViperForTests()
 
 			var server *httptest.Server
 			if c.useServer {
@@ -342,6 +365,9 @@ func TestNewCmdFetch(t *testing.T) {
 }
 
 func TestFetchCommand_EnhancedScenarios(t *testing.T) {
+	// Initialize viper for test
+	setupViperForTests()
+
 	cases := []struct {
 		name             string
 		writeKey         string
@@ -408,6 +434,9 @@ func TestFetchCommand_EnhancedScenarios(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			// Initialize viper for subtest
+			setupViperForTests()
+
 			// Create test server with custom response
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(c.serverStatusCode)

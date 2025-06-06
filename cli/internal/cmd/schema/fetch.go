@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/schema/config"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
 	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // NewCmdFetch creates the fetch command
@@ -56,21 +56,27 @@ func runFetch(outputFile, writeKey string, dryRun, verbose bool, indent int) err
 		fmt.Printf("Fetching schemas from API...\n")
 	}
 
-	// Load configuration from environment variables
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("configuration error: %w", err)
+	// Get configuration from viper (which handles the same env vars)
+	apiToken := viper.GetString("auth.accessToken")
+	if apiToken == "" {
+		return fmt.Errorf("access token is required. Please run 'rudder-cli auth login' or set RUDDERSTACK_ACCESS_TOKEN environment variable")
+	}
+
+	apiURL := viper.GetString("apiURL")
+	if apiURL == "" {
+		// Use default URL if not provided
+		apiURL = "https://api.rudderstack.com"
 	}
 
 	if verbose {
-		fmt.Printf("Using API URL: %s\n", cfg.APIURL)
+		fmt.Printf("Using API URL: %s\n", apiURL)
 		if writeKey != "" {
 			fmt.Printf("Filtering by write key: %s\n", writeKey)
 		}
 	}
 
 	// Create API client
-	apiClient := client.NewSchemaClient(cfg.APIURL, cfg.APIToken)
+	apiClient := client.NewSchemaClient(apiURL, apiToken)
 
 	// Fetch schemas
 	schemas, err := apiClient.FetchAllSchemas(writeKey)

@@ -9,20 +9,31 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/schema/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// setupViperForTests initializes viper with environment variable bindings for tests
+func setupViperForTests() {
+	viper.Reset()
+	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
+	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+}
 
 // TestFullWorkflow tests the complete workflow: fetch -> unflatten -> convert
 func TestFullWorkflow(t *testing.T) {
 	// Remove t.Parallel() to avoid race conditions
 	// t.Parallel()
+
+	// Initialize viper for test
+	setupViperForTests()
 
 	// Setup mock server for fetch
 	mockResponse := map[string]interface{}{
@@ -143,6 +154,9 @@ func TestFetchWithPagination(t *testing.T) {
 	// Remove t.Parallel() to avoid race conditions
 	// t.Parallel()
 
+	// Initialize viper for test
+	setupViperForTests()
+
 	// Track request count with mutex for thread safety
 	var requestCount int
 	var mu sync.Mutex
@@ -240,6 +254,9 @@ func TestFetchWithPagination(t *testing.T) {
 func TestDryRunMode(t *testing.T) {
 	t.Parallel()
 
+	// Initialize viper for test
+	setupViperForTests()
+
 	tempDir := t.TempDir()
 
 	// Create test input file
@@ -285,6 +302,9 @@ func TestDryRunMode(t *testing.T) {
 func TestErrorHandling(t *testing.T) {
 	t.Parallel()
 
+	// Initialize viper for test
+	setupViperForTests()
+
 	tempDir := t.TempDir()
 
 	cases := []struct {
@@ -294,6 +314,9 @@ func TestErrorHandling(t *testing.T) {
 		{
 			name: "FetchWithInvalidCredentials",
 			testFunc: func(t *testing.T) {
+				// Initialize viper for subtest
+				setupViperForTests()
+
 				// Store original values to restore later
 				originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
 				originalURL := os.Getenv("RUDDERSTACK_API_URL")
@@ -355,14 +378,20 @@ func TestErrorHandling(t *testing.T) {
 // These would be implemented to call the real command functions
 
 func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) error {
-	// Load configuration from environment variables (same as actual implementation)
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("configuration error: %w", err)
+	// Get configuration from viper (which handles the same env vars)
+	apiToken := viper.GetString("auth.accessToken")
+	if apiToken == "" {
+		return fmt.Errorf("access token is required. Please run 'rudder-cli auth login' or set RUDDERSTACK_ACCESS_TOKEN environment variable")
+	}
+
+	apiURL := viper.GetString("apiURL")
+	if apiURL == "" {
+		// Use default URL if not provided
+		apiURL = "https://api.rudderstack.com"
 	}
 
 	// Create API client
-	apiClient := client.NewSchemaClient(cfg.APIURL, cfg.APIToken)
+	apiClient := client.NewSchemaClient(apiURL, apiToken)
 
 	// Determine writeKey parameter
 	var writeKey string
@@ -371,7 +400,7 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 	}
 
 	// Fetch schemas from actual client
-	schemas, err := apiClient.FetchAllSchemas(writeKey)
+	pkgSchemas, err := apiClient.FetchAllSchemas(writeKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch schemas: %w", err)
 	}
@@ -380,9 +409,24 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 		return nil // Don't create file in dry run
 	}
 
+	// Convert pkg models to internal models
+	internalSchemas := make([]models.Schema, len(pkgSchemas))
+	for i, pkgSchema := range pkgSchemas {
+		internalSchemas[i] = models.Schema{
+			UID:             pkgSchema.UID,
+			WriteKey:        pkgSchema.WriteKey,
+			EventType:       pkgSchema.EventType,
+			EventIdentifier: pkgSchema.EventIdentifier,
+			Schema:          pkgSchema.Schema,
+			CreatedAt:       pkgSchema.CreatedAt.Format(time.RFC3339),
+			LastSeen:        pkgSchema.LastSeen.Format(time.RFC3339),
+			Count:           pkgSchema.Count,
+		}
+	}
+
 	// Create output structure
 	output := models.SchemasFile{
-		Schemas: schemas,
+		Schemas: internalSchemas,
 	}
 
 	// Write output file
