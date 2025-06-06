@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -306,6 +307,183 @@ func TestFetchCommand_ErrorScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewCmdFetch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CommandCreation", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdFetch()
+
+		assert.NotNil(t, cmd)
+		assert.Equal(t, "fetch", cmd.Name())
+		assert.Equal(t, "Fetch event schemas from the API", cmd.Short)
+		assert.Contains(t, cmd.Long, "Fetch event schemas from the Event Audit API")
+
+		// Check that flags are properly set
+		writeKeyFlag := cmd.Flags().Lookup("write-key")
+		assert.NotNil(t, writeKeyFlag)
+		assert.Equal(t, "", writeKeyFlag.DefValue)
+
+		dryRunFlag := cmd.Flags().Lookup("dry-run")
+		assert.NotNil(t, dryRunFlag)
+		assert.Equal(t, "false", dryRunFlag.DefValue)
+
+		verboseFlag := cmd.Flags().Lookup("verbose")
+		assert.NotNil(t, verboseFlag)
+		assert.Equal(t, "v", verboseFlag.Shorthand)
+
+		indentFlag := cmd.Flags().Lookup("indent")
+		assert.NotNil(t, indentFlag)
+		assert.Equal(t, "2", indentFlag.DefValue)
+	})
+}
+
+func TestFetchCommand_EnhancedScenarios(t *testing.T) {
+	cases := []struct {
+		name             string
+		writeKey         string
+		dryRun           bool
+		verbose          bool
+		expectFiles      bool
+		expectError      string
+		serverResponse   models.SchemasResponse
+		serverStatusCode int
+	}{
+		{
+			name:        "LargeDataset",
+			writeKey:    "",
+			dryRun:      false,
+			verbose:     true,
+			expectFiles: true,
+			expectError: "",
+			serverResponse: models.SchemasResponse{
+				Results:     generateLargeSchemaSet(100),
+				CurrentPage: 1,
+				HasNext:     false,
+			},
+			serverStatusCode: 200,
+		},
+		{
+			name:        "EmptyResponse",
+			writeKey:    "",
+			dryRun:      false,
+			verbose:     false,
+			expectFiles: true,
+			expectError: "",
+			serverResponse: models.SchemasResponse{
+				Results:     []models.Schema{},
+				CurrentPage: 1,
+				HasNext:     false,
+			},
+			serverStatusCode: 200,
+		},
+		{
+			name:             "ServerError500",
+			writeKey:         "",
+			dryRun:           false,
+			verbose:          false,
+			expectFiles:      false,
+			expectError:      "failed to fetch schemas",
+			serverResponse:   models.SchemasResponse{},
+			serverStatusCode: 500,
+		},
+		{
+			name:        "VerboseDryRunLargeDataset",
+			writeKey:    "specific-key",
+			dryRun:      true,
+			verbose:     true,
+			expectFiles: false,
+			expectError: "",
+			serverResponse: models.SchemasResponse{
+				Results:     generateLargeSchemaSet(50),
+				CurrentPage: 1,
+				HasNext:     false,
+			},
+			serverStatusCode: 200,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Create test server with custom response
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(c.serverStatusCode)
+				if c.serverStatusCode == 200 {
+					json.NewEncoder(w).Encode(c.serverResponse)
+				} else {
+					w.Write([]byte("Internal Server Error"))
+				}
+			}))
+			defer server.Close()
+
+			// Set environment variables
+			originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
+			originalURL := os.Getenv("RUDDERSTACK_API_URL")
+			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
+			os.Setenv("RUDDERSTACK_API_URL", server.URL)
+			defer func() {
+				if originalToken == "" {
+					os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
+				} else {
+					os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
+				}
+				if originalURL == "" {
+					os.Unsetenv("RUDDERSTACK_API_URL")
+				} else {
+					os.Setenv("RUDDERSTACK_API_URL", originalURL)
+				}
+			}()
+
+			tempDir := t.TempDir()
+			outputFile := filepath.Join(tempDir, "test_output.json")
+
+			err := runFetch(outputFile, c.writeKey, c.dryRun, c.verbose, 2)
+
+			if c.expectError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), c.expectError)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if c.expectFiles && c.expectError == "" {
+				if !c.dryRun {
+					assert.FileExists(t, outputFile)
+				} else {
+					// Dry run should not create files
+					_, err := os.Stat(outputFile)
+					assert.True(t, os.IsNotExist(err))
+				}
+			}
+		})
+	}
+}
+
+// Helper function to generate a large set of schemas for testing
+func generateLargeSchemaSet(count int) []models.Schema {
+	schemas := make([]models.Schema, count)
+	for i := 0; i < count; i++ {
+		schemas[i] = models.Schema{
+			UID:             fmt.Sprintf("test-uid-%d", i),
+			WriteKey:        fmt.Sprintf("write-key-%d", i%5), // Distribute across 5 write keys
+			EventType:       "track",
+			EventIdentifier: fmt.Sprintf("event_%d", i),
+			Schema: map[string]interface{}{
+				"userId": "string",
+				"event":  "string",
+				"properties": map[string]interface{}{
+					fmt.Sprintf("prop_%d", i): "string",
+				},
+			},
+			CreatedAt: time.Now(),
+			LastSeen:  time.Now(),
+			Count:     i + 1,
+		}
+	}
+	return schemas
 }
 
 func TestWriteJSONFile(t *testing.T) {
