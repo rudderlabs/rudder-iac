@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	internalModels "github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
-	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
+	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 )
 
 // GenerateEventsYAML creates the events.yaml structure

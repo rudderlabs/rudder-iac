@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 )
 
 // SchemaClient handles API communication for schema fetching

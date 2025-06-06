@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/config"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/client"
-	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
+	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/cobra"
 )
 
