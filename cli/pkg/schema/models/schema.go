@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 // SchemasResponse represents the API response structure
 type SchemasResponse struct {
@@ -21,7 +23,7 @@ type Schema struct {
 	Count           int                    `json:"count"`
 }
 
-// SchemasFile represents the output file structure matching schemas_real.json
+// SchemasFile represents the output file structure
 type SchemasFile struct {
 	Schemas []Schema `json:"schemas"`
 }
