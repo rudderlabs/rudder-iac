@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	internalModels "github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/models"
+	internalModels "github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/experimental/schema/models"
 )
 

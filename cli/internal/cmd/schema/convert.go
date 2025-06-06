@@ -3,7 +3,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +30,8 @@ The generated YAML files follow the RudderStack Data Catalog specifications
 and can be used with rudder-cli for tracking plan management.
 
 Examples:
-  rudder-cli experimental schema convert schemas.json output/
-  rudder-cli experimental schema convert schemas.json output/ --verbose --dry-run`,
+  rudder-cli schema convert schemas.json output/
+  rudder-cli schema convert schemas.json output/ --verbose --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConvert(args[0], args[1], dryRun, verbose, indent)

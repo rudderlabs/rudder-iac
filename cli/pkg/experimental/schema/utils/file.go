@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/experimental/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 )
 
 // ReadSchemasFile reads a schemas JSON file and returns the parsed structure

@@ -12,10 +12,9 @@
     - [Linux](#linux)
     - [Docker](#docker)
     - [Build from Source](#build-from-source)
-  - [🧪 Experimental Features](#-experimental-features)
-    - [Schema Management](#schema-management)
+  - [🧪 Schema Management](#-schema-management)
       - [Overview](#overview)
-      - [Enabling Experimental Mode](#enabling-experimental-mode)
+      - [Enabling Schema Commands](#enabling-schema-commands)
       - [Authentication Setup](#authentication-setup)
       - [Available Commands](#available-commands)
       - [Complete Workflow](#complete-workflow)
@@ -78,21 +77,21 @@ This will use the access token from your local configuration file, and the catal
 docker run -v ~/my-catalog:/catalog -e RUDDERSTACK_ACCESS_TOKEN=your-access-token rudderlabs/rudder-cli tp apply --dry-run -l /catalog
 ```
 
-**Experimental Features with Docker**:
+**Schema Features with Docker**:
 
-To run experimental schema commands with Docker:
+To run schema commands with Docker:
 
 ```sh
 # Convert schemas with experimental mode enabled
 docker run -v ~/.rudder:/.rudder -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
-  rudderlabs/rudder-cli experimental schema convert /workspace/schemas.json /workspace/output/
+  rudderlabs/rudder-cli schema convert /workspace/schemas.json /workspace/output/
 
 # Fetch schemas with access token
 docker run -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
   -e RUDDERSTACK_ACCESS_TOKEN="your-access-token" \
-  rudderlabs/rudder-cli experimental schema fetch /workspace/schemas.json
+  rudderlabs/rudder-cli schema fetch /workspace/schemas.json
 ```
 
 ### Build from Source
@@ -112,28 +111,29 @@ To build the Docker image locally:
 make docker-build
 ```
 
-## 🧪 Experimental Features
-
-### Schema Management
+## 🧪 Schema Management
 
 #### Overview
 
-The experimental schema management functionality allows you to work with RudderStack event schemas from the Event Audit API. You can fetch schemas, process them, and convert them into RudderStack Data Catalog YAML files for tracking plan management.
+The schema management functionality allows you to work with RudderStack event schemas from the Event Audit API. You can fetch schemas, process them, and convert them into RudderStack Data Catalog YAML files for tracking plan management.
 
 **Workflow**: Fetch → Unflatten → Convert → Deploy
 
-#### Enabling Experimental Mode
+#### Enabling Schema Commands
 
-Experimental features are disabled by default. Enable them using one of these methods:
+Schema commands require experimental mode to be enabled (legacy requirement). Enable experimental mode using one of these methods:
 
 **Environment Variable** (Recommended):
 ```bash
 export RUDDERSTACK_CLI_EXPERIMENTAL=true
 ```
 
-**CLI Flag**:
-```bash
-rudder-cli --config experimental=true experimental schema --help
+**Config File**:
+Edit your config file (default: `~/.rudder/config.json`) and set:
+```json
+{
+  "experimental": true
+}
 ```
 
 #### Authentication Setup
@@ -170,13 +170,13 @@ Schema commands use the main CLI's authentication system:
 export RUDDERSTACK_CLI_EXPERIMENTAL=true
 
 # 1. Fetch schemas from Event Audit API
-rudder-cli experimental schema fetch schemas.json --verbose
+rudder-cli schema fetch schemas.json --verbose
 
 # 2. Unflatten dot-notation keys to nested structures
-rudder-cli experimental schema unflatten schemas.json unflattened.json --verbose
+rudder-cli schema unflatten schemas.json unflattened.json --verbose
 
 # 3. Convert to Data Catalog YAML files
-rudder-cli experimental schema convert unflattened.json output/ --verbose
+rudder-cli schema convert unflattened.json output/ --verbose
 
 # 4. Validate generated tracking plans
 rudder-cli tp validate -l output/
@@ -190,34 +190,34 @@ rudder-cli tp apply -l output/
 **Fetch Schemas**:
 ```bash
 # Fetch all schemas
-rudder-cli experimental schema fetch schemas.json
+rudder-cli schema fetch schemas.json
 
 # Fetch schemas for specific writeKey
-rudder-cli experimental schema fetch schemas.json --write-key=YOUR_WRITE_KEY
+rudder-cli schema fetch schemas.json --write-key=YOUR_WRITE_KEY
 
 # Dry run to preview what would be fetched
-rudder-cli experimental schema fetch schemas.json --dry-run --verbose
+rudder-cli schema fetch schemas.json --dry-run --verbose
 ```
 
 **Unflatten Schemas**:
 ```bash
 # Unflatten flattened schema keys
-rudder-cli experimental schema unflatten input.json output.json
+rudder-cli schema unflatten input.json output.json
 
 # With verbose output and custom indentation
-rudder-cli experimental schema unflatten input.json output.json --verbose --indent 4
+rudder-cli schema unflatten input.json output.json --verbose --indent 4
 ```
 
 **Convert to YAML**:
 ```bash
 # Convert schemas to Data Catalog YAML files
-rudder-cli experimental schema convert schemas.json output/
+rudder-cli schema convert schemas.json output/
 
 # Dry run to preview generated files
-rudder-cli experimental schema convert schemas.json output/ --dry-run --verbose
+rudder-cli schema convert schemas.json output/ --dry-run --verbose
 
 # Custom YAML indentation
-rudder-cli experimental schema convert schemas.json output/ --indent 4
+rudder-cli schema convert schemas.json output/ --indent 4
 ```
 
 **Generated Output Structure**:

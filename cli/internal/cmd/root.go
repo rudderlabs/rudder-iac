@@ -8,6 +8,7 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/schema"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -50,7 +51,7 @@ func init() {
 	// Add subcommands to the root command
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
-	rootCmd.AddCommand(experimentalCmd)
+	rootCmd.AddCommand(schema.NewCmdSchema())
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 }
@@ -63,10 +64,6 @@ func initConfig() {
 		debugCmd.Hidden = false
 	}
 
-	// only add experimental command if enabled in config
-	if viper.GetBool("experimental") {
-		experimentalCmd.Hidden = false
-	}
 }
 
 func initLogger() {
