@@ -211,3 +211,64 @@ func TestConfigDefaults(t *testing.T) {
 		assert.Equal(t, TelemetryDataplaneURL, viper.GetString("telemetry.dataplaneURL"))
 	})
 }
+
+func TestCreateConfigFileIfNotExistsCI(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CreatesConfigFileSuccessfully", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "test-config.json")
+
+		err := createConfigFileIfNotExists(configFile)
+		assert.NoError(t, err)
+
+		// File should exist
+		assert.FileExists(t, configFile)
+	})
+
+	t.Run("HandlesMissingDirectory", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "subdir", "config.json")
+
+		err := createConfigFileIfNotExists(configFile)
+		assert.NoError(t, err)
+
+		// File should exist
+		assert.FileExists(t, configFile)
+	})
+
+	t.Run("HandlesInvalidPath", func(t *testing.T) {
+		t.Parallel()
+
+		// Try to create config in an invalid path
+		invalidPath := "/invalid/path/config.json"
+
+		// This should return an error but not panic
+		err := createConfigFileIfNotExists(invalidPath)
+		assert.Error(t, err)
+	})
+
+	t.Run("SkipsExistingFile", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "existing-config.json")
+
+		// Create the file first
+		err := os.WriteFile(configFile, []byte(`{"test": true}`), 0644)
+		require.NoError(t, err)
+
+		// Should not error when file already exists
+		err = createConfigFileIfNotExists(configFile)
+		assert.NoError(t, err)
+
+		// File content should be unchanged
+		content, err := os.ReadFile(configFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "test")
+	})
+}
