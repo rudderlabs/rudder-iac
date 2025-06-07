@@ -67,6 +67,14 @@ func initConfig() {
 }
 
 func initLogger() {
+	// Initialize logging with proper error handling
+	// This will gracefully handle CI environments where file operations might fail
+	if err := logger.InitializeLogging(); err != nil {
+		// In case of initialization error, we continue without file logging
+		// The error is not critical as logger will fall back to discard
+		fmt.Printf("Warning: Could not initialize file logging: %v\n", err)
+	}
+
 	if viper.GetBool("debug") {
 		logger.SetLogLevel(slog.LevelDebug)
 	}
