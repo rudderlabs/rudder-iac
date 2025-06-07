@@ -328,6 +328,70 @@ func TestConvertCommand_CommandFlags(t *testing.T) {
 	})
 }
 
+func TestConvertCommand_VerboseOutput(t *testing.T) {
+	t.Run("VerboseOutputMessages", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		inputFile := filepath.Join(tempDir, "test_schemas.json")
+		outputDir := filepath.Join(tempDir, "output")
+
+		// Create test data
+		testData := `{
+			"schemas": [
+				{
+					"uid": "test-uid",
+					"writeKey": "test-write-key",
+					"eventType": "track", 
+					"eventIdentifier": "test_event",
+					"schema": {
+						"event": "string",
+						"userId": "string"
+					}
+				}
+			]
+		}`
+
+		err := os.WriteFile(inputFile, []byte(testData), 0644)
+		require.NoError(t, err)
+
+		// Test with verbose enabled (should trigger the verbose output paths)
+		err = runConvert(inputFile, outputDir, false, true, 2)
+		assert.NoError(t, err)
+	})
+
+	t.Run("DryRunVerboseOutput", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		inputFile := filepath.Join(tempDir, "test_schemas.json")
+		outputDir := filepath.Join(tempDir, "output")
+
+		// Create test data
+		testData := `{
+			"schemas": [
+				{
+					"uid": "test-uid",
+					"writeKey": "test-write-key",
+					"eventType": "track",
+					"eventIdentifier": "test_event",
+					"schema": {
+						"event": "string",
+						"userId": "string"
+					}
+				}
+			]
+		}`
+
+		err := os.WriteFile(inputFile, []byte(testData), 0644)
+		require.NoError(t, err)
+
+		// Test with both dry-run and verbose (should trigger dry-run output paths)
+		err = runConvert(inputFile, outputDir, true, true, 2)
+		assert.NoError(t, err)
+	})
+}
+
 func TestNewCmdConvert(t *testing.T) {
 	t.Parallel()
 
@@ -353,6 +417,46 @@ func TestNewCmdConvert(t *testing.T) {
 		indentFlag := cmd.Flags().Lookup("indent")
 		assert.NotNil(t, indentFlag)
 		assert.Equal(t, "2", indentFlag.DefValue)
+	})
+
+	t.Run("CommandRequiresExactTwoArgs", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdConvert()
+		assert.NotNil(t, cmd.Args)
+
+		// Test that command requires exactly 2 arguments
+		// This should pass with 2 args
+		err := cmd.Args(cmd, []string{"input.json", "output/"})
+		assert.NoError(t, err)
+
+		// This should fail with 1 arg
+		err = cmd.Args(cmd, []string{"input.json"})
+		assert.Error(t, err)
+
+		// This should fail with 3 args
+		err = cmd.Args(cmd, []string{"input.json", "output/", "extra"})
+		assert.Error(t, err)
+	})
+
+	t.Run("CommandRunFunction", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		inputFile := filepath.Join(tempDir, "test_schemas.json")
+		outputDir := filepath.Join(tempDir, "output")
+
+		// Create minimal test data
+		testData := `{"schemas": []}`
+		err := os.WriteFile(inputFile, []byte(testData), 0644)
+		require.NoError(t, err)
+
+		cmd := NewCmdConvert()
+		assert.NotNil(t, cmd.RunE)
+
+		// Test that RunE function can be called
+		err = cmd.RunE(cmd, []string{inputFile, outputDir})
+		assert.NoError(t, err)
 	})
 }
 
