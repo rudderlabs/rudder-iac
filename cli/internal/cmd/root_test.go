@@ -124,6 +124,7 @@ func TestRecovery(t *testing.T) {
 			recovery()
 		})
 	})
+
 }
 
 func TestInitFunctions(t *testing.T) {
@@ -149,6 +150,16 @@ func TestInitFunctions(t *testing.T) {
 	})
 
 	t.Run("InitLogger", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			initLogger()
+		})
+	})
+
+	t.Run("InitLoggerWithDebugEnabled", func(t *testing.T) {
+		// Test the debug path in initLogger
+		viper.Set("debug", true)
+		defer viper.Set("debug", false)
+
 		assert.NotPanics(t, func() {
 			initLogger()
 		})
@@ -235,5 +246,68 @@ func TestDebugCommand_Visibility(t *testing.T) {
 		// By default, debug should be hidden unless config enables it
 		// We can't easily test this without full config setup
 		assert.NotNil(t, debugCommand)
+	})
+
+	t.Run("DebugCommandVisibleWhenEnabled", func(t *testing.T) {
+		// Test the debug command visibility logic in initConfig
+		viper.Set("debug", true)
+		defer viper.Set("debug", false)
+
+		// Find debug command
+		var debugCommand *cobra.Command
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Name() == "debug" {
+				debugCommand = cmd
+				break
+			}
+		}
+
+		require.NotNil(t, debugCommand, "Debug command should exist")
+
+		// Call initConfig to trigger the visibility logic
+		assert.NotPanics(t, func() {
+			initConfig()
+		})
+
+		// The debug command should now be visible
+		assert.False(t, debugCommand.Hidden)
+	})
+}
+
+func TestInitConfigWithDebugEnabled(t *testing.T) {
+	t.Run("DebugCommandBecomesVisible", func(t *testing.T) {
+		// Clean slate
+		viper.Reset()
+
+		// Set debug to true
+		viper.Set("debug", true)
+		defer viper.Set("debug", false)
+
+		// Find debug command
+		var debugCommand *cobra.Command
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Name() == "debug" {
+				debugCommand = cmd
+				break
+			}
+		}
+
+		require.NotNil(t, debugCommand, "Debug command should exist")
+
+		// Initially, command might be hidden
+		originalHidden := debugCommand.Hidden
+
+		// Call initConfig which should make debug visible
+		assert.NotPanics(t, func() {
+			initConfig()
+		})
+
+		// After initConfig, debug command should be visible when debug is enabled
+		if viper.GetBool("debug") {
+			assert.False(t, debugCommand.Hidden, "Debug command should be visible when debug is enabled")
+		}
+
+		// Restore original state
+		debugCommand.Hidden = originalHidden
 	})
 }
