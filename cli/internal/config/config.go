@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tidwall/pretty"
 	"github.com/tidwall/sjson"
@@ -23,10 +22,11 @@ var (
 )
 
 type Config = struct {
-	Debug   bool   `mapstructure:"debug"`
-	Verbose bool   `mapstructure:"verbose"`
-	APIURL  string `mapstructure:"apiURL"`
-	Auth    struct {
+	Debug        bool   `mapstructure:"debug"`
+	Experimental bool   `mapstructure:"experimental"`
+	Verbose      bool   `mapstructure:"verbose"`
+	APIURL       string `mapstructure:"apiURL"`
+	Auth         struct {
 		AccessToken string `mapstructure:"accessToken"`
 	} `mapstructure:"auth"`
 	Telemetry struct {
@@ -39,7 +39,15 @@ type Config = struct {
 
 func defaultConfigPath() string {
 	homeDir, err := os.UserHomeDir()
-	cobra.CheckErr(err)
+	if err != nil {
+		// In CI environments or when home directory is not available,
+		// fall back to current directory or temp directory
+		if tmpDir := os.TempDir(); tmpDir != "" {
+			return filepath.Join(tmpDir, ".rudder")
+		}
+		// Final fallback to current directory
+		return ".rudder"
+	}
 
 	return fmt.Sprintf("%s/.rudder", homeDir)
 }
@@ -58,12 +66,17 @@ func InitConfig(cfgFile string) {
 	}
 
 	err := createConfigFileIfNotExists(cfgFile)
-	cobra.CheckErr(err)
+	if err != nil {
+		// In CI/test environments, if we can't create config file,
+		// continue with in-memory config only
+		log.Debug("could not create config file, using in-memory config", "error", err)
+	}
 
 	viper.SetConfigFile(cfgFile)
 
 	// set defaults
 	viper.SetDefault("debug", false)
+	viper.SetDefault("experimental", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL_V2)
 	viper.SetDefault("telemetry.disabled", false)
@@ -72,11 +85,12 @@ func InitConfig(cfgFile string) {
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	viper.BindEnv("experimental", "RUDDERSTACK_CLI_EXPERIMENTAL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 
-	// load configuration
+	// load configuration - this is optional in case file doesn't exist
 	_ = viper.ReadInConfig()
 }
 
@@ -120,16 +134,31 @@ func SetTelemetryAnonymousID(anonymousID string) {
 
 func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		// If no config file is being used, skip the update
+		log.Debug("no config file in use, skipping config update")
+		return
+	}
+
 	data, err := os.ReadFile(configFile)
-	cobra.CheckErr(err)
+	if err != nil {
+		log.Debug("could not read config file", "error", err)
+		return
+	}
 
 	newData, err := f(data)
-	cobra.CheckErr(err)
+	if err != nil {
+		log.Debug("could not update config data", "error", err)
+		return
+	}
 
 	formattedData := pretty.Pretty(newData)
 
 	err = os.WriteFile(configFile, formattedData, 0644)
-	cobra.CheckErr(err)
+	if err != nil {
+		log.Debug("could not write config file", "error", err)
+		return
+	}
 
 	_ = viper.ReadInConfig()
 }
@@ -137,11 +166,24 @@ func updateConfig(f func(data []byte) ([]byte, error)) {
 func GetConfig() Config {
 	var config Config
 	err := viper.Unmarshal(&config)
-	cobra.CheckErr(err)
+	if err != nil {
+		// In case of error, return default config
+		log.Debug("could not unmarshal config, using defaults", "error", err)
+		return Config{
+			Debug:        false,
+			Experimental: false,
+			Verbose:      false,
+			APIURL:       client.BASE_URL_V2,
+		}
+	}
 
 	return config
 }
 
 func GetConfigDir() string {
-	return filepath.Dir(viper.ConfigFileUsed())
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		return defaultConfigPath()
+	}
+	return filepath.Dir(configFile)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/schema"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -50,6 +51,7 @@ func init() {
 	// Add subcommands to the root command
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(schema.NewCmdSchema())
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 }
@@ -61,9 +63,18 @@ func initConfig() {
 	if viper.GetBool("debug") {
 		debugCmd.Hidden = false
 	}
+
 }
 
 func initLogger() {
+	// Initialize logging with proper error handling
+	// This will gracefully handle CI environments where file operations might fail
+	if err := logger.InitializeLogging(); err != nil {
+		// In case of initialization error, we continue without file logging
+		// The error is not critical as logger will fall back to discard
+		fmt.Printf("Warning: Could not initialize file logging: %v\n", err)
+	}
+
 	if viper.GetBool("debug") {
 		logger.SetLogLevel(slog.LevelDebug)
 	}
