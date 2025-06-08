@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -73,19 +72,9 @@ func NewDeps() (Deps, error) {
 
 func setupClient(version string) (*client.Client, error) {
 	cfg := config.GetConfig()
-
-	// If APIURL is not the default, ensure it includes /v2 for API versioning
-	apiURL := cfg.APIURL
-	if apiURL != client.BASE_URL_V2 {
-		// Custom URL provided - append /v2 if not already present
-		if !strings.HasSuffix(apiURL, "/v2") {
-			apiURL = apiURL + "/v2"
-		}
-	}
-
 	return client.New(
 		cfg.Auth.AccessToken,
-		client.WithBaseURL(apiURL),
+		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
 }
