@@ -64,7 +64,7 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
-	return nil, nil
+	return state.EmptyState(), nil
 }
 
 func (p *Provider) PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error {
