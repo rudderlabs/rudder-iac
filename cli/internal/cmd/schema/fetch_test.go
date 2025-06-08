@@ -731,6 +731,10 @@ func TestFetchCommand_DefaultAPIURL(t *testing.T) {
 }
 
 func TestFetchCommand_FileWriteError(t *testing.T) {
+	// Initialize viper for test
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
+
 	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		schemas := []models.Schema{
@@ -784,6 +788,10 @@ func TestFetchCommand_FileWriteError(t *testing.T) {
 }
 
 func TestFetchCommand_VerboseWithWriteKey(t *testing.T) {
+	// Initialize viper for test
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
+
 	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		schemas := []models.Schema{

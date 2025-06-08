@@ -1,14 +1,17 @@
 package schema
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 
-	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
+	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // NewCmdFetch creates the fetch command
@@ -56,30 +59,21 @@ func runFetch(outputFile, writeKey string, dryRun, verbose bool, indent int) err
 		fmt.Printf("Fetching schemas from API...\n")
 	}
 
-	// Get configuration from viper (which handles the same env vars)
-	apiToken := viper.GetString("auth.accessToken")
-	if apiToken == "" {
-		return fmt.Errorf("access token is required. Please run 'rudder-cli auth login' or set RUDDERSTACK_ACCESS_TOKEN environment variable")
-	}
-
-	apiURL := viper.GetString("apiURL")
-	if apiURL == "" {
-		// Use default URL if not provided
-		apiURL = "https://api.rudderstack.com"
+	// Initialize dependencies to get the central API client
+	deps, err := app.NewDeps()
+	if err != nil {
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
 	}
 
 	if verbose {
-		fmt.Printf("Using API URL: %s\n", apiURL)
+		fmt.Printf("Using API URL: %s\n", deps.Client().URL(""))
 		if writeKey != "" {
 			fmt.Printf("Filtering by write key: %s\n", writeKey)
 		}
 	}
 
-	// Create API client
-	apiClient := client.NewSchemaClient(apiURL, apiToken)
-
 	// Fetch schemas
-	schemas, err := apiClient.FetchAllSchemas(writeKey)
+	schemas, err := fetchSchemas(deps.Client(), writeKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch schemas: %w", err)
 	}
@@ -134,4 +128,56 @@ func writeJSONFile(filename string, data interface{}, indent int) error {
 	}
 
 	return nil
+}
+
+// fetchSchemas fetches all schemas with pagination from the API using the central client
+func fetchSchemas(apiClient *client.Client, writeKey string) ([]pkgModels.Schema, error) {
+	var allSchemas []pkgModels.Schema
+	page := 1
+
+	for {
+		schemas, hasNext, err := fetchSchemasPage(apiClient, page, writeKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch schemas page %d: %w", page, err)
+		}
+
+		allSchemas = append(allSchemas, schemas...)
+
+		if !hasNext {
+			break
+		}
+		page++
+	}
+
+	return allSchemas, nil
+}
+
+// fetchSchemasPage fetches a single page of schemas
+func fetchSchemasPage(apiClient *client.Client, page int, writeKey string) ([]pkgModels.Schema, bool, error) {
+	// Build path with query parameters
+	path := "schemas"
+	query := url.Values{}
+	query.Set("page", strconv.Itoa(page))
+	if writeKey != "" {
+		query.Set("writeKey", writeKey)
+	}
+
+	if queryStr := query.Encode(); queryStr != "" {
+		path = path + "?" + queryStr
+	}
+
+	// Make request using the central client
+	ctx := context.Background()
+	data, err := apiClient.Do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to make request: %w", err)
+	}
+
+	// Parse response
+	var response pkgModels.SchemasResponse
+	if err := json.Unmarshal(data, &response); err != nil {
+		return nil, false, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Results, response.HasNext, nil
 }

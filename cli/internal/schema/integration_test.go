@@ -1,20 +1,24 @@
 package schema
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
+	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -346,13 +350,19 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 	}
 
 	apiURL := viper.GetString("apiURL")
-	if apiURL == "" {
-		// Use default URL if not provided
-		apiURL = "https://api.rudderstack.com"
-	}
+	var centralClient *client.Client
+	var err error
 
-	// Create API client
-	apiClient := client.NewSchemaClient(apiURL, apiToken)
+	if apiURL == "" {
+		// Use default central client (which defaults to https://api.rudderstack.com/v2)
+		centralClient, err = client.New(apiToken)
+	} else {
+		// Use custom URL (for testing, the mock server URL should be used directly with /v2 added)
+		centralClient, err = client.New(apiToken, client.WithBaseURL(apiURL+"/v2"))
+	}
+	if err != nil {
+		return fmt.Errorf("failed to create central API client: %w", err)
+	}
 
 	// Determine writeKey parameter
 	var writeKey string
@@ -360,8 +370,8 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 		writeKey = writeKeys[0]
 	}
 
-	// Fetch schemas from actual client
-	pkgSchemas, err := apiClient.FetchAllSchemas(writeKey)
+	// Fetch schemas directly using central client
+	pkgSchemas, err := fetchAllSchemas(centralClient, writeKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch schemas: %w", err)
 	}
@@ -370,12 +380,9 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 		return nil // Don't create file in dry run
 	}
 
-	// Since we're now using unified models, no conversion needed
-	internalSchemas := pkgSchemas
-
-	// Create output structure
-	output := models.SchemasFile{
-		Schemas: internalSchemas,
+	// Create output structure using pkg models (internal models are re-exports)
+	output := pkgModels.SchemasFile{
+		Schemas: pkgSchemas,
 	}
 
 	// Write output file
@@ -395,6 +402,58 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 	return nil
 }
 
+// fetchAllSchemas fetches all schemas with pagination from the API using the central client
+func fetchAllSchemas(apiClient *client.Client, writeKey string) ([]pkgModels.Schema, error) {
+	var allSchemas []pkgModels.Schema
+	page := 1
+
+	for {
+		schemas, hasNext, err := fetchSchemasPage(apiClient, page, writeKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch schemas page %d: %w", page, err)
+		}
+
+		allSchemas = append(allSchemas, schemas...)
+
+		if !hasNext {
+			break
+		}
+		page++
+	}
+
+	return allSchemas, nil
+}
+
+// fetchSchemasPage fetches a single page of schemas for integration tests
+func fetchSchemasPage(apiClient *client.Client, page int, writeKey string) ([]pkgModels.Schema, bool, error) {
+	// Build path with query parameters
+	path := "schemas"
+	query := url.Values{}
+	query.Set("page", strconv.Itoa(page))
+	if writeKey != "" {
+		query.Set("writeKey", writeKey)
+	}
+
+	if queryStr := query.Encode(); queryStr != "" {
+		path = path + "?" + queryStr
+	}
+
+	// Make request using the central client
+	ctx := context.Background()
+	data, err := apiClient.Do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to make request: %w", err)
+	}
+
+	// Parse response
+	var response pkgModels.SchemasResponse
+	if err := json.Unmarshal(data, &response); err != nil {
+		return nil, false, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Results, response.HasNext, nil
+}
+
 func performUnflatten(inputFile, outputFile string, dryRun, verbose bool) error {
 	if dryRun {
 		return nil // Don't create file in dry run
@@ -407,7 +466,7 @@ func performUnflatten(inputFile, outputFile string, dryRun, verbose bool) error 
 	}
 
 	// Parse JSON
-	var schemasFile models.SchemasFile
+	var schemasFile pkgModels.SchemasFile
 	if err := json.Unmarshal(data, &schemasFile); err != nil {
 		return err
 	}
@@ -438,7 +497,7 @@ func performConvert(inputFile, outputDir string, dryRun, verbose bool, yamlInden
 		return err
 	}
 
-	var schemasFile models.SchemasFile
+	var schemasFile pkgModels.SchemasFile
 	if err := json.Unmarshal(data, &schemasFile); err != nil {
 		return err
 	}
