@@ -578,15 +578,260 @@ func TestUnflattenSchema_RudderStackRealWorld(t *testing.T) {
 }
 
 func BenchmarkUnflattenLargeArray(b *testing.B) {
-	// Create input with large array
+	// Create a large array with 1000 elements
 	input := make(map[string]interface{})
 	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("items.%d.value", i)
-		input[key] = "test_value"
+		input[fmt.Sprintf("array.%d", i)] = fmt.Sprintf("value_%d", i)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		UnflattenSchema(input)
 	}
+}
+
+// TestUnflatten_SuccessfulNestedStructureCreation tests successful nested structure creation
+// This covers lines 73-74 in unflatten.go (setNestedValue function creating nested structures)
+func TestUnflatten_SuccessfulNestedStructureCreation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SuccessfulObjectCreation", func(t *testing.T) {
+		t.Parallel()
+
+		// Test successful creation of nested objects (lines 73-74)
+		input := map[string]interface{}{
+			"level1.level2.level3.field": "deep_value",
+			"level1.level2.other_field":  "shallow_value",
+			"level1.simple_field":        "simple_value",
+		}
+
+		result := UnflattenSchema(input)
+
+		// Verify the nested structure was created successfully
+		expected := map[string]interface{}{
+			"level1": map[string]interface{}{
+				"level2": map[string]interface{}{
+					"level3": map[string]interface{}{
+						"field": "deep_value",
+					},
+					"other_field": "shallow_value",
+				},
+				"simple_field": "simple_value",
+			},
+		}
+
+		assert.Equal(t, expected, result)
+
+		// Verify specific nested structure access
+		level1, ok := result["level1"].(map[string]interface{})
+		require.True(t, ok, "level1 should be a map")
+
+		level2, ok := level1["level2"].(map[string]interface{})
+		require.True(t, ok, "level2 should be a map")
+
+		level3, ok := level2["level3"].(map[string]interface{})
+		require.True(t, ok, "level3 should be a map")
+
+		assert.Equal(t, "deep_value", level3["field"])
+		assert.Equal(t, "shallow_value", level2["other_field"])
+		assert.Equal(t, "simple_value", level1["simple_field"])
+	})
+
+	t.Run("SuccessfulArrayCreation", func(t *testing.T) {
+		t.Parallel()
+
+		// Test successful creation of arrays within nested objects
+		input := map[string]interface{}{
+			"data.items.0.name":         "item1",
+			"data.items.0.properties.0": "prop1",
+			"data.items.0.properties.1": "prop2",
+			"data.items.1.name":         "item2",
+			"data.items.1.properties.0": "prop3",
+			"data.metadata.count":       2,
+		}
+
+		result := UnflattenSchema(input)
+
+		// Verify nested structure with arrays
+		data, ok := result["data"].(map[string]interface{})
+		require.True(t, ok, "data should be a map")
+
+		items, ok := data["items"].([]interface{})
+		require.True(t, ok, "items should be an array")
+		require.Len(t, items, 2)
+
+		// Check first item
+		item1, ok := items[0].(map[string]interface{})
+		require.True(t, ok, "first item should be a map")
+		assert.Equal(t, "item1", item1["name"])
+
+		properties1, ok := item1["properties"].([]interface{})
+		require.True(t, ok, "properties should be an array")
+		assert.Equal(t, []interface{}{"prop1", "prop2"}, properties1)
+
+		// Check second item
+		item2, ok := items[1].(map[string]interface{})
+		require.True(t, ok, "second item should be a map")
+		assert.Equal(t, "item2", item2["name"])
+
+		properties2, ok := item2["properties"].([]interface{})
+		require.True(t, ok, "properties should be an array")
+		assert.Equal(t, []interface{}{"prop3"}, properties2)
+
+		// Check metadata
+		metadata, ok := data["metadata"].(map[string]interface{})
+		require.True(t, ok, "metadata should be a map")
+		assert.Equal(t, 2, metadata["count"])
+	})
+
+	t.Run("SuccessfulMixedTypeCreation", func(t *testing.T) {
+		t.Parallel()
+
+		// Test creation of structures with mixed types
+		input := map[string]interface{}{
+			"user.id":                        123,
+			"user.profile.name":              "John Doe",
+			"user.profile.active":            true,
+			"user.profile.score":             95.5,
+			"user.tags.0":                    "developer",
+			"user.tags.1":                    "golang",
+			"user.preferences.theme":         "dark",
+			"user.preferences.notifications": true,
+			"user.metadata.created":          "2024-01-01",
+			"user.metadata.updated":          "2024-01-15",
+		}
+
+		result := UnflattenSchema(input)
+
+		// Verify all types and structures were created correctly
+		user, ok := result["user"].(map[string]interface{})
+		require.True(t, ok)
+
+		assert.Equal(t, 123, user["id"])
+
+		profile, ok := user["profile"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "John Doe", profile["name"])
+		assert.Equal(t, true, profile["active"])
+		assert.Equal(t, 95.5, profile["score"])
+
+		tags, ok := user["tags"].([]interface{})
+		require.True(t, ok)
+		assert.Equal(t, []interface{}{"developer", "golang"}, tags)
+
+		preferences, ok := user["preferences"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "dark", preferences["theme"])
+		assert.Equal(t, true, preferences["notifications"])
+
+		metadata, ok := user["metadata"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "2024-01-01", metadata["created"])
+		assert.Equal(t, "2024-01-15", metadata["updated"])
+	})
+
+	t.Run("SuccessfulComplexStructures", func(t *testing.T) {
+		t.Parallel()
+
+		// Test creation of complex nested structures that mirror real-world usage
+		input := map[string]interface{}{
+			"event":                         "product_purchased",
+			"properties.product.id":         "prod_123",
+			"properties.product.name":       "Premium Widget",
+			"properties.product.category.0": "electronics",
+			"properties.product.category.1": "widgets",
+			"properties.order.id":           "order_456",
+			"properties.order.total":        199.99,
+			"properties.order.items.0.sku":  "SKU001",
+			"properties.order.items.0.qty":  2,
+			"properties.order.items.1.sku":  "SKU002",
+			"properties.order.items.1.qty":  1,
+			"context.user_agent":            "Mozilla/5.0...",
+			"context.page.url":              "https://example.com/checkout",
+			"context.page.title":            "Checkout - Example Store",
+		}
+
+		result := UnflattenSchema(input)
+
+		// Verify the complex structure
+		assert.Equal(t, "product_purchased", result["event"])
+
+		properties, ok := result["properties"].(map[string]interface{})
+		require.True(t, ok)
+
+		product, ok := properties["product"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "prod_123", product["id"])
+		assert.Equal(t, "Premium Widget", product["name"])
+
+		category, ok := product["category"].([]interface{})
+		require.True(t, ok)
+		assert.Equal(t, []interface{}{"electronics", "widgets"}, category)
+
+		order, ok := properties["order"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "order_456", order["id"])
+		assert.Equal(t, 199.99, order["total"])
+
+		items, ok := order["items"].([]interface{})
+		require.True(t, ok)
+		require.Len(t, items, 2)
+
+		item1, ok := items[0].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "SKU001", item1["sku"])
+		assert.Equal(t, 2, item1["qty"])
+
+		item2, ok := items[1].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "SKU002", item2["sku"])
+		assert.Equal(t, 1, item2["qty"])
+
+		context, ok := result["context"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "Mozilla/5.0...", context["user_agent"])
+
+		page, ok := context["page"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "https://example.com/checkout", page["url"])
+		assert.Equal(t, "Checkout - Example Store", page["title"])
+	})
+
+	t.Run("SuccessfulDynamicStructureBuilding", func(t *testing.T) {
+		t.Parallel()
+
+		// Test that structures are built progressively (testing the core setNestedValue logic)
+		input := map[string]interface{}{
+			"a.b.c": "value1",
+			"a.b.d": "value2",
+			"a.e.f": "value3",
+			"g.h.0": "array_value1",
+			"g.h.1": "array_value2",
+			"g.i":   "simple_value",
+		}
+
+		result := UnflattenSchema(input)
+
+		// Verify that each path was built correctly and structures are shared appropriately
+		a, ok := result["a"].(map[string]interface{})
+		require.True(t, ok)
+
+		b, ok := a["b"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "value1", b["c"])
+		assert.Equal(t, "value2", b["d"])
+
+		e, ok := a["e"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "value3", e["f"])
+
+		g, ok := result["g"].(map[string]interface{})
+		require.True(t, ok)
+
+		h, ok := g["h"].([]interface{})
+		require.True(t, ok)
+		assert.Equal(t, []interface{}{"array_value1", "array_value2"}, h)
+
+		assert.Equal(t, "simple_value", g["i"])
+	})
 }
