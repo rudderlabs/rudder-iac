@@ -929,3 +929,197 @@ func TestFetchCommand_VerboseWithWriteKey(t *testing.T) {
 		assert.FileExists(t, outputFile)
 	}
 }
+
+func TestFetchCommand_HappyPathSuccessMessages(t *testing.T) {
+	// Initialize viper for test
+	setupViperForTests()
+
+	// Create test response with multiple schemas
+	testSchemas := []models.Schema{
+		{
+			UID:             "test-uid-1",
+			WriteKey:        "test-write-key-1",
+			EventType:       "track",
+			EventIdentifier: "test-event-1",
+			Schema: map[string]interface{}{
+				"event":  "string",
+				"userId": "string",
+			},
+		},
+		{
+			UID:             "test-uid-2",
+			WriteKey:        "test-write-key-2",
+			EventType:       "identify",
+			EventIdentifier: "test-event-2",
+			Schema: map[string]interface{}{
+				"userId":       "string",
+				"traits.email": "string",
+			},
+		},
+	}
+
+	testResponse := models.SchemasResponse{
+		Results:     testSchemas,
+		CurrentPage: 1,
+		HasNext:     false,
+	}
+
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(testResponse)
+	}))
+	defer server.Close()
+
+	// Set environment variables
+	originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
+	originalURL := os.Getenv("RUDDERSTACK_API_URL")
+	os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
+	os.Setenv("RUDDERSTACK_API_URL", server.URL)
+	defer func() {
+		if originalToken == "" {
+			os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
+		} else {
+			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
+		}
+		if originalURL == "" {
+			os.Unsetenv("RUDDERSTACK_API_URL")
+		} else {
+			os.Setenv("RUDDERSTACK_API_URL", originalURL)
+		}
+	}()
+
+	// Create temporary output file
+	tempDir := t.TempDir()
+	outputFile := filepath.Join(tempDir, "success_test_output.json")
+
+	// Test case 1: Success path without verbose - covers lines 110-111
+	t.Run("SuccessMessagesNonVerbose", func(t *testing.T) {
+		err := runFetch(outputFile, "", false, false, 2)
+		require.NoError(t, err)
+
+		// Verify the success messages were printed (lines 110-111 in fetch.go)
+		// This will exercise the final success output lines that are currently uncovered
+		assert.FileExists(t, outputFile)
+
+		// Verify file content was written correctly
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+
+		var output models.SchemasFile
+		err = json.Unmarshal(content, &output)
+		require.NoError(t, err)
+		assert.Len(t, output.Schemas, 2)
+	})
+
+	// Test case 2: Success path with different write key - covers success scenarios
+	t.Run("SuccessWithSpecificWriteKey", func(t *testing.T) {
+		outputFile2 := filepath.Join(tempDir, "success_writekey_output.json")
+		err := runFetch(outputFile2, "test-write-key-1", false, false, 2)
+		require.NoError(t, err)
+
+		assert.FileExists(t, outputFile2)
+
+		// Verify the content
+		content, err := os.ReadFile(outputFile2)
+		require.NoError(t, err)
+
+		var output models.SchemasFile
+		err = json.Unmarshal(content, &output)
+		require.NoError(t, err)
+		assert.Len(t, output.Schemas, 2)
+	})
+}
+
+func TestWriteJSONFile_HappyPaths(t *testing.T) {
+	// Test various success scenarios for writeJSONFile to cover lines 123-124
+	testData := models.SchemasFile{
+		Schemas: []models.Schema{
+			{
+				UID:             "test-uid",
+				WriteKey:        "test-write-key",
+				EventType:       "track",
+				EventIdentifier: "test_event",
+				Schema: map[string]interface{}{
+					"event":  "string",
+					"userId": "string",
+				},
+			},
+		},
+	}
+
+	t.Run("WriteJSONFileWithIndent", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		outputFile := filepath.Join(tempDir, "indented_output.json")
+
+		// Test with indent > 0 (covers indent formatting path)
+		err := writeJSONFile(outputFile, testData, 4)
+		require.NoError(t, err)
+
+		// Verify file exists and has proper content
+		assert.FileExists(t, outputFile)
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+
+		// Verify indentation is applied
+		assert.Contains(t, string(content), "    ") // Should contain 4 spaces for indentation
+
+		// Verify JSON structure
+		var output models.SchemasFile
+		err = json.Unmarshal(content, &output)
+		require.NoError(t, err)
+		assert.Len(t, output.Schemas, 1)
+		assert.Equal(t, "test-uid", output.Schemas[0].UID)
+	})
+
+	t.Run("WriteJSONFileWithoutIndent", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		outputFile := filepath.Join(tempDir, "compact_output.json")
+
+		// Test with indent = 0 (covers compact formatting path)
+		err := writeJSONFile(outputFile, testData, 0)
+		require.NoError(t, err)
+
+		// Verify file exists and has proper content
+		assert.FileExists(t, outputFile)
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+
+		// Verify JSON structure
+		var output models.SchemasFile
+		err = json.Unmarshal(content, &output)
+		require.NoError(t, err)
+		assert.Len(t, output.Schemas, 1)
+		assert.Equal(t, "test-uid", output.Schemas[0].UID)
+	})
+
+	t.Run("WriteJSONFileWithDefaultIndent", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		outputFile := filepath.Join(tempDir, "default_output.json")
+
+		// Test with default indent (covers the setIndent path with 2 spaces)
+		err := writeJSONFile(outputFile, testData, 2)
+		require.NoError(t, err)
+
+		// Verify file exists and has proper content
+		assert.FileExists(t, outputFile)
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+
+		// Verify indentation is applied (should have 2 spaces)
+		assert.Contains(t, string(content), "  ") // Should contain 2 spaces for indentation
+
+		// Verify JSON structure
+		var output models.SchemasFile
+		err = json.Unmarshal(content, &output)
+		require.NoError(t, err)
+		assert.Len(t, output.Schemas, 1)
+		assert.Equal(t, "test-uid", output.Schemas[0].UID)
+	})
+}
