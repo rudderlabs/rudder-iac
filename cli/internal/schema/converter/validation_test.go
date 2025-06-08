@@ -212,7 +212,8 @@ func TestCustomTypeNameGeneration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateCustomTypeName(tt.path, tt.baseType)
+			customTypeFactory := NewCustomTypeFactory()
+			result := customTypeFactory.generateCustomTypeName(tt.path, tt.baseType)
 
 			// Check length constraint
 			assert.True(t, len(result) >= 3 && len(result) <= 65,
@@ -259,7 +260,12 @@ func TestPropertyIDGeneration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateUniquePropertyID(tt.propName, tt.propType)
+			propertyFactory := NewPropertyFactory()
+			// Create a mock analyzer for testing
+			mockAnalyzer := &SchemaAnalyzer{
+				UsedPropertyIDs: make(map[string]bool),
+			}
+			result := propertyFactory.generateUniquePropertyID(mockAnalyzer, tt.propName, tt.propType)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
