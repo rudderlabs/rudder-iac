@@ -1,6 +1,7 @@
 package jsonpath
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -325,4 +326,289 @@ func TestProcessor_ComplexJSONPaths(t *testing.T) {
 			assert.Equal(t, c.expected, result.Value)
 		})
 	}
+}
+
+// TestProcessor_JSONPathNormalization tests JSONPath normalization for gjson compatibility
+// This covers lines 44-45 in processor.go (normalizeJSONPath function)
+func TestProcessor_JSONPathNormalization(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		inputPath    string
+		expectedPath string
+	}{
+		{
+			name:         "DollarDotPrefix",
+			inputPath:    "$.properties.user",
+			expectedPath: "properties.user",
+		},
+		{
+			name:         "DollarOnly",
+			inputPath:    "$",
+			expectedPath: "",
+		},
+		{
+			name:         "DotOnly",
+			inputPath:    "$.",
+			expectedPath: "",
+		},
+		{
+			name:         "NoPrefix",
+			inputPath:    "properties.user",
+			expectedPath: "properties.user",
+		},
+		{
+			name:         "EmptyPath",
+			inputPath:    "",
+			expectedPath: "",
+		},
+		{
+			name:         "DeepPath",
+			inputPath:    "$.context.app.version",
+			expectedPath: "context.app.version",
+		},
+		{
+			name:         "ArrayAccess",
+			inputPath:    "$.items.0.tags.1",
+			expectedPath: "items.0.tags.1",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			processor := NewProcessor(c.inputPath, true)
+			normalizedPath := processor.normalizeJSONPath()
+			assert.Equal(t, c.expectedPath, normalizedPath)
+		})
+	}
+}
+
+// TestProcessor_ResultParsing tests successful result parsing and type conversion
+// This covers lines 56-59 in processor.go (parseGjsonResult function)
+func TestProcessor_ResultParsing(t *testing.T) {
+	t.Parallel()
+
+	testSchema := map[string]interface{}{
+		"string_field":  "hello world",
+		"number_field":  42.5,
+		"integer_field": 123,
+		"boolean_true":  true,
+		"boolean_false": false,
+		"null_field":    nil,
+		"object_field": map[string]interface{}{
+			"nested_string": "nested value",
+			"nested_number": 99,
+		},
+		"array_field": []interface{}{
+			"item1", "item2", "item3",
+		},
+		"mixed_array": []interface{}{
+			"string",
+			123,
+			true,
+			map[string]interface{}{
+				"nested": "object",
+			},
+		},
+	}
+
+	cases := []struct {
+		name          string
+		jsonPath      string
+		expectedValue interface{}
+		expectedType  string
+	}{
+		{
+			name:          "StringField",
+			jsonPath:      "$.string_field",
+			expectedValue: "hello world",
+			expectedType:  "string",
+		},
+		{
+			name:          "NumberField",
+			jsonPath:      "$.number_field",
+			expectedValue: 42.5,
+			expectedType:  "float64",
+		},
+		{
+			name:          "IntegerField",
+			jsonPath:      "$.integer_field",
+			expectedValue: float64(123), // gjson returns all numbers as float64
+			expectedType:  "float64",
+		},
+		{
+			name:          "BooleanTrue",
+			jsonPath:      "$.boolean_true",
+			expectedValue: true,
+			expectedType:  "bool",
+		},
+		{
+			name:          "BooleanFalse",
+			jsonPath:      "$.boolean_false",
+			expectedValue: false,
+			expectedType:  "bool",
+		},
+		{
+			name:          "NullField",
+			jsonPath:      "$.null_field",
+			expectedValue: nil,
+			expectedType:  "<nil>",
+		},
+		{
+			name:     "ObjectField",
+			jsonPath: "$.object_field",
+			expectedValue: map[string]interface{}{
+				"nested_string": "nested value",
+				"nested_number": float64(99), // gjson parses numbers as float64
+			},
+			expectedType: "map[string]interface {}",
+		},
+		{
+			name:          "ArrayField",
+			jsonPath:      "$.array_field",
+			expectedValue: []interface{}{"item1", "item2", "item3"},
+			expectedType:  "[]interface {}",
+		},
+		{
+			name:     "MixedArray",
+			jsonPath: "$.mixed_array",
+			expectedValue: []interface{}{
+				"string",
+				float64(123), // gjson parses numbers as float64
+				true,
+				map[string]interface{}{
+					"nested": "object",
+				},
+			},
+			expectedType: "[]interface {}",
+		},
+		{
+			name:          "NestedStringField",
+			jsonPath:      "$.object_field.nested_string",
+			expectedValue: "nested value",
+			expectedType:  "string",
+		},
+		{
+			name:          "ArrayElement",
+			jsonPath:      "$.array_field.1",
+			expectedValue: "item2",
+			expectedType:  "string",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			processor := NewProcessor(c.jsonPath, true)
+			result := processor.ProcessSchema(testSchema)
+
+			require.NoError(t, result.Error, "Expected no error for path: %s", c.jsonPath)
+			assert.Equal(t, c.expectedValue, result.Value, "Value mismatch for path: %s", c.jsonPath)
+
+			// Check type as well
+			if result.Value != nil {
+				assert.Contains(t, c.expectedType, fmt.Sprintf("%T", result.Value),
+					"Type mismatch for path: %s", c.jsonPath)
+			}
+		})
+	}
+}
+
+// TestProcessor_SuccessfulHappyPaths tests various successful scenarios to ensure coverage
+func TestProcessor_SuccessfulHappyPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CompleteWorkflow", func(t *testing.T) {
+		t.Parallel()
+
+		// Test a complete workflow that exercises normalization and parsing
+		schema := map[string]interface{}{
+			"user": map[string]interface{}{
+				"profile": map[string]interface{}{
+					"preferences": map[string]interface{}{
+						"theme":         "dark",
+						"notifications": true,
+						"settings": map[string]interface{}{
+							"volume":  0.8,
+							"quality": "high",
+						},
+					},
+				},
+			},
+		}
+
+		// Test deeply nested path that exercises normalization
+		processor := NewProcessor("$.user.profile.preferences", true)
+		result := processor.ProcessSchema(schema)
+
+		require.NoError(t, result.Error)
+		require.NotNil(t, result.Value)
+
+		preferences, ok := result.Value.(map[string]interface{})
+		require.True(t, ok)
+
+		assert.Equal(t, "dark", preferences["theme"])
+		assert.Equal(t, true, preferences["notifications"])
+
+		settings, ok := preferences["settings"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, 0.8, settings["volume"])
+		assert.Equal(t, "high", settings["quality"])
+	})
+
+	t.Run("ArrayProcessing", func(t *testing.T) {
+		t.Parallel()
+
+		schema := map[string]interface{}{
+			"events": []interface{}{
+				map[string]interface{}{
+					"name":      "event1",
+					"timestamp": 1234567890,
+					"data":      map[string]interface{}{"key": "value1"},
+				},
+				map[string]interface{}{
+					"name":      "event2",
+					"timestamp": 1234567891,
+					"data":      map[string]interface{}{"key": "value2"},
+				},
+			},
+		}
+
+		// Test array access
+		processor := NewProcessor("$.events.0.data", true)
+		result := processor.ProcessSchema(schema)
+
+		require.NoError(t, result.Error)
+		require.NotNil(t, result.Value)
+
+		data, ok := result.Value.(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "value1", data["key"])
+	})
+
+	t.Run("RootPathHandling", func(t *testing.T) {
+		t.Parallel()
+
+		schema := map[string]interface{}{
+			"top_level": "value",
+			"nested": map[string]interface{}{
+				"field": "nested_value",
+			},
+		}
+
+		// Test root path variations
+		rootPaths := []string{"", "$", "$."}
+
+		for _, path := range rootPaths {
+			processor := NewProcessor(path, true)
+			result := processor.ProcessSchema(schema)
+
+			require.NoError(t, result.Error, "Root path should not error: %s", path)
+			assert.Equal(t, schema, result.Value, "Root path should return entire schema: %s", path)
+		}
+	})
 }
