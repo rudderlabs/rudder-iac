@@ -155,7 +155,7 @@ func fetchSchemas(apiClient *client.Client, writeKey string) ([]pkgModels.Schema
 // fetchSchemasPage fetches a single page of schemas
 func fetchSchemasPage(apiClient *client.Client, page int, writeKey string) ([]pkgModels.Schema, bool, error) {
 	// Build path with query parameters
-	path := "schemas"
+	path := "v2/schemas"
 	query := url.Values{}
 	query.Set("page", strconv.Itoa(page))
 	if writeKey != "" {

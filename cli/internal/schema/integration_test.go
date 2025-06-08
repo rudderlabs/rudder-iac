@@ -357,8 +357,8 @@ func performFetch(writeKeys []string, outputFile string, dryRun, verbose bool) e
 		// Use default central client (which defaults to https://api.rudderstack.com/v2)
 		centralClient, err = client.New(apiToken)
 	} else {
-		// Use custom URL (for testing, the mock server URL should be used directly with /v2 added)
-		centralClient, err = client.New(apiToken, client.WithBaseURL(apiURL+"/v2"))
+		// Use custom URL directly (v2 is added in the request path)
+		centralClient, err = client.New(apiToken, client.WithBaseURL(apiURL))
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create central API client: %w", err)
@@ -427,7 +427,7 @@ func fetchAllSchemas(apiClient *client.Client, writeKey string) ([]pkgModels.Sch
 // fetchSchemasPage fetches a single page of schemas for integration tests
 func fetchSchemasPage(apiClient *client.Client, page int, writeKey string) ([]pkgModels.Schema, bool, error) {
 	// Build path with query parameters
-	path := "schemas"
+	path := "v2/schemas"
 	query := url.Values{}
 	query.Set("page", strconv.Itoa(page))
 	if writeKey != "" {
