@@ -11,91 +11,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// setupViperForTests initializes viper with environment variable bindings for tests
-func setupViperForTests() {
-	viper.Reset()
-	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
-	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
-}
-
 func TestFetchCommand_Integration(t *testing.T) {
 	t.Parallel()
 
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
-	// Create test response
+	// Create test schemas
 	testSchemas := []models.Schema{
-		{
-			UID:             "test-uid-1",
-			WriteKey:        "test-write-key",
-			EventType:       "track",
-			EventIdentifier: "test-event-1",
-			Schema: map[string]interface{}{
-				"event":      "string",
-				"userId":     "string",
-				"context.ip": "string",
-			},
-			CreatedAt: time.Now(),
-			LastSeen:  time.Now(),
-			Count:     10,
-		},
-		{
-			UID:             "test-uid-2",
-			WriteKey:        "test-write-key-2",
-			EventType:       "identify",
-			EventIdentifier: "test-event-2",
-			Schema: map[string]interface{}{
-				"userId":       "string",
-				"traits.email": "string",
-			},
-			CreatedAt: time.Now(),
-			LastSeen:  time.Now(),
-			Count:     5,
-		},
+		testhelpers.CreateTestSchema("test-uid-1", "test-write-key", "test-event-1"),
+		testhelpers.CreateTestSchema("test-uid-2", "test-write-key-2", "test-event-2"),
 	}
 
-	testResponse := models.SchemasResponse{
-		Results:     testSchemas,
-		CurrentPage: 1,
-		HasNext:     false,
-	}
-
-	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify request
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
-		assert.Equal(t, "/v2/schemas", r.URL.Path)
-
-		// Return test response
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(testResponse)
-	}))
-	defer server.Close()
+	// Create test server with standard handler
+	server := testhelpers.SetupMockServer(t, testhelpers.CreateStandardMockHandler(t, testSchemas))
 
 	// Set environment variables
-	originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-	originalURL := os.Getenv("RUDDERSTACK_API_URL")
-	os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-	os.Setenv("RUDDERSTACK_API_URL", server.URL)
-	defer func() {
-		if originalToken == "" {
-			os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-		} else {
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-		}
-		if originalURL == "" {
-			os.Unsetenv("RUDDERSTACK_API_URL")
-		} else {
-			os.Setenv("RUDDERSTACK_API_URL", originalURL)
-		}
-	}()
+	cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+		"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+		"RUDDERSTACK_API_URL":      server.URL,
+	})
+	defer cleanupEnv()
 
 	// Create temporary output file
 	tempDir := t.TempDir()
@@ -125,7 +69,8 @@ func TestFetchCommand_Integration(t *testing.T) {
 
 func TestFetchCommand_Scenarios(t *testing.T) {
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	cases := []struct {
 		name        string
@@ -167,10 +112,11 @@ func TestFetchCommand_Scenarios(t *testing.T) {
 			// t.Parallel()
 
 			// Initialize viper for subtest
-			setupViperForTests()
+			cleanup := testhelpers.SetupViper(t)
+			defer cleanup()
 
 			// Create test server that verifies writeKey parameter if specified
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := testhelpers.SetupMockServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Check that the writeKey parameter is passed correctly
 				writeKeyParam := r.URL.Query().Get("writeKey")
 				if c.writeKey != "" {
@@ -185,34 +131,18 @@ func TestFetchCommand_Scenarios(t *testing.T) {
 					responseWriteKey = writeKeyParam
 				}
 
-				response := models.SchemasResponse{
-					Results: []models.Schema{
-						{UID: "test-uid", EventIdentifier: "test-event", WriteKey: responseWriteKey},
-					},
-					CurrentPage: 1,
-					HasNext:     false,
-				}
+				response := testhelpers.CreateTestSchemaResponse([]models.Schema{
+					{UID: "test-uid", EventIdentifier: "test-event", WriteKey: responseWriteKey},
+				}, 1, false)
 				json.NewEncoder(w).Encode(response)
 			}))
-			defer server.Close()
 
 			// Set environment variables
-			originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-			originalURL := os.Getenv("RUDDERSTACK_API_URL")
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-			os.Setenv("RUDDERSTACK_API_URL", server.URL)
-			defer func() {
-				if originalToken == "" {
-					os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-				} else {
-					os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-				}
-				if originalURL == "" {
-					os.Unsetenv("RUDDERSTACK_API_URL")
-				} else {
-					os.Setenv("RUDDERSTACK_API_URL", originalURL)
-				}
-			}()
+			cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+				"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+				"RUDDERSTACK_API_URL":      server.URL,
+			})
+			defer cleanupEnv()
 
 			tempDir := t.TempDir()
 			outputFile := filepath.Join(tempDir, "test_output.json")
@@ -238,7 +168,8 @@ func TestFetchCommand_Scenarios(t *testing.T) {
 
 func TestFetchCommand_ErrorScenarios(t *testing.T) {
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	cases := []struct {
 		name        string
@@ -272,7 +203,8 @@ func TestFetchCommand_ErrorScenarios(t *testing.T) {
 			// t.Parallel()
 
 			// Initialize viper for subtest
-			setupViperForTests()
+			cleanup := testhelpers.SetupViper(t)
+			defer cleanup()
 
 			var server *httptest.Server
 			if c.useServer {
@@ -367,7 +299,8 @@ func TestNewCmdFetch(t *testing.T) {
 
 func TestFetchCommand_EnhancedScenarios(t *testing.T) {
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	cases := []struct {
 		name             string
@@ -436,10 +369,11 @@ func TestFetchCommand_EnhancedScenarios(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			// Initialize viper for subtest
-			setupViperForTests()
+			cleanup := testhelpers.SetupViper(t)
+			defer cleanup()
 
 			// Create test server with custom response
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := testhelpers.SetupMockServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(c.serverStatusCode)
 				if c.serverStatusCode == 200 {
 					json.NewEncoder(w).Encode(c.serverResponse)
@@ -447,25 +381,13 @@ func TestFetchCommand_EnhancedScenarios(t *testing.T) {
 					w.Write([]byte("Internal Server Error"))
 				}
 			}))
-			defer server.Close()
 
 			// Set environment variables
-			originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-			originalURL := os.Getenv("RUDDERSTACK_API_URL")
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-			os.Setenv("RUDDERSTACK_API_URL", server.URL)
-			defer func() {
-				if originalToken == "" {
-					os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-				} else {
-					os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-				}
-				if originalURL == "" {
-					os.Unsetenv("RUDDERSTACK_API_URL")
-				} else {
-					os.Setenv("RUDDERSTACK_API_URL", originalURL)
-				}
-			}()
+			cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+				"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+				"RUDDERSTACK_API_URL":      server.URL,
+			})
+			defer cleanupEnv()
 
 			tempDir := t.TempDir()
 			outputFile := filepath.Join(tempDir, "test_output.json")
@@ -932,62 +854,24 @@ func TestFetchCommand_VerboseWithWriteKey(t *testing.T) {
 
 func TestFetchCommand_HappyPathSuccessMessages(t *testing.T) {
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
-	// Create test response with multiple schemas
+	// Create test schemas
 	testSchemas := []models.Schema{
-		{
-			UID:             "test-uid-1",
-			WriteKey:        "test-write-key-1",
-			EventType:       "track",
-			EventIdentifier: "test-event-1",
-			Schema: map[string]interface{}{
-				"event":  "string",
-				"userId": "string",
-			},
-		},
-		{
-			UID:             "test-uid-2",
-			WriteKey:        "test-write-key-2",
-			EventType:       "identify",
-			EventIdentifier: "test-event-2",
-			Schema: map[string]interface{}{
-				"userId":       "string",
-				"traits.email": "string",
-			},
-		},
-	}
-
-	testResponse := models.SchemasResponse{
-		Results:     testSchemas,
-		CurrentPage: 1,
-		HasNext:     false,
+		testhelpers.CreateTestSchema("test-uid-1", "test-write-key-1", "test-event-1"),
+		testhelpers.CreateTestSchema("test-uid-2", "test-write-key-2", "test-event-2"),
 	}
 
 	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(testResponse)
-	}))
-	defer server.Close()
+	server := testhelpers.SetupMockServer(t, testhelpers.CreateStandardMockHandler(t, testSchemas))
 
 	// Set environment variables
-	originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-	originalURL := os.Getenv("RUDDERSTACK_API_URL")
-	os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-	os.Setenv("RUDDERSTACK_API_URL", server.URL)
-	defer func() {
-		if originalToken == "" {
-			os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-		} else {
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-		}
-		if originalURL == "" {
-			os.Unsetenv("RUDDERSTACK_API_URL")
-		} else {
-			os.Setenv("RUDDERSTACK_API_URL", originalURL)
-		}
-	}()
+	cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+		"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+		"RUDDERSTACK_API_URL":      server.URL,
+	})
+	defer cleanupEnv()
 
 	// Create temporary output file
 	tempDir := t.TempDir()

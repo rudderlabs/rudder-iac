@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,14 +89,14 @@ func TestConvertCommand_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify output files were created
-	assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
-	assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
-
-	// Verify tracking plan files were created for each writeKey
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-1.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-2.yaml"))
+	testhelpers.AssertFilesExist(t,
+		filepath.Join(outputDir, "events.yaml"),
+		filepath.Join(outputDir, "properties.yaml"),
+		filepath.Join(outputDir, "custom-types.yaml"),
+		filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-1.yaml"),
+		filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-2.yaml"),
+	)
+	testhelpers.AssertDirsExist(t, filepath.Join(outputDir, "tracking-plans"))
 }
 
 func TestConvertCommand_Scenarios(t *testing.T) {
@@ -175,10 +176,12 @@ func TestConvertCommand_Scenarios(t *testing.T) {
 			}
 
 			if c.expectFiles {
-				assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
-				assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
-				assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
-				assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
+				testhelpers.AssertFilesExist(t,
+					filepath.Join(outputDir, "events.yaml"),
+					filepath.Join(outputDir, "properties.yaml"),
+					filepath.Join(outputDir, "custom-types.yaml"),
+				)
+				testhelpers.AssertDirsExist(t, filepath.Join(outputDir, "tracking-plans"))
 			} else {
 				_, err := os.Stat(outputDir)
 				assert.True(t, os.IsNotExist(err))

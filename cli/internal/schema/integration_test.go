@@ -13,25 +13,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/unflatten"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/schema/client"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// viperMutex protects concurrent access to viper configuration
-var viperMutex sync.Mutex
-
-// setupViperForTests initializes viper with environment variable bindings for tests
-func setupViperForTests() {
-	// Use a mutex to prevent race conditions on viper.Reset()
-	viperMutex.Lock()
-	defer viperMutex.Unlock()
-
-	viper.Reset()
-	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
-	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
-}
 
 // TestFullWorkflow tests the complete workflow: fetch -> unflatten -> convert
 func TestFullWorkflow(t *testing.T) {
@@ -39,66 +26,30 @@ func TestFullWorkflow(t *testing.T) {
 	// t.Parallel()
 
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
+
+	// Create test schema with flattened structure
+	testSchema := testhelpers.CreateFlattenedTestSchema("test-uid-1", "test-write-key", "product_viewed")
 
 	// Setup mock server for fetch
-	mockResponse := map[string]interface{}{
-		"results": []map[string]interface{}{
-			{
-				"uid":             "test-uid-1",
-				"writeKey":        "test-write-key",
-				"eventType":       "track",
-				"eventIdentifier": "product_viewed",
-				"schema": map[string]interface{}{
-					"event":                   "string",
-					"userId":                  "string",
-					"context.app.name":        "string",
-					"context.device.type":     "string",
-					"properties.product_id":   "string",
-					"properties.product_name": "string",
-					"properties.price":        "number",
-					"properties.categories.0": "string",
-					"properties.categories.1": "string",
-				},
-				"createdAt": "2023-01-01T00:00:00Z",
-				"lastSeen":  "2023-01-01T00:00:00Z",
-				"count":     100,
-			},
-		},
-		"currentPage": 1,
-		"hasNext":     false,
-	}
+	server := testhelpers.SetupMockServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		testhelpers.AssertHTTPRequest(t, r, "Bearer test-token", "/v2/schemas")
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify authorization header
-		auth := r.Header.Get("Authorization")
-		assert.Equal(t, "Bearer test-token", auth)
-
+		mockResponse := testhelpers.CreateTestSchemaResponse([]models.Schema{testSchema}, 1, false)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(mockResponse)
 	}))
-	defer server.Close()
 
 	// Create temporary directory for test
 	tempDir := t.TempDir()
 
 	// Set environment variables
-	originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-	originalURL := os.Getenv("RUDDERSTACK_API_URL")
-	os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-	os.Setenv("RUDDERSTACK_API_URL", server.URL)
-	defer func() {
-		if originalToken == "" {
-			os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-		} else {
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-		}
-		if originalURL == "" {
-			os.Unsetenv("RUDDERSTACK_API_URL")
-		} else {
-			os.Setenv("RUDDERSTACK_API_URL", originalURL)
-		}
-	}()
+	cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+		"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+		"RUDDERSTACK_API_URL":      server.URL,
+	})
+	defer cleanupEnv()
 
 	// Step 1: Fetch schemas
 	fetchedFile := filepath.Join(tempDir, "fetched_schemas.json")
@@ -161,7 +112,8 @@ func TestFetchWithPagination(t *testing.T) {
 	// t.Parallel()
 
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	// Track request count with mutex for thread safety
 	var requestCount int
@@ -261,7 +213,8 @@ func TestDryRunMode(t *testing.T) {
 	// Removed t.Parallel() to avoid race conditions with viper
 
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	tempDir := t.TempDir()
 
@@ -309,7 +262,8 @@ func TestErrorHandling(t *testing.T) {
 	// Removed t.Parallel() to avoid race conditions with viper
 
 	// Initialize viper for test
-	setupViperForTests()
+	cleanup := testhelpers.SetupViper(t)
+	defer cleanup()
 
 	tempDir := t.TempDir()
 
@@ -321,7 +275,8 @@ func TestErrorHandling(t *testing.T) {
 			name: "FetchWithInvalidCredentials",
 			testFunc: func(t *testing.T) {
 				// Initialize viper for subtest
-				setupViperForTests()
+				cleanup := testhelpers.SetupViper(t)
+				defer cleanup()
 
 				// Store original values to restore later
 				originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
