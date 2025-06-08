@@ -551,23 +551,16 @@ func TestFetchCommand_Success(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			// Save original environment variables
-			originalToken := os.Getenv("RUDDERSTACK_ACCESS_TOKEN")
-			originalURL := os.Getenv("RUDDERSTACK_API_URL")
-			os.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
-			os.Setenv("RUDDERSTACK_API_URL", server.URL)
-			defer func() {
-				if originalToken == "" {
-					os.Unsetenv("RUDDERSTACK_ACCESS_TOKEN")
-				} else {
-					os.Setenv("RUDDERSTACK_ACCESS_TOKEN", originalToken)
-				}
-				if originalURL == "" {
-					os.Unsetenv("RUDDERSTACK_API_URL")
-				} else {
-					os.Setenv("RUDDERSTACK_API_URL", originalURL)
-				}
-			}()
+			// Setup viper configuration for tests
+			cleanup := testhelpers.SetupViper(t)
+			defer cleanup()
+
+			// Setup environment variables
+			cleanupEnv := testhelpers.SetupEnvVars(t, map[string]string{
+				"RUDDERSTACK_ACCESS_TOKEN": "test-token",
+				"RUDDERSTACK_API_URL":      server.URL,
+			})
+			defer cleanupEnv()
 
 			tempDir := t.TempDir()
 			outputFile := filepath.Join(tempDir, "test_output.json")
