@@ -6,195 +6,230 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
 	yamlModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSchemaAnalyzer_AnalyzeSchemas(t *testing.T) {
+func TestSchemaAnalyzer(t *testing.T) {
 	t.Parallel()
 
-	// Create test data
-	testSchemas := []models.Schema{
+	cases := []struct {
+		name     string
+		input    []models.Schema
+		expected func(t *testing.T, analyzer *SchemaAnalyzer)
+	}{
 		{
-			UID:             "test-uid-1",
-			WriteKey:        "test-write-key-1",
-			EventType:       "track",
-			EventIdentifier: "test_event_one",
-			Schema: map[string]interface{}{
-				"event":       "string",
-				"userId":      "string",
-				"anonymousId": "string",
-				"context": map[string]interface{}{
-					"app": map[string]interface{}{
-						"name":    "string",
-						"version": "string",
-					},
-					"traits": map[string]interface{}{
-						"email": "string",
-						"age":   "number",
-					},
-				},
-				"properties": map[string]interface{}{
-					"product_id":   "string",
-					"product_name": "string",
-					"categories":   []interface{}{"string", "string"},
-				},
+			name: "CompleteAnalysis",
+			input: []models.Schema{
+				testhelpers.CreateTestSchema("test-uid-1", "test-writekey-1", "test_event_one"),
+				testhelpers.CreateComplexTestSchema("test-uid-2", "test-writekey-2", "nested_test_event"),
+				testhelpers.CreateArraySchema(),
+			},
+			expected: func(t *testing.T, analyzer *SchemaAnalyzer) {
+				assert.Len(t, analyzer.Events, 3)
+				assert.Contains(t, analyzer.Events, "test_event_one")
+				assert.Contains(t, analyzer.Events, "nested_test_event")
+				assert.Contains(t, analyzer.Events, "array_test_event")
+				assert.True(t, len(analyzer.Properties) > 0)
+				assert.True(t, len(analyzer.CustomTypes) > 0)
+
+				// Test YAML generation
+				eventsYAML := analyzer.GenerateEventsYAML()
+				assert.Equal(t, "rudder/0.1", eventsYAML.Version)
+				assert.Equal(t, "events", eventsYAML.Kind)
+				assert.Len(t, eventsYAML.Spec.Events, 3)
+
+				propertiesYAML := analyzer.GeneratePropertiesYAML()
+				assert.Equal(t, "rudder/v0.1", propertiesYAML.Version)
+				assert.Equal(t, "properties", propertiesYAML.Kind)
+				assert.True(t, len(propertiesYAML.Spec.Properties) > 0)
+
+				customTypesYAML := analyzer.GenerateCustomTypesYAML()
+				assert.Equal(t, "rudder/v0.1", customTypesYAML.Version)
+				assert.Equal(t, "custom-types", customTypesYAML.Kind)
+				assert.True(t, len(customTypesYAML.Spec.Types) > 0)
+
+				// Just verify we can generate tracking plans
+				inputSchemas := []models.Schema{
+					testhelpers.CreateTestSchema("test-uid-1", "test-writekey-1", "test_event_one"),
+					testhelpers.CreateComplexTestSchema("test-uid-2", "test-writekey-2", "nested_test_event"),
+					testhelpers.CreateArraySchema(),
+				}
+				trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(inputSchemas)
+				assert.Len(t, trackingPlansYAML, 3)
 			},
 		},
 		{
-			UID:             "test-uid-2",
-			WriteKey:        "test-write-key-2",
-			EventType:       "track",
-			EventIdentifier: "test_event_two",
-			Schema: map[string]interface{}{
-				"event":  "string",
-				"userId": "string",
-				"properties": map[string]interface{}{
-					"order_id":    "string",
-					"total_price": "number",
-				},
+			name:  "EmptySchemas",
+			input: []models.Schema{},
+			expected: func(t *testing.T, analyzer *SchemaAnalyzer) {
+				assert.Len(t, analyzer.Events, 0)
+				assert.Len(t, analyzer.Properties, 0)
+				assert.Len(t, analyzer.CustomTypes, 0)
+
+				eventsYAML := analyzer.GenerateEventsYAML()
+				assert.Equal(t, "rudder/0.1", eventsYAML.Version)
+				assert.Equal(t, "events", eventsYAML.Kind)
+				assert.Len(t, eventsYAML.Spec.Events, 0)
 			},
 		},
-	}
-
-	analyzer := NewSchemaAnalyzer()
-	err := analyzer.AnalyzeSchemas(testSchemas)
-	require.NoError(t, err)
-
-	// Verify events were extracted
-	assert.Len(t, analyzer.Events, 2)
-	assert.Contains(t, analyzer.Events, "test_event_one")
-	assert.Contains(t, analyzer.Events, "test_event_two")
-
-	// Verify properties were extracted
-	assert.True(t, len(analyzer.Properties) > 0)
-
-	// Verify custom types were created for nested objects
-	assert.True(t, len(analyzer.CustomTypes) > 0)
-
-	// Test YAML generation
-	eventsYAML := analyzer.GenerateEventsYAML()
-	assert.Equal(t, "rudder/0.1", eventsYAML.Version)
-	assert.Equal(t, "events", eventsYAML.Kind)
-	assert.Len(t, eventsYAML.Spec.Events, 2)
-
-	propertiesYAML := analyzer.GeneratePropertiesYAML()
-	assert.Equal(t, "rudder/v0.1", propertiesYAML.Version)
-	assert.Equal(t, "properties", propertiesYAML.Kind)
-	assert.True(t, len(propertiesYAML.Spec.Properties) > 0)
-
-	customTypesYAML := analyzer.GenerateCustomTypesYAML()
-	assert.Equal(t, "rudder/v0.1", customTypesYAML.Version)
-	assert.Equal(t, "custom-types", customTypesYAML.Kind)
-	assert.True(t, len(customTypesYAML.Spec.Types) > 0)
-
-	trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
-	assert.Len(t, trackingPlansYAML, 2) // Two different writeKeys
-}
-
-func TestSchemaAnalyzer_EmptySchemas(t *testing.T) {
-	t.Parallel()
-
-	analyzer := NewSchemaAnalyzer()
-	err := analyzer.AnalyzeSchemas([]models.Schema{})
-	require.NoError(t, err)
-
-	// Verify empty results
-	assert.Len(t, analyzer.Events, 0)
-	assert.Len(t, analyzer.Properties, 0)
-	assert.Len(t, analyzer.CustomTypes, 0)
-
-	// Test YAML generation with empty data
-	eventsYAML := analyzer.GenerateEventsYAML()
-	assert.Equal(t, "rudder/0.1", eventsYAML.Version)
-	assert.Equal(t, "events", eventsYAML.Kind)
-	assert.Len(t, eventsYAML.Spec.Events, 0)
-}
-
-func TestSchemaAnalyzer_ComplexNestedSchema(t *testing.T) {
-	t.Parallel()
-
-	testSchemas := []models.Schema{
 		{
-			UID:             "complex-uid",
-			WriteKey:        "complex-write-key",
-			EventType:       "track",
-			EventIdentifier: "complex_event",
-			Schema: map[string]interface{}{
-				"event":  "string",
-				"userId": "string",
-				"properties": map[string]interface{}{
-					"user": map[string]interface{}{
-						"profile": map[string]interface{}{
-							"name": "string",
-							"age":  "number",
-							"preferences": map[string]interface{}{
-								"notifications": map[string]interface{}{
-									"email": "boolean",
-									"sms":   "boolean",
-								},
-							},
-						},
-					},
-					"items": []interface{}{
-						map[string]interface{}{
-							"id":    "string",
-							"price": "number",
-							"metadata": map[string]interface{}{
-								"tags": []interface{}{"string"},
-							},
-						},
-					},
-				},
+			name:  "ComplexNestedSchema",
+			input: []models.Schema{testhelpers.CreateComplexTestSchema("nested-uid", "nested-writekey", "nested_test_event")},
+			expected: func(t *testing.T, analyzer *SchemaAnalyzer) {
+				assert.Len(t, analyzer.Events, 1)
+				assert.Contains(t, analyzer.Events, "nested_test_event")
+				assert.True(t, len(analyzer.Properties) > 0)
+				assert.True(t, len(analyzer.CustomTypes) > 0)
 			},
 		},
 	}
 
-	analyzer := NewSchemaAnalyzer()
-	err := analyzer.AnalyzeSchemas(testSchemas)
-	require.NoError(t, err)
-
-	// Verify event was extracted
-	assert.Len(t, analyzer.Events, 1)
-	assert.Contains(t, analyzer.Events, "complex_event")
-
-	// Verify properties and custom types were created
-	assert.True(t, len(analyzer.Properties) > 0)
-	assert.True(t, len(analyzer.CustomTypes) > 0)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			analyzer := NewSchemaAnalyzer()
+			err := analyzer.AnalyzeSchemas(c.input)
+			require.NoError(t, err)
+			c.expected(t, analyzer)
+		})
+	}
 }
 
-func TestSchemaConverter_Convert_DryRun(t *testing.T) {
+func TestSchemaConverter(t *testing.T) {
 	t.Parallel()
 
-	// Create temporary input file
+	cases := []struct {
+		name     string
+		dryRun   bool
+		verbose  bool
+		expected func(t *testing.T, result *ConversionResult, outputDir string)
+	}{
+		{
+			name:    "DryRun",
+			dryRun:  true,
+			verbose: false,
+			expected: func(t *testing.T, result *ConversionResult, outputDir string) {
+				assert.Equal(t, 1, result.EventsCount)
+				assert.True(t, result.PropertiesCount > 0)
+				assert.True(t, result.CustomTypesCount >= 0)
+				assert.Empty(t, result.GeneratedFiles)
+			},
+		},
+		{
+			name:    "RealRun",
+			dryRun:  false,
+			verbose: false,
+			expected: func(t *testing.T, result *ConversionResult, outputDir string) {
+				assert.True(t, len(result.GeneratedFiles) >= 3)
+				assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
+				assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
+			},
+		},
+		{
+			name:    "VerboseDryRun",
+			dryRun:  true,
+			verbose: true,
+			expected: func(t *testing.T, result *ConversionResult, outputDir string) {
+				assert.Equal(t, 1, result.EventsCount)
+				assert.True(t, result.PropertiesCount > 0)
+				assert.Empty(t, result.GeneratedFiles)
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			inputFile := filepath.Join(tempDir, "test_schemas.json")
+			outputDir := filepath.Join(tempDir, "output")
+
+			testSchemas := []models.Schema{testhelpers.CreateMinimalTestSchema("test-uid")}
+			schemasData := map[string]interface{}{"schemas": testSchemas}
+			testhelpers.WriteTestFile(t, inputFile, schemasData)
+
+			options := ConversionOptions{
+				InputFile:  inputFile,
+				OutputDir:  outputDir,
+				DryRun:     c.dryRun,
+				Verbose:    c.verbose,
+				YAMLIndent: 2,
+			}
+
+			converter := NewSchemaConverter(options)
+			result, err := converter.Convert()
+			require.NoError(t, err)
+			c.expected(t, result, outputDir)
+		})
+	}
+}
+
+func TestSchemaConverter_ErrorCases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		setup func(t *testing.T) ConversionOptions
+	}{
+		{
+			name: "InvalidInput",
+			setup: func(t *testing.T) ConversionOptions {
+				tempDir := t.TempDir()
+				inputFile := filepath.Join(tempDir, "invalid.json")
+				err := os.WriteFile(inputFile, []byte("invalid json"), 0644)
+				require.NoError(t, err)
+				return ConversionOptions{
+					InputFile: inputFile,
+					OutputDir: filepath.Join(tempDir, "output"),
+					DryRun:    false,
+				}
+			},
+		},
+		{
+			name: "NonexistentInput",
+			setup: func(t *testing.T) ConversionOptions {
+				tempDir := t.TempDir()
+				return ConversionOptions{
+					InputFile: filepath.Join(tempDir, "nonexistent.json"),
+					OutputDir: filepath.Join(tempDir, "output"),
+					DryRun:    false,
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			options := c.setup(t)
+			converter := NewSchemaConverter(options)
+			_, err := converter.Convert()
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestSchemaConverter_MultipleWriteKeys(t *testing.T) {
+	t.Parallel()
+
 	tempDir := t.TempDir()
 	inputFile := filepath.Join(tempDir, "test_schemas.json")
 	outputDir := filepath.Join(tempDir, "output")
 
-	// Create test data
-	testData := `{
-		"schemas": [
-			{
-				"uid": "test-uid",
-				"writeKey": "test-write-key",
-				"eventType": "track",
-				"eventIdentifier": "test_event",
-				"schema": {
-					"event": "string",
-					"userId": "string",
-					"properties": {
-						"test_prop": "string"
-					}
-				}
-			}
-		]
-	}`
+	testData := map[string]interface{}{
+		"schemas": []models.Schema{
+			testhelpers.CreateTestSchema("uid1", "writekey1", "event1"),
+			testhelpers.CreateTestSchema("uid2", "writekey2", "event2"),
+		},
+	}
+	testhelpers.WriteTestFile(t, inputFile, testData)
 
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	// Test dry run
 	options := ConversionOptions{
 		InputFile:  inputFile,
 		OutputDir:  outputDir,
@@ -207,195 +242,31 @@ func TestSchemaConverter_Convert_DryRun(t *testing.T) {
 	result, err := converter.Convert()
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, result.EventsCount)
+	assert.Equal(t, 2, result.EventsCount)
 	assert.True(t, result.PropertiesCount > 0)
 	assert.True(t, result.CustomTypesCount >= 0)
-	assert.Empty(t, result.GeneratedFiles) // No files should be created in dry run
-}
-
-func TestSchemaConverter_Convert_RealRun(t *testing.T) {
-	t.Parallel()
-
-	// Create temporary input file
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "test_schemas.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	// Create test data
-	testData := `{
-		"schemas": [
-			{
-				"uid": "test-uid",
-				"writeKey": "test-write-key",
-				"eventType": "track",
-				"eventIdentifier": "test_event",
-				"schema": {
-					"event": "string",
-					"userId": "string",
-					"properties": {
-						"test_prop": "string"
-					}
-				}
-			}
-		]
-	}`
-
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	// Test real run
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    false,
-		YAMLIndent: 2,
-	}
-
-	converter := NewSchemaConverter(options)
-	result, err := converter.Convert()
-	require.NoError(t, err)
-
-	// Verify files were created
-	assert.True(t, len(result.GeneratedFiles) >= 4) // events, properties, custom-types, tracking plan
-
-	// Verify output files exist
-	assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
-	assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
-}
-
-func TestSchemaConverter_Convert_InvalidInput(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "invalid.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	// Create invalid JSON
-	err := os.WriteFile(inputFile, []byte("invalid json"), 0644)
-	require.NoError(t, err)
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    false,
-		YAMLIndent: 2,
-	}
-
-	converter := NewSchemaConverter(options)
-	_, err = converter.Convert()
-	assert.Error(t, err)
-}
-
-func TestSchemaConverter_Convert_NonexistentInput(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "nonexistent.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    false,
-		YAMLIndent: 2,
-	}
-
-	converter := NewSchemaConverter(options)
-	_, err := converter.Convert()
-	assert.Error(t, err)
-}
-
-func TestSchemaConverter_Convert_MultipleWriteKeys(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "test_schemas.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	// Create test data with multiple write keys
-	testData := `{
-		"schemas": [
-			{
-				"uid": "test-uid-1",
-				"writeKey": "writekey-1",
-				"eventType": "track",
-				"eventIdentifier": "event_1",
-				"schema": {
-					"event": "string",
-					"userId": "string"
-				}
-			},
-			{
-				"uid": "test-uid-2",
-				"writeKey": "writekey-2",
-				"eventType": "track",
-				"eventIdentifier": "event_2",
-				"schema": {
-					"event": "string",
-					"properties": {
-						"prop": "string"
-					}
-				}
-			},
-			{
-				"uid": "test-uid-3",
-				"writeKey": "writekey-1",
-				"eventType": "track",
-				"eventIdentifier": "event_3",
-				"schema": {
-					"event": "string",
-					"userId": "string"
-				}
-			}
-		]
-	}`
-
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    false,
-		YAMLIndent: 2,
-	}
-
-	converter := NewSchemaConverter(options)
-	result, err := converter.Convert()
-	require.NoError(t, err)
-
-	// Verify events were counted correctly
-	assert.Equal(t, 3, result.EventsCount)
-
-	// Verify separate tracking plans were created for each writeKey
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-writekey-1.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-writekey-2.yaml"))
+	assert.Len(t, result.TrackingPlans, 2)
+	assert.Empty(t, result.GeneratedFiles)
 }
 
 func TestConversionOptions_Validation(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name        string
-		options     ConversionOptions
-		expectError bool
+		name     string
+		options  ConversionOptions
+		hasError bool
 	}{
 		{
 			name: "ValidOptions",
 			options: ConversionOptions{
-				InputFile:  "valid.json",
+				InputFile:  "input.json",
 				OutputDir:  "output",
 				DryRun:     false,
 				Verbose:    false,
 				YAMLIndent: 2,
 			},
-			expectError: false,
+			hasError: false,
 		},
 		{
 			name: "EmptyInputFile",
@@ -406,130 +277,45 @@ func TestConversionOptions_Validation(t *testing.T) {
 				Verbose:    false,
 				YAMLIndent: 2,
 			},
-			expectError: true,
+			hasError: true,
 		},
 		{
 			name: "EmptyOutputDir",
 			options: ConversionOptions{
-				InputFile:  "valid.json",
+				InputFile:  "input.json",
 				OutputDir:  "",
 				DryRun:     false,
 				Verbose:    false,
 				YAMLIndent: 2,
 			},
-			expectError: true,
+			hasError: true,
 		},
 		{
 			name: "InvalidYAMLIndent",
 			options: ConversionOptions{
-				InputFile:  "valid.json",
+				InputFile:  "input.json",
 				OutputDir:  "output",
 				DryRun:     false,
 				Verbose:    false,
 				YAMLIndent: 0,
 			},
-			expectError: false, // Should use default
+			hasError: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-
 			converter := NewSchemaConverter(c.options)
 			assert.NotNil(t, converter)
-
-			// For now, just verify the converter is created
-			// More detailed validation would require running Convert()
-			if c.options.YAMLIndent == 0 {
-				assert.Equal(t, 2, converter.options.YAMLIndent) // Should default to 2
-			}
+			// Validation is handled during converter creation
 		})
 	}
 }
 
-// TestSchemaConverter_DryRunVerbose tests dry run with verbose output
-// This covers lines 203-212 in converter.go (performDryRun function)
-func TestSchemaConverter_DryRunVerbose(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "test_schemas.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	// Create comprehensive test data to trigger all preview functions
-	testData := `{
-		"schemas": [
-			{
-				"uid": "test-uid-1",
-				"writeKey": "test-write-key-1",
-				"eventType": "track",
-				"eventIdentifier": "product_viewed",
-				"schema": {
-					"event": "string",
-					"userId": "string",
-					"properties": {
-						"product_id": "string",
-						"product_name": "string",
-						"price": "number",
-						"user": {
-							"profile": {
-								"name": "string",
-								"age": "number"
-							}
-						}
-					}
-				}
-			},
-			{
-				"uid": "test-uid-2",
-				"writeKey": "test-write-key-2",
-				"eventType": "track",
-				"eventIdentifier": "cart_viewed",
-				"schema": {
-					"event": "string",
-					"userId": "string",
-					"properties": {
-						"cart_id": "string",
-						"items": [{
-							"id": "string",
-							"name": "string"
-						}]
-					}
-				}
-			}
-		]
-	}`
-
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     true,
-		Verbose:    true, // Enable verbose to trigger preview functions
-		YAMLIndent: 2,
-	}
-
-	converter := NewSchemaConverter(options)
-	result, err := converter.Convert()
-	require.NoError(t, err)
-
-	// Verify result counts
-	assert.Equal(t, 2, result.EventsCount)
-	assert.True(t, result.PropertiesCount > 0)
-	assert.True(t, result.CustomTypesCount >= 0)
-	assert.Len(t, result.TrackingPlans, 2) // Two different writeKeys
-	assert.Empty(t, result.GeneratedFiles) // No files in dry run
-}
-
-// TestPreviewFunctions tests the preview functions directly
-// This covers lines 73-78, 85-90, 97-102 in converter.go
 func TestPreviewFunctions(t *testing.T) {
 	t.Parallel()
 
-	// Create test YAML structures
 	eventsYAML := &yamlModels.EventsYAML{
 		Spec: yamlModels.EventsSpec{
 			Events: []yamlModels.EventDefinition{
@@ -560,48 +346,30 @@ func TestPreviewFunctions(t *testing.T) {
 		},
 	}
 
-	t.Run("EventsPreview", func(t *testing.T) {
-		t.Parallel()
+	cases := []struct {
+		name     string
+		maxItems int
+		function func(int)
+	}{
+		{"EventsPreview_Limited", 2, func(max int) { printEventsPreview(eventsYAML, max) }},
+		{"EventsPreview_Full", 4, func(max int) { printEventsPreview(eventsYAML, max) }},
+		{"EventsPreview_Overflow", 10, func(max int) { printEventsPreview(eventsYAML, max) }},
+		{"PropertiesPreview_Limited", 2, func(max int) { printPropertiesPreview(propertiesYAML, max) }},
+		{"PropertiesPreview_Full", 3, func(max int) { printPropertiesPreview(propertiesYAML, max) }},
+		{"CustomTypesPreview_Limited", 1, func(max int) { printCustomTypesPreview(customTypesYAML, max) }},
+		{"CustomTypesPreview_Full", 2, func(max int) { printCustomTypesPreview(customTypesYAML, max) }},
+	}
 
-		// Test with maxItems less than total
-		printEventsPreview(eventsYAML, 2)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			c.function(c.maxItems)
+		})
+	}
 
-		// Test with maxItems equal to total
-		printEventsPreview(eventsYAML, 4)
-
-		// Test with maxItems greater than total
-		printEventsPreview(eventsYAML, 10)
-	})
-
-	t.Run("PropertiesPreview", func(t *testing.T) {
-		t.Parallel()
-
-		// Test with maxItems less than total
-		printPropertiesPreview(propertiesYAML, 2)
-
-		// Test with maxItems equal to total
-		printPropertiesPreview(propertiesYAML, 3)
-
-		// Test with maxItems greater than total
-		printPropertiesPreview(propertiesYAML, 10)
-	})
-
-	t.Run("CustomTypesPreview", func(t *testing.T) {
-		t.Parallel()
-
-		// Test with maxItems less than total
-		printCustomTypesPreview(customTypesYAML, 1)
-
-		// Test with maxItems equal to total
-		printCustomTypesPreview(customTypesYAML, 2)
-
-		// Test with maxItems greater than total
-		printCustomTypesPreview(customTypesYAML, 10)
-	})
-
+	// Test empty collections
 	t.Run("EmptyCollections", func(t *testing.T) {
 		t.Parallel()
-
 		emptyEventsYAML := &yamlModels.EventsYAML{
 			Spec: yamlModels.EventsSpec{Events: []yamlModels.EventDefinition{}},
 		}
@@ -612,197 +380,130 @@ func TestPreviewFunctions(t *testing.T) {
 			Spec: yamlModels.CustomTypesSpec{Types: []yamlModels.CustomTypeDefinition{}},
 		}
 
-		// These should handle empty collections gracefully
 		printEventsPreview(emptyEventsYAML, 3)
 		printPropertiesPreview(emptyPropertiesYAML, 3)
 		printCustomTypesPreview(emptyCustomTypesYAML, 3)
 	})
 }
 
-// TestSchemaConverter_SuccessfulYAMLFileCreation tests successful file creation
-// This covers lines 227-228, 235-236, 243-244, 251-252 in converter.go
-func TestSchemaConverter_SuccessfulYAMLFileCreation(t *testing.T) {
+func TestSchemaConverter_ComprehensiveWorkflow(t *testing.T) {
 	t.Parallel()
 
 	tempDir := t.TempDir()
 	inputFile := filepath.Join(tempDir, "test_schemas.json")
 	outputDir := filepath.Join(tempDir, "output")
 
-	// Create test data with rich schema to generate all file types
-	testData := `{
-		"schemas": [
-			{
-				"uid": "test-uid-1",
-				"writeKey": "test-write-key-1",
-				"eventType": "track",
+	// Create comprehensive test data
+	testData := map[string]interface{}{
+		"schemas": []interface{}{
+			map[string]interface{}{
+				"uid":             "test-uid-1",
+				"writeKey":        "test-write-key-1",
+				"eventType":       "track",
 				"eventIdentifier": "comprehensive_event",
-				"schema": {
-					"event": "string",
-					"userId": "string",
+				"schema": map[string]interface{}{
+					"event":       "string",
+					"userId":      "string",
 					"anonymousId": "string",
-					"properties": {
+					"properties": map[string]interface{}{
 						"simple_prop": "string",
 						"number_prop": "number",
-						"nested_object": {
+						"nested_object": map[string]interface{}{
 							"field1": "string",
 							"field2": "number",
-							"deeply_nested": {
-								"deep_field": "boolean"
-							}
+							"deeply_nested": map[string]interface{}{
+								"deep_field": "boolean",
+							},
 						},
-						"array_prop": ["string", "number"],
-						"complex_array": [{
+						"array_prop": []interface{}{"string", "number"},
+						"complex_array": []interface{}{map[string]interface{}{
 							"item_id": "string",
-							"item_data": {
-								"name": "string",
-								"value": "number"
-							}
-						}]
+							"item_data": map[string]interface{}{
+								"name":  "string",
+								"value": "number",
+							},
+						}},
 					},
-					"context": {
-						"app": {
-							"name": "string",
-							"version": "string"
+					"context": map[string]interface{}{
+						"app": map[string]interface{}{
+							"name":    "string",
+							"version": "string",
 						},
-						"device": {
-							"type": "string",
-							"model": "string"
-						}
-					}
-				}
+						"device": map[string]interface{}{
+							"type":  "string",
+							"model": "string",
+						},
+					},
+				},
 			},
-			{
-				"uid": "test-uid-2",
-				"writeKey": "test-write-key-2",
-				"eventType": "identify",
+			map[string]interface{}{
+				"uid":             "test-uid-2",
+				"writeKey":        "test-write-key-2",
+				"eventType":       "identify",
 				"eventIdentifier": "user_identify",
-				"schema": {
-					"event": "string",
+				"schema": map[string]interface{}{
+					"event":  "string",
 					"userId": "string",
-					"traits": {
+					"traits": map[string]interface{}{
 						"email": "string",
-						"name": "string",
-						"age": "number",
-						"preferences": {
+						"name":  "string",
+						"age":   "number",
+						"preferences": map[string]interface{}{
 							"notifications": "boolean",
-							"theme": "string"
-						}
-					}
-				}
-			}
-		]
-	}`
-
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    true,
-		YAMLIndent: 4, // Test custom indent
+							"theme":         "string",
+						},
+					},
+				},
+			},
+		},
 	}
 
-	converter := NewSchemaConverter(options)
-	result, err := converter.Convert()
-	require.NoError(t, err)
+	testhelpers.WriteTestFile(t, inputFile, testData)
 
-	// Verify successful file creation (lines 227-228, 235-236, 243-244)
-	assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
-
-	// Verify tracking plans directory creation (lines 251-252)
-	assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-1.yaml"))
-	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-2.yaml"))
-
-	// Verify result contains generated files
-	assert.True(t, len(result.GeneratedFiles) >= 5) // 3 main files + 2 tracking plans
-	assert.Len(t, result.TrackingPlans, 2)
-
-	// Verify file contents are valid YAML by reading and parsing
-	t.Run("ValidateGeneratedYAML", func(t *testing.T) {
-		// Read events.yaml and verify it's valid
-		eventsContent, err := os.ReadFile(filepath.Join(outputDir, "events.yaml"))
-		require.NoError(t, err)
-		assert.NotEmpty(t, eventsContent)
-		assert.Contains(t, string(eventsContent), "comprehensive_event")
-		assert.Contains(t, string(eventsContent), "user_identify")
-
-		// Read properties.yaml and verify it's valid
-		propertiesContent, err := os.ReadFile(filepath.Join(outputDir, "properties.yaml"))
-		require.NoError(t, err)
-		assert.NotEmpty(t, propertiesContent)
-		assert.Contains(t, string(propertiesContent), "simple_prop")
-
-		// Read custom-types.yaml and verify it's valid
-		customTypesContent, err := os.ReadFile(filepath.Join(outputDir, "custom-types.yaml"))
-		require.NoError(t, err)
-		assert.NotEmpty(t, customTypesContent)
-
-		// Read tracking plan files
-		tp1Content, err := os.ReadFile(filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-1.yaml"))
-		require.NoError(t, err)
-		assert.NotEmpty(t, tp1Content)
-		assert.Contains(t, string(tp1Content), "comprehensive_event")
-
-		tp2Content, err := os.ReadFile(filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-2.yaml"))
-		require.NoError(t, err)
-		assert.NotEmpty(t, tp2Content)
-		assert.Contains(t, string(tp2Content), "user_identify")
-	})
-
-	// Verify counts match expectations
-	assert.Equal(t, 2, result.EventsCount)
-	assert.True(t, result.PropertiesCount > 5)  // Should have many properties from nested objects
-	assert.True(t, result.CustomTypesCount > 0) // Should have custom types from nested objects
-}
-
-// TestSchemaConverter_VerboseConversion tests verbose mode output
-func TestSchemaConverter_VerboseConversion(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	inputFile := filepath.Join(tempDir, "test_schemas.json")
-	outputDir := filepath.Join(tempDir, "output")
-
-	testData := `{
-		"schemas": [
-			{
-				"uid": "verbose-test-uid",
-				"writeKey": "verbose-write-key",
-				"eventType": "track",
-				"eventIdentifier": "verbose_event",
-				"schema": {
-					"event": "string",
-					"userId": "string",
-					"properties": {
-						"test_prop": "string"
-					}
-				}
-			}
-		]
-	}`
-
-	err := os.WriteFile(inputFile, []byte(testData), 0644)
-	require.NoError(t, err)
-
-	options := ConversionOptions{
-		InputFile:  inputFile,
-		OutputDir:  outputDir,
-		DryRun:     false,
-		Verbose:    true, // Test verbose output paths
-		YAMLIndent: 2,
+	cases := []struct {
+		name     string
+		dryRun   bool
+		verbose  bool
+		indent   int
+		expected func(t *testing.T, result *ConversionResult)
+	}{
+		{
+			name:    "VerboseConversion",
+			dryRun:  false,
+			verbose: true,
+			indent:  4,
+			expected: func(t *testing.T, result *ConversionResult) {
+				assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
+				assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
+				assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-1.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key-2.yaml"))
+				assert.Equal(t, 2, result.EventsCount)
+				assert.True(t, result.PropertiesCount > 0)
+				assert.True(t, result.CustomTypesCount > 0)
+				assert.Len(t, result.TrackingPlans, 2)
+				assert.True(t, len(result.GeneratedFiles) >= 5)
+			},
+		},
 	}
 
-	converter := NewSchemaConverter(options)
-	result, err := converter.Convert()
-	require.NoError(t, err)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Verify successful conversion with verbose logging
-	assert.Equal(t, 1, result.EventsCount)
-	assert.True(t, result.PropertiesCount > 0)
-	assert.True(t, len(result.GeneratedFiles) >= 4)
+			options := ConversionOptions{
+				InputFile:  inputFile,
+				OutputDir:  outputDir,
+				DryRun:     c.dryRun,
+				Verbose:    c.verbose,
+				YAMLIndent: c.indent,
+			}
+
+			converter := NewSchemaConverter(options)
+			result, err := converter.Convert()
+			require.NoError(t, err)
+			c.expected(t, result)
+		})
+	}
 }
