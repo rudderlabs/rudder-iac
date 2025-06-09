@@ -38,7 +38,8 @@ func TestFullWorkflow(t *testing.T) {
 
 	// Setup mock server for fetch
 	server := testhelpers.SetupMockServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		testhelpers.AssertHTTPRequest(t, r, "Bearer test-token", "/v2/schemas")
+		testhelpers.AssertHTTPRequest(t, r, "GET", "/v2/schemas")
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
 		mockResponse := testhelpers.CreateTestSchemaResponse([]models.Schema{testSchema}, 1, false)
 		w.Header().Set("Content-Type", "application/json")

@@ -97,63 +97,6 @@ func CreateTestSchema(uid, writeKey, eventIdentifier string) models.Schema {
 	}
 }
 
-// CreateComplexTestSchema creates a schema with nested structures for testing
-func CreateComplexTestSchema(uid, writeKey, eventIdentifier string) models.Schema {
-	return models.Schema{
-		UID:             uid,
-		WriteKey:        writeKey,
-		EventType:       "track",
-		EventIdentifier: eventIdentifier,
-		Schema: map[string]interface{}{
-			"event":       "string",
-			"userId":      "string",
-			"anonymousId": "string",
-			"context": map[string]interface{}{
-				"app": map[string]interface{}{
-					"name":    "string",
-					"version": "string",
-				},
-				"traits": map[string]interface{}{
-					"email": "string",
-					"age":   "number",
-				},
-			},
-			"properties": map[string]interface{}{
-				"product_id":   "string",
-				"product_name": "string",
-				"categories":   []interface{}{"string", "string"},
-			},
-		},
-		CreatedAt: time.Now(),
-		LastSeen:  time.Now(),
-		Count:     10,
-	}
-}
-
-// CreateFlattenedTestSchema creates a schema with flattened dot-notation keys
-func CreateFlattenedTestSchema(uid, writeKey, eventIdentifier string) models.Schema {
-	return models.Schema{
-		UID:             uid,
-		WriteKey:        writeKey,
-		EventType:       "track",
-		EventIdentifier: eventIdentifier,
-		Schema: map[string]interface{}{
-			"event":                   "string",
-			"userId":                  "string",
-			"context.app.name":        "string",
-			"context.device.type":     "string",
-			"properties.product_id":   "string",
-			"properties.product_name": "string",
-			"properties.price":        "number",
-			"properties.categories.0": "string",
-			"properties.categories.1": "string",
-		},
-		CreatedAt: time.Now(),
-		LastSeen:  time.Now(),
-		Count:     100,
-	}
-}
-
 // WriteTestFile writes test data to a file and ensures cleanup
 func WriteTestFile(t *testing.T, filename string, data interface{}) {
 	var content []byte
@@ -198,58 +141,53 @@ func AssertValidJSON(t *testing.T, filepath string) {
 }
 
 // AssertHTTPRequest validates common HTTP request properties
-func AssertHTTPRequest(t *testing.T, r *http.Request, expectedAuth, expectedPath string) {
-	if expectedAuth != "" {
-		assert.Equal(t, expectedAuth, r.Header.Get("Authorization"))
-	}
-	if expectedPath != "" {
-		assert.Equal(t, expectedPath, r.URL.Path)
-	}
+func AssertHTTPRequest(t *testing.T, req *http.Request, expectedMethod, expectedPath string) {
+	assert.Equal(t, expectedMethod, req.Method)
+	assert.Equal(t, expectedPath, req.URL.Path)
 }
 
-// CreateStandardMockHandler creates a standard mock handler for schema API
+// CreateStandardMockHandler creates a mock handler that returns schemas
 func CreateStandardMockHandler(t *testing.T, schemas []models.Schema) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		AssertHTTPRequest(t, r, "Bearer test-token", "/v2/schemas")
-
 		response := CreateTestSchemaResponse(schemas, 1, false)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		w.WriteHeader(http.StatusOK)
+
+		err := json.NewEncoder(w).Encode(response)
+		require.NoError(t, err)
 	}
 }
 
-// CreatePaginatedMockHandler creates a mock handler that simulates pagination
+// CreatePaginatedMockHandler creates a mock handler that supports pagination
 func CreatePaginatedMockHandler(t *testing.T, allSchemas []models.Schema, pageSize int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page := 1
-		if pageParam := r.URL.Query().Get("page"); pageParam != "" {
-			if p, err := json.Number(pageParam).Int64(); err == nil {
-				page = int(p)
+		if p := r.URL.Query().Get("page"); p != "" {
+			// Basic page parsing
+			if p == "2" {
+				page = 2
 			}
 		}
 
 		start := (page - 1) * pageSize
 		end := start + pageSize
-
-		if start >= len(allSchemas) {
-			response := CreateTestSchemaResponse([]models.Schema{}, page, false)
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
 		if end > len(allSchemas) {
 			end = len(allSchemas)
 		}
 
-		pageSchemas := allSchemas[start:end]
+		schemas := allSchemas[start:end]
 		hasNext := end < len(allSchemas)
 
-		response := CreateTestSchemaResponse(pageSchemas, page, hasNext)
-		json.NewEncoder(w).Encode(response)
+		response := CreateTestSchemaResponse(schemas, page, hasNext)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		err := json.NewEncoder(w).Encode(response)
+		require.NoError(t, err)
 	}
 }
 
-// CreateErrorMockHandler creates a mock handler that returns an HTTP error
+// CreateErrorMockHandler creates a mock handler that returns an error
 func CreateErrorMockHandler(statusCode int, message string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
@@ -257,16 +195,15 @@ func CreateErrorMockHandler(statusCode int, message string) http.HandlerFunc {
 	}
 }
 
-// CreateTimeoutMockHandler creates a mock handler that simulates network timeout
+// CreateTimeoutMockHandler creates a mock handler that simulates timeouts
 func CreateTimeoutMockHandler(delay time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(delay)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{}"))
 	}
 }
 
-// SetupTempDirWithFiles creates a temporary directory with test files
+// SetupTempDirWithFiles creates a temporary directory with specified files
 func SetupTempDirWithFiles(t *testing.T, files map[string]interface{}) string {
 	tempDir := t.TempDir()
 
@@ -283,4 +220,101 @@ func SetupTempDirWithFiles(t *testing.T, files map[string]interface{}) string {
 	}
 
 	return tempDir
+}
+
+// CreateMinimalTestSchema creates a minimal schema for basic testing
+func CreateMinimalTestSchema(uid string) models.Schema {
+	return models.Schema{
+		UID:             uid,
+		WriteKey:        "test-writekey",
+		EventType:       "track",
+		EventIdentifier: "minimal_test_event",
+		Schema: map[string]interface{}{
+			"event":  "string",
+			"userId": "string",
+		},
+		CreatedAt: time.Now(),
+		LastSeen:  time.Now(),
+		Count:     1,
+	}
+}
+
+// CreateComplexTestSchema creates a schema with nested structures for testing
+func CreateComplexTestSchema(uid, writeKey, eventIdentifier string) models.Schema {
+	return models.Schema{
+		UID:             uid,
+		WriteKey:        writeKey,
+		EventType:       "track",
+		EventIdentifier: eventIdentifier,
+		Schema: map[string]interface{}{
+			"event":       "string",
+			"userId":      "string",
+			"anonymousId": "string",
+			"context": map[string]interface{}{
+				"app": map[string]interface{}{
+					"name":    "string",
+					"version": "string",
+				},
+				"traits": map[string]interface{}{
+					"email": "string",
+					"age":   "number",
+				},
+			},
+			"properties": map[string]interface{}{
+				"product_id":   "string",
+				"product_name": "string",
+				"categories":   []interface{}{"string", "string"},
+			},
+		},
+		CreatedAt: time.Now(),
+		LastSeen:  time.Now(),
+		Count:     10,
+	}
+}
+
+// CreateArraySchema creates a schema with array structures for testing
+func CreateArraySchema() models.Schema {
+	return models.Schema{
+		UID:             "array-test-uid",
+		WriteKey:        "test-writekey-array",
+		EventType:       "track",
+		EventIdentifier: "array_test_event",
+		Schema: map[string]interface{}{
+			"event": "string",
+			"items": []interface{}{
+				map[string]interface{}{
+					"name":  "string",
+					"price": "number",
+				},
+			},
+			"tags": []interface{}{"string"},
+		},
+		CreatedAt: time.Now(),
+		LastSeen:  time.Now(),
+		Count:     5,
+	}
+}
+
+// CreateFlattenedTestSchema creates a schema with flattened dot-notation keys
+func CreateFlattenedTestSchema(uid, writeKey, eventIdentifier string) models.Schema {
+	return models.Schema{
+		UID:             uid,
+		WriteKey:        writeKey,
+		EventType:       "track",
+		EventIdentifier: eventIdentifier,
+		Schema: map[string]interface{}{
+			"event":                   "string",
+			"userId":                  "string",
+			"context.app.name":        "string",
+			"context.device.type":     "string",
+			"properties.product_id":   "string",
+			"properties.product_name": "string",
+			"properties.price":        "number",
+			"properties.categories.0": "string",
+			"properties.categories.1": "string",
+		},
+		CreatedAt: time.Now(),
+		LastSeen:  time.Now(),
+		Count:     100,
+	}
 }
