@@ -84,55 +84,27 @@ func TestDefaultConfigFile(t *testing.T) {
 }
 
 func TestCreateConfigFileIfNotExists(t *testing.T) {
-	cases := []struct {
-		name      string
-		setupFunc func(tempDir string) string
-		expectErr bool
+	configTests := []struct {
+		name string
+		path func(string) string
 	}{
-		{
-			name: "CreateNewConfigFile",
-			setupFunc: func(tempDir string) string {
-				return filepath.Join(tempDir, "new_config.json")
-			},
-			expectErr: false,
-		},
-		{
-			name: "ConfigFileAlreadyExists",
-			setupFunc: func(tempDir string) string {
-				configFile := filepath.Join(tempDir, "existing_config.json")
-				// Create the file first
-				err := os.WriteFile(configFile, []byte("{}"), 0644)
-				if err != nil {
-					panic(err)
-				}
-				return configFile
-			},
-			expectErr: false,
-		},
-		{
-			name: "CreateNestedDirectory",
-			setupFunc: func(tempDir string) string {
-				return filepath.Join(tempDir, "nested", "dir", "config.json")
-			},
-			expectErr: false,
-		},
+		{"CreateNewConfigFile", func(dir string) string { return filepath.Join(dir, "new_config.json") }},
+		{"ConfigFileAlreadyExists", func(dir string) string {
+			configFile := filepath.Join(dir, "existing_config.json")
+			os.WriteFile(configFile, []byte("{}"), 0644)
+			return configFile
+		}},
+		{"CreateNestedDirectory", func(dir string) string { return filepath.Join(dir, "nested", "dir", "config.json") }},
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+	for _, test := range configTests {
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-
 			tempDir := t.TempDir()
-			configFile := c.setupFunc(tempDir)
-
+			configFile := test.path(tempDir)
 			err := createConfigFileIfNotExists(configFile)
-
-			if c.expectErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.FileExists(t, configFile)
-			}
+			assert.NoError(t, err)
+			assert.FileExists(t, configFile)
 		})
 	}
 }
@@ -404,113 +376,83 @@ func TestGetConfigDir(t *testing.T) {
 }
 
 func TestConfigDefaults(t *testing.T) {
-	t.Run("VerifyDefaultValues", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "defaults_config.json")
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "defaults_config.json")
 
-		// Save and clear environment variables that might affect defaults
-		envVars := []string{
-			"RUDDERSTACK_ACCESS_TOKEN",
-			"RUDDERSTACK_API_URL",
-			"RUDDERSTACK_CLI_EXPERIMENTAL",
-			"RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY",
-			"RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL",
-			"RUDDERSTACK_CLI_TELEMETRY_DISABLED",
-		}
-
-		originalEnvs := make(map[string]string)
-		for _, envVar := range envVars {
-			originalEnvs[envVar] = os.Getenv(envVar)
-			os.Unsetenv(envVar)
-		}
-
-		defer func() {
-			// Restore environment variables
-			for envVar, value := range originalEnvs {
-				if value != "" {
-					os.Setenv(envVar, value)
-				}
+	// Clear environment variables
+	envVars := []string{"RUDDERSTACK_ACCESS_TOKEN", "RUDDERSTACK_API_URL", "RUDDERSTACK_CLI_EXPERIMENTAL", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL", "RUDDERSTACK_CLI_TELEMETRY_DISABLED"}
+	originalEnvs := make(map[string]string)
+	for _, envVar := range envVars {
+		originalEnvs[envVar] = os.Getenv(envVar)
+		os.Unsetenv(envVar)
+	}
+	defer func() {
+		for envVar, value := range originalEnvs {
+			if value != "" {
+				os.Setenv(envVar, value)
 			}
-		}()
+		}
+	}()
 
-		// Initialize config with the temporary file
-		// Completely reset viper state to avoid interference from global config
-		viper.Reset()
+	viper.Reset()
+	os.WriteFile(configFile, []byte("{}"), 0644)
+	InitConfig(configFile)
 
-		// Write an empty JSON file to ensure clean state
-		err := os.WriteFile(configFile, []byte("{}"), 0644)
-		require.NoError(t, err)
-
-		InitConfig(configFile)
-
-		// Verify default values
-		assert.False(t, viper.GetBool("debug"))
-		assert.False(t, viper.GetBool("experimental"))
-		assert.False(t, viper.GetBool("verbose"))
-		assert.NotEmpty(t, viper.GetString("apiURL"))
-		assert.False(t, viper.GetBool("telemetry.disabled"))
-		assert.Equal(t, TelemetryWriteKey, viper.GetString("telemetry.writeKey"))
-		assert.Equal(t, TelemetryDataplaneURL, viper.GetString("telemetry.dataplaneURL"))
-	})
+	// Verify default values
+	defaults := map[string]interface{}{
+		"debug": false, "experimental": false, "verbose": false,
+		"telemetry.disabled": false, "telemetry.writeKey": TelemetryWriteKey, "telemetry.dataplaneURL": TelemetryDataplaneURL,
+	}
+	for key, expected := range defaults {
+		if key == "telemetry.writeKey" || key == "telemetry.dataplaneURL" {
+			assert.Equal(t, expected, viper.GetString(key))
+		} else {
+			assert.Equal(t, expected, viper.GetBool(key))
+		}
+	}
+	assert.NotEmpty(t, viper.GetString("apiURL"))
 }
 
 func TestCreateConfigFileIfNotExistsCI(t *testing.T) {
 	t.Parallel()
 
-	t.Run("CreatesConfigFileSuccessfully", func(t *testing.T) {
-		t.Parallel()
+	ciTests := []struct {
+		name string
+		test func(*testing.T)
+	}{
+		{"CreatesConfigFileSuccessfully", func(t *testing.T) {
+			tempDir := t.TempDir()
+			configFile := filepath.Join(tempDir, "test-config.json")
+			err := createConfigFileIfNotExists(configFile)
+			assert.NoError(t, err)
+			assert.FileExists(t, configFile)
+		}},
+		{"HandlesMissingDirectory", func(t *testing.T) {
+			tempDir := t.TempDir()
+			configFile := filepath.Join(tempDir, "subdir", "config.json")
+			err := createConfigFileIfNotExists(configFile)
+			assert.NoError(t, err)
+			assert.FileExists(t, configFile)
+		}},
+		{"HandlesInvalidPath", func(t *testing.T) {
+			err := createConfigFileIfNotExists("/invalid/path/config.json")
+			assert.Error(t, err)
+		}},
+		{"SkipsExistingFile", func(t *testing.T) {
+			tempDir := t.TempDir()
+			configFile := filepath.Join(tempDir, "existing-config.json")
+			os.WriteFile(configFile, []byte(`{"test": true}`), 0644)
+			err := createConfigFileIfNotExists(configFile)
+			assert.NoError(t, err)
+			content, _ := os.ReadFile(configFile)
+			assert.Contains(t, string(content), "test")
+		}},
+	}
 
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "test-config.json")
-
-		err := createConfigFileIfNotExists(configFile)
-		assert.NoError(t, err)
-
-		// File should exist
-		assert.FileExists(t, configFile)
-	})
-
-	t.Run("HandlesMissingDirectory", func(t *testing.T) {
-		t.Parallel()
-
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "subdir", "config.json")
-
-		err := createConfigFileIfNotExists(configFile)
-		assert.NoError(t, err)
-
-		// File should exist
-		assert.FileExists(t, configFile)
-	})
-
-	t.Run("HandlesInvalidPath", func(t *testing.T) {
-		t.Parallel()
-
-		// Try to create config in an invalid path
-		invalidPath := "/invalid/path/config.json"
-
-		// This should return an error but not panic
-		err := createConfigFileIfNotExists(invalidPath)
-		assert.Error(t, err)
-	})
-
-	t.Run("SkipsExistingFile", func(t *testing.T) {
-		t.Parallel()
-
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "existing-config.json")
-
-		// Create the file first
-		err := os.WriteFile(configFile, []byte(`{"test": true}`), 0644)
-		require.NoError(t, err)
-
-		// Should not error when file already exists
-		err = createConfigFileIfNotExists(configFile)
-		assert.NoError(t, err)
-
-		// File content should be unchanged
-		content, err := os.ReadFile(configFile)
-		require.NoError(t, err)
-		assert.Contains(t, string(content), "test")
-	})
+	for _, test := range ciTests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			test.test(t)
+		})
+	}
 }

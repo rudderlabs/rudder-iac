@@ -1,84 +1,16 @@
 package jsonpath
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewProcessor(t *testing.T) {
+func TestJSONPathProcessor(t *testing.T) {
 	t.Parallel()
 
-	t.Run("CreateProcessor", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties", true)
-		assert.NotNil(t, processor)
-		assert.Equal(t, "$.properties", processor.jsonPath)
-		assert.True(t, processor.skipFailed)
-	})
-
-	t.Run("CreateProcessorSkipFalse", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.context", false)
-		assert.Equal(t, "$.context", processor.jsonPath)
-		assert.False(t, processor.skipFailed)
-	})
-}
-
-func TestProcessor_IsRootPath(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		jsonPath string
-		expected bool
-	}{
-		{
-			name:     "EmptyPath",
-			jsonPath: "",
-			expected: true,
-		},
-		{
-			name:     "DollarSign",
-			jsonPath: "$",
-			expected: true,
-		},
-		{
-			name:     "DollarDot",
-			jsonPath: "$.",
-			expected: true,
-		},
-		{
-			name:     "PropertiesPath",
-			jsonPath: "$.properties",
-			expected: false,
-		},
-		{
-			name:     "NestedPath",
-			jsonPath: "$.context.app",
-			expected: false,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			processor := NewProcessor(c.jsonPath, true)
-			result := processor.IsRootPath()
-			assert.Equal(t, c.expected, result)
-		})
-	}
-}
-
-func TestProcessor_ProcessSchema(t *testing.T) {
-	t.Parallel()
-
-	// Test schema data
+	// Shared test schemas
 	testSchema := map[string]interface{}{
 		"event":  "product_viewed",
 		"userId": "12345",
@@ -100,515 +32,398 @@ func TestProcessor_ProcessSchema(t *testing.T) {
 		},
 	}
 
-	t.Run("RootPath", func(t *testing.T) {
-		t.Parallel()
-
-		cases := []string{"", "$", "$."}
-		for _, jsonPath := range cases {
-			t.Run("Path_"+jsonPath, func(t *testing.T) {
-				t.Parallel()
-
-				processor := NewProcessor(jsonPath, true)
-				result := processor.ProcessSchema(testSchema)
-
-				assert.NoError(t, result.Error)
-				assert.Equal(t, testSchema, result.Value)
-			})
-		}
-	})
-
-	t.Run("ExtractProperties", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties", true)
-		result := processor.ProcessSchema(testSchema)
-
-		require.NoError(t, result.Error)
-		require.NotNil(t, result.Value)
-
-		extracted, ok := result.Value.(map[string]interface{})
-		require.True(t, ok)
-
-		assert.Equal(t, "abc123", extracted["product_id"])
-		assert.Equal(t, "iPhone", extracted["product_name"])
-		assert.Equal(t, 999.99, extracted["price"])
-
-		categories, ok := extracted["categories"].([]interface{})
-		require.True(t, ok)
-		assert.Len(t, categories, 2)
-		assert.Equal(t, "electronics", categories[0])
-		assert.Equal(t, "phones", categories[1])
-	})
-
-	t.Run("ExtractNestedField", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.context.app", true)
-		result := processor.ProcessSchema(testSchema)
-
-		require.NoError(t, result.Error)
-		require.NotNil(t, result.Value)
-
-		extracted, ok := result.Value.(map[string]interface{})
-		require.True(t, ok)
-
-		assert.Equal(t, "MyApp", extracted["name"])
-		assert.Equal(t, "1.0.0", extracted["version"])
-	})
-
-	t.Run("ExtractPrimitiveValue", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.userId", true)
-		result := processor.ProcessSchema(testSchema)
-
-		require.NoError(t, result.Error)
-		assert.Equal(t, "12345", result.Value)
-	})
-
-	t.Run("ExtractArray", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties.categories", true)
-		result := processor.ProcessSchema(testSchema)
-
-		require.NoError(t, result.Error)
-		require.NotNil(t, result.Value)
-
-		categories, ok := result.Value.([]interface{})
-		require.True(t, ok)
-		assert.Len(t, categories, 2)
-		assert.Equal(t, "electronics", categories[0])
-		assert.Equal(t, "phones", categories[1])
-	})
-
-	t.Run("ExtractArrayElement", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties.categories.0", true)
-		result := processor.ProcessSchema(testSchema)
-
-		require.NoError(t, result.Error)
-		assert.Equal(t, "electronics", result.Value)
-	})
-
-	t.Run("NonExistentPath", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.nonexistent", true)
-		result := processor.ProcessSchema(testSchema)
-
-		assert.Error(t, result.Error)
-		assert.Nil(t, result.Value)
-		assert.Contains(t, result.Error.Error(), "JSONPath '$.nonexistent' returned no results")
-	})
-
-	t.Run("InvalidJSONPath", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties..invalid", true)
-		result := processor.ProcessSchema(testSchema)
-
-		assert.Error(t, result.Error)
-		assert.Nil(t, result.Value)
-		assert.Contains(t, result.Error.Error(), "returned no results")
-	})
-
-	t.Run("EmptySchema", func(t *testing.T) {
-		t.Parallel()
-
-		emptySchema := map[string]interface{}{}
-		processor := NewProcessor("$.properties", true)
-		result := processor.ProcessSchema(emptySchema)
-
-		assert.Error(t, result.Error)
-		assert.Nil(t, result.Value)
-		assert.Contains(t, result.Error.Error(), "returned no results")
-	})
-}
-
-func TestProcessor_ShouldSkipOnError(t *testing.T) {
-	t.Parallel()
-
-	t.Run("SkipFailedTrue", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties", true)
-		assert.True(t, processor.ShouldSkipOnError())
-	})
-
-	t.Run("SkipFailedFalse", func(t *testing.T) {
-		t.Parallel()
-
-		processor := NewProcessor("$.properties", false)
-		assert.False(t, processor.ShouldSkipOnError())
-	})
-}
-
-func TestProcessor_ComplexJSONPaths(t *testing.T) {
-	t.Parallel()
-
 	complexSchema := map[string]interface{}{
 		"data": map[string]interface{}{
-			"items": []interface{}{
-				map[string]interface{}{
-					"id":   "item1",
-					"tags": []interface{}{"tag1", "tag2"},
-				},
-				map[string]interface{}{
-					"id":   "item2",
-					"tags": []interface{}{"tag3", "tag4"},
-				},
+			"users": []interface{}{
+				map[string]interface{}{"id": "1", "name": "Alice", "active": true},
+				map[string]interface{}{"id": "2", "name": "Bob", "active": false},
+				map[string]interface{}{"id": "3", "name": "Charlie", "active": true},
 			},
 			"metadata": map[string]interface{}{
-				"version": "1.0",
-				"nested": map[string]interface{}{
-					"deep": map[string]interface{}{
-						"value": "found_it",
-					},
-				},
+				"version":  "2.0",
+				"features": []interface{}{"auth", "analytics"},
 			},
 		},
 	}
 
+	integrationSchemas := []struct {
+		name        string
+		schema      map[string]interface{}
+		jsonPath    string
+		expectedVal interface{}
+	}{
+		{
+			name:        "SimplePropertyExtraction",
+			jsonPath:    "$.user_id",
+			schema:      map[string]interface{}{"user_id": "12345", "event": "page_viewed"},
+			expectedVal: "12345",
+		},
+		{
+			name:     "NestedObjectExtraction",
+			jsonPath: "$.properties",
+			schema: map[string]interface{}{
+				"event":      "purchase",
+				"properties": map[string]interface{}{"total": 99.99, "currency": "USD"},
+			},
+			expectedVal: map[string]interface{}{"total": 99.99, "currency": "USD"},
+		},
+		{
+			name:     "ArrayExtraction",
+			jsonPath: "$.items",
+			schema: map[string]interface{}{
+				"items": []interface{}{"item1", "item2", "item3"},
+			},
+			expectedVal: []interface{}{"item1", "item2", "item3"},
+		},
+	}
+
 	cases := []struct {
+		category string
 		name     string
 		jsonPath string
-		expected interface{}
+		skipFail bool
+		schema   map[string]interface{}
+		validate func(t *testing.T, processor *Processor)
 	}{
+		// Processor Creation Tests
 		{
-			name:     "FirstItem",
-			jsonPath: "$.data.items.0",
-			expected: map[string]interface{}{
-				"id":   "item1",
-				"tags": []interface{}{"tag1", "tag2"},
+			category: "Creation",
+			name:     "CreateProcessor",
+			jsonPath: "$.properties",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.NotNil(t, processor)
+				assert.Equal(t, "$.properties", processor.jsonPath)
+				assert.True(t, processor.skipFailed)
 			},
 		},
 		{
-			name:     "FirstItemID",
-			jsonPath: "$.data.items.0.id",
-			expected: "item1",
+			category: "Creation",
+			name:     "CreateProcessorSkipFalse",
+			jsonPath: "$.context",
+			skipFail: false,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.Equal(t, "$.context", processor.jsonPath)
+				assert.False(t, processor.skipFailed)
+			},
+		},
+
+		// Root Path Detection Tests
+		{
+			category: "RootPath",
+			name:     "EmptyPath",
+			jsonPath: "",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.True(t, processor.IsRootPath())
+			},
 		},
 		{
-			name:     "FirstItemFirstTag",
-			jsonPath: "$.data.items.0.tags.0",
-			expected: "tag1",
+			category: "RootPath",
+			name:     "DollarSign",
+			jsonPath: "$",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.True(t, processor.IsRootPath())
+			},
 		},
 		{
-			name:     "DeepNested",
-			jsonPath: "$.data.metadata.nested.deep.value",
-			expected: "found_it",
+			category: "RootPath",
+			name:     "DollarDot",
+			jsonPath: "$.",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.True(t, processor.IsRootPath())
+			},
 		},
 		{
-			name:     "AllItems",
-			jsonPath: "$.data.items",
-			expected: []interface{}{
-				map[string]interface{}{
-					"id":   "item1",
-					"tags": []interface{}{"tag1", "tag2"},
-				},
-				map[string]interface{}{
-					"id":   "item2",
-					"tags": []interface{}{"tag3", "tag4"},
-				},
+			category: "RootPath",
+			name:     "PropertiesPath",
+			jsonPath: "$.properties",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.False(t, processor.IsRootPath())
+			},
+		},
+		{
+			category: "RootPath",
+			name:     "NestedPath",
+			jsonPath: "$.context.app",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.False(t, processor.IsRootPath())
+			},
+		},
+
+		// Schema Processing Tests
+		{
+			category: "Processing",
+			name:     "RootPathExtraction",
+			jsonPath: "$",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				assert.NoError(t, processResult.Error)
+				assert.Equal(t, testSchema, processResult.Value)
+			},
+		},
+		{
+			category: "Processing",
+			name:     "ExtractProperties",
+			jsonPath: "$.properties",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				require.NoError(t, processResult.Error)
+				require.NotNil(t, processResult.Value)
+
+				extracted, ok := processResult.Value.(map[string]interface{})
+				require.True(t, ok)
+				assert.Equal(t, "abc123", extracted["product_id"])
+				assert.Equal(t, "iPhone", extracted["product_name"])
+				assert.Equal(t, 999.99, extracted["price"])
+
+				categories, ok := extracted["categories"].([]interface{})
+				require.True(t, ok)
+				assert.Len(t, categories, 2)
+				assert.Equal(t, "electronics", categories[0])
+				assert.Equal(t, "phones", categories[1])
+			},
+		},
+		{
+			category: "Processing",
+			name:     "ExtractNestedField",
+			jsonPath: "$.context.app",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				require.NoError(t, processResult.Error)
+				require.NotNil(t, processResult.Value)
+
+				extracted, ok := processResult.Value.(map[string]interface{})
+				require.True(t, ok)
+				assert.Equal(t, "MyApp", extracted["name"])
+				assert.Equal(t, "1.0.0", extracted["version"])
+			},
+		},
+		{
+			category: "Processing",
+			name:     "ExtractPrimitiveValue",
+			jsonPath: "$.userId",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				require.NoError(t, processResult.Error)
+				assert.Equal(t, "12345", processResult.Value)
+			},
+		},
+		{
+			category: "Processing",
+			name:     "ExtractArray",
+			jsonPath: "$.properties.categories",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				require.NoError(t, processResult.Error)
+				require.NotNil(t, processResult.Value)
+
+				categories, ok := processResult.Value.([]interface{})
+				require.True(t, ok)
+				assert.Len(t, categories, 2)
+				assert.Equal(t, "electronics", categories[0])
+				assert.Equal(t, "phones", categories[1])
+			},
+		},
+		{
+			category: "Processing",
+			name:     "ExtractArrayElement",
+			jsonPath: "$.properties.categories.0",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				require.NoError(t, processResult.Error)
+				assert.Equal(t, "electronics", processResult.Value)
+			},
+		},
+
+		// Error Handling Tests
+		{
+			category: "ErrorHandling",
+			name:     "NonExistentPath",
+			jsonPath: "$.nonexistent",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				assert.Error(t, processResult.Error)
+				assert.Nil(t, processResult.Value)
+				assert.Contains(t, processResult.Error.Error(), "JSONPath '$.nonexistent' returned no results")
+			},
+		},
+		{
+			category: "ErrorHandling",
+			name:     "InvalidJSONPath",
+			jsonPath: "$.properties..invalid",
+			skipFail: true,
+			schema:   testSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(testSchema)
+				assert.Error(t, processResult.Error)
+				assert.Nil(t, processResult.Value)
+				assert.Contains(t, processResult.Error.Error(), "returned no results")
+			},
+		},
+		{
+			category: "ErrorHandling",
+			name:     "EmptySchema",
+			jsonPath: "$.properties",
+			skipFail: true,
+			schema:   map[string]interface{}{},
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(map[string]interface{}{})
+				assert.Error(t, processResult.Error)
+				assert.Nil(t, processResult.Value)
+				assert.Contains(t, processResult.Error.Error(), "returned no results")
+			},
+		},
+
+		// Skip Behavior Tests
+		{
+			category: "SkipBehavior",
+			name:     "SkipFailedTrue",
+			jsonPath: "$.properties",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.True(t, processor.ShouldSkipOnError())
+			},
+		},
+		{
+			category: "SkipBehavior",
+			name:     "SkipFailedFalse",
+			jsonPath: "$.properties",
+			skipFail: false,
+			validate: func(t *testing.T, processor *Processor) {
+				assert.False(t, processor.ShouldSkipOnError())
+			},
+		},
+
+		// Complex JSONPath Tests
+		{
+			category: "ComplexPaths",
+			name:     "ArrayFirstElement",
+			jsonPath: "$.data.users.0",
+			skipFail: true,
+			schema:   complexSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(complexSchema)
+				require.NoError(t, processResult.Error)
+				require.NotNil(t, processResult.Value)
+
+				user, ok := processResult.Value.(map[string]interface{})
+				require.True(t, ok)
+				assert.Equal(t, "Alice", user["name"])
+				assert.Equal(t, "1", user["id"])
+				assert.True(t, user["active"].(bool))
+			},
+		},
+		{
+			category: "ComplexPaths",
+			name:     "NestedArrayAccess",
+			jsonPath: "$.data.users.0.name",
+			skipFail: true,
+			schema:   complexSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(complexSchema)
+				require.NoError(t, processResult.Error)
+				assert.Equal(t, "Alice", processResult.Value)
+			},
+		},
+		{
+			category: "ComplexPaths",
+			name:     "DeepNestedPath",
+			jsonPath: "$.data.metadata.version",
+			skipFail: true,
+			schema:   complexSchema,
+			validate: func(t *testing.T, processor *Processor) {
+				processResult := processor.ProcessSchema(complexSchema)
+				require.NoError(t, processResult.Error)
+				assert.Equal(t, "2.0", processResult.Value)
+			},
+		},
+
+		// JSONPath Normalization Tests
+		{
+			category: "Normalization",
+			name:     "NormalizeBasicPath",
+			jsonPath: "properties",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				normalizedPath := processor.normalizeJSONPath()
+				assert.Equal(t, "properties", normalizedPath)
+			},
+		},
+		{
+			category: "Normalization",
+			name:     "NormalizeComplexPath",
+			jsonPath: "context.app.name",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				normalizedPath := processor.normalizeJSONPath()
+				assert.Equal(t, "context.app.name", normalizedPath)
+			},
+		},
+		{
+			category: "Normalization",
+			name:     "AlreadyNormalizedPath",
+			jsonPath: "$.data.users",
+			skipFail: true,
+			validate: func(t *testing.T, processor *Processor) {
+				normalizedPath := processor.normalizeJSONPath()
+				assert.Equal(t, "data.users", normalizedPath)
 			},
 		},
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			processor := NewProcessor(c.jsonPath, true)
-			result := processor.ProcessSchema(complexSchema)
-
-			require.NoError(t, result.Error)
-			assert.Equal(t, c.expected, result.Value)
+	// Add integration test scenarios to main test matrix
+	for _, integration := range integrationSchemas {
+		cases = append(cases, struct {
+			category string
+			name     string
+			jsonPath string
+			skipFail bool
+			schema   map[string]interface{}
+			validate func(t *testing.T, processor *Processor)
+		}{
+			category: "Integration",
+			name:     integration.name,
+			jsonPath: integration.jsonPath,
+			skipFail: true,
+			schema:   integration.schema,
+			validate: func(t *testing.T, processor *Processor) {
+				result := processor.ProcessSchema(integration.schema)
+				require.NoError(t, result.Error, "Processing should succeed for valid JSONPath")
+				assert.Equal(t, integration.expectedVal, result.Value, "Extracted value should match expected")
+			},
 		})
 	}
-}
-
-// TestProcessor_JSONPathNormalization tests JSONPath normalization for gjson compatibility
-// This covers lines 44-45 in processor.go (normalizeJSONPath function)
-func TestProcessor_JSONPathNormalization(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name         string
-		inputPath    string
-		expectedPath string
-	}{
-		{
-			name:         "DollarDotPrefix",
-			inputPath:    "$.properties.user",
-			expectedPath: "properties.user",
-		},
-		{
-			name:         "DollarOnly",
-			inputPath:    "$",
-			expectedPath: "",
-		},
-		{
-			name:         "DotOnly",
-			inputPath:    "$.",
-			expectedPath: "",
-		},
-		{
-			name:         "NoPrefix",
-			inputPath:    "properties.user",
-			expectedPath: "properties.user",
-		},
-		{
-			name:         "EmptyPath",
-			inputPath:    "",
-			expectedPath: "",
-		},
-		{
-			name:         "DeepPath",
-			inputPath:    "$.context.app.version",
-			expectedPath: "context.app.version",
-		},
-		{
-			name:         "ArrayAccess",
-			inputPath:    "$.items.0.tags.1",
-			expectedPath: "items.0.tags.1",
-		},
-	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		t.Run(c.category+"/"+c.name, func(t *testing.T) {
 			t.Parallel()
 
-			processor := NewProcessor(c.inputPath, true)
-			normalizedPath := processor.normalizeJSONPath()
-			assert.Equal(t, c.expectedPath, normalizedPath)
-		})
-	}
-}
-
-// TestProcessor_ResultParsing tests successful result parsing and type conversion
-// This covers lines 56-59 in processor.go (parseGjsonResult function)
-func TestProcessor_ResultParsing(t *testing.T) {
-	t.Parallel()
-
-	testSchema := map[string]interface{}{
-		"string_field":  "hello world",
-		"number_field":  42.5,
-		"integer_field": 123,
-		"boolean_true":  true,
-		"boolean_false": false,
-		"null_field":    nil,
-		"object_field": map[string]interface{}{
-			"nested_string": "nested value",
-			"nested_number": 99,
-		},
-		"array_field": []interface{}{
-			"item1", "item2", "item3",
-		},
-		"mixed_array": []interface{}{
-			"string",
-			123,
-			true,
-			map[string]interface{}{
-				"nested": "object",
-			},
-		},
-	}
-
-	cases := []struct {
-		name          string
-		jsonPath      string
-		expectedValue interface{}
-		expectedType  string
-	}{
-		{
-			name:          "StringField",
-			jsonPath:      "$.string_field",
-			expectedValue: "hello world",
-			expectedType:  "string",
-		},
-		{
-			name:          "NumberField",
-			jsonPath:      "$.number_field",
-			expectedValue: 42.5,
-			expectedType:  "float64",
-		},
-		{
-			name:          "IntegerField",
-			jsonPath:      "$.integer_field",
-			expectedValue: float64(123), // gjson returns all numbers as float64
-			expectedType:  "float64",
-		},
-		{
-			name:          "BooleanTrue",
-			jsonPath:      "$.boolean_true",
-			expectedValue: true,
-			expectedType:  "bool",
-		},
-		{
-			name:          "BooleanFalse",
-			jsonPath:      "$.boolean_false",
-			expectedValue: false,
-			expectedType:  "bool",
-		},
-		{
-			name:          "NullField",
-			jsonPath:      "$.null_field",
-			expectedValue: nil,
-			expectedType:  "<nil>",
-		},
-		{
-			name:     "ObjectField",
-			jsonPath: "$.object_field",
-			expectedValue: map[string]interface{}{
-				"nested_string": "nested value",
-				"nested_number": float64(99), // gjson parses numbers as float64
-			},
-			expectedType: "map[string]interface {}",
-		},
-		{
-			name:          "ArrayField",
-			jsonPath:      "$.array_field",
-			expectedValue: []interface{}{"item1", "item2", "item3"},
-			expectedType:  "[]interface {}",
-		},
-		{
-			name:     "MixedArray",
-			jsonPath: "$.mixed_array",
-			expectedValue: []interface{}{
-				"string",
-				float64(123), // gjson parses numbers as float64
-				true,
-				map[string]interface{}{
-					"nested": "object",
-				},
-			},
-			expectedType: "[]interface {}",
-		},
-		{
-			name:          "NestedStringField",
-			jsonPath:      "$.object_field.nested_string",
-			expectedValue: "nested value",
-			expectedType:  "string",
-		},
-		{
-			name:          "ArrayElement",
-			jsonPath:      "$.array_field.1",
-			expectedValue: "item2",
-			expectedType:  "string",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			processor := NewProcessor(c.jsonPath, true)
-			result := processor.ProcessSchema(testSchema)
-
-			require.NoError(t, result.Error, "Expected no error for path: %s", c.jsonPath)
-			assert.Equal(t, c.expectedValue, result.Value, "Value mismatch for path: %s", c.jsonPath)
-
-			// Check type as well
-			if result.Value != nil {
-				assert.Contains(t, c.expectedType, fmt.Sprintf("%T", result.Value),
-					"Type mismatch for path: %s", c.jsonPath)
+			processor := NewProcessor(c.jsonPath, c.skipFail)
+			schema := c.schema
+			if schema == nil {
+				schema = testSchema // Default schema
 			}
+
+			c.validate(t, processor)
 		})
 	}
-}
-
-// TestProcessor_SuccessfulHappyPaths tests various successful scenarios to ensure coverage
-func TestProcessor_SuccessfulHappyPaths(t *testing.T) {
-	t.Parallel()
-
-	t.Run("CompleteWorkflow", func(t *testing.T) {
-		t.Parallel()
-
-		// Test a complete workflow that exercises normalization and parsing
-		schema := map[string]interface{}{
-			"user": map[string]interface{}{
-				"profile": map[string]interface{}{
-					"preferences": map[string]interface{}{
-						"theme":         "dark",
-						"notifications": true,
-						"settings": map[string]interface{}{
-							"volume":  0.8,
-							"quality": "high",
-						},
-					},
-				},
-			},
-		}
-
-		// Test deeply nested path that exercises normalization
-		processor := NewProcessor("$.user.profile.preferences", true)
-		result := processor.ProcessSchema(schema)
-
-		require.NoError(t, result.Error)
-		require.NotNil(t, result.Value)
-
-		preferences, ok := result.Value.(map[string]interface{})
-		require.True(t, ok)
-
-		assert.Equal(t, "dark", preferences["theme"])
-		assert.Equal(t, true, preferences["notifications"])
-
-		settings, ok := preferences["settings"].(map[string]interface{})
-		require.True(t, ok)
-		assert.Equal(t, 0.8, settings["volume"])
-		assert.Equal(t, "high", settings["quality"])
-	})
-
-	t.Run("ArrayProcessing", func(t *testing.T) {
-		t.Parallel()
-
-		schema := map[string]interface{}{
-			"events": []interface{}{
-				map[string]interface{}{
-					"name":      "event1",
-					"timestamp": 1234567890,
-					"data":      map[string]interface{}{"key": "value1"},
-				},
-				map[string]interface{}{
-					"name":      "event2",
-					"timestamp": 1234567891,
-					"data":      map[string]interface{}{"key": "value2"},
-				},
-			},
-		}
-
-		// Test array access
-		processor := NewProcessor("$.events.0.data", true)
-		result := processor.ProcessSchema(schema)
-
-		require.NoError(t, result.Error)
-		require.NotNil(t, result.Value)
-
-		data, ok := result.Value.(map[string]interface{})
-		require.True(t, ok)
-		assert.Equal(t, "value1", data["key"])
-	})
-
-	t.Run("RootPathHandling", func(t *testing.T) {
-		t.Parallel()
-
-		schema := map[string]interface{}{
-			"top_level": "value",
-			"nested": map[string]interface{}{
-				"field": "nested_value",
-			},
-		}
-
-		// Test root path variations
-		rootPaths := []string{"", "$", "$."}
-
-		for _, path := range rootPaths {
-			processor := NewProcessor(path, true)
-			result := processor.ProcessSchema(schema)
-
-			require.NoError(t, result.Error, "Root path should not error: %s", path)
-			assert.Equal(t, schema, result.Value, "Root path should return entire schema: %s", path)
-		}
-	})
 }

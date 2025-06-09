@@ -8,16 +8,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnflatten(t *testing.T) {
+func TestUnflattenComprehensive(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
+		category string
 		name     string
 		input    map[string]interface{}
 		expected map[string]interface{}
+		check    func(t *testing.T, result map[string]interface{})
 	}{
+		// Basic Cases
 		{
-			name: "SimpleKeys",
+			category: "Basic",
+			name:     "SimpleKeys",
 			input: map[string]interface{}{
 				"name":  "John",
 				"age":   30,
@@ -30,7 +34,8 @@ func TestUnflatten(t *testing.T) {
 			},
 		},
 		{
-			name: "DottedKeys",
+			category: "Basic",
+			name:     "DottedKeys",
 			input: map[string]interface{}{
 				"user.name":    "John",
 				"user.age":     30,
@@ -49,7 +54,26 @@ func TestUnflatten(t *testing.T) {
 			},
 		},
 		{
-			name: "ArrayIndexes",
+			category: "Basic",
+			name:     "EmptyInput",
+			input:    map[string]interface{}{},
+			expected: map[string]interface{}{},
+		},
+		{
+			category: "Basic",
+			name:     "SingleKey",
+			input: map[string]interface{}{
+				"key": "value",
+			},
+			expected: map[string]interface{}{
+				"key": "value",
+			},
+		},
+
+		// Array Cases
+		{
+			category: "Arrays",
+			name:     "ArrayIndexes",
 			input: map[string]interface{}{
 				"items.0.name":  "item1",
 				"items.0.price": 10.99,
@@ -74,7 +98,45 @@ func TestUnflatten(t *testing.T) {
 			},
 		},
 		{
-			name: "DeepNesting",
+			category: "Arrays",
+			name:     "ArrayWithGaps",
+			input: map[string]interface{}{
+				"arr.0": "first",
+				"arr.2": "third",
+				"arr.5": "sixth",
+			},
+			expected: map[string]interface{}{
+				"arr": []interface{}{
+					"first",
+					nil,
+					"third",
+					nil,
+					nil,
+					"sixth",
+				},
+			},
+		},
+		{
+			category: "Arrays",
+			name:     "ComplexArrayIndexes",
+			input: map[string]interface{}{
+				"matrix.0.0": "a",
+				"matrix.0.1": "b",
+				"matrix.1.0": "c",
+				"matrix.1.1": "d",
+			},
+			expected: map[string]interface{}{
+				"matrix": []interface{}{
+					[]interface{}{"a", "b"},
+					[]interface{}{"c", "d"},
+				},
+			},
+		},
+
+		// Deep Nesting Cases
+		{
+			category: "Nesting",
+			name:     "DeepNesting",
 			input: map[string]interface{}{
 				"user.profile.personal.name":      "John",
 				"user.profile.personal.age":       30,
@@ -103,7 +165,8 @@ func TestUnflatten(t *testing.T) {
 			},
 		},
 		{
-			name: "MixedStructure",
+			category: "Nesting",
+			name:     "MixedStructure",
 			input: map[string]interface{}{
 				"event":                "product_viewed",
 				"userId":               "123",
@@ -137,79 +200,17 @@ func TestUnflatten(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:     "EmptyInput",
-			input:    map[string]interface{}{},
-			expected: map[string]interface{}{},
-		},
-		{
-			name: "SingleKey",
-			input: map[string]interface{}{
-				"key": "value",
-			},
-			expected: map[string]interface{}{
-				"key": "value",
-			},
-		},
-		{
-			name: "ArrayWithGaps",
-			input: map[string]interface{}{
-				"arr.0": "first",
-				"arr.2": "third",
-				"arr.5": "sixth",
-			},
-			expected: map[string]interface{}{
-				"arr": []interface{}{
-					"first",
-					nil,
-					"third",
-					nil,
-					nil,
-					"sixth",
-				},
-			},
-		},
-	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			result := UnflattenSchema(c.input)
-			assert.Equal(t, c.expected, result)
-		})
-	}
-}
-
-func TestUnflatten_EdgeCases(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		input    map[string]interface{}
-		expected map[string]interface{}
-	}{
+		// Edge Cases
 		{
+			category: "EdgeCases",
 			name:     "NilInput",
 			input:    nil,
 			expected: map[string]interface{}{},
 		},
 		{
-			name: "ComplexArrayIndexes",
-			input: map[string]interface{}{
-				"matrix.0.0": "a",
-				"matrix.0.1": "b",
-				"matrix.1.0": "c",
-				"matrix.1.1": "d",
-			},
-			expected: map[string]interface{}{
-				"matrix": []interface{}{
-					[]interface{}{"a", "b"},
-					[]interface{}{"c", "d"},
-				},
-			},
-		},
-		{
-			name: "StringArrayIndexes",
+			category: "EdgeCases",
+			name:     "StringArrayIndexes",
 			input: map[string]interface{}{
 				"items.first.name":  "item1",
 				"items.second.name": "item2",
@@ -225,27 +226,11 @@ func TestUnflatten_EdgeCases(t *testing.T) {
 				},
 			},
 		},
-	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			result := UnflattenSchema(c.input)
-			assert.Equal(t, c.expected, result)
-		})
-	}
-}
-
-func TestUnflatten_RealWorldScenarios(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name  string
-		input map[string]interface{}
-		check func(t *testing.T, result map[string]interface{})
-	}{
+		// Real World Scenarios
 		{
-			name: "RudderStackEventSchema",
+			category: "RealWorld",
+			name:     "RudderStackEventSchema",
 			input: map[string]interface{}{
 				"anonymousId":              "string",
 				"channel":                  "string",
@@ -269,7 +254,8 @@ func TestUnflatten_RealWorldScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "DeepNestedPath",
+			category: "RealWorld",
+			name:     "DeepNestedPath",
 			input: map[string]interface{}{
 				"a.b.c.d.e.f.g.h.i.j": "deep_value",
 				"a.b.c.d.e.f.g.h.x":   "another_value",
@@ -281,7 +267,8 @@ func TestUnflatten_RealWorldScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "MixedArraysAndObjects",
+			category: "RealWorld",
+			name:     "MixedArraysAndObjects",
 			input: map[string]interface{}{
 				"data.0.items.0.properties.name": "item1",
 				"data.0.items.1.properties.name": "item2",
@@ -296,7 +283,8 @@ func TestUnflatten_RealWorldScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "LargeArrayIndexes",
+			category: "RealWorld",
+			name:     "LargeArrayIndexes",
 			input: map[string]interface{}{
 				"items.100.id":   "large_index",
 				"items.1000.id":  "very_large_index",
@@ -309,27 +297,11 @@ func TestUnflatten_RealWorldScenarios(t *testing.T) {
 				assert.Equal(t, "extremely_large_index", items[10000].(map[string]interface{})["id"])
 			},
 		},
-	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			result := UnflattenSchema(c.input)
-			c.check(t, result)
-		})
-	}
-}
-
-func TestUnflatten_SpecialCases(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name  string
-		input map[string]interface{}
-		check func(t *testing.T, result map[string]interface{})
-	}{
+		// Special Cases
 		{
-			name: "ArrayGaps",
+			category: "SpecialCases",
+			name:     "ArrayGaps",
 			input: map[string]interface{}{
 				"items.0.name": "first",
 				"items.2.name": "third",
@@ -344,7 +316,8 @@ func TestUnflatten_SpecialCases(t *testing.T) {
 			},
 		},
 		{
-			name: "MixedKeyTypes",
+			category: "SpecialCases",
+			name:     "MixedKeyTypes",
 			input: map[string]interface{}{
 				"data":   "direct",
 				"data.0": "array_item",
@@ -358,10 +331,15 @@ func TestUnflatten_SpecialCases(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		t.Run(c.category+"/"+c.name, func(t *testing.T) {
 			t.Parallel()
 			result := UnflattenSchema(c.input)
-			c.check(t, result)
+
+			if c.check != nil {
+				c.check(t, result)
+			} else {
+				assert.Equal(t, c.expected, result)
+			}
 		})
 	}
 }
