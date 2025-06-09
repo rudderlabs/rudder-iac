@@ -6,7 +6,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-const LatestVersion = "1.0.0"
 const RudderRef = "$__rudderRef"
 
 func ToJSON(state *State) (json.RawMessage, error) {

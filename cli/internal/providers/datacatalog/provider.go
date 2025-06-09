@@ -41,9 +41,10 @@ func (p *Provider) GetSupportedKinds() []string {
 
 func (p *Provider) GetSupportedTypes() []string {
 	return []string{
-		"property",
-		"event",
-		"trackingplan",
+		provider.PropertyResourceType,
+		provider.EventResourceType,
+		provider.TrackingPlanResourceType,
+		provider.CustomTypeResourceType,
 	}
 }
 

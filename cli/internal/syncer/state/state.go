@@ -11,8 +11,11 @@ type State struct {
 	Resources map[string]*ResourceState `json:"resources"`
 }
 
+const LatestVersion = "1.0.0"
+
 func EmptyState() *State {
 	return &State{
+		Version:   LatestVersion,
 		Resources: make(map[string]*ResourceState),
 	}
 }

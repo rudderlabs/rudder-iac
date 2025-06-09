@@ -85,7 +85,7 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error) {
-	var state *state.State = nil
+	var state *state.State = state.EmptyState()
 	for _, provider := range p.Providers {
 		s, err := provider.LoadState(ctx)
 		if err != nil {
@@ -97,7 +97,7 @@ func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error)
 		} else {
 			state, err = state.Merge(s)
 			if err != nil {
-				return nil, fmt.Errorf("error merging provider states")
+				return nil, fmt.Errorf("error merging provider states: %s", err)
 			}
 		}
 	}
