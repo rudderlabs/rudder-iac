@@ -7,6 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tidwall/pretty"
 	"github.com/tidwall/sjson"
@@ -39,15 +40,7 @@ type Config = struct {
 
 func defaultConfigPath() string {
 	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// In CI environments or when home directory is not available,
-		// fall back to current directory or temp directory
-		if tmpDir := os.TempDir(); tmpDir != "" {
-			return filepath.Join(tmpDir, ".rudder")
-		}
-		// Final fallback to current directory
-		return ".rudder"
-	}
+	cobra.CheckErr(err)
 
 	return fmt.Sprintf("%s/.rudder", homeDir)
 }
@@ -66,11 +59,7 @@ func InitConfig(cfgFile string) {
 	}
 
 	err := createConfigFileIfNotExists(cfgFile)
-	if err != nil {
-		// In CI/test environments, if we can't create config file,
-		// continue with in-memory config only
-		log.Debug("could not create config file, using in-memory config", "error", err)
-	}
+	cobra.CheckErr(err)
 
 	viper.SetConfigFile(cfgFile)
 
@@ -90,7 +79,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 
-	// load configuration - this is optional in case file doesn't exist
+	// load configuration
 	_ = viper.ReadInConfig()
 }
 
@@ -135,30 +124,20 @@ func SetTelemetryAnonymousID(anonymousID string) {
 func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
 	if configFile == "" {
-		// If no config file is being used, skip the update
 		log.Debug("no config file in use, skipping config update")
 		return
 	}
 
 	data, err := os.ReadFile(configFile)
-	if err != nil {
-		log.Debug("could not read config file", "error", err)
-		return
-	}
+	cobra.CheckErr(err)
 
 	newData, err := f(data)
-	if err != nil {
-		log.Debug("could not update config data", "error", err)
-		return
-	}
+	cobra.CheckErr(err)
 
 	formattedData := pretty.Pretty(newData)
 
 	err = os.WriteFile(configFile, formattedData, 0644)
-	if err != nil {
-		log.Debug("could not write config file", "error", err)
-		return
-	}
+	cobra.CheckErr(err)
 
 	_ = viper.ReadInConfig()
 }
@@ -166,24 +145,11 @@ func updateConfig(f func(data []byte) ([]byte, error)) {
 func GetConfig() Config {
 	var config Config
 	err := viper.Unmarshal(&config)
-	if err != nil {
-		// In case of error, return default config
-		log.Debug("could not unmarshal config, using defaults", "error", err)
-		return Config{
-			Debug:        false,
-			Experimental: false,
-			Verbose:      false,
-			APIURL:       client.BASE_URL_V2,
-		}
-	}
+	cobra.CheckErr(err)
 
 	return config
 }
 
 func GetConfigDir() string {
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		return defaultConfigPath()
-	}
-	return filepath.Dir(configFile)
+	return filepath.Dir(viper.ConfigFileUsed())
 }
