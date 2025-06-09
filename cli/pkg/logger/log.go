@@ -1,11 +1,10 @@
 package logger
 
 import (
-	"io"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
 // Writing a wrapper over the slog
@@ -18,61 +17,29 @@ type Attr struct {
 	Value string
 }
 
-var (
-	logFile  *os.File
-	levelVar = new(slog.LevelVar)
-	initOnce sync.Once
-	initErr  error
-)
+var logFile *os.File
+var levelVar = new(slog.LevelVar)
 
-// initializeLogger initializes the logger with proper error handling
-// This replaces the problematic init() function
-func initializeLogger() error {
-	initOnce.Do(func() {
-		// Try to get home directory, but don't fail if it doesn't work
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			// In CI environments or when home directory is not available,
-			// we'll use a fallback (discard output or current directory)
-			logFile = nil
-			initErr = nil // Don't treat this as an error
-			return
-		}
-
-		// Try to create log directory and file
-		logPath := filepath.Join(homeDir, ".rudder", "cli.log")
-		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
-			// If we can't create the directory, fall back to discard
-			logFile = nil
-			initErr = nil
-			return
-		}
-
-		lf, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			// If we can't open the log file, fall back to discard
-			logFile = nil
-			initErr = nil
-			return
-		}
-
-		logFile = lf
-	})
-	return initErr
-}
-
-// getLogWriter returns the appropriate writer for logging
-func getLogWriter() io.Writer {
-	// Initialize logger if not already done
-	_ = initializeLogger()
-
-	if logFile != nil {
-		return logFile
+func init() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("Error getting home directory: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Fallback: in test environments or when file operations fail,
-	// we discard logs to avoid breaking functionality
-	return io.Discard
+	logPath := filepath.Join(homeDir, ".rudder", "cli.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+		fmt.Printf("Error creating log directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	lf, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening log file: %v\n", err)
+		os.Exit(1)
+	}
+
+	logFile = lf
 }
 
 type Logger struct {
@@ -80,7 +47,7 @@ type Logger struct {
 }
 
 func New(pkgName string, attrs ...Attr) *Logger {
-	h := slog.NewTextHandler(getLogWriter(), &slog.HandlerOptions{
+	h := slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			// Anything other than time key
 			// return
@@ -113,10 +80,4 @@ func New(pkgName string, attrs ...Attr) *Logger {
 
 func SetLogLevel(l slog.Level) {
 	levelVar.Set(l)
-}
-
-// InitializeLogging can be called explicitly to ensure logging is set up
-// This is safe to call multiple times
-func InitializeLogging() error {
-	return initializeLogger()
 }
