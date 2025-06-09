@@ -7,12 +7,38 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/interfaces"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/services"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	pkgModels "github.com/rudderlabs/rudder-iac/cli/pkg/schema/models"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+// SimpleLogger implements basic logging functionality
+type SimpleLogger struct {
+	verbose bool
+}
+
+func (l *SimpleLogger) Info(msg string) {
+	if l.verbose {
+		fmt.Printf("INFO: %s\n", msg)
+	}
+}
+
+func (l *SimpleLogger) Error(msg string) {
+	fmt.Printf("ERROR: %s\n", msg)
+}
+
+func (l *SimpleLogger) Debug(msg string) {
+	if l.verbose {
+		fmt.Printf("DEBUG: %s\n", msg)
+	}
+}
 
 // NewCmdFetch creates the fetch command
 func NewCmdFetch() *cobra.Command {
@@ -55,6 +81,90 @@ Examples:
 
 // runFetch handles the fetch command execution
 func runFetch(outputFile, writeKey string, dryRun, verbose bool, indent int) error {
+	// Check if new architecture should be used (feature flag)
+	useNewArchitecture := viper.GetBool("features.new_architecture")
+
+	if useNewArchitecture {
+		return runFetchWithService(outputFile, writeKey, dryRun, verbose, indent)
+	}
+
+	// Fallback to legacy implementation for backward compatibility
+	return runFetchLegacy(outputFile, writeKey, dryRun, verbose, indent)
+}
+
+// runFetchWithService uses the new service layer architecture
+func runFetchWithService(outputFile, writeKey string, dryRun, verbose bool, indent int) error {
+	// Initialize dependencies
+	deps, err := app.NewDeps()
+	if err != nil {
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+
+	// Create logger
+	log := logger.New("schema.fetch")
+
+	// Create fetch service
+	fetchService := services.NewFetchService(deps.Client(), log)
+
+	// Prepare fetch options
+	fetchOptions := interfaces.FetchOptions{
+		WriteKey: writeKey,
+		DryRun:   dryRun,
+		Verbose:  verbose,
+		PageSize: 100,
+		Timeout:  30 * time.Second,
+	}
+
+	// Fetch schemas using the service
+	ctx := context.Background()
+	schemasFile, err := fetchService.FetchSchemas(ctx, fetchOptions)
+	if err != nil {
+		return fmt.Errorf("fetch failed: %w", err)
+	}
+
+	// Convert to pkg models for output compatibility
+	output := pkgModels.SchemasFile{
+		Schemas: make([]pkgModels.Schema, len(schemasFile.Schemas)),
+	}
+
+	for i, schema := range schemasFile.Schemas {
+		output.Schemas[i] = pkgModels.Schema{
+			UID:             schema.UID,
+			WriteKey:        schema.WriteKey,
+			EventType:       schema.EventType,
+			EventIdentifier: schema.EventIdentifier,
+			Schema:          schema.Schema,
+			CreatedAt:       schema.CreatedAt,
+			LastSeen:        schema.LastSeen,
+			Count:           schema.Count,
+		}
+	}
+
+	if dryRun {
+		fmt.Printf("DRY RUN: Would write %d schemas to %s\n", len(output.Schemas), outputFile)
+		if verbose && len(output.Schemas) > 0 {
+			fmt.Printf("DRY RUN: First schema preview:\n")
+			fmt.Printf("  UID: %s\n", output.Schemas[0].UID)
+			fmt.Printf("  Event: %s\n", output.Schemas[0].EventIdentifier)
+			fmt.Printf("  Write Key: %s\n", output.Schemas[0].WriteKey)
+			fmt.Printf("  Schema fields count: %d\n", len(output.Schemas[0].Schema))
+		}
+		return nil
+	}
+
+	// Write output file
+	if err := writeJSONFile(outputFile, output, indent); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("✓ Successfully fetched %d schemas\n", len(output.Schemas))
+	fmt.Printf("✓ Output written to %s\n", outputFile)
+
+	return nil
+}
+
+// runFetchLegacy maintains the original implementation for backward compatibility
+func runFetchLegacy(outputFile, writeKey string, dryRun, verbose bool, indent int) error {
 	if verbose {
 		fmt.Printf("Fetching schemas from API...\n")
 	}
