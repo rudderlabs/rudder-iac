@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/workspace"
 	"golang.org/x/exp/maps"
 )
 
@@ -143,6 +144,30 @@ func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType 
 		return fmt.Errorf("no provider found for resource type %s", resourceType)
 	}
 	return provider.Delete(ctx, ID, resourceType, state)
+}
+
+func (p *CompositeProvider) List(ctx context.Context, resourceType string) ([]*workspace.Resource, error) {
+	provider := p.providerForType(resourceType)
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
+	}
+	return provider.List(ctx, resourceType)
+}
+
+func (p *CompositeProvider) Template(ctx context.Context, resource *workspace.Resource) ([]byte, error) {
+	provider := p.providerForType(resource.Type)
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resource.Type)
+	}
+	return provider.Template(ctx, resource)
+}
+
+func (p *CompositeProvider) ImportState(ctx context.Context, resource *workspace.Resource) (*state.ResourceState, error) {
+	provider := p.providerForType(resource.Type)
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resource.Type)
+	}
+	return provider.ImportState(ctx, resource)
 }
 
 // Helper methods

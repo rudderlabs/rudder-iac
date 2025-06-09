@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/workspace"
 )
 
 type Provider struct {
@@ -59,6 +60,10 @@ func (p *Provider) Validate() error {
 	return nil
 }
 
+func (p *Provider) ImportState(ctx context.Context, _ *workspace.Resource) (*state.ResourceState, error) {
+	return nil, nil
+}
+
 func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	return nil, nil
 }
@@ -85,4 +90,12 @@ func (p *Provider) Update(ctx context.Context, ID string, resourceType string, d
 
 func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	return nil
+}
+
+func (p *Provider) List(ctx context.Context, resourceType string) ([]*workspace.Resource, error) {
+	return []*workspace.Resource{}, nil
+}
+
+func (p *Provider) Template(ctx context.Context, resource *workspace.Resource) ([]byte, error) {
+	return []byte{}, nil
 }
