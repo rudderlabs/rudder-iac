@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -52,32 +51,13 @@ func TestRootCommand_Structure(t *testing.T) {
 }
 
 func TestSetVersion(t *testing.T) {
-	// Removed t.Parallel() to avoid race conditions with global rootCmd.Version
+	versions := []string{"1.0.0", "1.0.0-beta.1", ""}
+	versionNames := []string{"ValidVersion", "VersionWithBuild", "EmptyVersion"}
 
-	cases := []struct {
-		name    string
-		version string
-	}{
-		{
-			name:    "ValidVersion",
-			version: "1.0.0",
-		},
-		{
-			name:    "VersionWithBuild",
-			version: "1.0.0-beta.1",
-		},
-		{
-			name:    "EmptyVersion",
-			version: "",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			// Removed t.Parallel() to avoid race conditions with global rootCmd.Version
-
-			SetVersion(c.version)
-			assert.Equal(t, c.version, rootCmd.Version)
+	for i, version := range versions {
+		t.Run(versionNames[i], func(t *testing.T) {
+			SetVersion(version)
+			assert.Equal(t, version, rootCmd.Version)
 		})
 	}
 }
@@ -128,54 +108,35 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestInitFunctions(t *testing.T) {
-	// These tests verify that the init functions can be called without errors
-	// Full integration testing would require more complex setup
-
-	t.Run("InitConfig", func(t *testing.T) {
-		tempDir := t.TempDir()
-		_ = filepath.Join(tempDir, "test_config.json") // We create a temp path but don't use it
-
-		// Set a temporary config file to avoid affecting global state
-		originalViper := viper.GetViper()
-		defer func() {
-			viper.Reset()
-			for key, value := range originalViper.AllSettings() {
-				viper.Set(key, value)
-			}
-		}()
-
-		assert.NotPanics(t, func() {
+	initTests := []struct {
+		name string
+		fn   func()
+	}{
+		{"InitConfig", func() {
+			originalViper := viper.GetViper()
+			defer func() {
+				viper.Reset()
+				for key, value := range originalViper.AllSettings() {
+					viper.Set(key, value)
+				}
+			}()
 			initConfig()
-		})
-	})
-
-	t.Run("InitLogger", func(t *testing.T) {
-		assert.NotPanics(t, func() {
+		}},
+		{"InitLogger", initLogger},
+		{"InitLoggerWithDebugEnabled", func() {
+			viper.Set("debug", true)
+			defer viper.Set("debug", false)
 			initLogger()
-		})
-	})
+		}},
+		{"InitAppDependencies", initAppDependencies},
+		{"InitTelemetry", initTelemetry},
+	}
 
-	t.Run("InitLoggerWithDebugEnabled", func(t *testing.T) {
-		// Test the debug path in initLogger
-		viper.Set("debug", true)
-		defer viper.Set("debug", false)
-
-		assert.NotPanics(t, func() {
-			initLogger()
+	for _, test := range initTests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.NotPanics(t, test.fn)
 		})
-	})
-
-	t.Run("InitAppDependencies", func(t *testing.T) {
-		assert.NotPanics(t, func() {
-			initAppDependencies()
-		})
-	})
-
-	t.Run("InitTelemetry", func(t *testing.T) {
-		assert.NotPanics(t, func() {
-			initTelemetry()
-		})
-	})
+	}
 }
 
 func TestExecute(t *testing.T) {

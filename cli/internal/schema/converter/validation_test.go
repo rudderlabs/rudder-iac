@@ -13,265 +13,211 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TestValidationRequirements tests that the converter produces output that meets all validation requirements
-func TestValidationRequirements(t *testing.T) {
+func TestValidation(t *testing.T) {
 	t.Parallel()
 
-	// Create test schemas with potential for duplicates and validation issues
+	// Shared test schemas for validation requirements
 	testSchemas := []models.Schema{
 		{
-			UID:             "test-uid-1",
-			WriteKey:        "writekey-1",
-			EventType:       "track",
-			EventIdentifier: "user_signed_up",
+			UID: "test-uid-1", WriteKey: "writekey-1", EventType: "track", EventIdentifier: "user_signed_up",
 			Schema: map[string]interface{}{
-				"userId": "string",
-				"email":  "string",
-				"properties": map[string]interface{}{
-					"name":  "string",
-					"email": "string", // Same name, same type - should be detected as duplicate
-				},
+				"userId": "string", "email": "string",
+				"properties": map[string]interface{}{"name": "string", "email": "string"},
 			},
 		},
 		{
-			UID:             "test-uid-2",
-			WriteKey:        "writekey-1", // Same writekey - should create unique rule IDs
-			EventType:       "track",
-			EventIdentifier: "user_signed_up", // Same event - should create unique rule IDs
+			UID: "test-uid-2", WriteKey: "writekey-1", EventType: "track", EventIdentifier: "user_signed_up",
 			Schema: map[string]interface{}{
-				"userId": "number", // Same name, different type - should have unique ID
-				"properties": map[string]interface{}{
-					"name": "number", // Same name, different type from first schema
-				},
+				"userId":     "number",
+				"properties": map[string]interface{}{"name": "number"},
 			},
 		},
 		{
-			UID:             "test-uid-3",
-			WriteKey:        "writekey-2",
-			EventType:       "track",
-			EventIdentifier: "order_completed",
+			UID: "test-uid-3", WriteKey: "writekey-2", EventType: "track", EventIdentifier: "order_completed",
 			Schema: map[string]interface{}{
 				"properties": map[string]interface{}{
-					"nested_object": map[string]interface{}{
-						"deep_field": "string",
-					},
-					"array_field": []interface{}{
-						map[string]interface{}{
-							"item_name": "string",
-						},
-					},
+					"nested_object": map[string]interface{}{"deep_field": "string"},
+					"array_field":   []interface{}{map[string]interface{}{"item_name": "string"}},
 				},
 			},
 		},
 	}
 
-	// Create analyzer and process schemas
-	analyzer := NewSchemaAnalyzer()
-	err := analyzer.AnalyzeSchemas(testSchemas)
-	require.NoError(t, err)
-
-	// Generate YAML structures
-	eventsYAML := analyzer.GenerateEventsYAML()
-	propertiesYAML := analyzer.GeneratePropertiesYAML()
-	customTypesYAML := analyzer.GenerateCustomTypesYAML()
-	trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
-
-	// Test 1: Custom type IDs must be unique
-	t.Run("CustomTypeIDsValidation", func(t *testing.T) {
-		seenIDs := make(map[string]bool)
-
-		for _, customType := range customTypesYAML.Spec.Types {
-			assert.False(t, seenIDs[customType.ID],
-				"Custom type ID '%s' must be unique", customType.ID)
-			seenIDs[customType.ID] = true
-		}
-	})
-
-	// Test 2: Property IDs must be unique and representative of name+type combination
-	t.Run("PropertyIDsValidation", func(t *testing.T) {
-		seenIDs := make(map[string]bool)
-		propertyNameTypes := make(map[string]string) // name -> type mapping
-
-		for _, property := range propertiesYAML.Spec.Properties {
-			// Check ID uniqueness
-			assert.False(t, seenIDs[property.ID],
-				"Property ID '%s' must be unique", property.ID)
-			seenIDs[property.ID] = true
-
-			// For properties with same name, ensure they have different types if IDs are different
-			if existingType, exists := propertyNameTypes[property.Name]; exists {
-				if property.Type != existingType {
-					// Same name, different type - IDs should be different
-					// This is validated by the uniqueness check above
-					assert.NotEqual(t, existingType, property.Type,
-						"Properties with same name '%s' should have different types to justify different IDs", property.Name)
-				}
-			}
-			propertyNameTypes[property.Name] = property.Type
-		}
-	})
-
-	// Test 3: Event rule IDs must be unique across all tracking plans
-	t.Run("EventRuleIDsValidation", func(t *testing.T) {
-		seenRuleIDs := make(map[string]bool)
-
-		for writeKey, tp := range trackingPlansYAML {
-			for _, rule := range tp.Spec.Rules {
-				assert.False(t, seenRuleIDs[rule.ID],
-					"Event rule ID '%s' in tracking plan '%s' must be globally unique", rule.ID, writeKey)
-				seenRuleIDs[rule.ID] = true
-
-				// Rule ID should be non-empty
-				assert.NotEmpty(t, rule.ID, "Rule ID cannot be empty")
-			}
-		}
-	})
-
-	// Test 4: Integration test - write files and verify they don't have validation errors
-	t.Run("IntegrationValidation", func(t *testing.T) {
-		tempDir := t.TempDir()
-
-		// Write the generated YAML files
-		err := writeYAMLFile(filepath.Join(tempDir, "events.yaml"), eventsYAML, 2)
-		require.NoError(t, err)
-		err = writeYAMLFile(filepath.Join(tempDir, "properties.yaml"), propertiesYAML, 2)
-		require.NoError(t, err)
-		err = writeYAMLFile(filepath.Join(tempDir, "custom-types.yaml"), customTypesYAML, 2)
-		require.NoError(t, err)
-
-		// Write tracking plans
-		tpDir := filepath.Join(tempDir, "tracking-plans")
-		err = os.MkdirAll(tpDir, 0755)
-		require.NoError(t, err)
-
-		for writeKey, tp := range trackingPlansYAML {
-			filename := fmt.Sprintf("writekey-%s.yaml", writeKey)
-			err = writeYAMLFile(filepath.Join(tpDir, filename), tp, 2)
-			require.NoError(t, err)
-		}
-
-		// Verify files exist and are valid YAML
-		assert.FileExists(t, filepath.Join(tempDir, "events.yaml"))
-		assert.FileExists(t, filepath.Join(tempDir, "properties.yaml"))
-		assert.FileExists(t, filepath.Join(tempDir, "custom-types.yaml"))
-
-		// Read and verify YAML structure
-		verifyYAMLStructure(t, filepath.Join(tempDir, "events.yaml"))
-		verifyYAMLStructure(t, filepath.Join(tempDir, "properties.yaml"))
-		verifyYAMLStructure(t, filepath.Join(tempDir, "custom-types.yaml"))
-	})
-}
-
-// TestCustomTypeNameGeneration specifically tests custom type name generation
-func TestCustomTypeNameGeneration(t *testing.T) {
-	tests := []struct {
-		name        string
-		path        string
-		baseType    string
-		expectedLen int
-		shouldMatch bool
-	}{
-		{
-			name:        "Simple path",
-			path:        "user.profile",
-			baseType:    "object",
-			expectedLen: 15, // "UserprofileType"
-			shouldMatch: true,
-		},
-		{
-			name:        "Path with numbers and symbols",
-			path:        "user_123.profile-data.info$test",
-			baseType:    "object",
-			expectedLen: 21, // "UserprofiledatainfoType" (numbers/symbols removed)
-			shouldMatch: true,
-		},
-		{
-			name:        "Array type",
-			path:        "items",
-			baseType:    "array",
-			expectedLen: 10, // "ItemsArray"
-			shouldMatch: true,
-		},
-		{
-			name:        "Empty path",
-			path:        "",
-			baseType:    "object",
-			expectedLen: 13, // "GeneratedType"
-			shouldMatch: true,
-		},
-		{
-			name:        "Very long path",
-			path:        "very.long.path.with.many.nested.fields.that.should.be.truncated.to.fit.within.sixtyfive.character.limit",
-			baseType:    "object",
-			expectedLen: 65, // Should be truncated to exactly 65 chars
-			shouldMatch: true,
-		},
-	}
-
-	customTypeNameRegex := regexp.MustCompile(`^[A-Z][a-zA-Z]{2,64}$`)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			customTypeFactory := NewCustomTypeFactory()
-			result := customTypeFactory.generateCustomTypeName(tt.path, tt.baseType)
-
-			// Check length constraint
-			assert.True(t, len(result) >= 3 && len(result) <= 65,
-				"Generated name '%s' should be 3-65 characters, got %d", result, len(result))
-
-			// Check format
-			assert.True(t, customTypeNameRegex.MatchString(result),
-				"Generated name '%s' should match validation regex", result)
-
-			// Check starts with uppercase
-			assert.True(t, result[0] >= 'A' && result[0] <= 'Z',
-				"Generated name '%s' should start with uppercase letter", result)
-		})
-	}
-}
-
-// TestPropertyIDGeneration tests property ID generation for uniqueness
-func TestPropertyIDGeneration(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
+		category string
 		name     string
-		propName string
-		propType string
-		expected string
+		validate func(t *testing.T)
 	}{
+		// Validation Requirements Tests
 		{
-			name:     "String property",
-			propName: "email",
-			propType: "string",
-			expected: "email_string",
+			category: "Requirements",
+			name:     "CustomTypeIDsValidation",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+				customTypesYAML := analyzer.GenerateCustomTypesYAML()
+
+				seenIDs := make(map[string]bool)
+				for _, customType := range customTypesYAML.Spec.Types {
+					assert.False(t, seenIDs[customType.ID], "Custom type ID '%s' must be unique", customType.ID)
+					seenIDs[customType.ID] = true
+				}
+			},
 		},
 		{
-			name:     "Number property with same name",
-			propName: "email",
-			propType: "number",
-			expected: "email_number",
+			category: "Requirements",
+			name:     "PropertyIDsValidation",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+				propertiesYAML := analyzer.GeneratePropertiesYAML()
+
+				seenIDs := make(map[string]bool)
+				propertyNameTypes := make(map[string]string)
+
+				for _, property := range propertiesYAML.Spec.Properties {
+					assert.False(t, seenIDs[property.ID], "Property ID '%s' must be unique", property.ID)
+					seenIDs[property.ID] = true
+
+					if existingType, exists := propertyNameTypes[property.Name]; exists {
+						if property.Type != existingType {
+							assert.NotEqual(t, existingType, property.Type,
+								"Properties with same name '%s' should have different types to justify different IDs", property.Name)
+						}
+					}
+					propertyNameTypes[property.Name] = property.Type
+				}
+			},
 		},
 		{
-			name:     "Custom type property",
-			propName: "user",
-			propType: "#/custom-types/test/UserType",
-			expected: "user_usertype",
+			category: "Requirements",
+			name:     "EventRuleIDsValidation",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+				trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
+
+				seenRuleIDs := make(map[string]bool)
+				for writeKey, tp := range trackingPlansYAML {
+					for _, rule := range tp.Spec.Rules {
+						assert.False(t, seenRuleIDs[rule.ID],
+							"Event rule ID '%s' in tracking plan '%s' must be globally unique", rule.ID, writeKey)
+						seenRuleIDs[rule.ID] = true
+						assert.NotEmpty(t, rule.ID, "Rule ID cannot be empty")
+					}
+				}
+			},
+		},
+		{
+			category: "Requirements",
+			name:     "IntegrationValidation",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+
+				eventsYAML := analyzer.GenerateEventsYAML()
+				propertiesYAML := analyzer.GeneratePropertiesYAML()
+				customTypesYAML := analyzer.GenerateCustomTypesYAML()
+				trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
+
+				tempDir := t.TempDir()
+				err = writeYAMLFile(filepath.Join(tempDir, "events.yaml"), eventsYAML, 2)
+				require.NoError(t, err)
+				err = writeYAMLFile(filepath.Join(tempDir, "properties.yaml"), propertiesYAML, 2)
+				require.NoError(t, err)
+				err = writeYAMLFile(filepath.Join(tempDir, "custom-types.yaml"), customTypesYAML, 2)
+				require.NoError(t, err)
+
+				tpDir := filepath.Join(tempDir, "tracking-plans")
+				err = os.MkdirAll(tpDir, 0755)
+				require.NoError(t, err)
+
+				for writeKey, tp := range trackingPlansYAML {
+					filename := fmt.Sprintf("writekey-%s.yaml", writeKey)
+					err = writeYAMLFile(filepath.Join(tpDir, filename), tp, 2)
+					require.NoError(t, err)
+				}
+
+				assert.FileExists(t, filepath.Join(tempDir, "events.yaml"))
+				assert.FileExists(t, filepath.Join(tempDir, "properties.yaml"))
+				assert.FileExists(t, filepath.Join(tempDir, "custom-types.yaml"))
+
+				verifyYAMLStructure(t, filepath.Join(tempDir, "events.yaml"))
+				verifyYAMLStructure(t, filepath.Join(tempDir, "properties.yaml"))
+				verifyYAMLStructure(t, filepath.Join(tempDir, "custom-types.yaml"))
+			},
+		},
+
+		// Custom Type Name Generation Tests
+		{
+			category: "CustomTypeNames",
+			name:     "NameGenerationValidation",
+			validate: func(t *testing.T) {
+				tests := []struct {
+					name        string
+					path        string
+					baseType    string
+					expectedLen int
+				}{
+					{"Simple path", "user.profile", "object", 15},
+					{"Path with symbols", "user_123.profile-data.info$test", "object", 21},
+					{"Array type", "items", "array", 10},
+					{"Empty path", "", "object", 13},
+					{"Very long path", "very.long.path.with.many.nested.fields.that.should.be.truncated.to.fit.within.sixtyfive.character.limit", "object", 65},
+				}
+
+				customTypeNameRegex := regexp.MustCompile(`^[A-Z][a-zA-Z]{2,64}$`)
+				customTypeFactory := NewCustomTypeFactory()
+
+				for _, tt := range tests {
+					result := customTypeFactory.generateCustomTypeName(tt.path, tt.baseType)
+					assert.True(t, len(result) >= 3 && len(result) <= 65,
+						"Generated name '%s' should be 3-65 characters, got %d", result, len(result))
+					assert.True(t, customTypeNameRegex.MatchString(result),
+						"Generated name '%s' should match validation regex", result)
+					assert.True(t, result[0] >= 'A' && result[0] <= 'Z',
+						"Generated name '%s' should start with uppercase letter", result)
+				}
+			},
+		},
+
+		// Property ID Generation Tests
+		{
+			category: "PropertyIDs",
+			name:     "IDGenerationValidation",
+			validate: func(t *testing.T) {
+				tests := []struct {
+					name     string
+					propName string
+					propType string
+					expected string
+				}{
+					{"String property", "email", "string", "email_string"},
+					{"Number property with same name", "email", "number", "email_number"},
+					{"Custom type property", "user", "#/custom-types/test/UserType", "user_usertype"},
+				}
+
+				propertyFactory := NewPropertyFactory()
+				for _, tt := range tests {
+					mockAnalyzer := &SchemaAnalyzer{UsedPropertyIDs: make(map[string]bool)}
+					result := propertyFactory.generateUniquePropertyID(mockAnalyzer, tt.propName, tt.propType)
+					assert.Equal(t, tt.expected, result)
+				}
+			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			propertyFactory := NewPropertyFactory()
-			// Create a mock analyzer for testing
-			mockAnalyzer := &SchemaAnalyzer{
-				UsedPropertyIDs: make(map[string]bool),
-			}
-			result := propertyFactory.generateUniquePropertyID(mockAnalyzer, tt.propName, tt.propType)
-			assert.Equal(t, tt.expected, result)
+	for _, c := range cases {
+		t.Run(c.category+"/"+c.name, func(t *testing.T) {
+			t.Parallel()
+			c.validate(t)
 		})
 	}
 }
-
-// Helper functions
 
 func verifyYAMLStructure(t *testing.T, filename string) {
 	data, err := os.ReadFile(filename)
