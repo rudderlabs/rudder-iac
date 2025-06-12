@@ -53,12 +53,12 @@ jobs:
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
         run: |
           make docker-build
-          if [[ ${{ github.event_name }} == 'repository_dispatch' ]] || [[ ${{ github.ref_type }} == 'tag' ]]; then
+          # if [[ ${{ github.event_name }} == 'repository_dispatch' ]] || [[ ${{ github.ref_type }} == 'tag' ]]; then
             # For releases (repository_dispatch) or version tags, also push as latest
-            docker tag rudderlabs/rudder-cli:$VERSION rudderlabs/rudder-cli:latest
-            docker push rudderlabs/rudder-cli:$VERSION
-            docker push rudderlabs/rudder-cli:latest
-          else
+            # docker tag rudderlabs/rudder-cli:$VERSION rudderlabs/rudder-cli:latest
+            # docker push rudderlabs/rudder-cli:$VERSION
+            # docker push rudderlabs/rudder-cli:latest
+          # else
             # For branches and PRs just push with version tag
-            docker push rudderlabs/rudder-cli:$VERSION
-          fi
+            # docker push rudderlabs/rudder-cli:$VERSION
+          # fi
