@@ -36,12 +36,6 @@ func NewCLIBinary(dir string, exec Executor) (*CLIBinary, error) {
 		return nil, fmt.Errorf("invalid dir %q: %w", dir, err)
 	}
 
-	// create default executor if not provided
-	exec, err := NewCmdExecutor("")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create default executor: %w", err)
-	}
-
 	filename := "rudder-cli"
 
 	if runtime.GOOS == "windows" {
@@ -49,7 +43,6 @@ func NewCLIBinary(dir string, exec Executor) (*CLIBinary, error) {
 	}
 
 	filepath := filepath.Join(dir, filename)
-
 	return &CLIBinary{exec: exec, binPath: filepath, dir: dir}, nil
 }
 

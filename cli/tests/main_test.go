@@ -40,7 +40,8 @@ func TestMain(m *testing.M) {
 
 	oldpath := os.Getenv("PATH")
 	binDir := filepath.Dir(path)
-	os.Setenv("PATH", fmt.Sprintf("%s/%s", binDir, oldpath))
+
+	os.Setenv("PATH", fmt.Sprintf("%s:%s", binDir, oldpath))
 
 	defer os.Setenv("PATH", oldpath)
 
