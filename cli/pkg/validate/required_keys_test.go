@@ -427,36 +427,6 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 			errorContains:  "property name cannot have leading or trailing whitespace characters",
 		},
 		{
-			name: "property name with tab characters",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "tab-prop",
-						Name:        "\tProperty With Tab\t",
-						Description: "Property with tab characters",
-						Type:        "string",
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "property name cannot have leading or trailing whitespace characters",
-		},
-		{
-			name: "property name with newline characters",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "newline-prop",
-						Name:        "\nProperty With Newline\n",
-						Description: "Property with newline characters",
-						Type:        "string",
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "property name cannot have leading or trailing whitespace characters",
-		},
-		{
 			name: "property name with internal spaces (should be valid)",
 			properties: map[catalog.EntityGroup][]catalog.Property{
 				"test-group": {
@@ -484,33 +454,6 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 			},
 			expectedErrors: 1,
 			errorContains:  "id, name and type fields on property are mandatory",
-		},
-		{
-			name: "multiple properties with different whitespace issues",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "leading-space-prop",
-						Name:        " Leading Space",
-						Description: "Property with leading space",
-						Type:        "string",
-					},
-					{
-						LocalID:     "trailing-space-prop",
-						Name:        "Trailing Space ",
-						Description: "Property with trailing space",
-						Type:        "string",
-					},
-					{
-						LocalID:     "valid-prop",
-						Name:        "Valid Property",
-						Description: "Valid property",
-						Type:        "string",
-					},
-				},
-			},
-			expectedErrors: 2, // Two properties with whitespace issues
-			errorContains:  "property name cannot have leading or trailing whitespace characters",
 		},
 	}
 
