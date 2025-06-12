@@ -47,7 +47,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Validate property name doesn't have leading or trailing whitespace
-			if prop.Name != "" && prop.Name != strings.TrimSpace(prop.Name) {
+			if prop.Name != strings.TrimSpace(prop.Name) {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("property name cannot have leading or trailing whitespace characters"),
 					Reference: reference,
