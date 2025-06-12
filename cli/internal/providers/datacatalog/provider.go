@@ -36,7 +36,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (p *Provider) GetSupportedKinds() []string {
-	return []string{"properties", "events", "tp"}
+	return []string{"properties", "events", "tp", "custom-types"}
 }
 
 func (p *Provider) GetSupportedTypes() []string {
