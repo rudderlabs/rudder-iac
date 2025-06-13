@@ -110,7 +110,10 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 // and updates the datacatalog struct with it.
 func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 	// TODO: properly handle metadata - ensuring schema and types
-	name := s.Metadata["name"].(string)
+	name, ok := s.Metadata["name"].(string)
+	if !ok {
+		name = ""
+	}
 	switch s.Kind {
 	case "properties":
 		properties, err := ExtractProperties(s)
