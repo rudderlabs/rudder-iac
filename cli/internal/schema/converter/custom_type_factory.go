@@ -172,7 +172,7 @@ func (ctf *CustomTypeFactory) generateUniquenessSignature(analyzer *SchemaAnalyz
 		// For array types, uniqueness is based on itemType
 		return fmt.Sprintf("array:%s", customType.ArrayItemType)
 	} else if customType.Type == "object" {
-		// For object types, uniqueness is based on structure (field name + type pairs)
+		// For object types, uniqueness is based on structure (property references)
 		if len(customType.Structure) == 0 {
 			return "object:empty"
 		}
@@ -184,15 +184,24 @@ func (ctf *CustomTypeFactory) generateUniquenessSignature(analyzer *SchemaAnalyz
 		}
 		sort.Strings(structKeys)
 
-		// Create signature based on field:type pairs (not property IDs)
-		var structPairs []string
+		// Create signature based on property references
+		var propertyRefs []string
 		for _, structKey := range structKeys {
-			structPairs = append(structPairs, fmt.Sprintf("%s:%s", structKey, customType.Structure[structKey]))
+			typeInfo := customType.Structure[structKey]
+			// Find the property ID for this field
+			propertyID := ctf.findPropertyForStructField(analyzer, structKey, customType)
+			if propertyID != "" {
+				propertyRef := fmt.Sprintf("#/properties/extracted_properties/%s", propertyID)
+				propertyRefs = append(propertyRefs, propertyRef)
+			} else {
+				// Fallback to field:type format if property not found
+				propertyRefs = append(propertyRefs, fmt.Sprintf("%s:%s", structKey, typeInfo))
+			}
 		}
 
-		// Sort the pairs for deterministic ordering
-		sort.Strings(structPairs)
-		return fmt.Sprintf("object:%s", strings.Join(structPairs, "|"))
+		// Sort the refs for deterministic ordering
+		sort.Strings(propertyRefs)
+		return fmt.Sprintf("object:%s", strings.Join(propertyRefs, "|"))
 	}
 
 	// Fallback for other types
