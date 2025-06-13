@@ -181,3 +181,40 @@ func fetchSchemasPage(apiClient *client.Client, page int, writeKey string) ([]pk
 
 	return response.Results, response.HasNext, nil
 }
+
+// RunFetch is a public wrapper for runFetch to be used by other commands
+func RunFetch(outputFile, writeKey string, dryRun, verbose bool, indent int) error {
+	return runFetch(outputFile, writeKey, dryRun, verbose, indent)
+}
+
+// FetchSchemas fetches schemas and returns them as Go structs for in-memory processing
+func FetchSchemas(writeKey string, verbose bool) ([]pkgModels.Schema, error) {
+	if verbose {
+		fmt.Printf("Fetching schemas from API...\n")
+	}
+
+	// Initialize dependencies to get the central API client
+	deps, err := app.NewDeps()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+
+	if verbose {
+		fmt.Printf("Using API URL: %s\n", deps.Client().URL(""))
+		if writeKey != "" {
+			fmt.Printf("Filtering by write key: %s\n", writeKey)
+		}
+	}
+
+	// Fetch schemas
+	schemas, err := fetchSchemas(deps.Client(), writeKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch schemas: %w", err)
+	}
+
+	if verbose {
+		fmt.Printf("Successfully fetched %d schemas\n", len(schemas))
+	}
+
+	return schemas, nil
+}

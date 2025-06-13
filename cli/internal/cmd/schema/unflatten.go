@@ -258,3 +258,238 @@ func countKeys(obj interface{}) int {
 		return 0
 	}
 }
+
+// runUnflattenWithEventTypeConfig handles unflatten with event-type-specific configuration
+func runUnflattenWithEventTypeConfig(inputFile, outputFile string, dryRun, verbose bool, indent int, eventTypeConfig *models.EventTypeConfig, skipFailed bool) error {
+	if verbose {
+		fmt.Printf("Processing %s with event-type-specific configuration...\n", inputFile)
+	}
+
+	// Check if input file exists
+	if !fileExists(inputFile) {
+		return fmt.Errorf("input file %s does not exist", inputFile)
+	}
+
+	// Read the input file
+	schemasFile, err := readSchemasFile(inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %w", err)
+	}
+
+	if verbose {
+		fmt.Printf("Found %d schemas to process\n", len(schemasFile.Schemas))
+		if eventTypeConfig.HasCustomMappings() {
+			fmt.Printf("Using event-type-specific configuration\n")
+		}
+	}
+
+	// Process each schema
+	var processedSchemas []models.Schema
+	var processingErrors []ProcessingError
+	processedCount := 0
+	skippedCount := 0
+
+	for i := range schemasFile.Schemas {
+		originalSchema := &schemasFile.Schemas[i]
+
+		// Step 1: Always unflatten first
+		if len(originalSchema.Schema) > 0 {
+			originalSchema.Schema = unflatten.UnflattenSchema(originalSchema.Schema)
+		}
+
+		// Step 2: Apply event-type-specific JSONPath extraction
+		jsonPath := eventTypeConfig.GetJSONPathForEventType(originalSchema.EventType)
+
+		if verbose {
+			fmt.Printf("Schema %s (eventType: %s) using JSONPath: %s\n",
+				originalSchema.UID, originalSchema.EventType, jsonPath)
+		}
+
+		// Create processor for this schema's event type
+		processor := jsonpath.NewProcessor(jsonPath, skipFailed)
+
+		if processor != nil && !processor.IsRootPath() {
+			result := processor.ProcessSchema(originalSchema.Schema)
+			if result.Error != nil {
+				// Handle error based on skip-failed setting
+				processingErrors = append(processingErrors, ProcessingError{
+					SchemaUID: fmt.Sprintf("%s (eventType: %s)", originalSchema.UID, originalSchema.EventType),
+					Error:     result.Error,
+				})
+
+				if processor.ShouldSkipOnError() {
+					// Skip this schema
+					skippedCount++
+					continue
+				}
+				// else: keep the unflattened schema and continue
+			} else {
+				// Replace schema with extracted value
+				switch v := result.Value.(type) {
+				case map[string]interface{}:
+					originalSchema.Schema = v
+				case []interface{}:
+					// For arrays, wrap them to maintain schema structure
+					originalSchema.Schema = map[string]interface{}{
+						"items": v,
+					}
+				case string, float64, bool, nil:
+					// For primitive types, wrap them in a map to maintain schema structure
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				default:
+					// Fallback: convert to map
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				}
+			}
+		}
+
+		processedSchemas = append(processedSchemas, *originalSchema)
+		processedCount++
+	}
+
+	// Update the schemas file with processed schemas
+	schemasFile.Schemas = processedSchemas
+
+	// Report processing results
+	if verbose || len(processingErrors) > 0 {
+		fmt.Printf("✓ Successfully processed %d schemas\n", processedCount)
+		if skippedCount > 0 {
+			fmt.Printf("⚠ Skipped %d schemas due to JSONPath errors\n", skippedCount)
+		}
+		if len(processingErrors) > 0 {
+			fmt.Printf("⚠ JSONPath processing errors:\n")
+			for _, err := range processingErrors {
+				fmt.Printf("  - Schema %s: %s\n", err.SchemaUID, err.Error.Error())
+			}
+		}
+	}
+
+	if dryRun {
+		fmt.Printf("DRY RUN: Would write output to %s\n", outputFile)
+		if verbose {
+			fmt.Printf("DRY RUN: Final output preview:\n")
+			if len(schemasFile.Schemas) > 0 {
+				fmt.Printf("  Schemas count: %d\n", len(schemasFile.Schemas))
+				fmt.Printf("  First schema event: %s\n", schemasFile.Schemas[0].EventIdentifier)
+				fmt.Printf("  First schema keys count: %d\n", countKeys(schemasFile.Schemas[0].Schema))
+			}
+		}
+		return nil
+	}
+
+	// Write the output file
+	if err := writeSchemasFile(outputFile, schemasFile, indent); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("✓ Successfully processed %d schemas\n", processedCount)
+	if skippedCount > 0 {
+		fmt.Printf("⚠ Skipped %d schemas due to JSONPath errors\n", skippedCount)
+	}
+	fmt.Printf("✓ Output written to %s\n", outputFile)
+
+	return nil
+}
+
+// RunUnflattenWithEventTypeConfig is a public wrapper for runUnflattenWithEventTypeConfig to be used by other commands
+func RunUnflattenWithEventTypeConfig(inputFile, outputFile string, dryRun, verbose bool, indent int, eventTypeConfig *models.EventTypeConfig, skipFailed bool) error {
+	return runUnflattenWithEventTypeConfig(inputFile, outputFile, dryRun, verbose, indent, eventTypeConfig, skipFailed)
+}
+
+// UnflattenSchemasWithEventTypeConfig processes schemas in memory with event-type-specific configuration
+func UnflattenSchemasWithEventTypeConfig(schemas []models.Schema, eventTypeConfig *models.EventTypeConfig, skipFailed, verbose bool) ([]models.Schema, error) {
+	if verbose {
+		fmt.Printf("Processing %d schemas with event-type-specific configuration in memory...\n", len(schemas))
+		if eventTypeConfig.HasCustomMappings() {
+			fmt.Printf("Using event-type-specific configuration\n")
+		}
+	}
+
+	// Process each schema
+	var processedSchemas []models.Schema
+	var processingErrors []ProcessingError
+	processedCount := 0
+	skippedCount := 0
+
+	for i := range schemas {
+		originalSchema := schemas[i] // Create a copy to avoid modifying the original
+
+		// Step 1: Always unflatten first
+		if len(originalSchema.Schema) > 0 {
+			originalSchema.Schema = unflatten.UnflattenSchema(originalSchema.Schema)
+		}
+
+		// Step 2: Apply event-type-specific JSONPath extraction
+		jsonPath := eventTypeConfig.GetJSONPathForEventType(originalSchema.EventType)
+
+		if verbose {
+			fmt.Printf("Schema %s (eventType: %s) using JSONPath: %s\n",
+				originalSchema.UID, originalSchema.EventType, jsonPath)
+		}
+
+		// Create processor for this schema's event type
+		processor := jsonpath.NewProcessor(jsonPath, skipFailed)
+
+		if processor != nil && !processor.IsRootPath() {
+			result := processor.ProcessSchema(originalSchema.Schema)
+			if result.Error != nil {
+				// Handle error based on skip-failed setting
+				processingErrors = append(processingErrors, ProcessingError{
+					SchemaUID: fmt.Sprintf("%s (eventType: %s)", originalSchema.UID, originalSchema.EventType),
+					Error:     result.Error,
+				})
+
+				if processor.ShouldSkipOnError() {
+					// Skip this schema
+					skippedCount++
+					continue
+				}
+				// else: keep the unflattened schema and continue
+			} else {
+				// Replace schema with extracted value
+				switch v := result.Value.(type) {
+				case map[string]interface{}:
+					originalSchema.Schema = v
+				case []interface{}:
+					// For arrays, wrap them to maintain schema structure
+					originalSchema.Schema = map[string]interface{}{
+						"items": v,
+					}
+				case string, float64, bool, nil:
+					// For primitive types, wrap them in a map to maintain schema structure
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				default:
+					// Fallback: convert to map
+					originalSchema.Schema = map[string]interface{}{
+						"value": v,
+					}
+				}
+			}
+		}
+
+		processedSchemas = append(processedSchemas, originalSchema)
+		processedCount++
+	}
+
+	// Report processing results
+	if verbose || len(processingErrors) > 0 {
+		fmt.Printf("✓ Successfully processed %d schemas\n", processedCount)
+		if skippedCount > 0 {
+			fmt.Printf("⚠ Skipped %d schemas due to JSONPath errors\n", skippedCount)
+		}
+		if len(processingErrors) > 0 {
+			fmt.Printf("⚠ JSONPath processing errors:\n")
+			for _, err := range processingErrors {
+				fmt.Printf("  - Schema %s: %s\n", err.SchemaUID, err.Error.Error())
+			}
+		}
+	}
+
+	return processedSchemas, nil
+}
