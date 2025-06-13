@@ -39,6 +39,13 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 	})
 
 	if err != nil {
+		if catalog.IsCatalogAlreadyExistsError(err) {
+			identifier := toArgs.Name
+			if identifier == "" {
+				identifier = toArgs.EventType
+			}
+			return nil, fmt.Errorf("event '%s' already exists in the data catalog", identifier)
+		}
 		return nil, fmt.Errorf("creating event in upstream catalog: %w", err)
 	}
 

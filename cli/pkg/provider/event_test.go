@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
@@ -182,4 +183,51 @@ func TestEventProviderOperations(t *testing.T) {
 
 func strptr(str string) *string {
 	return &str
+}
+
+func TestEventProviderDuplicateError(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name     string
+		args     state.EventArgs
+		expected string
+	}{
+		{
+			name: "duplicate track event with name",
+			args: state.EventArgs{
+				Name:        "Signup Click",
+				Description: "desc",
+				EventType:   "track",
+			},
+			expected: "event 'Signup Click' already exists in the data catalog",
+		},
+		{
+			name: "duplicate identify event without name",
+			args: state.EventArgs{
+				Name:        "",
+				Description: "identify desc",
+				EventType:   "identify",
+			},
+			expected: "event 'identify' already exists in the data catalog",
+		},
+	}
+
+	for _, tc := range cases {
+		c := tc
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockCatalog := &MockEventCatalog{}
+			mockCatalog.SetError(&client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "event with name already exists",
+			})
+			eventProvider := provider.NewEventProvider(mockCatalog)
+
+			_, err := eventProvider.Create(ctx, "event-id", c.args.ToResourceData())
+			require.Error(t, err)
+			assert.Equal(t, c.expected, err.Error())
+		})
+	}
 }
