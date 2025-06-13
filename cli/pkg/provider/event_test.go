@@ -3,6 +3,7 @@ package provider_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -191,6 +192,7 @@ func TestEventProviderDuplicateError(t *testing.T) {
 	cases := []struct {
 		name     string
 		args     state.EventArgs
+		err      error
 		expected string
 	}{
 		{
@@ -199,6 +201,10 @@ func TestEventProviderDuplicateError(t *testing.T) {
 				Name:        "Signup Click",
 				Description: "desc",
 				EventType:   "track",
+			},
+			err: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "event with name already exists",
 			},
 			expected: "event 'Signup Click' already exists in the data catalog",
 		},
@@ -209,7 +215,31 @@ func TestEventProviderDuplicateError(t *testing.T) {
 				Description: "identify desc",
 				EventType:   "identify",
 			},
+			err: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "event with name already exists",
+			},
 			expected: "event 'identify' already exists in the data catalog",
+		},
+		{
+			name: "not an API error",
+			args: state.EventArgs{
+				Name:        "Signup Click",
+				Description: "desc",
+				EventType:   "track",
+			},
+			err:      errors.New("not an API error"),
+			expected: "creating event in upstream catalog: not an API error",
+		},
+		{
+			name: "internal server error",
+			args: state.EventArgs{
+				Name:        "Signup Click",
+				Description: "desc",
+				EventType:   "track",
+			},
+			err:      &client.APIError{HTTPStatusCode: 500, Message: "unexpected error", ErrorCode: "500"},
+			expected: "creating event in upstream catalog: http status code: 500, error code: '500', error: 'unexpected error'",
 		},
 	}
 
@@ -219,10 +249,7 @@ func TestEventProviderDuplicateError(t *testing.T) {
 			t.Parallel()
 
 			mockCatalog := &MockEventCatalog{}
-			mockCatalog.SetError(&client.APIError{
-				HTTPStatusCode: 400,
-				Message:        "event with name already exists",
-			})
+			mockCatalog.SetError(c.err)
 			eventProvider := provider.NewEventProvider(mockCatalog)
 
 			_, err := eventProvider.Create(ctx, "event-id", c.args.ToResourceData())
