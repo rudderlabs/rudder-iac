@@ -933,3 +933,483 @@ func TestCountKeys_HappyPaths(t *testing.T) {
 		assert.Equal(t, 0, countKeys([]interface{}{}))
 	})
 }
+
+func TestNewCmdUnflatten(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CommandCreation", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdUnflatten()
+
+		assert.NotNil(t, cmd)
+		assert.Equal(t, "unflatten", cmd.Name())
+		assert.Equal(t, "Unflatten schema JSON files with optional JSONPath extraction", cmd.Short)
+		assert.Contains(t, cmd.Long, "Unflatten converts flattened schema keys back to nested JSON structures")
+		assert.Contains(t, cmd.Example, "rudder-cli schema unflatten input.json output.json")
+	})
+
+	t.Run("HasExpectedFlags", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdUnflatten()
+
+		// Check that all expected flags are present
+		assert.NotNil(t, cmd.Flags().Lookup("dry-run"))
+		assert.NotNil(t, cmd.Flags().Lookup("verbose"))
+		assert.NotNil(t, cmd.Flags().Lookup("indent"))
+		assert.NotNil(t, cmd.Flags().Lookup("jsonpath"))
+		assert.NotNil(t, cmd.Flags().Lookup("skip-failed"))
+	})
+
+	t.Run("FlagDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdUnflatten()
+
+		// Check flag defaults
+		dryRunFlag := cmd.Flags().Lookup("dry-run")
+		assert.Equal(t, "false", dryRunFlag.DefValue)
+
+		verboseFlag := cmd.Flags().Lookup("verbose")
+		assert.Equal(t, "false", verboseFlag.DefValue)
+
+		indentFlag := cmd.Flags().Lookup("indent")
+		assert.Equal(t, "2", indentFlag.DefValue)
+
+		jsonpathFlag := cmd.Flags().Lookup("jsonpath")
+		assert.Equal(t, "", jsonpathFlag.DefValue)
+
+		skipFailedFlag := cmd.Flags().Lookup("skip-failed")
+		assert.Equal(t, "true", skipFailedFlag.DefValue)
+	})
+
+	t.Run("ArgumentValidation", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewCmdUnflatten()
+
+		// Test that command expects exactly 2 arguments by checking Args function
+		assert.NotNil(t, cmd.Args, "Args function should be set")
+
+		// Test with correct number of args - should not error
+		err := cmd.Args(cmd, []string{"input.json", "output.json"})
+		assert.NoError(t, err)
+
+		// Test with wrong number of args - should error
+		err = cmd.Args(cmd, []string{"input.json"})
+		assert.Error(t, err)
+
+		err = cmd.Args(cmd, []string{"input.json", "output.json", "extra"})
+		assert.Error(t, err)
+
+		err = cmd.Args(cmd, []string{})
+		assert.Error(t, err)
+	})
+}
+
+func TestRunUnflattenWithEventTypeConfig_Integration(t *testing.T) {
+	t.Parallel()
+
+	// Create temporary directory for test
+	tempDir := t.TempDir()
+	inputFile := filepath.Join(tempDir, "test_input.json")
+
+	// Create test input file with different event types
+	testData := `{
+		"schemas": [
+			{
+				"uid": "test-uid-1",
+				"writeKey": "test-write-key",
+				"eventType": "track",
+				"eventIdentifier": "product_viewed",
+				"schema": {
+					"properties.product_id": "string",
+					"properties.name": "string",
+					"context.traits.email": "string"
+				},
+				"createdAt": "2024-01-10T10:08:15.407491Z",
+				"lastSeen": "2024-03-25T18:49:31.870834Z",
+				"count": 10
+			},
+			{
+				"uid": "test-uid-2",
+				"writeKey": "test-write-key",
+				"eventType": "identify",
+				"eventIdentifier": "user_identified",
+				"schema": {
+					"traits.email": "string",
+					"traits.name": "string",
+					"context.ip": "string"
+				},
+				"createdAt": "2024-01-15T12:30:00.000000Z",
+				"lastSeen": "2024-03-30T15:45:30.123456Z",
+				"count": 25
+			}
+		]
+	}`
+
+	err := os.WriteFile(inputFile, []byte(testData), 0644)
+	require.NoError(t, err)
+
+	t.Run("WithEventTypeConfig", func(t *testing.T) {
+		t.Parallel()
+
+		outputFile := filepath.Join(tempDir, "event_type_output.json")
+
+		// Create event type configuration
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track":    "$.properties",
+				"identify": "$.traits",
+			},
+		}
+
+		// Test the function
+		err := RunUnflattenWithEventTypeConfig(inputFile, outputFile, false, false, 2, eventTypeConfig, true)
+		require.NoError(t, err)
+
+		// Verify output file was created
+		assert.FileExists(t, outputFile)
+
+		// Read and verify the content
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+
+		var result models.SchemasFile
+		err = json.Unmarshal(content, &result)
+		require.NoError(t, err)
+
+		// Should have 2 schemas
+		assert.Len(t, result.Schemas, 2)
+
+		// First schema (track event) should have properties extracted
+		firstSchema := result.Schemas[0].Schema
+		assert.Contains(t, firstSchema, "product_id")
+		assert.Contains(t, firstSchema, "name")
+		assert.NotContains(t, firstSchema, "context")
+
+		// Second schema (identify event) should have traits extracted
+		secondSchema := result.Schemas[1].Schema
+		assert.Contains(t, secondSchema, "email")
+		assert.Contains(t, secondSchema, "name")
+		assert.NotContains(t, secondSchema, "context")
+	})
+
+	t.Run("WithVerboseMode", func(t *testing.T) {
+		t.Parallel()
+
+		outputFile := filepath.Join(tempDir, "verbose_output.json")
+
+		// Create simple event type configuration
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		// Test verbose mode
+		err := RunUnflattenWithEventTypeConfig(inputFile, outputFile, false, true, 2, eventTypeConfig, true)
+		require.NoError(t, err)
+
+		assert.FileExists(t, outputFile)
+	})
+
+	t.Run("DryRunMode", func(t *testing.T) {
+		t.Parallel()
+
+		outputFile := filepath.Join(tempDir, "dry_run_output.json")
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		// Test dry run mode - should not create output file
+		err := RunUnflattenWithEventTypeConfig(inputFile, outputFile, true, false, 2, eventTypeConfig, true)
+		require.NoError(t, err)
+
+		// Output file should not exist
+		assert.NoFileExists(t, outputFile)
+	})
+}
+
+func TestUnflattenSchemasWithEventTypeConfig_InMemory(t *testing.T) {
+	t.Parallel()
+
+	// Create test schemas in memory
+	schemas := []models.Schema{
+		{
+			UID:             "test-uid-1",
+			WriteKey:        "test-write-key",
+			EventType:       "track",
+			EventIdentifier: "product_viewed",
+			Schema: map[string]interface{}{
+				"properties.product_id": "string",
+				"properties.name":       "string",
+				"context.app.name":      "string",
+			},
+		},
+		{
+			UID:             "test-uid-2",
+			WriteKey:        "test-write-key",
+			EventType:       "identify",
+			EventIdentifier: "user_identified",
+			Schema: map[string]interface{}{
+				"traits.email": "string",
+				"traits.name":  "string",
+				"context.ip":   "string",
+			},
+		},
+		{
+			UID:             "test-uid-3",
+			WriteKey:        "test-write-key",
+			EventType:       "page",
+			EventIdentifier: "page_viewed",
+			Schema: map[string]interface{}{
+				"properties.url":   "string",
+				"context.referrer": "string",
+			},
+		},
+	}
+
+	t.Run("BasicProcessing", func(t *testing.T) {
+		t.Parallel()
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track":    "$.properties",
+				"identify": "$.traits",
+				"page":     "$.properties",
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		require.Len(t, result, 3)
+
+		// Track event should have properties extracted
+		trackSchema := result[0].Schema
+		assert.Contains(t, trackSchema, "product_id")
+		assert.Contains(t, trackSchema, "name")
+		assert.NotContains(t, trackSchema, "context")
+
+		// Identify event should have traits extracted
+		identifySchema := result[1].Schema
+		assert.Contains(t, identifySchema, "email")
+		assert.Contains(t, identifySchema, "name")
+		assert.NotContains(t, identifySchema, "context")
+
+		// Page event should have properties extracted
+		pageSchema := result[2].Schema
+		assert.Contains(t, pageSchema, "url")
+		assert.NotContains(t, pageSchema, "context")
+	})
+
+	t.Run("WithVerbose", func(t *testing.T) {
+		t.Parallel()
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, true)
+		require.NoError(t, err)
+		// Only track and page schemas will be processed successfully
+		// identify schema will be skipped because it has no "properties" fields (only "traits")
+		require.Len(t, result, 2)
+	})
+
+	t.Run("SkipFailedFalse", func(t *testing.T) {
+		t.Parallel()
+
+		// Create config that will fail for some schemas
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.nonexistent", // This path doesn't exist
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, false, false)
+		require.NoError(t, err)
+		require.Len(t, result, 3) // All schemas should be kept even if JSONPath fails
+	})
+
+	t.Run("SkipFailedTrue", func(t *testing.T) {
+		t.Parallel()
+
+		// Create config that will fail for track events
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.nonexistent", // This path doesn't exist
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		require.Len(t, result, 2) // Track schema should be skipped, only identify and page should remain
+	})
+
+	t.Run("EmptySchemas", func(t *testing.T) {
+		t.Parallel()
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig([]models.Schema{}, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		assert.Len(t, result, 0)
+	})
+}
+
+func TestRunUnflattenWithEventTypeConfig_ErrorCases(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	t.Run("FileNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		inputFile := filepath.Join(tempDir, "nonexistent.json")
+		outputFile := filepath.Join(tempDir, "output.json")
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		err := RunUnflattenWithEventTypeConfig(inputFile, outputFile, false, false, 2, eventTypeConfig, true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "does not exist")
+	})
+
+	t.Run("InvalidJSON", func(t *testing.T) {
+		t.Parallel()
+
+		inputFile := filepath.Join(tempDir, "invalid.json")
+		outputFile := filepath.Join(tempDir, "output.json")
+
+		// Create invalid JSON file
+		err := os.WriteFile(inputFile, []byte(`{"invalid": json}`), 0644)
+		require.NoError(t, err)
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		err = RunUnflattenWithEventTypeConfig(inputFile, outputFile, false, false, 2, eventTypeConfig, true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read input file")
+	})
+}
+
+func TestUnflattenSchemasWithEventTypeConfig_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SchemasWithEmptySchema", func(t *testing.T) {
+		t.Parallel()
+
+		schemas := []models.Schema{
+			{
+				UID:             "test-uid-1",
+				WriteKey:        "test-write-key",
+				EventType:       "track",
+				EventIdentifier: "test_event",
+				Schema:          map[string]interface{}{}, // Empty schema
+			},
+		}
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		require.Len(t, result, 0) // Should be skipped due to JSONPath failure
+	})
+
+	t.Run("UnknownEventType", func(t *testing.T) {
+		t.Parallel()
+
+		schemas := []models.Schema{
+			{
+				UID:             "test-uid-1",
+				WriteKey:        "test-write-key",
+				EventType:       "unknown",
+				EventIdentifier: "unknown_event",
+				Schema: map[string]interface{}{
+					"properties.test": "string",
+				},
+			},
+		}
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track": "$.properties",
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		require.Len(t, result, 1) // Should use default $.properties for unknown event type
+
+		// Verify it was processed with default path
+		resultSchema := result[0].Schema
+		assert.Contains(t, resultSchema, "test")
+	})
+
+	t.Run("JSONPathReturningDifferentTypes", func(t *testing.T) {
+		t.Parallel()
+
+		schemas := []models.Schema{
+			{
+				UID:             "array-test",
+				WriteKey:        "test-write-key",
+				EventType:       "track",
+				EventIdentifier: "array_event",
+				Schema: map[string]interface{}{
+					"items.0": "first",
+					"items.1": "second",
+				},
+			},
+			{
+				UID:             "primitive-test",
+				WriteKey:        "test-write-key",
+				EventType:       "identify",
+				EventIdentifier: "primitive_event",
+				Schema: map[string]interface{}{
+					"userId": "user123",
+				},
+			},
+		}
+
+		eventTypeConfig := &models.EventTypeConfig{
+			EventMappings: map[string]string{
+				"track":    "$.items",  // Will return an array
+				"identify": "$.userId", // Will return a primitive
+			},
+		}
+
+		result, err := UnflattenSchemasWithEventTypeConfig(schemas, eventTypeConfig, true, false)
+		require.NoError(t, err)
+		// Only the identify schema will be processed successfully
+		// track schema will be skipped because $.items path doesn't exist in the track schema
+		require.Len(t, result, 1)
+
+		// Primitive result should be wrapped
+		primitiveSchema := result[0].Schema
+		assert.Contains(t, primitiveSchema, "value")
+		assert.Equal(t, "user123", primitiveSchema["value"])
+	})
+}

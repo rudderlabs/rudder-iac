@@ -28,10 +28,8 @@ func NewCmdUnflatten() *cobra.Command {
 Optionally extract specific parts of the schema using JSONPath expressions.
 
 The command first unflattens all schemas (converting dot notation to nested structures),
-then applies JSONPath extraction if specified.
-
-Examples:
-  rudder-cli schema unflatten input.json output.json
+then applies JSONPath extraction if specified.`,
+		Example: `  rudder-cli schema unflatten input.json output.json
   rudder-cli schema unflatten input.json output.json --jsonpath "$.properties"
   rudder-cli schema unflatten input.json output.json --jsonpath "$.context.traits" --skip-failed=false
   rudder-cli schema unflatten input.json output.json --verbose --dry-run`,
