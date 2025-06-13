@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/schema"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/importfromsource/internal"
 	"github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -100,7 +100,7 @@ func runImportFromSource(outputDir, writeKey, configFile string, dryRun, verbose
 		fmt.Printf("📥 Step 1/3: Fetching schemas...\n")
 	}
 
-	schemas, err := schema.FetchSchemas(writeKey, verbose)
+	schemas, err := internal.FetchSchemas(writeKey, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to fetch schemas: %w", err)
 	}
@@ -114,7 +114,7 @@ func runImportFromSource(outputDir, writeKey, configFile string, dryRun, verbose
 		fmt.Printf("🔄 Step 2/3: Unflattening schemas with event-type configuration...\n")
 	}
 
-	unflattenedSchemas, err := schema.UnflattenSchemasWithEventTypeConfig(
+	unflattenedSchemas, err := internal.UnflattenSchemasWithEventTypeConfig(
 		schemas,
 		eventTypeConfig,
 		false, // skipFailed
@@ -133,7 +133,7 @@ func runImportFromSource(outputDir, writeKey, configFile string, dryRun, verbose
 		fmt.Printf("📝 Step 3/3: Converting schemas to YAML files...\n")
 	}
 
-	result, err := schema.ConvertSchemasToYAML(
+	result, err := internal.ConvertSchemasToYAML(
 		unflattenedSchemas,
 		outputDir,
 		dryRun,
