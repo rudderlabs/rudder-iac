@@ -195,6 +195,28 @@ func TestExtractCatalogEntity(t *testing.T) {
 				},
 			},
 		}, *emptyCatalog.TrackingPlans["my_first_tp"])
+
+		byt = []byte(`
+        version: rudder/0.1
+        kind: tp
+        metadata:
+          description: "This is my first tracking plan"
+        spec:
+          events:
+            - id: user_signed_up
+              name: "User Signed Up"
+              event_type: track
+              description: "Triggered when user successfully signed up"
+              categories:
+                - "User Onboarding"
+                - "Marketing Team"
+        `)
+
+		s, err = specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
+		require.Nil(t, err)
 	})
 
 	t.Run("custom types are extracted from customer defined yaml successfully", func(t *testing.T) {
