@@ -15,6 +15,55 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
+
+type MockTrackingPlanCatalog struct {
+	EmptyCatalog
+	tp   *catalog.TrackingPlan
+	tpes *catalog.TrackingPlanEventSchema
+	err  error
+}
+
+func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
+func (m *MockTrackingPlanCatalog) DeleteTrackingPlan(ctx context.Context, trackingPlanID string) error {
+	return m.err
+}
+
+func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
+	return m.err
+}
+
+func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent catalog.TrackingPlanUpsertEvent) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
+func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {
+	return m.tpes, m.err
+}
+
+func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *catalog.TrackingPlan) {
+	m.tp = tp
+}
+
+func (m *MockTrackingPlanCatalog) SetTrackingPlanEventSchema(tpes *catalog.TrackingPlanEventSchema) {
+	m.tpes = tpes
+}
+
+func (m *MockTrackingPlanCatalog) SetError(err error) {
+	m.err = err
+}
+
 func TestTrackingPlanProvider_Create(t *testing.T) {
 	t.Parallel()
 
@@ -466,40 +515,6 @@ func TestTrackingPlanProvider_Delete(t *testing.T) {
 
 	err := provider.Delete(ctx, "tracking-plan-id", resources.ResourceData{"id": "upstream-tracking-plan-id"})
 	require.Nil(t, err)
-}
-
-type MockTrackingPlanCatalog struct {
-	EmptyCatalog
-	tp  *catalog.TrackingPlan
-	err error
-}
-
-func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
-	return m.tp, m.err
-}
-
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
-	return m.tp, m.err
-}
-
-func (m *MockTrackingPlanCatalog) DeleteTrackingPlan(ctx context.Context, trackingPlanID string) error {
-	return m.err
-}
-
-func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
-	return m.err
-}
-
-func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID string, trackingPlanUpsertEvent catalog.TrackingPlanUpsertEvent) (*catalog.TrackingPlan, error) {
-	return m.tp, m.err
-}
-
-func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *catalog.TrackingPlan) {
-	m.tp = tp
-}
-
-func (m *MockTrackingPlanCatalog) SetError(err error) {
-	m.err = err
 }
 
 func getTrackingPlanArgs() *state.TrackingPlanArgs {

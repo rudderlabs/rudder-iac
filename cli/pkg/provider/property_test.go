@@ -36,6 +36,10 @@ func (m *MockPropertyCatalog) SetProperty(property *catalog.Property) {
 	m.property = property
 }
 
+func (m *MockPropertyCatalog) GetProperty(ctx context.Context, id string) (*catalog.Property, error) {
+	return m.property, m.err
+}
+
 func (m *MockPropertyCatalog) SetError(err error) {
 	m.err = err
 }

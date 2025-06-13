@@ -30,6 +30,7 @@ type EventStore interface {
 	CreateEvent(ctx context.Context, input EventCreate) (*Event, error)
 	UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
+	GetEvent(ctx context.Context, id string) (*Event, error)
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
@@ -69,6 +70,20 @@ func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *E
 	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("catalog/events/%s", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
+	}
+
+	var event Event
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&event); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &event, nil
+}
+
+func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/events/%s", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("sending get request: %w", err)
 	}
 
 	var event Event

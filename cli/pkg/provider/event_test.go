@@ -42,6 +42,10 @@ func (m *MockEventCatalog) DeleteEvent(ctx context.Context, eventID string) erro
 	return m.err
 }
 
+func (m *MockEventCatalog) GetEvent(ctx context.Context, id string) (*catalog.Event, error) {
+	return m.mockEvent, m.err
+}
+
 func TestEventProviderOperations(t *testing.T) {
 
 	var (

@@ -43,6 +43,7 @@ type CustomTypeStore interface {
 	CreateCustomType(ctx context.Context, input CustomTypeCreate) (*CustomType, error)
 	UpdateCustomType(ctx context.Context, id string, input *CustomType) (*CustomType, error)
 	DeleteCustomType(ctx context.Context, id string) error
+	GetCustomType(ctx context.Context, id string) (*CustomType, error)
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
@@ -84,6 +85,20 @@ func (c *RudderDataCatalog) CreateCustomType(ctx context.Context, input CustomTy
 	}
 
 	customType := CustomType{} // Create a holder for response object
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&customType); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &customType, nil
+}
+
+func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*CustomType, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/custom-types/%s", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("sending get request: %w", err)
+	}
+
+	var customType CustomType
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&customType); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
