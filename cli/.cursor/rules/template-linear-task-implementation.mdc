@@ -6,19 +6,26 @@ alwaysApply: false
 Linear Ticket: DAW-<number>
 
 ## Requirements
-Based on the requirements in the ticket along with refinement with user
+Parse the linear ticket and along with refinement with the user, come up with detailed set of the requirements for the ticket.
 
 ## Solution
-Though through and refined solution which is properly discussed with user
+Thought through and refined solution which is properly discussed with user would result in a detailed list of the microtasks which needs to be done in order to complete the ticket. The microtasks identified as part of this step needs to be added to the `Progress` as form of checklist of the changes. All the necessary microtasks **MUST** be identified.
+
+## Progress
+A checklist of the state of the changes identified to be implemented which needs to be regularly updated as and when they are handled. The microtasks in this section needs to be concise and clear and granular enough that they are not ambiguous.
+
+For example: To add a new entity in the repository
+<microtasks>
+- [] Define a new repository named `UserRepository`
+- [] Create a `NewUserRepository` function which takes in the config of persistence.
+- [] Create a function named `GetUser` on the user repository with the signature `func GetUser(id string) (*User, error)`
+- [] Write a test case TestUser(t *testing.T) {} which checks if the user is available
+</microtasks>
+
+All microtasks **MUST** be completed before we can mark this ticket as done.
 
 ## Acceptance Criteria
 A checklist of points which completed would mean the requirements are met
-
-## Testing
-The Testing strategy employed for the change
-
-## Progress
-A checklist of the state of the changes identified to be implemented which needs to be regularly updated as and when they are handled. They should be added in clear and concise way
 
 ## Miscellaneous
 Any miscellaneous points recorded during the implementation of the ticket
