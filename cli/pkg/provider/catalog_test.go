@@ -23,6 +23,10 @@ func (m *EmptyCatalog) DeleteEvent(ctx context.Context, eventID string) error {
 	return nil
 }
 
+func (m *EmptyCatalog) GetEvent(ctx context.Context, id string) (*catalog.Event, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate catalog.PropertyCreate) (*catalog.Property, error) {
 
 	return nil, nil
@@ -34,6 +38,10 @@ func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUp
 
 func (m *EmptyCatalog) DeleteProperty(ctx context.Context, propertyID string) error {
 	return nil
+}
+
+func (m *EmptyCatalog) GetProperty(ctx context.Context, id string) (*catalog.Property, error) {
+	return nil, nil
 }
 
 func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
@@ -56,11 +64,23 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) CreateCustomType(ctx context.Context, customTypeCreate catalog.CustomTypeCreate) (*catalog.CustomType, error) {
 	return nil, nil
 }
 
 func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomType) (*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCustomType(ctx context.Context, id string) (*catalog.CustomType, error) {
 	return nil, nil
 }
 

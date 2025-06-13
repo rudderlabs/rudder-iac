@@ -84,7 +84,6 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 
 	resourceData := tpState.ToResourceData()
 	return &resourceData, nil
-
 }
 
 func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {

@@ -32,6 +32,7 @@ type PropertyStore interface {
 	CreateProperty(ctx context.Context, input PropertyCreate) (*Property, error)
 	UpdateProperty(ctx context.Context, id string, input *Property) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
+	GetProperty(ctx context.Context, id string) (*Property, error)
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {
@@ -73,6 +74,20 @@ func (c *RudderDataCatalog) CreateProperty(ctx context.Context, input PropertyCr
 	}
 
 	property := Property{} // Create a holder for response object
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&property); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &property, nil
+}
+
+func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Property, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/properties/%s", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("sending get request: %w", err)
+	}
+
+	var property Property
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&property); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
