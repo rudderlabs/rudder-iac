@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -353,6 +354,135 @@ func Test_IsNumber(t *testing.T) {
 
 			result := isNumber(tc.input)
 			assert.Equal(t, tc.expected, result, "isNumber(%v) should return %v", tc.input, tc.expected)
+		})
+	}
+}
+
+func TestPropertyNameWhitespaceValidation(t *testing.T) {
+	validator := &RequiredKeysValidator{}
+
+	testCases := []struct {
+		name           string
+		properties     map[catalog.EntityGroup][]catalog.Property
+		expectedErrors int
+		errorContains  string
+	}{
+		{
+			name: "valid property name without whitespace",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "valid-prop",
+						Name:        "Valid Property Name",
+						Description: "A valid property name",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "property name with leading whitespace",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "leading-space-prop",
+						Name:        " Property With Leading Space",
+						Description: "Property with leading whitespace",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "property name cannot have leading or trailing whitespace characters",
+		},
+		{
+			name: "property name with trailing whitespace",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "trailing-space-prop",
+						Name:        "Property With Trailing Space ",
+						Description: "Property with trailing whitespace",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "property name cannot have leading or trailing whitespace characters",
+		},
+		{
+			name: "property name with both leading and trailing whitespace",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "both-space-prop",
+						Name:        " Property With Both Spaces ",
+						Description: "Property with both leading and trailing whitespace",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "property name cannot have leading or trailing whitespace characters",
+		},
+		{
+			name: "property name with internal spaces (should be valid)",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "internal-space-prop",
+						Name:        "Property With Internal Spaces",
+						Description: "Property with internal spaces which should be allowed",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "empty property name should trigger mandatory field error, not whitespace error",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID:     "empty-name-prop",
+						Name:        "",
+						Description: "Property with empty name",
+						Type:        "string",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "id, name and type fields on property are mandatory",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a minimal data catalog with just the properties
+			dc := &catalog.DataCatalog{
+				Properties: tc.properties,
+			}
+
+			// Validate
+			errors := validator.Validate(dc)
+
+			// Check results
+			if tc.expectedErrors == 0 {
+				assert.Empty(t, errors, "Expected no validation errors")
+			} else {
+				assert.Len(t, errors, tc.expectedErrors, "Expected %d validation errors, got %d", tc.expectedErrors, len(errors))
+				if tc.errorContains != "" {
+					found := false
+					for _, err := range errors {
+						if strings.Contains(err.Error(), tc.errorContains) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Expected to find error containing '%s' in errors: %v", tc.errorContains, errors)
+				}
+			}
 		})
 	}
 }
