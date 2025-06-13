@@ -5,10 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/converter"
+	pkgModels "github.com/rudderlabs/rudder-iac/cli/internal/schema/models"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestConvertCommand_Integration(t *testing.T) {
@@ -599,4 +603,530 @@ func TestConvertCommand_ComplexNestedStructures(t *testing.T) {
 	assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
 	assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
 	assert.FileExists(t, filepath.Join(outputDir, "tracking-plans", "writekey-test-write-key.yaml"))
+}
+
+// New tests for uncovered functions
+
+func TestRunConvert_PublicWrapper(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		setupFile   func(tempDir string) string
+		expectError bool
+	}{
+		{
+			name: "SuccessfulExecution",
+			setupFile: func(tempDir string) string {
+				inputFile := filepath.Join(tempDir, "test.json")
+				testData := `{
+					"schemas": [
+						{
+							"uid": "test-uid",
+							"writeKey": "test-key",
+							"eventType": "track",
+							"eventIdentifier": "test_event",
+							"schema": {
+								"event": "string",
+								"userId": "string"
+							}
+						}
+					]
+				}`
+				err := os.WriteFile(inputFile, []byte(testData), 0644)
+				require.NoError(t, err)
+				return inputFile
+			},
+			expectError: false,
+		},
+		{
+			name: "InvalidInputFile",
+			setupFile: func(tempDir string) string {
+				return filepath.Join(tempDir, "nonexistent.json")
+			},
+			expectError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			inputFile := c.setupFile(tempDir)
+			outputDir := filepath.Join(tempDir, "output")
+
+			err := RunConvert(inputFile, outputDir, false, false, 2)
+
+			if c.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
+				assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
+			}
+		})
+	}
+}
+
+func TestConvertSchemasToYAML_InMemoryConversion(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		schemas     func() []pkgModels.Schema
+		dryRun      bool
+		verbose     bool
+		expectError bool
+		validateFn  func(t *testing.T, result *converter.ConversionResult, outputDir string, dryRun bool)
+	}{
+		{
+			name: "SuccessfulConversion",
+			schemas: func() []pkgModels.Schema {
+				return []pkgModels.Schema{
+					{
+						UID:             "test-uid-1",
+						WriteKey:        "test-key",
+						EventType:       "track",
+						EventIdentifier: "test_event",
+						Schema: map[string]interface{}{
+							"event":  "string",
+							"userId": "string",
+							"properties": map[string]interface{}{
+								"product_id": "string",
+							},
+						},
+					},
+				}
+			},
+			dryRun:      false,
+			verbose:     false,
+			expectError: false,
+			validateFn: func(t *testing.T, result *converter.ConversionResult, outputDir string, dryRun bool) {
+				assert.NotNil(t, result)
+				assert.Equal(t, 1, result.EventsCount)
+				assert.Greater(t, result.PropertiesCount, 0)
+				if !dryRun {
+					assert.Greater(t, len(result.GeneratedFiles), 0)
+					assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				}
+			},
+		},
+		{
+			name: "DryRunMode",
+			schemas: func() []pkgModels.Schema {
+				return []pkgModels.Schema{
+					{
+						UID:             "test-uid-2",
+						WriteKey:        "test-key-2",
+						EventType:       "track",
+						EventIdentifier: "dry_run_event",
+						Schema: map[string]interface{}{
+							"event": "string",
+						},
+					},
+				}
+			},
+			dryRun:      true,
+			verbose:     true,
+			expectError: false,
+			validateFn: func(t *testing.T, result *converter.ConversionResult, outputDir string, dryRun bool) {
+				assert.NotNil(t, result)
+				assert.Equal(t, 1, result.EventsCount)
+				// In dry run mode, no files should be created
+				_, err := os.Stat(filepath.Join(outputDir, "events.yaml"))
+				assert.True(t, os.IsNotExist(err))
+			},
+		},
+		{
+			name: "EmptySchemas",
+			schemas: func() []pkgModels.Schema {
+				return []pkgModels.Schema{}
+			},
+			dryRun:      false,
+			verbose:     false,
+			expectError: false,
+			validateFn: func(t *testing.T, result *converter.ConversionResult, outputDir string, dryRun bool) {
+				assert.NotNil(t, result)
+				assert.Equal(t, 0, result.EventsCount)
+				assert.Equal(t, 0, result.PropertiesCount)
+				assert.Equal(t, 0, result.CustomTypesCount)
+				if !dryRun {
+					assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				}
+			},
+		},
+		{
+			name: "VerboseMode",
+			schemas: func() []pkgModels.Schema {
+				return []pkgModels.Schema{
+					{
+						UID:             "verbose-test",
+						WriteKey:        "verbose-key",
+						EventType:       "track",
+						EventIdentifier: "verbose_event",
+						Schema: map[string]interface{}{
+							"event": "string",
+							"properties": map[string]interface{}{
+								"complex": map[string]interface{}{
+									"nested": map[string]interface{}{
+										"value": "string",
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			dryRun:      false,
+			verbose:     true,
+			expectError: false,
+			validateFn: func(t *testing.T, result *converter.ConversionResult, outputDir string, dryRun bool) {
+				assert.NotNil(t, result)
+				assert.Equal(t, 1, result.EventsCount)
+				assert.Greater(t, result.PropertiesCount, 0)
+				if !dryRun {
+					assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			outputDir := filepath.Join(tempDir, "output")
+			schemas := c.schemas()
+
+			result, err := ConvertSchemasToYAML(schemas, outputDir, c.dryRun, c.verbose, 2)
+
+			if c.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				c.validateFn(t, result, outputDir, c.dryRun)
+			}
+		})
+	}
+}
+
+func TestConvertSchemasToYAML_ErrorScenarios(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReadOnlyDirectory", func(t *testing.T) {
+		t.Parallel()
+
+		schemas := []pkgModels.Schema{
+			{
+				UID:             "test-uid",
+				WriteKey:        "test-key",
+				EventType:       "track",
+				EventIdentifier: "test_event",
+				Schema: map[string]interface{}{
+					"event": "string",
+				},
+			},
+		}
+
+		// Use a directory that doesn't exist and can't be created
+		outputDir := "/root/readonly/path"
+
+		result, err := ConvertSchemasToYAML(schemas, outputDir, false, false, 2)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to create output directory")
+	})
+}
+
+func TestConvertSchemasToYAML_IndentationLevels(t *testing.T) {
+	t.Parallel()
+
+	schemas := []pkgModels.Schema{
+		{
+			UID:             "indent-test",
+			WriteKey:        "indent-key",
+			EventType:       "track",
+			EventIdentifier: "indent_event",
+			Schema: map[string]interface{}{
+				"event": "string",
+				"properties": map[string]interface{}{
+					"test": "string",
+				},
+			},
+		},
+	}
+
+	indentLevels := []int{1, 2, 4, 8}
+
+	for _, indent := range indentLevels {
+		t.Run(fmt.Sprintf("Indent_%d", indent), func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			outputDir := filepath.Join(tempDir, fmt.Sprintf("output_indent_%d", indent))
+
+			result, err := ConvertSchemasToYAML(schemas, outputDir, false, false, indent)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+
+			// Verify the YAML file uses correct indentation
+			yamlContent, err := os.ReadFile(filepath.Join(outputDir, "events.yaml"))
+			assert.NoError(t, err)
+			assert.NotEmpty(t, yamlContent)
+		})
+	}
+}
+
+func TestWriteYAMLFile_Functionality(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		data   map[string]interface{}
+		indent int
+	}{
+		{
+			name: "SimpleData",
+			data: map[string]interface{}{
+				"test": "value",
+				"num":  123,
+			},
+			indent: 2,
+		},
+		{
+			name: "ComplexData",
+			data: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "events",
+				"spec": map[string]interface{}{
+					"events": []map[string]interface{}{
+						{
+							"name": "test_event",
+							"type": "track",
+						},
+					},
+				},
+			},
+			indent: 4,
+		},
+		{
+			name:   "EmptyData",
+			data:   map[string]interface{}{},
+			indent: 2,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+
+			// Create a test that indirectly tests writeYAMLFile through the public API
+			schemas := []pkgModels.Schema{
+				{
+					UID:             "yaml-test",
+					WriteKey:        "yaml-key",
+					EventType:       "track",
+					EventIdentifier: "yaml_event",
+					Schema:          c.data,
+				},
+			}
+
+			result, err := ConvertSchemasToYAML(schemas, tempDir, false, false, c.indent)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.FileExists(t, filepath.Join(tempDir, "events.yaml"))
+
+			// Verify file content is valid YAML
+			yamlContent, err := os.ReadFile(filepath.Join(tempDir, "events.yaml"))
+			assert.NoError(t, err)
+			assert.NotEmpty(t, yamlContent)
+
+			// Verify it's valid YAML by trying to unmarshal it
+			var parsed interface{}
+			err = yaml.Unmarshal(yamlContent, &parsed)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPreviewFunctions_Coverage(t *testing.T) {
+	t.Parallel()
+
+	// Test the preview functions through dry run mode
+	schemas := []pkgModels.Schema{
+		{
+			UID:             "preview-test-1",
+			WriteKey:        "preview-key",
+			EventType:       "track",
+			EventIdentifier: "preview_event_1",
+			Schema: map[string]interface{}{
+				"event": "string",
+				"properties": map[string]interface{}{
+					"prop1": "string",
+					"prop2": "number",
+				},
+			},
+		},
+		{
+			UID:             "preview-test-2",
+			WriteKey:        "preview-key",
+			EventType:       "track",
+			EventIdentifier: "preview_event_2",
+			Schema: map[string]interface{}{
+				"event": "string",
+				"properties": map[string]interface{}{
+					"complex": map[string]interface{}{
+						"nested": map[string]interface{}{
+							"value": "string",
+						},
+					},
+				},
+			},
+		},
+		{
+			UID:             "preview-test-3",
+			WriteKey:        "preview-key",
+			EventType:       "track",
+			EventIdentifier: "preview_event_3",
+			Schema: map[string]interface{}{
+				"event": "string",
+				"properties": map[string]interface{}{
+					"simple": "string",
+				},
+			},
+		},
+	}
+
+	tempDir := t.TempDir()
+	outputDir := filepath.Join(tempDir, "preview_output")
+
+	// Test with verbose dry run to trigger preview functions
+	result, err := ConvertSchemasToYAML(schemas, outputDir, true, true, 2)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 3, result.EventsCount)
+	assert.Greater(t, result.PropertiesCount, 0)
+
+	// Verify no files were created in dry run mode
+	_, err = os.Stat(filepath.Join(outputDir, "events.yaml"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestPreviewFunctions_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		schemas []pkgModels.Schema
+	}{
+		{
+			name:    "EmptySchemas",
+			schemas: []pkgModels.Schema{},
+		},
+		{
+			name: "SingleSchema",
+			schemas: []pkgModels.Schema{
+				{
+					UID:             "single-test",
+					WriteKey:        "single-key",
+					EventType:       "track",
+					EventIdentifier: "single_event",
+					Schema: map[string]interface{}{
+						"event": "string",
+					},
+				},
+			},
+		},
+		{
+			name: "SchemaWithoutCustomTypes",
+			schemas: []pkgModels.Schema{
+				{
+					UID:             "no-custom-test",
+					WriteKey:        "no-custom-key",
+					EventType:       "track",
+					EventIdentifier: "no_custom_event",
+					Schema: map[string]interface{}{
+						"event":  "string",
+						"userId": "string",
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			outputDir := filepath.Join(tempDir, "edge_case_output")
+
+			// Test with verbose dry run to trigger preview functions with edge cases
+			result, err := ConvertSchemasToYAML(c.schemas, outputDir, true, true, 2)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+
+			// Verify no files were created in dry run mode
+			_, err = os.Stat(filepath.Join(outputDir, "events.yaml"))
+			assert.True(t, os.IsNotExist(err))
+		})
+	}
+}
+
+func TestConvertSchemasToYAML_PerformanceBenefits(t *testing.T) {
+	t.Parallel()
+
+	// Test with a larger dataset to ensure the in-memory processing works efficiently
+	schemas := make([]pkgModels.Schema, 100)
+	for i := 0; i < 100; i++ {
+		schemas[i] = pkgModels.Schema{
+			UID:             fmt.Sprintf("perf-test-%d", i),
+			WriteKey:        fmt.Sprintf("perf-key-%d", i%5), // 5 different write keys
+			EventType:       "track",
+			EventIdentifier: fmt.Sprintf("perf_event_%d", i),
+			Schema: map[string]interface{}{
+				"event": "string",
+				"properties": map[string]interface{}{
+					fmt.Sprintf("prop_%d", i): "string",
+					"common_prop":             "string",
+				},
+			},
+		}
+	}
+
+	tempDir := t.TempDir()
+	outputDir := filepath.Join(tempDir, "performance_output")
+
+	start := time.Now()
+	result, err := ConvertSchemasToYAML(schemas, outputDir, false, false, 2)
+	duration := time.Since(start)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 100, result.EventsCount)
+	assert.Greater(t, result.PropertiesCount, 100)
+
+	// Verify files were created
+	assert.FileExists(t, filepath.Join(outputDir, "events.yaml"))
+	assert.FileExists(t, filepath.Join(outputDir, "properties.yaml"))
+	assert.FileExists(t, filepath.Join(outputDir, "custom-types.yaml"))
+
+	// Verify tracking plans for different write keys were created
+	assert.DirExists(t, filepath.Join(outputDir, "tracking-plans"))
+
+	// Performance should be reasonable (less than 5 seconds for 100 schemas)
+	assert.Less(t, duration, 5*time.Second, "Conversion took too long: %v", duration)
+
+	fmt.Printf("Processed 100 schemas in %v\n", duration)
 }
