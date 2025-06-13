@@ -33,3 +33,12 @@ func IsCatalogNotFoundError(err error) bool {
 	}
 	return apiErr.HTTPStatusCode == 400 && strings.Contains(apiErr.Message, "not found")
 }
+
+func IsCatalogAlreadyExistsError(err error) bool {
+	var apiErr *client.APIError
+
+	if ok := errors.As(err, &apiErr); !ok {
+		return false
+	}
+	return apiErr.HTTPStatusCode == 400 && strings.Contains(apiErr.Message, "already exists")
+}
