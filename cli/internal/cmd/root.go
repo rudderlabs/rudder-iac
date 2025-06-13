@@ -52,7 +52,6 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(schema.NewCmdSchema())
-	rootCmd.AddCommand(NewCmdImportFromSource())
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 }
