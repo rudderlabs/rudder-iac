@@ -58,7 +58,7 @@ func (sa *SchemaAnalyzer) extractEvent(schema models.Schema) {
 		return // Event already processed
 	}
 
-	eventName := generateEventName(eventIdentifier)
+	eventName := eventIdentifier // Use the original eventIdentifier as the event name
 
 	event := &EventInfo{
 		ID:          eventID,

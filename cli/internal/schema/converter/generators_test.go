@@ -156,6 +156,137 @@ func TestGenerators(t *testing.T) {
 			},
 		},
 		{
+			category: "PropertyReferenceSorting",
+			name:     "CustomTypePropertyReferencesSorted",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				testSchemas := []models.Schema{
+					{
+						UID: "test-uid", WriteKey: "test-write-key", EventType: "track", EventIdentifier: "test_event",
+						Schema: map[string]interface{}{
+							"properties": map[string]interface{}{
+								"user_profile": map[string]interface{}{
+									"zebra_field": "string",
+									"alpha_field": "string",
+									"beta_field":  "string",
+								},
+								"metadata": map[string]interface{}{
+									"gamma_prop": "number",
+									"delta_prop": "boolean",
+								},
+							},
+						},
+					},
+				}
+
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+
+				customTypesYAML := analyzer.GenerateCustomTypesYAML()
+				require.NotNil(t, customTypesYAML)
+
+				// Find any custom type that has property references
+				var foundSortedRefs bool
+				for i := range customTypesYAML.Spec.Types {
+					customType := &customTypesYAML.Spec.Types[i]
+					if customType.Type == "object" && len(customType.Properties) > 1 {
+						refs := customType.Properties
+
+						// Verify that property references are sorted alphabetically by Ref
+						for j := 1; j < len(refs); j++ {
+							assert.True(t, refs[j-1].Ref < refs[j].Ref,
+								"Property references should be sorted alphabetically: %s should come before %s",
+								refs[j-1].Ref, refs[j].Ref)
+						}
+						foundSortedRefs = true
+						break
+					}
+				}
+
+				// If no custom types with multiple properties were found, that's okay for this test
+				// The important thing is that when they exist, they are sorted
+				if !foundSortedRefs {
+					t.Log("No custom types with multiple property references found - test passed trivially")
+				}
+			},
+		},
+		{
+			category: "PropertyReferenceSorting",
+			name:     "EventRulePropertyReferencesSorted",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				testSchemas := []models.Schema{
+					{
+						UID: "test-uid", WriteKey: "test-write-key", EventType: "track", EventIdentifier: "test_event",
+						Schema: map[string]interface{}{
+							"properties": map[string]interface{}{
+								"zebra_prop": "string",
+								"alpha_prop": "string",
+								"beta_prop":  "number",
+								"gamma_prop": "boolean",
+							},
+						},
+					},
+				}
+
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+
+				properties := analyzer.extractPropertiesForSchema(testSchemas[0])
+				require.True(t, len(properties) > 1, "Should have multiple property references to test sorting")
+
+				// Verify that property references are sorted alphabetically by Ref
+				for i := 1; i < len(properties); i++ {
+					assert.True(t, properties[i-1].Ref < properties[i].Ref,
+						"Property references should be sorted alphabetically: %s should come before %s",
+						properties[i-1].Ref, properties[i].Ref)
+				}
+			},
+		},
+		{
+			category: "PropertyReferenceSorting",
+			name:     "TrackingPlanPropertyReferencesSorted",
+			validate: func(t *testing.T) {
+				analyzer := NewSchemaAnalyzer()
+				testSchemas := []models.Schema{
+					{
+						UID: "test-uid", WriteKey: "test-write-key", EventType: "track", EventIdentifier: "test_event",
+						Schema: map[string]interface{}{
+							"properties": map[string]interface{}{
+								"zebra_field": "string",
+								"alpha_field": "string",
+								"beta_field":  "number",
+							},
+						},
+					},
+				}
+
+				err := analyzer.AnalyzeSchemas(testSchemas)
+				require.NoError(t, err)
+
+				trackingPlansYAML := analyzer.GenerateTrackingPlansYAML(testSchemas)
+				require.NotEmpty(t, trackingPlansYAML, "Should generate tracking plans")
+
+				// Check the first tracking plan
+				for _, trackingPlan := range trackingPlansYAML {
+					require.NotEmpty(t, trackingPlan.Spec.Rules, "Should have rules")
+
+					rule := trackingPlan.Spec.Rules[0]
+					properties := rule.Properties
+
+					if len(properties) > 1 {
+						// Verify that property references are sorted alphabetically by Ref
+						for i := 1; i < len(properties); i++ {
+							assert.True(t, properties[i-1].Ref < properties[i].Ref,
+								"Property references in tracking plan should be sorted alphabetically: %s should come before %s",
+								properties[i-1].Ref, properties[i].Ref)
+						}
+					}
+					break // Test first tracking plan only
+				}
+			},
+		},
+		{
 			category: "Utilities",
 			name:     "FindEventIDForSchema",
 			validate: func(t *testing.T) {

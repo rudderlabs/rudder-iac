@@ -128,13 +128,19 @@ func (sa *SchemaAnalyzer) GenerateCustomTypesYAML() *yamlModels.CustomTypesYAML 
 				}
 			}
 
+			// Sort property references alphabetically by Ref
 			if len(propertyRefs) > 0 {
+				sort.Slice(propertyRefs, func(i, j int) bool {
+					return propertyRefs[i].Ref < propertyRefs[j].Ref
+				})
 				customType.Properties = propertyRefs
 			}
 		}
 
 		customTypes = append(customTypes, customType)
 	}
+
+	// No post-processing needed since custom types now have deterministic IDs based on content
 
 	return &yamlModels.CustomTypesYAML{
 		Version: "rudder/v0.1",
@@ -145,6 +151,118 @@ func (sa *SchemaAnalyzer) GenerateCustomTypesYAML() *yamlModels.CustomTypesYAML 
 		Spec: yamlModels.CustomTypesSpec{
 			Types: customTypes,
 		},
+	}
+}
+
+// deduplicateCustomTypes removes duplicates based on final YAML structure
+func (sa *SchemaAnalyzer) deduplicateCustomTypes(customTypes []yamlModels.CustomTypeDefinition) ([]yamlModels.CustomTypeDefinition, map[string]string) {
+	seen := make(map[string]yamlModels.CustomTypeDefinition)
+	remappingTable := make(map[string]string) // maps removed ID -> kept ID
+	var result []yamlModels.CustomTypeDefinition
+
+	for _, customType := range customTypes {
+		// Generate signature based on type and content
+		var signature string
+		if customType.Type == "array" {
+			// For arrays, use type + itemTypes
+			itemTypes := ""
+			if customType.Config != nil && len(customType.Config.ItemTypes) > 0 {
+				sortedItemTypes := make([]string, len(customType.Config.ItemTypes))
+				copy(sortedItemTypes, customType.Config.ItemTypes)
+				sort.Strings(sortedItemTypes)
+				itemTypes = strings.Join(sortedItemTypes, "|")
+			}
+			signature = fmt.Sprintf("array:%s", itemTypes)
+		} else {
+			// For objects, use type + properties
+			var propertyRefs []string
+			for _, prop := range customType.Properties {
+				propertyRefs = append(propertyRefs, fmt.Sprintf("%s:%t", prop.Ref, prop.Required))
+			}
+			sort.Strings(propertyRefs)
+			signature = fmt.Sprintf("object:%s", strings.Join(propertyRefs, "|"))
+		}
+
+		// Check if we've seen this signature before
+		if existing, exists := seen[signature]; exists {
+			// Keep the one with shorter/simpler name or ID (preference for existing)
+			if len(customType.Name) < len(existing.Name) ||
+				(len(customType.Name) == len(existing.Name) && customType.ID < existing.ID) {
+				// customType becomes the kept one, existing becomes the removed one
+				remappingTable[existing.ID] = customType.ID
+				seen[signature] = customType
+			} else {
+				// existing stays as the kept one, customType becomes the removed one
+				remappingTable[customType.ID] = existing.ID
+			}
+		} else {
+			seen[signature] = customType
+		}
+	}
+
+	// Convert back to slice, maintaining sorted order
+	var signatures []string
+	for sig := range seen {
+		signatures = append(signatures, sig)
+	}
+	sort.Strings(signatures)
+
+	for _, sig := range signatures {
+		result = append(result, seen[sig])
+	}
+
+	// Debug: Check if any custom types were removed without being in remapping table
+	originalIDs := make(map[string]bool)
+	for _, ct := range customTypes {
+		originalIDs[ct.ID] = true
+	}
+
+	resultIDs := make(map[string]bool)
+	for _, ct := range result {
+		resultIDs[ct.ID] = true
+	}
+
+	fmt.Printf("DEDUPLICATION ANALYSIS:\n")
+	fmt.Printf("Original count: %d, Final count: %d\n", len(customTypes), len(result))
+
+	for originalID := range originalIDs {
+		if !resultIDs[originalID] && remappingTable[originalID] == "" {
+			fmt.Printf("WARNING: Custom type %s was removed without mapping!\n", originalID)
+		}
+	}
+
+	return result, remappingTable
+}
+
+// updatePropertyReferences updates property references to use correct custom type IDs after deduplication
+func (sa *SchemaAnalyzer) updatePropertyReferences(remappingTable map[string]string) {
+	updateCount := 0
+
+	// Update all property type references that point to removed custom types
+	for propertyKey, property := range sa.Properties {
+		// Check if this property has a custom type reference that needs to be updated
+		if strings.Contains(property.Type, "#/custom-types/extracted_custom_types/") {
+			// Extract the custom type ID from the reference
+			for removedID, newID := range remappingTable {
+				oldRef := fmt.Sprintf("#/custom-types/extracted_custom_types/%s", removedID)
+				newRef := fmt.Sprintf("#/custom-types/extracted_custom_types/%s", newID)
+
+				// Update the property type reference if it matches
+				if property.Type == oldRef {
+					fmt.Printf("Updating property %s: %s → %s\n", propertyKey, oldRef, newRef)
+					property.Type = newRef
+					updateCount++
+					break
+				}
+			}
+		}
+	}
+
+	fmt.Printf("Updated %d property references\n", updateCount)
+
+	// Also need to update the CustomTypes map itself to remove the duplicated entries
+	for removedID := range remappingTable {
+		delete(sa.CustomTypes, removedID)
 	}
 }
 
@@ -239,6 +357,11 @@ func (sa *SchemaAnalyzer) extractPropertiesForSchema(schema internalModels.Schem
 			properties = append(properties, propertyRef)
 		}
 	}
+
+	// Sort property references alphabetically by Ref
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].Ref < properties[j].Ref
+	})
 
 	return properties
 }

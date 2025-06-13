@@ -20,23 +20,26 @@ func NewCustomTypeFactory() *CustomTypeFactory {
 
 // createCustomTypeInternal handles common custom type creation logic
 func (ctf *CustomTypeFactory) createCustomTypeInternal(analyzer *SchemaAnalyzer, path, baseType string, structure map[string]string, arrayItemType string) (*CustomTypeInfo, error) {
-	// Generate hash for uniqueness
-	var hash string
-	if baseType == "array" {
-		hash = ctf.stringUtils.generateHash(arrayItemType, "array")
-	} else {
-		hash = ctf.generateStructureHash(structure)
+	// Create a temporary custom type to generate the uniqueness signature
+	tempCustomType := &CustomTypeInfo{
+		Type:          baseType,
+		Structure:     structure,
+		ArrayItemType: arrayItemType,
 	}
 
-	// Check if custom type already exists
+	// Generate uniqueness signature based on YAML output structure
+	uniquenessSignature := ctf.generateUniquenessSignature(analyzer, tempCustomType)
+
+	// Check if custom type with same uniqueness signature already exists
 	for _, customType := range analyzer.CustomTypes {
-		if customType.Hash == hash && customType.Type == baseType {
+		existingSignature := ctf.generateUniquenessSignature(analyzer, customType)
+		if existingSignature == uniquenessSignature {
 			return customType, nil
 		}
 	}
 
-	// Create new custom type with unique name
-	customTypeID := ctf.generateCustomTypeID(path, baseType, hash)
+	// Generate custom type ID based on uniqueness signature for consistent deduplication
+	customTypeID := ctf.generateCustomTypeIDFromSignature(uniquenessSignature)
 	customTypeName := ctf.generateUniqueCustomTypeName(analyzer, path, baseType)
 
 	customType := &CustomTypeInfo{
@@ -46,7 +49,7 @@ func (ctf *CustomTypeFactory) createCustomTypeInternal(analyzer *SchemaAnalyzer,
 		Description:   fmt.Sprintf("Custom %s type for %s", baseType, path),
 		Structure:     structure,
 		ArrayItemType: arrayItemType,
-		Hash:          hash,
+		Hash:          customTypeID, // Use the ID as the hash for backward compatibility
 	}
 
 	analyzer.CustomTypes[customTypeID] = customType
@@ -74,6 +77,21 @@ func (ctf *CustomTypeFactory) generateStructureHash(structure map[string]string)
 func (ctf *CustomTypeFactory) generateCustomTypeID(path, baseType, hash string) string {
 	cleanPath := ctf.stringUtils.sanitize(path, SanitizationModeBasic)
 	return fmt.Sprintf("%s_%s_%s", cleanPath, baseType, hash)
+}
+
+// generateCustomTypeIDFromSignature creates consistent custom type IDs based on uniqueness signature
+func (ctf *CustomTypeFactory) generateCustomTypeIDFromSignature(signature string) string {
+	// Generate a hash from the signature to create a deterministic ID
+	signatureHash := ctf.stringUtils.generateHash(signature, "")
+
+	// Extract type from signature
+	parts := strings.SplitN(signature, ":", 2)
+	if len(parts) < 2 {
+		return fmt.Sprintf("unknown_type_%s", signatureHash)
+	}
+
+	baseType := parts[0]
+	return fmt.Sprintf("%s_type_%s", baseType, signatureHash)
 }
 
 // generateUniqueCustomTypeName creates unique custom type names
@@ -146,4 +164,56 @@ func (ctf *CustomTypeFactory) generateCustomTypeName(path, baseType string) stri
 	}
 
 	return typeName
+}
+
+// generateUniquenessSignature creates a signature for uniqueness based on structure content
+func (ctf *CustomTypeFactory) generateUniquenessSignature(analyzer *SchemaAnalyzer, customType *CustomTypeInfo) string {
+	if customType.Type == "array" {
+		// For array types, uniqueness is based on itemType
+		return fmt.Sprintf("array:%s", customType.ArrayItemType)
+	} else if customType.Type == "object" {
+		// For object types, uniqueness is based on structure (field name + type pairs)
+		if len(customType.Structure) == 0 {
+			return "object:empty"
+		}
+
+		// Sort structure keys for consistent output
+		var structKeys []string
+		for structKey := range customType.Structure {
+			structKeys = append(structKeys, structKey)
+		}
+		sort.Strings(structKeys)
+
+		// Create signature based on field:type pairs (not property IDs)
+		var structPairs []string
+		for _, structKey := range structKeys {
+			structPairs = append(structPairs, fmt.Sprintf("%s:%s", structKey, customType.Structure[structKey]))
+		}
+
+		// Sort the pairs for deterministic ordering
+		sort.Strings(structPairs)
+		return fmt.Sprintf("object:%s", strings.Join(structPairs, "|"))
+	}
+
+	// Fallback for other types
+	return fmt.Sprintf("%s:unknown", customType.Type)
+}
+
+// findPropertyForStructField finds a property ID for a given struct field
+func (ctf *CustomTypeFactory) findPropertyForStructField(analyzer *SchemaAnalyzer, fieldName string, typeInfo *CustomTypeInfo) string {
+	// Use the same logic as in generators.go for consistency
+	for _, property := range analyzer.Properties {
+		// Check if the property path ends with the field name
+		// This handles nested paths like "properties.user.name" matching field "name"
+		pathParts := strings.Split(property.Path, ".")
+		if len(pathParts) > 0 && pathParts[len(pathParts)-1] == fieldName {
+			return property.ID
+		}
+
+		// Also check if the property name matches
+		if property.Name == fieldName {
+			return property.ID
+		}
+	}
+	return ""
 }

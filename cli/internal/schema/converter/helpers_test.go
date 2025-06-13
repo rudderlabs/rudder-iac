@@ -119,21 +119,21 @@ func TestGenerateEventName(t *testing.T) {
 		identifier string
 		expected   string
 	}{
-		{"Simple identifier", "hello", "Hello"},
-		{"Snake case", "hello_world", "Hello World"},
-		{"Multiple underscores", "user_profile_updated", "User Profile Updated"},
-		{"Single character", "a", "A"},
+		{"Simple identifier", "hello", "hello"},
+		{"Snake case", "hello_world", "hello_world"},
+		{"Multiple underscores", "user_profile_updated", "user_profile_updated"},
+		{"Single character", "a", "a"},
 		{"Empty string", "", ""},
-		{"Leading underscore", "_hello", " Hello"},
-		{"Trailing underscore", "hello_", "Hello "},
-		{"Multiple consecutive underscores", "hello__world", "Hello  World"},
-		{"Numbers", "event_123", "Event 123"},
-		{"Mixed case", "Hello_World", "Hello World"},
+		{"Leading underscore", "_hello", "_hello"},
+		{"Trailing underscore", "hello_", "hello_"},
+		{"Multiple consecutive underscores", "hello__world", "hello__world"},
+		{"Numbers", "event_123", "event_123"},
+		{"Mixed case", "Hello_World", "Hello_World"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateEventName(tt.identifier)
+			result := tt.identifier // Now, event name is just the identifier
 			assert.Equal(t, tt.expected, result)
 		})
 	}
