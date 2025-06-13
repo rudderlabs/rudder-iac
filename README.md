@@ -12,13 +12,13 @@
     - [Linux](#linux)
     - [Docker](#docker)
     - [Build from Source](#build-from-source)
-  - [🧪 Schema Management](#-schema-management)
+  - [🧪 Schema Import from Source](#-schema-import-from-source)
       - [Overview](#overview)
-      - [Enabling Schema Commands](#enabling-schema-commands)
+      - [Enabling ImportFromSource Command](#enabling-importfromsource-command)
       - [Authentication Setup](#authentication-setup)
-      - [Available Commands](#available-commands)
-      - [Complete Workflow](#complete-workflow)
+      - [Configuration File Format](#configuration-file-format)
       - [Command Examples](#command-examples)
+      - [Generated Output Structure](#generated-output-structure)
 
 ## ⚠️ Work in Progress
 
@@ -79,24 +79,24 @@ docker run -v ~/my-catalog:/catalog -e RUDDERSTACK_ACCESS_TOKEN=your-access-toke
 
 **Schema Features with Docker**:
 
-To run schema commands with Docker:
+To run schema import commands with Docker:
 
 ```sh
-# Convert schemas with experimental mode enabled
+# Import schemas with experimental mode enabled
 docker run -v ~/.rudder:/.rudder -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
-  rudderlabs/rudder-cli schema convert /workspace/schemas.json /workspace/output/
+  rudderlabs/rudder-cli tp importFromSource /workspace/output/ --verbose
 
-# Fetch schemas with access token
+# Import with access token and specific writeKey
 docker run -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
   -e RUDDERSTACK_ACCESS_TOKEN="your-access-token" \
-  rudderlabs/rudder-cli schema fetch /workspace/schemas.json
+  rudderlabs/rudder-cli tp importFromSource /workspace/output/ --write-key "your-write-key" --verbose
 
-# Unflatten with JSONPath extraction
-docker run -v $(pwd):/workspace \
+# Import with custom event type mappings
+docker run -v ~/.rudder:/.rudder -v $(pwd):/workspace \
   -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
-  rudderlabs/rudder-cli schema unflatten /workspace/schemas.json /workspace/properties.json --jsonpath "$.properties" --verbose
+  rudderlabs/rudder-cli tp importFromSource /workspace/output/ --config /workspace/mappings.yaml --verbose
 ```
 
 ### Build from Source
@@ -116,17 +116,17 @@ To build the Docker image locally:
 make docker-build
 ```
 
-## 🧪 Schema Management
+## 🧪 Schema Import from Source
 
 #### Overview
 
-The schema management functionality allows you to work with RudderStack event schemas from the Event Audit API. You can fetch schemas, process them, and convert them into RudderStack Data Catalog YAML files for tracking plan management.
+The `importFromSource` command provides an optimized, all-in-one workflow to import RudderStack event schemas from the Event Audit API and convert them into RudderStack Data Catalog YAML files for tracking plan management.
 
-**Workflow**: Fetch → Unflatten → Convert → Deploy
+**Optimized Workflow**: Fetch → Unflatten → Convert (all in memory)
 
-#### Enabling Schema Commands
+#### Enabling ImportFromSource Command
 
-Schema commands require experimental mode to be enabled (legacy requirement). Enable experimental mode using one of these methods:
+The `importFromSource` command requires experimental mode to be enabled. Enable experimental mode using one of these methods:
 
 **Environment Variable** (Recommended):
 ```bash
@@ -160,99 +160,86 @@ Schema commands use the main CLI's authentication system:
    export RUDDERSTACK_API_URL="https://api.rudderstack.com"
    ```
 
-#### Available Commands
+#### Configuration File Format
 
-| Command | Description |
-|---------|-------------|
-| `fetch` | Fetch event schemas from the Event Audit API |
-| `unflatten` | Convert flattened schema keys to nested JSON structures with optional JSONPath extraction |
-| `convert` | Convert schemas to RudderStack Data Catalog YAML files |
+The `importFromSource` command uses a YAML configuration file to specify event-type-specific JSONPath mappings for schema processing.
 
-#### Complete Workflow
+**Configuration File Format (YAML)**:
+```yaml
+event_mappings:
+  identify: "$.traits"           # or "$.context.traits" or "$.properties"
+  page: "$.context.traits"       # or "$.traits" or "$.properties"
+  screen: "$.properties"         # or "$.traits" or "$.context.traits"
+  group: "$.properties"          # or "$.traits" or "$.context.traits"
+  alias: "$.traits"              # or "$.context.traits" or "$.properties"
+# Note: "track" always uses "$.properties" regardless of config
+```
 
+**Default Behavior**:
+- Without writeKey: fetches all schemas
+- Without config: all event types use "$.properties" 
+- Track events always use "$.properties"
+
+#### Command Examples
+
+**Basic Import from Source**:
+```bash
+# Enable experimental mode (required)
+export RUDDERSTACK_CLI_EXPERIMENTAL=true
+
+# Import all schemas with default configuration
+rudder-cli tp importFromSource output/
+
+# Import with specific writeKey
+rudder-cli tp importFromSource output/ --write-key "your-write-key"
+
+# Import with custom event type mappings  
+rudder-cli tp importFromSource output/ --config mappings.yaml
+
+# Dry run with verbose output
+rudder-cli tp importFromSource output/ --config mappings.yaml --dry-run --verbose
+```
+
+**Complete Workflow**:
 ```bash
 # Enable experimental mode
 export RUDDERSTACK_CLI_EXPERIMENTAL=true
 
-# 1. Fetch schemas from Event Audit API
-rudder-cli schema fetch schemas.json --verbose
+# 1. Import schemas from Event Audit API (all-in-one optimized workflow)
+rudder-cli tp importFromSource output/ --verbose
 
-# 2. Unflatten dot-notation keys to nested structures
-rudder-cli schema unflatten schemas.json unflattened.json --verbose
-
-# 2a. (Optional) Extract specific schema parts using JSONPath
-rudder-cli schema unflatten schemas.json properties.json --jsonpath "$.properties" --verbose
-
-# 3. Convert to Data Catalog YAML files
-rudder-cli schema convert unflattened.json output/ --verbose
-
-# 4. Validate generated tracking plans
+# 2. Validate generated tracking plans
 rudder-cli tp validate -l output/
 
-# 5. Deploy tracking plans
+# 3. Deploy tracking plans
 rudder-cli tp apply -l output/
 ```
 
-#### Command Examples
-
-**Fetch Schemas**:
+**Advanced Examples**:
 ```bash
-# Fetch all schemas
-rudder-cli schema fetch schemas.json
+# Import with custom event mappings
+cat > mappings.yaml << EOF
+event_mappings:
+  identify: "$.traits"
+  page: "$.context.traits"
+  screen: "$.properties"
+  group: "$.properties"
+  alias: "$.traits"
+EOF
 
-# Fetch schemas for specific writeKey
-rudder-cli schema fetch schemas.json --write-key=YOUR_WRITE_KEY
+rudder-cli tp importFromSource output/ --config mappings.yaml --verbose
 
-# Dry run to preview what would be fetched
-rudder-cli schema fetch schemas.json --dry-run --verbose
+# Import for specific source with custom mappings
+rudder-cli tp importFromSource output/ --write-key "1a2b3c4d5e" --config mappings.yaml --verbose
+
+# Preview what would be generated
+rudder-cli tp importFromSource output/ --dry-run --verbose
 ```
 
-**Unflatten Schemas**:
-```bash
-# Basic unflatten - convert dot-notation keys to nested structures
-rudder-cli schema unflatten input.json output.json
+#### Generated Output Structure
 
-# With verbose output and custom indentation
-rudder-cli schema unflatten input.json output.json --verbose --indent 4
+The `importFromSource` command generates a complete RudderStack Data Catalog structure:
 
-# Extract specific parts using JSONPath expressions
-rudder-cli schema unflatten input.json output.json --jsonpath "$.properties"
-
-# Extract nested data
-rudder-cli schema unflatten input.json output.json --jsonpath "$.context.traits"
-
-# Extract array elements
-rudder-cli schema unflatten input.json output.json --jsonpath "$.properties.categories"
-
-# Control error handling - keep original schemas when JSONPath fails
-rudder-cli schema unflatten input.json output.json --jsonpath "$.properties" --skip-failed=false
-
-# Preview changes without writing output file
-rudder-cli schema unflatten input.json output.json --jsonpath "$.properties" --dry-run --verbose
-```
-
-**JSONPath Features**:
-- **Processing Flow**: Always unflattens schemas first, then applies JSONPath extraction
-- **Root Paths**: Using `$`, `$.`, or empty path behaves same as no JSONPath (returns full unflattened schema)
-- **Error Handling**: 
-  - `--skip-failed=true` (default): Skips schemas where JSONPath fails, reports errors
-  - `--skip-failed=false`: Keeps original unflattened schema when JSONPath fails, reports errors
-- **Supported JSONPath Expressions**: `$.properties`, `$.context.traits`, `$.properties.categories.0`, etc.
-- **Data Type Support**: Objects, arrays, primitives, and null values
-
-**Convert to YAML**:
-```bash
-# Convert schemas to Data Catalog YAML files
-rudder-cli schema convert schemas.json output/
-
-# Dry run to preview generated files
-rudder-cli schema convert schemas.json output/ --dry-run --verbose
-
-# Custom YAML indentation
-rudder-cli schema convert schemas.json output/ --indent 4
-```
-
-**Generated Output Structure**:
 ```
 output/
 ├── events.yaml              # All unique events extracted from eventIdentifier
@@ -263,12 +250,32 @@ output/
     └── writekey-source2.yaml
 ```
 
+**Key Features**:
+- **Optimized In-Memory Processing**: Eliminates temporary files for better performance
+- **Event-Type-Specific Processing**: Different JSONPath mappings per event type
+- **Automatic Type Generation**: Creates reusable custom types for complex objects
+- **Source Grouping**: Organizes tracking plans by writeKey (source)
+- **Data Catalog Compatible**: Generated YAML files work directly with `tp` commands
+
 **Integration with Tracking Plans**:
 ```bash
-# After conversion, validate and deploy
+# After import, validate and deploy
 rudder-cli tp validate -l output/
 rudder-cli tp apply -l output/ --dry-run
 rudder-cli tp apply -l output/
+```
+
+**Docker Integration**:
+```bash
+# Run importFromSource with Docker
+docker run -v ~/.rudder:/.rudder -v $(pwd):/workspace \
+  -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
+  rudderlabs/rudder-cli tp importFromSource /workspace/output/ --verbose
+
+# With custom configuration
+docker run -v ~/.rudder:/.rudder -v $(pwd):/workspace \
+  -e RUDDERSTACK_CLI_EXPERIMENTAL=true \
+  rudderlabs/rudder-cli tp importFromSource /workspace/output/ --config /workspace/mappings.yaml --verbose
 ```
 
 
