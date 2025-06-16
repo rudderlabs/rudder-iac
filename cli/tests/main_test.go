@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	bin, err := NewCLIBinary(tmpDir, exec)
+	bin, err := NewCLIBinary(exec)
 	if err != nil {
 		fmt.Println("failed to init CLIBinary helper:", err)
 		os.Exit(1)

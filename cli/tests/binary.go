@@ -14,7 +14,7 @@ import (
 //
 // A caller should call Clean to remove the generated binary when it is no longer needed.
 //
-//	bin := tests.NewCLIBinary(t.TempDir())
+//	bin := tests.NewCLIBinary(executor)
 //	path, err := bin.Setup() // builds on first call
 //	defer bin.Clean()
 //
@@ -28,10 +28,9 @@ type CLIBinary struct {
 }
 
 // NewCLIBinary initialises the helper. The dir must exist and be writable.
-func NewCLIBinary(dir string, exec Executor) (*CLIBinary, error) {
-	if dir == "" {
-		dir = os.TempDir()
-	}
+func NewCLIBinary(exec Executor) (*CLIBinary, error) {
+	dir := os.TempDir()
+
 	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
 		return nil, fmt.Errorf("invalid dir %q: %w", dir, err)
 	}
@@ -72,5 +71,7 @@ func (c *CLIBinary) Clean() error {
 		return err
 	}
 	c.binPath = ""
+	c.buildErr = fmt.Errorf("binary cleaned")
+
 	return nil
 }
