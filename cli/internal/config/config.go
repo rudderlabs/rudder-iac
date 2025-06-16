@@ -75,6 +75,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
+	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
 
 	// load configuration
 	_ = viper.ReadInConfig()
