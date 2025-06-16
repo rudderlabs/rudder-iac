@@ -23,22 +23,23 @@ func TestMain(m *testing.M) {
 
 	bin, err := NewCLIBinary(exec)
 	if err != nil {
-		fmt.Println("failed to init CLIBinary helper:", err)
+		fmt.Println("failed to init cli binary:", err)
 		os.Exit(1)
 	}
 
 	path, err := bin.Setup()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("failed to setup cli binary:", err)
 		os.Exit(1)
 	}
 
-	defer func() {
-		_ = bin.Clean()
-	}()
-
 	cliBinPath = path // Set global cli binary path
 	exitCode := m.Run()
+
+	if err := bin.Clean(); err != nil {
+		fmt.Println("failed to clean cli binary: ", err)
+		os.Exit(1)
+	}
 
 	os.Exit(exitCode)
 }
