@@ -1,11 +1,16 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
+)
+
+var (
+	ErrBinaryAlreadyCleaned = errors.New("binary already cleaned")
 )
 
 // CLIBinary builds a rudder-cli binary once and exposes its location for test runs.
@@ -29,10 +34,9 @@ type CLIBinary struct {
 
 // NewCLIBinary initialises the helper. The dir must exist and be writable.
 func NewCLIBinary(exec Executor) (*CLIBinary, error) {
-	dir := os.TempDir()
-
-	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
-		return nil, fmt.Errorf("invalid dir %q: %w", dir, err)
+	dir, err := os.MkdirTemp("", "rudder-cli-bin-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
 	}
 
 	filename := "rudder-cli"
@@ -41,7 +45,11 @@ func NewCLIBinary(exec Executor) (*CLIBinary, error) {
 		filename += ".exe"
 	}
 
-	return &CLIBinary{exec: exec, binPath: filepath.Join(dir, filename), dir: dir}, nil
+	return &CLIBinary{
+		exec:    exec,
+		binPath: filepath.Join(dir, filename),
+		dir:     dir,
+	}, nil
 }
 
 // Setup builds the rudder-cli binary once and returns its absolute path.
@@ -64,14 +72,14 @@ func (c *CLIBinary) Setup() (string, error) {
 // Clean removes the built binary if it exists.
 // It is safe to call multiple times.
 func (c *CLIBinary) Clean() error {
-	if c == nil || c.binPath == "" {
-		return nil
-	}
-	if err := os.Remove(c.binPath); err != nil && !os.IsNotExist(err) {
+	// Best effort to remove the directory
+	// which contains the binary
+	if err := os.RemoveAll(c.dir); err != nil {
 		return err
 	}
+
 	c.binPath = ""
-	c.buildErr = fmt.Errorf("binary cleaned")
+	c.buildErr = ErrBinaryAlreadyCleaned
 
 	return nil
 }

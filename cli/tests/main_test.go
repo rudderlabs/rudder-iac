@@ -15,16 +15,6 @@ var (
 // runs the package tests. It honours the cli/logging and cli/testing rules by
 // printing only essential information and performing cleanup after execution.
 func TestMain(m *testing.M) {
-	tmpDir, err := os.MkdirTemp("", "rudder-cli-bin-*")
-	if err != nil {
-		fmt.Println("failed to create temp dir:", err)
-		os.Exit(1)
-	}
-
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
-
 	exec, err := NewCmdExecutor("")
 	if err != nil {
 		fmt.Println("failed to init executor:", err)
