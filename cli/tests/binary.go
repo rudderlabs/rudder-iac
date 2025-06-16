@@ -42,8 +42,7 @@ func NewCLIBinary(dir string, exec Executor) (*CLIBinary, error) {
 		filename += ".exe"
 	}
 
-	filepath := filepath.Join(dir, filename)
-	return &CLIBinary{exec: exec, binPath: filepath, dir: dir}, nil
+	return &CLIBinary{exec: exec, binPath: filepath.Join(dir, filename), dir: dir}, nil
 }
 
 // Setup builds the rudder-cli binary once and returns its absolute path.
@@ -54,7 +53,7 @@ func (c *CLIBinary) Setup() (string, error) {
 
 		out, err := c.exec.Execute("go", "build", "-o", c.binPath, buildPath)
 		if err != nil {
-			c.buildErr = fmt.Errorf("building rudder-cli: %w\n%s", err, out)
+			c.buildErr = fmt.Errorf("building rudder-cli: %w\n%s\n", err, out)
 			return
 		}
 

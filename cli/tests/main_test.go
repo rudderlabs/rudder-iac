@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
+)
+
+var (
+	cliBinPath string
 )
 
 // TestMain builds the rudder-cli binary once, exposes it via PATH and then
@@ -18,7 +21,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	exec, err := NewCmdExecutor("")
 	if err != nil {
@@ -38,38 +43,25 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	oldpath := os.Getenv("PATH")
-	binDir := filepath.Dir(path)
+	defer func() {
+		_ = bin.Clean()
+	}()
 
-	os.Setenv("PATH", fmt.Sprintf("%s:%s", binDir, oldpath))
-
-	defer os.Setenv("PATH", oldpath)
-
+	cliBinPath = path // Set global cli binary path
 	exitCode := m.Run()
 
-	_ = bin.Clean()
 	os.Exit(exitCode)
 }
 
 func TestE2ESetup(t *testing.T) {
 	t.Parallel()
 
-	cfgPath, cleanup, err := NewConfigBuilder("").Build()
-	if err != nil {
-		t.Fatalf("create config: %v", err)
-	}
-	defer func() {
-		if err := cleanup(); err != nil {
-			t.Logf("cleanup config: %v", err)
-		}
-	}()
-
 	exec, err := NewCmdExecutor("")
 	if err != nil {
 		t.Fatalf("init executor: %v", err)
 	}
 
-	out, err := exec.Execute("rudder-cli", "-c", cfgPath, "-v")
+	out, err := exec.Execute(cliBinPath, "-v")
 	if err != nil {
 		t.Fatalf("rudder-cli -v failed: %v\n%s", err, out)
 	}
