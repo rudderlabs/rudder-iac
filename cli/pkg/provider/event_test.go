@@ -186,6 +186,11 @@ func strptr(str string) *string {
 	return &str
 }
 
+// Testing the error message we show to user when api returns a duplicate event error
+// For track event the api returns a message that contains the event name
+// For the rest of events like identify the api returns the same message but with out the event name
+// For example: Event with name  already exists" for identify event
+// "Event with name Signup Click already exists" for track event
 func TestEventProviderDuplicateError(t *testing.T) {
 	ctx := context.Background()
 
@@ -204,9 +209,9 @@ func TestEventProviderDuplicateError(t *testing.T) {
 			},
 			err: &client.APIError{
 				HTTPStatusCode: 400,
-				Message:        "event with name already exists",
+				Message:        "Event with name Signup Click already exists",
 			},
-			expected: "event 'Signup Click' already exists in the data catalog",
+			expected: "track event 'Signup Click' already exists",
 		},
 		{
 			name: "duplicate identify event without name",
@@ -217,9 +222,9 @@ func TestEventProviderDuplicateError(t *testing.T) {
 			},
 			err: &client.APIError{
 				HTTPStatusCode: 400,
-				Message:        "event with name already exists",
+				Message:        "Event with name  already exists",
 			},
-			expected: "event 'identify' already exists in the data catalog",
+			expected: "identify event already exists",
 		},
 		{
 			name: "not an API error",
