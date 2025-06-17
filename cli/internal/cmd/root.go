@@ -25,10 +25,21 @@ var (
 
 func recovery() {
 	if r := recover(); r != nil {
-		fmt.Println(emoji.Sprintf("\n:skull:Oops! Unexpected error occurred. Please contact tech support.\n"))
+		// Always log to file
 		log.Error("panic detected", "error", r)
 		log.Error(string(debug.Stack()))
 
+		// If debug mode is enabled, show detailed panic info in console and exit
+		if viper.GetBool("debug") {
+			fmt.Println("\n🔍 Debug Mode: Panic Details")
+			fmt.Printf("Error: %v\n", r)
+			fmt.Println("\nStack Trace:")
+			fmt.Println(string(debug.Stack()))
+			os.Exit(1)
+		}
+
+		// In non-debug mode, show the simple error message and exit
+		fmt.Println(emoji.Sprintf("\n:skull:Oops! Unexpected error occurred. Please contact tech support.\n"))
 		os.Exit(1)
 	}
 }
