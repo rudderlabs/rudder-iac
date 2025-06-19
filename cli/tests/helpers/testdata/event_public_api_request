@@ -1,0 +1,12 @@
+{
+  "id": "event-123",
+  "name": "public_api_request",
+  "description": "Tracks public API requests",
+  "properties": {
+    "endpoint": "string",
+    "method": "string",
+    "status_code": "number"
+  },
+  "categoryId": "cat-456",
+  "workspaceId": "workspace-789"
+} 

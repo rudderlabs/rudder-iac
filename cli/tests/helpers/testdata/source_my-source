@@ -1,0 +1,9 @@
+{
+  "id": "source-456",
+  "name": "my-source",
+  "type": "javascript",
+  "enabled": true,
+  "settings": {
+    "writeKey": "test-key"
+  }
+} 
