@@ -17,7 +17,7 @@ import (
 func newClient() (*client.Client, error) {
 	baseUrl := os.Getenv("RUDDERSTACK_API_HOST")
 	if baseUrl == "" {
-		baseUrl = "http://localhost:5555/v2"
+		baseUrl = "http://localhost:5555"
 	}
 	return client.New(os.Getenv("RUDDERSTACK_API_ACCESS_TOKEN"), client.WithBaseURL(baseUrl))
 }

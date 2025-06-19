@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 func TestClientOptionBaseURL(t *testing.T) {
 	c, err := client.New("some-access-token", client.WithBaseURL("https://some-base-url"))
 	assert.NoError(t, err)
-	assert.Equal(t, "https://some-base-url/path", c.URL("path"))
+	assert.Equal(t, fmt.Sprintf("https://some-base-url/%s/path", client.API_VERSION), c.URL("path"))
 }
 
 func TestClientOptionBaseURLEmpty(t *testing.T) {
@@ -25,7 +26,7 @@ func TestClientOptionBaseURLEmpty(t *testing.T) {
 func TestClientOptionHTTPClient(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://example.com/path", "")
+			return testutils.ValidateRequest(t, req, "GET", fmt.Sprintf("https://example.com/%s/path", client.API_VERSION), "")
 		},
 		ResponseStatus: 200,
 		ResponseBody:   "test",
