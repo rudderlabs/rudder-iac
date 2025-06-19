@@ -24,7 +24,8 @@ type Client struct {
 	Connections  *connections
 }
 
-const BASE_URL_V2 = "https://api.rudderstack.com/v2"
+const BASE_URL_V2 = "https://api.rudderstack.com"
+const API_VERSION = "v2"
 
 var (
 	ErrEmptyAccessToken  = fmt.Errorf("access token cannot be empty")
@@ -59,10 +60,10 @@ func New(accessToken string, options ...Option) (*Client, error) {
 
 func (c *Client) URL(path string) string {
 	if len(path) == 0 {
-		return c.baseURL
+		return fmt.Sprintf("%s/%s", c.baseURL, API_VERSION)
 	}
 
-	return fmt.Sprintf("%s/%s", c.baseURL, strings.TrimPrefix(path, "/"))
+	return fmt.Sprintf("%s/%s/%s", c.baseURL, API_VERSION, strings.TrimPrefix(path, "/"))
 }
 
 func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
