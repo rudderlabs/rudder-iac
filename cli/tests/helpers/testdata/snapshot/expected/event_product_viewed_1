@@ -1,0 +1,27 @@
+{
+    "id": "product_viewed_1",
+    "type": "event",
+    "input": {
+        "description": "This event is triggered every time a user views a product.",
+        "eventType": "track",
+        "name": "Product Viewed 1",
+        "categoryId": "expected-category-id"
+    },
+    "output": {
+        "description": "This event is triggered every time a user views a product.",
+        "eventArgs": {
+            "description": "This event is triggered every time a user views a product.",
+            "eventType": "track",
+            "name": "Product Viewed 1",
+            "categoryId": "expected-category-id"
+        },
+        "eventType": "track",
+        "name": "Product Viewed 1",
+        "createdAt": "expected-created-at",
+        "updatedAt": "expected-updated-at",
+        "id": "expected-id",
+        "workspaceId": "expected-workspace-id",
+        "categoryId": "expected-category-id"
+    },
+    "dependencies": []
+} 
