@@ -3,11 +3,11 @@ description: Workflow to manage user defined tasks
 globs: 
 alwaysApply: false
 ---
-## Linear Task Implementation
+## Linear Task Refinement and Implementation
 When user asks to plan out the steps to implement a specific linear issue, the rules helps elicit the workflow:
 1. Fetch the linear issue to be analysed using the `linear` mcp integration.
-2. Analyse the issue STICTLY IN PLAN MODE initially with the user to come up with a solid plan.
-3. Record the findings of the plan mode in a newly created cursor rule file in the nearest `.cusor/rules` directory using the naming convention `linear-task-<issue_id>.mdc` using the template [template-linear-task-implementation.mdc](mdc:cli/.cursor/rules/template-linear-task-implementation.mdc)
+2. Analyse the issue **STRICTLY IN PLAN MODE** initially with the user using the strategies listed in [task-refinement.mdc](mdc:cli/.cursor/rules/task-refinement.mdc)
+3. Record the findings of the refinement in plan mode in a newly created cursor rule file in the nearest `.cusor/rules` directory using the naming convention `linear-task-<issue_id>.mdc` using the template [template-linear-task-implementation.mdc](mdc:cli/.cursor/rules/template-linear-task-implementation.mdc)
 4. Only when it's agreed that the PLAN looks good, move towards ACT mode which is simply to start implement the changes.
 5. Based on the progress of task implementation, keep on updating the `Progress` section with the state of the tasks.
 6. Before making any updates to the Linear ticket (such as updating TBD sections, changing descriptions, or adding comments), always draft the changes and get explicit approval from the user before submitting.
