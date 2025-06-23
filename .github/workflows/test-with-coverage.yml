@@ -44,3 +44,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
+          files: |
+            coverage-unit.out
+            coverage-e2e.out
