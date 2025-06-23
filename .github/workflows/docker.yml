@@ -37,14 +37,14 @@ jobs:
           else
             # For PR, use PR branch name
             if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-              BRANCH=$GITHUB_HEAD_REF
+              TAG="pr-${{ github.event.pull_request.number }}"
             else
               # For main branch push
-              BRANCH=$GITHUB_REF_NAME
+              TAG=$GITHUB_REF_NAME
             fi
             # Sanitize branch name for docker tag
-            SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
-            echo "VERSION=$SAFE_BRANCH" >> $GITHUB_ENV
+            SAFE_TAG=$(echo "$TAG" | tr '/' '-')
+            echo "VERSION=$SAFE_TAG" >> $GITHUB_ENV
           fi
 
       - name: Build and Push
