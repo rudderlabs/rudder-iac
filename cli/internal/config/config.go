@@ -65,7 +65,7 @@ func InitConfig(cfgFile string) {
 	// set defaults
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
-	viper.SetDefault("apiURL", client.BASE_URL_V2)
+	viper.SetDefault("apiURL", client.BASE_URL)
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
