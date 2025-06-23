@@ -3,6 +3,7 @@ kind: properties
 metadata:
   name: "api_tracking"
 spec:
+  properties:
   - id: "api_method"
     name: "API Method"
     type: "string"

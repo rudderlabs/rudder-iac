@@ -4,11 +4,12 @@ metadata:
   name: "api_tracking"
 spec:
   events:
-    - id: "api_tracking"
-      name: "API Tracking"
-      event_type: "track"
-      description: "This event is triggered every time a user views a product."
-    - id: "api_error"
-      name: "API Error"
-      event_type: "track"
-      description: "This event is triggered when an API error occurs." 
+  - id: "api_tracking"
+    name: "API Tracking"
+    event_type: "track"
+    description: "This event is triggered every time a user views a product."
+
+  - id: "api_error"
+    name: "API Error"
+    event_type: "track"
+    description: "This event is triggered when an API error occurs." 

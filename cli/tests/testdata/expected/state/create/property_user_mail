@@ -1,0 +1,27 @@
+{
+  "id": "user_mail",
+  "type": "property",
+  "input": {
+    "config": {},
+    "description": "User's email address",
+    "name": "User Email",
+    "type": "string"
+  },
+  "output": {
+    "config": {},
+    "createdAt": "2025-06-19 13:00:19.689 +0000 UTC",
+    "description": "User's email address",
+    "id": "prop_2yjBIDGcgUi9BpkoK9Tm4wMq0EG",
+    "name": "User Email",
+    "propertyArgs": {
+      "config": {},
+      "description": "User's email address",
+      "name": "User Email",
+      "type": "string"
+    },
+    "type": "string",
+    "updatedAt": "2025-06-19 13:00:19.689 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

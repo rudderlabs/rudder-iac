@@ -1,0 +1,33 @@
+{
+  "id": "user_mail",
+  "type": "property",
+  "input": {
+    "config": {
+      "pattern": "^([\\w%.-]+@[\\d.A-Za-z-]+\\.[A-Za-z]{2,6})*$"
+    },
+    "description": "User's email address",
+    "name": "User Email",
+    "type": "string"
+  },
+  "output": {
+    "config": {
+      "pattern": "^([\\w%.-]+@[\\d.A-Za-z-]+\\.[A-Za-z]{2,6})*$"
+    },
+    "createdAt": "2025-06-19 13:00:19.689 +0000 UTC",
+    "description": "User's email address",
+    "id": "prop_2yjBIDGcgUi9BpkoK9Tm4wMq0EG",
+    "name": "User Email",
+    "propertyArgs": {
+      "config": {
+        "pattern": "^([\\w%.-]+@[\\d.A-Za-z-]+\\.[A-Za-z]{2,6})*$"
+      },
+      "description": "User's email address",
+      "name": "User Email",
+      "type": "string"
+    },
+    "type": "string",
+    "updatedAt": "2025-06-19 13:14:11.291 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}
