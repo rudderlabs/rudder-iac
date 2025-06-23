@@ -24,7 +24,7 @@ type Client struct {
 	Connections  *connections
 }
 
-const BASE_URL_V2 = "https://api.rudderstack.com"
+const BASE_URL = "https://api.rudderstack.com"
 const API_VERSION = "v2"
 
 var (
@@ -35,7 +35,7 @@ var (
 
 func New(accessToken string, options ...Option) (*Client, error) {
 	client := &Client{
-		baseURL:     BASE_URL_V2,
+		baseURL:     BASE_URL,
 		httpClient:  &http.Client{},
 		accessToken: accessToken,
 		userAgent:   "rudder-api-go/1.0.0",
