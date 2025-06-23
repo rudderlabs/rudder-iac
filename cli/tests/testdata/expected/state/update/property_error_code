@@ -1,0 +1,48 @@
+{
+  "id": "error_code",
+  "type": "property",
+  "input": {
+    "config": {
+      "enum": [
+        400,
+        401,
+        404,
+        500
+      ]
+    },
+    "description": "The HTTP error code.",
+    "name": "Error Code",
+    "type": "integer"
+  },
+  "output": {
+    "config": {
+      "enum": [
+        400,
+        401,
+        404,
+        500
+      ]
+    },
+    "createdAt": "2025-06-19 13:05:24.763 +0000 UTC",
+    "description": "The HTTP error code.",
+    "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
+    "name": "Error Code",
+    "propertyArgs": {
+      "config": {
+        "enum": [
+          400,
+          401,
+          404,
+          500
+        ]
+      },
+      "description": "The HTTP error code.",
+      "name": "Error Code",
+      "type": "integer"
+    },
+    "type": "integer",
+    "updatedAt": "2025-06-19 13:14:09.438 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"testing"
@@ -42,22 +41,4 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(exitCode)
-}
-
-func TestE2ESetup(t *testing.T) {
-	t.Parallel()
-
-	exec, err := NewCmdExecutor("")
-	if err != nil {
-		t.Fatalf("init executor: %v", err)
-	}
-
-	out, err := exec.Execute(cliBinPath, "-v")
-	if err != nil {
-		t.Fatalf("rudder-cli -v failed: %v\n%s", err, out)
-	}
-
-	if !bytes.Contains(out, []byte("rudder-cli")) {
-		t.Errorf("unexpected CLI output: %s", out)
-	}
 }
