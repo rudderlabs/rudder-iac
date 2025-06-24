@@ -1,0 +1,155 @@
+---
+description: Linear Task Refinement Guidelines
+globs: 
+alwaysApply: false
+---
+# Linear Task Refinement
+This document outlines a structured approach to refining tasks, focusing on thoroughness and clarity to facilitate efficient development. The refinement is an iterative approach in which we perform the following steps iteratively in **PLAN MODE** till we have a confidence that we have generated a solid plan of action to handle the requirements. The steps are :
+
+- Parse Requirements
+- Task and Subtask Breakdown
+- Subtask Change Identification
+
+Each of these steps is described in detail in following sections.
+
+## Parse the Requirements
+The first step involves a deep understanding of the initial requirements. This is crucial for accurate task breakdown and avoids misinterpretations later in the process.
+
+### Steps:
+
+- **Read Actively**: Go through the requirements multiple times
+- **Identify Keywords & Core Concepts**: Highlight key terms, verbs (actions), and nouns (entities, data)
+- **Clarify Ambiguities**: If any part of the requirement is unclear, ambiguous, or seems contradictory, make a note to seek clarification. Do not proceed with assumptions
+- **Define Scope**: Clearly delineate what is in scope and what is out of scope based on the requirements
+- **Identify Constraints & Dependencies**: Note any technical, business, or time constraints, as well as dependencies on other systems, data, or teams
+- **Input/Output Analysis**: For each major functional requirement, define the expected inputs and desired outputs
+
+## Break Down into Tasks and Subtasks
+This is where the heuristic comes into play, creating a hierarchical structure for manageability. The goal is to make each subtask as granular and independent as possible.
+
+### Top-Level Tasks
+Based on the parsed requirements, define the major, high-level functional areas or features.
+
+**Heuristic Example**: If the requirement is "Implement User Authentication," top-level tasks might be:
+- User Registration
+- User Login
+- Password Reset
+- Session Management
+
+### Subtasks (Atomic Units)
+For each top-level task, break it down further into smaller, actionable subtasks. A good subtask should ideally:
+
+- Be estimable (you can give a reasonable time estimate for its completion)
+- Be testable (you can verify its completion independently)
+- Have a clear start and end point
+- Be small enough to be completed within a short period (e.g., a few hours to a day)
+
+**Heuristic Example** (for "User Registration"):
+- Create User Model/Schema
+- Implement Registration API Endpoint
+- Add Input Validation
+- Hash Passwords
+- Store User Data in Database
+- Send Confirmation Email
+- Handle Error Cases
+
+### Additional Considerations
+- **Dependency Mapping**: Identify dependencies between subtasks. Some subtasks might need to be completed before others can begin
+- **Heuristic for Granularity**: Continue breaking down until a subtask represents a single, cohesive unit of work that directly translates to code changes or configuration. Avoid "God tasks" that encompass too much functionality
+
+## Identify Changes Each Subtask Will Entail (Thorough Refinement)
+This is the **MOST CRITICAL** part, as it maps the conceptual subtasks to concrete changes in the codebase. This requires a deep understanding of the existing project structure.
+
+For each subtask identified in previous, meticulously detail the following:
+
+### New Files to Be Created
+- List the exact file path and name (e.g., `src/models/UserModel.js`, `src/routes/authRoutes.js`, `src/services/emailService.js`)
+- Briefly describe its purpose
+
+### Existing Files to Be Updated
+- List the exact file path and name (e.g., `src/app.js`, `src/config/index.js`, `public/index.html`)
+- Specify which sections or lines of code will likely be affected (e.g., "Add new route to app.js," "Update database connection string in config/index.js," "Add new component import in index.html")
+- Mention the nature of the update (e.g., "add function," "modify existing logic," "update configuration")
+
+### Files to Be Removed
+- List the exact file path and name
+- Explain the reason for removal
+
+### New Functions/Classes to Be Created
+- Name the function/class (e.g., `registerUser()`, `AuthService`, `sendConfirmationEmail()`)
+- Specify the file where it will reside
+- Briefly describe its responsibility
+- Indicate expected inputs and outputs (e.g., `registerUser(username, email, password) -> { success: boolean, message: string }`)
+
+### Existing Functions/Classes to Be Modified
+- Name the function/class
+- Specify the file where it resides
+- Describe the reason for modification and the type of change (e.g., "Add new parameter to login() for role-based access," "Update validateInput() to include new regex for email format")
+
+### Database Changes
+- **New Tables/Collections**: Name and schema (fields, types, indexes)
+- **Existing Tables/Collections**: Changes to schema (add/remove columns/fields, change data types), new indexes
+- **Seed Data/Migrations**: If specific initial data or migration scripts are required
+
+### API Endpoints
+- **New Endpoints**: Method (GET, POST, PUT, DELETE), URL path (e.g., `/api/v1/auth/register`), expected request body, expected response
+- **Modified Endpoints**: Changes to existing ones (parameters, response structure)
+
+### User Interface (UI) Changes (if applicable)
+- New components/pages
+- Modifications to existing UI elements
+- Interactions, states, error messages displayed to the user
+
+### Configuration Changes
+- Environment variables
+- Feature flags
+- Third-party service API keys
+
+### Dependencies (New/Updated)
+- New libraries/packages to install
+- Updates to existing dependencies
+
+### Testing Considerations
+- What kind of tests will be needed for this subtask (unit, integration, end-to-end)?
+- Any specific edge cases to consider?
+
+## Item Checklist
+Once the refinement of the tasks and subtasks is complete, move towards capturing the latest refined state in a checklist. This would be final step to consolidate all the refined information into a clear, actionable checklist format typically in *Markdown Format*
+
+### Structure
+- Use Markdown headers for tasks and subtasks
+- Use Markdown checklist items (`- [ ]`) for each identified change within a subtask
+- Add comments or descriptive text as needed
+
+### Example Format
+```markdown
+# Feature: [Feature Name, e.g., User Authentication]
+
+## Task: [Task Name, e.g., User Registration]
+
+### Subtask: Create User Model/Schema
+- [ ] New File: `src/models/User.js` (Defines Mongoose schema for user)
+- [ ] Existing File Update: `src/db/index.js` (Import and initialize User model)
+- [ ] Database Change: New collection `users` with fields: `username` (String, unique), `email` (String, unique), `password` (String), `createdAt` (Date)
+
+### Subtask: Implement Registration API Endpoint
+- [ ] New File: `src/routes/authRoutes.js` (Handles /api/v1/auth/register POST requests)
+- [ ] Existing File Update: `src/app.js` (Add `app.use('/api/v1/auth', authRoutes)`)
+- [ ] New Function: `registerUser` in `src/controllers/authController.js` (Handles registration logic)
+- [ ] API Endpoint: POST `/api/v1/auth/register` (Req Body: `{ username, email, password }`, Res: `{ message, user_id }` or `{ error }`)
+
+### Subtask: Add Input Validation
+- [ ] Existing Function Modification: `registerUser` in `src/controllers/authController.js` (Add Joi/express-validator schema for input validation)
+- [ ] Existing File Update: `src/middlewares/validationMiddleware.js` (Add `validateRegistrationInput` middleware)
+- [ ] Error Handling: Ensure appropriate error responses for invalid inputs
+
+---
+
+## Task: [Next Task Name, e.g., User Login]
+### Subtask: ...
+```
+
+## Best Practices
+
+- **Regular Updates**: This checklist should be a living document, updated as more details emerge or as tasks are completed
+- **Version Control**: Commit this checklist file to your version control system alongside your code
