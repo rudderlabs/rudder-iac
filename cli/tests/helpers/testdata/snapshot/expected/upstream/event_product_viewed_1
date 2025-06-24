@@ -1,0 +1,10 @@
+{
+    "id": "44b010e8-e228-4a67-84f9-7532008702b3",
+    "name": "Product Viewed 1",
+    "description": "This event is triggered every time a user views a product.",
+    "eventType": "track",
+    "categoryId": null,
+    "workspaceId": "ead89b8a-c42b-4f45-83f3-c3e798a01bea",
+    "createdAt": "2025-06-25T00:00:00Z",
+    "updatedAt": "2025-06-25T00:00:00Z"
+} 
