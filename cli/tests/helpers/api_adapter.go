@@ -9,6 +9,11 @@ import (
 
 var _ UpstreamStateReader = &APIClientAdapter{}
 
+// UpstreamStateReader provides an interface for reading state in a raw format.
+type UpstreamStateReader interface {
+	RawState(ctx context.Context) (map[string]any, error)
+}
+
 // APIClientAdapter wraps the catalog.DataCatalog client
 // and implements the UpstreamStateReader interface.
 type APIClientAdapter struct {

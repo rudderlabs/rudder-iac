@@ -5,22 +5,17 @@ import (
 	"fmt"
 )
 
-// UpstreamStateReader provides an interface for reading state in a raw format.
-type UpstreamStateReader interface {
-	RawState(ctx context.Context) (map[string]any, error)
-}
-
-// SnapshotStateTester provides functionality to test state snapshots
+// StateSnapshotTester provides functionality to test state snapshots
 // using the existing generic comparator.
-type SnapshotStateTester struct {
+type StateSnapshotTester struct {
 	reader      UpstreamStateReader
 	fileManager *StateFileManager
 	ignore      []string
 }
 
-// NewSnapshotStateTester creates a new instance of SnapshotStateTester
-func NewSnapshotStateTester(reader UpstreamStateReader, manager *StateFileManager, ignore []string) *SnapshotStateTester {
-	return &SnapshotStateTester{
+// NewStateSnapshotTester creates a new instance of StateSnapshotTester
+func NewStateSnapshotTester(reader UpstreamStateReader, manager *StateFileManager, ignore []string) *StateSnapshotTester {
+	return &StateSnapshotTester{
 		reader:      reader,
 		fileManager: manager,
 		ignore:      ignore,
@@ -29,7 +24,7 @@ func NewSnapshotStateTester(reader UpstreamStateReader, manager *StateFileManage
 
 // SnapshotTest performs a complete snapshot comparison between actual and expected state.
 // It fetches the actual state, compares versions, resource counts, and individual resources.
-func (s *SnapshotStateTester) SnapshotTest(ctx context.Context) error {
+func (s *StateSnapshotTester) SnapshotTest(ctx context.Context) error {
 	actualState, err := s.reader.RawState(ctx)
 	if err != nil {
 		return fmt.Errorf("reading actual state: %w", err)

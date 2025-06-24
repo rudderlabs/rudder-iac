@@ -16,6 +16,8 @@ func (m *MockUpstreamStateReader) RawState(ctx context.Context) (map[string]any,
 }
 
 func TestSnapshotState(t *testing.T) {
+	t.Parallel()
+
 	mockState := map[string]any{
 		"version": "1.0.0",
 		"resources": map[string]any{
@@ -51,7 +53,7 @@ func TestSnapshotState(t *testing.T) {
 
 	mockReader := &MockUpstreamStateReader{state: mockState}
 
-	fileManager, err := NewStateFileManager("testdata/snapshot/expected")
+	fileManager, err := NewStateFileManager("testdata/snapshot/expected/state")
 	require.NoError(t, err, "creating state file manager")
 
 	ignoreFields := []string{
@@ -64,11 +66,11 @@ func TestSnapshotState(t *testing.T) {
 		"output.eventArgs.categoryId",
 	}
 
-	tester := NewSnapshotStateTester(
+	tester := NewStateSnapshotTester(
 		mockReader,
 		fileManager,
 		ignoreFields,
 	)
 	err = tester.SnapshotTest(context.Background())
-	require.NoError(t, err, "snapshot test")
+	require.NoError(t, err, "state snapshot test")
 }
