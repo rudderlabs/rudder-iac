@@ -65,7 +65,7 @@ func InitConfig(cfgFile string) {
 	// set defaults
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
-	viper.SetDefault("apiURL", client.BASE_URL_V2)
+	viper.SetDefault("apiURL", client.BASE_URL)
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
@@ -75,6 +75,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
+	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
 
 	// load configuration
 	_ = viper.ReadInConfig()

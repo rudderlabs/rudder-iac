@@ -28,8 +28,12 @@ clean:
 	rm -rf bin
 
 .PHONY: test
-test: ## Run all unit tests
-	go test --race --covermode=atomic --coverprofile=coverage.out ./...
+test: ## Run all unit tests (excluding e2e)
+	@go test --race --covermode=atomic --coverprofile=coverage.out $(shell go list ./... | grep -v /cli/tests)
+
+.PHONY: test-e2e
+test-e2e: ## Run end-to-end tests
+	go test --race --covermode=atomic --coverprofile=coverage-e2e.out ./cli/tests/...
 
 .PHONY: test-it
 test-it: ## Run all test, including integration tests
@@ -43,3 +47,6 @@ docker-build: ## Build Docker image
 		--build-arg TELEMETRY_DATAPLANE_URL=$(TELEMETRY_DATAPLANE_URL) \
 		-t $(REGISTRY)/$(IMAGE_NAME):$(VERSION) \
 		-f cli/Dockerfile .
+
+.PHONY: test-all
+test-all: test test-e2e ## Run all unit and end-to-end tests
