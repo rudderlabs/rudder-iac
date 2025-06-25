@@ -13,18 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	globalIgnoreFields = []string{
-		"output.createdAt",
-		"output.updatedAt",
-		"output.id",
-		"output.workspaceId",
-		"input.categoryId",
-		"output.categoryId",
-		"output.eventArgs.categoryId",
-	}
-)
-
 func TestTrackingPlanApply(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -55,11 +43,10 @@ func verifyState(t *testing.T, dir string) {
 	)
 
 	require.NoError(t, err)
+	dataCatalog := catalog.NewRudderDataCatalog(apiClient)
+	reader := helpers.NewAPIClientAdapter(dataCatalog)
 
-	reader := helpers.NewAPIClientAdapter(
-		catalog.NewRudderDataCatalog(apiClient),
-	)
-
+	// Verify state snapshot
 	expectedStateDir := filepath.Join("testdata", "expected", "state", dir)
 	fileManager, err := helpers.NewStateFileManager(expectedStateDir)
 	require.NoError(t, err)
@@ -67,9 +54,65 @@ func verifyState(t *testing.T, dir string) {
 	tester := helpers.NewStateSnapshotTester(
 		reader,
 		fileManager,
-		globalIgnoreFields,
+		[]string{
+			"output.id",
+			"output.createdAt",
+			"output.updatedAt",
+			"output.createdBy",
+			"output.updatedBy",
+			"output.workspaceId",
+			"output.categoryId",
+			"input.categoryId",
+			"output.eventArgs.categoryId",
+			"output.events[0].eventId",
+			"output.events[0].id",
+			"output.events[1].eventId",
+			"output.events[1].id",
+			"output.customTypeArgs.properties[0].id",
+			"output.customTypeArgs.properties[0].refToId",
+			"output.customTypeArgs.properties[1].id",
+			"output.customTypeArgs.properties[1].refToId",
+		},
 	)
 
 	err = tester.SnapshotTest(context.Background())
 	assert.NoError(t, err, "State verification failed")
+
+	// // // Verify upstream snapshot
+	expectedStateDir = filepath.Join("testdata", "expected", "upstream", dir)
+	fileManager, err = helpers.NewStateFileManager(expectedStateDir)
+	require.NoError(t, err)
+
+	upstreamTester := helpers.NewUpstreamSnapshotTester(
+		dataCatalog,
+		reader,
+		fileManager,
+		[]string{
+			"id",
+			"createdAt",
+			"updatedAt",
+			"createdBy",
+			"updatedBy",
+			"workspaceId",
+			"categoryId",
+			"properties[0].id",
+			"properties[1].id",
+			"events[0].id",
+			"events[0].createdAt",
+			"events[0].updatedAt",
+			"events[0].workspaceId",
+			"events[0].createdBy",
+			"events[0].updatedBy",
+			"events[0].categoryId",
+			"events[1].id",
+			"events[1].createdAt",
+			"events[1].updatedAt",
+			"events[1].workspaceId",
+			"events[1].createdBy",
+			"events[1].updatedBy",
+			"events[1].categoryId",
+		},
+	)
+	err = upstreamTester.SnapshotTest(context.Background())
+	assert.NoError(t, err, "Upstream state verification failed")
 }

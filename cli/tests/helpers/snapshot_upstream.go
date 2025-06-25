@@ -22,8 +22,8 @@ type UpstreamSnapshotTester struct {
 // with the required dependencies: DataCatalogClient, FileManager, and UpstreamRawStateFetcher
 func NewUpstreamSnapshotTester(
 	dataCatalog catalog.DataCatalog,
-	fileManager *StateFileManager,
 	stateReader UpstreamStateReader,
+	fileManager *StateFileManager,
 	ignore []string,
 ) *UpstreamSnapshotTester {
 	return &UpstreamSnapshotTester{

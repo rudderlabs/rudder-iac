@@ -1,0 +1,38 @@
+version: "rudder/v0.1"
+kind: "tp"
+metadata:
+  name: "api_tracking"
+spec:
+  id: "api_tracking"
+  display_name: "API Tracking"
+  description: "Tracking plan for an e-commerce application."
+  rules:
+    - type: "event_rule"
+      id: "login"
+      event:
+        $ref: "#/events/api_tracking/api_tracking"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/api_tracking/api_method"
+          required: true
+        - $ref: "#/properties/api_tracking/api_path"
+          required: true
+        - $ref: "#/properties/api_tracking/user_mail"
+          required: true
+        - $ref: "#/properties/api_tracking/password"
+          required: true
+
+    - type: "event_rule"
+      id: "login_error"
+      event:
+        $ref: "#/events/api_tracking/api_error"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/api_tracking/api_method"
+          required: true
+        - $ref: "#/properties/api_tracking/api_path"
+          required: true
+        - $ref: "#/properties/api_tracking/http_retry_count"
+          required: false
+        - $ref: "#/properties/api_tracking/error_code"
+          required: true

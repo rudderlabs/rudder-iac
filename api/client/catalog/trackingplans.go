@@ -62,6 +62,18 @@ type TrackingPlanEvent struct {
 	SchemaID       string `json:"schemaId"`
 }
 
+type TrackingPlanWithSchema struct {
+	ID           string                    `json:"id"`
+	Name         string                    `json:"name"`
+	Description  *string                   `json:"description,omitempty"`
+	CreationType string                    `json:"creationType"`
+	Version      int                       `json:"version"`
+	WorkspaceID  string                    `json:"workspaceId"`
+	CreatedAt    time.Time                 `json:"createdAt"`
+	UpdatedAt    time.Time                 `json:"updatedAt"`
+	Events       []TrackingPlanEventSchema `json:"events"`
+}
+
 type TrackingPlanEventSchema struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
@@ -87,7 +99,7 @@ type TrackingPlanStore interface {
 	UpdateTrackingPlan(ctx context.Context, id string, name, description string) (*TrackingPlan, error)
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
-	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error)
+	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchema, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 }
 
@@ -172,15 +184,39 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 	return nil
 }
 
-func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error) {
+func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchema, error) {
 	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s", id), nil)
 	if err != nil {
-		return nil, fmt.Errorf("executing http request: %w", err)
+		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
 	}
 
-	trackingPlan := TrackingPlan{}
+	trackingPlan := TrackingPlanWithSchema{}
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&trackingPlan); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
+	}
+
+	var events struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	eventsResp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s/events", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to fetch events on tracking plan: %w", err)
+	}
+
+	if err := json.NewDecoder(bytes.NewReader(eventsResp)).Decode(&events); err != nil {
+		return nil, fmt.Errorf("decoding events response: %w, response: %s", err, string(eventsResp))
+	}
+
+	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events.Data))
+	for i, event := range events.Data {
+		schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
+		if err != nil {
+			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
+		}
+		trackingPlan.Events[i] = *schema
 	}
 
 	return &trackingPlan, nil

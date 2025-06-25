@@ -1,0 +1,161 @@
+{
+    "id": "api_tracking",
+    "type": "tracking-plan",
+    "input": {
+        "description": "Tracking plan for an e-commerce application.",
+        "events": [
+            {
+                "allowUnplanned": false,
+                "description": "This event is triggered every time a user views a product.",
+                "identitySection": "",
+                "localId": "api_tracking",
+                "name": "API Tracking",
+                "properties": [
+                    {
+                        "config": {
+                            "enum": [
+                                "GET",
+                                "PUT",
+                                "POST",
+                                "DELETE",
+                                "PATCH"
+                            ]
+                        },
+                        "description": "http method of the api called",
+                        "hasCustomTypeRef": false,
+                        "hasItemTypesRef": false,
+                        "localId": "api_method",
+                        "name": "API Method",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "config": {},
+                        "description": "subpath of the api requested",
+                        "hasCustomTypeRef": false,
+                        "hasItemTypesRef": false,
+                        "localId": "api_path",
+                        "name": "API Path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "config": {},
+                        "description": "Username for the API",
+                        "hasCustomTypeRef": true,
+                        "hasItemTypesRef": false,
+                        "localId": "username",
+                        "name": "Username",
+                        "required": true,
+                        "type": {
+                            "$__rudderRef": "custom-type:email_type",
+                            "property": "name"
+                        }
+                    },
+                    {
+                        "config": {
+                            "maxLength": 64,
+                            "minLength": 10
+                        },
+                        "description": "Password for the API",
+                        "hasCustomTypeRef": false,
+                        "hasItemTypesRef": false,
+                        "localId": "password",
+                        "name": "Password",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "type": "track"
+            }
+        ],
+        "localId": "api_tracking",
+        "name": "API Tracking"
+    },
+    "output": {
+        "createdAt": "2025-06-25 07:00:05.432 +0000 UTC",
+        "creationType": "Data catalog API",
+        "description": "Tracking plan for an e-commerce application.",
+        "events": [
+            {
+                "eventId": "ev_2yzQD5HdaNB12pB0kiEAhiabG2d",
+                "id": "tpe_2yzQDuaJ5igZYb94JjkWb6AvQ8m",
+                "localId": "api_tracking"
+            }
+        ],
+        "id": "tp_2yzQDvIzyq8EcjcWFGW4BoOk6ek",
+        "name": "API Tracking",
+        "trackingPlanArgs": {
+            "description": "Tracking plan for an e-commerce application.",
+            "events": [
+                {
+                    "allowUnplanned": false,
+                    "description": "This event is triggered every time a user views a product.",
+                    "identitySection": "",
+                    "localId": "api_tracking",
+                    "name": "API Tracking",
+                    "properties": [
+                        {
+                            "config": {
+                                "enum": [
+                                    "GET",
+                                    "PUT",
+                                    "POST",
+                                    "DELETE",
+                                    "PATCH"
+                                ]
+                            },
+                            "description": "http method of the api called",
+                            "hasCustomTypeRef": false,
+                            "hasItemTypesRef": false,
+                            "localId": "api_method",
+                            "name": "API Method",
+                            "required": true,
+                            "type": "string"
+                        },
+                        {
+                            "config": {},
+                            "description": "subpath of the api requested",
+                            "hasCustomTypeRef": false,
+                            "hasItemTypesRef": false,
+                            "localId": "api_path",
+                            "name": "API Path",
+                            "required": true,
+                            "type": "string"
+                        },
+                        {
+                            "config": {},
+                            "description": "Username for the API",
+                            "hasCustomTypeRef": true,
+                            "hasItemTypesRef": false,
+                            "localId": "username",
+                            "name": "Username",
+                            "required": true,
+                            "type": "EmailType"
+                        },
+                        {
+                            "config": {
+                                "maxLength": 64,
+                                "minLength": 10
+                            },
+                            "description": "Password for the API",
+                            "hasCustomTypeRef": false,
+                            "hasItemTypesRef": false,
+                            "localId": "password",
+                            "name": "Password",
+                            "required": true,
+                            "type": "string"
+                        }
+                    ],
+                    "type": "track"
+                }
+            ],
+            "localId": "api_tracking",
+            "name": "API Tracking"
+        },
+        "updatedAt": "2025-06-25 07:00:05.432 +0000 UTC",
+        "version": 1,
+        "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+    },
+    "dependencies": []
+}

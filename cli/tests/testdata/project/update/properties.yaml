@@ -22,12 +22,19 @@ spec:
       type: "string"
       description: "subpath of the api requested"
 
+    - id: "http_retry_count"
+      name: "HTTP Retry Count"
+      type: "integer"
+      description: "Number of times to retry the API call"
+      propConfig:
+        minimum: 0
+        maximum: 10
+        multipleOf: 2
+
     - id: "user_mail"
       name: "User Email"
       description: "User's email address"
-      type: "string"
-      propConfig:
-        pattern: "^([\\w%.-]+@[\\d.A-Za-z-]+\\.[A-Za-z]{2,6})*$"
+      type: "#/custom-types/login_elements/email_type"
 
     - id: "error_code"
       name: "Error Code"
@@ -39,3 +46,12 @@ spec:
           - 401
           - 404
           - 500
+
+    - id: "password"
+      name: "Password"
+      description: "Password for the API"
+      type: "string"
+      propConfig:
+        minLength: 10
+        maxLength: 64
+ 

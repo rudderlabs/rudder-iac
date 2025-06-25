@@ -1,0 +1,10 @@
+{
+    "id": "ev_2yy5tT5llx29Ks3mj4sw9as3FrJ",
+    "name": "API Tracking",
+    "description": "This event is triggered every time a user views a product.",
+    "eventType": "track",
+    "categoryId": null,
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdAt": "2025-06-24T19:43:06.928Z",
+    "updatedAt": "2025-06-24T19:43:06.928Z"
+}

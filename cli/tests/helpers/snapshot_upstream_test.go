@@ -63,8 +63,8 @@ func TestUpstreamSnapshot(t *testing.T) {
 	})
 	upstreamTester := NewUpstreamSnapshotTester(
 		catalogClient,
-		fileManager,
 		reader,
+		fileManager,
 		ignoreFields,
 	)
 

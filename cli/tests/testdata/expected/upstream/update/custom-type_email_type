@@ -1,0 +1,30 @@
+{
+  "config": {
+    "format": "email",
+    "maxLength": 255,
+    "minLength": 15,
+    "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+  },
+  "rules": {
+    "format": "email",
+    "maxLength": 255,
+    "minLength": 15,
+    "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+    "type": [
+      "string"
+    ]
+  },
+  "itemDefinitions": [],
+  "id": "def_2yy5s7AGWa0LZTpHQWInASOPSAw",
+  "name": "EmailType",
+  "type": "string",
+  "dataType": "string",
+  "version": 2,
+  "description": "Custom type for email validation",
+  "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+  "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+  "createdAt": "2025-06-24T19:42:55.756Z",
+  "updatedBy": null,
+  "updatedAt": "2025-06-24T19:42:55.756Z",
+  "properties": []
+}

@@ -20,9 +20,10 @@ var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
 
 type MockTrackingPlanCatalog struct {
 	helpers.EmptyCatalog
-	tp   *catalog.TrackingPlan
-	tpes *catalog.TrackingPlanEventSchema
-	err  error
+	tp           *catalog.TrackingPlan
+	tpWithSchema *catalog.TrackingPlanWithSchema
+	tpes         *catalog.TrackingPlanEventSchema
+	err          error
 }
 
 func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
@@ -45,8 +46,8 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
-	return m.tp, m.err
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchema, error) {
+	return m.tpWithSchema, m.err
 }
 
 func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {
