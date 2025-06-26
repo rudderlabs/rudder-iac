@@ -1,0 +1,46 @@
+{
+  "config": {},
+  "rules": {
+    "type": [
+      "object"
+    ],
+    "required": [
+      "Password",
+      "User Email"
+    ],
+    "properties": {
+      "User Email": {
+        "$ref": "#/$defs/EmailType"
+      },
+      "Password": {
+        "maxLength": 64,
+        "minLength": 10,
+        "type": [
+          "string"
+        ]
+      }
+    }
+  },
+  "itemDefinitions": [],
+  "id": "def_2yy5t5nbaInoAYTzqe2ZNDBi9FU",
+  "name": "Login",
+  "type": "object",
+  "dataType": "object",
+  "version": 2,
+  "description": "Object containing login details",
+  "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+  "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+  "createdAt": "2025-06-24T19:43:03.234Z",
+  "updatedBy": null,
+  "updatedAt": "2025-06-24T19:43:03.234Z",
+  "properties": [
+    {
+      "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+      "required": true
+    },
+    {
+      "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+      "required": true
+    }
+  ]
+}

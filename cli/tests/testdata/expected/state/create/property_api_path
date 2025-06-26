@@ -1,0 +1,27 @@
+{
+  "id": "api_path",
+  "type": "property",
+  "input": {
+    "config": {},
+    "description": "subpath of the api requested",
+    "name": "API Path",
+    "type": "string"
+  },
+  "output": {
+    "config": {},
+    "createdAt": "2025-06-19 13:00:17.933 +0000 UTC",
+    "description": "subpath of the api requested",
+    "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
+    "name": "API Path",
+    "propertyArgs": {
+      "config": {},
+      "description": "subpath of the api requested",
+      "name": "API Path",
+      "type": "string"
+    },
+    "type": "string",
+    "updatedAt": "2025-06-19 13:00:17.933 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

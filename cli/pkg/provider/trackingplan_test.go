@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/testutils/factory"
+	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,10 +19,11 @@ import (
 var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
 
 type MockTrackingPlanCatalog struct {
-	EmptyCatalog
-	tp   *catalog.TrackingPlan
-	tpes *catalog.TrackingPlanEventSchema
-	err  error
+	helpers.EmptyCatalog
+	tp           *catalog.TrackingPlan
+	tpWithSchema *catalog.TrackingPlanWithSchema
+	tpes         *catalog.TrackingPlanEventSchema
+	err          error
 }
 
 func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
@@ -44,8 +46,8 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
-	return m.tp, m.err
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchema, error) {
+	return m.tpWithSchema, m.err
 }
 
 func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {

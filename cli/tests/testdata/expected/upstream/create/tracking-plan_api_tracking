@@ -1,0 +1,70 @@
+{
+  "createdAt": "2025-06-25T08:05:23.061Z",
+  "creationType": "Data catalog API",
+  "description": "Tracking plan for an e-commerce application.",
+  "events": [
+    {
+      "categoryId": null,
+      "createdAt": "2025-06-25T08:05:17.129Z",
+      "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "description": "This event is triggered every time a user views a product.",
+      "eventType": "track",
+      "id": "ev_2yzY9ZsFLG3HBB1X0jebuOPb0cC",
+      "identitySection": "properties",
+      "name": "API Tracking",
+      "rules": {
+        "$schema": "",
+        "properties": {
+          "properties": {
+            "additionalProperties": false,
+            "properties": {
+              "API Method": {
+                "enum": [
+                  "GET",
+                  "PUT",
+                  "POST",
+                  "DELETE",
+                  "PATCH"
+                ],
+                "type": [
+                  "string"
+                ]
+              },
+              "API Path": {
+                "type": [
+                  "string"
+                ]
+              },
+              "Password": {
+                "maxLength": 64,
+                "minLength": 10,
+                "type": [
+                  "string"
+                ]
+              },
+              "Username": {
+                "$ref": "#/$defs/EmailType"
+              }
+            },
+            "required": [
+              "API Method",
+              "API Path",
+              "Password",
+              "Username"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "updatedAt": "2025-06-25T08:05:24.102Z",
+      "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+    }
+  ],
+  "id": "tp_2yzYAEjZTRyI156F8eDawGyA3nJ",
+  "name": "API Tracking",
+  "updatedAt": "2025-06-25T08:05:24.102Z",
+  "version": 2,
+  "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+}

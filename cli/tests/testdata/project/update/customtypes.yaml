@@ -1,0 +1,34 @@
+
+version: "rudder/v0.1"
+kind: "custom-types"
+metadata:
+  name: "login_elements"
+spec:
+  types:
+    - id: "login"
+      name: "Login"
+      description: "Object containing login details"
+      type: "object"
+      properties:
+        - $ref: "#/properties/api_tracking/user_mail"
+          required: true
+        - $ref: "#/properties/api_tracking/password"
+          required: true
+
+    - id: "email_type"
+      name: "EmailType"
+      description: "Custom type for email validation"
+      type: "string"
+      config:
+        format: "email"
+        minLength: 15
+        maxLength: 255
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+    # - id: "email_type_list"
+    #   name: "EmailTypeList"
+    #   description: "Array of email type"
+    #   type: "array"
+    #   config:
+    #     itemTypes:
+    #     - "#/custom-types/login_elements/email_type"

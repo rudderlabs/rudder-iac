@@ -1,0 +1,138 @@
+{
+  "createdAt": "2025-06-25T08:11:46.21Z",
+  "creationType": "Data catalog API",
+  "description": "Tracking plan for an e-commerce application.",
+  "events": [
+    {
+      "categoryId": null,
+      "createdAt": "2025-06-25T08:11:58.411Z",
+      "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "description": "This event is triggered when an API error occurs.",
+      "eventType": "track",
+      "id": "ev_2yzYxszrUnzSogGdZOAPO7yF47u",
+      "identitySection": "properties",
+      "name": "API Error",
+      "rules": {
+        "$schema": "",
+        "properties": {
+          "properties": {
+            "additionalProperties": true,
+            "properties": {
+              "API Method": {
+                "enum": [
+                  "GET",
+                  "PUT",
+                  "POST",
+                  "DELETE",
+                  "PATCH",
+                  "HEAD"
+                ],
+                "type": [
+                  "string"
+                ]
+              },
+              "API Path": {
+                "type": [
+                  "string"
+                ]
+              },
+              "Error Code": {
+                "enum": [
+                  400,
+                  401,
+                  404,
+                  500
+                ],
+                "type": [
+                  "integer"
+                ]
+              },
+              "HTTP Retry Count": {
+                "maximum": 10,
+                "minimum": 0,
+                "multipleOf": 2,
+                "type": [
+                  "integer"
+                ]
+              }
+            },
+            "required": [
+              "API Method",
+              "API Path",
+              "Error Code"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "updatedAt": "2025-06-25T08:12:07.417Z",
+      "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+    },
+    {
+      "categoryId": null,
+      "createdAt": "2025-06-25T08:11:41.236Z",
+      "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "description": "This event is triggered every time a user views a product.",
+      "eventType": "track",
+      "id": "ev_2yzYvjMKk0y4X6GzlgLW9uJi7Er",
+      "identitySection": "properties",
+      "name": "API Tracking",
+      "rules": {
+        "$schema": "",
+        "properties": {
+          "properties": {
+            "additionalProperties": true,
+            "properties": {
+              "API Method": {
+                "enum": [
+                  "GET",
+                  "PUT",
+                  "POST",
+                  "DELETE",
+                  "PATCH",
+                  "HEAD"
+                ],
+                "type": [
+                  "string"
+                ]
+              },
+              "API Path": {
+                "type": [
+                  "string"
+                ]
+              },
+              "Password": {
+                "maxLength": 64,
+                "minLength": 10,
+                "type": [
+                  "string"
+                ]
+              },
+              "User Email": {
+                "$ref": "#/$defs/EmailType"
+              }
+            },
+            "required": [
+              "API Method",
+              "API Path",
+              "Password",
+              "User Email"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "updatedAt": "2025-06-25T08:11:46.632Z",
+      "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+      "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+    }
+  ],
+  "id": "tp_2yzYwMQquIHaXUOOYP5FCHXfUYU",
+  "name": "API Tracking",
+  "updatedAt": "2025-06-25T08:12:08.151Z",
+  "version": 6,
+  "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+}

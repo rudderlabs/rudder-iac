@@ -1,4 +1,4 @@
-package provider_test
+package helpers
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchema, error) {
 	return nil, nil
 }
 

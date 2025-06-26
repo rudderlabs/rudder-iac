@@ -1,0 +1,10 @@
+{
+    "id": "ev_2yy5tTQsAcFQTmQMEQxakuLxaHf",
+    "name": "API Error",
+    "description": "This event is triggered when an API error occurs.",
+    "eventType": "track",
+    "categoryId": null,
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdAt": "2025-06-24T19:43:06.029Z",
+    "updatedAt": "2025-06-24T19:43:06.029Z"
+}

@@ -1,0 +1,20 @@
+{
+    "propConfig": {
+        "enum": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+    "name": "API Method",
+    "description": "http method of the api called",
+    "type": "string",
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+    "updatedBy": null,
+    "createdAt": "2025-06-24T11:31:35.723Z",
+    "updatedAt": "2025-06-24T11:31:35.723Z"
+}

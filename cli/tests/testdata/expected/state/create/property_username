@@ -1,0 +1,32 @@
+{
+  "id": "username",
+  "type": "property",
+  "input": {
+    "config": {},
+    "description": "Username for the API",
+    "name": "Username",
+    "type": {
+      "$__rudderRef": "custom-type:email_type",
+      "property": "name"
+    }
+  },
+  "output": {
+    "config": {
+      "$ref": "#/$defs/EmailType"
+    },
+    "createdAt": "2025-06-24 18:04:47.527 +0000 UTC",
+    "description": "Username for the API",
+    "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+    "name": "Username",
+    "propertyArgs": {
+      "config": {},
+      "description": "Username for the API",
+      "name": "Username",
+      "type": "EmailType"
+    },
+    "type": "EmailType",
+    "updatedAt": "2025-06-24 18:04:47.527 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

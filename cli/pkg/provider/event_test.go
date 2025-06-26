@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ import (
 var _ catalog.DataCatalog = &MockEventCatalog{}
 
 type MockEventCatalog struct {
-	EmptyCatalog
+	helpers.EmptyCatalog
 	mockEvent *catalog.Event
 	err       error
 }

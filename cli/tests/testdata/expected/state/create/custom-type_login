@@ -1,0 +1,83 @@
+{
+  "id": "login",
+  "type": "custom-type",
+  "input": {
+    "config": {},
+    "description": "Object containing login details",
+    "localId": "login",
+    "name": "Login",
+    "properties": [
+      {
+        "id": "",
+        "refToId": {
+          "$__rudderRef": "property:username",
+          "property": "id"
+        },
+        "required": true
+      },
+      {
+        "id": "",
+        "refToId": {
+          "$__rudderRef": "property:password",
+          "property": "id"
+        },
+        "required": true
+      }
+    ],
+    "type": "object"
+  },
+  "output": {
+    "config": {},
+    "createdAt": "2025-06-24 18:04:51.814 +0000 UTC",
+    "customTypeArgs": {
+      "config": {},
+      "description": "Object containing login details",
+      "localId": "login",
+      "name": "Login",
+      "properties": [
+        {
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "refToId": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "required": true
+        },
+        {
+          "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "refToId": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "required": true
+        }
+      ],
+      "type": "object"
+    },
+    "description": "Object containing login details",
+    "id": "def_2yxtwgKJVOO9o0o0XLvrFmPGkO4",
+    "itemDefinitions": [],
+    "localId": "login",
+    "name": "Login",
+    "rules": {
+      "properties": {
+        "Password": {
+          "maxLength": 64,
+          "minLength": 10,
+          "type": [
+            "string"
+          ]
+        },
+        "Username": {
+          "$ref": "#/$defs/EmailType"
+        }
+      },
+      "required": [
+        "Username",
+        "Password"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "type": "object",
+    "updatedAt": "2025-06-24 18:04:51.814 +0000 UTC",
+    "version": 1,
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}
