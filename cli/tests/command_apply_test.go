@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTrackingPlanApply(t *testing.T) {
+func TestProjectApply(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -78,7 +78,6 @@ func verifyState(t *testing.T, dir string) {
 	err = tester.SnapshotTest(context.Background())
 	assert.NoError(t, err, "State verification failed")
 
-	// // // Verify upstream snapshot
 	expectedStateDir = filepath.Join("testdata", "expected", "upstream", dir)
 	fileManager, err = helpers.NewStateFileManager(expectedStateDir)
 	require.NoError(t, err)
