@@ -59,21 +59,21 @@ func (s *StateSnapshotTester) SnapshotTest(ctx context.Context) error {
 
 	var errs Errors
 
-	for id, resourceData := range actualResources {
+	for urn, resourceData := range actualResources {
 		actualResource, ok := resourceData.(map[string]any)
 		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: actual resource is not a map: %T", id, resourceData))
+			errs = append(errs, fmt.Errorf("resource %s: actual resource is not a map: %T", urn, resourceData))
 			continue
 		}
 
-		expectedResource, err := s.fileManager.LoadExpectedState(id)
+		expectedResource, err := s.fileManager.LoadExpectedState(urn)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("resource %s: failed to load expected state: %v", id, err))
+			errs = append(errs, fmt.Errorf("resource %s: failed to load expected state: %v", urn, err))
 			continue
 		}
 
 		if err := CompareStates(actualResource, expectedResource, s.ignore); err != nil {
-			errs = append(errs, fmt.Errorf("resource %s: %v", id, err))
+			errs = append(errs, fmt.Errorf("resource %s: %v", urn, err))
 		}
 	}
 

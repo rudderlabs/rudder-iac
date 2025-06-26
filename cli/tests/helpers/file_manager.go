@@ -38,8 +38,8 @@ func NewStateFileManager(baseDir string) (*StateFileManager, error) {
 // resourceKeyToFileName converts a resource key to a filesystem-safe filename
 // It replaces colons and other invalid characters with underscores, converts to lowercase,
 // and removes leading/trailing underscores.
-func (s *StateFileManager) resourceKeyToFileName(resourceKey string) string {
-	filename := strings.ToLower(resourceKey)
+func (s *StateFileManager) resourceURNToFileName(urn string) string {
+	filename := strings.ToLower(urn)
 	filename = resourceKeyToFileNameRegex.ReplaceAllString(filename, "_")
 	filename = strings.Trim(filename, "_")
 
@@ -47,23 +47,23 @@ func (s *StateFileManager) resourceKeyToFileName(resourceKey string) string {
 }
 
 // LoadExpectedState loads and parses a JSON state file for the given resource
-func (sfm *StateFileManager) LoadExpectedState(resourceName string) (map[string]any, error) {
+func (sfm *StateFileManager) LoadExpectedState(resourceURN string) (map[string]any, error) {
 	fullPath := filepath.Join(
 		sfm.baseDir,
-		sfm.resourceKeyToFileName(resourceName))
+		sfm.resourceURNToFileName(resourceURN))
 
 	if _, err := os.Stat(fullPath); err != nil {
-		return nil, fmt.Errorf("accessing state file for resource '%s': %w", resourceName, err)
+		return nil, fmt.Errorf("accessing state file for resource '%s': %w", resourceURN, err)
 	}
 
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("reading state file for resource '%s': %w", resourceName, err)
+		return nil, fmt.Errorf("reading state file for resource '%s': %w", resourceURN, err)
 	}
 
 	var state map[string]any
 	if err := json.Unmarshal(content, &state); err != nil {
-		return nil, fmt.Errorf("parsing JSON for resource '%s': %w", resourceName, err)
+		return nil, fmt.Errorf("parsing JSON for resource '%s': %w", resourceURN, err)
 	}
 
 	return state, nil

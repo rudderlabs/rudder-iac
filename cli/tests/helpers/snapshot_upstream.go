@@ -63,39 +63,39 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 	var errs Errors
 
 	// For each entity ID, call appropriate API method and compare with expected upstream state
-	for id, resourceData := range actualResources {
+	for urn, resourceData := range actualResources {
 		resource, ok := resourceData.(map[string]any)
 		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: is not a map: %T", id, resourceData))
+			errs = append(errs, fmt.Errorf("resource %s: is not a map: %T", urn, resourceData))
 			continue
 		}
 
 		output, ok := resource["output"].(map[string]any)
 		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: output is not a map: %T", id, resource))
+			errs = append(errs, fmt.Errorf("resource %s: output is not a map: %T", urn, resource))
 			continue
 		}
 
 		entityID, ok := output["id"].(string)
 		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: output.id is not a string: %T", id, output["id"]))
+			errs = append(errs, fmt.Errorf("resource %s: output.id is not a string: %T", urn, output["id"]))
 			continue
 		}
 
 		actual, err := u.upstreamEntity(ctx, entityID, resource["type"].(string))
 		if err != nil {
-			errs = append(errs, fmt.Errorf("resource %s: failed to fetch upstream data: %v", id, err))
+			errs = append(errs, fmt.Errorf("resource %s: failed to fetch upstream data: %v", urn, err))
 			continue
 		}
 
-		expected, err := u.fileManager.LoadExpectedState(id)
+		expected, err := u.fileManager.LoadExpectedState(urn)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("resource %s: failed to load expected upstream state: %v", id, err))
+			errs = append(errs, fmt.Errorf("resource %s: failed to load expected upstream state: %v", urn, err))
 			continue
 		}
 
 		if err := CompareStates(actual, expected, u.ignore); err != nil {
-			errs = append(errs, fmt.Errorf("resource %s failed comparison with upstream state: %v", id, err))
+			errs = append(errs, fmt.Errorf("resource %s failed comparison with upstream state: %v", urn, err))
 		}
 	}
 

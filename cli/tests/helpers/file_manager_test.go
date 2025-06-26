@@ -55,7 +55,7 @@ func TestResourceKeyToFileName(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := sfm.resourceKeyToFileName(c.input)
+			result := sfm.resourceURNToFileName(c.input)
 			assert.Equal(t, c.expected, result)
 		})
 	}
