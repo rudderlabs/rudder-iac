@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
@@ -81,7 +82,7 @@ func setupClient(version string) (*client.Client, error) {
 
 func setupProviders(c *client.Client) *Providers {
 	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c))
-	retlp := retl.New()
+	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 
 	return &Providers{
 		DataCatalog: dcp,
