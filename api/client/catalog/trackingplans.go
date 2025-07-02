@@ -62,7 +62,7 @@ type TrackingPlanEvent struct {
 	SchemaID       string `json:"schemaId"`
 }
 
-type TrackingPlanWithSchema struct {
+type TrackingPlanWithSchemas struct {
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
 	Description  *string                   `json:"description,omitempty"`
@@ -99,7 +99,7 @@ type TrackingPlanStore interface {
 	UpdateTrackingPlan(ctx context.Context, id string, name, description string) (*TrackingPlan, error)
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
-	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchema, error)
+	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 }
 
@@ -184,13 +184,13 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 	return nil
 }
 
-func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchema, error) {
+func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error) {
 	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
 	}
 
-	trackingPlan := TrackingPlanWithSchema{}
+	trackingPlan := TrackingPlanWithSchemas{}
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&trackingPlan); err != nil {
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/testutils/factory"
-	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,9 +18,9 @@ import (
 var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
 
 type MockTrackingPlanCatalog struct {
-	helpers.EmptyCatalog
+	provider.EmptyCatalog
 	tp           *catalog.TrackingPlan
-	tpWithSchema *catalog.TrackingPlanWithSchema
+	tpWithSchema *catalog.TrackingPlanWithSchemas
 	tpes         *catalog.TrackingPlanEventSchema
 	err          error
 }
@@ -46,7 +45,7 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchema, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
 	return m.tpWithSchema, m.err
 }
 
