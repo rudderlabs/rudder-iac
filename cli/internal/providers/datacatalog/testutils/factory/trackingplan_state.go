@@ -2,7 +2,7 @@ package factory
 
 import (
 	"github.com/google/uuid"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 )
 
 type TrackingPlanArgsFactory struct {

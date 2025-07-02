@@ -1,4 +1,4 @@
-package provider_test
+package datacatalog_test
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/testutils/factory"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ import (
 var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
 
 type MockTrackingPlanCatalog struct {
-	provider.EmptyCatalog
+	datacatalog.EmptyCatalog
 	tp           *catalog.TrackingPlan
 	tpWithSchema *catalog.TrackingPlanWithSchemas
 	tpes         *catalog.TrackingPlanEventSchema
@@ -71,7 +71,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = provider.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
@@ -134,7 +134,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = provider.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
@@ -240,7 +240,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = provider.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
 	)
 
 	var (
@@ -511,7 +511,7 @@ func TestTrackingPlanProvider_Delete(t *testing.T) {
 
 	var (
 		ctx      = context.Background()
-		provider = provider.NewTrackingPlanProvider(&MockTrackingPlanCatalog{})
+		provider = datacatalog.NewTrackingPlanProvider(&MockTrackingPlanCatalog{})
 	)
 
 	err := provider.Delete(ctx, "tracking-plan-id", resources.ResourceData{"id": "upstream-tracking-plan-id"})
@@ -781,7 +781,7 @@ func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
 			}
 
 			// Call GetUpsertEvent
-			actual := provider.GetUpsertEvent(event)
+			actual := datacatalog.GetUpsertEvent(event)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

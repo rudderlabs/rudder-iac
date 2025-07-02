@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/stretchr/testify/assert"
 )
 

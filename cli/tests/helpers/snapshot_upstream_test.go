@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/stretchr/testify/require"
 )
 
 type MockDataCatalogClient struct {
-	provider.EmptyCatalog
+	datacatalog.EmptyCatalog
 	event *catalog.Event
 }
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/stretchr/testify/assert"
 )
 

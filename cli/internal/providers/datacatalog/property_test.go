@@ -1,4 +1,4 @@
-package provider_test
+package datacatalog_test
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type MockPropertyCatalog struct {
-	provider.EmptyCatalog
+	datacatalog.EmptyCatalog
 	property *catalog.Property
 	err      error
 }
@@ -49,7 +49,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 	var (
 		ctx              = context.Background()
 		mockCatalog      = &MockPropertyCatalog{}
-		propertyProvider = provider.NewPropertyProvider(mockCatalog)
+		propertyProvider = datacatalog.NewPropertyProvider(mockCatalog)
 		createdAt, _     = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updatedAt, _     = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)

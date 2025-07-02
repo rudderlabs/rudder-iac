@@ -1,4 +1,4 @@
-package provider
+package datacatalog
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
 
 const (
@@ -16,10 +15,6 @@ const (
 	EventResourceType        = "event"
 	TrackingPlanResourceType = "tracking-plan"
 	CustomTypeResourceType   = "custom-type"
-)
-
-var (
-	log = logger.New("catalog-provider")
 )
 
 var resourceTypeCollection = map[string]catalog.ResourceCollection{

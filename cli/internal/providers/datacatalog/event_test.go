@@ -1,4 +1,4 @@
-package provider_test
+package datacatalog_test
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 var _ catalog.DataCatalog = &MockEventCatalog{}
 
 type MockEventCatalog struct {
-	provider.EmptyCatalog
+	datacatalog.EmptyCatalog
 	mockEvent *catalog.Event
 	err       error
 }
@@ -53,7 +53,7 @@ func TestEventProviderOperations(t *testing.T) {
 	var (
 		ctx           = context.Background()
 		mockCatalog   = &MockEventCatalog{}
-		eventProvider = provider.NewEventProvider(mockCatalog)
+		eventProvider = datacatalog.NewEventProvider(mockCatalog)
 		created, _    = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updated, _    = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)
@@ -255,7 +255,7 @@ func TestEventProviderDuplicateError(t *testing.T) {
 
 			mockCatalog := &MockEventCatalog{}
 			mockCatalog.SetError(c.err)
-			eventProvider := provider.NewEventProvider(mockCatalog)
+			eventProvider := datacatalog.NewEventProvider(mockCatalog)
 
 			_, err := eventProvider.Create(ctx, "event-id", c.args.ToResourceData())
 			require.Error(t, err)

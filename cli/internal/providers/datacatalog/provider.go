@@ -6,12 +6,11 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/provider"
-	pstate "github.com/rudderlabs/rudder-iac/cli/pkg/provider/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 )
 
@@ -25,7 +24,7 @@ type Provider struct {
 
 func New(client catalog.DataCatalog) *Provider {
 	return &Provider{
-		SyncProvider: provider.NewCatalogProvider(client),
+		SyncProvider: NewCatalogProvider(client),
 		client:       client,
 		dc:           localcatalog.New(),
 	}
@@ -41,10 +40,10 @@ func (p *Provider) GetSupportedKinds() []string {
 
 func (p *Provider) GetSupportedTypes() []string {
 	return []string{
-		provider.PropertyResourceType,
-		provider.EventResourceType,
-		provider.TrackingPlanResourceType,
-		provider.CustomTypeResourceType,
+		PropertyResourceType,
+		EventResourceType,
+		TrackingPlanResourceType,
+		CustomTypeResourceType,
 	}
 }
 
@@ -77,21 +76,21 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 	propIDToURN := make(map[string]string)
 	for _, props := range catalog.Properties {
 		for _, prop := range props {
-			propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, provider.PropertyResourceType)
+			propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, PropertyResourceType)
 		}
 	}
 
 	eventIDToURN := make(map[string]string)
 	for _, events := range catalog.Events {
 		for _, event := range events {
-			eventIDToURN[event.LocalID] = resources.URN(event.LocalID, provider.EventResourceType)
+			eventIDToURN[event.LocalID] = resources.URN(event.LocalID, EventResourceType)
 		}
 	}
 
 	customTypeIDToURN := make(map[string]string)
 	for _, customTypes := range catalog.CustomTypes {
 		for _, customType := range customTypes {
-			customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, provider.CustomTypeResourceType)
+			customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, CustomTypeResourceType)
 		}
 	}
 
@@ -128,7 +127,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				return nil, fmt.Errorf("creating property args from catalog property: %s, err:%w", prop.LocalID, err)
 			}
 
-			resource := resources.NewResource(prop.LocalID, provider.PropertyResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(prop.LocalID, PropertyResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -146,7 +145,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				EventType:   event.Type,
 				CategoryID:  nil,
 			}
-			resource := resources.NewResource(event.LocalID, provider.EventResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(event.LocalID, EventResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
 			eventIDToURN[event.LocalID] = resource.URN()
@@ -161,7 +160,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			// Add CustomTypeArgs
 			args := pstate.CustomTypeArgs{}
 			args.FromCatalogCustomType(&customType, getURNFromRef)
-			resource := resources.NewResource(customType.LocalID, provider.CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(customType.LocalID, CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 		}
 	}
@@ -175,7 +174,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return nil, fmt.Errorf("creating tracking plan args: %w", err)
 		}
 
-		resource := resources.NewResource(tp.LocalID, provider.TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
+		resource := resources.NewResource(tp.LocalID, TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}
