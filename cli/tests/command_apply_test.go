@@ -48,7 +48,7 @@ func verifyState(t *testing.T, dir string) {
 
 	// Verify state snapshot
 	expectedStateDir := filepath.Join("testdata", "expected", "state", dir)
-	fileManager, err := helpers.NewStateFileManager(expectedStateDir)
+	fileManager, err := helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
 	tester := helpers.NewStateSnapshotTester(
@@ -79,7 +79,7 @@ func verifyState(t *testing.T, dir string) {
 	assert.NoError(t, err, "State verification failed")
 
 	expectedStateDir = filepath.Join("testdata", "expected", "upstream", dir)
-	fileManager, err = helpers.NewStateFileManager(expectedStateDir)
+	fileManager, err = helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
 	upstreamTester := helpers.NewUpstreamSnapshotTester(

@@ -9,12 +9,12 @@ import (
 // using the existing generic comparator.
 type StateSnapshotTester struct {
 	reader      UpstreamStateReader
-	fileManager *StateFileManager
+	fileManager *SnapshotFileManager
 	ignore      []string
 }
 
 // NewStateSnapshotTester creates a new instance of StateSnapshotTester
-func NewStateSnapshotTester(reader UpstreamStateReader, manager *StateFileManager, ignore []string) *StateSnapshotTester {
+func NewStateSnapshotTester(reader UpstreamStateReader, manager *SnapshotFileManager, ignore []string) *StateSnapshotTester {
 	return &StateSnapshotTester{
 		reader:      reader,
 		fileManager: manager,

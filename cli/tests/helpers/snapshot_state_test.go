@@ -53,7 +53,7 @@ func TestSnapshotState(t *testing.T) {
 
 	mockReader := &MockUpstreamStateReader{state: mockState}
 
-	fileManager, err := NewStateFileManager("testdata/snapshot/expected/state")
+	fileManager, err := NewSnapshotFileManager("testdata/snapshot/expected/state")
 	require.NoError(t, err, "creating state file manager")
 
 	ignoreFields := []string{

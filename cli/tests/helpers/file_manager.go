@@ -14,13 +14,13 @@ var (
 )
 
 // StateFileManager manages reading state files from a base directory
-type StateFileManager struct {
+type SnapshotFileManager struct {
 	baseDir string
 }
 
 // NewStateFileManager creates a new StateFileManager instance
 // It validates that the baseDir exists and is a directory
-func NewStateFileManager(baseDir string) (*StateFileManager, error) {
+func NewSnapshotFileManager(baseDir string) (*SnapshotFileManager, error) {
 	info, err := os.Stat(baseDir)
 	if err != nil {
 		return nil, fmt.Errorf("error accessing directory %s: %w", baseDir, err)
@@ -30,7 +30,7 @@ func NewStateFileManager(baseDir string) (*StateFileManager, error) {
 		return nil, fmt.Errorf("path is not a directory: %s", baseDir)
 	}
 
-	return &StateFileManager{
+	return &SnapshotFileManager{
 		baseDir: baseDir,
 	}, nil
 }
@@ -38,7 +38,7 @@ func NewStateFileManager(baseDir string) (*StateFileManager, error) {
 // resourceKeyToFileName converts a resource key to a filesystem-safe filename
 // It replaces colons and other invalid characters with underscores, converts to lowercase,
 // and removes leading/trailing underscores.
-func (s *StateFileManager) resourceURNToFileName(urn string) string {
+func (s *SnapshotFileManager) resourceURNToFileName(urn string) string {
 	filename := strings.ToLower(urn)
 	filename = resourceKeyToFileNameRegex.ReplaceAllString(filename, "_")
 	filename = strings.Trim(filename, "_")
@@ -47,7 +47,7 @@ func (s *StateFileManager) resourceURNToFileName(urn string) string {
 }
 
 // LoadExpectedState loads and parses a JSON state file for the given resource
-func (sfm *StateFileManager) LoadExpectedState(resourceURN string) (map[string]any, error) {
+func (sfm *SnapshotFileManager) LoadExpectedState(resourceURN string) (map[string]any, error) {
 	fullPath := filepath.Join(
 		sfm.baseDir,
 		sfm.resourceURNToFileName(resourceURN))
@@ -71,7 +71,7 @@ func (sfm *StateFileManager) LoadExpectedState(resourceURN string) (map[string]a
 
 // LoadExpectedVersion reads the version file and returns the version string
 // Returns "0.0.0" with ok=false when file doesn't exist to provide a sensible default
-func (sfm *StateFileManager) LoadExpectedVersion() (string, bool) {
+func (sfm *SnapshotFileManager) LoadExpectedVersion() (string, bool) {
 	versionPath := filepath.Join(sfm.baseDir, "version")
 
 	content, err := os.ReadFile(versionPath)
@@ -85,7 +85,7 @@ func (sfm *StateFileManager) LoadExpectedVersion() (string, bool) {
 
 // ListResources returns a list of all resource names in the base directory
 // Excludes version file and non-JSON files to focus only on actual resource state files
-func (sfm *StateFileManager) ListResources() ([]string, error) {
+func (sfm *SnapshotFileManager) ListResources() ([]string, error) {
 	entries, err := os.ReadDir(sfm.baseDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory %s: %w", sfm.baseDir, err)

@@ -13,7 +13,7 @@ import (
 // by fetching actual data from the API and comparing with expected upstream states
 type UpstreamSnapshotTester struct {
 	dataCatalog catalog.DataCatalog
-	fileManager *StateFileManager
+	fileManager *SnapshotFileManager
 	stateReader UpstreamStateReader
 	ignore      []string
 }
@@ -23,7 +23,7 @@ type UpstreamSnapshotTester struct {
 func NewUpstreamSnapshotTester(
 	dataCatalog catalog.DataCatalog,
 	stateReader UpstreamStateReader,
-	fileManager *StateFileManager,
+	fileManager *SnapshotFileManager,
 	ignore []string,
 ) *UpstreamSnapshotTester {
 	return &UpstreamSnapshotTester{

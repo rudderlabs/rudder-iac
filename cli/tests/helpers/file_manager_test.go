@@ -48,7 +48,7 @@ func TestResourceKeyToFileName(t *testing.T) {
 		},
 	}
 
-	sfm, err := NewStateFileManager(t.TempDir())
+	sfm, err := NewSnapshotFileManager(t.TempDir())
 	require.Nil(t, err)
 
 	for _, c := range cases {
@@ -61,13 +61,13 @@ func TestResourceKeyToFileName(t *testing.T) {
 	}
 }
 
-func TestStateFileManager(t *testing.T) {
+func TestSnapshotFileManager(t *testing.T) {
 	t.Parallel()
 
-	sfm, err := NewStateFileManager(filepath.Join(".", "testdata"))
+	sfm, err := NewSnapshotFileManager(filepath.Join(".", "testdata"))
 	require.Nil(t, err)
 
-	t.Run("StateFileManager_LoadExpectedState", func(t *testing.T) {
+	t.Run("SnapshotFileManager_LoadExpectedState", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("successful loading", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestStateFileManager(t *testing.T) {
 		})
 	})
 
-	t.Run("StateFileManager_ListResources", func(t *testing.T) {
+	t.Run("SnapshotFileManager_ListResources", func(t *testing.T) {
 		t.Parallel()
 
 		resources, err := sfm.ListResources()
@@ -112,7 +112,7 @@ func TestStateFileManager(t *testing.T) {
 		}, resources)
 	})
 
-	t.Run("StateFileManager_LoadExpectedVersion", func(t *testing.T) {
+	t.Run("SnapshotFileManager_LoadExpectedVersion", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("existing version file", func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestStateFileManager(t *testing.T) {
 		t.Run("missing version file", func(t *testing.T) {
 			t.Parallel()
 
-			newSfm, err := NewStateFileManager(t.TempDir())
+			newSfm, err := NewSnapshotFileManager(t.TempDir())
 			require.Nil(t, err)
 
 			version, ok := newSfm.LoadExpectedVersion()
