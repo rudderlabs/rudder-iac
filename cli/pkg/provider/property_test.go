@@ -15,7 +15,7 @@ import (
 )
 
 type MockPropertyCatalog struct {
-	EmptyCatalog
+	provider.EmptyCatalog
 	property *catalog.Property
 	err      error
 }

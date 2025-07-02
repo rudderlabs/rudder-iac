@@ -1,0 +1,10 @@
+version: rudder/v0.1
+kind: events
+metadata:
+  name: "api_tracking"
+spec:
+  events:
+  - id: "api_tracking"
+    name: "API Tracking"
+    event_type: "track"
+    description: "This event is triggered every time a user views a product." 

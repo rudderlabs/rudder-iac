@@ -1,0 +1,57 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: "api_tracking"
+spec:
+  properties:
+    - id: "api_method"
+      name: "API Method"
+      type: "string"
+      description: "http method of the api called"
+      propConfig:
+        enum:
+          - "GET"
+          - "PUT"
+          - "POST"
+          - "DELETE"
+          - "PATCH"
+          - "HEAD"
+
+    - id: "api_path"
+      name: "API Path"
+      type: "string"
+      description: "subpath of the api requested"
+
+    - id: "http_retry_count"
+      name: "HTTP Retry Count"
+      type: "integer"
+      description: "Number of times to retry the API call"
+      propConfig:
+        minimum: 0
+        maximum: 10
+        multipleOf: 2
+
+    - id: "user_mail"
+      name: "User Email"
+      description: "User's email address"
+      type: "#/custom-types/login_elements/email_type"
+
+    - id: "error_code"
+      name: "Error Code"
+      type: "integer"
+      description: "The HTTP error code." 
+      propConfig:
+        enum:
+          - 400
+          - 401
+          - 404
+          - 500
+
+    - id: "password"
+      name: "Password"
+      description: "Password for the API"
+      type: "string"
+      propConfig:
+        minLength: 10
+        maxLength: 64
+ 

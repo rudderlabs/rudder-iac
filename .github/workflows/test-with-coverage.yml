@@ -12,6 +12,9 @@ jobs:
   test-and-upload-code-coverage:
     name: "upload coverage to codecov"
     runs-on: "ubuntu-24.04"
+    concurrency:
+      group: test-and-upload-code-coverage
+      cancel-in-progress: false
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -28,6 +31,10 @@ jobs:
 
       - name: running tests
         run: make test-all
+        env:
+          RUDDERSTACK_API_URL: ${{ vars.RUDDERSTACK_API_URL }}
+          RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
+          RUDDERSTACK_CLI_DEBUG: ${{ vars.RUDDERSTACK_CLI_DEBUG }}
 
       - name: upload cli logs
         uses: actions/upload-artifact@v4
@@ -41,3 +48,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
+          files: |
+            coverage-unit.out
+            coverage-e2e.out

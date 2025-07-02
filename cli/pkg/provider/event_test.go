@@ -19,7 +19,7 @@ import (
 var _ catalog.DataCatalog = &MockEventCatalog{}
 
 type MockEventCatalog struct {
-	EmptyCatalog
+	provider.EmptyCatalog
 	mockEvent *catalog.Event
 	err       error
 }
