@@ -5,8 +5,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
 

@@ -3,8 +3,8 @@ package localcatalog
 import (
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 )
 
 var (
