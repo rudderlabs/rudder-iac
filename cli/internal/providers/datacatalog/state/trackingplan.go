@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
 
 const (

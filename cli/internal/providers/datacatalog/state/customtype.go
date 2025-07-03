@@ -1,8 +1,8 @@
 package state
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 )
 
 // CustomTypeArgs holds the necessary information to create a custom type
