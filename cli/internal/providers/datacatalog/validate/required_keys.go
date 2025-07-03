@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
+	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 type RequiredKeysValidator struct {

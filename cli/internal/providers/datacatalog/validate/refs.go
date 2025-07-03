@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
+	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 var errInvalidRefFormat = fmt.Errorf("invalid reference format")

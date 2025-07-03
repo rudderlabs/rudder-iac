@@ -3,7 +3,7 @@ package validate
 import (
 	"testing"
 
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
+	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/stretchr/testify/assert"
 )
 

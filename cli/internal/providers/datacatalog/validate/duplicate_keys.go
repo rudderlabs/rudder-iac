@@ -3,8 +3,8 @@ package validate
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 type DuplicateNameIDKeysValidator struct {

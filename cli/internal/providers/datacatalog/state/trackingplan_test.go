@@ -3,7 +3,7 @@ package state_test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
