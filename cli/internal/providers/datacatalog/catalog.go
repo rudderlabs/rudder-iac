@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -24,30 +23,13 @@ var resourceTypeCollection = map[string]catalog.ResourceCollection{
 	CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
 }
 
-type CatalogProvider struct {
-	client        catalog.DataCatalog
-	providerStore map[string]resourceProvider
-}
-
 type resourceProvider interface {
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 }
 
-func NewCatalogProvider(dc catalog.DataCatalog) syncer.SyncProvider {
-	return &CatalogProvider{
-		client: dc,
-		providerStore: map[string]resourceProvider{
-			PropertyResourceType:     NewPropertyProvider(dc),
-			EventResourceType:        NewEventProvider(dc),
-			TrackingPlanResourceType: NewTrackingPlanProvider(dc),
-			CustomTypeResourceType:   NewCustomTypeProvider(dc),
-		},
-	}
-}
-
-func (p *CatalogProvider) LoadState(ctx context.Context) (*state.State, error) {
+func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 	cs, err := p.client.ReadState(ctx)
 	if err != nil {
 		return nil, err
@@ -72,7 +54,7 @@ func (p *CatalogProvider) LoadState(ctx context.Context) (*state.State, error) {
 	return s, nil
 }
 
-func (p *CatalogProvider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
+func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
 	encodedState := state.EncodeResourceState(s)
 
 	remoteID := s.Output["id"].(string)
@@ -90,7 +72,7 @@ func (p *CatalogProvider) PutResourceState(ctx context.Context, URN string, s *s
 	})
 }
 
-func (p *CatalogProvider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
+func (p *Provider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
 	remoteID := s.Output["id"].(string)
 	return p.client.DeleteResourceState(ctx, catalog.DeleteStateRequest{
 		Collection: resourceTypeCollection[s.Type],
@@ -98,7 +80,7 @@ func (p *CatalogProvider) DeleteResourceState(ctx context.Context, s *state.Reso
 	})
 }
 
-func (p *CatalogProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
@@ -106,7 +88,7 @@ func (p *CatalogProvider) Create(ctx context.Context, ID string, resourceType st
 	return provider.Create(ctx, ID, data)
 }
 
-func (p *CatalogProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
+func (p *Provider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
@@ -114,7 +96,7 @@ func (p *CatalogProvider) Update(ctx context.Context, ID string, resourceType st
 	return provider.Update(ctx, ID, data, state)
 }
 
-func (p *CatalogProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return fmt.Errorf("unknown resource type: %s", resourceType)
