@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/analytics-go/v4"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 )
 
 // CLI deals with only the internal logger interface

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tidwall/pretty"

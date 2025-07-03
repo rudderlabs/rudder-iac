@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 var log = logger.New("validate")

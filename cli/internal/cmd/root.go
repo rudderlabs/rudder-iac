@@ -11,9 +11,9 @@ import (
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
