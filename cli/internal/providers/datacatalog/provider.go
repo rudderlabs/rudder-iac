@@ -9,8 +9,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validate"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/validate"
 )
 
 var log = logger.New("datacatalogprovider")
