@@ -3,8 +3,8 @@ package state
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
 	"github.com/stretchr/testify/assert"
 )
 

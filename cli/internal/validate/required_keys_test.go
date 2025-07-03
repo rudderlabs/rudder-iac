@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	catalog "github.com/rudderlabs/rudder-iac/cli/pkg/localcatalog"
+	catalog "github.com/rudderlabs/rudder-iac/cli/internal/localcatalog"
 )
 
 func TestPropertyArrayItemTypesValidation(t *testing.T) {
