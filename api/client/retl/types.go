@@ -1,7 +1,6 @@
 package retl
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -29,16 +28,22 @@ type PutStateRequest struct {
 
 // RETLSource represents a RETL source in the API
 type RETLSource struct {
-	ID                   string          `json:"id,omitempty"`
-	Name                 string          `json:"name"`
-	Config               json.RawMessage `json:"config"`
-	IsEnabled            bool            `json:"enabled"`
-	SourceType           string          `json:"sourceType"`
-	SourceDefinitionName string          `json:"sourceDefinitionName"`
-	AccountID            string          `json:"accountId"`
-	PrimaryKey           string          `json:"primaryKey,omitempty"`
-	CreatedAt            *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt            *time.Time      `json:"updatedAt,omitempty"`
+	ID                   string           `json:"id,omitempty"`
+	Name                 string           `json:"name"`
+	Config               RETLSourceConfig `json:"config"`
+	IsEnabled            bool             `json:"enabled"`
+	SourceType           string           `json:"sourceType"`
+	SourceDefinitionName string           `json:"sourceDefinitionName"`
+	AccountID            string           `json:"accountId"`
+	CreatedAt            *time.Time       `json:"createdAt,omitempty"`
+	UpdatedAt            *time.Time       `json:"updatedAt,omitempty"`
+}
+
+// RETLSourceConfig represents the config of a RETL SQL model source
+type RETLSourceConfig struct {
+	PrimaryKey  string `json:"primaryKey"`
+	Sql         string `json:"sql"`
+	Description string `json:"description,omitempty"`
 }
 
 // RETLSources represents a response of RETL sources

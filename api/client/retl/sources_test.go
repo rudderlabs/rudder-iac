@@ -2,7 +2,6 @@ package retl_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -14,11 +13,15 @@ import (
 )
 
 func TestCreateRetlSource(t *testing.T) {
-	sourceConfig := json.RawMessage(`{"host":"localhost","port":5432}`)
+	sourceConfig := retl.RETLSourceConfig{
+		PrimaryKey:  "id",
+		Sql:         "SELECT * FROM users",
+		Description: "Test source",
+	}
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Source","config":{"host":"localhost","port":5432},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
+			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", expected)
 		},
 		ResponseStatus: 200,
@@ -26,7 +29,7 @@ func TestCreateRetlSource(t *testing.T) {
 			"source": {
 				"id": "src1",
 				"name": "Test Source",
-				"config": {"host":"localhost","port":5432},
+				"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
 				"enabled": true,
 				"sourceType": "postgres",
 				"sourceDefinitionName": "PostgreSQL",
@@ -68,11 +71,15 @@ func TestCreateRetlSource(t *testing.T) {
 }
 
 func TestUpdateRetlSource(t *testing.T) {
-	sourceConfig := json.RawMessage(`{"host":"localhost","port":5432,"dbname":"testdb"}`)
+	sourceConfig := retl.RETLSourceConfig{
+		PrimaryKey:  "id",
+		Sql:         "SELECT * FROM users",
+		Description: "Test source",
+	}
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"id":"src1","name":"Updated Source","config":{"host":"localhost","port":5432,"dbname":"testdb"},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
+			expected := `{"id":"src1","name":"Updated Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
 			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1", expected)
 		},
 		ResponseStatus: 200,
@@ -80,7 +87,7 @@ func TestUpdateRetlSource(t *testing.T) {
 			"source": {
 				"id": "src1",
 				"name": "Updated Source",
-				"config": {"host":"localhost","port":5432,"dbname":"testdb"},
+				"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
 				"enabled": true,
 				"sourceType": "postgres",
 				"sourceDefinitionName": "PostgreSQL",
