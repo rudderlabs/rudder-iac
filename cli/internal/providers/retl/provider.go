@@ -87,3 +87,7 @@ func (p *Provider) Update(ctx context.Context, ID string, resourceType string, d
 func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	return nil
 }
+
+func (p *Provider) List(ctx context.Context, resourceType string, filters map[string]string) ([]resources.ResourceData, error) {
+	return nil, fmt.Errorf("listing resources of type '%s' is not supported by the retl provider", resourceType)
+}

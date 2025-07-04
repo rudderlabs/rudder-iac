@@ -1,6 +1,7 @@
 package datacatalog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -71,6 +72,10 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	}
 
 	return createResourceGraph(p.dc)
+}
+
+func (p *Provider) List(ctx context.Context, resourceType string, filters map[string]string) ([]resources.ResourceData, error) {
+	return nil, fmt.Errorf("listing resources of type '%s' is not supported by the datacatalog provider", resourceType)
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -27,6 +28,7 @@ type ProjectProvider interface {
 type Provider interface {
 	ProjectProvider
 	syncer.SyncProvider
+	List(ctx context.Context, resourceType string, filters map[string]string) ([]resources.ResourceData, error)
 }
 
 type Project interface {

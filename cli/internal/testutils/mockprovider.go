@@ -25,6 +25,8 @@ type MockProvider struct {
 	UpdateVal              *resources.ResourceData
 	UpdateErr              error
 	DeleteErr              error
+	ListVal                []resources.ResourceData
+	ListErr                error
 
 	// Tracking calls
 	ValidateCalledCount              int
@@ -36,6 +38,7 @@ type MockProvider struct {
 	CreateCalledWithArg              CreateArgs
 	UpdateCalledWithArg              UpdateArgs
 	DeleteCalledWithArg              DeleteArgs
+	ListCalledWithArg                ListArgs
 }
 
 // LoadSpecArgs stores arguments for LoadSpec calls
@@ -70,6 +73,12 @@ type DeleteArgs struct {
 	ID           string
 	ResourceType string
 	State        resources.ResourceData
+}
+
+// ListArgs stores arguments for List calls
+type ListArgs struct {
+	ResourceType string
+	Filters      map[string]string
 }
 
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
@@ -132,6 +141,11 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 	return m.DeleteErr
 }
 
+func (m *MockProvider) List(ctx context.Context, resourceType string, filters map[string]string) ([]resources.ResourceData, error) {
+	m.ListCalledWithArg = ListArgs{ResourceType: resourceType, Filters: filters}
+	return m.ListVal, m.ListErr
+}
+
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
@@ -143,4 +157,5 @@ func (m *MockProvider) ResetCallCounters() {
 	m.CreateCalledWithArg = CreateArgs{}
 	m.UpdateCalledWithArg = UpdateArgs{}
 	m.DeleteCalledWithArg = DeleteArgs{}
+	m.ListCalledWithArg = ListArgs{}
 }
