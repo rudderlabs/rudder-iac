@@ -102,9 +102,85 @@ func TestClientAccountsList(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestClientAccountsGet(t *testing.T) {
+func TestClientAccountsListAll(t *testing.T) {
 	ctx := context.Background()
 
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/accounts", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"data": [{
+					"id": "id-1",
+					"name": "name-1",
+					"definition": {
+						"type": "type-1",
+						"category": "category-1"
+					}
+				}, {
+					"id": "id-2",
+					"name": "name-2",
+					"definition": {
+						"type": "type-2",
+						"category": "category-2"
+					}
+				}],
+				"paging": {
+					"total": 3,
+					"next": "/v2/accounts?page=2"
+				}
+			}`,
+		},
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/accounts?page=2", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"data": [{
+					"id": "id-3",
+					"name": "name-3",
+					"definition": {
+						"type": "type-3",
+						"category": "category-3"
+					}
+				}],
+				"paging": {
+					"total": 3
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	accounts, err := c.Accounts.ListAll(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, accounts)
+	assert.Len(t, accounts, 3)
+	assert.Equal(t, "id-1", accounts[0].ID)
+	assert.Equal(t, "name-1", accounts[0].Name)
+	assert.Equal(t, "type-1", accounts[0].Definition.Type)
+	assert.Equal(t, "category-1", accounts[0].Definition.Category)
+	assert.Equal(t, "id-2", accounts[1].ID)
+	assert.Equal(t, "name-2", accounts[1].Name)
+	assert.Equal(t, "type-2", accounts[1].Definition.Type)
+	assert.Equal(t, "category-2", accounts[1].Definition.Category)
+	assert.Equal(t, "id-3", accounts[2].ID)
+	assert.Equal(t, "name-3", accounts[2].Name)
+	assert.Equal(t, "type-3", accounts[2].Definition.Type)
+	assert.Equal(t, "category-3", accounts[2].Definition.Category)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientAccountsGet(t *testing.T) {
+	ctx := context.Background()
 	calls := []testutils.Call{
 		{
 			Validate: func(req *http.Request) bool {

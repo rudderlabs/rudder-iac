@@ -46,6 +46,36 @@ func (s *accounts) List(ctx context.Context) (*AccountsPage, error) {
 	return page, nil
 }
 
+func (s *accounts) ListAll(ctx context.Context) ([]Account, error) {
+	var allAccounts []Account
+
+	page, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if page == nil {
+		return allAccounts, nil
+	}
+
+	allAccounts = append(allAccounts, page.Accounts...)
+
+	for {
+		if page.Paging.Next == "" {
+			break
+		}
+		page, err = s.Next(ctx, page.Paging)
+		if err != nil {
+			return nil, err
+		}
+		if page == nil {
+			break
+		}
+		allAccounts = append(allAccounts, page.Accounts...)
+	}
+
+	return allAccounts, nil
+}
+
 func (s *accounts) Get(ctx context.Context, id string) (*Account, error) {
 	response := &Account{}
 	if err := s.get(ctx, id, response); err != nil {
