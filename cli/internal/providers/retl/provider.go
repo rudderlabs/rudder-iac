@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -14,7 +15,7 @@ type Provider struct {
 	sqlModelSpecs []*SQLModelSpec
 }
 
-func New() *Provider {
+func New(client retlClient.RETLStore) *Provider {
 	return &Provider{
 		sqlModelSpecs: []*SQLModelSpec{},
 	}
