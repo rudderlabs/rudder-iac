@@ -110,7 +110,7 @@ func (c *RudderDataCatalog) CreateTrackingPlan(ctx context.Context, input Tracki
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", "catalog/tracking-plans", bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "POST", "v2/catalog/tracking-plans", bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -136,7 +136,7 @@ func (c *RudderDataCatalog) UpdateTrackingPlan(ctx context.Context, id string, n
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("catalog/tracking-plans/%s", id), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -154,7 +154,7 @@ func (c *RudderDataCatalog) UpsertTrackingPlan(ctx context.Context, id string, e
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PATCH", fmt.Sprintf("catalog/tracking-plans/%s/events", id), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "PATCH", fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -168,7 +168,7 @@ func (c *RudderDataCatalog) UpsertTrackingPlan(ctx context.Context, id string, e
 }
 
 func (c *RudderDataCatalog) DeleteTrackingPlan(ctx context.Context, id string) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("catalog/tracking-plans/%s", id), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
 	if err != nil {
 		return fmt.Errorf("sending delete request: %w", err)
 	}
@@ -177,7 +177,7 @@ func (c *RudderDataCatalog) DeleteTrackingPlan(ctx context.Context, id string) e
 }
 
 func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("catalog/tracking-plans/%s/events/%s", trackingPlanId, eventId), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s", trackingPlanId, eventId), nil)
 	if err != nil {
 		return fmt.Errorf("sending delete request: %w", err)
 	}
@@ -185,7 +185,7 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 }
 
 func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
 	}
@@ -201,7 +201,7 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		} `json:"data"`
 	}
 
-	eventsResp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s/events", id), nil)
+	eventsResp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch events on tracking plan: %w", err)
 	}
@@ -223,7 +223,7 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/tracking-plans/%s/events/%s?format=schema", id, eventId), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", id, eventId), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}

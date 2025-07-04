@@ -22,10 +22,10 @@ type Client struct {
 	Sources      *sources
 	Destinations *destinations
 	Connections  *connections
+	Accounts     *accounts
 }
 
 const BASE_URL = "https://api.rudderstack.com"
-const API_VERSION = "v2"
 
 var (
 	ErrEmptyAccessToken  = fmt.Errorf("access token cannot be empty")
@@ -41,9 +41,10 @@ func New(accessToken string, options ...Option) (*Client, error) {
 		userAgent:   "rudder-api-go/1.0.0",
 	}
 
-	client.Sources = &sources{service: client.service("sources")}
-	client.Destinations = &destinations{service: client.service("destinations")}
-	client.Connections = &connections{service: client.service("connections")}
+	client.Sources = &sources{service: client.service("/v2/sources")}
+	client.Destinations = &destinations{service: client.service("/v2/destinations")}
+	client.Connections = &connections{service: client.service("/v2/connections")}
+	client.Accounts = &accounts{service: client.service("/v2/accounts")}
 
 	for _, o := range options {
 		if err := o(client); err != nil {
@@ -60,10 +61,10 @@ func New(accessToken string, options ...Option) (*Client, error) {
 
 func (c *Client) URL(path string) string {
 	if len(path) == 0 {
-		return fmt.Sprintf("%s/%s", c.baseURL, API_VERSION)
+		return c.baseURL
 	}
 
-	return fmt.Sprintf("%s/%s/%s", c.baseURL, API_VERSION, strings.TrimPrefix(path, "/"))
+	return fmt.Sprintf("%s/%s", c.baseURL, strings.TrimPrefix(path, "/"))
 }
 
 func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
