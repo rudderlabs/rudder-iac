@@ -36,7 +36,7 @@ type PropertyStore interface {
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("catalog/properties/%s", id), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/catalog/properties/%s", id), nil)
 	if err != nil {
 		return fmt.Errorf("sending request: %w", err)
 	}
@@ -49,7 +49,7 @@ func (c *RudderDataCatalog) UpdateProperty(ctx context.Context, id string, new *
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("catalog/properties/%s", id), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/properties/%s", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -68,7 +68,7 @@ func (c *RudderDataCatalog) CreateProperty(ctx context.Context, input PropertyCr
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", "catalog/properties", bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "POST", "v2/catalog/properties", bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -82,7 +82,7 @@ func (c *RudderDataCatalog) CreateProperty(ctx context.Context, input PropertyCr
 }
 
 func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Property, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/properties/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/properties/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("sending get request: %w", err)
 	}

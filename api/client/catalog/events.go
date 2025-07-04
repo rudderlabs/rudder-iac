@@ -34,7 +34,7 @@ type EventStore interface {
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("catalog/events/%s", id), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/catalog/events/%s", id), nil)
 	if err != nil {
 		return fmt.Errorf("sending delete request: %w", err)
 	}
@@ -48,7 +48,7 @@ func (c *RudderDataCatalog) CreateEvent(ctx context.Context, input EventCreate) 
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", "catalog/events", bytes.NewReader(body))
+	resp, err := c.client.Do(ctx, "POST", "v2/catalog/events", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -67,7 +67,7 @@ func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *E
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("catalog/events/%s", id), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/events/%s", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -81,7 +81,7 @@ func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *E
 }
 
 func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/events/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/events/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("sending get request: %w", err)
 	}
