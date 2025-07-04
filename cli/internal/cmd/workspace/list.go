@@ -27,6 +27,7 @@ func newCmdListAccounts() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			category, _ := cmd.Flags().GetString("category")
 			accountType, _ := cmd.Flags().GetString("type")
+			jsonOutput, _ := cmd.Flags().GetBool("json")
 
 			d, err := app.NewDeps()
 			if err != nil {
@@ -34,7 +35,11 @@ func newCmdListAccounts() *cobra.Command {
 			}
 
 			p := d.CompositeProvider()
-			l := lister.New(p)
+			format := lister.TableFormat
+			if jsonOutput {
+				format = lister.JSONFormat
+			}
+			l := lister.New(p, format)
 
 			filters := make(lister.Filters)
 			if category != "" {
@@ -50,6 +55,7 @@ func newCmdListAccounts() *cobra.Command {
 
 	cmd.Flags().String("category", "", "Filter by account category")
 	cmd.Flags().String("type", "", "Filter by account type")
+	cmd.Flags().Bool("json", false, "Output as JSON")
 
 	return cmd
 }

@@ -37,28 +37,24 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters map[st
 }
 
 func (p *Provider) listAccounts(ctx context.Context, filters map[string]string) ([]resources.ResourceData, error) {
-	var allAccounts []resources.ResourceData
-	page, err := p.client.Accounts.List(ctx)
+	var filteredAccounts []resources.ResourceData
+	accounts, err := p.client.Accounts.ListAll(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for page != nil {
-		for _, account := range page.Accounts {
-			if category, ok := filters["category"]; ok && account.Definition.Category != category {
-				continue
-			}
-			if accountType, ok := filters["type"]; ok && account.Definition.Type != accountType {
-				continue
-			}
-			acc := &Account{Account: &account}
-			allAccounts = append(allAccounts, acc.ToResourceData())
+
+	for _, account := range accounts {
+		if category, ok := filters["category"]; ok && account.Definition.Category != category {
+			continue
 		}
-		page, err = p.client.Accounts.Next(ctx, page.Paging)
-		if err != nil {
-			return nil, err
+		if accountType, ok := filters["type"]; ok && account.Definition.Type != accountType {
+			continue
 		}
+		acc := &Account{Account: &account}
+		filteredAccounts = append(filteredAccounts, acc.ToResourceData())
 	}
-	return allAccounts, nil
+
+	return filteredAccounts, nil
 }
 
 func (p *Provider) GetSupportedKinds() []string {
