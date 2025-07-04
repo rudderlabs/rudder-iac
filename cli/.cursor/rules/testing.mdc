@@ -37,10 +37,10 @@ func TestSomeOperations(t *testing.T) {
 ## Important Information
 1. The CLI helps managing resources through providers which allows to capture the state of the resource and manage lifecycle of the state through mainly it's CRUD operations. Any changes in the state and / or provider operations, needs to be backed by corresponding test cases always. Examples are: 
 
-Provider [property.go](mdc:cli/pkg/provider/property.go) with state [property.go](mdc:cli/pkg/provider/state/property.go) are both backed by testcases
+Provider [property.go](mdc:cli/internal/providers/datacatalog/property.go) with state [property.go](mdc:cli/internal/providers/datacatalog/state/property.go) are both backed by testcases
 
 2. Any change in the core module of the system like `internal/syncer` needs to have corresponding test cases.
-3. There are two states being referenced in the CLI. One is the [state.go](mdc:cli/internal/syncer/state/state.go) and other is the [property.go](mdc:cli/pkg/provider/state/property.go). Understanding the distinction between which state is being talked about is necessary.
+3. There are two states being referenced in the CLI. One is the [state.go](mdc:cli/internal/syncer/state/state.go) and other is the [property.go](mdc:cli/internal/providers/datacatalog/state/property.go). Understanding the distinction between which state is being talked about is necessary.
 
 
 
