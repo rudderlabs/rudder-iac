@@ -35,7 +35,7 @@ func newCmdListAccounts() *cobra.Command {
 			}
 
 			p := d.CompositeProvider()
-			format := lister.TableFormat
+			format := lister.DetailedFormat
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
