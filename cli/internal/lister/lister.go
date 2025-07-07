@@ -34,7 +34,7 @@ func (l *Lister) List(ctx context.Context, resourceType string, filters Filters)
 	var rs []resources.ResourceData
 	var err error
 
-	if l.Format == TableFormat {
+	if l.Format != JSONFormat {
 		spinner := ui.NewSpinner(fmt.Sprintf("Fetching %s...", resourceType))
 		spinner.Start()
 		rs, err = l.Provider.List(ctx, resourceType, filters)
@@ -51,7 +51,7 @@ func (l *Lister) List(ctx context.Context, resourceType string, filters Filters)
 	case JSONFormat:
 		return printResourcesAsJSON(rs)
 	case TableFormat:
-		return printResourcesAsBubbleTeaTable(rs)
+		return printTableWithDetails(rs)
 	case DetailedFormat:
 		return printListWithDetails(rs)
 	default:

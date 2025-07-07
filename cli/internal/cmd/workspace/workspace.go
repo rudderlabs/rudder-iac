@@ -10,7 +10,7 @@ func NewCmdWorkspace() *cobra.Command {
 		Short: "Manage workspace resources",
 	}
 
-	cmd.AddCommand(NewCmdList())
+	cmd.AddCommand(NewCmdAccounts())
 
 	return cmd
 }
