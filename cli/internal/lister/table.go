@@ -8,8 +8,43 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
+
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.DoubleBorder()).
+	BorderForeground(lipgloss.Color("240"))
+
+type tableModel struct {
+	table      table.Model
+	windowSize tea.WindowSizeMsg
+}
+
+func (m tableModel) Init() tea.Cmd { return nil }
+
+func (m tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.windowSize = msg
+		m.table.SetWidth(msg.Width)
+		return m, nil
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		}
+	}
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
+}
+
+func (m tableModel) View() string {
+	return baseStyle.Render(m.table.View()) + "\n"
+}
 
 func printResourcesAsTable(rs []resources.ResourceData) error {
 	if len(rs) == 0 {
@@ -121,4 +156,51 @@ func getTableRow(r resources.ResourceData, headers []string) ([]string, error) {
 		}
 	}
 	return row, nil
+}
+
+func printResourcesAsBubbleTeaTable(rs []resources.ResourceData) error {
+	if len(rs) == 0 {
+		return nil
+	}
+
+	headers := getHeaders(rs)
+	columns := make([]table.Column, len(headers))
+	for i, h := range headers {
+		columns[i] = table.Column{Title: h, Width: len(h)}
+	}
+
+	rows := make([]table.Row, len(rs))
+	for i, r := range rs {
+		row, err := getTableRow(r, headers)
+		if err != nil {
+			return fmt.Errorf("failed to create table row: %w", err)
+		}
+		rows[i] = row
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(len(rs)),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	t.SetStyles(s)
+
+	m := tableModel{table: t}
+	if _, err := tea.NewProgram(m).Run(); err != nil {
+		return fmt.Errorf("failed to run bubbletea program: %w", err)
+	}
+
+	return nil
 }

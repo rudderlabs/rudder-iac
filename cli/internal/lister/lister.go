@@ -18,6 +18,8 @@ const (
 	JSONFormat OutputFormat = "json"
 	// TableFormat outputs resources in a human-readable table.
 	TableFormat OutputFormat = "table"
+	// DetailedFormat outputs each resource with all its details.
+	DetailedFormat OutputFormat = "details"
 )
 
 // Filters represents a generic way to pass key-value filter criteria.
@@ -49,7 +51,9 @@ func (l *Lister) List(ctx context.Context, resourceType string, filters Filters)
 	case JSONFormat:
 		return printResourcesAsJSON(rs)
 	case TableFormat:
-		return printResourcesAsTable(rs)
+		return printResourcesAsBubbleTeaTable(rs)
+	case DetailedFormat:
+		return printListWithDetails(rs)
 	default:
 		return fmt.Errorf("unknown output format: %s", l.Format)
 	}
