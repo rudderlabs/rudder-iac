@@ -1,40 +1,70 @@
 package lister
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"reflect"
-	"sort"
-	"strings"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.DoubleBorder()).
-	BorderForeground(lipgloss.Color("240"))
-
-type tableModel struct {
-	table      table.Model
-	windowSize tea.WindowSizeMsg
+type model struct {
+	table     table.Model
+	help      help.Model
+	keys      keyMap
+	resources []resources.ResourceData
+	width     int
+	height    int
 }
 
-func (m tableModel) Init() tea.Cmd { return nil }
+type keyMap struct {
+	Up   key.Binding
+	Down key.Binding
+	Quit key.Binding
+}
 
-func (m tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Quit}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.Up, k.Down},
+		{k.Quit},
+	}
+}
+
+var keys = keyMap{
+	Up: key.NewBinding(
+		key.WithKeys("up"),
+		key.WithHelp("↑", "move up"),
+	),
+	Down: key.NewBinding(
+		key.WithKeys("down"),
+		key.WithHelp("↓", "move down"),
+	),
+	Quit: key.NewBinding(
+		key.WithKeys("esc", "ctrl+c"),
+		key.WithHelp("esc", "quit"),
+	),
+}
+
+func (m model) Init() tea.Cmd { return nil }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.windowSize = msg
-		m.table.SetWidth(msg.Width)
-		return m, nil
+		m.width = msg.Width
+		m.height = msg.Height
+		m.help.Width = msg.Width
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		}
 	}
@@ -42,147 +72,74 @@ func (m tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m tableModel) View() string {
-	return baseStyle.Render(m.table.View()) + "\n"
+func (m model) View() string {
+	if m.width == 0 {
+		return "Initializing..."
+	}
+
+	// Details View
+	var detailsView string
+	if len(m.resources) > 0 {
+		selected := m.resources[m.table.Cursor()]
+		detailsView = ui.RenderDetails(selected)
+	} else {
+		detailsView = "No resources found."
+	}
+
+	// Details View with Header
+	detailsHeader := ui.Bold("Details")
+	ruler := ui.RulerWithWidth(m.width - (4 + 27 + 30 + 6) - 4)
+	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
+	fullDetailsView := lipgloss.JoinVertical(lipgloss.Left, detailsHeader, ruler, detailsContent)
+
+	// Main Layout
+	detailsStyle := lipgloss.NewStyle().
+		Padding(0, 2).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderLeft(true).
+		BorderForeground(lipgloss.Color("240"))
+
+	mainView := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		m.table.View(),
+		detailsStyle.Render(fullDetailsView),
+	)
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		mainView,
+		m.help.View(m.keys),
+	)
 }
 
-func printResourcesAsTable(rs []resources.ResourceData) error {
-	if len(rs) == 0 {
-		return nil
-	}
-
-	headers := getHeaders(rs)
-	data := make([][]string, len(rs))
-	for i, r := range rs {
-		row, err := getTableRow(r, headers)
-		if err != nil {
-			return fmt.Errorf("failed to create table row: %w", err)
-		}
-		data[i] = row
-	}
-
-	columnWidths := make([]int, len(headers))
-	for i, h := range headers {
-		columnWidths[i] = len(h)
-	}
-	for _, row := range data {
-		for i, cell := range row {
-			if len(cell) > columnWidths[i] {
-				columnWidths[i] = len(cell)
-			}
-		}
-	}
-
-	// Print header
-	for i, h := range headers {
-		fmt.Fprintf(os.Stdout, "%-*s  ", columnWidths[i], h)
-	}
-	fmt.Fprintln(os.Stdout)
-
-	// Print separator
-	for _, w := range columnWidths {
-		fmt.Fprint(os.Stdout, strings.Repeat("-", w)+"  ")
-	}
-	fmt.Fprintln(os.Stdout)
-
-	// Print data
-	for _, row := range data {
-		for i, cell := range row {
-			fmt.Fprintf(os.Stdout, "%-*s  ", columnWidths[i], cell)
-		}
-		fmt.Fprintln(os.Stdout)
-	}
-
-	return nil
-}
-
-func getHeaders(rs []resources.ResourceData) []string {
-	headerMap := make(map[string]struct{})
-	for _, r := range rs {
-		for k := range r {
-			headerMap[k] = struct{}{}
-		}
-	}
-
-	headers := make([]string, 0, len(headerMap))
-	for k := range headerMap {
-		headers = append(headers, k)
-	}
-	sort.Strings(headers)
-
-	// Move "id" and "name" to the beginning if they exist
-	for _, key := range []string{"name", "id"} {
-		for i, h := range headers {
-			if h == key {
-				headers = append(headers[:i], headers[i+1:]...)
-				headers = append([]string{key}, headers...)
-				break
-			}
-		}
-	}
-
-	// Move "createdAt", "updatedAt", and "definition" to the end if they exist
-	for _, key := range []string{"createdAt", "updatedAt"} {
-		for i, h := range headers {
-			if h == key {
-				headers = append(headers[:i], headers[i+1:]...)
-				headers = append(headers, key)
-				break
-			}
-		}
-	}
-
-	return headers
-}
-
-func getTableRow(r resources.ResourceData, headers []string) ([]string, error) {
-	row := make([]string, len(headers))
-	for i, h := range headers {
-		val, ok := r[h]
-		if !ok {
-			row[i] = ""
-			continue
-		}
-
-		v := reflect.ValueOf(val)
-		if v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
-			b, err := json.Marshal(val)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal field %s: %w", h, err)
-			}
-			row[i] = string(b)
-		} else {
-			row[i] = fmt.Sprintf("%v", val)
-		}
-	}
-	return row, nil
-}
-
-func printResourcesAsBubbleTeaTable(rs []resources.ResourceData) error {
-	if len(rs) == 0 {
-		return nil
-	}
-
-	headers := getHeaders(rs)
-	columns := make([]table.Column, len(headers))
-	for i, h := range headers {
-		columns[i] = table.Column{Title: h, Width: len(h)}
+func printTableWithDetails(rs []resources.ResourceData) error {
+	columns := []table.Column{
+		{Title: "#", Width: 4},
+		{Title: "ID", Width: 27}, // KSUID length
+		{Title: "Name", Width: 30},
 	}
 
 	rows := make([]table.Row, len(rs))
-	for i, r := range rs {
-		row, err := getTableRow(r, headers)
-		if err != nil {
-			return fmt.Errorf("failed to create table row: %w", err)
+	for i, resource := range rs {
+		name := resource["name"]
+		nameStr := ""
+		if name == nil || name == "" {
+			nameStr = "- not set -"
+		} else {
+			nameStr = name.(string)
 		}
-		rows[i] = row
+
+		rows[i] = table.Row{
+			fmt.Sprintf("%d", i+1),
+			resource["id"].(string),
+			nameStr,
+		}
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(len(rs)),
+		table.WithHeight(len(rows)),
 	)
 
 	s := table.DefaultStyles()
@@ -190,16 +147,23 @@ func printResourcesAsBubbleTeaTable(rs []resources.ResourceData) error {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		BorderBottom(true).
-		Bold(false)
+		Bold(true)
 	s.Selected = s.Selected.
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
 
-	m := tableModel{table: t}
-	if _, err := tea.NewProgram(m).Run(); err != nil {
-		return fmt.Errorf("failed to run bubbletea program: %w", err)
+	m := model{
+		table:     t,
+		help:      help.New(),
+		keys:      keys,
+		resources: rs,
+	}
+
+	p := tea.NewProgram(m)
+	if _, err := p.Run(); err != nil {
+		return err
 	}
 
 	return nil

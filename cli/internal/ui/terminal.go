@@ -19,8 +19,17 @@ func GetTerminalWidth() int {
 	return width
 }
 
-// Ruler prints a horizontal line across the terminal.
-func Ruler() {
-	width := GetTerminalWidth()
-	fmt.Println(strings.Repeat("─", width))
+// Ruler returns a string representing a horizontal line across the terminal.
+func Ruler() string {
+	return RulerWithWidth(GetTerminalWidth())
+}
+
+// RulerWithWidth returns a string representing a horizontal line of a given width.
+func RulerWithWidth(width int) string {
+	return strings.Repeat("─", width)
+}
+
+// PrintRuler prints a horizontal line across the terminal.
+func PrintRuler() {
+	fmt.Println(Ruler())
 }

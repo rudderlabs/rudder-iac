@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdList() *cobra.Command {
+func NewCmdAccounts() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List resources in the workspace",
+		Use:   "accounts",
+		Short: "Manage accounts in the workspace",
 		Args:  cobra.NoArgs,
 	}
 
@@ -21,7 +21,7 @@ func NewCmdList() *cobra.Command {
 
 func newCmdListAccounts() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "accounts",
+		Use:   "list",
 		Short: "List accounts in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,7 +35,7 @@ func newCmdListAccounts() *cobra.Command {
 			}
 
 			p := d.CompositeProvider()
-			format := lister.DetailedFormat
+			format := lister.TableFormat
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
