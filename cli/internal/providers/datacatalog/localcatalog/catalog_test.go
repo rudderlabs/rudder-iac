@@ -14,6 +14,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		Properties:    make(map[EntityGroup][]Property),
 		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 		CustomTypes:   make(map[EntityGroup][]CustomType),
+		Categories:    make(map[EntityGroup][]Category),
 	}
 
 	t.Run("properties are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -327,5 +328,50 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/city", Required: true}, customType.Properties[1])
 		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/state", Required: false}, customType.Properties[2])
 		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/zip", Required: true}, customType.Properties[3])
+	})
+
+	t.Run("categories are extracted from customer defined yaml successfully", func(t *testing.T) {
+
+		byt := []byte(`
+        version: rudder/0.1
+        kind: categories
+        metadata:
+          name: app_categories
+        spec:
+          categories:
+            - id: user_actions
+              name: "User Actions"
+            - id: system_events
+              name: "System Events"
+            - id: payment_events
+              name: "Payment Events"
+        `)
+
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+
+		err = extractEntities(s, &emptyCatalog)
+		require.Nil(t, err)
+
+		assert.Equal(t, 1, len(emptyCatalog.Categories))
+		assert.Equal(t, 3, len(emptyCatalog.Categories["app_categories"]))
+
+		// Verify first category
+		assert.Equal(t, Category{
+			LocalID: "user_actions",
+			Name:    "User Actions",
+		}, emptyCatalog.Categories["app_categories"][0])
+
+		// Verify second category
+		assert.Equal(t, Category{
+			LocalID: "system_events",
+			Name:    "System Events",
+		}, emptyCatalog.Categories["app_categories"][1])
+
+		// Verify third category
+		assert.Equal(t, Category{
+			LocalID: "payment_events",
+			Name:    "Payment Events",
+		}, emptyCatalog.Categories["app_categories"][2])
 	})
 }
