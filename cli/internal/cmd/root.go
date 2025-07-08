@@ -63,6 +63,7 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
+	rootCmd.AddCommand(NewCmdApply())
 }
 
 func initConfig() {

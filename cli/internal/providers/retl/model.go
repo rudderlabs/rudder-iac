@@ -3,13 +3,15 @@ package retl
 import "fmt"
 
 type SQLModelSpec struct {
-	ID          string  `json:"id"`
-	DisplayName string  `json:"display_name"`
-	Description string  `json:"description"`
-	File        *string `json:"file"`
-	SQL         *string `json:"sql"`
-	AccountID   string  `json:"account_id"`
-	PrimaryKey  string  `json:"primary_key"`
+	ID                   string  `json:"id" mapstructure:"id"`
+	DisplayName          string  `json:"display_name" mapstructure:"display_name"`
+	Description          string  `json:"description" mapstructure:"description"`
+	File                 *string `json:"file" mapstructure:"file"`
+	SQL                  *string `json:"sql" mapstructure:"sql"`
+	AccountID            string  `json:"account_id" mapstructure:"account_id"`
+	PrimaryKey           string  `json:"primary_key" mapstructure:"primary_key"`
+	SourceDefinitionName string  `json:"source_definition_name" mapstructure:"source_definition_name"`
+	Enabled              bool    `json:"enabled" mapstructure:"enabled"`
 }
 
 func ValidateSQLModelSpec(spec *SQLModelSpec) error {
@@ -30,6 +32,9 @@ func ValidateSQLModelSpec(spec *SQLModelSpec) error {
 	}
 	if spec.PrimaryKey == "" {
 		return fmt.Errorf("primary_key is required")
+	}
+	if spec.SourceDefinitionName == "" {
+		return fmt.Errorf("source_definition_name is required")
 	}
 	return nil
 }
