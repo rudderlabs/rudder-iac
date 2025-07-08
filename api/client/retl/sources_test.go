@@ -489,3 +489,95 @@ func TestCreateRetlSourceMalformedResponse(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+func TestCreateRetlSourceInvalidRequest(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", "")
+		},
+		ResponseStatus: 400,
+		ResponseBody:   `{"error":"Invalid request"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	source := &retl.RETLSourceCreateRequest{
+		// Missing required fields
+	}
+
+	_, err = retlClient.CreateRetlSource(context.Background(), source)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "creating RETL source")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateRetlSourceInvalidRequest(t *testing.T) {
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	source := &retl.RETLSourceUpdateRequest{
+		// Missing SourceID
+		Name:      "Updated Source",
+		IsEnabled: true,
+		AccountID: "acc123",
+	}
+
+	_, err = retlClient.UpdateRetlSource(context.Background(), source)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source ID cannot be empty")
+}
+
+func TestGetRetlSourceAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources/src1", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	_, err = retlClient.GetRetlSource(context.Background(), "src1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "getting RETL source")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateRetlSourceAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	source := &retl.RETLSourceUpdateRequest{
+		SourceID:  "src1",
+		Name:      "Updated Source",
+		IsEnabled: true,
+		AccountID: "acc123",
+	}
+
+	_, err = retlClient.UpdateRetlSource(context.Background(), source)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "updating RETL source")
+
+	httpClient.AssertNumberOfCalls()
+}
