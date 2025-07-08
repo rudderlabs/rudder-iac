@@ -54,7 +54,8 @@ Fields such as `id`, `createdAt`, and `updatedAt` change on every run. The compa
 
 1. Place new or updated YAML files in `cli/tests/testdata/{create|update}/`.
 2. Run `rudder-cli tp apply` manually to generate the state.
-3. Fetch the upstream JSON using `https://<CONTROL_PLANE>/v2/cli/catalog/state` (or the helpers in `cli/tests/helpers`).
+3. Fetch the upstream JSON using `https://<CONTROL_PLANE>/v2/cli/catalog/state` manually (or the helpers in `cli/tests/helpers`).
+4. Fetch the upstream resource JSON based on the `id` of the resource and public endpoint to view the entity.
 4. Copy the JSON into `expected/state/` and `expected/upstream/`, following the URN-based filename convention.
 5. Commit the snapshots and run `make test-e2e`.
 
