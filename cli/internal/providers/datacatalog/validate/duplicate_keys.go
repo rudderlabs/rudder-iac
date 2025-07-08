@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 type DuplicateNameIDKeysValidator struct {
 }
 
-func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
+func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) []ValidationError {
 	log.Info("validating duplicate name and id keys on the entities in catalog")
 
 	var errors []ValidationError
