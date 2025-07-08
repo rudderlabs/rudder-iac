@@ -8,14 +8,8 @@ import (
 )
 
 // CreateRetlSource creates a new RETL source
-func (r *RudderRETLStore) CreateRetlSource(ctx context.Context, source *RETLSource) (*RETLSource, error) {
-	// Create a copy to avoid modifying the input and remove fields that should not be in request
-	src := *source
-	src.ID = ""
-	src.CreatedAt = nil
-	src.UpdatedAt = nil
-
-	data, err := json.Marshal(src)
+func (r *RudderRETLStore) CreateRetlSource(ctx context.Context, source *RETLSourceCreateRequest) (*RETLSource, error) {
+	data, err := json.Marshal(source)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling source: %w", err)
 	}
@@ -25,46 +19,42 @@ func (r *RudderRETLStore) CreateRetlSource(ctx context.Context, source *RETLSour
 		return nil, fmt.Errorf("creating RETL source: %w", err)
 	}
 
-	var result struct {
-		Source *RETLSource `json:"source"`
-	}
+	var result *RETLSource
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	return result.Source, nil
+	return result, nil
 }
 
 // UpdateRetlSource updates an existing RETL source
-func (r *RudderRETLStore) UpdateRetlSource(ctx context.Context, source *RETLSource) (*RETLSource, error) {
-	if source.ID == "" {
+func (r *RudderRETLStore) UpdateRetlSource(ctx context.Context, source *RETLSourceUpdateRequest) (*RETLSource, error) {
+	if source.SourceID == "" {
 		return nil, fmt.Errorf("source ID cannot be empty")
 	}
 
-	// Create a copy to avoid modifying the input and remove fields that should not be in request
-	src := *source
-	src.CreatedAt = nil
-	src.UpdatedAt = nil
-
-	data, err := json.Marshal(src)
+	data, err := json.Marshal(map[string]interface{}{
+		"name":      source.Name,
+		"config":    source.Config,
+		"enabled":   source.IsEnabled,
+		"accountId": source.AccountID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("marshalling source: %w", err)
 	}
 
-	path := fmt.Sprintf("%s/%s", "/retl-sources", source.ID)
+	path := fmt.Sprintf("%s/%s", "/retl-sources", source.SourceID)
 	resp, err := r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("updating RETL source: %w", err)
 	}
 
-	var result struct {
-		Source *RETLSource `json:"source"`
-	}
+	var result *RETLSource
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	return result.Source, nil
+	return result, nil
 }
 
 // DeleteRetlSource deletes a RETL source by ID
@@ -94,14 +84,12 @@ func (r *RudderRETLStore) GetRetlSource(ctx context.Context, id string) (*RETLSo
 		return nil, fmt.Errorf("getting RETL source: %w", err)
 	}
 
-	var result struct {
-		Source *RETLSource `json:"source"`
-	}
+	var result *RETLSource
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	return result.Source, nil
+	return result, nil
 }
 
 // ListRetlSources lists all RETL sources

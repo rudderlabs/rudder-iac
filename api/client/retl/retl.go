@@ -26,10 +26,10 @@ type StateStore interface {
 // RETLSourceStore is the interface for RETL source operations
 type RETLSourceStore interface {
 	// CreateRetlSource creates a new RETL source
-	CreateRetlSource(ctx context.Context, source *RETLSource) (*RETLSource, error)
+	CreateRetlSource(ctx context.Context, source *RETLSourceCreateRequest) (*RETLSource, error)
 
 	// UpdateRetlSource updates an existing RETL source
-	UpdateRetlSource(ctx context.Context, source *RETLSource) (*RETLSource, error)
+	UpdateRetlSource(ctx context.Context, source *RETLSourceUpdateRequest) (*RETLSource, error)
 
 	// DeleteRetlSource deletes a RETL source by ID
 	DeleteRetlSource(ctx context.Context, id string) error
