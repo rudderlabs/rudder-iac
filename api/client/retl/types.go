@@ -31,12 +31,30 @@ type RETLSource struct {
 	ID                   string           `json:"id,omitempty"`
 	Name                 string           `json:"name"`
 	Config               RETLSourceConfig `json:"config"`
-	IsEnabled            bool             `json:"enabled"`
+	IsEnabled            bool             `json:"enabled,omitempty"`
 	SourceType           string           `json:"sourceType"`
 	SourceDefinitionName string           `json:"sourceDefinitionName"`
 	AccountID            string           `json:"accountId"`
 	CreatedAt            *time.Time       `json:"createdAt,omitempty"`
 	UpdatedAt            *time.Time       `json:"updatedAt,omitempty"`
+}
+
+type RETLSourceCreateRequest struct {
+	ID                   string           `json:"id,omitempty"`
+	Name                 string           `json:"name"`
+	Config               RETLSourceConfig `json:"config"`
+	SourceType           string           `json:"sourceType"`
+	SourceDefinitionName string           `json:"sourceDefinitionName"`
+	AccountID            string           `json:"accountId"`
+}
+
+type RETLSourceUpdateRequest struct {
+	ID        string           `json:"id,omitempty"`
+	Name      string           `json:"name"`
+	Config    RETLSourceConfig `json:"config"`
+	IsEnabled bool             `json:"enabled,omitempty"`
+	AccountID string           `json:"accountId"`
+	SourceID  string           `json:"sourceId"`
 }
 
 // RETLSourceConfig represents the config of a RETL SQL model source
@@ -48,5 +66,5 @@ type RETLSourceConfig struct {
 
 // RETLSources represents a response of RETL sources
 type RETLSources struct {
-	Sources []RETLSource `json:"sources"`
+	Data []RETLSource `json:"data"`
 }

@@ -21,22 +21,20 @@ func TestCreateRetlSource(t *testing.T) {
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
+			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"source": {
-				"id": "src1",
-				"name": "Test Source",
-				"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
-				"enabled": true,
-				"sourceType": "postgres",
-				"sourceDefinitionName": "PostgreSQL",
-				"accountId": "acc123",
-				"createdAt": "2023-07-01T12:00:00Z",
-				"updatedAt": "2023-07-01T12:00:00Z"
-			}
+			"id": "src1",
+			"name": "Test Source",
+			"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
+			"enabled": true,
+			"sourceType": "postgres",
+			"sourceDefinitionName": "PostgreSQL",
+			"accountId": "acc123",
+			"createdAt": "2023-07-01T12:00:00Z",
+			"updatedAt": "2023-07-01T12:00:00Z"
 		}`,
 	})
 
@@ -45,10 +43,9 @@ func TestCreateRetlSource(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	source := &retl.RETLSource{
+	source := &retl.RETLSourceCreateRequest{
 		Name:                 "Test Source",
 		Config:               sourceConfig,
-		IsEnabled:            true,
 		SourceType:           "postgres",
 		SourceDefinitionName: "PostgreSQL",
 		AccountID:            "acc123",
@@ -79,22 +76,20 @@ func TestUpdateRetlSource(t *testing.T) {
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"id":"src1","name":"Updated Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"enabled":true,"sourceType":"postgres","sourceDefinitionName":"PostgreSQL","accountId":"acc123"}`
+			expected := `{"name":"Updated Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"enabled":true,"accountId":"acc123"}`
 			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"source": {
-				"id": "src1",
-				"name": "Updated Source",
-				"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
-				"enabled": true,
-				"sourceType": "postgres",
-				"sourceDefinitionName": "PostgreSQL",
-				"accountId": "acc123",
-				"createdAt": "2023-07-01T12:00:00Z",
-				"updatedAt": "2023-07-01T13:00:00Z"
-			}
+			"id": "src1",
+			"name": "Updated Source",
+			"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
+			"enabled": true,
+			"sourceType": "postgres",
+			"sourceDefinitionName": "PostgreSQL",
+			"accountId": "acc123",
+			"createdAt": "2023-07-01T12:00:00Z",
+			"updatedAt": "2023-07-01T13:00:00Z"
 		}`,
 	})
 
@@ -103,14 +98,12 @@ func TestUpdateRetlSource(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	source := &retl.RETLSource{
-		ID:                   "src1",
-		Name:                 "Updated Source",
-		Config:               sourceConfig,
-		IsEnabled:            true,
-		SourceType:           "postgres",
-		SourceDefinitionName: "PostgreSQL",
-		AccountID:            "acc123",
+	source := &retl.RETLSourceUpdateRequest{
+		SourceID:  "src1",
+		Name:      "Updated Source",
+		Config:    sourceConfig,
+		IsEnabled: true,
+		AccountID: "acc123",
 	}
 
 	updated, err := retlClient.UpdateRetlSource(context.Background(), source)
@@ -120,6 +113,9 @@ func TestUpdateRetlSource(t *testing.T) {
 	assert.Equal(t, "Updated Source", updated.Name)
 	assert.Equal(t, sourceConfig, updated.Config)
 	assert.Equal(t, true, updated.IsEnabled)
+	assert.Equal(t, "postgres", updated.SourceType)
+	assert.Equal(t, "PostgreSQL", updated.SourceDefinitionName)
+	assert.Equal(t, "acc123", updated.AccountID)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -131,17 +127,15 @@ func TestGetRetlSource(t *testing.T) {
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"source": {
-				"id": "src1",
-				"name": "Test Source",
-				"config": {"host":"localhost","port":5432},
-				"enabled": true,
-				"sourceType": "postgres",
-				"sourceDefinitionName": "PostgreSQL",
-				"accountId": "acc123",
-				"createdAt": "2023-07-01T12:00:00Z",
-				"updatedAt": "2023-07-01T12:00:00Z"
-			}
+			"id": "src1",
+			"name": "Test Source",
+			"config": {"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},
+			"enabled": true,
+			"sourceType": "postgres",
+			"sourceDefinitionName": "PostgreSQL",
+			"accountId": "acc123",
+			"createdAt": "2023-07-01T12:00:00Z",
+			"updatedAt": "2023-07-01T12:00:00Z"
 		}`,
 	})
 
@@ -157,6 +151,8 @@ func TestGetRetlSource(t *testing.T) {
 	assert.Equal(t, "Test Source", source.Name)
 	assert.Equal(t, true, source.IsEnabled)
 	assert.Equal(t, "postgres", source.SourceType)
+	assert.Equal(t, "PostgreSQL", source.SourceDefinitionName)
+	assert.Equal(t, "acc123", source.AccountID)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -188,7 +184,7 @@ func TestListRetlSources(t *testing.T) {
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"sources": [
+			"data": [
 				{
 					"id": "src1",
 					"name": "Source 1",
@@ -217,14 +213,20 @@ func TestListRetlSources(t *testing.T) {
 	sources, err := retlClient.ListRetlSources(context.Background())
 	require.NoError(t, err)
 
-	assert.Len(t, sources.Sources, 2)
-	assert.Equal(t, "src1", sources.Sources[0].ID)
-	assert.Equal(t, "Source 1", sources.Sources[0].Name)
-	assert.Equal(t, true, sources.Sources[0].IsEnabled)
+	assert.Len(t, sources.Data, 2)
+	assert.Equal(t, "src1", sources.Data[0].ID)
+	assert.Equal(t, "Source 1", sources.Data[0].Name)
+	assert.Equal(t, true, sources.Data[0].IsEnabled)
+	assert.Equal(t, "postgres", sources.Data[0].SourceType)
+	assert.Equal(t, "PostgreSQL", sources.Data[0].SourceDefinitionName)
+	assert.Equal(t, "acc123", sources.Data[0].AccountID)
 
-	assert.Equal(t, "src2", sources.Sources[1].ID)
-	assert.Equal(t, "Source 2", sources.Sources[1].Name)
-	assert.Equal(t, false, sources.Sources[1].IsEnabled)
+	assert.Equal(t, "src2", sources.Data[1].ID)
+	assert.Equal(t, "Source 2", sources.Data[1].Name)
+	assert.Equal(t, false, sources.Data[1].IsEnabled)
+	assert.Equal(t, "mysql", sources.Data[1].SourceType)
+	assert.Equal(t, "MySQL", sources.Data[1].SourceDefinitionName)
+	assert.Equal(t, "acc123", sources.Data[1].AccountID)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -236,7 +238,7 @@ func TestNextRetlSources(t *testing.T) {
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"sources": [
+			"data": [
 				{
 					"id": "src3",
 					"name": "Source 3",
@@ -257,9 +259,13 @@ func TestNextRetlSources(t *testing.T) {
 	sources, err := retlClient.ListRetlSources(context.Background())
 	require.NoError(t, err)
 
-	assert.Len(t, sources.Sources, 1)
-	assert.Equal(t, "src3", sources.Sources[0].ID)
-	assert.Equal(t, "Source 3", sources.Sources[0].Name)
+	assert.Len(t, sources.Data, 1)
+	assert.Equal(t, "src3", sources.Data[0].ID)
+	assert.Equal(t, "Source 3", sources.Data[0].Name)
+	assert.Equal(t, true, sources.Data[0].IsEnabled)
+	assert.Equal(t, "postgres", sources.Data[0].SourceType)
+	assert.Equal(t, "PostgreSQL", sources.Data[0].SourceDefinitionName)
+	assert.Equal(t, "acc123", sources.Data[0].AccountID)
 
 	httpClient.AssertNumberOfCalls()
 }

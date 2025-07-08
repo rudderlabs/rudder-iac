@@ -24,7 +24,10 @@ func (r *RudderRETLStore) ReadState(ctx context.Context) (*State, error) {
 
 // PutResourceState saves a resource state record
 func (r *RudderRETLStore) PutResourceState(ctx context.Context, req PutStateRequest) error {
-	data, err := json.Marshal(req)
+	data, err := json.Marshal(map[string]interface{}{
+		"urn":   req.URN,
+		"state": req.State,
+	})
 	if err != nil {
 		return fmt.Errorf("marshalling PUT request: %w", err)
 	}

@@ -68,7 +68,7 @@ func TestReadState(t *testing.T) {
 func TestPutResourceState(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"id":"source1","urn":"retl:source:source1","state":{"id":"source1","type":"retl_source","input":{"name":"Source 1"},"output":{"id":"src1"},"dependencies":[]}}`
+			expected := `{"urn":"retl:source:source1","state":{"id":"source1","type":"retl_source","input":{"name":"Source 1"},"output":{"id":"src1"},"dependencies":[]}}`
 			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/cli/retl/state/source1", expected)
 		},
 		ResponseStatus: 200,
