@@ -21,6 +21,7 @@ type DataCatalog struct {
 	Events        map[EntityGroup][]Event       `json:"events"`
 	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
 	CustomTypes   map[EntityGroup][]CustomType  `json:"customTypes"`   // Custom types grouped by entity group
+	Categories    map[EntityGroup][]Category    `json:"categories"`    // Categories grouped by entity group
 }
 
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
@@ -39,6 +40,18 @@ func (dc *DataCatalog) Event(groupName string, id string) *Event {
 		for _, event := range events {
 			if event.LocalID == id {
 				return &event
+			}
+		}
+	}
+	return nil
+}
+
+// Category returns a category by group name and ID
+func (dc *DataCatalog) Category(groupName string, id string) *Category {
+	if categories, ok := dc.Categories[EntityGroup(groupName)]; ok {
+		for _, category := range categories {
+			if category.LocalID == id {
+				return &category
 			}
 		}
 	}
@@ -95,6 +108,7 @@ func New() *DataCatalog {
 		Events:        map[EntityGroup][]Event{},
 		TrackingPlans: map[EntityGroup]*TrackingPlan{},
 		CustomTypes:   map[EntityGroup][]CustomType{},
+		Categories:    map[EntityGroup][]Category{},
 	}
 }
 
@@ -128,6 +142,13 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
 		dc.Events[EntityGroup(name)] = events
+
+	case "categories":
+		categories, err := ExtractCategories(s)
+		if err != nil {
+			return fmt.Errorf("extracting categories: %w", err)
+		}
+		dc.Categories[EntityGroup(name)] = categories
 
 	case "tp":
 		tp, err := ExtractTrackingPlan(s)
