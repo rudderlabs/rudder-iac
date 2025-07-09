@@ -1,4 +1,4 @@
-package retl
+package retl_test
 
 import (
 	"context"
@@ -9,10 +9,13 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
+// mockRETLStore mocks the RETL client for testing
 type mockRETLStore struct {
 	retlClient.RETLStore
 	readStateFunc   func(ctx context.Context) (*retlClient.State, error)
@@ -30,7 +33,7 @@ func (m *mockRETLStore) ReadState(ctx context.Context) (*retlClient.State, error
 	if m.readStateFunc != nil {
 		return m.readStateFunc(ctx)
 	}
-	return &retlClient.State{Resources: map[string]retlClient.ResourceState{}}, nil
+	return nil, nil
 }
 
 func (m *mockRETLStore) PutResourceState(ctx context.Context, req retlClient.PutStateRequest) error {
@@ -47,26 +50,20 @@ func (m *mockRETLStore) DeleteResourceState(ctx context.Context, ID string) erro
 	return nil
 }
 
-// Add implementations for RETL source operations
+// Mock RETL source operations
+
 func (m *mockRETLStore) CreateRetlSource(ctx context.Context, source *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
 	if m.createRetlSourceFunc != nil {
 		return m.createRetlSourceFunc(ctx, source)
 	}
-	return &retlClient.RETLSource{ID: "test-source-id"}, nil
+	return nil, nil
 }
 
 func (m *mockRETLStore) UpdateRetlSource(ctx context.Context, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
 	if m.updateRetlSourceFunc != nil {
 		return m.updateRetlSourceFunc(ctx, source)
 	}
-	return &retlClient.RETLSource{
-		ID:                   source.SourceID,
-		SourceType:           "model",
-		SourceDefinitionName: "postgres",
-		Name:                 source.Name,
-		Config:               source.Config,
-		AccountID:            source.AccountID,
-	}, nil
+	return nil, nil
 }
 
 func (m *mockRETLStore) DeleteRetlSource(ctx context.Context, id string) error {
@@ -122,7 +119,7 @@ func TestProvider(t *testing.T) {
 		return nil
 	}
 
-	provider := New(mockClient)
+	provider := retl.New(mockClient)
 
 	t.Run("GetSupportedKinds", func(t *testing.T) {
 		t.Parallel()
@@ -135,7 +132,7 @@ func TestProvider(t *testing.T) {
 		t.Parallel()
 
 		types := provider.GetSupportedTypes()
-		assert.Contains(t, types, "sql-model")
+		assert.Contains(t, types, sqlmodel.ResourceType)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
@@ -155,12 +152,13 @@ func TestProvider(t *testing.T) {
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "retl-source-sql-model",
 				Spec: map[string]interface{}{
-					"id":           "test-model",
-					"display_name": "Test Model",
-					"description":  "Test Description",
-					"account_id":   "test-account",
-					"primary_key":  "id",
-					"sql":          "SELECT * FROM users",
+					"id":                     "test-model",
+					"display_name":           "Test Model",
+					"description":            "Test Description",
+					"account_id":             "test-account",
+					"primary_key":            "id",
+					"sql":                    "SELECT * FROM users",
+					"source_definition_name": "postgres",
 				},
 			})
 			assert.NoError(t, err)
@@ -182,9 +180,9 @@ func TestProvider(t *testing.T) {
 		mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
 			return &retlClient.State{
 				Resources: map[string]retlClient.ResourceState{
-					"sql-model:test": {
+					"retl-source-sql-model:test": {
 						ID:   "test",
-						Type: "sql-model",
+						Type: "retl-source-sql-model",
 					},
 				},
 			}, nil
@@ -194,10 +192,10 @@ func TestProvider(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, s)
 
-		rs := s.GetResource("sql-model:test")
+		rs := s.GetResource("retl-source-sql-model:test")
 		require.NotNil(t, rs)
 		assert.Equal(t, "test", rs.ID)
-		assert.Equal(t, "sql-model", rs.Type)
+		assert.Equal(t, "retl-source-sql-model", rs.Type)
 	})
 
 	t.Run("PutResourceState", func(t *testing.T) {
@@ -212,10 +210,15 @@ func TestProvider(t *testing.T) {
 			return nil
 		}
 
-		err := provider.PutResourceState(ctx, "test:resource", &state.ResourceState{
+		rs := &state.ResourceState{
 			ID:   "test",
-			Type: "sql-model",
-		})
+			Type: sqlmodel.ResourceType,
+			Output: map[string]interface{}{
+				"source_id": "test",
+			},
+		}
+
+		err := provider.PutResourceState(ctx, "test:resource", rs)
 		require.NoError(t, err)
 		assert.True(t, called)
 	})
@@ -236,18 +239,20 @@ func TestProvider(t *testing.T) {
 
 		// Create complete test data for SQL model
 		createData := resources.ResourceData{
-			"id":           "test-model",
-			"display_name": "Test Model",
-			"description":  "Test Description",
-			"account_id":   "test-account",
-			"primary_key":  "id",
-			"sql":          "SELECT * FROM users",
+			"id":                     "test-model",
+			"display_name":           "Test Model",
+			"description":            "Test Description",
+			"account_id":             "test-account",
+			"primary_key":            "id",
+			"sql":                    "SELECT * FROM users",
+			"source_definition_name": "postgres",
+			"enabled":                true,
 		}
 
 		t.Run("Create", func(t *testing.T) {
 			t.Parallel()
 
-			result, err := provider.Create(ctx, "test", "sql-model", createData)
+			result, err := provider.Create(ctx, "test", sqlmodel.ResourceType, createData)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			assert.Equal(t, "test-source-id", (*result)["source_id"])
@@ -261,16 +266,18 @@ func TestProvider(t *testing.T) {
 
 			// For update, we need state data with a source_id
 			stateData := resources.ResourceData{
-				"id":           "test-model",
-				"display_name": "Test Model",
-				"description":  "Test Description",
-				"account_id":   "test-account",
-				"primary_key":  "id",
-				"sql":          "SELECT * FROM users",
-				"source_id":    "test-source-id",
+				"id":                     "test-model",
+				"display_name":           "Test Model",
+				"description":            "Test Description",
+				"account_id":             "test-account",
+				"primary_key":            "id",
+				"sql":                    "SELECT * FROM users",
+				"source_id":              "test-source-id",
+				"source_definition_name": "postgres",
+				"enabled":                true,
 			}
 
-			result, err := provider.Update(ctx, "test", "sql-model", createData, stateData)
+			result, err := provider.Update(ctx, "test", sqlmodel.ResourceType, createData, stateData)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
@@ -286,11 +293,100 @@ func TestProvider(t *testing.T) {
 				"source_id": "test-source-id",
 			}
 
-			err := provider.Delete(ctx, "test", "sql-model", stateData)
+			err := provider.Delete(ctx, "test", sqlmodel.ResourceType, stateData)
 			require.NoError(t, err)
 
 			err = provider.Delete(ctx, "test", "unknown", stateData)
 			assert.Error(t, err)
 		})
+	})
+
+	t.Run("Validate", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []struct {
+			name          string
+			specs         []*specs.Spec
+			expectedError bool
+			errorMessage  string
+			loadError     bool
+		}{
+			{
+				name: "Valid resources",
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "retl-source-sql-model",
+						Spec: map[string]interface{}{
+							"id":                     "test-model",
+							"display_name":           "Test Model",
+							"description":            "Test description",
+							"sql":                    "SELECT * FROM users",
+							"account_id":             "acc123",
+							"primary_key":            "id",
+							"source_definition_name": "postgres",
+							"enabled":                true,
+						},
+					},
+				},
+				expectedError: false,
+				loadError:     false,
+			},
+			{
+				name: "Invalid resource - missing required fields",
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "retl-source-sql-model",
+						Spec: map[string]interface{}{
+							"id":                     "test-model",
+							"display_name":           "Test Model",
+							"description":            "Test description",
+							"account_id":             "acc123",
+							"primary_key":            "id",
+							"source_definition_name": "postgres",
+							"enabled":                true,
+						},
+					},
+				},
+				expectedError: true,
+				errorMessage:  "sql or file must be specified",
+				loadError:     true,
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				mockClient := &mockRETLStore{}
+				provider := retl.New(mockClient)
+
+				// Load all specs
+				for _, spec := range tc.specs {
+					err := provider.LoadSpec("test.yaml", spec)
+					if tc.loadError {
+						assert.Error(t, err)
+						if tc.errorMessage != "" {
+							assert.Contains(t, err.Error(), tc.errorMessage)
+						}
+						return
+					}
+					require.NoError(t, err, "LoadSpec should not fail")
+				}
+
+				// Validate all specs
+				err := provider.Validate()
+				if tc.expectedError {
+					assert.Error(t, err)
+					if tc.errorMessage != "" {
+						assert.Contains(t, err.Error(), tc.errorMessage)
+					}
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
 	})
 }

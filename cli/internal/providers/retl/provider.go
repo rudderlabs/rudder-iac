@@ -6,6 +6,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -23,12 +24,12 @@ func New(client retlClient.RETLStore) *Provider {
 		client:   client,
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
-			"retl-source-sql-model": "retl-source-sql-model",
+			"retl-source-sql-model": sqlmodel.ResourceType,
 		},
 	}
 
 	// Register handlers
-	p.handlers["retl-source-sql-model"] = NewSQLModelHandler(client)
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
 
 	return p
 }
