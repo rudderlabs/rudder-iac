@@ -47,7 +47,7 @@ type CustomTypeStore interface {
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("catalog/custom-types/%s", id), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/catalog/custom-types/%s", id), nil)
 	if err != nil {
 		return fmt.Errorf("sending request: %w", err)
 	}
@@ -60,7 +60,7 @@ func (c *RudderDataCatalog) UpdateCustomType(ctx context.Context, id string, new
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("catalog/custom-types/%s", id), bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/custom-types/%s", id), bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -79,7 +79,7 @@ func (c *RudderDataCatalog) CreateCustomType(ctx context.Context, input CustomTy
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "POST", "catalog/custom-types", bytes.NewReader(byt))
+	resp, err := c.client.Do(ctx, "POST", "v2/catalog/custom-types", bytes.NewReader(byt))
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
@@ -93,7 +93,7 @@ func (c *RudderDataCatalog) CreateCustomType(ctx context.Context, input CustomTy
 }
 
 func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*CustomType, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("catalog/custom-types/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/custom-types/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("sending get request: %w", err)
 	}

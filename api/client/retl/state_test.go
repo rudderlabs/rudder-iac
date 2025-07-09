@@ -65,6 +65,46 @@ func TestReadState(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestReadStateAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/cli/retl/state", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+	_, err = retlClient.ReadState(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sending read state request")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestReadStateMalformedResponse(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/cli/retl/state", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{invalid_json`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+	_, err = retlClient.ReadState(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshalling response")
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestPutResourceState(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -100,4 +140,55 @@ func TestPutResourceState(t *testing.T) {
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
+}
+
+func TestPutResourceStateAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/cli/retl/state/source1", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	req := retl.PutStateRequest{
+		ID:  "source1",
+		URN: "retl:source:source1",
+		State: retl.ResourceState{
+			ID:   "source1",
+			Type: "retl_source",
+		},
+	}
+
+	err = retlClient.PutResourceState(context.Background(), req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sending put state request")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestPutResourceStateInvalidRequest(t *testing.T) {
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	req := retl.PutStateRequest{
+		ID:  "source1",
+		URN: "retl:source:source1",
+		State: retl.ResourceState{
+			Input: map[string]interface{}{
+				"invalid": make(chan int), // This will cause json.Marshal to fail
+			},
+		},
+	}
+
+	err = retlClient.PutResourceState(context.Background(), req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "marshalling PUT request")
 }
