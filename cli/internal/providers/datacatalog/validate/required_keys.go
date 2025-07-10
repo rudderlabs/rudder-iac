@@ -30,6 +30,9 @@ var validFormatValues = []string{
 // Regex for custom type name validation
 var customTypeNameRegex = regexp.MustCompile(`^[A-Z][a-zA-Z0-9_-]{2,64}$`)
 
+// Regex for category name validation
+var categoryNameRegex = regexp.MustCompile(`^[A-Z_a-z][\s\w,.-]{2,64}$`)
+
 func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	log.Info("validating required keys on the entities in catalog")
 
@@ -224,6 +227,40 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				case "array":
 					errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
 				}
+			}
+		}
+	}
+
+	// Categories required keys and format validation
+	for group, categories := range dc.Categories {
+		for _, category := range categories {
+			reference := fmt.Sprintf("#/categories/%s/%s", group, category.LocalID)
+
+			// Check mandatory fields
+			if category.LocalID == "" || category.Name == "" {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("id and name fields on category are mandatory"),
+					Reference: reference,
+				})
+				continue
+			}
+
+			// Validate category name doesn't have leading or trailing whitespace
+			if category.Name != strings.TrimSpace(category.Name) {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("category name cannot have leading or trailing whitespace characters"),
+					Reference: reference,
+				})
+				continue
+			}
+
+			// Category name format validation using the regex from category.go
+			if !categoryNameRegex.MatchString(category.Name) {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("category name must start with a letter (upper/lower case) or underscore, followed by 2-64 characters including spaces, word characters, commas, periods, and hyphens"),
+					Reference: reference,
+				})
+				continue
 			}
 		}
 	}

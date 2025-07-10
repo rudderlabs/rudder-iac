@@ -486,3 +486,175 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCategoryValidation(t *testing.T) {
+	validator := &RequiredKeysValidator{}
+
+	testCases := []struct {
+		name           string
+		categories     map[catalog.EntityGroup][]catalog.Category
+		expectedErrors int
+		errorContains  string
+	}{
+		{
+			name: "valid category",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "valid-category",
+						Name:    "Valid Category",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "category with missing fields",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "",
+						Name:    "",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "id and name fields on category are mandatory",
+		},
+		{
+			name: "category with missing LocalID",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "",
+						Name:    "Valid Name",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "id and name fields on category are mandatory",
+		},
+		{
+			name: "category with missing Name",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "valid-id",
+						Name:    "",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "id and name fields on category are mandatory",
+		},
+		{
+			name: "category with leading whitespace in name",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "leading-space",
+						Name:    " Category With Leading Space",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "category name cannot have leading or trailing whitespace characters",
+		},
+		{
+			name: "category with trailing whitespace in name",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "trailing-space",
+						Name:    "Category With Trailing Space ",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "category name cannot have leading or trailing whitespace characters",
+		},
+		{
+			name: "category with invalid name format",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "invalid-format",
+						Name:    "!@#Invalid",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "category name must start with a letter (upper/lower case) or underscore",
+		},
+		{
+			name: "category with valid name formats",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "uppercase-start",
+						Name:    "Uppercase Start",
+					},
+					{
+						LocalID: "lowercase-start",
+						Name:    "lowercase start",
+					},
+					{
+						LocalID: "underscore-start",
+						Name:    "_underscore start",
+					},
+					{
+						LocalID: "with-numbers",
+						Name:    "Category123",
+					},
+					{
+						LocalID: "with-special-chars",
+						Name:    "Category-Name.With,Special",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "category name too short",
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"test-group": {
+					{
+						LocalID: "too-short",
+						Name:    "A",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "category name must start with a letter (upper/lower case) or underscore",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a minimal data catalog with just the categories
+			dc := &catalog.DataCatalog{
+				Categories: tc.categories,
+			}
+
+			// Validate
+			errors := validator.Validate(dc)
+
+			// Check results
+			if tc.expectedErrors == 0 {
+				assert.Empty(t, errors, "Expected no validation errors")
+			} else {
+				assert.Len(t, errors, tc.expectedErrors, "Expected %d validation errors, got %d", tc.expectedErrors, len(errors))
+				if tc.errorContains != "" {
+					found := false
+					for _, err := range errors {
+						if strings.Contains(err.Error(), tc.errorContains) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Expected to find error containing '%s' in errors: %v", tc.errorContains, errors)
+				}
+			}
+		})
+	}
+}

@@ -64,6 +64,33 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 	return spec.Events, nil
 }
 
+// Category represents a user-defined category
+type Category struct {
+	LocalID string `json:"id"`
+	Name    string `json:"name"`
+}
+
+// CategorySpec represents the spec section of a categories resource
+type CategorySpec struct {
+	Categories []Category `json:"categories"`
+}
+
+// ExtractCategories parses a resource definition and extracts categories
+func ExtractCategories(s *specs.Spec) ([]Category, error) {
+	spec := CategorySpec{}
+
+	jsonByt, err := json.Marshal(s.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling the spec: %w", err)
+	}
+
+	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+		return nil, fmt.Errorf("extracting categories spec: %w", err)
+	}
+
+	return spec.Categories, nil
+}
+
 // CustomType represents a user-defined custom type
 type CustomType struct {
 	LocalID     string                 `json:"id"`

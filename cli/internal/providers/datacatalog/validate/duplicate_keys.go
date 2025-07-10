@@ -142,5 +142,32 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 		}
 	}
 
+	var (
+		categoryName = make(map[string]any)
+		categoryID   = make(map[string]any)
+	)
+
+	// Checking duplicate id and name keys in categories
+	for group, categories := range dc.Categories {
+		for _, category := range categories {
+			if _, ok := categoryName[category.Name]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate name key %s in categories", category.Name),
+					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
+				})
+			}
+
+			if _, ok := categoryID[category.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s in categories", category.LocalID),
+					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
+				})
+			}
+
+			categoryName[category.Name] = nil
+			categoryID[category.LocalID] = nil
+		}
+	}
+
 	return errors
 }
