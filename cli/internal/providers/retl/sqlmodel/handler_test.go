@@ -53,13 +53,12 @@ func (m *mockRETLClient) GetRetlSource(ctx context.Context, sourceID string) (*r
 	}, nil
 }
 
-func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
 	m.updateCalled = true
 	if m.updateError {
 		return nil, fmt.Errorf("updating RETL source")
 	}
 	return &retlClient.RETLSource{
-		ID:                   req.SourceID,
 		Name:                 req.Name,
 		Config:               req.Config,
 		SourceType:           "model",
@@ -99,7 +98,7 @@ func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, erro
 	}, nil
 }
 
-func (m *mockRETLClient) PutResourceState(ctx context.Context, req retlClient.PutStateRequest) error {
+func (m *mockRETLClient) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
 	return nil
 }
 

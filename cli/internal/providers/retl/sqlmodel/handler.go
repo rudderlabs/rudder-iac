@@ -177,8 +177,7 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	}
 
 	source := &retlClient.RETLSourceUpdateRequest{
-		SourceID: sourceID,
-		Name:     data["display_name"].(string),
+		Name: data["display_name"].(string),
 		Config: retlClient.RETLSourceConfig{
 			PrimaryKey:  data["primary_key"].(string),
 			Sql:         sqlContent,
@@ -189,7 +188,7 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	}
 
 	// Call API to update RETL source
-	resp, err := h.client.UpdateRetlSource(ctx, source)
+	resp, err := h.client.UpdateRetlSource(ctx, sourceID, source)
 	if err != nil {
 		return nil, fmt.Errorf("updating RETL source: %w", err)
 	}

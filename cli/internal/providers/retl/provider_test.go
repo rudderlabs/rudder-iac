@@ -19,11 +19,11 @@ import (
 type mockRETLStore struct {
 	retlClient.RETLStore
 	readStateFunc   func(ctx context.Context) (*retlClient.State, error)
-	putStateFunc    func(ctx context.Context, req retlClient.PutStateRequest) error
+	putStateFunc    func(ctx context.Context, id string, req retlClient.PutStateRequest) error
 	deleteStateFunc func(ctx context.Context, ID string) error
 	// Adding mock functions for RETL source operations
 	createRetlSourceFunc func(ctx context.Context, source *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
-	updateRetlSourceFunc func(ctx context.Context, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
+	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
@@ -36,9 +36,9 @@ func (m *mockRETLStore) ReadState(ctx context.Context) (*retlClient.State, error
 	return nil, nil
 }
 
-func (m *mockRETLStore) PutResourceState(ctx context.Context, req retlClient.PutStateRequest) error {
+func (m *mockRETLStore) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
 	if m.putStateFunc != nil {
-		return m.putStateFunc(ctx, req)
+		return m.putStateFunc(ctx, id, req)
 	}
 	return nil
 }
@@ -59,9 +59,9 @@ func (m *mockRETLStore) CreateRetlSource(ctx context.Context, source *retlClient
 	return nil, nil
 }
 
-func (m *mockRETLStore) UpdateRetlSource(ctx context.Context, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+func (m *mockRETLStore) UpdateRetlSource(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
 	if m.updateRetlSourceFunc != nil {
-		return m.updateRetlSourceFunc(ctx, source)
+		return m.updateRetlSourceFunc(ctx, sourceID, source)
 	}
 	return nil, nil
 }
@@ -104,9 +104,8 @@ func TestProvider(t *testing.T) {
 		}, nil
 	}
 
-	mockClient.updateRetlSourceFunc = func(ctx context.Context, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+	mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
 		return &retlClient.RETLSource{
-			ID:                   source.SourceID,
 			SourceType:           "model",
 			SourceDefinitionName: "postgres",
 			Name:                 source.Name,
@@ -203,9 +202,9 @@ func TestProvider(t *testing.T) {
 
 		ctx := context.Background()
 		called := false
-		mockClient.putStateFunc = func(ctx context.Context, req retlClient.PutStateRequest) error {
+		mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
 			called = true
-			assert.Equal(t, "test", req.ID)
+			assert.Equal(t, "test", id)
 			assert.Equal(t, "test:resource", req.URN)
 			return nil
 		}

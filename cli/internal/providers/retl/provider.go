@@ -120,7 +120,6 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
 	remoteID := s.Output["source_id"].(string)
 	req := retlClient.PutStateRequest{
-		ID:  remoteID,
 		URN: URN,
 		State: retlClient.ResourceState{
 			ID:           s.ID,
@@ -131,7 +130,7 @@ func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.Re
 		},
 	}
 
-	return p.client.PutResourceState(ctx, req)
+	return p.client.PutResourceState(ctx, remoteID, req)
 }
 
 // DeleteResourceState is deprecated as removing resource from the state
