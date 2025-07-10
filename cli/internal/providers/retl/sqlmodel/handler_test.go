@@ -45,7 +45,7 @@ func (m *mockRETLClient) GetRetlSource(ctx context.Context, sourceID string) (*r
 	return &retlClient.RETLSource{
 		ID:                   sourceID,
 		Name:                 "Test Model",
-		Config:               retlClient.RETLSourceConfig{},
+		Config:               retlClient.RETLSQLModelConfig{},
 		SourceType:           "model",
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
@@ -82,7 +82,7 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context) (*retlClient.RETLS
 			{
 				ID:                   m.sourceID,
 				Name:                 "Test Model",
-				Config:               retlClient.RETLSourceConfig{},
+				Config:               retlClient.RETLSQLModelConfig{},
 				SourceType:           "model",
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",

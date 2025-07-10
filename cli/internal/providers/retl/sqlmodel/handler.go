@@ -125,7 +125,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 
 	source := &retlClient.RETLSourceCreateRequest{
 		Name: data["display_name"].(string),
-		Config: retlClient.RETLSourceConfig{
+		Config: retlClient.RETLSQLModelConfig{
 			PrimaryKey:  data["primary_key"].(string),
 			Sql:         sqlContent,
 			Description: data["description"].(string),
@@ -178,7 +178,7 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name: data["display_name"].(string),
-		Config: retlClient.RETLSourceConfig{
+		Config: retlClient.RETLSQLModelConfig{
 			PrimaryKey:  data["primary_key"].(string),
 			Sql:         sqlContent,
 			Description: data["description"].(string),
