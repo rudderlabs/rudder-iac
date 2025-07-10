@@ -28,22 +28,17 @@ func (r *RudderRETLStore) CreateRetlSource(ctx context.Context, source *RETLSour
 }
 
 // UpdateRetlSource updates an existing RETL source
-func (r *RudderRETLStore) UpdateRetlSource(ctx context.Context, source *RETLSourceUpdateRequest) (*RETLSource, error) {
-	if source.SourceID == "" {
+func (r *RudderRETLStore) UpdateRetlSource(ctx context.Context, id string, source *RETLSourceUpdateRequest) (*RETLSource, error) {
+	if id == "" {
 		return nil, fmt.Errorf("source ID cannot be empty")
 	}
 
-	data, err := json.Marshal(map[string]interface{}{
-		"name":      source.Name,
-		"config":    source.Config,
-		"enabled":   source.IsEnabled,
-		"accountId": source.AccountID,
-	})
+	data, err := json.Marshal(source)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling source: %w", err)
 	}
 
-	path := fmt.Sprintf("%s/%s", "/retl-sources", source.SourceID)
+	path := fmt.Sprintf("%s/%s", "/retl-sources", id)
 	resp, err := r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("updating RETL source: %w", err)

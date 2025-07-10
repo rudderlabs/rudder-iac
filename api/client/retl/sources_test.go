@@ -99,14 +99,13 @@ func TestUpdateRetlSource(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	source := &retl.RETLSourceUpdateRequest{
-		SourceID:  "src1",
 		Name:      "Updated Source",
 		Config:    sourceConfig,
 		IsEnabled: true,
 		AccountID: "acc123",
 	}
 
-	updated, err := retlClient.UpdateRetlSource(context.Background(), source)
+	updated, err := retlClient.UpdateRetlSource(context.Background(), "src1", source)
 	require.NoError(t, err)
 
 	assert.Equal(t, "src1", updated.ID)
@@ -277,13 +276,12 @@ func TestUpdateRetlSourceEmptyID(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	source := &retl.RETLSourceUpdateRequest{
-		SourceID:  "", // Empty ID to trigger the error
 		Name:      "Updated Source",
 		IsEnabled: true,
 		AccountID: "acc123",
 	}
 
-	_, err = retlClient.UpdateRetlSource(context.Background(), source)
+	_, err = retlClient.UpdateRetlSource(context.Background(), "", source)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "source ID cannot be empty")
 }
@@ -401,13 +399,12 @@ func TestUpdateRetlSourceMalformedResponse(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	source := &retl.RETLSourceUpdateRequest{
-		SourceID:  "src1",
 		Name:      "Updated Source",
 		IsEnabled: true,
 		AccountID: "acc123",
 	}
 
-	_, err = retlClient.UpdateRetlSource(context.Background(), source)
+	_, err = retlClient.UpdateRetlSource(context.Background(), "src1", source)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshalling response")
 
@@ -515,24 +512,6 @@ func TestCreateRetlSourceInvalidRequest(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestUpdateRetlSourceInvalidRequest(t *testing.T) {
-	c, err := client.New("test-token")
-	require.NoError(t, err)
-
-	retlClient := retl.NewRudderRETLStore(c)
-
-	source := &retl.RETLSourceUpdateRequest{
-		// Missing SourceID
-		Name:      "Updated Source",
-		IsEnabled: true,
-		AccountID: "acc123",
-	}
-
-	_, err = retlClient.UpdateRetlSource(context.Background(), source)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "source ID cannot be empty")
-}
-
 func TestGetRetlSourceAPIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -569,13 +548,12 @@ func TestUpdateRetlSourceAPIError(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	source := &retl.RETLSourceUpdateRequest{
-		SourceID:  "src1",
 		Name:      "Updated Source",
 		IsEnabled: true,
 		AccountID: "acc123",
 	}
 
-	_, err = retlClient.UpdateRetlSource(context.Background(), source)
+	_, err = retlClient.UpdateRetlSource(context.Background(), "src1", source)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "updating RETL source")
 

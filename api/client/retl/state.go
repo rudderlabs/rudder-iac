@@ -23,16 +23,17 @@ func (r *RudderRETLStore) ReadState(ctx context.Context) (*State, error) {
 }
 
 // PutResourceState saves a resource state record
-func (r *RudderRETLStore) PutResourceState(ctx context.Context, req PutStateRequest) error {
-	data, err := json.Marshal(map[string]interface{}{
-		"urn":   req.URN,
-		"state": req.State,
-	})
+func (r *RudderRETLStore) PutResourceState(ctx context.Context, id string, req PutStateRequest) error {
+	if id == "" {
+		return fmt.Errorf("resource ID cannot be empty")
+	}
+
+	data, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshalling PUT request: %w", err)
 	}
 
-	path := fmt.Sprintf("cli/retl/retl-sources/%s/state", req.ID)
+	path := fmt.Sprintf("cli/retl/retl-sources/%s/state", id)
 	_, err = r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("sending put state request: %w", err)
