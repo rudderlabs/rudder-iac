@@ -21,7 +21,6 @@ type ResourceState struct {
 
 // PutStateRequest represents the request to update a resource state
 type PutStateRequest struct {
-	ID    string        `json:"id"`
 	URN   string        `json:"urn"`
 	State ResourceState `json:"state"`
 }
@@ -40,7 +39,6 @@ type RETLSource struct {
 }
 
 type RETLSourceCreateRequest struct {
-	ID                   string           `json:"id,omitempty"`
 	Name                 string           `json:"name"`
 	Config               RETLSourceConfig `json:"config"`
 	SourceType           string           `json:"sourceType"`
@@ -49,12 +47,10 @@ type RETLSourceCreateRequest struct {
 }
 
 type RETLSourceUpdateRequest struct {
-	ID        string           `json:"id,omitempty"`
 	Name      string           `json:"name"`
 	Config    RETLSourceConfig `json:"config"`
 	IsEnabled bool             `json:"enabled,omitempty"`
 	AccountID string           `json:"accountId"`
-	SourceID  string           `json:"sourceId"`
 }
 
 // RETLSourceConfig represents the config of a RETL SQL model source

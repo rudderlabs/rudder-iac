@@ -121,7 +121,6 @@ func TestPutResourceState(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	req := retl.PutStateRequest{
-		ID:  "source1",
 		URN: "retl:source:source1",
 		State: retl.ResourceState{
 			ID:   "source1",
@@ -136,7 +135,7 @@ func TestPutResourceState(t *testing.T) {
 		},
 	}
 
-	err = retlClient.PutResourceState(context.Background(), req)
+	err = retlClient.PutResourceState(context.Background(), "source1", req)
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
@@ -157,7 +156,6 @@ func TestPutResourceStateAPIError(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	req := retl.PutStateRequest{
-		ID:  "source1",
 		URN: "retl:source:source1",
 		State: retl.ResourceState{
 			ID:   "source1",
@@ -165,7 +163,7 @@ func TestPutResourceStateAPIError(t *testing.T) {
 		},
 	}
 
-	err = retlClient.PutResourceState(context.Background(), req)
+	err = retlClient.PutResourceState(context.Background(), "source1", req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "sending put state request")
 
@@ -179,7 +177,6 @@ func TestPutResourceStateInvalidRequest(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	req := retl.PutStateRequest{
-		ID:  "source1",
 		URN: "retl:source:source1",
 		State: retl.ResourceState{
 			Input: map[string]interface{}{
@@ -188,7 +185,7 @@ func TestPutResourceStateInvalidRequest(t *testing.T) {
 		},
 	}
 
-	err = retlClient.PutResourceState(context.Background(), req)
+	err = retlClient.PutResourceState(context.Background(), "source1", req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "marshalling PUT request")
 }
