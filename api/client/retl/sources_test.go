@@ -13,7 +13,7 @@ import (
 )
 
 func TestCreateRetlSource(t *testing.T) {
-	sourceConfig := retl.RETLSourceConfig{
+	sourceConfig := retl.RETLSQLModelConfig{
 		PrimaryKey:  "id",
 		Sql:         "SELECT * FROM users",
 		Description: "Test source",
@@ -68,7 +68,7 @@ func TestCreateRetlSource(t *testing.T) {
 }
 
 func TestUpdateRetlSource(t *testing.T) {
-	sourceConfig := retl.RETLSourceConfig{
+	sourceConfig := retl.RETLSQLModelConfig{
 		PrimaryKey:  "id",
 		Sql:         "SELECT * FROM users",
 		Description: "Test source",
@@ -322,7 +322,7 @@ func TestCreateRetlSourceAPIError(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sourceConfig := retl.RETLSourceConfig{
+	sourceConfig := retl.RETLSQLModelConfig{
 		PrimaryKey: "id",
 		Sql:        "SELECT * FROM users",
 	}
@@ -467,7 +467,7 @@ func TestCreateRetlSourceMalformedResponse(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sourceConfig := retl.RETLSourceConfig{
+	sourceConfig := retl.RETLSQLModelConfig{
 		PrimaryKey: "id",
 		Sql:        "SELECT * FROM users",
 	}
