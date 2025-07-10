@@ -9,3 +9,7 @@ func Bold(s string) string {
 func Color(s string, color string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(s)
 }
+
+func GreyedOut(s string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#999999")).Render(s)
+}
