@@ -27,34 +27,34 @@ type PutStateRequest struct {
 
 // RETLSource represents a RETL source in the API
 type RETLSource struct {
-	ID                   string           `json:"id,omitempty"`
-	Name                 string           `json:"name"`
-	Config               RETLSourceConfig `json:"config"`
-	IsEnabled            bool             `json:"enabled,omitempty"`
-	SourceType           string           `json:"sourceType"`
-	SourceDefinitionName string           `json:"sourceDefinitionName"`
-	AccountID            string           `json:"accountId"`
-	CreatedAt            *time.Time       `json:"createdAt,omitempty"`
-	UpdatedAt            *time.Time       `json:"updatedAt,omitempty"`
+	ID                   string             `json:"id"`
+	Name                 string             `json:"name"`
+	Config               RETLSQLModelConfig `json:"config"`
+	IsEnabled            bool               `json:"enabled"`
+	SourceType           string             `json:"sourceType"`
+	SourceDefinitionName string             `json:"sourceDefinitionName"`
+	AccountID            string             `json:"accountId"`
+	CreatedAt            *time.Time         `json:"createdAt"`
+	UpdatedAt            *time.Time         `json:"updatedAt"`
 }
 
 type RETLSourceCreateRequest struct {
-	Name                 string           `json:"name"`
-	Config               RETLSourceConfig `json:"config"`
-	SourceType           string           `json:"sourceType"`
-	SourceDefinitionName string           `json:"sourceDefinitionName"`
-	AccountID            string           `json:"accountId"`
+	Name                 string             `json:"name"`
+	Config               RETLSQLModelConfig `json:"config"`
+	SourceType           string             `json:"sourceType"`
+	SourceDefinitionName string             `json:"sourceDefinitionName"`
+	AccountID            string             `json:"accountId"`
 }
 
 type RETLSourceUpdateRequest struct {
-	Name      string           `json:"name"`
-	Config    RETLSourceConfig `json:"config"`
-	IsEnabled bool             `json:"enabled,omitempty"`
-	AccountID string           `json:"accountId"`
+	Name      string             `json:"name"`
+	Config    RETLSQLModelConfig `json:"config"`
+	IsEnabled bool               `json:"enabled"`
+	AccountID string             `json:"accountId"`
 }
 
 // RETLSourceConfig represents the config of a RETL SQL model source
-type RETLSourceConfig struct {
+type RETLSQLModelConfig struct {
 	PrimaryKey  string `json:"primaryKey"`
 	Sql         string `json:"sql"`
 	Description string `json:"description,omitempty"`
