@@ -91,14 +91,14 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	for _, spec := range h.specs {
 		// Convert spec to resource data
 		data := resources.ResourceData{
-			"id":                     spec.ID,
-			"display_name":           spec.DisplayName,
-			"description":            spec.Description,
-			"account_id":             spec.AccountID,
-			"primary_key":            spec.PrimaryKey,
-			"source_definition_name": spec.SourceDefinitionName,
-			"enabled":                spec.Enabled,
-			"sql":                    spec.SQL,
+			LocalIDKey:              spec.ID,
+			DisplayNameKey:          spec.DisplayName,
+			DescriptionKey:          spec.Description,
+			AccountIDKey:            spec.AccountID,
+			PrimaryKeyKey:           spec.PrimaryKey,
+			SourceDefinitionNameKey: spec.SourceDefinitionName,
+			EnabledKey:              spec.Enabled,
+			SQLKey:                  spec.SQL,
 		}
 
 		// Create resource with SQL Model resource type
@@ -117,22 +117,16 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
-	// Convert resource data to RETL source
-	sqlContent := ""
-	if sql, ok := data["sql"].(string); ok {
-		sqlContent = sql
-	}
-
 	source := &retlClient.RETLSourceCreateRequest{
-		Name: data["display_name"].(string),
+		Name: data[DisplayNameKey].(string),
 		Config: retlClient.RETLSQLModelConfig{
-			PrimaryKey:  data["primary_key"].(string),
-			Sql:         sqlContent,
-			Description: data["description"].(string),
+			PrimaryKey:  data[PrimaryKeyKey].(string),
+			Sql:         data[SQLKey].(string),
+			Description: data[DescriptionKey].(string),
 		},
-		SourceType:           "model",
-		SourceDefinitionName: data["source_definition_name"].(string),
-		AccountID:            data["account_id"].(string),
+		SourceType:           ModelSourceType,
+		SourceDefinitionName: data[SourceDefinitionNameKey].(string),
+		AccountID:            data[AccountIDKey].(string),
 	}
 
 	// Call API to create RETL source
@@ -143,20 +137,24 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 
 	// Convert API response to resource data
 	result := resources.ResourceData{
-		"id":                     ID,
-		"display_name":           resp.Name,
-		"description":            resp.Config.Description,
-		"account_id":             resp.AccountID,
-		"primary_key":            resp.Config.PrimaryKey,
-		"sql":                    resp.Config.Sql,
-		"source_id":              resp.ID, // Store the remote source ID
-		"source_type":            resp.SourceType,
-		"enabled":                resp.IsEnabled,
-		"source_definition_name": resp.SourceDefinitionName,
+		LocalIDKey:              ID,
+		DisplayNameKey:          resp.Name,
+		DescriptionKey:          resp.Config.Description,
+		AccountIDKey:            resp.AccountID,
+		PrimaryKeyKey:           resp.Config.PrimaryKey,
+		SQLKey:                  resp.Config.Sql,
+		SourceIDKey:             resp.ID, // Store the remote source ID
+		SourceTypeKey:           resp.SourceType,
+		EnabledKey:              resp.IsEnabled,
+		SourceDefinitionNameKey: resp.SourceDefinitionName,
 	}
 
 	if resp.CreatedAt != nil {
-		result["created_at"] = resp.CreatedAt
+		result[CreatedAtKey] = resp.CreatedAt
+	}
+
+	if resp.UpdatedAt != nil {
+		result[UpdatedAtKey] = resp.UpdatedAt
 	}
 
 	return &result, nil
@@ -165,26 +163,20 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
-	sourceID, ok := state["source_id"].(string)
+	sourceID, ok := state[SourceIDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing source_id in resource state")
 	}
 
-	// Convert resource data to RETL source
-	sqlContent := ""
-	if sql, ok := data["sql"].(string); ok {
-		sqlContent = sql
-	}
-
 	source := &retlClient.RETLSourceUpdateRequest{
-		Name: data["display_name"].(string),
+		Name: data[DisplayNameKey].(string),
 		Config: retlClient.RETLSQLModelConfig{
-			PrimaryKey:  data["primary_key"].(string),
-			Sql:         sqlContent,
-			Description: data["description"].(string),
+			PrimaryKey:  data[PrimaryKeyKey].(string),
+			Sql:         data[SQLKey].(string),
+			Description: data[DescriptionKey].(string),
 		},
-		IsEnabled: data["enabled"].(bool),
-		AccountID: data["account_id"].(string),
+		IsEnabled: data[EnabledKey].(bool),
+		AccountID: data[AccountIDKey].(string),
 	}
 
 	// Call API to update RETL source
@@ -195,24 +187,24 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 
 	// Convert API response to resource data
 	result := resources.ResourceData{
-		"id":                     ID,
-		"display_name":           resp.Name,
-		"description":            resp.Config.Description,
-		"account_id":             resp.AccountID,
-		"primary_key":            resp.Config.PrimaryKey,
-		"sql":                    resp.Config.Sql,
-		"source_id":              resp.ID,
-		"source_type":            resp.SourceType,
-		"enabled":                resp.IsEnabled,
-		"source_definition_name": resp.SourceDefinitionName,
+		LocalIDKey:              ID,
+		DisplayNameKey:          resp.Name,
+		DescriptionKey:          resp.Config.Description,
+		AccountIDKey:            resp.AccountID,
+		PrimaryKeyKey:           resp.Config.PrimaryKey,
+		SQLKey:                  resp.Config.Sql,
+		SourceIDKey:             resp.ID,
+		SourceTypeKey:           resp.SourceType,
+		EnabledKey:              resp.IsEnabled,
+		SourceDefinitionNameKey: resp.SourceDefinitionName,
 	}
 
 	if resp.CreatedAt != nil {
-		result["created_at"] = resp.CreatedAt
+		result[CreatedAtKey] = resp.CreatedAt
 	}
 
 	if resp.UpdatedAt != nil {
-		result["updated_at"] = resp.UpdatedAt
+		result[UpdatedAtKey] = resp.UpdatedAt
 	}
 
 	return &result, nil
