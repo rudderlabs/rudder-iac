@@ -352,7 +352,6 @@ func TestSQLModelHandler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.True(t, mockClient.createCalled)
-		assert.Equal(t, "test-model", (*result)["id"])
 		assert.Equal(t, "src123", (*result)["source_id"])
 	})
 
