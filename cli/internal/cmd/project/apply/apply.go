@@ -1,4 +1,4 @@
-package cmd
+package apply
 
 import (
 	"context"
@@ -7,23 +7,17 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/spf13/cobra"
 )
 
 var (
-	applyCmd = &cobra.Command{
-		Use:   "apply",
-		Short: "Apply the changes to upstream",
-		Long: heredoc.Doc(`
-			The tool reads the current state of local catalog defined by the customer. It identifies
-			the changes based on the last recorded state. The diff is then applied to the upstream.
-		`),
-		Example: heredoc.Doc(`
-			$ rudder-cli apply --location </path/to/dir or file> --dry-run
-		`),
-	}
+	applyLog = logger.New("root", logger.Attr{
+		Key:   "cmd",
+		Value: "apply",
+	})
 )
 
 func NewCmdApply() *cobra.Command {
@@ -38,13 +32,16 @@ func NewCmdApply() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "Apply the changes to upstream",
+		Short: "Apply project configuration changes",
 		Long: heredoc.Doc(`
-			The tool reads the current state of local catalog defined by the customer. It identifies
-			the changes based on the last recorded state. The diff is then applied to the upstream.
+			Applies the project configuration changes to the upstream system.
+			This includes creating, updating, or deleting resources based on
+			the differences between local configuration and upstream state.
 		`),
 		Example: heredoc.Doc(`
+			$ rudder-cli apply --location </path/to/dir or file>
 			$ rudder-cli apply --location </path/to/dir or file> --dry-run
+			$ rudder-cli apply --location </path/to/dir or file> --no-confirm
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -53,33 +50,39 @@ func NewCmdApply() *cobra.Command {
 			}
 
 			p = project.New(location, deps.CompositeProvider())
+
+			// Load and validate the project configuration
 			if err := p.Load(); err != nil {
-				return fmt.Errorf("loading project: %w", err)
+				return fmt.Errorf("loading and validating project: %w", err)
 			}
 
-			return err
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Debug("apply", "dryRun", dryRun, "confirm", confirm)
-			log.Debug("identifying changes for the upstream catalog")
+			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
+			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
 				telemetry.TrackCommand("apply", err, []telemetry.KV{
+					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
 				}...)
 			}()
 
+			// Get resource graph to understand dependencies
 			graph, err := p.GetResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
+			// Create syncer to handle the changes
 			s, err := syncer.New(deps.CompositeProvider())
 			if err != nil {
-				return err
+				return fmt.Errorf("creating syncer: %w", err)
 			}
 
+			// Apply the changes
 			err = s.Sync(
 				context.Background(),
 				graph,
@@ -92,12 +95,19 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
 
+			if dryRun {
+				applyLog.Info("Dry run completed. No changes were applied.")
+			} else {
+				applyLog.Info("Successfully applied all changes")
+			}
+
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
-	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
+	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
+	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
+	_ = cmd.MarkFlagRequired("location")
 	return cmd
 }
