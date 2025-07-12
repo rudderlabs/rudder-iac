@@ -13,6 +13,7 @@ type DataCatalog interface {
 	TrackingPlanStore
 	StateStore
 	CustomTypeStore
+	CategoryStore
 }
 
 type RudderDataCatalog struct {

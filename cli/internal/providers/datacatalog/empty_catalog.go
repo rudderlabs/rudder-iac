@@ -99,3 +99,19 @@ func (m *EmptyCatalog) PutResourceState(ctx context.Context, _ catalog.PutStateR
 func (m *EmptyCatalog) DeleteResourceState(ctx context.Context, _ catalog.DeleteStateRequest) error {
 	return nil
 }
+
+func (m *EmptyCatalog) CreateCategory(ctx context.Context, categoryCreate catalog.CategoryCreate) (*catalog.Category, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) DeleteCategory(ctx context.Context, categoryID string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
+	return nil, nil
+}
