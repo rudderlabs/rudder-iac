@@ -56,6 +56,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("events are extracted from customer defined yamls successfully", func(t *testing.T) {
 
+		category := "#/categories/app_categories/user_actions"
 		byt := []byte(`
         version: rudder/0.1
         kind: events
@@ -67,9 +68,7 @@ func TestExtractCatalogEntity(t *testing.T) {
               name: "User Signed Up"
               event_type: track
               description: "Triggered when user successfully signed up"
-              categories:
-                - "User Onboarding"
-                - "Marketing Team"
+              category: "#/categories/app_categories/user_actions"
         `)
 
 		s, err := specs.New(byt)
@@ -78,6 +77,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
+		
 		assert.Equal(t, 1, len(emptyCatalog.Events))
 		assert.Equal(t, 1, len(emptyCatalog.Events["app_events"]))
 		assert.Equal(t, Event{
@@ -85,7 +85,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Name:        "User Signed Up",
 			Type:        "track",
 			Description: "Triggered when user successfully signed up",
-			Categories:  []string{"User Onboarding", "Marketing Team"},
+			CategoryRef: &category,
 		}, emptyCatalog.Events["app_events"][0])
 	})
 
@@ -102,9 +102,7 @@ func TestExtractCatalogEntity(t *testing.T) {
               name: "User Signed Up"
               event_type: track
               description: "Triggered when user successfully signed up"
-              categories:
-                - "User Onboarding"
-                - "Marketing Team"
+              category: "#/categories/app_categories/user_actions"
         `)
 
 		s, err := specs.New(byt)
@@ -208,9 +206,7 @@ func TestExtractCatalogEntity(t *testing.T) {
               name: "User Signed Up"
               event_type: track
               description: "Triggered when user successfully signed up"
-              categories:
-                - "User Onboarding"
-                - "Marketing Team"
+              category: "#/categories/app_categories/user_actions"
         `)
 
 		s, err = specs.New(byt)

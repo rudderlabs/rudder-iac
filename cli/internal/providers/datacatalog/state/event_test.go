@@ -16,21 +16,19 @@ func TestEventState_ResourceData(t *testing.T) {
 		Description: "event-description",
 		EventType:   "event-type",
 		WorkspaceID: "workspace-id",
-		CategoryID:  nil,
 		CreatedAt:   "2021-09-01T00:00:00Z",
 		UpdatedAt:   "2021-09-01T00:00:00Z",
 		EventArgs: state.EventArgs{
 			Name:        "event-name",
 			Description: "event-description",
 			EventType:   "event-type",
-			CategoryID:  nil,
+			Category:    nil,
 		},
 	}
 
 	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
-		var categoryID *string
 		resourceData := eventState.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
 			"id":          "upstream-event-catalog-id",
@@ -38,14 +36,13 @@ func TestEventState_ResourceData(t *testing.T) {
 			"description": "event-description",
 			"eventType":   "event-type",
 			"workspaceId": "workspace-id",
-			"categoryId":  categoryID,
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"eventArgs": map[string]interface{}{
 				"name":        "event-name",
 				"description": "event-description",
 				"eventType":   "event-type",
-				"categoryId":  categoryID,
+				"category":    (resources.ResourceData)(nil),
 			},
 		}, resourceData)
 	})
@@ -66,19 +63,18 @@ func TestEventArgs_ResourceData(t *testing.T) {
 		Name:        "event-name",
 		Description: "event-description",
 		EventType:   "event-type",
-		CategoryID:  nil,
+		Category:    nil,
 	}
 
 	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
-		var categoryID *string
 		resourceData := args.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
 			"name":        "event-name",
 			"description": "event-description",
 			"eventType":   "event-type",
-			"categoryId":  categoryID,
+			"category":  (resources.ResourceData)(nil),
 		}, resourceData)
 
 	})

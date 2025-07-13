@@ -31,11 +31,15 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 	toArgs := state.EventArgs{}
 	toArgs.FromResourceData(data)
 
+	var categoryID *string
+	if toArgs.Category != nil {
+		categoryID = &toArgs.Category.Name
+	}
 	event, err := p.catalog.CreateEvent(ctx, catalog.EventCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
-		CategoryId:  toArgs.CategoryID,
+		CategoryId:  categoryID,
 	})
 
 	if err != nil {
@@ -58,7 +62,6 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 		Description: event.Description,
 		EventType:   event.EventType,
 		WorkspaceID: event.WorkspaceId,
-		CategoryID:  event.CategoryId,
 		CreatedAt:   event.CreatedAt.String(),
 		UpdatedAt:   event.UpdatedAt.String(),
 	}
@@ -77,12 +80,17 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 	prevState := state.EventState{}
 	prevState.FromResourceData(olds)
 
+	var categoryID *string
+	if toArgs.Category != nil {
+		categoryID = &toArgs.Category.Name
+	}
+
 	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.Event{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
 		WorkspaceId: prevState.WorkspaceID,
-		CategoryId:  toArgs.CategoryID,
+		CategoryId:  categoryID,
 	})
 
 	if err != nil {
@@ -96,7 +104,6 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		Description: updatedEvent.Description,
 		EventType:   updatedEvent.EventType,
 		WorkspaceID: updatedEvent.WorkspaceId,
-		CategoryID:  updatedEvent.CategoryId,
 		CreatedAt:   updatedEvent.CreatedAt.String(),
 		UpdatedAt:   updatedEvent.UpdatedAt.String(),
 	}

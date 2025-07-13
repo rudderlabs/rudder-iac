@@ -100,6 +100,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		}
 	}
 
+	categoryNameToURN := make(map[string]string)
+	for _, categories := range catalog.Categories {
+		for _, category := range categories {
+			categoryNameToURN[category.Name] = resources.URN(category.LocalID, CategoryResourceType)
+		}
+	}
+
 	// Helper function to get URN from reference
 	getURNFromRef := func(ref string) string {
 		// Format: #/entities/group/id
@@ -118,6 +125,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return propIDToURN[id]
 		case "custom-types":
 			return customTypeIDToURN[id]
+		case "categories":
+			return categoryNameToURN[id]
 		default:
 			return ""
 		}
@@ -149,7 +158,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				Name:        event.Name,
 				Description: event.Description,
 				EventType:   event.Type,
-				CategoryID:  nil,
+				Category:    nil,
 			}
 			resource := resources.NewResource(event.LocalID, EventResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
