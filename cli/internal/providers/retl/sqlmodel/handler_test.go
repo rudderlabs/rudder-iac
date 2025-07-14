@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,16 +21,23 @@ import (
 
 // mockRETLClient is a mock implementation of the RETL client
 type mockRETLClient struct {
-	createCalled bool
-	updateCalled bool
-	deleteCalled bool
-	sourceID     string
-	deleteError  bool
-	updateError  bool
+	createCalled         bool
+	updateCalled         bool
+	deleteCalled         bool
+	sourceID             string
+	deleteError          bool
+	updateError          bool
+	createRetlSourceFunc func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
+	updateRetlSourceFunc func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
 	m.createCalled = true
+
+	if m.createRetlSourceFunc != nil {
+		return m.createRetlSourceFunc(ctx, req)
+	}
+
 	return &retlClient.RETLSource{
 		ID:                   m.sourceID,
 		Name:                 req.Name,
@@ -55,6 +63,11 @@ func (m *mockRETLClient) GetRetlSource(ctx context.Context, sourceID string) (*r
 
 func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
 	m.updateCalled = true
+
+	if m.updateRetlSourceFunc != nil {
+		return m.updateRetlSourceFunc(ctx, sourceID, req)
+	}
+
 	if m.updateError {
 		return nil, fmt.Errorf("updating RETL source")
 	}
@@ -251,6 +264,31 @@ func TestSQLModelHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("LoadSpec with invalid spec structure", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup
+		mockClient := &mockRETLClient{sourceID: "src123"}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		// Create a spec with invalid structure that will cause mapstructure.Decode to fail
+		invalidSpec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":      123,          // ID should be a string, not an int
+				"enabled": "not-a-bool", // Enabled should be a bool
+			},
+		}
+
+		// Execute
+		err := handler.LoadSpec("test.yaml", invalidSpec)
+
+		// Verify
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "converting spec")
+	})
+
 	t.Run("Validate", func(t *testing.T) {
 		t.Parallel()
 
@@ -278,6 +316,34 @@ func TestSQLModelHandler(t *testing.T) {
 
 		// Verify
 		assert.NoError(t, err)
+	})
+
+	t.Run("Validate with invalid resource", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup
+		mockClient := &mockRETLClient{sourceID: "src123"}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		// Load a spec with missing required fields to trigger validation error
+		err := handler.LoadSpec("test.yaml", &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":           "test-model",
+				"display_name": "Test Model",
+				"sql":          "SELECT * FROM users",
+				// Missing description, account_id, primary_key, source_definition_name
+			},
+		})
+		require.NoError(t, err)
+
+		// Execute
+		err = handler.Validate()
+
+		// Verify
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "validating sql model spec")
 	})
 
 	t.Run("GetResources", func(t *testing.T) {
@@ -353,6 +419,86 @@ func TestSQLModelHandler(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.True(t, mockClient.createCalled)
 		assert.Equal(t, "src123", (*result)["source_id"])
+	})
+
+	t.Run("Create with API error", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup
+		mockClient := &mockRETLClient{
+			sourceID: "src123",
+			createRetlSourceFunc: func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("API error creating source")
+			},
+		}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		// Create resource data
+		data := resources.ResourceData{
+			"id":                     "test-model",
+			"display_name":           "Test Model",
+			"description":            "Test description",
+			"sql":                    "SELECT * FROM users",
+			"account_id":             "acc123",
+			"primary_key":            "id",
+			"source_definition_name": "postgres",
+			"enabled":                true,
+		}
+
+		// Execute
+		result, err := handler.Create(context.Background(), "test-model", data)
+
+		// Verify
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "creating RETL source")
+	})
+
+	t.Run("Create with timestamps", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup
+		createdAt := time.Now().Add(-24 * time.Hour)
+		updatedAt := time.Now()
+
+		mockClient := &mockRETLClient{
+			sourceID: "src123",
+			createRetlSourceFunc: func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "src123",
+					Name:                 req.Name,
+					Config:               req.Config,
+					SourceType:           req.SourceType,
+					SourceDefinitionName: req.SourceDefinitionName,
+					AccountID:            req.AccountID,
+					IsEnabled:            true,
+					CreatedAt:            &createdAt,
+					UpdatedAt:            &updatedAt,
+				}, nil
+			},
+		}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		// Create resource data
+		data := resources.ResourceData{
+			"id":                     "test-model",
+			"display_name":           "Test Model",
+			"description":            "Test description",
+			"sql":                    "SELECT * FROM users",
+			"account_id":             "acc123",
+			"primary_key":            "id",
+			"source_definition_name": "postgres",
+			"enabled":                true,
+		}
+
+		// Execute
+		result, err := handler.Create(context.Background(), "test-model", data)
+
+		// Verify
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, &createdAt, (*result)["created_at"])
+		assert.Equal(t, &updatedAt, (*result)["updated_at"])
 	})
 
 	t.Run("Update", func(t *testing.T) {
@@ -444,6 +590,53 @@ func TestSQLModelHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("Update with timestamps", func(t *testing.T) {
+		t.Parallel()
+
+		createdAt := time.Now().Add(-24 * time.Hour)
+		updatedAt := time.Now()
+
+		mockClient := &mockRETLClient{
+			sourceID: "src123",
+			updateRetlSourceFunc: func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   sourceID,
+					Name:                 req.Name,
+					Config:               req.Config,
+					SourceType:           "model",
+					SourceDefinitionName: "postgres",
+					AccountID:            req.AccountID,
+					IsEnabled:            req.IsEnabled,
+					CreatedAt:            &createdAt,
+					UpdatedAt:            &updatedAt,
+				}, nil
+			},
+		}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		data := resources.ResourceData{
+			"display_name":           "Updated Model",
+			"description":            "Updated description",
+			"sql":                    "SELECT * FROM updated",
+			"account_id":             "acc123",
+			"primary_key":            "id",
+			"source_definition_name": "postgres",
+			"enabled":                true,
+		}
+		state := resources.ResourceData{
+			"source_id": "src123",
+		}
+
+		// Execute
+		result, err := handler.Update(context.Background(), "test-model", data, state)
+
+		// Verify
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, &createdAt, (*result)["created_at"])
+		assert.Equal(t, &updatedAt, (*result)["updated_at"])
 	})
 
 	t.Run("Delete", func(t *testing.T) {
