@@ -66,7 +66,7 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog)
+			s, err := syncer.New(deps.CompositeProvider())
 			if err != nil {
 				return err
 			}
