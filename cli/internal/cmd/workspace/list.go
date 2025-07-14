@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 	"github.com/spf13/cobra"
@@ -29,6 +30,15 @@ func newCmdListAccounts() *cobra.Command {
 			accountType, _ := cmd.Flags().GetString("type")
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 
+			var err error
+			defer func() {
+				telemetry.TrackCommand("workspace accounts list", err, []telemetry.KV{
+					{K: "category", V: category},
+					{K: "type", V: accountType},
+					{K: "json", V: jsonOutput},
+				}...)
+			}()
+
 			d, err := app.NewDeps()
 			if err != nil {
 				return err
@@ -49,7 +59,8 @@ func newCmdListAccounts() *cobra.Command {
 				filters["type"] = accountType
 			}
 
-			return l.List(cmd.Context(), workspace.AccountResourceType, filters)
+			err = l.List(cmd.Context(), workspace.AccountResourceType, filters)
+			return err
 		},
 	}
 
