@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -26,8 +25,12 @@ const (
 type Filters map[string]string
 
 type Lister struct {
-	Provider project.Provider
+	Provider ListProvider
 	Format   OutputFormat
+}
+
+type ListProvider interface {
+	List(ctx context.Context, resourceType string, filters Filters) ([]resources.ResourceData, error)
 }
 
 func (l *Lister) List(ctx context.Context, resourceType string, filters Filters) error {
@@ -52,8 +55,6 @@ func (l *Lister) List(ctx context.Context, resourceType string, filters Filters)
 		return printResourcesAsJSON(rs)
 	case TableFormat:
 		return printTableWithDetails(rs)
-	case DetailedFormat:
-		return printListWithDetails(rs)
 	default:
 		return fmt.Errorf("unknown output format: %s", l.Format)
 	}
@@ -70,7 +71,7 @@ func printResourcesAsJSON(resources []resources.ResourceData) error {
 	return nil
 }
 
-func New(p project.Provider, format OutputFormat) *Lister {
+func New(p ListProvider, format OutputFormat) *Lister {
 	return &Lister{
 		Provider: p,
 		Format:   format,

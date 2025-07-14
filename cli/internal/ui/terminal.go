@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -26,10 +25,9 @@ func Ruler() string {
 
 // RulerWithWidth returns a string representing a horizontal line of a given width.
 func RulerWithWidth(width int) string {
-	return strings.Repeat("─", width)
-}
+	if width <= 0 {
+		return ""
+	}
 
-// PrintRuler prints a horizontal line across the terminal.
-func PrintRuler() {
-	fmt.Println(Ruler())
+	return strings.Repeat("─", width)
 }

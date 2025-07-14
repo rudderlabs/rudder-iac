@@ -5,50 +5,26 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 var priorityFields = []string{"id", "name", "createdAt", "updatedAt"}
 var notSetLiteral = "- not set -"
 
-// RenderDetails renders a single resource to a string.
-// It calculates the required column width based only on the fields within that single resource.
-func RenderDetails(resource resources.ResourceData) string {
+// FormattedMap formats a single map[string]any resource into a structured, human-readable string.
+//
+// Formatting applied:
+// - Priority fields (id, name, createdAt, updatedAt) are displayed first
+// - Remaining fields are sorted alphabetically
+// - Column alignment with padding for clean layout
+// - Color coding: IDs in yellow, unset values in grey
+// - Nested objects are indented with proper hierarchy
+// - Column width is calculated based on the longest key in the resource
+//
+// Designed for displaying detailed information of a single resource in CLI output.
+func FormattedMap(resource map[string]any) string {
 	processed := preprocessData(resource)
 	maxKeyWidth := calculateMaxKeyWidth(processed, 0)
 	return renderSingleResource(processed, maxKeyWidth)
-}
-
-// RenderDetailsList renders a list of resources to a single, formatted string.
-// It calculates the required column width across all items to ensure alignment.
-func RenderDetailsList(rs []resources.ResourceData) string {
-	if len(rs) == 0 {
-		return "No resources found."
-	}
-
-	processedResources := make([]map[string]any, len(rs))
-	for i, r := range rs {
-		processedResources[i] = preprocessData(r)
-	}
-
-	globalMaxKeyWidth := 0
-	for _, p := range processedResources {
-		if width := calculateMaxKeyWidth(p, 0); width > globalMaxKeyWidth {
-			globalMaxKeyWidth = width
-		}
-	}
-
-	var b strings.Builder
-	for i, p := range processedResources {
-		if i > 0 {
-			b.WriteString("\n")
-			b.WriteString(Ruler())
-			b.WriteString("\n")
-		}
-		b.WriteString(renderSingleResource(p, globalMaxKeyWidth))
-	}
-	return b.String()
 }
 
 // renderSingleResource renders a pre-processed resource map into a string.

@@ -61,7 +61,7 @@ func NewDeps() (Deps, error) {
 
 	p := setupProviders(c)
 
-	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL, p.Workspace)
+	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}

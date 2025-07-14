@@ -5,13 +5,9 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
-
-const ProviderName = "workspace"
 
 type Provider struct {
 	client *client.Client
@@ -23,11 +19,7 @@ func New(client *client.Client) *Provider {
 	}
 }
 
-func (p *Provider) GetName() string {
-	return ProviderName
-}
-
-func (p *Provider) List(ctx context.Context, resourceType string, filters map[string]string) ([]resources.ResourceData, error) {
+func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
 	switch resourceType {
 	case AccountResourceType:
 		return p.listAccounts(ctx, filters)
@@ -63,40 +55,4 @@ func (p *Provider) GetSupportedKinds() []string {
 
 func (p *Provider) GetSupportedTypes() []string {
 	return []string{AccountResourceType}
-}
-
-func (p *Provider) Validate() error {
-	return nil
-}
-
-func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
-	return nil
-}
-
-func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
-	return resources.NewGraph(), nil
-}
-
-func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
-	return state.EmptyState(), nil
-}
-
-func (p *Provider) PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error {
-	return nil
-}
-
-func (p *Provider) DeleteResourceState(ctx context.Context, state *state.ResourceState) error {
-	return nil
-}
-
-func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, project.ErrNotImplemented
-}
-
-func (p *Provider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, project.ErrNotImplemented
-}
-
-func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
-	return project.ErrNotImplemented
 }

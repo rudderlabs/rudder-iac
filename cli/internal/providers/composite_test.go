@@ -511,7 +511,6 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	pB.DeleteErr = errTest
 	pB.PutResourceStateErr = errTest
 	pB.DeleteResourceStateErr = errTest
-	pB.ListErr = errTest
 
 	tests := []struct {
 		name           string
@@ -546,10 +545,6 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		{name: "Delete no provider for type", op: "Delete", providers: []project.Provider{pA}, resourceType: "typeUnknown", stateData: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
 		{name: "Delete success", op: "Delete", providers: []project.Provider{pA, pB}, resourceType: "typeA", stateData: resDataA, expectCallOn: pA},
 		{name: "Delete error", op: "Delete", providers: []project.Provider{pA, pB}, resourceType: "typeB", stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
-		// List
-		{name: "List no provider for type", op: "List", providers: []project.Provider{pA}, resourceType: "typeUnknown", expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
-		{name: "List success", op: "List", providers: []project.Provider{pA, pB}, resourceType: "typeA", expectCallOn: pA, expectedReturn: []resources.ResourceData{resDataA}},
-		{name: "List error", op: "List", providers: []project.Provider{pA, pB}, resourceType: "typeB", expectedErr: errTest, expectCallOn: pB},
 	}
 
 	for _, tt := range tests {
@@ -561,8 +556,6 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			if tt.expectCallOn == pA {
 				if tt.expectedReturn != nil {
 					switch tt.op {
-					case "List":
-						pA.ListVal = tt.expectedReturn.([]resources.ResourceData)
 					case "Create":
 						pA.CreateVal = tt.expectedReturn.(*resources.ResourceData)
 					case "Update":
@@ -590,8 +583,6 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 				actualReturn, err = cp.Update(ctx, "id1", tt.resourceType, tt.data, tt.stateData)
 			case "Delete":
 				err = cp.Delete(ctx, "id1", tt.resourceType, tt.stateData)
-			case "List":
-				actualReturn, err = cp.List(ctx, tt.resourceType, nil)
 			default:
 				t.Fatalf("Unknown operation: %s", tt.op)
 			}
@@ -623,8 +614,6 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 				case "Delete":
 					assert.Equal(t, tt.resourceType, tt.expectCallOn.DeleteCalledWithArg.ResourceType)
 					assert.Equal(t, tt.stateData, tt.expectCallOn.DeleteCalledWithArg.State)
-				case "List":
-					assert.Equal(t, tt.resourceType, tt.expectCallOn.ListCalledWithArg.ResourceType)
 				}
 			} else {
 				// Ensure no provider was called if none was expected (check one field from each relevant arg struct)
@@ -633,14 +622,12 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 				assert.Empty(t, pA.CreateCalledWithArg.ID, "pA.Create called unexpectedly for op %s", tt.op)
 				assert.Empty(t, pA.UpdateCalledWithArg.ID, "pA.Update called unexpectedly for op %s", tt.op)
 				assert.Empty(t, pA.DeleteCalledWithArg.ID, "pA.Delete called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pA.ListCalledWithArg.ResourceType, "pA.List called unexpectedly for op %s", tt.op)
 
 				assert.Empty(t, pB.PutResourceStateCalledWithArg.URN, "pB.PutResourceState called unexpectedly for op %s", tt.op)
 				assert.Nil(t, pB.DeleteResourceStateCalledWithArg, "pB.DeleteResourceState called unexpectedly for op %s", tt.op)
 				assert.Empty(t, pB.CreateCalledWithArg.ID, "pB.Create called unexpectedly for op %s", tt.op)
 				assert.Empty(t, pB.UpdateCalledWithArg.ID, "pB.Update called unexpectedly for op %s", tt.op)
 				assert.Empty(t, pB.DeleteCalledWithArg.ID, "pB.Delete called unexpectedly for op %s", tt.op)
-				assert.Empty(t, pB.ListCalledWithArg.ResourceType, "pB.List called unexpectedly for op %s", tt.op)
 			}
 		})
 	}

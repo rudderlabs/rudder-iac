@@ -73,15 +73,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.width == 0 {
-		return "Initializing..."
-	}
-
 	// Details View
 	var detailsView string
 	if len(m.resources) > 0 {
 		selected := m.resources[m.table.Cursor()]
-		detailsView = ui.RenderDetails(selected)
+		detailsView = ui.FormattedMap(selected)
 	} else {
 		detailsView = "No resources found."
 	}
@@ -90,14 +86,11 @@ func (m model) View() string {
 	detailsHeader := ui.Bold("Details")
 	ruler := ui.RulerWithWidth(m.width - (4 + 27 + 30 + 6) - 4)
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
-	fullDetailsView := lipgloss.JoinVertical(lipgloss.Left, detailsHeader, ruler, detailsContent)
+	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
 	// Main Layout
 	detailsStyle := lipgloss.NewStyle().
-		Padding(0, 2).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderLeft(true).
-		BorderForeground(lipgloss.Color("240"))
+		Padding(0, 2)
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -145,7 +138,6 @@ func printTableWithDetails(rs []resources.ResourceData) error {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
 		BorderBottom(true).
 		Bold(true)
 	s.Selected = s.Selected.
