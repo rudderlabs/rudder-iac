@@ -104,7 +104,7 @@ func (m *EmptyCatalog) CreateCategory(ctx context.Context, categoryCreate catalo
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate *catalog.Category) (*catalog.Category, error) {
+func (m *EmptyCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
 	return nil, nil
 }
 
