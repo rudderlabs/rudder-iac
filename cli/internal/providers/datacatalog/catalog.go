@@ -14,6 +14,7 @@ const (
 	EventResourceType        = "event"
 	TrackingPlanResourceType = "tracking-plan"
 	CustomTypeResourceType   = "custom-type"
+	CategoryResourceType     = "category"
 )
 
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
@@ -21,6 +22,7 @@ var resourceTypeCollection = map[string]catalog.ResourceCollection{
 	EventResourceType:        catalog.ResourceCollectionEvents,
 	TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
 	CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
+	CategoryResourceType:     catalog.ResourceCollectionCategories,
 }
 
 type resourceProvider interface {
