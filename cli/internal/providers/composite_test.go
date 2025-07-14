@@ -555,13 +555,15 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			// Set return values for successful calls on pA if it's the expected one
 			if tt.expectCallOn == pA {
 				if tt.expectedReturn != nil {
-					switch tt.op {
-					case "Create":
-						pA.CreateVal = tt.expectedReturn.(*resources.ResourceData)
-					case "Update":
-						pA.UpdateVal = tt.expectedReturn.(*resources.ResourceData)
-					}
+					pA.CreateVal = tt.expectedReturn.(*resources.ResourceData)
+					pA.UpdateVal = tt.expectedReturn.(*resources.ResourceData)
+				} else {
+					pA.CreateVal = nil
+					pA.UpdateVal = nil
 				}
+			} else {
+				pA.CreateVal = nil // Ensure pA doesn't return values if not expected
+				pA.UpdateVal = nil
 			}
 			// pB already has error values set if it's the target for error cases
 
