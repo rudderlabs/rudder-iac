@@ -2,6 +2,7 @@ package retl_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,62 +165,181 @@ func TestProvider(t *testing.T) {
 		})
 	})
 
-	t.Run("GetResourceGraph", func(t *testing.T) {
-		t.Parallel()
-
-		graph, err := provider.GetResourceGraph()
-		require.NoError(t, err)
-		assert.NotNil(t, graph)
-	})
-
 	t.Run("LoadState", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
-			return &retlClient.State{
-				Resources: map[string]retlClient.ResourceState{
-					"retl-source-sql-model:test": {
-						ID:   "test",
-						Type: "retl-source-sql-model",
+		t.Run("Success with multiple resources", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
+				return &retlClient.State{
+					Resources: map[string]retlClient.ResourceState{
+						"retl-source-sql-model:test1": {
+							ID:   "test1",
+							Type: "retl-source-sql-model",
+							Input: map[string]interface{}{
+								"name": "test1",
+							},
+							Output: map[string]interface{}{
+								"source_id": "src1",
+							},
+							Dependencies: []string{"dep1"},
+						},
+						"retl-source-sql-model:test2": {
+							ID:   "test2",
+							Type: "retl-source-sql-model",
+							Input: map[string]interface{}{
+								"name": "test2",
+							},
+							Output: map[string]interface{}{
+								"source_id": "src2",
+							},
+							Dependencies: []string{"dep2"},
+						},
 					},
+				}, nil
+			}
+
+			s, err := provider.LoadState(ctx)
+			require.NoError(t, err)
+			assert.NotNil(t, s)
+
+			// Check first resource
+			rs1 := s.GetResource("retl-source-sql-model:test1")
+			require.NotNil(t, rs1)
+			assert.Equal(t, "test1", rs1.ID)
+			assert.Equal(t, "retl-source-sql-model", rs1.Type)
+			assert.Equal(t, "test1", rs1.Input["name"])
+			assert.Equal(t, "src1", rs1.Output["source_id"])
+			assert.Equal(t, []string{"dep1"}, rs1.Dependencies)
+
+			// Check second resource
+			rs2 := s.GetResource("retl-source-sql-model:test2")
+			require.NotNil(t, rs2)
+			assert.Equal(t, "test2", rs2.ID)
+			assert.Equal(t, "retl-source-sql-model", rs2.Type)
+			assert.Equal(t, "test2", rs2.Input["name"])
+			assert.Equal(t, "src2", rs2.Output["source_id"])
+			assert.Equal(t, []string{"dep2"}, rs2.Dependencies)
+		})
+
+		t.Run("Error reading state", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
+				return nil, fmt.Errorf("failed to read state")
+			}
+
+			s, err := provider.LoadState(ctx)
+			assert.Error(t, err)
+			assert.Nil(t, s)
+			assert.Contains(t, err.Error(), "reading remote state")
+		})
+	})
+
+	t.Run("GetResourceGraph", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("Multiple resources", func(t *testing.T) {
+			t.Parallel()
+
+			// Load multiple specs to test graph with multiple resources
+			err := provider.LoadSpec("test1.yaml", &specs.Spec{
+				Kind: "retl-source-sql-model",
+				Spec: map[string]interface{}{
+					"id":                     "test-model-1",
+					"display_name":           "Test Model 1",
+					"description":            "Test Description 1",
+					"account_id":             "test-account",
+					"primary_key":            "id",
+					"sql":                    "SELECT * FROM users",
+					"source_definition_name": "postgres",
 				},
-			}, nil
-		}
+			})
+			require.NoError(t, err)
 
-		s, err := provider.LoadState(ctx)
-		require.NoError(t, err)
-		assert.NotNil(t, s)
+			err = provider.LoadSpec("test2.yaml", &specs.Spec{
+				Kind: "retl-source-sql-model",
+				Spec: map[string]interface{}{
+					"id":                     "test-model-2",
+					"display_name":           "Test Model 2",
+					"description":            "Test Description 2",
+					"account_id":             "test-account",
+					"primary_key":            "id",
+					"sql":                    "SELECT * FROM orders",
+					"source_definition_name": "postgres",
+				},
+			})
+			require.NoError(t, err)
 
-		rs := s.GetResource("retl-source-sql-model:test")
-		require.NotNil(t, rs)
-		assert.Equal(t, "test", rs.ID)
-		assert.Equal(t, "retl-source-sql-model", rs.Type)
+			graph, err := provider.GetResourceGraph()
+			require.NoError(t, err)
+			assert.NotNil(t, graph)
+
+			// Verify both resources are in the graph
+			resources := graph.Resources()
+			assert.Len(t, resources, 2)
+
+			// Verify resource IDs
+			resourceIDs := make([]string, 0, len(resources))
+			for _, r := range resources {
+				resourceIDs = append(resourceIDs, r.ID())
+			}
+			assert.Contains(t, resourceIDs, "test-model-1")
+			assert.Contains(t, resourceIDs, "test-model-2")
+		})
 	})
 
 	t.Run("PutResourceState", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		called := false
-		mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-			called = true
-			assert.Equal(t, "test", id)
-			assert.Equal(t, "test:resource", req.URN)
-			return nil
-		}
+		t.Run("Success case", func(t *testing.T) {
+			t.Parallel()
 
-		rs := &state.ResourceState{
-			ID:   "test",
-			Type: sqlmodel.ResourceType,
-			Output: map[string]interface{}{
-				"source_id": "test",
-			},
-		}
+			ctx := context.Background()
+			called := false
+			mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
+				called = true
+				assert.Equal(t, "test", id)
+				assert.Equal(t, "test:resource", req.URN)
+				return nil
+			}
 
-		err := provider.PutResourceState(ctx, "test:resource", rs)
-		require.NoError(t, err)
-		assert.True(t, called)
+			rs := &state.ResourceState{
+				ID:   "test",
+				Type: sqlmodel.ResourceType,
+				Output: map[string]interface{}{
+					"source_id": "test",
+				},
+			}
+
+			err := provider.PutResourceState(ctx, "test:resource", rs)
+			require.NoError(t, err)
+			assert.True(t, called)
+		})
+
+		t.Run("Error case - client error", func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
+				return fmt.Errorf("failed to put state")
+			}
+
+			rs := &state.ResourceState{
+				ID:   "test",
+				Type: sqlmodel.ResourceType,
+				Output: map[string]interface{}{
+					"source_id": "test",
+				},
+			}
+
+			err := provider.PutResourceState(ctx, "test:resource", rs)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to put state")
+		})
 	})
 
 	t.Run("DeleteResourceState", func(t *testing.T) {
