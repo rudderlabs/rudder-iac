@@ -19,6 +19,7 @@ import (
 // mockRETLStore mocks the RETL client for testing
 type mockRETLStore struct {
 	retlClient.RETLStore
+	sourceID        string
 	readStateFunc   func(ctx context.Context) (*retlClient.State, error)
 	putStateFunc    func(ctx context.Context, id string, req retlClient.PutStateRequest) error
 	deleteStateFunc func(ctx context.Context, ID string) error
@@ -88,59 +89,54 @@ func (m *mockRETLStore) ListRetlSources(ctx context.Context) (*retlClient.RETLSo
 	return &retlClient.RETLSources{}, nil
 }
 
+// newDefaultMockClient creates a new mock client with default behavior
+func newDefaultMockClient() *mockRETLStore {
+	return &mockRETLStore{
+		sourceID: "test-source-id",
+		createRetlSourceFunc: func(ctx context.Context, source *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
+			return &retlClient.RETLSource{
+				ID:                   "test-source-id",
+				SourceType:           source.SourceType,
+				SourceDefinitionName: source.SourceDefinitionName,
+				Name:                 source.Name,
+				Config:               source.Config,
+				AccountID:            source.AccountID,
+			}, nil
+		},
+		updateRetlSourceFunc: func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+			return &retlClient.RETLSource{
+				SourceType:           "model",
+				SourceDefinitionName: "postgres",
+				Name:                 source.Name,
+				Config:               source.Config,
+				AccountID:            source.AccountID,
+			}, nil
+		},
+		deleteRetlSourceFunc: func(ctx context.Context, id string) error {
+			return nil
+		},
+	}
+}
+
 func TestProvider(t *testing.T) {
-	t.Parallel()
-
-	mockClient := &mockRETLStore{}
-
-	// Set up mock client functions
-	mockClient.createRetlSourceFunc = func(ctx context.Context, source *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
-		return &retlClient.RETLSource{
-			ID:                   "test-source-id",
-			SourceType:           source.SourceType,
-			SourceDefinitionName: source.SourceDefinitionName,
-			Name:                 source.Name,
-			Config:               source.Config,
-			AccountID:            source.AccountID,
-		}, nil
-	}
-
-	mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
-		return &retlClient.RETLSource{
-			SourceType:           "model",
-			SourceDefinitionName: "postgres",
-			Name:                 source.Name,
-			Config:               source.Config,
-			AccountID:            source.AccountID,
-		}, nil
-	}
-
-	mockClient.deleteRetlSourceFunc = func(ctx context.Context, id string) error {
-		return nil
-	}
-
-	provider := retl.New(mockClient)
-
 	t.Run("GetSupportedKinds", func(t *testing.T) {
 		t.Parallel()
-
+		provider := retl.New(newDefaultMockClient())
 		kinds := provider.GetSupportedKinds()
 		assert.Contains(t, kinds, "retl-source-sql-model")
 	})
 
 	t.Run("GetSupportedTypes", func(t *testing.T) {
 		t.Parallel()
-
+		provider := retl.New(newDefaultMockClient())
 		types := provider.GetSupportedTypes()
 		assert.Contains(t, types, sqlmodel.ResourceType)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("UnsupportedKind", func(t *testing.T) {
 			t.Parallel()
-
+			provider := retl.New(newDefaultMockClient())
 			err := provider.LoadSpec("test.yaml", &specs.Spec{Kind: "unsupported"})
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "unsupported kind")
@@ -148,7 +144,7 @@ func TestProvider(t *testing.T) {
 
 		t.Run("ValidKind", func(t *testing.T) {
 			t.Parallel()
-
+			provider := retl.New(newDefaultMockClient())
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "retl-source-sql-model",
 				Spec: map[string]interface{}{
@@ -166,10 +162,10 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("LoadState", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("Success with multiple resources", func(t *testing.T) {
 			t.Parallel()
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
 
 			ctx := context.Background()
 			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
@@ -226,6 +222,8 @@ func TestProvider(t *testing.T) {
 
 		t.Run("Error reading state", func(t *testing.T) {
 			t.Parallel()
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
 
 			ctx := context.Background()
 			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
@@ -240,10 +238,9 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("GetResourceGraph", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("Multiple resources", func(t *testing.T) {
 			t.Parallel()
+			provider := retl.New(newDefaultMockClient())
 
 			// Load multiple specs to test graph with multiple resources
 			err := provider.LoadSpec("test1.yaml", &specs.Spec{
@@ -293,10 +290,10 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("PutResourceState", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("Success case", func(t *testing.T) {
 			t.Parallel()
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
 
 			ctx := context.Background()
 			called := false
@@ -322,6 +319,8 @@ func TestProvider(t *testing.T) {
 
 		t.Run("Error case - client error", func(t *testing.T) {
 			t.Parallel()
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
 
 			ctx := context.Background()
 			mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
@@ -344,6 +343,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("DeleteResourceState", func(t *testing.T) {
 		t.Parallel()
+		provider := retl.New(newDefaultMockClient())
 
 		// DeleteResourceState is now a no-op, so just check that it returns nil
 		ctx := context.Background()
@@ -352,24 +352,22 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("CRUD Operations", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-
-		// Create complete test data for SQL model
-		createData := resources.ResourceData{
-			"id":                     "test-model",
-			"display_name":           "Test Model",
-			"description":            "Test Description",
-			"account_id":             "test-account",
-			"primary_key":            "id",
-			"sql":                    "SELECT * FROM users",
-			"source_definition_name": "postgres",
-			"enabled":                true,
-		}
-
 		t.Run("Create", func(t *testing.T) {
 			t.Parallel()
+			provider := retl.New(newDefaultMockClient())
+			ctx := context.Background()
+
+			// Create complete test data for SQL model
+			createData := resources.ResourceData{
+				"id":                     "test-model",
+				"display_name":           "Test Model",
+				"description":            "Test Description",
+				"account_id":             "test-account",
+				"primary_key":            "id",
+				"sql":                    "SELECT * FROM users",
+				"source_definition_name": "postgres",
+				"enabled":                true,
+			}
 
 			result, err := provider.Create(ctx, "test", sqlmodel.ResourceType, createData)
 			require.NoError(t, err)
@@ -382,6 +380,20 @@ func TestProvider(t *testing.T) {
 
 		t.Run("Update", func(t *testing.T) {
 			t.Parallel()
+			provider := retl.New(newDefaultMockClient())
+			ctx := context.Background()
+
+			// Create complete test data for SQL model
+			createData := resources.ResourceData{
+				"id":                     "test-model",
+				"display_name":           "Test Model",
+				"description":            "Test Description",
+				"account_id":             "test-account",
+				"primary_key":            "id",
+				"sql":                    "SELECT * FROM users",
+				"source_definition_name": "postgres",
+				"enabled":                true,
+			}
 
 			// For update, we need state data with a source_id
 			stateData := resources.ResourceData{
@@ -406,6 +418,8 @@ func TestProvider(t *testing.T) {
 
 		t.Run("Delete", func(t *testing.T) {
 			t.Parallel()
+			provider := retl.New(newDefaultMockClient())
+			ctx := context.Background()
 
 			// For delete, we need state data with a source_id
 			stateData := resources.ResourceData{
@@ -421,8 +435,6 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("Validate", func(t *testing.T) {
-		t.Parallel()
-
 		testCases := []struct {
 			name          string
 			specs         []*specs.Spec
@@ -475,12 +487,10 @@ func TestProvider(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
+			tc := tc // capture range variable
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-
-				mockClient := &mockRETLStore{}
-				provider := retl.New(mockClient)
+				provider := retl.New(newDefaultMockClient())
 
 				// Load all specs
 				for _, spec := range tc.specs {
