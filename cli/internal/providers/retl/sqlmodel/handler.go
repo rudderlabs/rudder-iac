@@ -15,14 +15,14 @@ import (
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
 	client retlClient.RETLStore
-	specs  []*SQLModelResource
+	specs  map[string]*SQLModelResource
 }
 
 // NewHandler creates a new SQL Model resource handler
 func NewHandler(client retlClient.RETLStore) *Handler {
 	return &Handler{
 		client: client,
-		specs:  []*SQLModelResource{},
+		specs:  make(map[string]*SQLModelResource),
 	}
 }
 
@@ -33,6 +33,10 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	// Convert spec map to struct using mapstructure
 	if err := mapstructure.Decode(s.Spec, spec); err != nil {
 		return fmt.Errorf("converting spec: %w", err)
+	}
+
+	if _, ok := h.specs[spec.ID]; ok {
+		return fmt.Errorf("sql model with id %s already exists", spec.ID)
 	}
 
 	if spec.SQL == nil && spec.File == nil {
@@ -61,7 +65,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		spec.SQL = &sqlStr
 	}
 
-	h.specs = append(h.specs, &SQLModelResource{
+	h.specs[spec.ID] = &SQLModelResource{
 		ID:                   spec.ID,
 		DisplayName:          spec.DisplayName,
 		Description:          spec.Description,
@@ -70,7 +74,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SourceDefinitionName: spec.SourceDefinitionName,
 		Enabled:              spec.Enabled,
 		SQL:                  *spec.SQL,
-	})
+	}
 	return nil
 }
 

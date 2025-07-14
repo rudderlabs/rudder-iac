@@ -230,7 +230,6 @@ func TestSQLModelHandler(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc // capture range variable
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
@@ -262,6 +261,46 @@ func TestSQLModelHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("LoadSpec with duplicate id", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := &mockRETLClient{sourceID: "src123"}
+		handler := sqlmodel.NewHandler(mockClient)
+
+		err := handler.LoadSpec("test.yaml", &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":                     "test-model",
+				"display_name":           "Test Model",
+				"description":            "Test description",
+				"sql":                    "SELECT * FROM users",
+				"account_id":             "acc123",
+				"primary_key":            "id",
+				"source_definition_name": "postgres",
+			},
+		})
+
+		require.NoError(t, err)
+
+		err = handler.LoadSpec("test.yaml", &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":                     "test-model",
+				"display_name":           "Test Model",
+				"description":            "Test description",
+				"sql":                    "SELECT * FROM users",
+				"account_id":             "acc123",
+				"primary_key":            "id",
+				"source_definition_name": "postgres",
+			},
+		})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "sql model with id test-model already exists")
 	})
 
 	t.Run("LoadSpec with invalid spec structure", func(t *testing.T) {
