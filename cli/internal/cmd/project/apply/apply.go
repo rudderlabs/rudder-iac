@@ -34,14 +34,14 @@ func NewCmdApply() *cobra.Command {
 		Use:   "apply",
 		Short: "Apply project configuration changes",
 		Long: heredoc.Doc(`
-			Applies the project configuration changes to the upstream system.
+			Applies the project configuration changes to the RudderStack workspace associated with your access token.
 			This includes creating, updating, or deleting resources based on
-			the differences between local configuration and upstream state.
+			the differences between local configuration and the workspace resources.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli apply --location </path/to/dir or file>
 			$ rudder-cli apply --location </path/to/dir or file> --dry-run
-			$ rudder-cli apply --location </path/to/dir or file> --no-confirm
+			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -105,9 +105,8 @@ func NewCmdApply() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
-	_ = cmd.MarkFlagRequired("location")
 	return cmd
 }
