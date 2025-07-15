@@ -457,7 +457,7 @@ func TestSQLModelHandler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.True(t, mockClient.createCalled)
-		assert.Equal(t, "src123", (*result)["source_id"])
+		assert.Equal(t, "src123", (*result)[sqlmodel.IDKey])
 	})
 
 	t.Run("Create with API error", func(t *testing.T) {
@@ -563,7 +563,7 @@ func TestSQLModelHandler(t *testing.T) {
 					"enabled":                true,
 				},
 				state: resources.ResourceData{
-					"source_id": "src123",
+					sqlmodel.IDKey: "src123",
 				},
 				expectedError: false,
 				mockSetup: func() *mockRETLClient {
@@ -582,7 +582,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 				state:         resources.ResourceData{},
 				expectedError: true,
-				errorMessage:  "missing source_id in resource state",
+				errorMessage:  fmt.Sprintf("missing %s in resource state", sqlmodel.IDKey),
 				mockSetup: func() *mockRETLClient {
 					return &mockRETLClient{}
 				},
@@ -598,7 +598,7 @@ func TestSQLModelHandler(t *testing.T) {
 					"enabled":      true,
 				},
 				state: resources.ResourceData{
-					"source_id": "error",
+					sqlmodel.IDKey: "error",
 				},
 				expectedError: true,
 				errorMessage:  "updating RETL source",
@@ -665,7 +665,7 @@ func TestSQLModelHandler(t *testing.T) {
 			"enabled":                true,
 		}
 		state := resources.ResourceData{
-			"source_id": "src123",
+			sqlmodel.IDKey: "src123",
 		}
 
 		// Execute
@@ -691,7 +691,7 @@ func TestSQLModelHandler(t *testing.T) {
 			{
 				name: "Valid delete",
 				state: resources.ResourceData{
-					"source_id": "src123",
+					sqlmodel.IDKey: "src123",
 				},
 				expectedError: false,
 				mockSetup: func() *mockRETLClient {
@@ -702,7 +702,7 @@ func TestSQLModelHandler(t *testing.T) {
 				name:          "Missing source_id",
 				state:         resources.ResourceData{},
 				expectedError: true,
-				errorMessage:  "missing source_id in resource state",
+				errorMessage:  fmt.Sprintf("missing %s in resource state", sqlmodel.IDKey),
 				mockSetup: func() *mockRETLClient {
 					return &mockRETLClient{}
 				},
@@ -710,7 +710,7 @@ func TestSQLModelHandler(t *testing.T) {
 			{
 				name: "API error",
 				state: resources.ResourceData{
-					"source_id": "error",
+					sqlmodel.IDKey: "error",
 				},
 				expectedError: true,
 				errorMessage:  "deleting RETL source",

@@ -15,7 +15,7 @@ const (
 	SourceDefinitionNameKey = "source_definition_name"
 	EnabledKey              = "enabled"
 	SQLKey                  = "sql"
-	SourceIDKey             = "source_id"
+	IDKey                   = "id"
 	SourceTypeKey           = "source_type"
 	CreatedAtKey            = "created_at"
 	UpdatedAtKey            = "updated_at"

@@ -308,7 +308,7 @@ func TestProvider(t *testing.T) {
 				ID:   "test",
 				Type: sqlmodel.ResourceType,
 				Output: map[string]interface{}{
-					"source_id": "test",
+					sqlmodel.IDKey: "test",
 				},
 			}
 
@@ -331,7 +331,7 @@ func TestProvider(t *testing.T) {
 				ID:   "test",
 				Type: sqlmodel.ResourceType,
 				Output: map[string]interface{}{
-					"source_id": "test",
+					sqlmodel.IDKey: "test",
 				},
 			}
 
@@ -372,7 +372,7 @@ func TestProvider(t *testing.T) {
 			result, err := provider.Create(ctx, "test", sqlmodel.ResourceType, createData)
 			require.NoError(t, err)
 			require.NotNil(t, result)
-			assert.Equal(t, "test-source-id", (*result)["source_id"])
+			assert.Equal(t, "test-source-id", (*result)[sqlmodel.IDKey])
 
 			_, err = provider.Create(ctx, "test", "unknown", createData)
 			assert.Error(t, err)
@@ -397,13 +397,12 @@ func TestProvider(t *testing.T) {
 
 			// For update, we need state data with a source_id
 			stateData := resources.ResourceData{
-				"id":                     "test-model",
 				"display_name":           "Test Model",
 				"description":            "Test Description",
 				"account_id":             "test-account",
 				"primary_key":            "id",
 				"sql":                    "SELECT * FROM users",
-				"source_id":              "test-source-id",
+				"id":                     "test-source-id",
 				"source_definition_name": "postgres",
 				"enabled":                true,
 			}
@@ -423,7 +422,7 @@ func TestProvider(t *testing.T) {
 
 			// For delete, we need state data with a source_id
 			stateData := resources.ResourceData{
-				"source_id": "test-source-id",
+				sqlmodel.IDKey: "test-source-id",
 			}
 
 			err := provider.Delete(ctx, "test", sqlmodel.ResourceType, stateData)

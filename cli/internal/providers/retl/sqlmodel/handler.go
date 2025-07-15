@@ -14,15 +14,15 @@ import (
 
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
-	client retlClient.RETLStore
-	specs  map[string]*SQLModelResource
+	client    retlClient.RETLStore
+	resources map[string]*SQLModelResource
 }
 
 // NewHandler creates a new SQL Model resource handler
 func NewHandler(client retlClient.RETLStore) *Handler {
 	return &Handler{
-		client: client,
-		specs:  make(map[string]*SQLModelResource),
+		client:    client,
+		resources: make(map[string]*SQLModelResource),
 	}
 }
 
@@ -35,7 +35,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		return fmt.Errorf("converting spec: %w", err)
 	}
 
-	if _, ok := h.specs[spec.ID]; ok {
+	if _, ok := h.resources[spec.ID]; ok {
 		return fmt.Errorf("sql model with id %s already exists", spec.ID)
 	}
 
@@ -46,9 +46,10 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	if spec.SQL != nil && spec.File != nil {
 		return fmt.Errorf("sql and file cannot be specified together")
 	}
-
-	// If file path is specified, load SQL from file
-	if spec.File != nil && spec.SQL == nil {
+	sqlStr := ""
+	if spec.SQL != nil {
+		sqlStr = *spec.SQL
+	} else {
 		filePath := *spec.File
 		if !filepath.IsAbs(filePath) {
 			// If path is relative, resolve it relative to the spec file
@@ -60,12 +61,11 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		if err != nil {
 			return fmt.Errorf("reading SQL file %s: %w", *spec.File, err)
 		}
-
-		sqlStr := string(sqlContent)
-		spec.SQL = &sqlStr
+		sqlStr = string(sqlContent)
 	}
 
-	h.specs[spec.ID] = &SQLModelResource{
+	// Create resource with SQL directly from spec
+	h.resources[spec.ID] = &SQLModelResource{
 		ID:                   spec.ID,
 		DisplayName:          spec.DisplayName,
 		Description:          spec.Description,
@@ -73,14 +73,14 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		PrimaryKey:           spec.PrimaryKey,
 		SourceDefinitionName: spec.SourceDefinitionName,
 		Enabled:              spec.Enabled,
-		SQL:                  *spec.SQL,
+		SQL:                  sqlStr,
 	}
 	return nil
 }
 
 // Validate validates all loaded SQL Model specs
 func (h *Handler) Validate() error {
-	for _, spec := range h.specs {
+	for _, spec := range h.resources {
 		if err := ValidateSQLModelResource(spec); err != nil {
 			return fmt.Errorf("validating sql model spec: %w", err)
 		}
@@ -90,9 +90,9 @@ func (h *Handler) Validate() error {
 
 // GetResources returns all SQL Model resources
 func (h *Handler) GetResources() ([]*resources.Resource, error) {
-	result := make([]*resources.Resource, 0, len(h.specs))
+	result := make([]*resources.Resource, 0, len(h.resources))
 
-	for _, spec := range h.specs {
+	for _, spec := range h.resources {
 		// Convert spec to resource data
 		data := resources.ResourceData{
 			LocalIDKey:              spec.ID,
@@ -141,13 +141,12 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 
 	// Convert API response to resource data
 	result := resources.ResourceData{
-		LocalIDKey:              ID,
 		DisplayNameKey:          resp.Name,
 		DescriptionKey:          resp.Config.Description,
 		AccountIDKey:            resp.AccountID,
 		PrimaryKeyKey:           resp.Config.PrimaryKey,
 		SQLKey:                  resp.Config.Sql,
-		SourceIDKey:             resp.ID, // Store the remote source ID
+		IDKey:                   resp.ID, // Store the remote source ID
 		SourceTypeKey:           resp.SourceType,
 		EnabledKey:              resp.IsEnabled,
 		SourceDefinitionNameKey: resp.SourceDefinitionName,
@@ -167,9 +166,9 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
-	sourceID, ok := state[SourceIDKey].(string)
+	sourceID, ok := state[IDKey].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing source_id in resource state")
+		return nil, fmt.Errorf("missing %s in resource state", IDKey)
 	}
 
 	source := &retlClient.RETLSourceUpdateRequest{
@@ -191,13 +190,12 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 
 	// Convert API response to resource data
 	result := resources.ResourceData{
-		LocalIDKey:              ID,
 		DisplayNameKey:          resp.Name,
 		DescriptionKey:          resp.Config.Description,
 		AccountIDKey:            resp.AccountID,
 		PrimaryKeyKey:           resp.Config.PrimaryKey,
 		SQLKey:                  resp.Config.Sql,
-		SourceIDKey:             resp.ID,
+		IDKey:                   resp.ID,
 		SourceTypeKey:           resp.SourceType,
 		EnabledKey:              resp.IsEnabled,
 		SourceDefinitionNameKey: resp.SourceDefinitionName,
@@ -217,9 +215,9 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 // Delete deletes an existing SQL Model resource
 func (h *Handler) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
 	// Get source_id from state - needed for API call
-	sourceID, ok := state["source_id"].(string)
+	sourceID, ok := state[IDKey].(string)
 	if !ok {
-		return fmt.Errorf("missing source_id in resource state")
+		return fmt.Errorf("missing %s in resource state", IDKey)
 	}
 
 	// Call API to delete RETL source

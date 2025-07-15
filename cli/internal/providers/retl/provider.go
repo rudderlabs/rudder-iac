@@ -118,7 +118,11 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 
 // PutResourceState saves the state of a resource
 func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	remoteID := s.Output["source_id"].(string)
+	remoteID, ok := s.Output["id"].(string)
+	if !ok {
+		return fmt.Errorf("missing id in resource state")
+	}
+
 	req := retlClient.PutStateRequest{
 		URN: URN,
 		State: retlClient.ResourceState{
