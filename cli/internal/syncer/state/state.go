@@ -91,9 +91,9 @@ func dereferenceValue(v any, state *State) (any, error) {
 			return nil, err
 		}
 		return resources.PropertyRef{
-			URN:      val.URN,
-			Property: val.Property,
-			Value:    value,
+			URN:           val.URN,
+			Property:      val.Property,
+			ResolvedValue: value,
 		}, nil
 
 	case resources.ResourceData:

@@ -50,9 +50,9 @@ func TestDereference(t *testing.T) {
 			},
 			expected: resources.ResourceData{
 				"sourceName": resources.PropertyRef{
-					URN:      resources.URN("source1", "source"),
-					Property: "name",
-					Value:    "test source",
+					URN:           resources.URN("source1", "source"),
+					Property:      "name",
+					ResolvedValue: "test source",
 				},
 			},
 		},
@@ -69,9 +69,9 @@ func TestDereference(t *testing.T) {
 			expected: resources.ResourceData{
 				"sourceName": map[string]interface{}{
 					"nested": resources.PropertyRef{
-						URN:      resources.URN("source1", "source"),
-						Property: "name",
-						Value:    "test source",
+						URN:           resources.URN("source1", "source"),
+						Property:      "name",
+						ResolvedValue: "test source",
 					},
 				},
 			},
@@ -89,9 +89,9 @@ func TestDereference(t *testing.T) {
 			expected: resources.ResourceData{
 				"sourceName": []interface{}{
 					resources.PropertyRef{
-						URN:      resources.URN("source1", "source"),
-						Property: "name",
-						Value:    "test source",
+						URN:           resources.URN("source1", "source"),
+						Property:      "name",
+						ResolvedValue: "test source",
 					},
 				},
 			},
@@ -112,9 +112,9 @@ func TestDereference(t *testing.T) {
 				"sourceName": []interface{}{
 					map[string]interface{}{
 						"nested": resources.PropertyRef{
-							URN:      resources.URN("source1", "source"),
-							Property: "name",
-							Value:    "test source",
+							URN:           resources.URN("source1", "source"),
+							Property:      "name",
+							ResolvedValue: "test source",
 						},
 					},
 				},
@@ -136,9 +136,9 @@ func TestDereference(t *testing.T) {
 				"sourceName": []map[string]interface{}{
 					{
 						"nested": resources.PropertyRef{
-							URN:      resources.URN("source1", "source"),
-							Property: "name",
-							Value:    "test source",
+							URN:           resources.URN("source1", "source"),
+							Property:      "name",
+							ResolvedValue: "test source",
 						},
 					},
 				},
