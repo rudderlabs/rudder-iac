@@ -23,10 +23,11 @@ var (
 )
 
 type Config = struct {
-	Debug   bool   `mapstructure:"debug"`
-	Verbose bool   `mapstructure:"verbose"`
-	APIURL  string `mapstructure:"apiURL"`
-	Auth    struct {
+	Debug        bool   `mapstructure:"debug"`
+	Experimental bool   `mapstructure:"experimental"`
+	Verbose      bool   `mapstructure:"verbose"`
+	APIURL       string `mapstructure:"apiURL"`
+	Auth         struct {
 		AccessToken string `mapstructure:"accessToken"`
 	} `mapstructure:"auth"`
 	Telemetry struct {
@@ -64,6 +65,7 @@ func InitConfig(cfgFile string) {
 
 	// set defaults
 	viper.SetDefault("debug", false)
+	viper.SetDefault("experimental", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL)
 	viper.SetDefault("telemetry.disabled", false)
@@ -72,6 +74,7 @@ func InitConfig(cfgFile string) {
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	viper.BindEnv("experimental", "RUDDERSTACK_CLI_EXPERIMENTAL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
@@ -121,6 +124,11 @@ func SetTelemetryAnonymousID(anonymousID string) {
 
 func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		log.Debug("no config file in use, skipping config update")
+		return
+	}
+
 	data, err := os.ReadFile(configFile)
 	cobra.CheckErr(err)
 
