@@ -1,8 +1,6 @@
 package state
 
 import (
-	"strings"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -11,34 +9,7 @@ type EventArgs struct {
 	Name        string
 	Description string
 	EventType   string
-	Category    *EventCategoryArgs
-}
-
-// TODO: Do we need to store the category ref too?
-// We are currently storing only the URN of the category. The ref gets converted to the URN in the FromCatalogEvent function.
-type EventCategoryArgs struct {
-	URN  string
-	Name string
-}
-
-func (ecArgs *EventCategoryArgs) ToResourceData() resources.ResourceData {
-	if ecArgs == nil {
-		return nil
-	}
-	return resources.ResourceData{
-		"categoryRef": &resources.PropertyRef{
-			URN:      ecArgs.URN,
-			Property: "name",
-		},
-		"name": ecArgs.Name,
-	}
-}
-
-func (ecArgs *EventCategoryArgs) FromResourceData(from resources.ResourceData) {
-	ecArgs.Name = MustString(from, "name")
-	if ref, ok := from["categoryRef"].(*resources.PropertyRef); ok && ref != nil {
-		ecArgs.URN = ref.URN
-	}
+	CategoryId  *resources.PropertyRef
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
@@ -46,7 +17,7 @@ func (args *EventArgs) ToResourceData() resources.ResourceData {
 		"name":        args.Name,
 		"description": args.Description,
 		"eventType":   args.EventType,
-		"category":    args.Category.ToResourceData(),
+		"categoryId":  args.CategoryId,
 	}
 }
 
@@ -54,9 +25,8 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
-	if category, ok := from["category"].(resources.ResourceData); ok && category != nil {
-		args.Category = &EventCategoryArgs{}
-		args.Category.FromResourceData(category)
+	if categoryId, ok := from["categoryId"].(*resources.PropertyRef); ok {
+		args.CategoryId = categoryId
 	}
 }
 
@@ -65,10 +35,9 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 	args.Description = event.Description
 	args.EventType = event.Type
 	if event.CategoryRef != nil {
-		s := strings.Split(*event.CategoryRef, "/")
-		args.Category = &EventCategoryArgs{
-			URN:  getURNFromRef(*event.CategoryRef),
-			Name: s[len(s)-1],
+		args.CategoryId = &resources.PropertyRef{
+			URN:      getURNFromRef(*event.CategoryRef),
+			Property: "id",
 		}
 	}
 }

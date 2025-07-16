@@ -62,7 +62,7 @@ func TestEventProviderOperations(t *testing.T) {
 		Name:        "event",
 		Description: "event description",
 		EventType:   "event type",
-		Category:    nil,
+		CategoryId:  nil,
 	}
 
 	t.Run("Create", func(t *testing.T) {
@@ -103,9 +103,9 @@ func TestEventProviderOperations(t *testing.T) {
 			Name:        "event",
 			Description: "event new description",
 			EventType:   "event type",
-			Category: &state.EventCategoryArgs{
-				Name: "Marketing",
-				URN:  "category:123",
+			CategoryId: &resources.PropertyRef{
+				URN:      "category:123",
+				Property: "id",
 			},
 		}
 
@@ -121,7 +121,7 @@ func TestEventProviderOperations(t *testing.T) {
 				Name:        "event",
 				Description: "event description",
 				EventType:   "event type",
-				Category:    nil,
+				CategoryId:  nil,
 			},
 		}
 
