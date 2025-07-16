@@ -11,54 +11,95 @@ import (
 
 func TestPropertyArgs_ResourceData(t *testing.T) {
 
-	argsWithConfig := state.PropertyArgs{
-		Name:        "property-name",
-		Description: "property-description",
-		Type:        "property-type",
-		Config: map[string]interface{}{
-			"enum": []string{"value1", "value2"},
-		},
-	}
-
-	argsWithoutConfig := state.PropertyArgs{
-		Name:        "property-name",
-		Description: "property-description",
-		Type:        "property-type",
-		Config:      nil,
-	}
-
 	t.Run("to resource data", func(t *testing.T) {
 		t.Parallel()
 
-		resourceData := argsWithConfig.ToResourceData()
-		assert.Equal(t, resources.ResourceData{
-			"name":        "property-name",
-			"description": "property-description",
-			"type":        "property-type",
-			"config": map[string]interface{}{
-				"enum": []string{"value1", "value2"},
+		testcases := []struct {
+			testname string
+			args     state.PropertyArgs
+			want     resources.ResourceData
+		}{
+			{
+				testname: "with config and property ref",
+				args: state.PropertyArgs{
+					Name:        "property-name",
+					Description: "property-description",
+					Type:        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
+					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+				},
+				want: resources.ResourceData{
+					"name":        "property-name",
+					"description": "property-description",
+					"type":        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
+					"config":      map[string]interface{}{"enum": []string{"value1", "value2"}},
+				},
 			},
-		}, resourceData)
+		}
 
-		resourceData = argsWithoutConfig.ToResourceData()
-		assert.Equal(t, resources.ResourceData{
-			"name":        "property-name",
-			"description": "property-description",
-			"type":        "property-type",
-			"config":      map[string]interface{}(nil),
-		}, resourceData)
+		for _, tc := range testcases {
+			t.Run(tc.testname, func(t *testing.T) {
+				t.Parallel()
+				resourceData := tc.args.ToResourceData()
+				assert.Equal(t, tc.want, resourceData)
+			})
+		}
+
 	})
 
 	t.Run("from resource data", func(t *testing.T) {
 		t.Parallel()
 
-		loopback := state.PropertyArgs{}
-		loopback.FromResourceData(argsWithConfig.ToResourceData())
-		assert.Equal(t, argsWithConfig, loopback)
+		testcases := []struct {
+			testname string
+			args     resources.ResourceData
+			want     state.PropertyArgs
+		}{
+			{
+				testname: "with config and property ref",
+				args: resources.ResourceData{
+					"name":        "property-name",
+					"description": "property-description",
+					"type":        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
+					"config":      map[string]interface{}{"enum": []string{"value1", "value2"}},
+				},
+				want: state.PropertyArgs{
+					Name:        "property-name",
+					Description: "property-description",
+					Type:        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
+					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+				},
+			},
+			{
+				testname: "with property ref in itemTypes",
+				args: resources.ResourceData{
+					"name":        "property-name",
+					"description": "property-description",
+					"type":        "array",
+					"config": map[string]any{"itemTypes": []any{
+						resources.PropertyRef{URN: "urn1", Property: "property", ResolvedValue: "resolved-value-1"},
+						resources.PropertyRef{URN: "urn2", Property: "property", ResolvedValue: "resolved-value-2"},
+					}},
+				},
+				want: state.PropertyArgs{
+					Name:        "property-name",
+					Description: "property-description",
+					Type:        "array",
+					Config: map[string]any{"itemTypes": []any{
+						resources.PropertyRef{URN: "urn1", Property: "property", ResolvedValue: "resolved-value-1"},
+						resources.PropertyRef{URN: "urn2", Property: "property", ResolvedValue: "resolved-value-2"},
+					}},
+				},
+			},
+		}
 
-		loopback = state.PropertyArgs{}
-		loopback.FromResourceData(argsWithoutConfig.ToResourceData())
-		assert.Equal(t, argsWithoutConfig, loopback)
+		for _, tc := range testcases {
+			t.Run(tc.testname, func(t *testing.T) {
+				t.Parallel()
+				actual := state.PropertyArgs{}
+				actual.FromResourceData(tc.args)
+				assert.Equal(t, tc.want, actual)
+			})
+		}
 	})
 
 }

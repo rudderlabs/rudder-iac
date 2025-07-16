@@ -33,8 +33,8 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources
 	property, err := p.client.CreateProperty(ctx, catalog.PropertyCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
-		Type:        toArgs.ResolvedType(),
-		Config:      toArgs.Config,
+		Type:        toArgs.ResolveType(),
+		Config:      toArgs.ResolveConfig(),
 	})
 
 	if err != nil {
@@ -70,8 +70,8 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 		ID:          oldState.ID,
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
-		Type:        toArgs.ResolvedType(),
-		Config:      toArgs.Config,
+		Type:        toArgs.ResolveType(),
+		Config:      toArgs.ResolveConfig(),
 		WorkspaceId: oldState.WorkspaceID,
 	})
 
