@@ -12,14 +12,33 @@ type CustomTypeArgs struct {
 	Description string
 	Type        string
 	Config      map[string]any
-	Properties  []*CustomTypeProperty // For object-type custom types
+	Properties  []*CustomTypeProperty
+}
+
+func (args *CustomTypeArgs) ResolveConfig() map[string]any {
+	// Overriding itemTypes with resolved values as now we have property refs
+	// in the itemTypes array
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, item := range itemTypes.([]any) {
+			if propertyRef, ok := item.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+	}
+	return args.Config
 }
 
 // CustomTypeProperty represents a property reference in a custom type
 type CustomTypeProperty struct {
-	RefToID  any
-	ID       string
+	ID       any
 	Required bool
+}
+
+func (p *CustomTypeProperty) ResolveID() string {
+	if propertyRef, ok := p.ID.(resources.PropertyRef); ok {
+		return propertyRef.ResolvedValue.(string)
+	}
+	return p.ID.(string)
 }
 
 // ToResourceData converts CustomTypeArgs to ResourceData for use in the resource graph
@@ -27,7 +46,6 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 	properties := make([]map[string]any, 0, len(args.Properties))
 	for _, prop := range args.Properties {
 		properties = append(properties, map[string]any{
-			"refToId":  prop.RefToID,
 			"id":       prop.ID,
 			"required": prop.Required,
 		})
@@ -70,10 +88,17 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 
 		inst := &CustomTypeProperty{
 			Required: MustBool(propMap, "required"),
-			ID:       MustString(propMap, "id"),
-			RefToID:  MustString(propMap, "refToId"),
 		}
-		inst.ID = inst.RefToID.(string)
+
+		patchedID := SafePropertyRef(propMap, "id", resources.PropertyRef{})
+		if !patchedID.IsEmpty() {
+			inst.ID = patchedID
+		} else {
+			// ID was a string in the old format,
+			// now it's a property ref so we need to handle both cases cleanly
+			inst.ID = MustString(propMap, "id")
+		}
+
 		customTypeProperties[idx] = inst
 	}
 
@@ -90,7 +115,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	properties := make([]*CustomTypeProperty, 0, len(from.Properties))
 	for _, prop := range from.Properties {
 		properties = append(properties, &CustomTypeProperty{
-			RefToID: resources.PropertyRef{
+			ID: resources.PropertyRef{
 				URN:      urnFromRef(prop.Ref),
 				Property: "id",
 			},
@@ -98,7 +123,6 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 		})
 	}
 
-	// BUGGY CODE TO BE FIXED IN A BETTER
 	itemTypes, ok := args.Config["itemTypes"]
 	if ok {
 

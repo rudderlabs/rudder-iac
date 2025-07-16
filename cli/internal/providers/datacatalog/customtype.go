@@ -33,7 +33,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 	properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 	for _, prop := range toArgs.Properties {
 		properties = append(properties, catalog.CustomTypeProperty{
-			ID:       prop.ID,
+			ID:       prop.ResolveID(),
 			Required: prop.Required,
 		})
 	}
@@ -42,7 +42,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
-		Config:      toArgs.Config,
+		Config:      toArgs.ResolveConfig(),
 		Properties:  properties,
 	}
 
@@ -83,7 +83,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 	properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 	for _, prop := range toArgs.Properties {
 		properties = append(properties, catalog.CustomTypeProperty{
-			ID:       prop.ID,
+			ID:       prop.ResolveID(),
 			Required: prop.Required,
 		})
 	}
@@ -93,7 +93,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
-		Config:      toArgs.Config,
+		Config:      toArgs.ResolveConfig(),
 		Properties:  properties,
 	})
 	if err != nil {
