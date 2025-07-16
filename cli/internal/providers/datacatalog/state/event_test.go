@@ -22,7 +22,7 @@ func TestEventState_ResourceData(t *testing.T) {
 			Name:        "event-name",
 			Description: "event-description",
 			EventType:   "event-type",
-			Category:    nil,
+			CategoryId:    nil,
 		},
 	}
 
@@ -63,7 +63,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 		Name:        "event-name",
 		Description: "event-description",
 		EventType:   "event-type",
-		Category:    nil,
+		CategoryId:    nil,
 	}
 
 	t.Run("to resource data", func(t *testing.T) {

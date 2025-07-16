@@ -22,7 +22,11 @@ func CollectReferences(v interface{}) []*PropertyRef {
 			refs = append(refs, CollectReferences(vv)...)
 		}
 	case *PropertyRef:
-		refs = append(refs, v)
+		// a *PropertyRef can be nil, for example when the categoryId is not set
+		// in that case we don't want to add it to refs
+		if v != nil {
+			refs = append(refs, v)
+		}
 	case PropertyRef:
 		refs = append(refs, &v)
 	case ResourceData:
