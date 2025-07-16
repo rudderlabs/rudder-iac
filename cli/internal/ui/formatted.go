@@ -108,14 +108,12 @@ func calculateMaxKeyWidth(data map[string]any, indentLevel int) int {
 	}
 
 	for key, value := range data {
-		if _, isMap := value.(map[string]any); !isMap {
+		if v, isMap := value.(map[string]any); !isMap {
 			currentLen := len(indent) + len(key)
 			if currentLen > maxLen {
 				maxLen = currentLen
 			}
-		}
-
-		if v, ok := value.(map[string]any); ok {
+		} else {
 			if subLen := calculateMaxKeyWidth(v, indentLevel+1); subLen > maxLen {
 				maxLen = subLen
 			}
