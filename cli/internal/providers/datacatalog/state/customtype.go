@@ -30,15 +30,9 @@ func (args *CustomTypeArgs) ResolveConfig() map[string]any {
 
 // CustomTypeProperty represents a property reference in a custom type
 type CustomTypeProperty struct {
-	ID       any
+	RefToID  any
+	ID       string
 	Required bool
-}
-
-func (p *CustomTypeProperty) ResolveID() string {
-	if propertyRef, ok := p.ID.(resources.PropertyRef); ok {
-		return propertyRef.ResolvedValue.(string)
-	}
-	return p.ID.(string)
 }
 
 // ToResourceData converts CustomTypeArgs to ResourceData for use in the resource graph
@@ -46,6 +40,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 	properties := make([]map[string]any, 0, len(args.Properties))
 	for _, prop := range args.Properties {
 		properties = append(properties, map[string]any{
+			"refToId":  prop.RefToID,
 			"id":       prop.ID,
 			"required": prop.Required,
 		})
@@ -90,13 +85,13 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 			Required: MustBool(propMap, "required"),
 		}
 
-		patchedID := SafePropertyRef(propMap, "id", resources.PropertyRef{})
+		patchedID := SafePropertyRef(propMap, "refToId", resources.PropertyRef{})
 		if !patchedID.IsEmpty() {
-			inst.ID = patchedID
+			inst.RefToID = patchedID
+			inst.ID = patchedID.ResolvedValue.(string)
 		} else {
-			// ID was a string in the old format,
-			// now it's a property ref so we need to handle both cases cleanly
-			inst.ID = MustString(propMap, "id")
+			inst.RefToID = MustString(propMap, "refToId")
+			inst.ID = inst.RefToID.(string)
 		}
 
 		customTypeProperties[idx] = inst
@@ -115,7 +110,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	properties := make([]*CustomTypeProperty, 0, len(from.Properties))
 	for _, prop := range from.Properties {
 		properties = append(properties, &CustomTypeProperty{
-			ID: resources.PropertyRef{
+			RefToID: resources.PropertyRef{
 				URN:      urnFromRef(prop.Ref),
 				Property: "id",
 			},
