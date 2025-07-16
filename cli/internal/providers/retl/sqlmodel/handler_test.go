@@ -556,14 +556,21 @@ func TestSQLModelHandler(t *testing.T) {
 				data: resources.ResourceData{
 					"display_name":           "Updated Model",
 					"description":            "Updated description",
-					"sql":                    "SELECT * FROM updated",
+					"sql":                    "SELECT id, name, timestamp FROM updated",
 					"account_id":             "acc123",
 					"primary_key":            "id",
 					"source_definition_name": "postgres",
 					"enabled":                true,
 				},
 				state: resources.ResourceData{
-					sqlmodel.IDKey: "src123",
+					sqlmodel.IDKey:                   "src123",
+					sqlmodel.EnabledKey:              true,
+					sqlmodel.SourceDefinitionNameKey: "postgres",
+					sqlmodel.PrimaryKeyKey:           "id",
+					sqlmodel.AccountIDKey:            "acc123",
+					sqlmodel.DisplayNameKey:          "Updated Model",
+					sqlmodel.DescriptionKey:          "Updated description",
+					sqlmodel.SQLKey:                  "SELECT * FROM updated",
 				},
 				expectedError: false,
 				mockSetup: func() *mockRETLClient {
@@ -606,10 +613,36 @@ func TestSQLModelHandler(t *testing.T) {
 					return &mockRETLClient{sourceID: "error", updateError: true}
 				},
 			},
+			{
+				name: "Source definition name cannot be changed",
+				data: resources.ResourceData{
+					"source_definition_name": "redshift",
+					"enabled":                true,
+					"display_name":           "Updated Model",
+					"description":            "Updated description",
+					"sql":                    "SELECT id, name, timestamp FROM updated",
+					"account_id":             "acc123",
+					"primary_key":            "id",
+				},
+				state: resources.ResourceData{
+					sqlmodel.SourceDefinitionNameKey: "postgres",
+					sqlmodel.IDKey:                   "src123",
+					sqlmodel.EnabledKey:              true,
+					sqlmodel.DisplayNameKey:          "Updated Model",
+					sqlmodel.DescriptionKey:          "Updated description",
+					sqlmodel.SQLKey:                  "SELECT id, name, timestamp FROM updated",
+					sqlmodel.AccountIDKey:            "acc123",
+					sqlmodel.PrimaryKeyKey:           "id",
+				},
+				expectedError: true,
+				errorMessage:  "source definition name cannot be changed",
+				mockSetup: func() *mockRETLClient {
+					return &mockRETLClient{sourceID: "src123"}
+				},
+			},
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
@@ -658,14 +691,21 @@ func TestSQLModelHandler(t *testing.T) {
 		data := resources.ResourceData{
 			"display_name":           "Updated Model",
 			"description":            "Updated description",
-			"sql":                    "SELECT * FROM updated",
+			"sql":                    "SELECT id, name, timestamp FROM updated",
 			"account_id":             "acc123",
 			"primary_key":            "id",
 			"source_definition_name": "postgres",
 			"enabled":                true,
 		}
 		state := resources.ResourceData{
-			sqlmodel.IDKey: "src123",
+			sqlmodel.IDKey:                   "src123",
+			sqlmodel.EnabledKey:              true,
+			sqlmodel.SourceDefinitionNameKey: "postgres",
+			sqlmodel.PrimaryKeyKey:           "id",
+			sqlmodel.AccountIDKey:            "acc123",
+			sqlmodel.DisplayNameKey:          "Updated Model",
+			sqlmodel.DescriptionKey:          "Updated description",
+			sqlmodel.SQLKey:                  "SELECT * FROM updated",
 		}
 
 		// Execute

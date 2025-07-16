@@ -121,6 +121,10 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
+	if enabled, ok := data[EnabledKey].(bool); ok && !enabled {
+		return nil, fmt.Errorf("cannot create disabled sql model")
+	}
+
 	source := &retlClient.RETLSourceCreateRequest{
 		Name: data[DisplayNameKey].(string),
 		Config: retlClient.RETLSQLModelConfig{
@@ -139,28 +143,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("creating RETL source: %w", err)
 	}
 
-	// Convert API response to resource data
-	result := resources.ResourceData{
-		DisplayNameKey:          resp.Name,
-		DescriptionKey:          resp.Config.Description,
-		AccountIDKey:            resp.AccountID,
-		PrimaryKeyKey:           resp.Config.PrimaryKey,
-		SQLKey:                  resp.Config.Sql,
-		IDKey:                   resp.ID, // Store the remote source ID
-		SourceTypeKey:           resp.SourceType,
-		EnabledKey:              resp.IsEnabled,
-		SourceDefinitionNameKey: resp.SourceDefinitionName,
-	}
-
-	if resp.CreatedAt != nil {
-		result[CreatedAtKey] = resp.CreatedAt
-	}
-
-	if resp.UpdatedAt != nil {
-		result[UpdatedAtKey] = resp.UpdatedAt
-	}
-
-	return &result, nil
+	return toResourceData(resp), nil
 }
 
 // Update updates an existing SQL Model resource
@@ -169,6 +152,10 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	sourceID, ok := state[IDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing %s in resource state", IDKey)
+	}
+
+	if data[SourceDefinitionNameKey] != state[SourceDefinitionNameKey] {
+		return nil, fmt.Errorf("source definition name cannot be changed")
 	}
 
 	source := &retlClient.RETLSourceUpdateRequest{
@@ -188,28 +175,7 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("updating RETL source: %w", err)
 	}
 
-	// Convert API response to resource data
-	result := resources.ResourceData{
-		DisplayNameKey:          resp.Name,
-		DescriptionKey:          resp.Config.Description,
-		AccountIDKey:            resp.AccountID,
-		PrimaryKeyKey:           resp.Config.PrimaryKey,
-		SQLKey:                  resp.Config.Sql,
-		IDKey:                   resp.ID,
-		SourceTypeKey:           resp.SourceType,
-		EnabledKey:              resp.IsEnabled,
-		SourceDefinitionNameKey: resp.SourceDefinitionName,
-	}
-
-	if resp.CreatedAt != nil {
-		result[CreatedAtKey] = resp.CreatedAt
-	}
-
-	if resp.UpdatedAt != nil {
-		result[UpdatedAtKey] = resp.UpdatedAt
-	}
-
-	return &result, nil
+	return toResourceData(resp), nil
 }
 
 // Delete deletes an existing SQL Model resource
@@ -226,4 +192,26 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 	}
 
 	return nil
+}
+
+func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
+	result := resources.ResourceData{
+		DisplayNameKey:          source.Name,
+		DescriptionKey:          source.Config.Description,
+		AccountIDKey:            source.AccountID,
+		PrimaryKeyKey:           source.Config.PrimaryKey,
+		SQLKey:                  source.Config.Sql,
+		IDKey:                   source.ID,
+		SourceTypeKey:           source.SourceType,
+		EnabledKey:              source.IsEnabled,
+		SourceDefinitionNameKey: source.SourceDefinitionName,
+	}
+	if source.CreatedAt != nil {
+		result[CreatedAtKey] = source.CreatedAt
+	}
+
+	if source.UpdatedAt != nil {
+		result[UpdatedAtKey] = source.UpdatedAt
+	}
+	return &result
 }
