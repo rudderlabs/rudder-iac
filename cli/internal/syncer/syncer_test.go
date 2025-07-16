@@ -72,11 +72,11 @@ func TestSyncerCreate(t *testing.T) {
 		{Operation: "Create", Args: []interface{}{trackingPlan.ID(), trackingPlan.Type(), resources.ResourceData{
 			"name":        "Test Tracking Plan",
 			"description": "This is a test tracking plan",
-			"event_id":    "generated-event-event1",
+			"event_id":    resources.PropertyRef{URN: event.URN(), Property: "id", ResolvedValue: "generated-event-event1"},
 			"rules": []interface{}{
 				map[string]interface{}{
-					"event":    "generated-event-event1",
-					"property": "generated-property-property1",
+					"event":    resources.PropertyRef{URN: event.URN(), Property: "id", ResolvedValue: "generated-event-event1"},
+					"property": resources.PropertyRef{URN: property.URN(), Property: "id", ResolvedValue: "generated-property-property1"},
 				},
 			},
 		}}},
