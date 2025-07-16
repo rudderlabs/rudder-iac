@@ -240,6 +240,14 @@ type TrackingPlanPropertyArgs struct {
 	HasItemTypesRef  bool
 }
 
+func (args *TrackingPlanPropertyArgs) ResolveType() (bool, string) {
+	propertyRef, ok := args.Type.(resources.PropertyRef)
+	if !ok {
+		return false, args.Type.(string)
+	}
+	return true, propertyRef.ResolvedValue.(string)
+}
+
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
 	if args.LocalID != other.LocalID {
 		return true
