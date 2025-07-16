@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+type SourceType string
+
+const (
+	ModelSourceType SourceType = "model"
+)
+
 // State represents the complete RETL state
 type State struct {
 	Version   string                   `json:"version"`
@@ -31,7 +37,7 @@ type RETLSource struct {
 	Name                 string             `json:"name"`
 	Config               RETLSQLModelConfig `json:"config"`
 	IsEnabled            bool               `json:"enabled"`
-	SourceType           string             `json:"sourceType"`
+	SourceType           SourceType         `json:"sourceType"`
 	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
 	CreatedAt            *time.Time         `json:"createdAt"`
@@ -41,7 +47,7 @@ type RETLSource struct {
 type RETLSourceCreateRequest struct {
 	Name                 string             `json:"name"`
 	Config               RETLSQLModelConfig `json:"config"`
-	SourceType           string             `json:"sourceType"`
+	SourceType           SourceType         `json:"sourceType"`
 	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
 }

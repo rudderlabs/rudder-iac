@@ -4,8 +4,7 @@ import "fmt"
 
 // ResourceType is the type identifier for SQL Model resources
 const (
-	ResourceType    = "retl-source-sql-model"
-	ModelSourceType = "model"
+	ResourceType = "retl-source-sql-model"
 
 	LocalIDKey              = "local_id"
 	DisplayNameKey          = "display_name"

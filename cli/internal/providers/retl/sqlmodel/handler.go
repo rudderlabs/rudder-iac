@@ -132,7 +132,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 			Sql:         data[SQLKey].(string),
 			Description: data[DescriptionKey].(string),
 		},
-		SourceType:           ModelSourceType,
+		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionNameKey].(string),
 		AccountID:            data[AccountIDKey].(string),
 	}
