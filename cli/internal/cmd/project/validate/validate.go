@@ -69,7 +69,6 @@ func NewCmdValidate() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the project files or a specific file")
-	_ = cmd.MarkFlagRequired("location")
+	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	return cmd
 }

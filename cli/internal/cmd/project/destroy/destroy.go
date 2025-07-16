@@ -39,7 +39,7 @@ func NewCmdDestroy() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli destroy
 			$ rudder-cli destroy --dry-run
-			$ rudder-cli destroy --no-confirm
+			$ rudder-cli destroy --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()

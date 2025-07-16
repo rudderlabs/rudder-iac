@@ -48,7 +48,7 @@ func NewCmdTPDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			s, err := syncer.New(deps.CompositeProvider())
+			s, err := syncer.New(deps.Providers().DataCatalog)
 			if err != nil {
 				return err
 			}

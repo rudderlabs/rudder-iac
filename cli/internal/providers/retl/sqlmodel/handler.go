@@ -66,14 +66,14 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 
 	// Create resource with SQL directly from spec
 	h.resources[spec.ID] = &SQLModelResource{
-		ID:                   spec.ID,
-		DisplayName:          spec.DisplayName,
-		Description:          spec.Description,
-		AccountID:            spec.AccountID,
-		PrimaryKey:           spec.PrimaryKey,
-		SourceDefinitionName: spec.SourceDefinitionName,
-		Enabled:              spec.Enabled,
-		SQL:                  sqlStr,
+		ID:               spec.ID,
+		DisplayName:      spec.DisplayName,
+		Description:      spec.Description,
+		AccountID:        spec.AccountID,
+		PrimaryKey:       spec.PrimaryKey,
+		SourceDefinition: string(spec.SourceDefinition),
+		Enabled:          spec.Enabled,
+		SQL:              sqlStr,
 	}
 	return nil
 }
@@ -95,14 +95,14 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	for _, spec := range h.resources {
 		// Convert spec to resource data
 		data := resources.ResourceData{
-			LocalIDKey:              spec.ID,
-			DisplayNameKey:          spec.DisplayName,
-			DescriptionKey:          spec.Description,
-			AccountIDKey:            spec.AccountID,
-			PrimaryKeyKey:           spec.PrimaryKey,
-			SourceDefinitionNameKey: spec.SourceDefinitionName,
-			EnabledKey:              spec.Enabled,
-			SQLKey:                  spec.SQL,
+			LocalIDKey:          spec.ID,
+			DisplayNameKey:      spec.DisplayName,
+			DescriptionKey:      spec.Description,
+			AccountIDKey:        spec.AccountID,
+			PrimaryKeyKey:       spec.PrimaryKey,
+			SourceDefinitionKey: spec.SourceDefinition,
+			EnabledKey:          spec.Enabled,
+			SQLKey:              spec.SQL,
 		}
 
 		// Create resource with SQL Model resource type
@@ -126,14 +126,10 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	}
 
 	source := &retlClient.RETLSourceCreateRequest{
-		Name: data[DisplayNameKey].(string),
-		Config: retlClient.RETLSQLModelConfig{
-			PrimaryKey:  data[PrimaryKeyKey].(string),
-			Sql:         data[SQLKey].(string),
-			Description: data[DescriptionKey].(string),
-		},
+		Name:                 data[DisplayNameKey].(string),
+		Config:               toRETLSQLModelConfig(data),
 		SourceType:           retlClient.ModelSourceType,
-		SourceDefinitionName: data[SourceDefinitionNameKey].(string),
+		SourceDefinitionName: retlClient.SourceDefinition(data[SourceDefinitionKey].(string)),
 		AccountID:            data[AccountIDKey].(string),
 	}
 
@@ -154,17 +150,13 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("missing %s in resource state", IDKey)
 	}
 
-	if data[SourceDefinitionNameKey] != state[SourceDefinitionNameKey] {
+	if data[SourceDefinitionKey] != nil && data[SourceDefinitionKey].(string) != state[SourceDefinitionKey].(string) {
 		return nil, fmt.Errorf("source definition name cannot be changed")
 	}
 
 	source := &retlClient.RETLSourceUpdateRequest{
-		Name: data[DisplayNameKey].(string),
-		Config: retlClient.RETLSQLModelConfig{
-			PrimaryKey:  data[PrimaryKeyKey].(string),
-			Sql:         data[SQLKey].(string),
-			Description: data[DescriptionKey].(string),
-		},
+		Name:      data[DisplayNameKey].(string),
+		Config:    toRETLSQLModelConfig(data),
 		IsEnabled: data[EnabledKey].(bool),
 		AccountID: data[AccountIDKey].(string),
 	}
@@ -196,15 +188,15 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
 	result := resources.ResourceData{
-		DisplayNameKey:          source.Name,
-		DescriptionKey:          source.Config.Description,
-		AccountIDKey:            source.AccountID,
-		PrimaryKeyKey:           source.Config.PrimaryKey,
-		SQLKey:                  source.Config.Sql,
-		IDKey:                   source.ID,
-		SourceTypeKey:           source.SourceType,
-		EnabledKey:              source.IsEnabled,
-		SourceDefinitionNameKey: source.SourceDefinitionName,
+		DisplayNameKey:      source.Name,
+		DescriptionKey:      source.Config.Description,
+		AccountIDKey:        source.AccountID,
+		PrimaryKeyKey:       source.Config.PrimaryKey,
+		SQLKey:              source.Config.Sql,
+		IDKey:               source.ID,
+		SourceTypeKey:       source.SourceType,
+		EnabledKey:          source.IsEnabled,
+		SourceDefinitionKey: source.SourceDefinitionName,
 	}
 	if source.CreatedAt != nil {
 		result[CreatedAtKey] = source.CreatedAt
@@ -214,4 +206,16 @@ func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
 		result[UpdatedAtKey] = source.UpdatedAt
 	}
 	return &result
+}
+
+func toRETLSQLModelConfig(data resources.ResourceData) retlClient.RETLSQLModelConfig {
+	description, ok := data[DescriptionKey].(string)
+	if !ok {
+		description = data[DisplayNameKey].(string)
+	}
+	return retlClient.RETLSQLModelConfig{
+		PrimaryKey:  data[PrimaryKeyKey].(string),
+		Sql:         data[SQLKey].(string),
+		Description: description,
+	}
 }
