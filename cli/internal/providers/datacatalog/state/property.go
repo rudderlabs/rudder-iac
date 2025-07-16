@@ -75,8 +75,20 @@ func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 func (args *PropertyArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
-	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]interface{}))
+
+	if propertyRef := SafePropertyRef(from, "type", resources.PropertyRef{}); !propertyRef.IsEmpty() {
+		args.Type = propertyRef.ResolvedValue
+	} else {
+		args.Type = MustString(from, "type")
+	}
+}
+
+func (args *PropertyArgs) ResolvedType() string {
+	if propertyRef, ok := args.Type.(resources.PropertyRef); ok {
+		return propertyRef.ResolvedValue.(string)
+	}
+	return args.Type.(string)
 }
 
 type PropertyState struct {

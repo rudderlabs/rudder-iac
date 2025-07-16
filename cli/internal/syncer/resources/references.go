@@ -6,6 +6,10 @@ type PropertyRef struct {
 	ResolvedValue any    `json:"value"`
 }
 
+func (p PropertyRef) IsEmpty() bool {
+	return p.URN == "" && p.Property == "" && p.ResolvedValue == nil
+}
+
 func CollectReferences(v interface{}) []*PropertyRef {
 	var refs []*PropertyRef
 
