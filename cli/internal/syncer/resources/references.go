@@ -3,6 +3,7 @@ package resources
 type PropertyRef struct {
 	URN      string `json:"urn"`
 	Property string `json:"property"`
+	Value    any    `json:"value"`
 }
 
 func CollectReferences(v interface{}) []*PropertyRef {

@@ -49,7 +49,11 @@ func TestDereference(t *testing.T) {
 				},
 			},
 			expected: resources.ResourceData{
-				"sourceName": "test source",
+				"sourceName": resources.PropertyRef{
+					URN:      resources.URN("source1", "source"),
+					Property: "name",
+					Value:    "test source",
+				},
 			},
 		},
 		{
@@ -64,7 +68,11 @@ func TestDereference(t *testing.T) {
 			},
 			expected: resources.ResourceData{
 				"sourceName": map[string]interface{}{
-					"nested": "test source",
+					"nested": resources.PropertyRef{
+						URN:      resources.URN("source1", "source"),
+						Property: "name",
+						Value:    "test source",
+					},
 				},
 			},
 		},
@@ -80,7 +88,11 @@ func TestDereference(t *testing.T) {
 			},
 			expected: resources.ResourceData{
 				"sourceName": []interface{}{
-					"test source",
+					resources.PropertyRef{
+						URN:      resources.URN("source1", "source"),
+						Property: "name",
+						Value:    "test source",
+					},
 				},
 			},
 		},
@@ -99,7 +111,11 @@ func TestDereference(t *testing.T) {
 			expected: resources.ResourceData{
 				"sourceName": []interface{}{
 					map[string]interface{}{
-						"nested": "test source",
+						"nested": resources.PropertyRef{
+							URN:      resources.URN("source1", "source"),
+							Property: "name",
+							Value:    "test source",
+						},
 					},
 				},
 			},
@@ -119,7 +135,11 @@ func TestDereference(t *testing.T) {
 			expected: resources.ResourceData{
 				"sourceName": []map[string]interface{}{
 					{
-						"nested": "test source",
+						"nested": resources.PropertyRef{
+							URN:      resources.URN("source1", "source"),
+							Property: "name",
+							Value:    "test source",
+						},
 					},
 				},
 			},
