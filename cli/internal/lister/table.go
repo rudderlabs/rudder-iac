@@ -84,7 +84,7 @@ func (m model) View() string {
 
 	// Details View with Header
 	detailsHeader := ui.Bold("Details")
-	ruler := ui.RulerWithWidth(m.width - 66)
+	ruler := ui.RulerWithWidth(m.width - 66) // 66 is the width of the table (4 (# column) + 27 (ID) + 30 (Name) + 5 (padding))
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
