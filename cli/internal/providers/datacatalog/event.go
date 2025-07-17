@@ -64,6 +64,7 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 		Description: event.Description,
 		EventType:   event.EventType,
 		WorkspaceID: event.WorkspaceId,
+		CategoryID:  event.CategoryId,
 		CreatedAt:   event.CreatedAt.String(),
 		UpdatedAt:   event.UpdatedAt.String(),
 	}
@@ -107,6 +108,7 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		Description: updatedEvent.Description,
 		EventType:   updatedEvent.EventType,
 		WorkspaceID: updatedEvent.WorkspaceId,
+		CategoryID:  updatedEvent.CategoryId,
 		CreatedAt:   updatedEvent.CreatedAt.String(),
 		UpdatedAt:   updatedEvent.UpdatedAt.String(),
 	}

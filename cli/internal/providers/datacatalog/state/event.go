@@ -49,6 +49,7 @@ type EventState struct {
 	Description string
 	EventType   string
 	WorkspaceID string
+	CategoryID  *string
 	CreatedAt   string
 	UpdatedAt   string
 }
@@ -60,6 +61,7 @@ func (e *EventState) ToResourceData() resources.ResourceData {
 		"description": e.Description,
 		"eventType":   e.EventType,
 		"workspaceId": e.WorkspaceID,
+		"categoryId":  e.CategoryID,
 		"createdAt":   e.CreatedAt,
 		"updatedAt":   e.UpdatedAt,
 		"eventArgs":   map[string]interface{}(e.EventArgs.ToResourceData()),
@@ -72,6 +74,7 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 	e.Description = MustString(from, "description")
 	e.EventType = MustString(from, "eventType")
 	e.WorkspaceID = MustString(from, "workspaceId")
+	e.CategoryID = StringPtr(from, "categoryId", nil)
 	e.CreatedAt = MustString(from, "createdAt")
 	e.UpdatedAt = MustString(from, "updatedAt")
 	e.EventArgs.FromResourceData(resources.ResourceData(
