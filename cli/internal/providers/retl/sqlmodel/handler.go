@@ -129,7 +129,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		Name:                 data[DisplayNameKey].(string),
 		Config:               toRETLSQLModelConfig(data),
 		SourceType:           retlClient.ModelSourceType,
-		SourceDefinitionName: retlClient.SourceDefinition(data[SourceDefinitionKey].(string)),
+		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
 	}
 

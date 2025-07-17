@@ -5,30 +5,10 @@ import (
 )
 
 type SourceType string
-type SourceDefinition string
 
 const (
 	ModelSourceType SourceType = "model"
-
-	SourceDefinitionPostgres   SourceDefinition = "postgres"
-	SourceDefinitionRedshift   SourceDefinition = "redshift"
-	SourceDefinitionSnowflake  SourceDefinition = "snowflake"
-	SourceDefinitionBigQuery   SourceDefinition = "bigquery"
-	SourceDefinitionMySQL      SourceDefinition = "mysql"
-	SourceDefinitionDatabricks SourceDefinition = "databricks"
-	SourceDefinitionTrino      SourceDefinition = "trino"
 )
-
-// validSourceDefinitions contains all valid source definition values
-var ValidSourceDefinitions = []SourceDefinition{
-	SourceDefinitionPostgres,
-	SourceDefinitionRedshift,
-	SourceDefinitionSnowflake,
-	SourceDefinitionBigQuery,
-	SourceDefinitionMySQL,
-	SourceDefinitionDatabricks,
-	SourceDefinitionTrino,
-}
 
 // State represents the complete RETL state
 type State struct {
@@ -58,7 +38,7 @@ type RETLSource struct {
 	Config               RETLSQLModelConfig `json:"config"`
 	IsEnabled            bool               `json:"enabled"`
 	SourceType           SourceType         `json:"sourceType"`
-	SourceDefinitionName SourceDefinition   `json:"sourceDefinitionName"`
+	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
 	CreatedAt            *time.Time         `json:"createdAt"`
 	UpdatedAt            *time.Time         `json:"updatedAt"`
@@ -68,7 +48,7 @@ type RETLSourceCreateRequest struct {
 	Name                 string             `json:"name"`
 	Config               RETLSQLModelConfig `json:"config"`
 	SourceType           SourceType         `json:"sourceType"`
-	SourceDefinitionName SourceDefinition   `json:"sourceDefinitionName"`
+	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
 }
 

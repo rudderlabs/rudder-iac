@@ -677,7 +677,7 @@ func TestSQLModelHandler(t *testing.T) {
 					Name:                 req.Name,
 					Config:               req.Config,
 					SourceType:           "model",
-					SourceDefinitionName: retlClient.SourceDefinitionPostgres,
+					SourceDefinitionName: "postgres",
 					AccountID:            req.AccountID,
 					IsEnabled:            req.IsEnabled,
 					CreatedAt:            &createdAt,

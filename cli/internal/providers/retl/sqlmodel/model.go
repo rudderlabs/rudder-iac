@@ -2,9 +2,9 @@ package sqlmodel
 
 import (
 	"fmt"
-
-	"github.com/rudderlabs/rudder-iac/api/client/retl"
 )
+
+type SourceDefinition string
 
 // ResourceType is the type identifier for SQL Model resources
 const (
@@ -22,11 +22,30 @@ const (
 	SourceTypeKey       = "source_type"
 	CreatedAtKey        = "created_at"
 	UpdatedAtKey        = "updated_at"
+
+	SourceDefinitionPostgres   SourceDefinition = "postgres"
+	SourceDefinitionRedshift   SourceDefinition = "redshift"
+	SourceDefinitionSnowflake  SourceDefinition = "snowflake"
+	SourceDefinitionBigQuery   SourceDefinition = "bigquery"
+	SourceDefinitionMySQL      SourceDefinition = "mysql"
+	SourceDefinitionDatabricks SourceDefinition = "databricks"
+	SourceDefinitionTrino      SourceDefinition = "trino"
 )
 
+// validSourceDefinitions contains all valid source definition values
+var validSourceDefinitions = []SourceDefinition{
+	SourceDefinitionPostgres,
+	SourceDefinitionRedshift,
+	SourceDefinitionSnowflake,
+	SourceDefinitionBigQuery,
+	SourceDefinitionMySQL,
+	SourceDefinitionDatabricks,
+	SourceDefinitionTrino,
+}
+
 // isValidSourceDefinition checks if the given source definition is valid
-func isValidSourceDefinition(sd retl.SourceDefinition) bool {
-	for _, valid := range retl.ValidSourceDefinitions {
+func isValidSourceDefinition(sd SourceDefinition) bool {
+	for _, valid := range validSourceDefinitions {
 		if sd == valid {
 			return true
 		}
@@ -36,15 +55,15 @@ func isValidSourceDefinition(sd retl.SourceDefinition) bool {
 
 // SQLModelSpec represents the YAML specification for a SQL Model resource
 type SQLModelSpec struct {
-	ID               string                `mapstructure:"id"`
-	DisplayName      string                `mapstructure:"display_name"`
-	Description      string                `mapstructure:"description"`
-	File             *string               `mapstructure:"file"`
-	SQL              *string               `mapstructure:"sql"`
-	AccountID        string                `mapstructure:"account_id"`
-	PrimaryKey       string                `mapstructure:"primary_key"`
-	SourceDefinition retl.SourceDefinition `mapstructure:"source_definition"`
-	Enabled          bool                  `mapstructure:"enabled"`
+	ID               string           `mapstructure:"id"`
+	DisplayName      string           `mapstructure:"display_name"`
+	Description      string           `mapstructure:"description"`
+	File             *string          `mapstructure:"file"`
+	SQL              *string          `mapstructure:"sql"`
+	AccountID        string           `mapstructure:"account_id"`
+	PrimaryKey       string           `mapstructure:"primary_key"`
+	SourceDefinition SourceDefinition `mapstructure:"source_definition"`
+	Enabled          bool             `mapstructure:"enabled"`
 }
 
 // SQLModelResource represents a processed SQL Model resource ready for API operations
@@ -76,8 +95,8 @@ func ValidateSQLModelResource(spec *SQLModelResource) error {
 	if spec.SourceDefinition == "" {
 		return fmt.Errorf("source_definition is required")
 	}
-	if !isValidSourceDefinition(retl.SourceDefinition(spec.SourceDefinition)) {
-		return fmt.Errorf("source_definition '%s' is invalid, must be one of: %v", spec.SourceDefinition, retl.ValidSourceDefinitions)
+	if !isValidSourceDefinition(SourceDefinition(spec.SourceDefinition)) {
+		return fmt.Errorf("source_definition '%s' is invalid, must be one of: %v", spec.SourceDefinition, validSourceDefinitions)
 	}
 	if spec.SQL == "" {
 		return fmt.Errorf("sql is required")

@@ -47,7 +47,7 @@ func TestCreateRetlSource(t *testing.T) {
 		Name:                 "Test Source",
 		Config:               sourceConfig,
 		SourceType:           retl.ModelSourceType,
-		SourceDefinitionName: retl.SourceDefinitionPostgres,
+		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
 	}
 
@@ -59,7 +59,7 @@ func TestCreateRetlSource(t *testing.T) {
 	assert.Equal(t, sourceConfig, created.Config)
 	assert.Equal(t, true, created.IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, created.SourceType)
-	assert.Equal(t, retl.SourceDefinitionPostgres, created.SourceDefinitionName)
+	assert.Equal(t, "postgres", created.SourceDefinitionName)
 	assert.Equal(t, "acc123", created.AccountID)
 	assert.NotNil(t, created.CreatedAt)
 	assert.NotNil(t, created.UpdatedAt)
@@ -113,7 +113,7 @@ func TestUpdateRetlSource(t *testing.T) {
 	assert.Equal(t, sourceConfig, updated.Config)
 	assert.Equal(t, true, updated.IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, updated.SourceType)
-	assert.Equal(t, retl.SourceDefinitionPostgres, updated.SourceDefinitionName)
+	assert.Equal(t, "postgres", updated.SourceDefinitionName)
 	assert.Equal(t, "acc123", updated.AccountID)
 
 	httpClient.AssertNumberOfCalls()
@@ -150,7 +150,7 @@ func TestGetRetlSource(t *testing.T) {
 	assert.Equal(t, "Test Source", source.Name)
 	assert.Equal(t, true, source.IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, source.SourceType)
-	assert.Equal(t, retl.SourceDefinitionPostgres, source.SourceDefinitionName)
+	assert.Equal(t, "postgres", source.SourceDefinitionName)
 	assert.Equal(t, "acc123", source.AccountID)
 
 	httpClient.AssertNumberOfCalls()
@@ -217,14 +217,14 @@ func TestListRetlSources(t *testing.T) {
 	assert.Equal(t, "Source 1", sources.Data[0].Name)
 	assert.Equal(t, true, sources.Data[0].IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, sources.Data[0].SourceType)
-	assert.Equal(t, retl.SourceDefinitionPostgres, sources.Data[0].SourceDefinitionName)
+	assert.Equal(t, "postgres", sources.Data[0].SourceDefinitionName)
 	assert.Equal(t, "acc123", sources.Data[0].AccountID)
 
 	assert.Equal(t, "src2", sources.Data[1].ID)
 	assert.Equal(t, "Source 2", sources.Data[1].Name)
 	assert.Equal(t, false, sources.Data[1].IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, sources.Data[1].SourceType)
-	assert.Equal(t, retl.SourceDefinitionMySQL, sources.Data[1].SourceDefinitionName)
+	assert.Equal(t, "mysql", sources.Data[1].SourceDefinitionName)
 	assert.Equal(t, "acc123", sources.Data[1].AccountID)
 
 	httpClient.AssertNumberOfCalls()
@@ -263,7 +263,7 @@ func TestNextRetlSources(t *testing.T) {
 	assert.Equal(t, "Source 3", sources.Data[0].Name)
 	assert.Equal(t, true, sources.Data[0].IsEnabled)
 	assert.Equal(t, retl.ModelSourceType, sources.Data[0].SourceType)
-	assert.Equal(t, retl.SourceDefinitionPostgres, sources.Data[0].SourceDefinitionName)
+	assert.Equal(t, "postgres", sources.Data[0].SourceDefinitionName)
 	assert.Equal(t, "acc123", sources.Data[0].AccountID)
 
 	httpClient.AssertNumberOfCalls()
