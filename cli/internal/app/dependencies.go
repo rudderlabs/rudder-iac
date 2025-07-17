@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 )
 
 var (
@@ -20,6 +21,7 @@ var (
 type Providers struct {
 	DataCatalog project.Provider
 	RETL        project.Provider
+	Workspace   *workspace.Provider
 }
 
 type deps struct {
@@ -83,10 +85,12 @@ func setupClient(version string) (*client.Client, error) {
 func setupProviders(c *client.Client) *Providers {
 	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c))
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
+	wsp := workspace.New(c)
 
 	return &Providers{
 		DataCatalog: dcp,
 		RETL:        retlp,
+		Workspace:   wsp,
 	}
 }
 
