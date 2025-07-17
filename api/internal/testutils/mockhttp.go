@@ -3,7 +3,6 @@ package testutils
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -68,7 +67,7 @@ func ValidateRequest(t *testing.T, req *http.Request, method string, url string,
 	}
 
 	if body != "" {
-		bodyBytes, err := ioutil.ReadAll(req.Body)
+		bodyBytes, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
 		if !assert.JSONEq(t, body, string(bodyBytes)) {
 			return false

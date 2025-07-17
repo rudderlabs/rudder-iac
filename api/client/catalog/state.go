@@ -54,7 +54,7 @@ type StateStore interface {
 }
 
 func (c *RudderDataCatalog) ReadState(ctx context.Context) (*State, error) {
-	data, err := c.client.Do(ctx, "GET", "cli/catalog/state", nil)
+	data, err := c.client.Do(ctx, "GET", "v2/cli/catalog/state", nil)
 	if err != nil {
 		return nil, fmt.Errorf("sending read state request: %w", err)
 	}
@@ -77,7 +77,7 @@ func (c *RudderDataCatalog) PutResourceState(ctx context.Context, req PutStateRe
 		return fmt.Errorf("marshalling PUT request: %w", err)
 	}
 
-	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("cli/catalog/%s/%s/state", req.Collection, req.ID), bytes.NewReader(data))
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/cli/catalog/%s/%s/state", req.Collection, req.ID), bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("sending put state request: %w", err)
 	}
@@ -86,7 +86,7 @@ func (c *RudderDataCatalog) PutResourceState(ctx context.Context, req PutStateRe
 }
 
 func (c *RudderDataCatalog) DeleteResourceState(ctx context.Context, req DeleteStateRequest) error {
-	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("cli/catalog/%s/%s/state", req.Collection, req.ID), nil)
+	_, err := c.client.Do(ctx, "DELETE", fmt.Sprintf("v2/cli/catalog/%s/%s/state", req.Collection, req.ID), nil)
 	if err != nil {
 		return fmt.Errorf("sending delete state request: %w", err)
 	}
