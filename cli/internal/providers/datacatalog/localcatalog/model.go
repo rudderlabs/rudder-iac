@@ -36,11 +36,11 @@ func ExtractProperties(s *specs.Spec) ([]Property, error) {
 }
 
 type Event struct {
-	LocalID     string   `json:"id"`
-	Name        string   `json:"name"`
-	Type        string   `json:"event_type"`
-	Description string   `json:"description"`
-	Categories  []string `json:"categories"`
+	LocalID     string  `json:"id"`
+	Name        string  `json:"name"`
+	Type        string  `json:"event_type"`
+	Description string  `json:"description"`
+	CategoryRef *string `json:"category"` // This stores the ref to the category
 }
 
 type EventSpec struct {
