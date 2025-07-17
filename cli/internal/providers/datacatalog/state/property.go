@@ -25,7 +25,7 @@ func (args *PropertyArgs) ResolveType() string {
 func (args *PropertyArgs) ResolveConfig() map[string]any {
 	if itemTypes, ok := args.Config["itemTypes"]; ok {
 		for idx, itemType := range itemTypes.([]any) {
-			if propertyRef, ok := itemType.(resources.PropertyRef); !ok {
+			if propertyRef, ok := itemType.(resources.PropertyRef); ok {
 				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
 			}
 		}
