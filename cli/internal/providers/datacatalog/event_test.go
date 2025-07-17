@@ -92,7 +92,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event description",
 				"eventType":   "event type",
-				"category":    (resources.ResourceData)(nil),
+				"categoryId":  (*resources.PropertyRef)(nil),
 			},
 		}, *createdResource)
 	})
@@ -163,12 +163,9 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event new description",
 				"eventType":   "event type",
-				"category": resources.ResourceData{
-					"categoryRef": &resources.PropertyRef{
-						URN:      "category:123",
-						Property: "name",
-					},
-					"name": "Marketing",
+				"categoryId": &resources.PropertyRef{
+					URN:      "category:123",
+					Property: "id",
 				},
 			},
 		}, *updatedResource)

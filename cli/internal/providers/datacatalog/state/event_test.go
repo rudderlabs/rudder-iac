@@ -3,8 +3,8 @@ package state_test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ func TestEventState_ResourceData(t *testing.T) {
 			Name:        "event-name",
 			Description: "event-description",
 			EventType:   "event-type",
-			CategoryId:    nil,
+			CategoryId:  nil,
 		},
 	}
 
@@ -42,7 +42,7 @@ func TestEventState_ResourceData(t *testing.T) {
 				"name":        "event-name",
 				"description": "event-description",
 				"eventType":   "event-type",
-				"category":    (resources.ResourceData)(nil),
+				"categoryId":  (*resources.PropertyRef)(nil),
 			},
 		}, resourceData)
 	})
@@ -63,7 +63,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 		Name:        "event-name",
 		Description: "event-description",
 		EventType:   "event-type",
-		CategoryId:    nil,
+		CategoryId:  nil,
 	}
 
 	t.Run("to resource data", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 			"name":        "event-name",
 			"description": "event-description",
 			"eventType":   "event-type",
-			"category":  (resources.ResourceData)(nil),
+			"categoryId":  (*resources.PropertyRef)(nil),
 		}, resourceData)
 
 	})

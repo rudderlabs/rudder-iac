@@ -60,10 +60,8 @@ func (p *CategoryProvider) Update(ctx context.Context, ID string, input resource
 	oldState := state.CategoryState{}
 	oldState.FromResourceData(olds)
 
-	updated, err := p.client.UpdateCategory(ctx, oldState.ID, &catalog.Category{
-		ID:          oldState.ID,
-		Name:        toArgs.Name,
-		WorkspaceID: oldState.WorkspaceID,
+	updated, err := p.client.UpdateCategory(ctx, oldState.ID, catalog.CategoryUpdate{
+		Name: toArgs.Name,
 	})
 
 	if err != nil {

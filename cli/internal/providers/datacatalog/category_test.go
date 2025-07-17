@@ -34,7 +34,7 @@ func (m *MockCategoryCatalog) CreateCategory(ctx context.Context, categoryCreate
 	return m.mockCategory, m.err
 }
 
-func (m *MockCategoryCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate *catalog.Category) (*catalog.Category, error) {
+func (m *MockCategoryCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
 	return m.mockCategory, m.err
 }
 
