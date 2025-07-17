@@ -78,6 +78,11 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 			return nil, nil
 		}
 		return dereferenceValue(resourceData[val.Property], state)
+	case *resources.PropertyRef:
+		if val == nil {
+			return nil, nil
+		}
+		return dereferenceValue(*val, state)
 	case resources.ResourceData:
 		result := make(resources.ResourceData)
 		for k, v := range val {

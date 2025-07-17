@@ -9,9 +9,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +62,7 @@ func TestEventProviderOperations(t *testing.T) {
 		Name:        "event",
 		Description: "event description",
 		EventType:   "event type",
-		CategoryID:  nil,
+		CategoryId:  nil,
 	}
 
 	t.Run("Create", func(t *testing.T) {
@@ -93,7 +93,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event description",
 				"eventType":   "event type",
-				"categoryId":  (*string)(nil),
+				"categoryId":  (*resources.PropertyRef)(nil),
 			},
 		}, *createdResource)
 	})
@@ -104,7 +104,10 @@ func TestEventProviderOperations(t *testing.T) {
 			Name:        "event",
 			Description: "event new description",
 			EventType:   "event type",
-			CategoryID:  strptr("Marketing"),
+			CategoryId: &resources.PropertyRef{
+				URN:      "category:123",
+				Property: "id",
+			},
 		}
 
 		prevState := state.EventState{
@@ -120,7 +123,7 @@ func TestEventProviderOperations(t *testing.T) {
 				Name:        "event",
 				Description: "event description",
 				EventType:   "event type",
-				CategoryID:  nil,
+				CategoryId:  nil,
 			},
 		}
 
@@ -163,7 +166,10 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event new description",
 				"eventType":   "event type",
-				"categoryId":  strptr("Marketing"),
+				"categoryId": &resources.PropertyRef{
+					URN:      "category:123",
+					Property: "id",
+				},
 			},
 		}, *updatedResource)
 

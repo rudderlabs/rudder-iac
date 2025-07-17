@@ -19,6 +19,7 @@ const (
 	ResourceCollectionProperties    ResourceCollection = "properties"
 	ResourceCollectionTrackingPlans ResourceCollection = "tracking-plans"
 	ResourceCollectionCustomTypes   ResourceCollection = "custom-types"
+	ResourceCollectionCategories    ResourceCollection = "categories"
 )
 
 type ResourceState struct {

@@ -30,6 +30,7 @@ func New(client catalog.DataCatalog) *Provider {
 			EventResourceType:        NewEventProvider(client),
 			TrackingPlanResourceType: NewTrackingPlanProvider(client),
 			CustomTypeResourceType:   NewCustomTypeProvider(client),
+			CategoryResourceType:     NewCategoryProvider(client),
 		},
 	}
 }
@@ -39,7 +40,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (p *Provider) GetSupportedKinds() []string {
-	return []string{"properties", "events", "tp", "custom-types"}
+	return []string{"properties", "events", "tp", "custom-types", "categories"}
 }
 
 func (p *Provider) GetSupportedTypes() []string {
@@ -48,6 +49,7 @@ func (p *Provider) GetSupportedTypes() []string {
 		EventResourceType,
 		TrackingPlanResourceType,
 		CustomTypeResourceType,
+		CategoryResourceType,
 	}
 }
 
@@ -98,6 +100,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		}
 	}
 
+	categoryIDToURN := make(map[string]string)
+	for _, categories := range catalog.Categories {
+		for _, category := range categories {
+			categoryIDToURN[category.LocalID] = resources.URN(category.LocalID, CategoryResourceType)
+		}
+	}
+
 	// Helper function to get URN from reference
 	getURNFromRef := func(ref string) string {
 		// Format: #/entities/group/id
@@ -116,6 +125,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return propIDToURN[id]
 		case "custom-types":
 			return customTypeIDToURN[id]
+		case "categories":
+			return categoryIDToURN[id]
 		default:
 			return ""
 		}
@@ -143,12 +154,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		for _, event := range events {
 			log.Debug("adding event to graph", "event", event.LocalID, "group", group)
 
-			args := pstate.EventArgs{
-				Name:        event.Name,
-				Description: event.Description,
-				EventType:   event.Type,
-				CategoryID:  nil,
-			}
+			args := pstate.EventArgs{}
+			args.FromCatalogEvent(&event, getURNFromRef)
 			resource := resources.NewResource(event.LocalID, EventResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 
@@ -165,6 +172,19 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			args := pstate.CustomTypeArgs{}
 			args.FromCatalogCustomType(&customType, getURNFromRef)
 			resource := resources.NewResource(customType.LocalID, CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
+			graph.AddResource(resource)
+		}
+	}
+
+	// Add categories to the graph
+	for group, categories := range catalog.Categories {
+		for _, category := range categories {
+			log.Debug("adding category to graph", "id", category.LocalID, "group", group)
+
+			args := pstate.CategoryArgs{
+				Name: category.Name,
+			}
+			resource := resources.NewResource(category.LocalID, CategoryResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 		}
 	}

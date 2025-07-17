@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 )
 
 type DuplicateNameIDKeysValidator struct {
 }
 
-func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
+func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) []ValidationError {
 	log.Info("validating duplicate name and id keys on the entities in catalog")
 
 	var errors []ValidationError
@@ -139,6 +138,33 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *catalog.DataCatalog) []Vali
 
 			customTypeName[customType.Name] = nil
 			customTypeID[customType.LocalID] = nil
+		}
+	}
+
+	var (
+		categoryName = make(map[string]any)
+		categoryID   = make(map[string]any)
+	)
+
+	// Checking duplicate id and name keys in categories
+	for group, categories := range dc.Categories {
+		for _, category := range categories {
+			if _, ok := categoryName[category.Name]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate name key %s in categories", category.Name),
+					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
+				})
+			}
+
+			if _, ok := categoryID[category.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s in categories", category.LocalID),
+					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
+				})
+			}
+
+			categoryName[category.Name] = nil
+			categoryID[category.LocalID] = nil
 		}
 	}
 
