@@ -86,6 +86,7 @@ func TestEventProviderOperations(t *testing.T) {
 			"description": "event description",
 			"eventType":   "event type",
 			"workspaceId": "workspace-id",
+			"categoryId":  (*string)(nil),
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"eventArgs": map[string]interface{}{
@@ -115,6 +116,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event description",
 			EventType:   "event type",
 			WorkspaceID: "workspace-id",
+			CategoryID:  nil,
 			CreatedAt:   "2021-09-01 00:00:00 +0000 UTC",
 			UpdatedAt:   "2021-09-01 00:00:00 +0000 UTC",
 			EventArgs: state.EventArgs{
@@ -157,6 +159,7 @@ func TestEventProviderOperations(t *testing.T) {
 			"description": "event new description", // actual update and rest same
 			"eventType":   "event type",
 			"workspaceId": "workspace-id",
+			"categoryId":  strptr("Marketing"),
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"eventArgs": map[string]interface{}{

@@ -36,6 +36,7 @@ func TestEventState_ResourceData(t *testing.T) {
 			"description": "event-description",
 			"eventType":   "event-type",
 			"workspaceId": "workspace-id",
+			"categoryId":  (*string)(nil),
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"eventArgs": map[string]interface{}{
