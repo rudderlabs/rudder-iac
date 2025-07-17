@@ -1,12 +1,15 @@
 package state
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+)
 
 type EventArgs struct {
 	Name        string
 	Description string
 	EventType   string
-	CategoryID  *string
+	CategoryId  *resources.PropertyRef
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
@@ -14,7 +17,7 @@ func (args *EventArgs) ToResourceData() resources.ResourceData {
 		"name":        args.Name,
 		"description": args.Description,
 		"eventType":   args.EventType,
-		"categoryId":  args.CategoryID,
+		"categoryId":  args.CategoryId,
 	}
 }
 
@@ -22,7 +25,21 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
-	args.CategoryID = StringPtr(from, "categoryId", nil)
+	if categoryId, ok := from["categoryId"].(*resources.PropertyRef); ok {
+		args.CategoryId = categoryId
+	}
+}
+
+func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef func(ref string) string) {
+	args.Name = event.Name
+	args.Description = event.Description
+	args.EventType = event.Type
+	if event.CategoryRef != nil {
+		args.CategoryId = &resources.PropertyRef{
+			URN:      getURNFromRef(*event.CategoryRef),
+			Property: "id",
+		}
+	}
 }
 
 type EventState struct {
@@ -57,9 +74,9 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 	e.Description = MustString(from, "description")
 	e.EventType = MustString(from, "eventType")
 	e.WorkspaceID = MustString(from, "workspaceId")
+	e.CategoryID = StringPtr(from, "categoryId", nil)
 	e.CreatedAt = MustString(from, "createdAt")
 	e.UpdatedAt = MustString(from, "updatedAt")
-	e.CategoryID = StringPtr(from, "categoryId", nil)
 	e.EventArgs.FromResourceData(resources.ResourceData(
 		MustMapStringInterface(from, "eventArgs"),
 	))

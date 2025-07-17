@@ -110,3 +110,136 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestEventCategoryReferences(t *testing.T) {
+	validator := &RefValidator{}
+
+	// Create a test category
+	testCategory := catalog.Category{
+		LocalID: "user_actions",
+		Name:    "User Actions",
+	}
+
+	testCases := []struct {
+		name          string
+		events        map[catalog.EntityGroup][]catalog.Event
+		categories    map[catalog.EntityGroup][]catalog.Category
+		expectedErrs  int
+		errorContains []string
+	}{
+		{
+			name: "valid category reference in event",
+			events: map[catalog.EntityGroup][]catalog.Event{
+				"app-events": {
+					{
+						LocalID:     "user_signup",
+						Name:        "User Signup",
+						Type:        "track",
+						Description: "User signed up for the app",
+						CategoryRef: stringPtr("#/categories/app-categories/user_actions"),
+					},
+				},
+			},
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"app-categories": {testCategory},
+			},
+			expectedErrs: 0,
+		},
+		{
+			name: "event without category reference should pass validation",
+			events: map[catalog.EntityGroup][]catalog.Event{
+				"app-events": {
+					{
+						LocalID:     "user_signup",
+						Name:        "User Signup",
+						Type:        "track",
+						Description: "User signed up for the app",
+						CategoryRef: nil,
+					},
+				},
+			},
+			categories:   map[catalog.EntityGroup][]catalog.Category{},
+			expectedErrs: 0,
+		},
+		{
+			name: "invalid category reference format in event",
+			events: map[catalog.EntityGroup][]catalog.Event{
+				"app-events": {
+					{
+						LocalID:     "user_signup",
+						Name:        "User Signup",
+						Type:        "track",
+						Description: "User signed up for the app",
+						CategoryRef: stringPtr("#/categories/app-categories"), // Missing category ID
+					},
+				},
+			},
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"app-categories": {testCategory},
+			},
+			expectedErrs:  1,
+			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#/categories/<group>/<id>'"},
+		},
+		{
+			name: "reference to non-existent category in event",
+			events: map[catalog.EntityGroup][]catalog.Event{
+				"app-events": {
+					{
+						LocalID:     "user_signup",
+						Name:        "User Signup",
+						Type:        "track",
+						Description: "User signed up for the app",
+						CategoryRef: stringPtr("#/categories/app-categories/non_existent_category"),
+					},
+				},
+			},
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"app-categories": {testCategory},
+			},
+			expectedErrs:  1,
+			errorContains: []string{"category reference '#/categories/app-categories/non_existent_category' not found in catalog"},
+		},
+		{
+			name: "completely malformed category reference",
+			events: map[catalog.EntityGroup][]catalog.Event{
+				"app-events": {
+					{
+						LocalID:     "user_signup",
+						Name:        "User Signup",
+						Type:        "track",
+						Description: "User signed up for the app",
+						CategoryRef: stringPtr("user_actions"),
+					},
+				},
+			},
+			categories: map[catalog.EntityGroup][]catalog.Category{
+				"app-categories": {testCategory},
+			},
+			expectedErrs:  1,
+			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#/categories/<group>/<id>'"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dc := &catalog.DataCatalog{
+				Events:     tc.events,
+				Categories: tc.categories,
+			}
+
+			errs := validator.Validate(dc)
+
+			assert.Len(t, errs, tc.expectedErrs)
+			for i, errContains := range tc.errorContains {
+				if i < len(errs) {
+					assert.Contains(t, errs[i].error.Error(), errContains)
+				}
+			}
+		})
+	}
+}
+
+// Helper function to create string pointer
+func stringPtr(s string) *string {
+	return &s
+}

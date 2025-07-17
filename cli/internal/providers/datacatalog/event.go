@@ -31,11 +31,17 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 	toArgs := state.EventArgs{}
 	toArgs.FromResourceData(data)
 
+	// TODO: read categoryID via the new mechanism for reading resovlved property refs
+	var categoryId *string
+	if cId, ok := data["categoryId"].(string); ok {
+		categoryId = &cId
+	}
+
 	event, err := p.catalog.CreateEvent(ctx, catalog.EventCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
-		CategoryId:  toArgs.CategoryID,
+		CategoryId:  categoryId,
 	})
 
 	if err != nil {
@@ -77,12 +83,18 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 	prevState := state.EventState{}
 	prevState.FromResourceData(olds)
 
+	// TODO: read categoryID via the new mechanism for reading resovlved property refs
+	var categoryId *string
+	if cId, ok := input["categoryId"].(string); ok {
+		categoryId = &cId
+	}
+
 	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.Event{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
 		WorkspaceId: prevState.WorkspaceID,
-		CategoryId:  toArgs.CategoryID,
+		CategoryId:  categoryId,
 	})
 
 	if err != nil {
