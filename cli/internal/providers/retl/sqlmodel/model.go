@@ -33,24 +33,20 @@ const (
 )
 
 // validSourceDefinitions contains all valid source definition values
-var validSourceDefinitions = []SourceDefinition{
-	SourceDefinitionPostgres,
-	SourceDefinitionRedshift,
-	SourceDefinitionSnowflake,
-	SourceDefinitionBigQuery,
-	SourceDefinitionMySQL,
-	SourceDefinitionDatabricks,
-	SourceDefinitionTrino,
+var validSourceDefinitions = map[SourceDefinition]bool{
+	SourceDefinitionPostgres:   true,
+	SourceDefinitionRedshift:   true,
+	SourceDefinitionSnowflake:  true,
+	SourceDefinitionBigQuery:   true,
+	SourceDefinitionMySQL:      true,
+	SourceDefinitionDatabricks: true,
+	SourceDefinitionTrino:      true,
 }
 
 // isValidSourceDefinition checks if the given source definition is valid
 func isValidSourceDefinition(sd SourceDefinition) bool {
-	for _, valid := range validSourceDefinitions {
-		if sd == valid {
-			return true
-		}
-	}
-	return false
+	v, ok := validSourceDefinitions[sd]
+	return ok && v
 }
 
 // SQLModelSpec represents the YAML specification for a SQL Model resource
