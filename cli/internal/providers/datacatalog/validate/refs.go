@@ -124,35 +124,6 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 		}
 	}
 
-	// Validate event category references
-	for group, events := range dc.Events {
-		for _, event := range events {
-			reference := fmt.Sprintf("#/events/%s/%s", group, event.LocalID)
-
-			// Check if the event has a category reference
-			if event.CategoryRef != nil {
-				// Validate category reference format
-				matches := catalog.CategoryRegex.FindStringSubmatch(*event.CategoryRef)
-				if len(matches) != 3 {
-					errs = append(errs, ValidationError{
-						Reference: reference,
-						error:     fmt.Errorf("the category field value is invalid. It should always be a reference and must follow the format '#/categories/<group>/<id>'"),
-					})
-					continue
-				}
-
-				// Validate category existence
-				categoryGroup, categoryID := matches[1], matches[2]
-				if category := dc.Category(categoryGroup, categoryID); category == nil {
-					errs = append(errs, ValidationError{
-						Reference: reference,
-						error:     fmt.Errorf("category reference '%s' not found in catalog", *event.CategoryRef),
-					})
-				}
-			}
-		}
-	}
-
 	return errs
 }
 

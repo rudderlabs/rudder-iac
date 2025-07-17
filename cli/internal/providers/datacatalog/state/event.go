@@ -1,15 +1,12 @@
 package state
 
-import (
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-)
+import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 
 type EventArgs struct {
 	Name        string
 	Description string
 	EventType   string
-	CategoryId  *resources.PropertyRef
+	CategoryID  *string
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
@@ -17,7 +14,7 @@ func (args *EventArgs) ToResourceData() resources.ResourceData {
 		"name":        args.Name,
 		"description": args.Description,
 		"eventType":   args.EventType,
-		"categoryId":  args.CategoryId,
+		"categoryId":  args.CategoryID,
 	}
 }
 
@@ -25,21 +22,7 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
-	if categoryId, ok := from["categoryId"].(*resources.PropertyRef); ok {
-		args.CategoryId = categoryId
-	}
-}
-
-func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef func(ref string) string) {
-	args.Name = event.Name
-	args.Description = event.Description
-	args.EventType = event.Type
-	if event.CategoryRef != nil {
-		args.CategoryId = &resources.PropertyRef{
-			URN:      getURNFromRef(*event.CategoryRef),
-			Property: "id",
-		}
-	}
+	args.CategoryID = StringPtr(from, "categoryId", nil)
 }
 
 type EventState struct {
@@ -49,6 +32,7 @@ type EventState struct {
 	Description string
 	EventType   string
 	WorkspaceID string
+	CategoryID  *string
 	CreatedAt   string
 	UpdatedAt   string
 }
@@ -60,6 +44,7 @@ func (e *EventState) ToResourceData() resources.ResourceData {
 		"description": e.Description,
 		"eventType":   e.EventType,
 		"workspaceId": e.WorkspaceID,
+		"categoryId":  e.CategoryID,
 		"createdAt":   e.CreatedAt,
 		"updatedAt":   e.UpdatedAt,
 		"eventArgs":   map[string]interface{}(e.EventArgs.ToResourceData()),
@@ -74,6 +59,7 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 	e.WorkspaceID = MustString(from, "workspaceId")
 	e.CreatedAt = MustString(from, "createdAt")
 	e.UpdatedAt = MustString(from, "updatedAt")
+	e.CategoryID = StringPtr(from, "categoryId", nil)
 	e.EventArgs.FromResourceData(resources.ResourceData(
 		MustMapStringInterface(from, "eventArgs"),
 	))

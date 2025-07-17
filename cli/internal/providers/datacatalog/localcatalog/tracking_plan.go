@@ -13,7 +13,6 @@ var (
 	EventRegex      = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
 	IncludeRegex    = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
 	CustomTypeRegex = regexp.MustCompile(`^#\/custom-types\/(.*)\/(.*)$`)
-	CategoryRegex   = regexp.MustCompile(`^#\/categories\/(.*)\/(.*)$`)
 )
 
 type CatalogResourceFetcher interface {
