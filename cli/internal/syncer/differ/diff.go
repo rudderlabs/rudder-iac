@@ -100,6 +100,12 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 			return
 		}
 
+		// If v1 and v2 are pointers, compare the dereferenced values
+		if reflect.TypeOf(v1).Kind() == reflect.Pointer {
+			compareValues(key, reflect.ValueOf(v1).Elem().Interface(), reflect.ValueOf(v2).Elem().Interface())
+			return
+		}
+
 		switch v1Typed := v1.(type) {
 
 		case []map[string]interface{}:

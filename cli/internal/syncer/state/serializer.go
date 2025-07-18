@@ -7,6 +7,7 @@ import (
 )
 
 const RudderRef = "$__rudderRef"
+const RudderRefPtr = "$__rudderRefPtr"
 
 func ToJSON(state *State) (json.RawMessage, error) {
 	// Create a copy of state to avoid modifying the original
@@ -46,6 +47,16 @@ func encodeReferences(data map[string]interface{}) map[string]interface{} {
 				RudderRef:  val.URN,
 				"property": val.Property,
 			}
+
+		case *resources.PropertyRef:
+			var ref map[string]interface{}
+			if val != nil {
+				ref = map[string]interface{}{
+					RudderRefPtr: val.URN,
+					"property":   val.Property,
+				}
+			}
+			result[k] = ref
 
 		case []map[string]interface{}:
 			newArray := make([]map[string]interface{}, len(val))
@@ -101,10 +112,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if isReference(val) {
-				result[k] = resources.PropertyRef{
-					URN:      val[RudderRef].(string),
-					Property: val["property"].(string),
-				}
+				result[k] = getReference(val)
 			} else {
 				result[k] = decodeReferences(val)
 			}
@@ -122,10 +130,7 @@ func decodeReferences(data map[string]interface{}) map[string]interface{} {
 			for i, item := range val {
 				if m, ok := item.(map[string]interface{}); ok {
 					if isReference(m) {
-						newArray[i] = resources.PropertyRef{
-							URN:      m[RudderRef].(string),
-							Property: m["property"].(string),
-						}
+						newArray[i] = getReference(m)
 					} else {
 						newArray[i] = decodeReferences(m)
 					}
@@ -148,7 +153,24 @@ func isReference(v interface{}) bool {
 		return false
 	}
 	_, hasRef := m[RudderRef]
+	_, hasRefPtr := m[RudderRefPtr]
 	_, hasProperty := m["property"]
 
-	return hasRef && hasProperty
+	return hasProperty && (hasRef || hasRefPtr)
+}
+
+// getReference returns a reference from a map[string]interface{}
+// it returns *PropertyRef if the reference is a pointer, otherwise it returns a PropertyRef.
+func getReference(v map[string]interface{}) interface{} {
+	if _, hasRefPtr := v[RudderRefPtr]; hasRefPtr {
+		return &resources.PropertyRef{
+			URN:      v[RudderRefPtr].(string),
+			Property: v["property"].(string),
+		}
+	}
+
+	return resources.PropertyRef{
+		URN:      v[RudderRef].(string),
+		Property: v["property"].(string),
+	}
 }
