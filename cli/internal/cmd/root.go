@@ -8,6 +8,9 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
@@ -64,7 +67,11 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
-	rootCmd.AddCommand(workspace.NewCmdWorkspace())
+  rootCmd.AddCommand(workspace.NewCmdWorkspace())
+  
+	rootCmd.AddCommand(apply.NewCmdApply())
+	rootCmd.AddCommand(validate.NewCmdValidate())
+	rootCmd.AddCommand(destroy.NewCmdDestroy())
 }
 
 func initConfig() {
