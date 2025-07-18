@@ -1,5 +1,7 @@
 package state
 
+import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+
 func StringPtr(from map[string]interface{}, key string, defaultval *string) *string {
 	return SafeMapValue(from, key, defaultval)
 }
@@ -71,6 +73,14 @@ func MustStringSlice(from map[string]interface{}, key string) []string {
 		result[i] = v.(string)
 	}
 	return result
+}
+
+func SafePropertyRef(from map[string]any, key string, defaultval resources.PropertyRef) resources.PropertyRef {
+	return SafeMapValue(from, key, defaultval)
+}
+
+func MustPropertyRef(from map[string]any, key string) resources.PropertyRef {
+	return MustMapValue[string, any, resources.PropertyRef](from, key)
 }
 
 func SafeMapValue[K comparable, T any, V any](from map[K]T, key K, defaultval V) V {

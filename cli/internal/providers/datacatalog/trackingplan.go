@@ -230,20 +230,10 @@ func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 	for _, prop := range from.Properties {
 		propMap := make(map[string]any)
 
-		// Handle Type field based on HasCustomTypeRef flag
-		if prop.HasCustomTypeRef {
-			// This is a custom type reference, use $ref format
-			// The Type has been dereferenced by the syncer to the actual name
-			typValue := fmt.Sprint(prop.Type)
+		isRef, typValue := prop.ResolveType()
+		if isRef {
 			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", typValue)
 		} else {
-			// Regular type handling
-			typValue, ok := prop.Type.(string)
-			if !ok {
-				// If not a string but something else, convert to string
-				typValue = fmt.Sprint(prop.Type)
-			}
-
 			typ := lo.Map(strings.Split(typValue, ","), func(t string, _ int) string {
 				return strings.TrimSpace(t)
 			})
@@ -251,15 +241,16 @@ func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 		}
 
 		for k, v := range prop.Config {
-			if k == "itemTypes" && prop.HasItemTypesRef {
-				refValue := v.([]any)[0].(string)
-
-				propMap["items"] = map[string]any{
-					"$ref": fmt.Sprintf("#/$defs/%s", refValue),
-				}
-			} else if k == "itemTypes" {
-				propMap["items"] = map[string]interface{}{
-					"type": v,
+			if k == "itemTypes" {
+				refValue, ok := v.([]any)[0].(resources.PropertyRef)
+				if ok {
+					propMap["items"] = map[string]any{
+						"$ref": fmt.Sprintf("#/$defs/%s", refValue.ResolvedValue),
+					}
+				} else {
+					propMap["items"] = map[string]interface{}{
+						"type": v,
+					}
 				}
 			} else {
 				// Other config fields

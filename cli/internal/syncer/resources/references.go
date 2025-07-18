@@ -1,8 +1,13 @@
 package resources
 
 type PropertyRef struct {
-	URN      string `json:"urn"`
-	Property string `json:"property"`
+	URN           string `json:"urn"`
+	Property      string `json:"property"`
+	ResolvedValue any    `json:"value"`
+}
+
+func (p PropertyRef) IsEmpty() bool {
+	return p.URN == "" && p.Property == "" && p.ResolvedValue == nil
 }
 
 func CollectReferences(v interface{}) []*PropertyRef {

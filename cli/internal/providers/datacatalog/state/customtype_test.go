@@ -22,11 +22,11 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 		},
 		Properties: []*CustomTypeProperty{
 			{
-				ID:       "property1",
+				RefToID:  resources.PropertyRef{URN: "property:prop1", Property: "id", ResolvedValue: "property1"},
 				Required: true,
 			},
 			{
-				ID:       "property2",
+				RefToID:  resources.PropertyRef{URN: "property:prop2", Property: "id", ResolvedValue: "property2"},
 				Required: false,
 			},
 		},
@@ -48,9 +48,9 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 
 	properties := data["properties"].([]map[string]any)
 	assert.Len(t, properties, 2)
-	assert.Equal(t, "property1", properties[0]["id"])
+	assert.Equal(t, "property1", properties[0]["refToId"].(resources.PropertyRef).ResolvedValue)
 	assert.Equal(t, true, properties[0]["required"])
-	assert.Equal(t, "property2", properties[1]["id"])
+	assert.Equal(t, "property2", properties[1]["refToId"].(resources.PropertyRef).ResolvedValue)
 	assert.Equal(t, false, properties[1]["required"])
 }
 
@@ -68,13 +68,11 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 		},
 		"properties": []map[string]any{
 			{
-				"refToId":  "prop_val_1",
-				"id":       "",
+				"refToId":  resources.PropertyRef{URN: "property:prop1", Property: "id", ResolvedValue: "property1"},
 				"required": true,
 			},
 			{
-				"refToId":  "prop_val_2",
-				"id":       "",
+				"refToId":  resources.PropertyRef{URN: "property:prop2", Property: "id", ResolvedValue: "property2"},
 				"required": false,
 			},
 		},
@@ -95,9 +93,12 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 	assert.Equal(t, args.Config["maxLength"], 255)
 
 	assert.Len(t, args.Properties, 2)
-	assert.Equal(t, "prop_val_1", args.Properties[0].ID)
+	assert.Equal(t, "property:prop1", args.Properties[0].RefToID.(resources.PropertyRef).URN)
+	assert.Equal(t, "property1", args.Properties[0].RefToID.(resources.PropertyRef).ResolvedValue)
 	assert.Equal(t, true, args.Properties[0].Required)
-	assert.Equal(t, "prop_val_2", args.Properties[1].ID)
+
+	assert.Equal(t, "property:prop2", args.Properties[1].RefToID.(resources.PropertyRef).URN)
+	assert.Equal(t, "property2", args.Properties[1].RefToID.(resources.PropertyRef).ResolvedValue)
 	assert.Equal(t, false, args.Properties[1].Required)
 }
 
@@ -125,7 +126,8 @@ func TestFromCatalogCustomType(t *testing.T) {
 	getURN := func(ref string) string {
 		if ref == "#/properties/group/prop1" {
 			return "property:prop1"
-		} else if ref == "#/properties/group/prop2" {
+		}
+		if ref == "#/properties/group/prop2" {
 			return "property:prop2"
 		}
 		return ""

@@ -15,6 +15,25 @@ type PropertyArgs struct {
 	Config      map[string]interface{}
 }
 
+func (args *PropertyArgs) ResolveType() string {
+	if propertyRef, ok := args.Type.(resources.PropertyRef); ok {
+		return propertyRef.ResolvedValue.(string)
+	}
+	return args.Type.(string)
+}
+
+func (args *PropertyArgs) ResolveConfig() map[string]any {
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, itemType := range itemTypes.([]any) {
+			if propertyRef, ok := itemType.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+		args.Config["itemTypes"] = itemTypes
+	}
+	return args.Config
+}
+
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description
@@ -75,8 +94,22 @@ func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 func (args *PropertyArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
-	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]interface{}))
+
+	if propertyRef := SafePropertyRef(from, "type", resources.PropertyRef{}); !propertyRef.IsEmpty() {
+		args.Type = propertyRef
+	} else {
+		args.Type = MustString(from, "type")
+	}
+	// Remap the itemTypes to the resolved value
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, itemType := range itemTypes.([]any) {
+			if propertyRef, ok := itemType.(resources.PropertyRef); !ok {
+				itemTypes.([]any)[idx] = propertyRef
+			}
+		}
+		args.Config["itemTypes"] = itemTypes
+	}
 }
 
 type PropertyState struct {

@@ -12,7 +12,20 @@ type CustomTypeArgs struct {
 	Description string
 	Type        string
 	Config      map[string]any
-	Properties  []*CustomTypeProperty // For object-type custom types
+	Properties  []*CustomTypeProperty
+}
+
+func (args *CustomTypeArgs) ResolveConfig() map[string]any {
+	// Overriding itemTypes with resolved values as now we have property refs
+	// in the itemTypes array
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, item := range itemTypes.([]any) {
+			if propertyRef, ok := item.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+	}
+	return args.Config
 }
 
 // CustomTypeProperty represents a property reference in a custom type
@@ -70,10 +83,17 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 
 		inst := &CustomTypeProperty{
 			Required: MustBool(propMap, "required"),
-			ID:       MustString(propMap, "id"),
-			RefToID:  MustString(propMap, "refToId"),
 		}
-		inst.ID = inst.RefToID.(string)
+
+		patchedID := SafePropertyRef(propMap, "refToId", resources.PropertyRef{})
+		if !patchedID.IsEmpty() {
+			inst.RefToID = patchedID
+			inst.ID = patchedID.ResolvedValue.(string)
+		} else {
+			inst.RefToID = MustString(propMap, "refToId")
+			inst.ID = inst.RefToID.(string)
+		}
+
 		customTypeProperties[idx] = inst
 	}
 
@@ -98,7 +118,6 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 		})
 	}
 
-	// BUGGY CODE TO BE FIXED IN A BETTER
 	itemTypes, ok := args.Config["itemTypes"]
 	if ok {
 

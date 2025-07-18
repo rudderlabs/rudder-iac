@@ -42,7 +42,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
-		Config:      toArgs.Config,
+		Config:      toArgs.ResolveConfig(),
 		Properties:  properties,
 	}
 
@@ -93,7 +93,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
-		Config:      toArgs.Config,
+		Config:      toArgs.ResolveConfig(),
 		Properties:  properties,
 	})
 	if err != nil {
