@@ -24,7 +24,10 @@
       "name": "Username",
       "type": "EmailType"
     },
-    "type": "EmailType",
+    "type": {
+      "$__rudderRef": "custom-type:email_type",
+      "property": "name"
+    },
     "updatedAt": "2025-06-24 18:04:47.527 +0000 UTC",
     "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
   },

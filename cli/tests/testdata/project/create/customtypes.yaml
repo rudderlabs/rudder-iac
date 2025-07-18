@@ -23,11 +23,3 @@ spec:
         minLength: 10
         maxLength: 255
         pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-
-    # - id: "email_type_list"
-    #   name: "EmailTypeList"
-    #   description: "Array of email type"
-    #   type: "array"
-    #   config:
-    #     itemTypes:
-    #     - "#/custom-types/email_types/email_type"

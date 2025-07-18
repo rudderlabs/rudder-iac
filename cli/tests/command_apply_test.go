@@ -69,9 +69,7 @@ func verifyState(t *testing.T, dir string) {
 			"output.events[1].eventId",
 			"output.events[1].id",
 			"output.customTypeArgs.properties[0].id",
-			"output.customTypeArgs.properties[0].refToId",
 			"output.customTypeArgs.properties[1].id",
-			"output.customTypeArgs.properties[1].refToId",
 		},
 	)
 
