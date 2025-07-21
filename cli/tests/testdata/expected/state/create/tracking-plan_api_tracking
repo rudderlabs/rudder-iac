@@ -6,7 +6,10 @@
         "events": [
             {
                 "allowUnplanned": false,
-                "categoryId": null,
+                "categoryId": {
+                    "$__rudderRefPtr": "category:user_actions",
+                    "property": "id"
+                },
                 "description": "This event is triggered every time a user views a product.",
                 "identitySection": "",
                 "localId": "api_tracking",
@@ -71,6 +74,7 @@
             },
             {
                 "allowUnplanned": false,
+                "categoryId": null,
                 "description": "This is a login event without a category",
                 "identitySection": "",
                 "localId": "login",
@@ -194,6 +198,7 @@
                 },
                 {
                     "allowUnplanned": false,
+                    "categoryId": "",
                     "description": "This is a login event without a category",
                     "identitySection": "",
                     "localId": "login",
