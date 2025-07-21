@@ -2,13 +2,16 @@
   "id": "api_error",
   "type": "event",
   "input": {
-    "categoryId": null,
+    "categoryId": {
+      "$__rudderRefPtr": "category:admin_actions",
+      "property": "id"
+    },
     "description": "This event is triggered when an API error occurs.",
     "eventType": "track",
     "name": "API Error"
   },
   "output": {
-    "categoryId": null,
+    "categoryId": "some-category-id",
     "createdAt": "2025-06-19 13:05:23.29 +0000 UTC",
     "description": "This event is triggered when an API error occurs.",
     "eventArgs": {

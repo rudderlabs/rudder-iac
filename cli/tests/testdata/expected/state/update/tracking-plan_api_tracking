@@ -72,7 +72,10 @@
             },
             {
                 "allowUnplanned": true,
-                "categoryId": null,
+                "categoryId": {
+                    "$__rudderRefPtr": "category:admin_actions",
+                    "property": "id"
+                },
                 "description": "This event is triggered when an API error occurs.",
                 "identitySection": "",
                 "localId": "api_error",
@@ -140,6 +143,46 @@
                     }
                 ],
                 "type": "track"
+            },
+            {
+                "allowUnplanned": false,
+                "categoryId": {
+                    "$__rudderRefPtr": "category:user_actions",
+                    "property": "id"
+                },
+                "description": "This is a login event",
+                "identitySection": "",
+                "localId": "login",
+                "name": "Login Event",
+                "properties": [
+                    {
+                        "config": {},
+                        "description": "User's email address",
+                        "hasCustomTypeRef": true,
+                        "hasItemTypesRef": false,
+                        "localId": "user_mail",
+                        "name": "User Email",
+                        "required": true,
+                        "type": {
+                            "$__rudderRef": "custom-type:email_type",
+                            "property": "name"
+                        }
+                    },
+                    {
+                        "config": {
+                            "maxLength": 64,
+                            "minLength": 10
+                        },
+                        "description": "Password for the API",
+                        "hasCustomTypeRef": false,
+                        "hasItemTypesRef": false,
+                        "localId": "password",
+                        "name": "Password",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "type": "track"
             }
         ],
         "localId": "api_tracking",
@@ -156,10 +199,16 @@
                 "localId": "api_tracking"
             },
             {
+                "eventId": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
+                "id": "tpe_30CVISL0E9XhrxH6OeB9vtnedcv",
+                "localId": "login"
+            },
+            {
                 "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
                 "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
                 "localId": "api_error"
             }
+            
         ],
         "id": "tp_2yzTAKlo8XTDcoPezOYjo2dNn5r",
         "name": "API Tracking",
@@ -231,7 +280,7 @@
                 },
                 {
                     "allowUnplanned": true,
-                    "categoryId": "",
+                    "categoryId": "some-category-id",
                     "description": "This event is triggered when an API error occurs.",
                     "identitySection": "",
                     "localId": "api_error",
@@ -296,6 +345,40 @@
                             "name": "Error Code",
                             "required": true,
                             "type": "integer"
+                        }
+                    ],
+                    "type": "track"
+                },
+                {
+                    "allowUnplanned": false,
+                    "categoryId": "some-other-category-id",
+                    "description": "This is a login event",
+                    "identitySection": "",
+                    "localId": "login",
+                    "name": "Login Event",
+                    "properties": [
+                        {
+                            "config": {},
+                            "description": "User's email address",
+                            "hasCustomTypeRef": true,
+                            "hasItemTypesRef": false,
+                            "localId": "user_mail",
+                            "name": "User Email",
+                            "required": true,
+                            "type": "EmailType"
+                        },
+                        {
+                            "config": {
+                                "maxLength": 64,
+                                "minLength": 10
+                            },
+                            "description": "Password for the API",
+                            "hasCustomTypeRef": false,
+                            "hasItemTypesRef": false,
+                            "localId": "password",
+                            "name": "Password",
+                            "required": true,
+                            "type": "string"
                         }
                     ],
                     "type": "track"
