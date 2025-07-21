@@ -5,10 +5,16 @@ import (
 	"fmt"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+)
+
+// Resource type constants for listing operations
+const (
+	RETLSourceListResourceType = "retl-source"
 )
 
 // Provider implements the provider interface for RETL resources
@@ -171,4 +177,13 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 	}
 
 	return handler.Delete(ctx, ID, state)
+}
+
+// List lists RETL resources of the specified type with optional filters
+func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+	return handler.List(ctx)
 }
