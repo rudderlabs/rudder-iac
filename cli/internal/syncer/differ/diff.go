@@ -102,6 +102,10 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 
 		// If v1 and v2 are pointers, compare the dereferenced values
 		if reflect.TypeOf(v1).Kind() == reflect.Pointer {
+			if isNil(v1) || isNil(v2) {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				return
+			}
 			compareValues(key, reflect.ValueOf(v1).Elem().Interface(), reflect.ValueOf(v2).Elem().Interface())
 			return
 		}
