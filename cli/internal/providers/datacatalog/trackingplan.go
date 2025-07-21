@@ -274,10 +274,16 @@ func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 		}
 	}
 
+	var categoryId *string
+	if val, ok := from.CategoryId.(string); ok && val != "" {
+		categoryId = &val
+	}
+
 	return catalog.TrackingPlanUpsertEvent{
 		Name:            from.Name,
 		Description:     from.Description,
 		EventType:       from.Type,
+		CategoryId:      categoryId,
 		IdentitySection: identitySection,
 		Rules: getRulesBasedonIdentity(identitySection, &catalog.TrackingPlanUpsertEventProperties{
 			Type:                 "object",

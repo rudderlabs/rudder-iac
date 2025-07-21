@@ -182,6 +182,7 @@ type TrackingPlanEventArgs struct {
 	Name            string
 	LocalID         string
 	Description     string
+	CategoryId      any
 	Type            string
 	AllowUnplanned  bool
 	IdentitySection string
@@ -319,10 +320,18 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			properties = append(properties, tpProperty)
 		}
 
+		var categoryIDRef *resources.PropertyRef
+		if event.CategoryRef != nil {
+			categoryIDRef = &resources.PropertyRef{
+				URN:      urnFromRef(*event.CategoryRef),
+				Property: "id",
+			}
+		}
 		events = append(events, &TrackingPlanEventArgs{
 			Name:            event.Name,
 			LocalID:         event.LocalID,
 			Description:     event.Description,
+			CategoryId:      categoryIDRef,
 			Type:            event.Type,
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: event.IdentitySection,
@@ -386,6 +395,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 			Name:            MustString(event, "name"),
 			Description:     MustString(event, "description"),
 			LocalID:         MustString(event, "localId"),
+			CategoryId:      String(event, "categoryId", ""),
 			Type:            MustString(event, "type"),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
@@ -443,6 +453,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			"localId":         event.LocalID,
 			"name":            event.Name,
 			"description":     event.Description,
+			"categoryId":      event.CategoryId,
 			"type":            event.Type,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
