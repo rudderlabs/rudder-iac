@@ -230,25 +230,31 @@ func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 	for _, prop := range from.Properties {
 		propMap := make(map[string]any)
 
-		isRef, typValue := prop.ResolveType()
-		if isRef {
-			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", typValue)
+		// Though the value is resolved, we need to create
+		// call to the schema a bit differently with / without custom types
+		// and hence we use the differentiator.
+		// PS: Will be removed once we migrate to the new API to update events on trackingplan.
+		if prop.HasCustomTypeRef {
+			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", prop.Type)
 		} else {
-			typ := lo.Map(strings.Split(typValue, ","), func(t string, _ int) string {
+			typ := lo.Map(strings.Split(prop.Type.(string), ","), func(t string, _ int) string {
 				return strings.TrimSpace(t)
 			})
 			propMap["type"] = typ
 		}
 
 		for k, v := range prop.Config {
+			// Similar to the type field, we need to create
+			// call to the schema with itemTypes a bit differently with / without custom types
+			// and hence we use the differentiator.
+			// PS: Will be removed once we migrate to the new API to update events on trackingplan.
 			if k == "itemTypes" {
-				refValue, ok := v.([]any)[0].(resources.PropertyRef)
-				if ok {
+				if prop.HasItemTypesRef {
 					propMap["items"] = map[string]any{
-						"$ref": fmt.Sprintf("#/$defs/%s", refValue.ResolvedValue),
+						"$ref": fmt.Sprintf("#/$defs/%s", v.([]any)[0].(string)),
 					}
 				} else {
-					propMap["items"] = map[string]interface{}{
+					propMap["items"] = map[string]any{
 						"type": v,
 					}
 				}

@@ -644,7 +644,7 @@ func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
 				Name:             "prop2",
 				LocalID:          "prop-id-2",
 				Description:      "Custom type property",
-				Type:             resources.PropertyRef{ResolvedValue: "CustomType"}, // This would be the resolved value after dereferencing
+				Type:             "CustomType",
 				Required:         true,
 				HasCustomTypeRef: true,
 				HasItemTypesRef:  false,
@@ -728,7 +728,7 @@ func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
 				Description:      "Array with custom type",
 				Type:             "array",
 				Required:         false,
-				Config:           map[string]interface{}{"itemTypes": []any{resources.PropertyRef{ResolvedValue: "CustomType"}}},
+				Config:           map[string]interface{}{"itemTypes": []any{"CustomType"}},
 				HasCustomTypeRef: false,
 				HasItemTypesRef:  true,
 			},

@@ -25,13 +25,13 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 					Name:        "property-name",
 					Description: "property-description",
 					Type:        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
-					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+					Config:      map[string]any{"enum": []string{"value1", "value2"}},
 				},
 				want: resources.ResourceData{
 					"name":        "property-name",
 					"description": "property-description",
 					"type":        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
-					"config":      map[string]interface{}{"enum": []string{"value1", "value2"}},
+					"config":      map[string]any{"enum": []string{"value1", "value2"}},
 				},
 			},
 		}
@@ -60,13 +60,13 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 					"name":        "property-name",
 					"description": "property-description",
 					"type":        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
-					"config":      map[string]interface{}{"enum": []string{"value1", "value2"}},
+					"config":      map[string]any{"enum": []string{"value1", "value2"}},
 				},
 				want: state.PropertyArgs{
 					Name:        "property-name",
 					Description: "property-description",
-					Type:        resources.PropertyRef{URN: "urn", Property: "property", ResolvedValue: "resolved-value"},
-					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+					Type:        "resolved-value",
+					Config:      map[string]any{"enum": []string{"value1", "value2"}},
 				},
 			},
 			{
@@ -85,8 +85,8 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 					Description: "property-description",
 					Type:        "array",
 					Config: map[string]any{"itemTypes": []any{
-						resources.PropertyRef{URN: "urn1", Property: "property", ResolvedValue: "resolved-value-1"},
-						resources.PropertyRef{URN: "urn2", Property: "property", ResolvedValue: "resolved-value-2"},
+						"resolved-value-1",
+						"resolved-value-2",
 					}},
 				},
 			},

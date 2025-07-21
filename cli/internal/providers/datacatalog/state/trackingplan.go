@@ -240,6 +240,44 @@ type TrackingPlanPropertyArgs struct {
 	HasItemTypesRef  bool
 }
 
+func (args *TrackingPlanPropertyArgs) ToResourceData() resources.ResourceData {
+	return resources.ResourceData{
+		"name":             args.Name,
+		"description":      args.Description,
+		"localId":          args.LocalID,
+		"type":             args.Type,
+		"config":           args.Config,
+		"required":         args.Required,
+		"hasCustomTypeRef": args.HasCustomTypeRef,
+		"hasItemTypesRef":  args.HasItemTypesRef,
+	}
+}
+
+func (args *TrackingPlanPropertyArgs) FromResourceData(from resources.ResourceData) {
+	args.LocalID = MustString(from, "localId")
+	args.Name = MustString(from, "name")
+	args.Description = MustString(from, "description")
+	args.Required = MustBool(from, "required")
+	args.HasCustomTypeRef = Bool(from, "hasCustomTypeRef", false)
+	args.HasItemTypesRef = Bool(from, "hasItemTypesRef", false)
+
+	// Resolve the type field if it is a PropertyRef
+	args.Type = from["type"]
+	if typ, ok := args.Type.(resources.PropertyRef); ok {
+		args.Type = typ.ResolvedValue.(string)
+	}
+
+	// Resolve the itemTypes array if it is a PropertyRef
+	args.Config = MapStringInterface(from, "config", make(map[string]interface{}))
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, item := range itemTypes.([]any) {
+			if propertyRef, ok := item.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+	}
+}
+
 func (args *TrackingPlanPropertyArgs) ResolveType() (bool, string) {
 	propertyRef, ok := args.Type.(resources.PropertyRef)
 	if !ok {
@@ -372,9 +410,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 	args.Description = MustString(from, "description")
 	args.LocalID = MustString(from, "localId")
 
-	var (
-		events []interface{}
-	)
+	var events []interface{}
 
 	// When loading the args from the state []map[string]interface{} is treated as []interface{}
 	// but when we have events from catalog being registered as a resource, it is []map[string]interface{}
@@ -411,17 +447,9 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 
 		tpProperties := make([]*TrackingPlanPropertyArgs, len(properties))
 		for idx, property := range properties {
-			property := property.(map[string]interface{})
-			tpProperties[idx] = &TrackingPlanPropertyArgs{
-				LocalID:          MustString(property, "localId"),
-				Name:             MustString(property, "name"),
-				Description:      MustString(property, "description"),
-				Type:             property["type"],
-				Config:           MapStringInterface(property, "config", make(map[string]interface{})),
-				Required:         MustBool(property, "required"),
-				HasCustomTypeRef: Bool(property, "hasCustomTypeRef", false),
-				HasItemTypesRef:  Bool(property, "hasItemTypesRef", false),
-			}
+			args := &TrackingPlanPropertyArgs{}
+			args.FromResourceData(property.(map[string]any))
+			tpProperties[idx] = args
 		}
 		eventProps[idx].Properties = tpProperties
 	}
@@ -432,19 +460,9 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 
 	events := make([]map[string]interface{}, 0)
 	for _, event := range args.Events {
-
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
-			properties = append(properties, map[string]interface{}{
-				"name":             property.Name,
-				"description":      property.Description,
-				"localId":          property.LocalID,
-				"type":             property.Type,
-				"config":           property.Config,
-				"required":         property.Required,
-				"hasCustomTypeRef": property.HasCustomTypeRef,
-				"hasItemTypesRef":  property.HasItemTypesRef,
-			})
+			properties = append(properties, property.ToResourceData())
 		}
 
 		events = append(events, map[string]interface{}{

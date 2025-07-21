@@ -64,7 +64,15 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]any))
 
-	// Handle properties array using similar pattern to TrackingPlan
+	// Resolve the PropertyRef in itemTypes array within the config
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, item := range itemTypes.([]any) {
+			if propertyRef, ok := item.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+	}
+
 	var properties []any
 
 	// Try both patterns to handle different data structures
@@ -76,7 +84,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 		}
 	}
 
-	// Create properties array
+	// Resolving property refs in the properties array in refToId field
 	customTypeProperties := make([]*CustomTypeProperty, len(properties))
 	for idx, prop := range properties {
 		propMap := prop.(map[string]any)
@@ -87,7 +95,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 
 		patchedID := SafePropertyRef(propMap, "refToId", resources.PropertyRef{})
 		if !patchedID.IsEmpty() {
-			inst.RefToID = patchedID
+			inst.RefToID = patchedID.ResolvedValue.(string)
 			inst.ID = patchedID.ResolvedValue.(string)
 		} else {
 			inst.RefToID = MustString(propMap, "refToId")

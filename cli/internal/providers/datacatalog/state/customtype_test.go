@@ -93,12 +93,12 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 	assert.Equal(t, args.Config["maxLength"], 255)
 
 	assert.Len(t, args.Properties, 2)
-	assert.Equal(t, "property:prop1", args.Properties[0].RefToID.(resources.PropertyRef).URN)
-	assert.Equal(t, "property1", args.Properties[0].RefToID.(resources.PropertyRef).ResolvedValue)
-	assert.Equal(t, true, args.Properties[0].Required)
+	assert.Equal(t, "property1", args.Properties[0].ID)
+	assert.Equal(t, "property1", args.Properties[0].RefToID)
 
-	assert.Equal(t, "property:prop2", args.Properties[1].RefToID.(resources.PropertyRef).URN)
-	assert.Equal(t, "property2", args.Properties[1].RefToID.(resources.PropertyRef).ResolvedValue)
+	assert.Equal(t, "property2", args.Properties[1].ID)
+	assert.Equal(t, "property2", args.Properties[1].RefToID)
+	assert.Equal(t, true, args.Properties[0].Required)
 	assert.Equal(t, false, args.Properties[1].Required)
 }
 
