@@ -20,8 +20,8 @@ const (
 	SQLKey              = "sql"
 	IDKey               = "id"
 	SourceTypeKey       = "source_type"
-	CreatedAtKey        = "created_at"
-	UpdatedAtKey        = "updated_at"
+	CreatedAtKey        = "createdAt"
+	UpdatedAtKey        = "updatedAt"
 
 	SourceDefinitionPostgres   SourceDefinition = "postgres"
 	SourceDefinitionRedshift   SourceDefinition = "redshift"

@@ -39,4 +39,9 @@ type resourceHandler interface {
 	// The state parameter contains the current state of the resource.
 	// Returns an error if deletion fails.
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
+
+	// List lists all resources managed by this handler.
+	// The returned resources will be added to the resource graph for
+	// dependency resolution and state management.
+	List(ctx context.Context) ([]resources.ResourceData, error)
 }
