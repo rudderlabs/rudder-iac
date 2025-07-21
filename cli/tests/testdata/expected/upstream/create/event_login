@@ -1,0 +1,11 @@
+{
+    "id": "ev_30B3DyAMUbeE04TELNn4X4z6IUu",
+    "name": "Login Event",
+    "description": "This is a login event without a category",
+    "eventType": "track",
+    "categoryId": null,
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdAt": "2025-07-21T08:37:02.535Z",
+    "updatedAt": "2025-07-21T08:37:08.415Z",
+    "category": null
+}

@@ -1,0 +1,8 @@
+version: rudder/0.1
+kind: categories
+metadata:
+  name: app_categories
+spec:
+  categories:
+    - id: user_actions
+      name: "User Actions"

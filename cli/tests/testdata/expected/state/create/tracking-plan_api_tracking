@@ -67,23 +67,64 @@
                     }
                 ],
                 "type": "track"
+            },
+            {
+                "allowUnplanned": false,
+                "description": "This is a login event without a category",
+                "identitySection": "",
+                "localId": "login",
+                "name": "Login Event",
+                "properties": [
+                    {
+                        "config": {},
+                        "description": "Username for the API",
+                        "hasCustomTypeRef": true,
+                        "hasItemTypesRef": false,
+                        "localId": "username",
+                        "name": "Username",
+                        "required": true,
+                        "type": {
+                            "$__rudderRef": "custom-type:email_type",
+                            "property": "name"
+                        }
+                    },
+                    {
+                        "config": {
+                            "maxLength": 64,
+                            "minLength": 10
+                        },
+                        "description": "Password for the API",
+                        "hasCustomTypeRef": false,
+                        "hasItemTypesRef": false,
+                        "localId": "password",
+                        "name": "Password",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "type": "track"
             }
         ],
         "localId": "api_tracking",
         "name": "API Tracking"
     },
     "output": {
-        "createdAt": "2025-06-25 07:00:05.432 +0000 UTC",
+        "createdAt": "2025-07-21 07:59:40.797 +0000 UTC",
         "creationType": "Data catalog API",
         "description": "Tracking plan for an e-commerce application.",
         "events": [
             {
-                "eventId": "ev_2yzQD5HdaNB12pB0kiEAhiabG2d",
-                "id": "tpe_2yzQDuaJ5igZYb94JjkWb6AvQ8m",
+                "eventId": "ev_30AyfWxvSYDxDw7uLkSOGUA4fl1",
+                "id": "tpe_30AygIJzRIj1bJR5IWow01vyitS",
                 "localId": "api_tracking"
+            },
+            {
+                "eventId": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
+                "id": "tpe_30AygUBAlPdHGNZ84ufoK9X5eCr",
+                "localId": "login"
             }
         ],
-        "id": "tp_2yzQDvIzyq8EcjcWFGW4BoOk6ek",
+        "id": "tp_30AygDmnmMYbmyP4mMfl9ZNi4MG",
         "name": "API Tracking",
         "trackingPlanArgs": {
             "description": "Tracking plan for an e-commerce application.",
@@ -148,12 +189,45 @@
                         }
                     ],
                     "type": "track"
+                },
+                {
+                    "allowUnplanned": false,
+                    "description": "This is a login event without a category",
+                    "identitySection": "",
+                    "localId": "login",
+                    "name": "Login Event",
+                    "properties": [
+                        {
+                            "config": {},
+                            "description": "Username for the API",
+                            "hasCustomTypeRef": true,
+                            "hasItemTypesRef": false,
+                            "localId": "username",
+                            "name": "Username",
+                            "required": true,
+                            "type": "EmailType"
+                        },
+                        {
+                            "config": {
+                                "maxLength": 64,
+                                "minLength": 10
+                            },
+                            "description": "Password for the API",
+                            "hasCustomTypeRef": false,
+                            "hasItemTypesRef": false,
+                            "localId": "password",
+                            "name": "Password",
+                            "required": true,
+                            "type": "string"
+                        }
+                    ],
+                    "type": "track"
                 }
             ],
             "localId": "api_tracking",
             "name": "API Tracking"
         },
-        "updatedAt": "2025-06-25 07:00:05.432 +0000 UTC",
+        "updatedAt": "2025-07-21 07:59:40.797 +0000 UTC",
         "version": 1,
         "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
     },

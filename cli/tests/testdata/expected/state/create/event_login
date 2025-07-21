@@ -1,0 +1,27 @@
+{
+    "id": "login",
+    "type": "event",
+    "input": {
+        "categoryId": null,
+        "description": "This is a login event without a category",
+        "eventType": "track",
+        "name": "Login Event"
+    },
+    "output": {
+        "categoryId": null,
+        "createdAt": "2025-07-21 07:59:36.517 +0000 UTC",
+        "description": "This is a login event without a category",
+        "eventArgs": {
+            "categoryId": null,
+            "description": "This is a login event without a category",
+            "eventType": "track",
+            "name": "Login Event"
+        },
+        "eventType": "track",
+        "id": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
+        "name": "Login Event",
+        "updatedAt": "2025-07-21 07:59:36.517 +0000 UTC",
+        "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+    },
+    "dependencies": []
+}
