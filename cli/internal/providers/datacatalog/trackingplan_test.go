@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -644,7 +644,7 @@ func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
 				Name:             "prop2",
 				LocalID:          "prop-id-2",
 				Description:      "Custom type property",
-				Type:             "CustomType", // This would be the resolved value after dereferencing
+				Type:             "CustomType",
 				Required:         true,
 				HasCustomTypeRef: true,
 				HasItemTypesRef:  false,

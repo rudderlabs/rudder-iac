@@ -230,36 +230,33 @@ func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpser
 	for _, prop := range from.Properties {
 		propMap := make(map[string]any)
 
-		// Handle Type field based on HasCustomTypeRef flag
+		// Though the value is resolved, we need to create
+		// call to the schema a bit differently with / without custom types
+		// and hence we use the differentiator.
+		// PS: Will be removed once we migrate to the new API to update events on trackingplan.
 		if prop.HasCustomTypeRef {
-			// This is a custom type reference, use $ref format
-			// The Type has been dereferenced by the syncer to the actual name
-			typValue := fmt.Sprint(prop.Type)
-			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", typValue)
+			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", prop.Type)
 		} else {
-			// Regular type handling
-			typValue, ok := prop.Type.(string)
-			if !ok {
-				// If not a string but something else, convert to string
-				typValue = fmt.Sprint(prop.Type)
-			}
-
-			typ := lo.Map(strings.Split(typValue, ","), func(t string, _ int) string {
+			typ := lo.Map(strings.Split(prop.Type.(string), ","), func(t string, _ int) string {
 				return strings.TrimSpace(t)
 			})
 			propMap["type"] = typ
 		}
 
 		for k, v := range prop.Config {
-			if k == "itemTypes" && prop.HasItemTypesRef {
-				refValue := v.([]any)[0].(string)
-
-				propMap["items"] = map[string]any{
-					"$ref": fmt.Sprintf("#/$defs/%s", refValue),
-				}
-			} else if k == "itemTypes" {
-				propMap["items"] = map[string]interface{}{
-					"type": v,
+			// Similar to the type field, we need to create
+			// call to the schema with itemTypes a bit differently with / without custom types
+			// and hence we use the differentiator.
+			// PS: Will be removed once we migrate to the new API to update events on trackingplan.
+			if k == "itemTypes" {
+				if prop.HasItemTypesRef {
+					propMap["items"] = map[string]any{
+						"$ref": fmt.Sprintf("#/$defs/%s", v.([]any)[0].(string)),
+					}
+				} else {
+					propMap["items"] = map[string]any{
+						"type": v,
+					}
 				}
 			} else {
 				// Other config fields
