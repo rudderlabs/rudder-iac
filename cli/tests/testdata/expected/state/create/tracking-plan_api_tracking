@@ -131,10 +131,7 @@
                             "localId": "username",
                             "name": "Username",
                             "required": true,
-                            "type": {
-                                "$__rudderRef": "custom-type:email_type",
-                                "property": "name"
-                            }
+                            "type": "EmailType"
                         },
                         {
                             "config": {

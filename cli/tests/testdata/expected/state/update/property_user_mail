@@ -22,10 +22,7 @@
       "config": {},
       "description": "User's email address",
       "name": "User Email",
-      "type": {
-        "$__rudderRef": "custom-type:email_type",
-        "property": "name"
-      }
+      "type": "EmailType"
     },
     "type": "EmailType",
     "updatedAt": "2025-06-24 19:43:00.344 +0000 UTC",

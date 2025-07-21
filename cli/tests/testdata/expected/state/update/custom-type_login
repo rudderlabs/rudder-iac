@@ -37,18 +37,12 @@
       "properties": [
         {
           "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
-          "refToId": {
-            "$__rudderRef": "property:user_mail",
-            "property": "id"
-          },
+          "refToId": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
           "required": true
         },
         {
           "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
-          "refToId": {
-            "$__rudderRef": "property:password",
-            "property": "id"
-          },
+          "refToId": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
           "required": true
         }
       ],
