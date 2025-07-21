@@ -13,17 +13,7 @@
       "identitySection": "properties",
       "name": "API Tracking",
       "rules": {
-        "$defs": {
-          "EmailType": {
-            "format": "email",
-            "maxLength": 255,
-            "minLength": 10,
-            "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-            "type": [
-              "string"
-            ]
-          }
-        },
+        "$schema": "",
         "properties": {
           "properties": {
             "additionalProperties": false,
@@ -81,17 +71,7 @@
       "identitySection": "properties",
       "name": "Login Event",
       "rules": {
-        "$defs": {
-          "EmailType": {
-            "format": "email",
-            "maxLength": 255,
-            "minLength": 10,
-            "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-            "type": [
-              "string"
-            ]
-          }
-        },
+        "$schema": "",
         "properties": {
           "properties": {
             "additionalProperties": false,
@@ -124,6 +104,6 @@
   "id": "tp_2yzYAEjZTRyI156F8eDawGyA3nJ",
   "name": "API Tracking",
   "updatedAt": "2025-06-25T08:05:24.102Z",
-  "version": 2,
+  "version": 3,
   "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
 }

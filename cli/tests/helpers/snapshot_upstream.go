@@ -139,6 +139,13 @@ func (u *UpstreamSnapshotTester) upstreamEntity(ctx context.Context, entityID, e
 		}
 		v = customType
 
+	case datacatalog.CategoryResourceType:
+		category, err := u.dataCatalog.GetCategory(ctx, entityID)
+		if err != nil {
+			return nil, fmt.Errorf("calling GetCategory: %w", err)
+		}
+		v = category
+
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", entityType)
 	}

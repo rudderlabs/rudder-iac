@@ -301,7 +301,7 @@
             "name": "API Tracking"
         },
         "updatedAt": "2025-06-25 07:24:17.639 +0000 UTC",
-        "version": 6,
+        "version": 8,
         "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
     },
     "dependencies": []
