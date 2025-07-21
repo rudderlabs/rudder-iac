@@ -6,6 +6,7 @@
         "events": [
             {
                 "allowUnplanned": true,
+                "categoryId": null,
                 "description": "This event is triggered every time a user views a product.",
                 "identitySection": "",
                 "localId": "api_tracking",
@@ -71,6 +72,7 @@
             },
             {
                 "allowUnplanned": true,
+                "categoryId": null,
                 "description": "This event is triggered when an API error occurs.",
                 "identitySection": "",
                 "localId": "api_error",
@@ -166,6 +168,7 @@
             "events": [
                 {
                     "allowUnplanned": true,
+                    "categoryId": "",
                     "description": "This event is triggered every time a user views a product.",
                     "identitySection": "",
                     "localId": "api_tracking",
@@ -228,6 +231,7 @@
                 },
                 {
                     "allowUnplanned": true,
+                    "categoryId": "",
                     "description": "This event is triggered when an API error occurs.",
                     "identitySection": "",
                     "localId": "api_error",

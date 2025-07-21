@@ -6,6 +6,7 @@
         "events": [
             {
                 "allowUnplanned": false,
+                "categoryId": null,
                 "description": "This event is triggered every time a user views a product.",
                 "identitySection": "",
                 "localId": "api_tracking",
@@ -131,6 +132,7 @@
             "events": [
                 {
                     "allowUnplanned": false,
+                    "categoryId": "",
                     "description": "This event is triggered every time a user views a product.",
                     "identitySection": "",
                     "localId": "api_tracking",
