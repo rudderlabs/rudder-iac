@@ -12,11 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
-// Resource type constants for listing operations
-const (
-	RETLSourceListResourceType = "retl-source"
-)
-
 // Provider implements the provider interface for RETL resources
 type Provider struct {
 	client     retlClient.RETLStore
