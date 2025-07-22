@@ -41,6 +41,7 @@ type TPEvent struct {
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TPEventProperty
+	Variants        Variants
 }
 
 func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
@@ -67,6 +68,7 @@ type TPRule struct {
 	Event      *TPRuleEvent      `json:"event"`
 	Properties []*TPRuleProperty `json:"properties"`
 	Includes   *TPRuleIncludes   `json:"includes"`
+	Variants   Variants          `json:"variants,omitempty"`
 }
 
 type TPRuleEvent struct {
@@ -194,6 +196,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 		AllowUnplanned:  rule.Event.AllowUnplanned,
 		IdentitySection: rule.Event.IdentitySection,
 		Properties:      make([]*TPEventProperty, 0),
+		Variants:        rule.Variants,
 	}
 
 	// Load the properties from the data catalog
