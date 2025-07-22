@@ -19,6 +19,7 @@ var (
 type CatalogResourceFetcher interface {
 	Event(group, id string) *Event
 	Property(group, id string) *Property
+	Category(group, id string) *Category
 	TPEventRule(group, id string) *TPRule
 	TPEventRules(group string) ([]*TPRule, bool)
 }
@@ -37,6 +38,7 @@ type TPEvent struct {
 	Name            string
 	LocalID         string
 	Description     string
+	CategoryRef     *string
 	Type            string
 	AllowUnplanned  bool
 	IdentitySection string
@@ -186,10 +188,20 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 		return nil, fmt.Errorf("looking up event: %s in group: %s failed", eventID, eventGroup)
 	}
 
+	var categoryRef *string
+	if event.CategoryRef != nil {
+		catMatches := CategoryRegex.FindStringSubmatch(*event.CategoryRef)
+		if len(catMatches) != 3 {
+			return nil, fmt.Errorf("category ref: %s invalid as failed regex match", *event.CategoryRef)
+		}
+		categoryRef = event.CategoryRef
+	}
+
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
 		Description:     event.Description,
+		CategoryRef:     categoryRef,
 		Type:            event.Type,
 		AllowUnplanned:  rule.Event.AllowUnplanned,
 		IdentitySection: rule.Event.IdentitySection,

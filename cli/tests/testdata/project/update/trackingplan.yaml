@@ -36,3 +36,14 @@ spec:
           required: false
         - $ref: "#/properties/api_tracking/error_code"
           required: true
+
+    - type: "event_rule"
+      id: "login_event"
+      event:
+        $ref: "#/events/api_tracking/login"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/api_tracking/user_mail"
+          required: true
+        - $ref: "#/properties/api_tracking/password"
+          required: true
