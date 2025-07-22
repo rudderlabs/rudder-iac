@@ -105,6 +105,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 				{
 					"name":            "event",
 					"localId":         "event-id",
+					"categoryId":      "",
 					"description":     "event-description",
 					"type":            "event-type",
 					"allowUnplanned":  false,
@@ -212,6 +213,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 				{
 					"name":            "event",
 					"localId":         "event-id",
+					"categoryId":      "",
 					"description":     "event-description",
 					"type":            "event-type",
 					"allowUnplanned":  false,
@@ -318,6 +320,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 				{
 					"name":            "event-1",
 					"localId":         "event-id-1",
+					"categoryId":      "",
 					"description":     "event-description-1",
 					"type":            "event-type-1",
 					"allowUnplanned":  true,
@@ -527,6 +530,7 @@ func getTrackingPlanArgs() *state.TrackingPlanArgs {
 		Type:           "event-type",
 		Description:    "event-description",
 		AllowUnplanned: false,
+		CategoryId:     nil,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
 				Name:        "property",
