@@ -68,10 +68,15 @@ func verifyState(t *testing.T, dir string) {
 			"output.events[0].id",
 			"output.events[1].eventId",
 			"output.events[1].id",
+			"output.events[2].eventId",
+			"output.events[2].id",
 			"output.customTypeArgs.properties[0].id",
 			"output.customTypeArgs.properties[0].refToId",
 			"output.customTypeArgs.properties[1].id",
 			"output.customTypeArgs.properties[1].refToId",
+			"output.trackingPlanArgs.events[0].categoryId",
+			"output.trackingPlanArgs.events[1].categoryId",
+			"output.trackingPlanArgs.events[2].categoryId",
 		},
 	)
 
@@ -110,6 +115,13 @@ func verifyState(t *testing.T, dir string) {
 			"events[1].createdBy",
 			"events[1].updatedBy",
 			"events[1].categoryId",
+			"events[2].id",
+			"events[2].createdAt",
+			"events[2].updatedAt",
+			"events[2].workspaceId",
+			"events[2].createdBy",
+			"events[2].updatedBy",
+			"events[2].categoryId",
 		},
 	)
 	err = upstreamTester.SnapshotTest(context.Background())

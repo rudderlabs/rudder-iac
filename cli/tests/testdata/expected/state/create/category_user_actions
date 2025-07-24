@@ -1,0 +1,18 @@
+{
+    "id": "user_actions",
+    "type": "category",
+    "input": {
+        "name": "User Actions"
+    },
+    "output": {
+        "categoryArgs": {
+            "name": "User Actions"
+        },
+        "createdAt": "2025-07-21 07:59:30.149 +0000 UTC",
+        "id": "cat_30AyesbRSrc2o9me6qIL4z8ItIv",
+        "name": "User Actions",
+        "updatedAt": "2025-07-21 07:59:30.149 +0000 UTC",
+        "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+    },
+    "dependencies": []
+}

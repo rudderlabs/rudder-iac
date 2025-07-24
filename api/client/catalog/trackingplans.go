@@ -38,6 +38,7 @@ type TrackingPlanUpsertEventContextTraitsIdentity struct {
 type TrackingPlanUpsertEvent struct {
 	Name            string                       `json:"name"`
 	Description     string                       `json:"description"`
+	CategoryId      *string                      `json:"categoryId,omitempty"`
 	EventType       string                       `json:"eventType"`
 	IdentitySection string                       `json:"identitySection"`
 	Rules           TrackingPlanUpsertEventRules `json:"rules"`

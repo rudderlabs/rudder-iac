@@ -4,7 +4,7 @@
   "description": "Tracking plan for an e-commerce application.",
   "events": [
     {
-      "categoryId": null,
+      "categoryId": "some-category-id",
       "createdAt": "2025-06-25T08:11:58.411Z",
       "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "description": "This event is triggered when an API error occurs.",
@@ -128,11 +128,50 @@
       "updatedAt": "2025-06-25T08:11:46.632Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
-    }
+    },
+    {
+      "categoryId": "some-other-category-id",
+      "createdAt": "2025-07-21T20:57:35.878Z",
+      "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "description": "This is a login event",
+      "eventType": "track",
+      "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
+      "identitySection": "properties",
+      "name": "Login Event",
+      "rules": {
+          "$schema": "",
+          "properties": {
+              "properties": {
+                  "additionalProperties": false,
+                  "properties": {
+                      "Password": {
+                          "maxLength": 64,
+                          "minLength": 10,
+                          "type": [
+                              "string"
+                          ]
+                      },
+                      "User Email": {
+                          "$ref": "#/$defs/EmailType"
+                      }
+                  },
+                  "required": [
+                      "Password", 
+                      "User Email"
+                  ],
+                  "type": "object"
+              }
+          },
+          "type": "object"
+      },
+      "updatedAt": "2025-07-21T20:59:56.665Z",
+      "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
+  }
   ],
   "id": "tp_2yzYwMQquIHaXUOOYP5FCHXfUYU",
   "name": "API Tracking",
   "updatedAt": "2025-06-25T08:12:08.151Z",
-  "version": 6,
+  "version": 8,
   "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
 }

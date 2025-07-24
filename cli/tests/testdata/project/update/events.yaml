@@ -13,3 +13,10 @@ spec:
     name: "API Error"
     event_type: "track"
     description: "This event is triggered when an API error occurs." 
+    category: "#/categories/app_categories/admin_actions"
+
+  - id: "login"
+    name: "Login Event"
+    event_type: "track"
+    description: "This is a login event"
+    category: "#/categories/app_categories/user_actions"

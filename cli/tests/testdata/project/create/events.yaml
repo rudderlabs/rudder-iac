@@ -8,3 +8,8 @@ spec:
     name: "API Tracking"
     event_type: "track"
     description: "This event is triggered every time a user views a product." 
+    category: "#/categories/app_categories/user_actions"
+  - id: "login"
+    name: "Login Event"
+    event_type: "track"
+    description: "This is a login event without a category"

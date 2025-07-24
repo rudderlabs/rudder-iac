@@ -5,11 +5,11 @@
   "events": [
     {
       "categoryId": null,
-      "createdAt": "2025-06-25T08:05:17.129Z",
+      "createdAt": "2025-07-21T09:09:49.990Z",
       "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "description": "This event is triggered every time a user views a product.",
       "eventType": "track",
-      "id": "ev_2yzY9ZsFLG3HBB1X0jebuOPb0cC",
+      "id": "ev_30B7DBoeJPEMamGNLstEqsuIHaJ",
       "identitySection": "properties",
       "name": "API Tracking",
       "rules": {
@@ -22,7 +22,7 @@
                 "enum": [
                   "GET",
                   "PUT",
-                  "POST",
+                  "POST", 
                   "DELETE",
                   "PATCH"
                 ],
@@ -57,14 +57,53 @@
         },
         "type": "object"
       },
-      "updatedAt": "2025-06-25T08:05:24.102Z",
+      "updatedAt": "2025-07-21T09:09:56.070Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
+    },
+    {
+      "categoryId": null,
+      "createdAt": "2025-07-21T09:09:51.019Z",
+      "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "description": "This is a login event without a category",
+      "eventType": "track",
+      "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eS",
+      "identitySection": "properties",
+      "name": "Login Event",
+      "rules": {
+        "$schema": "",
+        "properties": {
+          "properties": {
+            "additionalProperties": false,
+            "properties": {
+              "Password": {
+                "maxLength": 64,
+                "minLength": 10,
+                "type": [
+                  "string"
+                ]
+              },
+              "Username": {
+                "$ref": "#/$defs/EmailType"
+              }
+            },
+            "required": [
+              "Password",
+              "Username"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "updatedAt": "2025-07-21T09:09:56.892Z",
+      "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
     }
   ],
   "id": "tp_2yzYAEjZTRyI156F8eDawGyA3nJ",
   "name": "API Tracking",
   "updatedAt": "2025-06-25T08:05:24.102Z",
-  "version": 2,
+  "version": 3,
   "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
 }
