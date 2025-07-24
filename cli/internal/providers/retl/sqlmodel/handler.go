@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -213,6 +214,48 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 	}
 
 	return resourceData, nil
+}
+
+func (h *Handler) Import(ctx context.Context, args importutils.ImportArgs) ([]importutils.ImportData, error) {
+	// First, get all sources to find the one we want to import
+	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
+	if err != nil {
+		return nil, fmt.Errorf("getting RETL source for import: %w", err)
+	}
+	// Validate that this is a SQL model source
+	if source.SourceType != retlClient.ModelSourceType {
+		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
+	}
+
+	// Create the base resource data structure for the imported source
+	importedData := resources.ResourceData{
+		IDKey:               args.LocalID,
+		DisplayNameKey:      source.Name,
+		DescriptionKey:      source.Config.Description,
+		AccountIDKey:        source.AccountID,
+		PrimaryKeyKey:       source.Config.PrimaryKey,
+		SourceDefinitionKey: source.SourceDefinitionName,
+		EnabledKey:          source.IsEnabled,
+		SQLKey:              source.Config.Sql,
+	}
+
+	importData := importutils.ImportData{
+		ResourceData: &importedData,
+		Metadata: map[string]interface{}{
+			"name":      args.LocalID,
+			"workspace": args.WorkspaceID,
+			"import": []struct {
+				LocalID  string `yaml:"local_id"`
+				RemoteID string `yaml:"remote_id"`
+			}{
+				{
+					LocalID:  args.LocalID,
+					RemoteID: args.RemoteID,
+				},
+			},
+		},
+	}
+	return []importutils.ImportData{importData}, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {

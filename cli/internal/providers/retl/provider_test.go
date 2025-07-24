@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -114,6 +115,22 @@ func newDefaultMockClient() *mockRETLStore {
 		},
 		deleteRetlSourceFunc: func(ctx context.Context, id string) error {
 			return nil
+		},
+		getRetlSourceFunc: func(ctx context.Context, id string) (*retlClient.RETLSource, error) {
+
+			if id == "remote-id-not-found" {
+				return nil, fmt.Errorf("retl source not found")
+			}
+
+			return &retlClient.RETLSource{
+				ID:                   "remote-id",
+				Name:                 "Imported Model",
+				SourceType:           retlClient.ModelSourceType,
+				SourceDefinitionName: "postgres",
+				AccountID:            "acc123",
+				IsEnabled:            true,
+				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+			}, nil
 		},
 	}
 }
@@ -516,6 +533,50 @@ func TestProvider(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("Import", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("Success", func(t *testing.T) {
+			provider := retl.New(newDefaultMockClient())
+
+			args := importutils.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			results, err := provider.Import(context.Background(), sqlmodel.ResourceType, args)
+			assert.NoError(t, err)
+			assert.Len(t, results, 1)
+			imported := results[0]
+			assert.Equal(t, "local-id", (*imported.ResourceData)[sqlmodel.IDKey])
+			assert.Equal(t, "Imported Model", (*imported.ResourceData)[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc", (*imported.ResourceData)[sqlmodel.DescriptionKey])
+			assert.Equal(t, "id", (*imported.ResourceData)[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM t", (*imported.ResourceData)[sqlmodel.SQLKey])
+			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
+			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
+			assert.Equal(t, "local-id", imported.Metadata["name"])
+			assert.Equal(t, "ws-1", imported.Metadata["workspace"])
+		})
+
+		t.Run("Unsupported resource type", func(t *testing.T) {
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
+			args := importutils.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			results, err := provider.Import(context.Background(), "unsupported-type", args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "import is only supported for SQL models")
+		})
+
+		t.Run("Handler error", func(t *testing.T) {
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
+			args := importutils.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id", WorkspaceID: "ws-1"}
+			results, err := provider.Import(context.Background(), sqlmodel.ResourceType, args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "getting RETL source for import")
+		})
 	})
 }
 
