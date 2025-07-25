@@ -11,6 +11,7 @@ func NewCmdWorkspace() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewCmdAccounts())
+	cmd.AddCommand(NewCmdRetlSource())
 
 	return cmd
 }

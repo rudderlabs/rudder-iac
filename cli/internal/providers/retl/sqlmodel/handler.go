@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -184,6 +185,34 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 	}
 
 	return nil
+}
+
+func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
+	sources, err := h.client.ListRetlSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing RETL sources: %w", err)
+	}
+	re := regexp.MustCompile(`\s+`)
+	var resourceData []resources.ResourceData
+	for _, source := range sources.Data {
+		// Replace newlines with spaces and collapse multiple spaces into one
+		sql := re.ReplaceAllString(source.Config.Sql, " ")
+		resourceData = append(resourceData, resources.ResourceData{
+			IDKey:               source.ID,
+			"name":              source.Name,
+			AccountIDKey:        source.AccountID,
+			SourceDefinitionKey: source.SourceDefinitionName,
+			CreatedAtKey:        source.CreatedAt,
+			UpdatedAtKey:        source.UpdatedAt,
+			"config": map[string]interface{}{
+				PrimaryKeyKey:  source.Config.PrimaryKey,
+				SQLKey:         sql,
+				DescriptionKey: source.Config.Description,
+			},
+		})
+	}
+
+	return resourceData, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {

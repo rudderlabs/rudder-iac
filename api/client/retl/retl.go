@@ -35,7 +35,7 @@ type RETLSourceStore interface {
 	// GetRetlSource retrieves a RETL source by ID
 	GetRetlSource(ctx context.Context, id string) (*RETLSource, error)
 
-	// ListRetlSources lists all RETL sources with pagination
+	// ListRetlSources lists all RETL sources
 	ListRetlSources(ctx context.Context) (*RETLSources, error)
 }
 
