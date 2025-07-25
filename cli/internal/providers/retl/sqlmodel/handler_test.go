@@ -1087,8 +1087,10 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
 			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
 			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
-			assert.Equal(t, "local-id", imported.Metadata["name"])
-			assert.Equal(t, "ws-1", imported.Metadata["workspace"])
+			assert.Equal(t, "local-id", imported.Metadata.Name)
+			assert.Equal(t, "ws-1", imported.Metadata.WorkspaceID)
+			assert.Equal(t, "remote-id", imported.Metadata.ImportIds[0].RemoteID)
+			assert.Equal(t, "local-id", imported.Metadata.ImportIds[0].LocalID)
 		})
 
 		t.Run("Non-SQL-model type", func(t *testing.T) {

@@ -239,21 +239,17 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		SQLKey:              source.Config.Sql,
 	}
 
+	importMetadata := importremote.ImportMetadata{
+		WorkspaceID: args.WorkspaceID,
+		Name:        args.LocalID,
+		ImportIds: []importremote.ImportIds{
+			{LocalID: args.LocalID, RemoteID: args.RemoteID},
+		},
+	}
+
 	importData := importremote.ImportData{
 		ResourceData: &importedData,
-		Metadata: map[string]interface{}{
-			"name":      args.LocalID,
-			"workspace": args.WorkspaceID,
-			"import": []struct {
-				LocalID  string `yaml:"local_id"`
-				RemoteID string `yaml:"remote_id"`
-			}{
-				{
-					LocalID:  args.LocalID,
-					RemoteID: args.RemoteID,
-				},
-			},
-		},
+		Metadata:     importMetadata,
 	}
 	return []importremote.ImportData{importData}, nil
 }
