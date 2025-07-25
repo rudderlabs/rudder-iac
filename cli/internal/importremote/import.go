@@ -49,14 +49,14 @@ func Import(ctx context.Context, resourceType string, resources []ImportData, lo
 		if err != nil {
 			return err
 		}
-    
+
 		spec := &specs.Spec{
 			Version:  CLIVersion,
 			Kind:     resourceType,
 			Metadata: metadata,
 			Spec:     *resourceData.ResourceData,
 		}
-    
+
 		// write spec to file
 		specYAML, err := yaml.Marshal(spec)
 		if err != nil {
