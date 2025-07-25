@@ -30,7 +30,6 @@ type ImportMetadata struct {
 type ImportData struct {
 	ResourceData *resources.ResourceData
 	Metadata     ImportMetadata
-}
 
 type ImportProvider interface {
 	Import(ctx context.Context, resourceType string, args ImportArgs) ([]ImportData, error)
