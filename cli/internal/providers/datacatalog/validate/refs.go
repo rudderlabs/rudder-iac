@@ -19,12 +19,11 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 
 	errs := make([]ValidationError, 0)
 
-	// Validate tracking plan references
-	for _, tp := range dc.TrackingPlans {
+	for group, tp := range dc.TrackingPlans {
 		for _, rule := range tp.Rules {
 			errs = append(
 				errs,
-				rv.handleRefs(rule, dc)...,
+				rv.handleRefs(rule, fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID), dc)...,
 			)
 		}
 	}
@@ -32,13 +31,11 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	// Validate custom type references
 	for group, customTypes := range dc.CustomTypes {
 		for _, customType := range customTypes {
-			// Only object types with properties need validation
-			if customType.Type == "object" && len(customType.Properties) > 0 {
+			if customType.Type == "object" {
 				reference := fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID)
 
+				// Step 1: Validate references in custom type properties
 				for i, prop := range customType.Properties {
-
-					// Validate property reference format
 					matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
 					if len(matches) != 3 {
 						errs = append(errs, ValidationError{
@@ -48,7 +45,6 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 						continue
 					}
 
-					// Validate property existence
 					groupName, propID := matches[1], matches[2]
 					if property := dc.Property(groupName, propID); property == nil {
 						errs = append(errs, ValidationError{
@@ -57,6 +53,11 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 						})
 					}
 				}
+
+				// Step 2: Validate references in custom type variants
+				errs = append(
+					errs,
+					rv.validateVariantsReferences(customType.Variants, reference, dc)...)
 			}
 		}
 	}
@@ -156,7 +157,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	return errs
 }
 
-func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.CatalogResourceFetcher) []ValidationError {
+func (rv *RefValidator) handleRefs(rule *catalog.TPRule, baseReference string, fetcher catalog.CatalogResourceFetcher) []ValidationError {
 	errs := make([]ValidationError, 0)
 
 	if rule.Event != nil {
@@ -218,6 +219,77 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, fetcher catalog.Catalog
 						error:     fmt.Errorf("no event rule found from reference"),
 					})
 				}
+			}
+		}
+	}
+
+	if rule.Variants != nil {
+		errs = append(
+			errs,
+			rv.validateVariantsReferences(
+				rule.Variants,
+				fmt.Sprintf("%s/rules/%s", baseReference, rule.LocalID),
+				fetcher,
+			)...,
+		)
+	}
+
+	return errs
+}
+
+func (rv *RefValidator) validateVariantsReferences(
+	variants catalog.Variants,
+	reference string,
+	fetcher catalog.CatalogResourceFetcher,
+) []ValidationError {
+	errs := make([]ValidationError, 0)
+
+	for idx, variant := range variants {
+		variantReference := fmt.Sprintf("%s/variants[%d]", reference, idx)
+
+		for idx, variantCase := range variant.Cases {
+			caseReference := fmt.Sprintf("%s/cases[%d]", variantReference, idx)
+
+			for idx, propRef := range variantCase.Properties {
+				propReference := fmt.Sprintf("%s/properties[%d]", caseReference, idx)
+
+				matches := catalog.PropRegex.FindStringSubmatch(propRef.Ref)
+				if len(matches) != 3 {
+					errs = append(errs, ValidationError{
+						Reference: propReference,
+						error:     fmt.Errorf("property reference has invalid format. Should be '#/properties/<group>/<id>'"),
+					})
+					continue
+				}
+
+				group, propID := matches[1], matches[2]
+				if property := fetcher.Property(group, propID); property == nil {
+					errs = append(errs, ValidationError{
+						Reference: propReference,
+						error:     fmt.Errorf("property reference '%s' not found in catalog", propRef.Ref),
+					})
+				}
+			}
+		}
+
+		for idx, propRef := range variant.Default {
+			defaultReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, idx)
+
+			matches := catalog.PropRegex.FindStringSubmatch(propRef.Ref)
+			if len(matches) != 3 {
+				errs = append(errs, ValidationError{
+					Reference: defaultReference,
+					error:     fmt.Errorf("default property reference has invalid format. Should be '#/properties/<group>/<id>'"),
+				})
+				continue
+			}
+
+			group, propID := matches[1], matches[2]
+			if property := fetcher.Property(group, propID); property == nil {
+				errs = append(errs, ValidationError{
+					Reference: defaultReference,
+					error:     fmt.Errorf("default property reference '%s' not found in catalog", propRef.Ref),
+				})
 			}
 		}
 	}
