@@ -145,6 +145,14 @@ func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType 
 	return provider.Delete(ctx, ID, resourceType, state)
 }
 
+func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
+	provider := p.providerForType(resourceType)
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
+	}
+	return provider.Import(ctx, ID, resourceType, data, metadata)
+}
+
 // Helper methods
 func (p *CompositeProvider) providerForKind(kind string) project.Provider {
 	return p.registeredKinds[kind]

@@ -26,6 +26,7 @@ type ImportMetadata struct {
 	Name        string      `yaml:"name" mapstructure:"name"`
 	ImportIds   []ImportIds `yaml:"import_ids" mapstructure:"import_ids"`
 }
+
 type ImportData struct {
 	ResourceData *resources.ResourceData
 	Metadata     ImportMetadata
@@ -43,7 +44,6 @@ type ImportArgs struct {
 
 func Import(ctx context.Context, resourceType string, resources []ImportData, location string) error {
 	for _, resourceData := range resources {
-
 		metadata := make(map[string]interface{})
 		err := mapstructure.Decode(resourceData.Metadata, &metadata)
 		if err != nil {

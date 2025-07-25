@@ -3,6 +3,7 @@ package importcmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -106,7 +107,10 @@ func NewCmdRetlSource() *cobra.Command {
 					if err != nil {
 						return fmt.Errorf("writing SQL file: %w", err)
 					}
-					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", sqlLocation, localID)
+
+					relativeSqlLocation := strings.TrimPrefix(sqlLocation, location)
+					relativeSqlLocation = strings.TrimLeft(relativeSqlLocation, "/")
+					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relativeSqlLocation, localID)
 					delete(resourceData, sqlmodel.SQLKey)
 				}
 			}

@@ -18,6 +18,7 @@ const (
 	Create OperationType = iota
 	Update
 	Delete
+	Import
 )
 
 type Operation struct {
@@ -37,6 +38,8 @@ func (t *OperationType) String() string {
 		return "Update"
 	case Delete:
 		return "Delete"
+	case Import:
+		return "Import"
 	default:
 		return "Unknown"
 	}
@@ -61,6 +64,12 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
 		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
+	}
+
+	sortedImport := sortByDependencies(diff.ImportResources, target)
+	for _, urn := range sortedImport {
+		resource, _ := target.GetResource(urn)
+		plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
 	}
 
 	updatedURNs := make([]string, 0, len(diff.UpdatedResources))

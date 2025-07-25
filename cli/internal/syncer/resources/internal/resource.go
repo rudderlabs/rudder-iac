@@ -6,4 +6,6 @@ type Resource struct {
 	Type         string
 	Data         map[string]interface{}
 	Dependencies []string
+
+	ImportMetadata map[string]interface{}
 }
