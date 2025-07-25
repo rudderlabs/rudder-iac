@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -77,6 +77,11 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		Enabled:          spec.Enabled,
 		SQL:              sqlStr,
 	}
+
+	if len(s.Metadata) > 0 {
+		h.resources[spec.ID].ImportMetadata = s.Metadata
+	}
+
 	return nil
 }
 
@@ -107,12 +112,18 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			SQLKey:              spec.SQL,
 		}
 
+		var metadata map[string]interface{}
+		if len(spec.ImportMetadata) > 0 {
+			metadata = spec.ImportMetadata
+		}
+
 		// Create resource with SQL Model resource type
-		resource := resources.NewResource(
+		resource := resources.NewResourceWithImportMetadata(
 			spec.ID,
 			ResourceType,
 			data,
 			[]string{}, // No dependencies for now
+			metadata,
 		)
 
 		result = append(result, resource)
@@ -144,6 +155,24 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	return toResourceData(resp), nil
 }
 
+func (h *Handler) createCall(ctx context.Context, data resources.ResourceData) (*resources.ResourceData, error) {
+	source := &retlClient.RETLSourceCreateRequest{
+		Name:                 data[DisplayNameKey].(string),
+		Config:               toRETLSQLModelConfig(data),
+		SourceType:           retlClient.ModelSourceType,
+		SourceDefinitionName: data[SourceDefinitionKey].(string),
+		AccountID:            data[AccountIDKey].(string),
+	}
+
+	// Call API to create RETL source
+	resp, err := h.client.CreateRetlSource(ctx, source)
+	if err != nil {
+		return nil, fmt.Errorf("creating RETL source: %w", err)
+	}
+
+	return toResourceData(resp), nil
+}
+
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
@@ -156,6 +185,10 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("source definition name cannot be changed")
 	}
 
+	return h.updateCall(ctx, sourceID, data)
+}
+
+func (h *Handler) updateCall(ctx context.Context, sourceID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name:      data[DisplayNameKey].(string),
 		Config:    toRETLSQLModelConfig(data),
@@ -216,7 +249,24 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 	return resourceData, nil
 }
 
-func (h *Handler) Import(ctx context.Context, args importutils.ImportArgs) ([]importutils.ImportData, error) {
+func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
+	importData := &importremote.ImportMetadata{}
+	if err := mapstructure.Decode(metadata, importData); err != nil {
+		return nil, fmt.Errorf("decoding import metadata: %w", err)
+	}
+	if len(importData.ImportIds) == 0 {
+		return nil, fmt.Errorf("import metadata is required")
+	}
+	remoteID := importData.ImportIds[0].RemoteID
+	_, err := h.client.GetRetlSource(ctx, remoteID)
+	if err == nil {
+		return h.updateCall(ctx, remoteID, data)
+	}
+
+	return h.createCall(ctx, data)
+}
+
+func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
 	// First, get all sources to find the one we want to import
 	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
 	if err != nil {
@@ -239,23 +289,19 @@ func (h *Handler) Import(ctx context.Context, args importutils.ImportArgs) ([]im
 		SQLKey:              source.Config.Sql,
 	}
 
-	importData := importutils.ImportData{
-		ResourceData: &importedData,
-		Metadata: map[string]interface{}{
-			"name":      args.LocalID,
-			"workspace": args.WorkspaceID,
-			"import": []struct {
-				LocalID  string `yaml:"local_id"`
-				RemoteID string `yaml:"remote_id"`
-			}{
-				{
-					LocalID:  args.LocalID,
-					RemoteID: args.RemoteID,
-				},
-			},
+	importMetadata := importremote.ImportMetadata{
+		WorkspaceID: args.WorkspaceID,
+		Name:        args.LocalID,
+		ImportIds: []importremote.ImportIds{
+			{LocalID: args.LocalID, RemoteID: args.RemoteID},
 		},
 	}
-	return []importutils.ImportData{importData}, nil
+
+	importData := importremote.ImportData{
+		ResourceData: &importedData,
+		Metadata:     importMetadata,
+	}
+	return []importremote.ImportData{importData}, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {

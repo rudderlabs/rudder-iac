@@ -73,6 +73,8 @@ type SQLModelResource struct {
 	PrimaryKey       string `json:"primary_key"`
 	SourceDefinition string `json:"source_definition"`
 	Enabled          bool   `json:"enabled"`
+
+	ImportMetadata map[string]interface{} `json:"import_metadata,omitempty"`
 }
 
 // ValidateSQLModelResource validates a SQL Model resource

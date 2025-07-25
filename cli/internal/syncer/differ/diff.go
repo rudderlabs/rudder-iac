@@ -21,6 +21,8 @@ type Diff struct {
 	RemovedResources []string
 	// UnmodifiedResources contains URNs of resources that exist in both graphs with identical data
 	UnmodifiedResources []string
+	// ImportResources contains URNs of resources that are imported
+	ImportResources []string
 }
 
 type ResourceDiff struct {
@@ -42,6 +44,7 @@ type PropertyDiff struct {
 // - Unmodified resources are resources that exist in both with identical data
 func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 	newResources := []string{}
+	importResources := []string{}
 	removedResources := []string{}
 	updatedResources := map[string]ResourceDiff{}
 	unmodifiedResources := []string{}
@@ -49,8 +52,14 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 	// Iterate over target resources to find new and updated resources
 	for urn, r := range target.Resources() {
 		if sourceResource, exists := source.GetResource(urn); !exists {
-			// Resource is new if it doesn't exist in the source
-			newResources = append(newResources, urn)
+			metadata := r.ImportMetadata()
+			if _, ok := metadata["import_ids"]; ok {
+				// Resource is import if it has import_metadata
+				importResources = append(importResources, urn)
+			} else {
+				// Resource is new if it doesn't exist in the source
+				newResources = append(newResources, urn)
+			}
 		} else {
 			// Check if resource is updated or unmodified
 			propertyDiffs := CompareData(sourceResource.Data(), r.Data())
@@ -75,6 +84,7 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 		UpdatedResources:    updatedResources,
 		RemovedResources:    removedResources,
 		UnmodifiedResources: unmodifiedResources,
+		ImportResources:     importResources,
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -90,7 +90,7 @@ func NewCmdRetlSource() *cobra.Command {
 				return fmt.Errorf("failed to cast RETL provider")
 			}
 
-			resources, err := retlProvider.Import(cmd.Context(), sqlmodel.ResourceType, importutils.ImportArgs{
+			resources, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, importremote.ImportArgs{
 				RemoteID:    remoteID,
 				LocalID:     localID,
 				WorkspaceID: workspaceID,
@@ -112,7 +112,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			// Perform the import
-			err = importutils.Import(cmd.Context(), sqlmodel.ResourceType, resources, location)
+			err = importremote.Import(cmd.Context(), sqlmodel.ResourceType, resources, location)
 			if err != nil {
 				return fmt.Errorf("importing RETL SQL Model: %w", err)
 			}

@@ -105,3 +105,7 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 	}
 	return provider.Delete(ctx, ID, state)
 }
+
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
+	return nil, fmt.Errorf("import is not supported for %s", resourceType)
+}
