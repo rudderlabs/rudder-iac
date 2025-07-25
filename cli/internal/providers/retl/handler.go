@@ -3,7 +3,7 @@ package retl
 import (
 	"context"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -50,6 +50,5 @@ type resourceHandler interface {
 	// This method fetches a remote resource by remoteID and prepares it for local import
 	// with the specified localID. The workspaceID is used for proper resource scoping.
 	// Returns the resource data with import metadata or an error if import fails.
-	Import(ctx context.Context, args importutils.ImportArgs) ([]importutils.ImportData, error)
-
+	FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error)
 }

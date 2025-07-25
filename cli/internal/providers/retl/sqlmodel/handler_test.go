@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -1070,12 +1070,12 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			}
 
-			args := importutils.ImportArgs{
+			args := importremote.ImportArgs{
 				RemoteID:    "remote-id",
 				LocalID:     "local-id",
 				WorkspaceID: "ws-1",
 			}
-			results, err := handler.Import(context.Background(), args)
+			results, err := handler.FetchImportData(context.Background(), args)
 			assert.NoError(t, err)
 			assert.Len(t, results, 1)
 			imported := results[0]
@@ -1103,8 +1103,8 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			}
 
-			args := importutils.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
-			results, err := handler.Import(context.Background(), args)
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "is not a SQL model")
@@ -1119,8 +1119,8 @@ func TestSQLModelHandler(t *testing.T) {
 				return nil, fmt.Errorf("api error")
 			}
 
-			args := importutils.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
-			results, err := handler.Import(context.Background(), args)
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
