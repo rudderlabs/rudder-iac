@@ -8,7 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 )
 
-//go:embed templates/main.kt.tmpl
+//go:embed templates/Main.kt.tmpl
 var kotlinTemplate string
 
 //go:embed templates/typealias.tmpl
