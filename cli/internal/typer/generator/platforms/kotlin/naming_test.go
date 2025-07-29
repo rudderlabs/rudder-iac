@@ -3,7 +3,7 @@ package kotlin_test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/kotlin"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/stretchr/testify/assert"
 )
 
