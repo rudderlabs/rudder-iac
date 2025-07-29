@@ -91,6 +91,10 @@ type CustomType struct {
 	Schema      ObjectSchema  `json:"schema,omitempty"`
 }
 
+func (c *CustomType) IsPrimitive() bool {
+	return c.Type != PrimitiveTypeObject
+}
+
 /*
  * Event Rule related types
  */

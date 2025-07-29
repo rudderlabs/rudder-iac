@@ -11,8 +11,17 @@ import (
 //go:embed templates/main.kt.tmpl
 var kotlinTemplate string
 
-func GenerateFile(path string, t string, ctx *RootContext) (*core.File, error) {
-	tmpl, err := template.New("kotlin").Parse(t)
+//go:embed templates/typealias.tmpl
+var typealiasTemplate string
+
+func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
+	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse and add sub-templates
+	_, err = tmpl.New("typealias.tmpl").Parse(typealiasTemplate)
 	if err != nil {
 		return nil, err
 	}
