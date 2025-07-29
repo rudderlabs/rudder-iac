@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"testing"
 
+	"os"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +24,17 @@ func TestGenerate(t *testing.T) {
 	assert.Len(t, files, 1)
 	assert.NotNil(t, files[0])
 	assert.Equal(t, "Main.kt", files[0].Path)
-	assert.Contains(t, files[0].Content, mainContents)
+
+	content := files[0].Content
+
+	// Create a preview file with the generated content to see the actual output
+	err = os.MkdirAll("output", 0755)
+	if err == nil {
+		_ = os.WriteFile("output/Generated_Main.kt", []byte(content), 0644)
+	}
+
+	// Verify the file contains expected content from testdata
+	assert.Contains(t, content, mainContents)
 }
 
 // createTestTrackingPlan creates a tracking plan with various primitive custom types for testing
