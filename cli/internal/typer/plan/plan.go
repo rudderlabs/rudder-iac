@@ -96,6 +96,10 @@ func (c *CustomType) IsPrimitive() bool {
 	return c.Type != PrimitiveTypeObject
 }
 
+func (c *CustomType) IsPrimitive() bool {
+	return c.Type != PrimitiveTypeObject
+}
+
 /*
  * Event Rule related types
  */

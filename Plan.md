@@ -4,47 +4,56 @@
 
 This implementation plan provides a phased approach for building RudderTyper 2.0, a code generation system that transforms tracking plans into platform-specific RudderAnalytics bindings. Each phase introduces incremental functionality and includes working tests to validate the implementation.
 
-## Phase 1: Basic Infrastructure + Type Aliases
+## Phase 1: Basic Infrastructure + Type Aliases - COMPLETED ✅
 
 **Goal**: Generate Kotlin type aliases for primitive custom types
 
 ### Core Infrastructure
 
-- [ ] **Plan Models** (`cli/internal/typer/plan/`):
-  - [ ] Create simple test tracking plan with primitive custom types only
-- [ ] **Name Registry** (`cli/internal/typer/generator/core/`):
-  - [ ] Create `name_registry.go` with basic implementation
-  - [ ] Define `CollisionHandler` function type: `func(name string, existingNames []string) string`
-  - [ ] Implement basic `NameRegistry` struct with `RegisterName()` method
-- [ ] **Generator Core** (`cli/internal/typer/generator/`):
-  - [ ] Define basic `GeneratorStrategy` interface
-  - [ ] Update existing `core.File` struct if needed
+- [x] **Plan Models** (`cli/internal/typer/plan/`):
+  - [x] Already exists with basic structure
+- [x] **Name Registry** (`cli/internal/typer/generator/core/`):
+  - [x] Create `name_registry.go` with basic implementation
+  - [x] Define `CollisionHandler` function type: `func(name string, existingNames []string) string`
+  - [x] Implement basic `NameRegistry` struct with `RegisterName()` method with error handling
+  - [x] Create comprehensive tests for NameRegistry
+- [x] **Generator Core** (`cli/internal/typer/generator/core/`):
+  - [x] Create formatting utilities: `ToPascalCase`, `ToCamelCase`, `SplitIntoWords`
+  - [x] Create comprehensive tests for formatting utilities
+- [x] **Generator Core** (`cli/internal/typer/generator/core/`):
+  - [x] Define basic `GeneratorStrategy` interface
+  - [x] Define `File` struct for generated files
+  - [x] Define `GeneratorOptions` for configuration
 
 ### Kotlin Type Alias Generation
 
-- [ ] **Context Types** (`cli/internal/typer/generator/kotlin/context.go`):
-  - [ ] Define `KotlinTypeAlias` struct with Alias, Comment, Type fields
-  - [ ] Define basic `KotlinContext` with TypeAliases slice
-- [ ] **Name Handling** (`cli/internal/typer/generator/kotlin/naming.go`):
-  - [ ] Implement `FormatClassName()` - PascalCase for type aliases
-  - [ ] Basic collision handler
-- [ ] **Generator Logic** (`cli/internal/typer/generator/kotlin/generator.go`):
-  - [ ] Implement `Generate()` method focusing only on primitive custom types
-  - [ ] Process primitive custom types → generate KotlinTypeAlias
-  - [ ] Register names with NameRegistry
-- [ ] **Templates** (`cli/internal/typer/generator/kotlin/templates/`):
-  - [ ] Create basic `main.kt.tmpl` with package declaration and typealias section
-  - [ ] Implement `typealias.tmpl` partial
+- [x] **Context Types** (`cli/internal/typer/generator/kotlin/context.go`):
+  - [x] Define `KotlinTypeAlias` struct with Alias, Comment, Type fields
+  - [x] Define basic `KotlinContext` with TypeAliases slice
+  - [x] Create `NewKotlinContext()` constructor
+- [x] **Name Handling** (`cli/internal/typer/generator/kotlin/naming.go`):
+  - [x] Implement `FormatClassName()` - PascalCase for type aliases with reserved keyword handling
+  - [x] Kotlin-specific collision handler using NameRegistry
+  - [x] Comprehensive tests for naming functions
+- [x] **Generator Logic** (`cli/internal/typer/generator/kotlin/generator.go`):
+  - [x] Implement `Generate()` method focusing only on primitive custom types
+  - [x] Process primitive custom types → generate KotlinTypeAlias
+  - [x] Register names with NameRegistry
+  - [x] Alphabetical sorting for deterministic output
+- [x] **Templates** (`cli/internal/typer/generator/kotlin/templates/`):
+  - [x] Create basic `main.kt.tmpl` with package declaration and typealias section
+  - [x] Implement `typealias.tmpl` partial
+  - [x] Update template engine to support sub-templates
 
 ### Phase 1 Testing
 
-- [ ] **Test** (`cli/internal/typer/generator/kotlin/generator_test.go`):
-  - [ ] Update `TestGenerate()` to include basic type alias generation
-  - [ ] Build tracking plan with multiple primitive custom types (email→String, age→Int, etc.)
-  - [ ] Generate Kotlin code and validate type aliases are created correctly
-  - [ ] Verify expect generate code based on testdata output (`cli/internal/typer/generator/kotlin/testdata/Main.kt`)
+- [x] **Test** (`cli/internal/typer/generator/kotlin/generator_test.go`):
+  - [x] Update `TestGenerate()` to include basic type alias generation
+  - [x] Build tracking plan with multiple primitive custom types (email→String, age→Int, etc.)
+  - [x] Generate Kotlin code and validate type aliases are created correctly
+  - [x] Verify generated code based on testdata output (`cli/internal/typer/generator/kotlin/testdata/Main.kt`)
 
-**Deliverable**: Generate valid Kotlin file with type aliases for primitive custom types
+**Deliverable**: ✅ Generate valid Kotlin file with type aliases for primitive custom types
 
 ---
 
@@ -237,7 +246,26 @@ This implementation plan provides a phased approach for building RudderTyper 2.0
 2. **Extensibility**: Strategy pattern enables easy addition of new platforms
 3. **Template-based**: Go templates provide flexibility and maintainability
 4. **Name Safety**: Dedicated registry handles collisions and reserved words
-5. **Comprehensive Testing**: Single test validates entire generation pipeline
+5. **Comprehensive Testing**: Every major component must have thorough unit tests with good coverage
+6. **Test-Driven Development**: Tests should be written alongside or before implementation
+
+### Testing Requirements
+
+**IMPORTANT**: Every major component introduced in this implementation must include comprehensive unit tests:
+
+- **Core Infrastructure**: NameRegistry, GeneratorStrategy interface, and utility functions
+- **Context Types**: All Kotlin context structs and their methods
+- **Name Handling**: All naming functions and collision handlers
+- **Generator Logic**: All processing functions and generation methods
+- **Templates**: Template rendering and context integration
+
+Tests should:
+
+- Cover both success and error scenarios
+- Test edge cases and boundary conditions
+- Use meaningful test data that reflects real-world usage
+- Be placed in `*_test` packages for proper encapsulation
+- Follow Go testing conventions and use testify/assert for clarity
 
 ### Implementation Dependencies
 
