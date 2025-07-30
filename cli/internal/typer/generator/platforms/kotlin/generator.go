@@ -2,6 +2,7 @@ package kotlin
 
 import (
 	_ "embed"
+	"fmt"
 	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -12,7 +13,7 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	ctx := NewKotlinContext()
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
-	err := processCustomTypes(plan, ctx, nameRegistry)
+	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -27,15 +28,41 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	}, nil
 }
 
-// processCustomTypes extracts custom types from the tracking plan and enriches context with type aliases for primitive types
-func processCustomTypes(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
+// processPropertiesAndCustomTypes extracts custom types and properties from the tracking plan and generates corresponding Kotlin types
+func processPropertiesAndCustomTypes(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	customTypes := make(map[string]*plan.CustomType)
+	properties := make(map[string]*plan.Property)
 
-	// Extract all custom types from event rules
+	// Extract all custom types and properties from event rules
 	for _, rule := range p.Rules {
-		extractCustomTypesFromSchema(rule.Schema, customTypes)
+		extractCustomTypesFromSchema(&rule.Schema, customTypes)
+		extractPropertiesFromSchema(&rule.Schema, properties)
 	}
 
+	// Extract properties from within custom type schemas
+	for _, customType := range customTypes {
+		if !customType.IsPrimitive() {
+			extractPropertiesFromSchema(customType.Schema, properties)
+		}
+	}
+
+	// Process custom types first (both primitive and object)
+	err := processCustomTypesIntoContext(customTypes, ctx, nameRegistry)
+	if err != nil {
+		return err
+	}
+
+	// Process individual properties to create type aliases
+	err = processPropertiesIntoContext(properties, ctx, nameRegistry)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// processCustomTypesIntoContext processes custom types and adds them to the context
+func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	// Sort custom type names for deterministic output
 	var sortedNames []string
 	for name := range customTypes {
@@ -43,7 +70,7 @@ func processCustomTypes(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases for primitive custom types in sorted order
+	// Generate type aliases for primitive custom types and data classes for object custom types
 	for _, name := range sortedNames {
 		customType := customTypes[name]
 		if customType.IsPrimitive() {
@@ -52,35 +79,71 @@ func processCustomTypes(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *
 				return err
 			}
 			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+		} else {
+			dataClass, err := createCustomTypeDataClass(customType, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 		}
 	}
+	return nil
+}
 
+// processPropertiesIntoContext processes individual properties and creates type aliases for all properties
+func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
+	// Sort property names for deterministic output
+	var sortedNames []string
+	for name := range allProperties {
+		sortedNames = append(sortedNames, name)
+	}
+	sort.Strings(sortedNames)
+
+	// Generate type aliases for all properties
+	for _, name := range sortedNames {
+		property := allProperties[name]
+		alias, err := createPropertyTypeAlias(property, nameRegistry)
+		if err != nil {
+			return err
+		}
+		ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+	}
 	return nil
 }
 
 // extractCustomTypesFromSchema recursively extracts custom types from an ObjectSchema
-func extractCustomTypesFromSchema(schema plan.ObjectSchema, customTypes map[string]*plan.CustomType) {
+func extractCustomTypesFromSchema(schema *plan.ObjectSchema, customTypes map[string]*plan.CustomType) {
 	for _, propSchema := range schema.Properties {
 		if propSchema.Property.IsCustomType() {
 			customType := propSchema.Property.CustomType()
 			if customType != nil {
 				customTypes[customType.Name] = customType
+
+				// Recursively process referenced by object custom types
+				if customType.Schema != nil {
+					extractCustomTypesFromSchema(customType.Schema, customTypes)
+				}
 			}
 		}
 
+	}
+}
+
+// extractPropertiesFromSchema recursively extracts all properties from an ObjectSchema
+func extractPropertiesFromSchema(schema *plan.ObjectSchema, allProperties map[string]*plan.Property) {
+	for _, propSchema := range schema.Properties {
+		allProperties[propSchema.Property.Name] = &propSchema.Property
+
 		// Recursively process nested schemas
 		if propSchema.Schema != nil {
-			extractCustomTypesFromSchema(*propSchema.Schema, customTypes)
+			extractPropertiesFromSchema(propSchema.Schema, allProperties)
 		}
 	}
 }
 
 // createCustomTypeTypeAlias creates a KotlinTypeAlias from a primitive custom type
 func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
-	aliasName := FormatClassName("CustomType", customType.Name)
-
-	// Register the name to handle collisions
-	finalName, err := nameRegistry.RegisterName("customtype:"+customType.Name, "typealias", aliasName)
+	finalName, err := getOrRegisterCustomTypeAliasName(customType, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +156,87 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 		Comment: customType.Description,
 		Type:    kotlinType,
 	}, nil
+}
+
+// createPropertyTypeAlias creates a KotlinTypeAlias from any property
+func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
+	finalName, err := getOrRegisterPropertyAliasName(property, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the appropriate Kotlin type for this property
+	var kotlinType string
+	if property.IsPrimitive() {
+		kotlinType = mapPrimitiveToKotlinType(property.PrimitiveType())
+	} else if property.IsCustomType() {
+		customType := property.CustomType()
+		if customType.IsPrimitive() {
+			// Reference the custom type alias
+			kotlinType, err = getOrRegisterCustomTypeAliasName(customType, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Reference the custom type data class
+			kotlinType, err = getOrRegisterCustomTypeClassName(customType, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("unsupported property type: %s", property.Type)
+	}
+
+	return &KotlinTypeAlias{
+		Alias:   finalName,
+		Comment: property.Description,
+		Type:    kotlinType,
+	}, nil
+}
+
+// createCustomTypeDataClass creates a KotlinDataClass from an object custom type
+func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process properties from the custom type's schema in sorted order
+	var sortedPropNames []string
+	for propName := range customType.Schema.Properties {
+		sortedPropNames = append(sortedPropNames, propName)
+	}
+	sort.Strings(sortedPropNames)
+
+	var properties []KotlinProperty
+	for _, propName := range sortedPropNames {
+		propSchema := customType.Schema.Properties[propName]
+		kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+		if err != nil {
+			return nil, err
+		}
+
+		property := KotlinProperty{
+			Name:         formatPropertyName(propName),
+			OriginalName: propName,
+			Type:         kotlinType,
+			Comment:      propSchema.Property.Description,
+			Optional:     !propSchema.Required,
+		}
+		properties = append(properties, property)
+	}
+
+	return &KotlinDataClass{
+		Name:       finalName,
+		Comment:    customType.Description,
+		Properties: properties,
+	}, nil
+}
+
+// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases
+func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	return getOrRegisterPropertyAliasName(&property, nameRegistry)
 }
 
 // mapPrimitiveToKotlinType maps plan primitive types to Kotlin types

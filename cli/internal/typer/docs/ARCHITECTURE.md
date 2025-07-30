@@ -13,7 +13,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### Core Generator
 
 - **Purpose**: Defines interfaces and common types for platform-specific code generation
-- **Current Implementation**: Located in `generator/core/`
+- **Current Implementation**: Located in `cli/internal/typer/generator/core/`
 - **Key Types**:
 
   ```go
@@ -35,7 +35,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### NameRegistry
 
 - **Purpose**: Manages name collision resolution across all generated code constructs
-- **Current Implementation**: Located in `generator/core/name_registry.go`
+- **Current Implementation**: Located in `cli/internal/typer/generator/core/name_registry.go`
 - **Key Features**:
   - Registers names under scope/id pairs with bidirectional mapping
   - Applies configurable collision handlers
@@ -51,7 +51,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### Platform Generators
 
 - **Purpose**: Platform-specific code generation implementations
-- **Current Implementation**: Kotlin generator in `generator/platforms/kotlin/`
+- **Current Implementation**: Kotlin generator in `cli/internal/typer/generator/platforms/kotlin/`
 - **Architecture**:
   - Direct function-based approach rather than full strategy pattern
   - Template-based code generation using Go embed
@@ -102,7 +102,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 - Input source independence (API, YAML, JSON, etc.)
 - Domain-driven design alignment
 
-**Current Implementation**: Located in `plan/plan.go`
+**Current Implementation**: Located in `cli/internal/typer/plan/plan.go`
 
 ### TemplateContext Model
 
@@ -126,7 +126,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 - Pre-processed values (no escaping or formatting in templates)
 - Minimal conditional logic
 
-**Current Implementation**: Located in `generator/platforms/kotlin/context.go`
+**Current Implementation**: Located in `cli/internal/typer/generator/platforms/kotlin/context.go`
 
 ## Design Principles
 
@@ -161,7 +161,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 
 ### Adding New Platforms
 
-1. Create a new package under `generator/platforms/{platform}/`
+1. Create a new package under `cli/internal/typer/generator/platforms/{platform}/`
 2. Define platform-specific context types (like `KotlinContext`)
 3. Implement a `Generate` function following the current pattern
 4. Create embedded Go templates using `//go:embed`
