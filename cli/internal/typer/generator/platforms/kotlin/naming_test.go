@@ -53,3 +53,41 @@ func TestFormatClassName_ReservedKeywords(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatMethodName(t *testing.T) {
+	tests := []struct {
+		name     string
+		prefix   string
+		input    string
+		expected string
+	}{
+		{"snake_case", "", "user_id", "userId"},
+		{"kebab-case", "", "email-address", "emailAddress"},
+		{"space separated", "", "first name", "firstName"},
+		{"camelCase", "", "firstName", "firstName"},
+		{"PascalCase", "", "FirstName", "firstName"},
+		{"single word", "", "user", "user"},
+		{"with numbers", "", "user123", "user123"},
+		{"number at end", "", "user123Id", "user123Id"},
+		{"leading number", "", "123user", "_123user"},
+		{"reserved keyword", "", "class", "_class"},
+		{"reserved keyword uppercase", "", "Class", "_class"},
+		{"reserved keyword mixed", "", "CLASS", "_class"},
+		{"empty string", "", "", ""},
+		{"whitespace only", "", "   ", ""},
+		{"complex name", "", "user_email-address.type", "userEmailAddressType"},
+		// Tests with prefix
+		{"with prefix track", "track", "User Signed Up", "trackUserSignedUp"},
+		{"with prefix get", "get", "user_info", "getUserInfo"},
+		{"with prefix set", "set", "email-address", "setEmailAddress"},
+		{"prefix with empty name", "track", "", ""},
+		{"empty prefix", "", "testMethod", "testMethod"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := kotlin.FormatMethodName(tt.prefix, tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
