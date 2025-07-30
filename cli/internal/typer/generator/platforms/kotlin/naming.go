@@ -14,7 +14,7 @@ var (
 	DataclassScope = "dataclass"
 )
 
-// FormatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
+// formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
 	trimmedName := strings.TrimSpace(name)
