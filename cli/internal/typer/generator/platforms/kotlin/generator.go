@@ -30,21 +30,9 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 
 // processPropertiesAndCustomTypes extracts custom types and properties from the tracking plan and generates corresponding Kotlin types
 func processPropertiesAndCustomTypes(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
-	customTypes := make(map[string]*plan.CustomType)
-	properties := make(map[string]*plan.Property)
-
-	// Extract all custom types and properties from event rules
-	for _, rule := range p.Rules {
-		extractCustomTypesFromSchema(&rule.Schema, customTypes)
-		extractPropertiesFromSchema(&rule.Schema, properties)
-	}
-
-	// Extract properties from within custom type schemas
-	for _, customType := range customTypes {
-		if !customType.IsPrimitive() {
-			extractPropertiesFromSchema(customType.Schema, properties)
-		}
-	}
+	// Use the plan helper methods to extract types and properties
+	customTypes := p.ExtractAllCustomTypes()
+	properties := p.ExtractAllProperties()
 
 	// Process custom types first (both primitive and object)
 	err := processCustomTypesIntoContext(customTypes, ctx, nameRegistry)
@@ -109,36 +97,6 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 		ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 	}
 	return nil
-}
-
-// extractCustomTypesFromSchema recursively extracts custom types from an ObjectSchema
-func extractCustomTypesFromSchema(schema *plan.ObjectSchema, customTypes map[string]*plan.CustomType) {
-	for _, propSchema := range schema.Properties {
-		if propSchema.Property.IsCustomType() {
-			customType := propSchema.Property.CustomType()
-			if customType != nil {
-				customTypes[customType.Name] = customType
-
-				// Recursively process referenced by object custom types
-				if customType.Schema != nil {
-					extractCustomTypesFromSchema(customType.Schema, customTypes)
-				}
-			}
-		}
-
-	}
-}
-
-// extractPropertiesFromSchema recursively extracts all properties from an ObjectSchema
-func extractPropertiesFromSchema(schema *plan.ObjectSchema, allProperties map[string]*plan.Property) {
-	for _, propSchema := range schema.Properties {
-		allProperties[propSchema.Property.Name] = &propSchema.Property
-
-		// Recursively process nested schemas
-		if propSchema.Schema != nil {
-			extractPropertiesFromSchema(propSchema.Schema, allProperties)
-		}
-	}
 }
 
 // createCustomTypeTypeAlias creates a KotlinTypeAlias from a primitive custom type
