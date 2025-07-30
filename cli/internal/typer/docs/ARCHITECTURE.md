@@ -177,7 +177,8 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 
 - **Location**: `cli/internal/typer/plan/testutils/reference_plan.go`
 - **Purpose**: Provides known test data with predictable structure for reliable testing
-- **Coverage**: Includes primitive custom types (email, age, active), object custom types (user_profile), and nested properties
+- **Coverage**: Includes primitive custom types (email, age, active), object custom types (user_profile), nested properties, and comprehensive event rules for all RudderStack event types
+- **Event Types**: Covers Track events (with custom names), Identify, Page, Screen, and Group events with both Properties and Traits sections
 - **Constants**: Defines expected counts for validation (`ExpectedCustomTypeCount`, `ExpectedPropertyCount`, `ExpectedEventCount`)
 
 ### Benefits
@@ -195,10 +196,11 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 2. Define platform-specific context types (like `KotlinContext`)
 3. Implement a `Generate` function following the current pattern
 4. **Use plan helper methods** (`ExtractAllCustomTypes`, `ExtractAllProperties`) for data extraction instead of implementing custom traversal logic
-5. Create embedded Go templates using `//go:embed`
-6. Implement platform-specific collision handlers and naming functions
-7. Add template processing functions
-8. **Leverage the reference tracking plan** for comprehensive testing of your generator
+5. **Process event rules** to generate platform-specific constructs for all RudderStack event types (Track, Identify, Page, Screen, Group) with appropriate naming conventions for your target platform
+6. Create embedded Go templates using `//go:embed`
+7. Implement platform-specific collision handlers and naming functions
+8. Add template processing functions
+9. **Leverage the reference tracking plan** for comprehensive testing of your generator
 
 ### Extending TrackingPlan Model
 

@@ -13,6 +13,26 @@ func init() {
 		Description: "Triggered when a user signs up",
 	}
 
+	ReferenceEvents["Identify"] = &plan.Event{
+		EventType:   plan.EventTypeIdentify,
+		Description: "User identification event",
+	}
+
+	ReferenceEvents["Page"] = &plan.Event{
+		EventType:   plan.EventTypePage,
+		Description: "Page view event",
+	}
+
+	ReferenceEvents["Screen"] = &plan.Event{
+		EventType:   plan.EventTypeScreen,
+		Description: "Screen view event",
+	}
+
+	ReferenceEvents["Group"] = &plan.Event{
+		EventType:   plan.EventTypeGroup,
+		Description: "Group association event",
+	}
+
 	ReferenceCustomTypes["email"] = &plan.CustomType{
 		Name:        "email",
 		Description: "Custom type for email validation",
@@ -92,8 +112,10 @@ func init() {
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
 func GetReferenceTrackingPlan() *plan.TrackingPlan {
-	// Create event rule with properties using custom types
-	eventRule := plan.EventRule{
+	var rules []plan.EventRule
+
+	// Track event - properties
+	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["User Signed Up"],
 		Section: plan.EventRuleSectionProperties,
 		Schema: plan.ObjectSchema{
@@ -113,11 +135,75 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 			},
 			AdditionalProperties: false,
 		},
-	}
+	})
+
+	// Identify event - traits
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Identify"],
+		Section: plan.EventRuleSectionTraits,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"email": {
+					Property: *ReferenceProperties["email"],
+					Required: true,
+				},
+				"active": {
+					Property: *ReferenceProperties["active"],
+					Required: false,
+				},
+			},
+			AdditionalProperties: false,
+		},
+	})
+
+	// Page event - properties
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Page"],
+		Section: plan.EventRuleSectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"profile": {
+					Property: *ReferenceProperties["profile"],
+					Required: true,
+				},
+			},
+			AdditionalProperties: false,
+		},
+	})
+
+	// Screen event - properties
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Screen"],
+		Section: plan.EventRuleSectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"profile": {
+					Property: *ReferenceProperties["profile"],
+					Required: false,
+				},
+			},
+			AdditionalProperties: false,
+		},
+	})
+
+	// Group event - traits
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Group"],
+		Section: plan.EventRuleSectionTraits,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"active": {
+					Property: *ReferenceProperties["active"],
+					Required: true,
+				},
+			},
+			AdditionalProperties: false,
+		},
+	})
 
 	return &plan.TrackingPlan{
 		Name:  "Test Plan",
-		Rules: []plan.EventRule{eventRule},
+		Rules: rules,
 	}
 }
 
@@ -125,5 +211,5 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 const (
 	ExpectedCustomTypeCount = 4 // email, age, active, user_profile
 	ExpectedPropertyCount   = 6 // email, first_name, last_name, age, active, profile
-	ExpectedEventCount      = 1 // User Signed Up
+	ExpectedEventCount      = 5 // User Signed Up, Identify, Page, Screen, Group
 )
