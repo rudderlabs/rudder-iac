@@ -1,7 +1,11 @@
 package com.rudderstack.ruddertyper
 
+import com.rudderstack.sdk.kotlin.core.Analytics
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 
 /** Whether user is active */
 typealias CustomTypeActive = Boolean
@@ -97,3 +101,51 @@ data class TrackUserSignedUpProperties(
     @SerialName("profile")
     val profile: PropertyProfile
 )
+
+class RudderAnalytics(private val analytics: Analytics) {
+    private val json = Json {
+        prettyPrint = true
+        encodeDefaults = false
+    }
+
+    /**
+     * Group association event
+     */
+    fun group(groupId: String, traits: GroupTraits) {
+        analytics.group(
+            groupId = groupId,
+            traits = json.encodeToJsonElement(traits).jsonObject
+        )
+    }
+
+    /**
+     * User identification event
+     */
+    fun identify(userId: String?, traits: IdentifyTraits) {
+        analytics.identify(
+            userId = userId,
+            traits = json.encodeToJsonElement(traits).jsonObject
+        )
+    }
+
+    /**
+     * Screen view event
+     */
+    fun screen(screenName: String, category: String?, properties: ScreenProperties) {
+        analytics.screen(
+            screenName = screenName,
+            category = category,
+            properties = json.encodeToJsonElement(properties).jsonObject
+        )
+    }
+
+    /**
+     * Triggered when a user signs up
+     */
+    fun trackUserSignedUp(properties: TrackUserSignedUpProperties) {
+        analytics.track(
+            name = "User Signed Up",
+            properties = json.encodeToJsonElement(properties).jsonObject
+        )
+    }
+}

@@ -215,11 +215,11 @@ func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegist
 // processEventRules processes event rules and generates data classes for event properties/traits
 func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	// Map rules by a unique composite key for deterministic processing
-	ruleMap := make(map[string]plan.EventRule)
+	ruleMap := make(map[string]*plan.EventRule)
 	for _, rule := range p.Rules {
 		// Create a unique key using event type, name, and section
 		key := string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
-		ruleMap[key] = rule
+		ruleMap[key] = &rule
 	}
 
 	// Sort keys for deterministic output
@@ -232,11 +232,23 @@ func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *c
 	// Process each rule to create event data classes
 	for _, key := range sortedKeys {
 		rule := ruleMap[key]
-		dataClass, err := createEventDataClass(&rule, nameRegistry)
+
+		// create data class and method for the event rule
+		dataClass, err := createEventDataClass(rule, nameRegistry)
 		if err != nil {
 			return err
 		}
 		ctx.DataClasses = append(ctx.DataClasses, *dataClass)
+
+		// create RudderAnalyticsMethod for the event rule
+		method, err := createRudderAnalyticsMethod(rule, nameRegistry)
+		if err != nil {
+			return err
+		}
+
+		if method != nil {
+			ctx.RudderAnalyticsMethods = append(ctx.RudderAnalyticsMethods, *method)
+		}
 	}
 
 	return nil

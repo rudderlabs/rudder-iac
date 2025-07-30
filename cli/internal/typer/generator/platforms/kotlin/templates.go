@@ -17,6 +17,9 @@ var typealiasTemplate string
 //go:embed templates/dataclass.tmpl
 var dataclassTemplate string
 
+//go:embed templates/rudderanalytics.tmpl
+var rudderanalyticsTemplate string
+
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
 	if err != nil {
@@ -30,6 +33,11 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	}
 
 	_, err = tmpl.New("dataclass.tmpl").Parse(dataclassTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("rudderanalytics.tmpl").Parse(rudderanalyticsTemplate)
 	if err != nil {
 		return nil, err
 	}
