@@ -88,7 +88,8 @@ type CustomType struct {
 	Name        string        `json:"name"`
 	Description string        `json:"description,omitempty"`
 	Type        PrimitiveType `json:"type"`
-	Schema      ObjectSchema  `json:"schema,omitempty"`
+	// Schema defines the structure of the custom type if it's an object
+	Schema *ObjectSchema `json:"schema,omitempty"`
 }
 
 func (c *CustomType) IsPrimitive() bool {
@@ -132,7 +133,8 @@ type ObjectSchema struct {
 
 // PropertySchema represents the schema for a property within an ObjectSchema
 type PropertySchema struct {
-	Property Property      `json:"property"`
-	Required bool          `json:"required"`
-	Schema   *ObjectSchema `json:"schema,omitempty"`
+	Property Property `json:"property"`
+	Required bool     `json:"required"`
+	// Schema represents a nested object schema for the property, if applicable
+	Schema *ObjectSchema `json:"schema,omitempty"`
 }
