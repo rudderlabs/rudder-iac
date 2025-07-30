@@ -45,3 +45,55 @@ data class CustomTypeUserProfile(
     @SerialName("last_name")
     val lastName: PropertyLastName?
 )
+
+/** Group association event */
+@Serializable
+data class GroupTraits(
+    /** User active status */
+    @SerialName("active")
+    val active: PropertyActive
+)
+
+/** User identification event */
+@Serializable
+data class IdentifyTraits(
+    /** User active status */
+    @SerialName("active")
+    val active: PropertyActive?,
+
+    /** User's email address */
+    @SerialName("email")
+    val email: PropertyEmail
+)
+
+/** Page view event */
+@Serializable
+data class PageProperties(
+    /** User profile data */
+    @SerialName("profile")
+    val profile: PropertyProfile
+)
+
+/** Screen view event */
+@Serializable
+data class ScreenProperties(
+    /** User profile data */
+    @SerialName("profile")
+    val profile: PropertyProfile?
+)
+
+/** Triggered when a user signs up */
+@Serializable
+data class TrackUserSignedUpProperties(
+    /** User active status */
+    @SerialName("active")
+    val active: PropertyActive,
+
+    /** User's age */
+    @SerialName("age")
+    val age: PropertyAge?,
+
+    /** User profile data */
+    @SerialName("profile")
+    val profile: PropertyProfile
+)

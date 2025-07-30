@@ -18,6 +18,11 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 		return nil, err
 	}
 
+	err = processEventRules(plan, ctx, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
 	mainFile, err := GenerateFile("Main.kt", ctx)
 	if err != nil {
 		return nil, err
@@ -153,23 +158,18 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 	}, nil
 }
 
-// createCustomTypeDataClass creates a KotlinDataClass from an object custom type
-func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
-	finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	// Process properties from the custom type's schema in sorted order
+// createKotlinPropertiesFromSchema processes properties from an ObjectSchema and returns KotlinProperty objects
+func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) ([]KotlinProperty, error) {
+	// Sort property names for deterministic output
 	var sortedPropNames []string
-	for propName := range customType.Schema.Properties {
+	for propName := range schema.Properties {
 		sortedPropNames = append(sortedPropNames, propName)
 	}
 	sort.Strings(sortedPropNames)
 
 	var properties []KotlinProperty
 	for _, propName := range sortedPropNames {
-		propSchema := customType.Schema.Properties[propName]
+		propSchema := schema.Properties[propName]
 		kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
 		if err != nil {
 			return nil, err
@@ -185,6 +185,21 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 		properties = append(properties, property)
 	}
 
+	return properties, nil
+}
+
+// createCustomTypeDataClass creates a KotlinDataClass from an object custom type
+func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	properties, err := createKotlinPropertiesFromSchema(customType.Schema, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
 	return &KotlinDataClass{
 		Name:       finalName,
 		Comment:    customType.Description,
@@ -195,6 +210,99 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 // getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases
 func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	return getOrRegisterPropertyAliasName(&property, nameRegistry)
+}
+
+// processEventRules processes event rules and generates data classes for event properties/traits
+func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
+	// Map rules by a unique composite key for deterministic processing
+	ruleMap := make(map[string]plan.EventRule)
+	for _, rule := range p.Rules {
+		// Create a unique key using event type, name, and section
+		key := string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
+		ruleMap[key] = rule
+	}
+
+	// Sort keys for deterministic output
+	var sortedKeys []string
+	for key := range ruleMap {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
+
+	// Process each rule to create event data classes
+	for _, key := range sortedKeys {
+		rule := ruleMap[key]
+		dataClass, err := createEventDataClass(rule, nameRegistry)
+		if err != nil {
+			return err
+		}
+		ctx.DataClasses = append(ctx.DataClasses, *dataClass)
+	}
+
+	return nil
+}
+
+// createEventDataClass creates a KotlinDataClass from an event rule
+func createEventDataClass(rule plan.EventRule, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	// Generate class name based on event type, name, and section
+	var prefix string
+	var baseName string
+
+	if rule.Event.EventType == plan.EventTypeTrack {
+		// For track events: add "Track" prefix and use the event name
+		prefix = "Track"
+		baseName = rule.Event.Name
+	} else {
+		// For other events: use the type as prefix (capitalized) and skip the name
+		switch rule.Event.EventType {
+		case plan.EventTypeIdentify:
+			prefix = "Identify"
+		case plan.EventTypePage:
+			prefix = "Page"
+		case plan.EventTypeScreen:
+			prefix = "Screen"
+		case plan.EventTypeGroup:
+			prefix = "Group"
+		default:
+			return nil, fmt.Errorf("unsupported event type: %s", rule.Event.EventType)
+		}
+		baseName = ""
+	}
+
+	var suffix string
+	switch rule.Section {
+	case plan.EventRuleSectionProperties:
+		suffix = "Properties"
+	case plan.EventRuleSectionTraits:
+		suffix = "Traits"
+	default:
+		return nil, fmt.Errorf("unsupported event rule section: %s", rule.Section)
+	}
+
+	className := FormatClassName("", prefix+baseName+suffix)
+
+	// Register the class name with a unique key
+	registrationKey := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name
+	finalName, err := nameRegistry.RegisterName(
+		registrationKey,
+		"dataclass",
+		className,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the shared helper to create properties from the rule's schema
+	properties, err := createKotlinPropertiesFromSchema(&rule.Schema, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KotlinDataClass{
+		Name:       finalName,
+		Comment:    rule.Event.Description,
+		Properties: properties,
+	}, nil
 }
 
 // mapPrimitiveToKotlinType maps plan primitive types to Kotlin types
