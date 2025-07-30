@@ -205,6 +205,21 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 		return nil, err
 	}
 
+	return properties, nil
+}
+
+// createCustomTypeDataClass creates a KotlinDataClass from an object custom type
+func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	properties, err := createKotlinPropertiesFromSchema(customType.Schema, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
 	return &KotlinDataClass{
 		Name:       finalName,
 		Comment:    customType.Description,
