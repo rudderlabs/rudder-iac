@@ -1,0 +1,47 @@
+package plan_test
+
+import (
+	"testing"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestExtractAllCustomTypes(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	customTypes := trackingPlan.ExtractAllCustomTypes()
+	assert.Len(t, customTypes, testutils.ExpectedCustomTypeCount)
+
+	expectedNames := []string{"email", "age", "active", "user_profile"}
+	assert.Len(t, expectedNames, testutils.ExpectedCustomTypeCount) // consistency check
+	for _, name := range expectedNames {
+		assert.Contains(t, customTypes, name, "Custom type %s should be present", name)
+	}
+
+	for name, customType := range customTypes {
+		assert.NotNil(t, customType)
+		referenceType := testutils.ReferenceCustomTypes[name]
+		assert.Equal(t, customType, referenceType, "Custom type %s should match reference", name)
+	}
+}
+
+func TestExtractAllProperties(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	properties := trackingPlan.ExtractAllProperties()
+	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile"}
+
+	assert.Len(t, properties, testutils.ExpectedPropertyCount)
+	assert.Len(t, expectedNames, testutils.ExpectedPropertyCount) // consistency check
+
+	for _, name := range expectedNames {
+		assert.Contains(t, properties, name, "Property %s should be present", name)
+	}
+
+	for name, property := range properties {
+		assert.NotNil(t, property)
+		referenceProperty := testutils.ReferenceProperties[name]
+		assert.Equal(t, property, referenceProperty, "Property %s should match reference", name)
+	}
+}
