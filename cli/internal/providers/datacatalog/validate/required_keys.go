@@ -138,6 +138,8 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		}
 
 		for _, rule := range tp.Rules {
+			ruleRef := fmt.Sprintf("%s/rules/%s", reference, rule.LocalID)
+
 			if rule.LocalID == "" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("id field is mandatory on the rules in tracking plan"),
@@ -167,7 +169,13 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			if len(rule.Variants) > 0 {
-				errors = append(errors, rk.validateVariantsRequiredKeys(rule.Variants, fmt.Sprintf("%s/rules/%s", reference, rule.LocalID))...)
+				errors = append(errors, rk.validateVariantsRequiredKeys(rule.Variants, ruleRef)...)
+			}
+
+			// Validate nested properties if they exist
+			if rule.Event != nil && len(rule.Properties) > 0 {
+				nestedErrors := rk.validateProperties(rule, ruleRef, dc)
+				errors = append(errors, nestedErrors...)
 			}
 		}
 	}
@@ -593,4 +601,92 @@ func isInteger(val any) bool {
 		return float64(int64(v)) == v
 	}
 	return false
+}
+
+// validateNestedProperties validates nested properties structure and constraints
+func (rk *RequiredKeysValidator) validateProperties(rule *catalog.TPRule, ruleRef string, dc *catalog.DataCatalog) []ValidationError {
+	var errors []ValidationError
+
+	// iterate over the properties and validate each of them
+	for _, prop := range rule.Properties {
+		if len(prop.Properties) > 0 {
+			errors = append(errors, rk.validateNestedProperty(prop, ruleRef, dc)...)
+		}
+	}
+
+	return errors
+}
+
+func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProperty, ruleRef string, dc *catalog.DataCatalog) []ValidationError {
+	if prop.Ref == "" {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("ref field is mandatory for property %s in rule %s", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	// validate the property reference
+	matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
+	if len(matches) != 3 {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("invalid property reference format: %s in rule %s", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	propertyGroup, propertyID := matches[1], matches[2]
+
+	// check if the property exists in the data catalog
+	property := dc.Property(propertyGroup, propertyID)
+	if property == nil {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("invalid property reference: %s found in tracking plan rule: %s - referred property does not exist", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	// validate the property type
+	if property.Type != "object" {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("property %s in rule %s must have type 'object', but has type '%s' - nested properties are only supported for object type properties", prop.Ref, ruleRef, property.Type),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	// validate the property nesting depth
+	if len(prop.Properties) > 0 {
+		errors := rk.validateNestingDepth(prop.Properties, 1, 3, ruleRef)
+		return errors
+	}
+
+	return nil
+}
+
+// validateNestingDepth validates maximum nesting depth (3 levels)
+func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRuleProperty, currentDepth int, maxDepth int, ruleRef string) []ValidationError {
+	var errors []ValidationError
+
+	if currentDepth > maxDepth {
+		errors = append(errors, ValidationError{
+			error:     fmt.Errorf("maximum property nesting depth of %d levels exceeded in rule %s", maxDepth, ruleRef),
+			Reference: ruleRef,
+		})
+		return errors
+	}
+
+	for _, prop := range properties {
+		if len(prop.Properties) > 0 {
+			errors = append(errors, rk.validateNestingDepth(prop.Properties, currentDepth+1, maxDepth, ruleRef)...)
+		}
+	}
+
+	return errors
 }
