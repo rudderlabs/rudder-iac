@@ -94,6 +94,15 @@ type TrackingPlanEventSchema struct {
 	} `json:"rules"`
 }
 
+const (
+	IdentitySectionProperties    = "properties"
+	IdentitySectionTraits        = "traits"
+	IdentitySectionContextTraits = "context.traits"
+
+	ActionEdit   = "edit"
+	ActionDelete = "delete"
+)
+
 type TrackingPlanEventsUpdate struct {
 	Events []EventIdentifierDetail `json:"events"`
 }
