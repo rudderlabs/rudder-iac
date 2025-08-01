@@ -94,6 +94,27 @@ type TrackingPlanEventSchema struct {
 	} `json:"rules"`
 }
 
+type TrackingPlanEventsUpdate struct {
+	Events []EventIdentifierDetail `json:"events"`
+}
+
+type EventIdentifierDetail struct {
+	ID                   string                     `json:"id"`
+	Properties           []PropertyIdentifierDetail `json:"properties,omitempty"`
+	AdditionalProperties bool                       `json:"additionalProperties"`
+	IdentitySection      string                     `json:"identitySection"`
+	Action               string                     `json:"action"`
+	Variants             []Variant                  `json:"variants,omitempty"`
+}
+
+type PropertyIdentifierDetail struct {
+	ID                   string                     `json:"id"`
+	Required             bool                       `json:"required"`
+	AdditionalProperties bool                       `json:"additionalProperties"`
+	Metadata             map[string]any             `json:"metadata,omitempty"`
+	Properties           []PropertyIdentifierDetail `json:"properties,omitempty"`
+}
+
 type TrackingPlanStore interface {
 	CreateTrackingPlan(ctx context.Context, input TrackingPlanCreate) (*TrackingPlan, error)
 	UpsertTrackingPlan(ctx context.Context, id string, input TrackingPlanUpsertEvent) (*TrackingPlan, error)
@@ -102,6 +123,7 @@ type TrackingPlanStore interface {
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
 	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
+	UpdateTrackingPlanEvents(ctx context.Context, id string, input TrackingPlanEventsUpdate) (*TrackingPlan, error)
 }
 
 // TODO: Make this create idempotent so that we can call it multiple times without error
@@ -235,4 +257,23 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 	}
 
 	return &schema, nil
+}
+
+func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input TrackingPlanEventsUpdate) (*TrackingPlan, error) {
+	byt, err := json.Marshal(input)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling input: %w", err)
+	}
+
+	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), bytes.NewReader(byt))
+	if err != nil {
+		return nil, fmt.Errorf("executing http request: %w", err)
+	}
+
+	trackingPlan := TrackingPlan{}
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&trackingPlan); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &trackingPlan, nil
 }
