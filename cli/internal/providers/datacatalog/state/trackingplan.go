@@ -244,6 +244,7 @@ type TrackingPlanPropertyArgs struct {
 	Required         bool
 	HasCustomTypeRef bool
 	HasItemTypesRef  bool
+	Properties       []*TrackingPlanPropertyArgs `json:"properties,omitempty"`
 }
 
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
@@ -251,7 +252,37 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 		return true
 	}
 
-	return args.Required != other.Required
+	if args.Required != other.Required {
+		return true
+	}
+
+	// Compare nested properties
+	if len(args.Properties) != len(other.Properties) {
+		return true
+	}
+
+	for _, prop := range args.Properties {
+		otherProp := other.PropertyByLocalID(prop.LocalID)
+		if otherProp == nil {
+			return true
+		}
+
+		if prop.Diff(otherProp) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Helper method to find nested property by LocalID
+func (args *TrackingPlanPropertyArgs) PropertyByLocalID(id string) *TrackingPlanPropertyArgs {
+	for _, prop := range args.Properties {
+		if prop.LocalID == id {
+			return prop
+		}
+	}
+	return nil
 }
 
 func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
@@ -300,7 +331,78 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 		}
 	}
 
+	// Handle nested properties recursively
+	if len(prop.Properties) > 0 {
+		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(prop.Properties))
+		for _, nestedProp := range prop.Properties {
+			nestedArgs := &TrackingPlanPropertyArgs{}
+			if err := nestedArgs.FromCatalogTrackingPlanEventProperty(nestedProp, urnFromRef); err != nil {
+				return fmt.Errorf("processing nested property %s: %w", nestedProp.LocalID, err)
+			}
+			nestedProperties = append(nestedProperties, nestedArgs)
+		}
+		args.Properties = nestedProperties
+	}
+
 	return nil
+}
+
+// ToResourceData converts TrackingPlanPropertyArgs to resource data map
+func (args *TrackingPlanPropertyArgs) ToResourceData() map[string]interface{} {
+	propMap := map[string]interface{}{
+		"name":             args.Name,
+		"description":      args.Description,
+		"localId":          args.LocalID,
+		"type":             args.Type,
+		"config":           args.Config,
+		"required":         args.Required,
+		"hasCustomTypeRef": args.HasCustomTypeRef,
+		"hasItemTypesRef":  args.HasItemTypesRef,
+	}
+
+	// Handle nested properties recursively
+	if len(args.Properties) > 0 {
+		nestedProps := make([]map[string]interface{}, 0, len(args.Properties))
+		for _, nestedProp := range args.Properties {
+			nestedProps = append(nestedProps, nestedProp.ToResourceData())
+		}
+		propMap["properties"] = nestedProps
+	}
+
+	return propMap
+}
+
+// FromResourceData populates TrackingPlanPropertyArgs from resource data map
+func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interface{}) {
+	args.LocalID = MustString(propMap, "localId")
+	args.Name = MustString(propMap, "name")
+	args.Description = MustString(propMap, "description")
+	args.Type = propMap["type"]
+	args.Config = MapStringInterface(propMap, "config", make(map[string]interface{}))
+	args.Required = MustBool(propMap, "required")
+	args.HasCustomTypeRef = Bool(propMap, "hasCustomTypeRef", false)
+	args.HasItemTypesRef = Bool(propMap, "hasItemTypesRef", false)
+
+	// Handle nested properties recursively
+	nestedProps := InterfaceSlice(propMap, "properties", nil)
+	if len(nestedProps) == 0 {
+		// Try map version
+		nestedPropsMap := MapStringInterfaceSlice(propMap, "properties", nil)
+		for _, prop := range nestedPropsMap {
+			nestedProps = append(nestedProps, prop)
+		}
+	}
+
+	if len(nestedProps) > 0 {
+		nestedProperties := make([]*TrackingPlanPropertyArgs, len(nestedProps))
+		for nestedIdx, nestedProp := range nestedProps {
+			nestedProperty := nestedProp.(map[string]interface{})
+			nestedArg := &TrackingPlanPropertyArgs{}
+			nestedArg.FromResourceData(nestedProperty)
+			nestedProperties[nestedIdx] = nestedArg
+		}
+		args.Properties = nestedProperties
+	}
 }
 
 func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan, urnFromRef func(string) string) error {
@@ -440,16 +542,9 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		tpProperties := make([]*TrackingPlanPropertyArgs, len(properties))
 		for idx, property := range properties {
 			property := property.(map[string]interface{})
-			tpProperties[idx] = &TrackingPlanPropertyArgs{
-				LocalID:          MustString(property, "localId"),
-				Name:             MustString(property, "name"),
-				Description:      MustString(property, "description"),
-				Type:             property["type"],
-				Config:           MapStringInterface(property, "config", make(map[string]interface{})),
-				Required:         MustBool(property, "required"),
-				HasCustomTypeRef: Bool(property, "hasCustomTypeRef", false),
-				HasItemTypesRef:  Bool(property, "hasItemTypesRef", false),
-			}
+			tpProperty := &TrackingPlanPropertyArgs{}
+			tpProperty.FromResourceData(property)
+			tpProperties[idx] = tpProperty
 		}
 		eventProps[idx].Properties = tpProperties
 	}
@@ -463,16 +558,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
-			properties = append(properties, map[string]interface{}{
-				"name":             property.Name,
-				"description":      property.Description,
-				"localId":          property.LocalID,
-				"type":             property.Type,
-				"config":           property.Config,
-				"required":         property.Required,
-				"hasCustomTypeRef": property.HasCustomTypeRef,
-				"hasItemTypesRef":  property.HasItemTypesRef,
-			})
+			properties = append(properties, property.ToResourceData())
 		}
 
 		events = append(events, map[string]interface{}{
