@@ -32,6 +32,7 @@ type mockRETLClient struct {
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
 	getRetlSourceFunc    func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) // <-- add this
+	readStateFunc        func(ctx context.Context) (*retlClient.State, error)
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
@@ -115,6 +116,9 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context) (*retlClient.RETLS
 }
 
 func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, error) {
+	if m.readStateFunc != nil {
+		return m.readStateFunc(ctx)
+	}
 	return &retlClient.State{
 		Resources: map[string]retlClient.ResourceState{},
 	}, nil
@@ -1050,7 +1054,7 @@ func TestSQLModelHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("Import", func(t *testing.T) {
+	t.Run("FetchImportData", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("Success", func(t *testing.T) {
@@ -1126,6 +1130,37 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
+		})
+
+		t.Run("Already imported", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
+				return &retlClient.State{
+					Resources: map[string]retlClient.ResourceState{
+						"retl-source-sql-model:remote-id": {Output: map[string]interface{}{"id": "remote-id"}},
+					},
+				}, nil
+			}
+
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "is already imported")
 		})
 	})
 }
