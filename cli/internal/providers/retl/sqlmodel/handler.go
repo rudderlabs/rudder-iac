@@ -227,6 +227,16 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
 	}
 
+	state, err := h.client.ReadState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reading state: %w", err)
+	}
+	for _, resource := range state.Resources {
+		if resource.Output["id"] == args.RemoteID {
+			return nil, fmt.Errorf("source %s is already imported", args.RemoteID)
+		}
+	}
+
 	// Create the base resource data structure for the imported source
 	importedData := resources.ResourceData{
 		IDKey:               args.LocalID,
