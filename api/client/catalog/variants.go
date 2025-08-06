@@ -3,10 +3,10 @@ package catalog
 type Variants []Variant
 
 type Variant struct {
-	Type          string             `json:"type"`
-	Discriminator string             `json:"discriminator"`
-	Cases         []VariantCase      `json:"cases"`
-	Default       *PropertyReference `json:"default,omitempty"`
+	Type          string              `json:"type"`
+	Discriminator string              `json:"discriminator"`
+	Cases         []VariantCase       `json:"cases"`
+	Default       []PropertyReference `json:"default,omitempty"`
 }
 
 type VariantCase struct {
@@ -17,6 +17,6 @@ type VariantCase struct {
 }
 
 type PropertyReference struct {
-	Ref      string `json:"$ref"`
+	ID       string `json:"id"`
 	Required bool   `json:"required"`
 }
