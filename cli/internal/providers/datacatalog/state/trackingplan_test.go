@@ -147,6 +147,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-property",
 				LocalID:     "test-property-id",
+				Ref:         "#/properties/mypropertygroup/test-property-id",
 				Description: "Test property description",
 				Type:        "string",
 				Required:    true,
@@ -154,10 +155,11 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 					"enum": []string{"value1", "value2"},
 				},
 			},
-			urnFromRef: func(ref string) string { return "" },
+			urnFromRef: func(ref string) string { return "property:test-property-id" },
 			expected: &state.TrackingPlanPropertyArgs{
 				Name:             "test-property",
 				LocalID:          "test-property-id",
+				ID:               resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
 				Description:      "Test property description",
 				Type:             "string",
 				Required:         true,
@@ -173,6 +175,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-property",
 				LocalID:     "test-property-id",
+				Ref:         "#/properties/mypropertygroup/test-property-id",
 				Description: "Test property description",
 				Type:        "#/custom-types/group/type-id",
 				Required:    true,
@@ -181,12 +184,16 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				if ref == "#/custom-types/group/type-id" {
 					return "urn:custom-type:type-id"
 				}
+				if ref == "#/properties/mypropertygroup/test-property-id" {
+					return "property:test-property-id"
+				}
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				Name:             "test-property",
 				LocalID:          "test-property-id",
 				Description:      "Test property description",
+				ID:               resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
 				Type:             resources.PropertyRef{URN: "urn:custom-type:type-id", Property: "name"},
 				Required:         true,
 				HasCustomTypeRef: true,
@@ -198,6 +205,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
+				Ref:         "#/properties/mypropertygroup/test-array-id",
 				Description: "Test array property",
 				Type:        "array",
 				Required:    false,
@@ -209,11 +217,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				if ref == "#/custom-types/group/type-id" {
 					return "urn:custom-type:type-id"
 				}
+				if ref == "#/properties/mypropertygroup/test-array-id" {
+					return "property:test-array-id"
+				}
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				Name:             "test-array",
 				LocalID:          "test-array-id",
+				ID:               resources.PropertyRef{URN: "property:test-array-id", Property: "id"},
 				Description:      "Test array property",
 				Type:             "array",
 				Required:         false,
@@ -231,11 +243,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-property",
 				LocalID:     "test-property-id",
+				Ref:         "#/properties/mypropertygroup/test-property-id",
 				Description: "Test property description",
 				Type:        "#/custom-types/group/invalid-id",
 				Required:    true,
 			},
 			urnFromRef: func(ref string) string {
+				if ref == "#/properties/mypropertygroup/test-property-id" {
+					return "property:test-property-id"
+				}
 				return "" // Simulate not finding the custom type
 			},
 			expectedErrMsg: "unable to resolve custom type reference urn: #/custom-types/group/invalid-id",

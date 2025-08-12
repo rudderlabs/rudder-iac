@@ -180,6 +180,7 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 
 type TrackingPlanEventArgs struct {
 	Name            string
+	ID              any
 	LocalID         string
 	Description     string
 	CategoryId      any
@@ -237,6 +238,7 @@ func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPro
 
 type TrackingPlanPropertyArgs struct {
 	Name             string
+	ID               any
 	LocalID          string
 	Description      string
 	Type             any
@@ -257,6 +259,10 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description
+	args.ID = resources.PropertyRef{
+		URN:      urnFromRef(prop.Ref),
+		Property: "id",
+	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
 	args.Type = prop.Type
@@ -333,11 +339,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			}
 		}
 
-		localIDToURN := make(map[string]string)
-		for _, prop := range event.Properties {
-			localIDToURN[prop.LocalID] = prop.Type
-		}
-
 		var variants Variants
 		for _, localVariant := range event.Variants {
 			variant := &Variant{}
@@ -345,7 +346,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			if err := variant.FromLocalCatalogVariant(
 				localVariant,
 				urnFromRef,
-				func(a string) string { return localIDToURN[a] },
 			); err != nil {
 				return fmt.Errorf("converting variant for event %s: %w", event.LocalID, err)
 			}
@@ -353,7 +353,11 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 		}
 
 		events = append(events, &TrackingPlanEventArgs{
-			Name:            event.Name,
+			Name: event.Name,
+			ID: resources.PropertyRef{
+				URN:      urnFromRef(event.Ref),
+				Property: "id",
+			},
 			LocalID:         event.LocalID,
 			Description:     event.Description,
 			CategoryId:      categoryIDRef,
@@ -374,20 +378,6 @@ func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
 	for _, event := range args.Events {
 		if event.LocalID == id {
 			return event
-		}
-	}
-	return nil
-}
-
-func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *TrackingPlanPropertyArgs {
-	event := args.EventByLocalID(eventID)
-	if event == nil {
-		return nil
-	}
-
-	for _, property := range event.Properties {
-		if property.LocalID == id {
-			return property
 		}
 	}
 	return nil
@@ -420,6 +410,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		eventProps[idx] = &TrackingPlanEventArgs{
 			Name:            MustString(event, "name"),
 			Description:     MustString(event, "description"),
+			ID:              String(event, "id", ""),
 			LocalID:         MustString(event, "localId"),
 			CategoryId:      String(event, "categoryId", ""),
 			Type:            MustString(event, "type"),
@@ -427,6 +418,10 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 			IdentitySection: String(event, "identitySection", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
 		}
+
+		var variants Variants
+		variants.FromResourceData(InterfaceSlice(event, "variants", nil))
+		eventProps[idx].Variants = variants
 
 		// Same situation as the events
 		properties := InterfaceSlice(event, "properties", nil)
@@ -441,6 +436,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		for idx, property := range properties {
 			property := property.(map[string]interface{})
 			tpProperties[idx] = &TrackingPlanPropertyArgs{
+				ID:               String(property, "id", ""),
 				LocalID:          MustString(property, "localId"),
 				Name:             MustString(property, "name"),
 				Description:      MustString(property, "description"),
@@ -464,6 +460,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
 			properties = append(properties, map[string]interface{}{
+				"id":               property.ID,
 				"name":             property.Name,
 				"description":      property.Description,
 				"localId":          property.LocalID,
@@ -476,6 +473,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		}
 
 		events = append(events, map[string]interface{}{
+			"id":              event.ID,
 			"localId":         event.LocalID,
 			"name":            event.Name,
 			"description":     event.Description,
@@ -484,6 +482,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
+			"variants":        event.Variants.ToResourceData(),
 		})
 	}
 

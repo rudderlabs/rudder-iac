@@ -53,7 +53,7 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input catalog.TrackingPlanEventsUpdate) (*catalog.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
 	return m.tp, m.err
 }
 
@@ -108,6 +108,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 			"events": []map[string]interface{}{
 				{
 					"name":            "event",
+					"id":              "",
 					"localId":         "event-id",
 					"categoryId":      "",
 					"description":     "event-description",
@@ -118,6 +119,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 						{
 							"name":             "property",
 							"localId":          "property-id",
+							"id":               "",
 							"description":      "property-description",
 							"type":             "string",
 							"required":         true,
@@ -126,6 +128,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 							"hasItemTypesRef":  false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},
@@ -217,6 +220,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 				{
 					"name":            "event",
 					"localId":         "event-id",
+					"id":              "",
 					"categoryId":      "",
 					"description":     "event-description",
 					"type":            "event-type",
@@ -225,6 +229,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 					"properties": []map[string]interface{}{
 						{
 							"name":             "property",
+							"id":               "",
 							"localId":          "property-id",
 							"description":      "property-description",
 							"type":             "string",
@@ -234,6 +239,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 							"hasItemTypesRef":  false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},
@@ -323,6 +329,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 			"events": []map[string]interface{}{
 				{
 					"name":            "event-1",
+					"id":              "",
 					"localId":         "event-id-1",
 					"categoryId":      "",
 					"description":     "event-description-1",
@@ -332,6 +339,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 					"properties": []map[string]interface{}{
 						{
 							"name":             "property-1",
+							"id":               "",
 							"localId":          "property-id-1",
 							"description":      "property-description-1",
 							"type":             "string",
@@ -341,6 +349,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 							"hasItemTypesRef":  false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},

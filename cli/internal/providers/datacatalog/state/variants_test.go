@@ -24,7 +24,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 					{
 						DisplayName: "Login",
 						Match:       []any{"login"},
-						Description: &description,
+						Description: description,
 						Properties: []PropertyReference{
 							{ID: propID, Required: true},
 						},
@@ -44,7 +44,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 					{
 						DisplayName: "Login",
 						Match:       []any{"login"},
-						Description: &description,
+						Description: description,
 						Properties: []PropertyReference{
 							{ID: propID, Required: true},
 						},
@@ -210,7 +210,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc1},
+					{DisplayName: "Case1", Description: desc1},
 				},
 			},
 		}
@@ -219,7 +219,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc2},
+					{DisplayName: "Case1", Description: desc2},
 				},
 			},
 		}
@@ -236,7 +236,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: nil},
+					{DisplayName: "Case1", Description: ""},
 				},
 			},
 		}
@@ -245,7 +245,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc},
+					{DisplayName: "Case1", Description: desc},
 				},
 			},
 		}

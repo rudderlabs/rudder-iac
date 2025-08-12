@@ -110,7 +110,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	for _, variant := range from.Variants {
 		toAdd := Variant{}
 
-		if err := toAdd.FromLocalCatalogVariant(variant, urnFromRef, urnFromRef); err != nil {
+		if err := toAdd.FromLocalCatalogVariant(variant, urnFromRef); err != nil {
 			return fmt.Errorf("processing %s variant %s: %w", variant.Type, variant.Discriminator, err)
 		}
 		variants = append(variants, toAdd)

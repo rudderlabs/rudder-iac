@@ -98,9 +98,6 @@ const (
 	IdentitySectionProperties    = "properties"
 	IdentitySectionTraits        = "traits"
 	IdentitySectionContextTraits = "context.traits"
-
-	ActionEdit   = "edit"
-	ActionDelete = "delete"
 )
 
 type TrackingPlanEventsUpdate struct {
@@ -112,7 +109,6 @@ type EventIdentifierDetail struct {
 	Properties           []PropertyIdentifierDetail `json:"properties,omitempty"`
 	AdditionalProperties bool                       `json:"additionalProperties"`
 	IdentitySection      string                     `json:"identitySection"`
-	Action               string                     `json:"action"`
 	Variants             []Variant                  `json:"variants,omitempty"`
 }
 
@@ -132,7 +128,7 @@ type TrackingPlanStore interface {
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
 	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
-	UpdateTrackingPlanEvents(ctx context.Context, id string, input TrackingPlanEventsUpdate) (*TrackingPlan, error)
+	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
 }
 
 // TODO: Make this create idempotent so that we can call it multiple times without error
@@ -268,7 +264,7 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 	return &schema, nil
 }
 
-func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input TrackingPlanEventsUpdate) (*TrackingPlan, error) {
+func (c *RudderDataCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error) {
 	byt, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)

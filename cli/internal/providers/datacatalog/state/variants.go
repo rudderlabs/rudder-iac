@@ -1,7 +1,6 @@
 package state
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/samber/lo"
@@ -47,18 +46,21 @@ func (v Variants) ToCatalogVariants() catalog.Variants {
 	return variants
 }
 
-func (v Variants) ToResourceData() []any {
+func (v *Variants) ToResourceData() []map[string]any {
+	if v == nil {
+		return nil
+	}
 
-	toReturn := make([]any, 0, len(v))
-	for _, variant := range v {
+	toReturn := make([]map[string]any, 0, len(*v))
+	for _, variant := range *v {
 
-		cases := make([]any, 0, len(variant.Cases))
+		cases := make([]map[string]any, 0, len(variant.Cases))
 		for _, vc := range variant.Cases {
 			cases = append(cases, map[string]any{
 				"display_name": vc.DisplayName,
 				"match":        vc.Match,
 				"description":  vc.Description,
-				"properties": lo.Map(vc.Properties, func(pr PropertyReference, _ int) any {
+				"properties": lo.Map(vc.Properties, func(pr PropertyReference, _ int) map[string]any {
 					return map[string]any{
 						"id":       pr.ID,
 						"required": pr.Required,
@@ -71,7 +73,7 @@ func (v Variants) ToResourceData() []any {
 			"type":          variant.Type,
 			"discriminator": variant.Discriminator,
 			"cases":         cases,
-			"default": lo.Map(variant.Default, func(pr PropertyReference, _ int) any {
+			"default": lo.Map(variant.Default, func(pr PropertyReference, _ int) map[string]any {
 				return map[string]any{
 					"id":       pr.ID,
 					"required": pr.Required,
@@ -83,38 +85,38 @@ func (v Variants) ToResourceData() []any {
 	return toReturn
 }
 
-func (v Variants) FromResourceData(from []any) {
+func (v *Variants) FromResourceData(from []any) {
 	for _, entry := range from {
 		variantMap := entry.(map[string]any)
-		variant := &Variant{
+		variant := Variant{
 			Type:          variantMap["type"].(string),
 			Discriminator: variantMap["discriminator"].(string),
 		}
 
-		cases := variantMap["cases"].([]any)
+		cases := variantMap["cases"].([]map[string]any)
 		for _, entry := range cases {
-			variantCase := entry.(map[string]any)
+			variantCase := entry
 			variant.Cases = append(variant.Cases, VariantCase{
 				DisplayName: variantCase["display_name"].(string),
 				Match:       variantCase["match"].([]any),
-				Description: variantCase["description"].(*string),
-				Properties: lo.Map(variantCase["properties"].([]any), func(pr any, _ int) PropertyReference {
+				Description: variantCase["description"].(string),
+				Properties: lo.Map(variantCase["properties"].([]map[string]any), func(pr map[string]any, _ int) PropertyReference {
 					return PropertyReference{
-						ID:       pr.(map[string]any)["id"].(string),
-						Required: pr.(map[string]any)["required"].(bool),
+						ID:       pr["id"].(string),
+						Required: pr["required"].(bool),
 					}
 				}),
 			})
 		}
 
-		variant.Default = lo.Map(variantMap["default"].([]any), func(pr any, _ int) PropertyReference {
+		variant.Default = lo.Map(variantMap["default"].([]map[string]any), func(pr map[string]any, _ int) PropertyReference {
 			return PropertyReference{
-				ID:       pr.(map[string]any)["id"].(string),
-				Required: pr.(map[string]any)["required"].(bool),
+				ID:       pr["id"].(string),
+				Required: pr["required"].(bool),
 			}
 		})
 
-		v = append(v, *variant)
+		*v = append(*v, variant)
 	}
 }
 
@@ -128,15 +130,11 @@ type Variant struct {
 func (v *Variant) FromLocalCatalogVariant(
 	localVariant localcatalog.Variant,
 	urnFromRef func(string) string,
-	urnFromLocalID func(string) string,
 ) error {
-	if urnFromLocalID(localVariant.Discriminator) == "" {
-		return fmt.Errorf("lookup from local id failed for discriminator %s", localVariant.Discriminator)
-	}
 
 	v.Type = localVariant.Type
 	v.Discriminator = resources.PropertyRef{
-		URN:      urnFromLocalID(localVariant.Discriminator),
+		URN:      urnFromRef(localVariant.Discriminator),
 		Property: "id",
 	}
 
@@ -173,7 +171,7 @@ func (v *Variant) FromLocalCatalogVariant(
 type VariantCase struct {
 	DisplayName string              `json:"display_name"`
 	Match       []any               `json:"match"`
-	Description *string             `json:"description"`
+	Description string              `json:"description"`
 	Properties  []PropertyReference `json:"properties"`
 }
 
@@ -245,10 +243,7 @@ func (vc VariantCase) diffVariantCase(against VariantCase) bool {
 		return true
 	}
 
-	if (vc.Description == nil) != (against.Description == nil) {
-		return true
-	}
-	if vc.Description != nil && against.Description != nil && *vc.Description != *against.Description {
+	if vc.Description != against.Description {
 		return true
 	}
 

@@ -52,11 +52,12 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 	)
 
 	for _, event := range args.Events {
-		lastupserted, err := p.client.UpsertTrackingPlan(
+		lastupserted, err := p.client.UpdateTrackingPlanEvent(
 			ctx,
 			created.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
 		}
@@ -133,10 +134,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Added {
-		updated, err = p.client.UpsertTrackingPlan(
+		updated, err = p.client.UpdateTrackingPlanEvent(
 			ctx,
 			prevState.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
 
 		if err != nil {
@@ -151,10 +152,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Updated {
-		updated, err = p.client.UpsertTrackingPlan(
+		updated, err = p.client.UpdateTrackingPlanEvent(
 			ctx,
 			prevState.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
 
 		if err != nil {
@@ -211,6 +212,27 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 	}
 
 	return nil
+}
+
+func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {
+	var identitySection = PropertiesIdentity
+	if from.IdentitySection != "" {
+		identitySection = from.IdentitySection
+	}
+	return catalog.EventIdentifierDetail{
+		ID: from.ID.(string),
+		Properties: lo.Map(
+			from.Properties,
+			func(prop *state.TrackingPlanPropertyArgs, _ int) catalog.PropertyIdentifierDetail {
+				return catalog.PropertyIdentifierDetail{
+					ID:       prop.ID.(string),
+					Required: prop.Required,
+				}
+			}),
+		AdditionalProperties: from.AllowUnplanned,
+		IdentitySection:      identitySection,
+		Variants:             from.Variants.ToCatalogVariants(),
+	}
 }
 
 func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpsertEvent {
