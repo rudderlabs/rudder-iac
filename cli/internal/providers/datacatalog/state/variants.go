@@ -47,10 +47,6 @@ func (v Variants) ToCatalogVariants() catalog.Variants {
 }
 
 func (v *Variants) ToResourceData() []map[string]any {
-	if v == nil {
-		return nil
-	}
-
 	toReturn := make([]map[string]any, 0, len(*v))
 	for _, variant := range *v {
 
