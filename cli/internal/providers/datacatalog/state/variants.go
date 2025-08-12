@@ -15,10 +15,10 @@ import (
 type Variants []Variant
 
 func (v Variants) ToCatalogVariants() catalog.Variants {
-	variants := make(catalog.Variants, 0, len(v))
+	variants := make(catalog.Variants, 0)
 
-	for idx, variant := range v {
-		variants[idx] = catalog.Variant{
+	for _, variant := range v {
+		variants = append(variants, catalog.Variant{
 			Type:          variant.Type,
 			Discriminator: variant.Discriminator.(string),
 			Cases: lo.Map(variant.Cases, func(vc VariantCase, _ int) catalog.VariantCase {
@@ -40,7 +40,7 @@ func (v Variants) ToCatalogVariants() catalog.Variants {
 					Required: pr.Required,
 				}
 			}),
-		}
+		})
 	}
 
 	return variants
@@ -81,9 +81,9 @@ func (v *Variants) ToResourceData() []map[string]any {
 	return toReturn
 }
 
-func (v *Variants) FromResourceData(from []any) {
+func (v *Variants) FromResourceData(from []map[string]any) {
 	for _, entry := range from {
-		variantMap := entry.(map[string]any)
+		variantMap := entry
 		variant := Variant{
 			Type:          variantMap["type"].(string),
 			Discriminator: variantMap["discriminator"].(string),

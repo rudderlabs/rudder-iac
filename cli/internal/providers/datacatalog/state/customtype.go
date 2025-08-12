@@ -55,7 +55,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]any))
 	args.Variants.FromResourceData(
-		InterfaceSlice(from, "variants", nil),
+		MapStringInterfaceSlice(from, "variants", nil),
 	)
 
 	// Handle properties array using similar pattern to TrackingPlan

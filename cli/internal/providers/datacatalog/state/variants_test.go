@@ -493,7 +493,7 @@ func TestVariants_ResourceData(t *testing.T) {
 				expectedVariants Variants
 			)
 
-			actualVariants.FromResourceData([]any{})
+			actualVariants.FromResourceData([]map[string]any{})
 			assert.Equal(t, expectedVariants, actualVariants)
 		})
 
@@ -523,7 +523,7 @@ func TestVariants_ResourceData(t *testing.T) {
 				}
 			)
 
-			actualVariants.FromResourceData([]any{
+			actualVariants.FromResourceData([]map[string]any{
 				map[string]any{
 					"type":          "discriminator",
 					"discriminator": "test",

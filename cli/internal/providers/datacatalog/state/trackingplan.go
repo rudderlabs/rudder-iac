@@ -420,7 +420,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		}
 
 		var variants Variants
-		variants.FromResourceData(InterfaceSlice(event, "variants", nil))
+		variants.FromResourceData(MapStringInterfaceSlice(event, "variants", nil))
 		eventProps[idx].Variants = variants
 
 		// Same situation as the events
