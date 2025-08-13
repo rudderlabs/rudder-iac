@@ -37,6 +37,7 @@ type TrackingPlan struct {
 type TPEvent struct {
 	Name            string
 	LocalID         string
+	Ref             string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -57,6 +58,7 @@ func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
 
 type TPEventProperty struct {
 	Name        string                 `json:"name"`
+	Ref         string                 `json:"$ref"`
 	LocalID     string                 `json:"id"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
@@ -126,47 +128,6 @@ func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
 	}
 	tp.EventProps = expandedEvents
 	return nil
-}
-
-// expandPropertyRefs recursively expands property references and their nested properties
-func expandPropertyRefs(ruleProperties []*TPRuleProperty, fetcher CatalogResourceFetcher) ([]*TPEventProperty, error) {
-	var expandedProperties []*TPEventProperty
-
-	for _, prop := range ruleProperties {
-		// Expand the current property reference
-		matches := PropRegex.FindStringSubmatch(prop.Ref)
-		if len(matches) != 3 {
-			return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
-		}
-
-		propertyGroup, propertyID := matches[1], matches[2]
-		property := fetcher.Property(propertyGroup, propertyID)
-		if property == nil {
-			return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
-		}
-
-		expandedProp := &TPEventProperty{
-			Name:        property.Name,
-			LocalID:     property.LocalID,
-			Description: property.Description,
-			Type:        property.Type,
-			Required:    prop.Required,
-			Config:      shallowCopy(property.Config),
-		}
-
-		// Recursively expand nested properties if they exist
-		if len(prop.Properties) > 0 {
-			nestedProps, err := expandPropertyRefs(prop.Properties, fetcher)
-			if err != nil {
-				return nil, fmt.Errorf("expanding nested properties for %s: %w", prop.Ref, err)
-			}
-			expandedProp.Properties = nestedProps
-		}
-
-		expandedProperties = append(expandedProperties, expandedProp)
-	}
-
-	return expandedProperties, nil
 }
 
 // expandIncludeRefs expands the include references in the tracking plan rule definition
@@ -245,6 +206,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
+		Ref:             rule.Event.Ref,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
 		Type:            event.Type,
@@ -256,11 +218,28 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 
 	// Load the properties from the data catalog (including nested properties)
 	// into corresponding event on the tracking plan
-	expandedProperties, err := expandPropertyRefs(rule.Properties, fetcher)
-	if err != nil {
-		return nil, fmt.Errorf("expanding properties: %w", err)
+	for _, prop := range rule.Properties {
+		matches = PropRegex.FindStringSubmatch(prop.Ref)
+		if len(matches) != 3 {
+			return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
+		}
+
+		propertyGroup, propertyID := matches[1], matches[2]
+		property := fetcher.Property(propertyGroup, propertyID)
+		if property == nil {
+			return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
+		}
+
+		toReturn.Properties = append(toReturn.Properties, &TPEventProperty{
+			Name:        property.Name,
+			Ref:         prop.Ref,
+			LocalID:     property.LocalID,
+			Description: property.Description,
+			Type:        property.Type,
+			Required:    prop.Required,
+			Config:      shallowCopy(property.Config),
+		})
 	}
-	toReturn.Properties = expandedProperties
 
 	return &toReturn, nil
 }

@@ -18,19 +18,12 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		toArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
-				Name:           "event-name",
-				Description:    "event-description",
-				Type:           "event-type",
 				LocalID:        "event-local-id",
 				AllowUnplanned: false,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						Name:        "property-name",
-						Description: "property-description",
-						Type:        "property-type",
-						Config: map[string]interface{}{
-							"enum": []string{"value1", "value2"},
-						},
+						LocalID:  "property-local-id",
+						Required: true,
 					},
 					{
 						Name:        "other-property-name",
@@ -60,17 +53,11 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		toArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
-				Name:            "event-name",
-				Description:     "event-description",
-				Type:            "event-type",
 				LocalID:         "event-local-id-updated", // added
 				AllowUnplanned:  false,
 				IdentitySection: "traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
-				Name:            "event-name-1",
-				Description:     "event-description-1",
-				Type:            "event-type-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  true, // updated
 				IdentitySection: "",
@@ -78,17 +65,11 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
-				Name:            "event-name",
-				Description:     "event-description",
-				Type:            "event-type",
 				LocalID:         "event-local-id",
 				AllowUnplanned:  true,
 				IdentitySection: "context.traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
-				Name:            "event-name-1",
-				Description:     "event-description-1",
-				Type:            "event-type-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  false,
 				IdentitySection: "",
@@ -104,37 +85,23 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		t.Parallel()
 
 		toArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event-name",
-			Description:    "event-description",
-			Type:           "event-type",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property-name",
-					Description: "property-description",
-					Type:        "property-type",
-					LocalID:     "property-local-id",
-					Config:      nil,
-					Required:    false,
+					LocalID:  "property-local-id",
+					Required: false,
 				},
 			},
 		}).Build()
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event-name",
-			Description:    "event-description",
-			Type:           "event-type",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property-name",
-					Description: "property-description",
-					Type:        "property-type",
-					LocalID:     "property-local-id",
-					Config:      nil,
-					Required:    true, // Same properties length
+					LocalID:  "property-local-id",
+					Required: true, // Same properties length
 				},
 			},
 		}).Build()
@@ -291,6 +258,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-property",
 				LocalID:     "test-property-id",
+				Ref:         "#/properties/mypropertygroup/test-property-id",
 				Description: "Test property description",
 				Type:        "string",
 				Required:    true,
@@ -298,18 +266,11 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 					"enum": []string{"value1", "value2"},
 				},
 			},
-			urnFromRef: func(ref string) string { return "" },
+			urnFromRef: func(ref string) string { return "property:test-property-id" },
 			expected: &state.TrackingPlanPropertyArgs{
-				Name:             "test-property",
-				LocalID:          "test-property-id",
-				Description:      "Test property description",
-				Type:             "string",
-				Required:         true,
-				HasCustomTypeRef: false,
-				HasItemTypesRef:  false,
-				Config: map[string]interface{}{
-					"enum": []string{"value1", "value2"},
-				},
+				LocalID:  "test-property-id",
+				ID:       resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
+				Required: true,
 			},
 		},
 		{
@@ -317,6 +278,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-property",
 				LocalID:     "test-property-id",
+				Ref:         "#/properties/mypropertygroup/test-property-id",
 				Description: "Test property description",
 				Type:        "#/custom-types/group/type-id",
 				Required:    true,
@@ -325,16 +287,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				if ref == "#/custom-types/group/type-id" {
 					return "urn:custom-type:type-id"
 				}
+				if ref == "#/properties/mypropertygroup/test-property-id" {
+					return "property:test-property-id"
+				}
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
-				Name:             "test-property",
-				LocalID:          "test-property-id",
-				Description:      "Test property description",
-				Type:             resources.PropertyRef{URN: "urn:custom-type:type-id", Property: "name"},
-				Required:         true,
-				HasCustomTypeRef: true,
-				HasItemTypesRef:  false,
+				LocalID:  "test-property-id",
+				ID:       resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
+				Required: true,
 			},
 		},
 		{
@@ -342,6 +303,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
+				Ref:         "#/properties/mypropertygroup/test-array-id",
 				Description: "Test array property",
 				Type:        "array",
 				Required:    false,
@@ -353,21 +315,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				if ref == "#/custom-types/group/type-id" {
 					return "urn:custom-type:type-id"
 				}
+				if ref == "#/properties/mypropertygroup/test-array-id" {
+					return "property:test-array-id"
+				}
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
-				Name:             "test-array",
-				LocalID:          "test-array-id",
-				Description:      "Test array property",
-				Type:             "array",
-				Required:         false,
-				HasCustomTypeRef: false,
-				HasItemTypesRef:  true,
-				Config: map[string]interface{}{
-					"itemTypes": []any{
-						resources.PropertyRef{URN: "urn:custom-type:type-id", Property: "name"},
-					},
-				},
+				LocalID:  "test-array-id",
+				ID:       resources.PropertyRef{URN: "property:test-array-id", Property: "id"},
+				Required: false,
 			},
 		},
 		{
