@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -266,7 +267,7 @@ func (rv *RefValidator) validateVariantsReferences(
 		if len(matches) != 3 {
 			errs = append(errs, ValidationError{
 				Reference: variantReference,
-				error:     fmt.Errorf("discriminator reference has invalid format. Should be '#/properties/<group>/<id>'"),
+				error:     errors.New("discriminator reference has invalid format, should be #/properties/<group>/<id>"),
 			})
 		} else {
 			group, propID := matches[1], matches[2]

@@ -535,7 +535,7 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.V
 					uint, uint8, uint16, uint32, uint64:
 				default:
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("match value at index %d must be string, bool or number type (got: %T)", k, matchValue),
+						error:     fmt.Errorf("match value at index %d must be string, bool or integer type (got: %T)", k, matchValue),
 						Reference: caseReference,
 					})
 				}
