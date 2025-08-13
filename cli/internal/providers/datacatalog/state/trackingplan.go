@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -179,12 +178,8 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 }
 
 type TrackingPlanEventArgs struct {
-	Name            string
 	ID              any
 	LocalID         string
-	Description     string
-	CategoryId      any
-	Type            string
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TrackingPlanPropertyArgs
@@ -237,15 +232,9 @@ func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPro
 }
 
 type TrackingPlanPropertyArgs struct {
-	Name             string
-	ID               any
-	LocalID          string
-	Description      string
-	Type             any
-	Config           map[string]interface{}
-	Required         bool
-	HasCustomTypeRef bool
-	HasItemTypesRef  bool
+	ID       any
+	LocalID  string
+	Required bool
 }
 
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
@@ -257,54 +246,18 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 }
 
 func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
-	args.Name = prop.Name
-	args.Description = prop.Description
+
+	urn := urnFromRef(prop.Ref)
+	if urn == "" {
+		return fmt.Errorf("unable to resolve ref to the property urn: %s", prop.Ref)
+	}
+
 	args.ID = resources.PropertyRef{
-		URN:      urnFromRef(prop.Ref),
+		URN:      urn,
 		Property: "id",
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
-	args.Type = prop.Type
-	args.Config = prop.Config
-	args.HasCustomTypeRef = false
-	args.HasItemTypesRef = false
-
-	// Check if Type is a custom type reference
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
-		customTypeURN := urnFromRef(prop.Type)
-		if customTypeURN == "" {
-			return fmt.Errorf("unable to resolve custom type reference urn: %s", prop.Type)
-		}
-
-		args.Type = resources.PropertyRef{
-			URN:      customTypeURN,
-			Property: "name",
-		}
-		args.HasCustomTypeRef = true
-	}
-
-	// Check if Config has itemTypes with custom type reference
-	if prop.Config != nil {
-		if itemTypes, ok := prop.Config["itemTypes"].([]any); ok && len(itemTypes) > 0 {
-			val := itemTypes[0].(string)
-
-			if strings.HasPrefix(val, "#/custom-types/") {
-				customTypeURN := urnFromRef(val)
-				if customTypeURN == "" {
-					return fmt.Errorf("unable to resolve custom type reference urn in itemTypes: %s", val)
-				}
-
-				args.Config["itemTypes"] = []any{
-					resources.PropertyRef{
-						URN:      customTypeURN,
-						Property: "name",
-					},
-				}
-				args.HasItemTypesRef = true
-			}
-		}
-	}
 
 	return nil
 }
@@ -331,14 +284,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			properties = append(properties, tpProperty)
 		}
 
-		var categoryIDRef *resources.PropertyRef
-		if event.CategoryRef != nil {
-			categoryIDRef = &resources.PropertyRef{
-				URN:      urnFromRef(*event.CategoryRef),
-				Property: "id",
-			}
-		}
-
 		var variants Variants
 		for _, localVariant := range event.Variants {
 			variant := &Variant{}
@@ -353,15 +298,11 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 		}
 
 		events = append(events, &TrackingPlanEventArgs{
-			Name: event.Name,
 			ID: resources.PropertyRef{
 				URN:      urnFromRef(event.Ref),
 				Property: "id",
 			},
 			LocalID:         event.LocalID,
-			Description:     event.Description,
-			CategoryId:      categoryIDRef,
-			Type:            event.Type,
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: event.IdentitySection,
 			Properties:      properties,
@@ -408,12 +349,8 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		event := event.(map[string]interface{})
 
 		eventProps[idx] = &TrackingPlanEventArgs{
-			Name:            MustString(event, "name"),
-			Description:     MustString(event, "description"),
 			ID:              String(event, "id", ""),
 			LocalID:         MustString(event, "localId"),
-			CategoryId:      String(event, "categoryId", ""),
-			Type:            MustString(event, "type"),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
@@ -436,15 +373,9 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		for idx, property := range properties {
 			property := property.(map[string]interface{})
 			tpProperties[idx] = &TrackingPlanPropertyArgs{
-				ID:               String(property, "id", ""),
-				LocalID:          MustString(property, "localId"),
-				Name:             MustString(property, "name"),
-				Description:      MustString(property, "description"),
-				Type:             property["type"],
-				Config:           MapStringInterface(property, "config", make(map[string]interface{})),
-				Required:         MustBool(property, "required"),
-				HasCustomTypeRef: Bool(property, "hasCustomTypeRef", false),
-				HasItemTypesRef:  Bool(property, "hasItemTypesRef", false),
+				ID:       String(property, "id", ""),
+				LocalID:  MustString(property, "localId"),
+				Required: MustBool(property, "required"),
 			}
 		}
 		eventProps[idx].Properties = tpProperties
@@ -460,25 +391,15 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
 			properties = append(properties, map[string]interface{}{
-				"id":               property.ID,
-				"name":             property.Name,
-				"description":      property.Description,
-				"localId":          property.LocalID,
-				"type":             property.Type,
-				"config":           property.Config,
-				"required":         property.Required,
-				"hasCustomTypeRef": property.HasCustomTypeRef,
-				"hasItemTypesRef":  property.HasItemTypesRef,
+				"id":       property.ID,
+				"localId":  property.LocalID,
+				"required": property.Required,
 			})
 		}
 
 		events = append(events, map[string]interface{}{
 			"id":              event.ID,
 			"localId":         event.LocalID,
-			"name":            event.Name,
-			"description":     event.Description,
-			"categoryId":      event.CategoryId,
-			"type":            event.Type,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
