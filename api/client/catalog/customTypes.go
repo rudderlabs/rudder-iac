@@ -14,6 +14,7 @@ type CustomTypeCreate struct {
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+	Variants    Variants               `json:"variants,omitempty"`
 }
 
 type CustomType struct {
@@ -28,6 +29,7 @@ type CustomType struct {
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`
 	ItemDefinitions []string               `json:"itemDefinitions"`
+	Variants        Variants               `json:"variants,omitempty"`
 	CreatedAt       time.Time              `json:"createdAt"`
 	UpdatedAt       time.Time              `json:"updatedAt"`
 	CreatedBy       string                 `json:"createdBy"`
