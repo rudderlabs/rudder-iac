@@ -54,9 +54,11 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Description = MustString(from, "description")
 	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]any))
-	args.Variants.FromResourceData(
-		MapStringInterfaceSlice(from, "variants", nil),
-	)
+
+	variants := NormalizeToSliceMap(from, "variants")
+	var variantsToAdd Variants
+	variantsToAdd.FromResourceData(variants)
+	args.Variants = variantsToAdd
 
 	// Handle properties array using similar pattern to TrackingPlan
 	var properties []any
