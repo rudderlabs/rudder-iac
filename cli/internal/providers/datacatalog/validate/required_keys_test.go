@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -657,4 +658,282 @@ func TestCategoryValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVariantsValidation(t *testing.T) {
+	validator := &RequiredKeysValidator{}
+
+	t.Run("variants validation success", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			trackingPlans map[catalog.EntityGroup]*catalog.TrackingPlan
+			customTypes   map[catalog.EntityGroup][]catalog.CustomType
+		}{
+			{
+				name: "valid variants in tracking plan",
+				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+					"test-group": {
+						LocalID: "test-tp",
+						Name:    "Test Tracking Plan",
+						Rules: []*catalog.TPRule{
+							{
+								LocalID: "test-rule",
+								Type:    "event_rule",
+								Event: &catalog.TPRuleEvent{
+									Ref: "#/events/test-group/test-event",
+								},
+								Variants: catalog.Variants{
+									{
+										Type:          "discriminator",
+										Discriminator: "page_name",
+										Cases: []catalog.VariantCase{
+											{
+												DisplayName: "Search Page",
+												Match:       []any{"search", "search_bar"},
+												Properties: []catalog.PropertyReference{
+													{Ref: "#/properties/test-group/search_term", Required: true},
+												},
+											},
+										},
+										Default: []catalog.PropertyReference{
+											{Ref: "#/properties/test-group/page_url", Required: true},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				name: "valid variants in custom type",
+				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
+					"test-group": {
+						{
+							LocalID:     "TestType",
+							Name:        "TestType",
+							Description: "Test custom type with variants",
+							Type:        "object",
+							Properties: []catalog.CustomTypeProperty{
+								{Ref: "#/properties/test-group/profile_type", Required: true},
+							},
+							Variants: catalog.Variants{
+								{
+									Type:          "discriminator",
+									Discriminator: "profile_type",
+									Cases: []catalog.VariantCase{
+										{
+											DisplayName: "Premium User",
+											Match:       []any{"premium", "vip"},
+											Properties: []catalog.PropertyReference{
+												{Ref: "#/properties/test-group/subscription_tier", Required: true},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				name: "valid variants with mixed match value types",
+				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+					"test-group": {
+						LocalID: "test-tp",
+						Name:    "Test Tracking Plan",
+						Rules: []*catalog.TPRule{
+							{
+								LocalID: "test-rule",
+								Type:    "event_rule",
+								Event: &catalog.TPRuleEvent{
+									Ref: "#/events/test-group/test-event",
+								},
+								Variants: catalog.Variants{
+									{
+										Type:          "discriminator",
+										Discriminator: "user_id",
+										Cases: []catalog.VariantCase{
+											{
+												DisplayName: "Admin User",
+												Match:       []any{123.0, 456.78, true, "admin"}, // Fixed: using float64 instead of int
+												Properties: []catalog.PropertyReference{
+													{Ref: "#/properties/test-group/admin_level", Required: true},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				dc := &catalog.DataCatalog{
+					TrackingPlans: tc.trackingPlans,
+					CustomTypes:   tc.customTypes,
+				}
+				errors := validator.Validate(dc)
+				assert.Empty(t, errors, "Expected no validation errors")
+			})
+		}
+	})
+
+	t.Run("variants validation failures", func(t *testing.T) {
+		testCases := []struct {
+			name           string
+			trackingPlans  map[catalog.EntityGroup]*catalog.TrackingPlan
+			customTypes    map[catalog.EntityGroup][]catalog.CustomType
+			expectedErrors int
+			errorContains  []ValidationError
+		}{
+			{
+				name: "structural validation failures",
+				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+					"test-group": {
+						LocalID: "test-tp",
+						Name:    "Test Tracking Plan",
+						Rules: []*catalog.TPRule{
+							{
+								LocalID: "test-rule",
+								Type:    "event_rule",
+								Event: &catalog.TPRuleEvent{
+									Ref: "#/events/test-group/test-event",
+								},
+								Variants: catalog.Variants{
+									{
+										Type:          "other_type", // Invalid type
+										Discriminator: "",           // Missing discriminator
+										Cases: []catalog.VariantCase{
+											{
+												DisplayName: "",                            // Missing display name
+												Match:       []any{},                       // Empty match array
+												Properties:  []catalog.PropertyReference{}, // Empty properties array
+											},
+										},
+									},
+									{
+										Type:          "discriminator", // Second variant (should fail length check)
+										Discriminator: "page_name",
+										Cases: []catalog.VariantCase{
+											{
+												DisplayName: "Search Page",
+												Match:       []any{"search"},
+												Properties: []catalog.PropertyReference{
+													{Required: true}, // Missing Ref
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				expectedErrors: 7,
+				errorContains: []ValidationError{
+					{
+						error:     fmt.Errorf("type field is mandatory for variant and must be 'discriminator'"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]",
+					},
+					{
+						error:     fmt.Errorf("discriminator field is mandatory for variant"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]",
+					},
+					{
+						error:     fmt.Errorf("display_name field is mandatory for variant case"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+					},
+					{
+						error:     fmt.Errorf("match array must have at least one element"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+					},
+					{
+						error:     fmt.Errorf("properties array must have at least one element"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+					},
+					{
+						error:     fmt.Errorf("variants array cannot have more than 1 variant (current length: 2)"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule",
+					},
+					{
+						error:     fmt.Errorf("$ref field is mandatory for property reference"),
+						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[1]/cases[0]/properties[0]",
+					},
+				},
+			},
+			{
+				name: "custom type validation failures",
+				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
+					"test-group": {
+						{
+							LocalID:     "TestType",
+							Name:        "TestType",
+							Description: "Test custom type with variants",
+							Type:        "string",
+							Variants: catalog.Variants{
+								{
+									Type:          "discriminator",
+									Discriminator: "profile_type",
+									Cases: []catalog.VariantCase{
+										{
+											DisplayName: "Premium User",
+											Match:       []any{"premium"},
+											Properties: []catalog.PropertyReference{
+												{Ref: "#/properties/test-group/subscription_tier", Required: true},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				expectedErrors: 1,
+				errorContains: []ValidationError{
+					{
+						error:     fmt.Errorf("variants are only allowed for custom type of type object"),
+						Reference: "#/custom-types/test-group/TestType",
+					},
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+
+				dc := &catalog.DataCatalog{
+					TrackingPlans: tc.trackingPlans,
+					CustomTypes:   tc.customTypes,
+				}
+				errors := validator.Validate(dc)
+				assert.Len(t, errors, tc.expectedErrors, "Expected %d validation errors, got %d", tc.expectedErrors, len(errors))
+
+				if len(tc.errorContains) > 0 {
+					// Check that we have the expected number of errors
+					assert.Len(t, errors, tc.expectedErrors, "Expected %d validation errors, got %d", tc.expectedErrors, len(errors))
+
+					for _, actual := range errors {
+						found := false
+
+						for _, expected := range tc.errorContains {
+							if actual.Error() == expected.Error() && actual.Reference == expected.Reference {
+								found = true
+								break
+							}
+						}
+
+						if !found {
+							assert.Failf(t, "variants_validation_failures", "Expected to find error: %v with reference: %s in expected", actual, actual.Reference)
+						}
+
+					}
+				}
+			})
+		}
+	})
 }

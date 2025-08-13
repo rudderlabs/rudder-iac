@@ -99,6 +99,7 @@ type CustomType struct {
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+	Variants    Variants               `json:"variants,omitempty"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type

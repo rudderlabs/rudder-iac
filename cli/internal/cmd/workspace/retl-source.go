@@ -13,7 +13,7 @@ import (
 
 func NewCmdRetlSource() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "retl-source",
+		Use:   "retl-sources",
 		Short: "Manage RETL sources in the workspace",
 		Args:  cobra.NoArgs,
 	}
