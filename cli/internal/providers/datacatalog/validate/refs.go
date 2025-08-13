@@ -270,6 +270,17 @@ func (rv *RefValidator) validateVariantsReferences(
 			})
 		} else {
 			group, propID := matches[1], matches[2]
+			if prop := fetcher.Property(group, propID); prop != nil {
+				if !strings.HasPrefix(prop.Type, "#/custom-types/") {
+					if !strings.Contains(prop.Type, "string") && !strings.Contains(prop.Type, "integer") && !strings.Contains(prop.Type, "boolean") {
+						errs = append(errs, ValidationError{
+							Reference: variantReference,
+							error:     fmt.Errorf("discriminator reference '%s' has invalid type, should be one of 'string', 'integer', 'boolean'", variant.Discriminator),
+						})
+					}
+				}
+			}
+
 			if !rulePropertyExists(fmt.Sprintf("#/properties/%s/%s", group, propID)) {
 				errs = append(errs, ValidationError{
 					Reference: variantReference,
