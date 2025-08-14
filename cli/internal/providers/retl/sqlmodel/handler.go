@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -213,6 +214,61 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 	}
 
 	return resourceData, nil
+}
+
+func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+	if args.LocalID == "" {
+		return nil, fmt.Errorf("local id is required")
+	}
+	if args.RemoteID == "" {
+		return nil, fmt.Errorf("remote id is required")
+	}
+
+	// First, get all sources to find the one we want to import
+	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
+	if err != nil {
+		return nil, fmt.Errorf("getting RETL source for import: %w", err)
+	}
+	// Validate that this is a SQL model source
+	if source.SourceType != retlClient.ModelSourceType {
+		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
+	}
+
+	// Create the base resource data structure for the imported source
+	importedData := resources.ResourceData{
+		IDKey:               args.LocalID,
+		DisplayNameKey:      source.Name,
+		DescriptionKey:      source.Config.Description,
+		AccountIDKey:        source.AccountID,
+		PrimaryKeyKey:       source.Config.PrimaryKey,
+		SourceDefinitionKey: source.SourceDefinitionName,
+		EnabledKey:          source.IsEnabled,
+		SQLKey:              source.Config.Sql,
+	}
+
+	importMetadata := importremote.Metadata{
+		Name: args.LocalID,
+		Import: importremote.WorkspacesImportMetadata{
+			Workspaces: []importremote.WorkspaceImportMetadata{
+				{
+					WorkspaceID: source.WorkspaceID,
+					Resources: []importremote.ImportIds{
+						{
+							LocalID:  args.LocalID,
+							RemoteID: args.RemoteID,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	importData := importremote.ImportData{
+		ResourceData: &importedData,
+		Metadata:     importMetadata,
+		ResourceType: ResourceType,
+	}
+	return []importremote.ImportData{importData}, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
