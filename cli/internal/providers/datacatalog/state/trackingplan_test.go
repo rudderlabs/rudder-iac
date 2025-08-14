@@ -26,13 +26,13 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 						Required: true,
 					},
 					{
-						ID:        "other-property-name",
-						LocalID:     "other-property-local-id",
+						ID:      "other-property-name",
+						LocalID: "other-property-local-id",
 						Properties: []*state.TrackingPlanPropertyArgs{
 							{
-								ID:        "nested-property-name",
-								LocalID:     "nested-property-local-id",
-								Required:    true,
+								ID:       "nested-property-name",
+								LocalID:  "nested-property-local-id",
+								Required: true,
 							},
 						},
 					},
@@ -110,19 +110,19 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		assert.Equal(t, 0, len(diffed.Deleted))
 
 	})
-	
+
 	t.Run("nested property diff - nested property changed", func(t *testing.T) {
 		t.Parallel()
 
 		propertyWithNested := &state.TrackingPlanPropertyArgs{
-			ID:        "user-profile",
-			LocalID:     "user-profile-id",
-			Required:    true,
+			ID:       "user-profile",
+			LocalID:  "user-profile-id",
+			Required: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:        "profile-name",
-					LocalID:     "profile-name-id",
-					Required:    true, // Changed to false later
+					ID:       "profile-name",
+					LocalID:  "profile-name-id",
+					Required: true, // Changed to false later
 				},
 			},
 		}
@@ -134,14 +134,14 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}).Build()
 
 		propertyWithNestedChanged := &state.TrackingPlanPropertyArgs{
-			ID:        "user-profile",
-			LocalID:     "user-profile-id",
-			Required:    true,
+			ID:       "user-profile",
+			LocalID:  "user-profile-id",
+			Required: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:        "profile-name",
-					LocalID:     "profile-name-id",
-					Required:    false, // Different from above
+					ID:       "profile-name",
+					LocalID:  "profile-name-id",
+					Required: false, // Different from above
 				},
 			},
 		}
@@ -163,14 +163,14 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		// Property with no nested properties
 		propertyWithoutNested := &state.TrackingPlanPropertyArgs{
-			ID:        "user-profile",
-			LocalID:     "user-profile-id",
-			Required:    true,
+			ID:       "user-profile",
+			LocalID:  "user-profile-id",
+			Required: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:        "profile-name",
-					LocalID:     "profile-name-id",
-					Required:    true,
+					ID:       "profile-name",
+					LocalID:  "profile-name-id",
+					Required: true,
 				},
 			},
 		}
@@ -183,19 +183,19 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		// Property with one nested property
 		propertyWithOneNested := &state.TrackingPlanPropertyArgs{
-			ID:        "user-profile",
-			LocalID:     "user-profile-id",
-			Required:    true,
+			ID:       "user-profile",
+			LocalID:  "user-profile-id",
+			Required: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:        "profile-name",
-					LocalID:     "profile-name-id",
-					Required:    true,
+					ID:       "profile-name",
+					LocalID:  "profile-name-id",
+					Required: true,
 				},
 				{
-					ID:        "profile-email", // Added nested property
-					LocalID:     "profile-email-id",
-					Required:    false,
+					ID:       "profile-email", // Added nested property
+					LocalID:  "profile-email-id",
+					Required: false,
 				},
 			},
 		}
@@ -382,19 +382,20 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
-				LocalID:          "user-profile-id",
-				Required:         true,
+				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
+				LocalID:              "user-profile-id",
+				Required:             true,
+				AdditionalProperties: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:        resources.PropertyRef{URN: "property:profile-name-id", Property: "id"},
-						LocalID:     "profile-name-id",
-						Required:    true,
+						ID:       resources.PropertyRef{URN: "property:profile-name-id", Property: "id"},
+						LocalID:  "profile-name-id",
+						Required: true,
 					},
 					{
-						ID:        resources.PropertyRef{URN: "property:profile-email-id", Property: "id"},
-						LocalID:     "profile-email-id",
-						Required:    false,
+						ID:       resources.PropertyRef{URN: "property:profile-email-id", Property: "id"},
+						LocalID:  "profile-email-id",
+						Required: false,
 					},
 				},
 			},
@@ -469,29 +470,32 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
-				LocalID:          "user-profile-id",
-				Required:         true,
+				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
+				LocalID:              "user-profile-id",
+				Required:             true,
+				AdditionalProperties: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:        resources.PropertyRef{URN: "property:profile-settings-id", Property: "id"},
-						LocalID:     "profile-settings-id",
-						Required:    false,
+						ID:                   resources.PropertyRef{URN: "property:profile-settings-id", Property: "id"},
+						LocalID:              "profile-settings-id",
+						Required:             false,
+						AdditionalProperties: true,
 						Properties: []*state.TrackingPlanPropertyArgs{
 							{
-								ID:        resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
-								LocalID:     "theme-preference-id",
-								Required:    false,
+								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
+								LocalID:  "theme-preference-id",
+								Required: false,
 							},
 							{
-								ID:        resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
-								LocalID:     "notifications-id",
-								Required:    true,
+								ID:                   resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
+								LocalID:              "notifications-id",
+								Required:             true,
+								AdditionalProperties: true,
 								Properties: []*state.TrackingPlanPropertyArgs{
 									{
-										ID:        resources.PropertyRef{URN: "property:email-enabled-id", Property: "id"},
-										LocalID:     "email-enabled-id",
-										Required:    true,
+										ID:       resources.PropertyRef{URN: "property:email-enabled-id", Property: "id"},
+										LocalID:  "email-enabled-id",
+										Required: true,
 									},
 								},
 							},
@@ -533,14 +537,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				return ""
 			},
 			expected: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
-				LocalID:          "user-profile-id",
-				Required:         true,
+				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
+				LocalID:              "user-profile-id",
+				Required:             true,
+				AdditionalProperties: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:             resources.PropertyRef{URN: "property:email-address-id", Property: "id"},
-						LocalID:          "email-address-id",
-						Required:         true,
+						ID:       resources.PropertyRef{URN: "property:email-address-id", Property: "id"},
+						LocalID:  "email-address-id",
+						Required: true,
 					},
 				},
 			},
@@ -601,51 +606,51 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 		{
 			name: "Simple property without nested properties",
 			property: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:simple-property-id", Property: "id"},
-				LocalID:          "simple-property-id",
-				Required:         true,
+				ID:       resources.PropertyRef{URN: "property:simple-property-id", Property: "id"},
+				LocalID:  "simple-property-id",
+				Required: true,
 			},
 		},
 		{
 			name: "Property with deeply nested properties (3 levels)",
 			property: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
-				LocalID:          "user-profile-id",
-				Required:         true,
+				ID:       resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
+				LocalID:  "user-profile-id",
+				Required: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:        resources.PropertyRef{URN: "property:profile-settings-id", Property: "id"},
-						LocalID:     "profile-settings-id",
-						Required:    false,
+						ID:       resources.PropertyRef{URN: "property:profile-settings-id", Property: "id"},
+						LocalID:  "profile-settings-id",
+						Required: false,
 						Properties: []*state.TrackingPlanPropertyArgs{
 							{
-								ID:        resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
-								LocalID:     "theme-preference-id",
-								Required:    false,
+								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
+								LocalID:  "theme-preference-id",
+								Required: false,
 							},
 							{
-								ID:        resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
-								LocalID:     "notifications-id",
-								Required:    true,
+								ID:       resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
+								LocalID:  "notifications-id",
+								Required: true,
 								Properties: []*state.TrackingPlanPropertyArgs{
 									{
-										ID:        resources.PropertyRef{URN: "property:email-enabled-id", Property: "id"},
-										LocalID:     "email-enabled-id",
-										Required:    true,
+										ID:       resources.PropertyRef{URN: "property:email-enabled-id", Property: "id"},
+										LocalID:  "email-enabled-id",
+										Required: true,
 									},
 									{
-										ID:        resources.PropertyRef{URN: "property:push-enabled-id", Property: "id"},
-										LocalID:     "push-enabled-id",
-										Required:    false,
+										ID:       resources.PropertyRef{URN: "property:push-enabled-id", Property: "id"},
+										LocalID:  "push-enabled-id",
+										Required: false,
 									},
 								},
 							},
 						},
 					},
 					{
-						ID:        resources.PropertyRef{URN: "property:profile-visibility-id", Property: "id"},
-						LocalID:     "profile-visibility-id",
-						Required:    true,
+						ID:       resources.PropertyRef{URN: "property:profile-visibility-id", Property: "id"},
+						LocalID:  "profile-visibility-id",
+						Required: true,
 					},
 				},
 			},
@@ -653,14 +658,14 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 		{
 			name: "Property with custom type reference and nested properties",
 			property: &state.TrackingPlanPropertyArgs{
-				ID:             resources.PropertyRef{URN: "property:user-data-id", Property: "id"},
-				LocalID:          "user-data-id",
-				Required:         true,
+				ID:       resources.PropertyRef{URN: "property:user-data-id", Property: "id"},
+				LocalID:  "user-data-id",
+				Required: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:             resources.PropertyRef{URN: "property:custom-field-id", Property: "id"},
-						LocalID:          "custom-field-id",
-						Required:         true,
+						ID:       resources.PropertyRef{URN: "property:custom-field-id", Property: "id"},
+						LocalID:  "custom-field-id",
+						Required: true,
 					},
 				},
 			},
