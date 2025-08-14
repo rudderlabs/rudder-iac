@@ -46,6 +46,7 @@ type resourceHandler interface {
 	// dependency resolution and state management.
 	List(ctx context.Context) ([]resources.ResourceData, error)
 
+
 	// Import imports a single remote resource with local ID mapping.
 	// This method fetches a remote resource by remoteID and prepares it for local import
 	// with the specified localID. The workspaceID is used for proper resource scoping.
