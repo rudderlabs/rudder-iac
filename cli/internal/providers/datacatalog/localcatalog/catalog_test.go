@@ -126,10 +126,24 @@ func TestExtractCatalogEntity(t *testing.T) {
                 maxLength: 63
             - id: button_signin
               name: "Button used for signin in the app"
-              type: string
+              type: object
               description: "Button used for signin in the app"
-              propConfig:
-                enum: '["Sign In", "Sign Up"]'
+            - id: remember_me_checkbox_clicked
+              name: "Remember Me Checkbox Clicked"
+              type: boolean
+              description: "Whether the remember me checkbox was clicked during signin"
+            - id: captcha
+              name: "Captcha"
+              type: object
+              description: "Captcha details during signin"
+            - id: captcha_solved
+              name: "Captcha Solved"
+              type: boolean
+              description: "Whether the captcha was solved during signin"
+            - id: captcha_type
+              name: "Captcha Type"
+              type: string
+              description: "Type of captcha used during signin"
        `)
 
 		s, err = specs.New(byt)
@@ -159,6 +173,18 @@ func TestExtractCatalogEntity(t *testing.T) {
                   required: true
                 - $ref: "#/properties/base_mobile_props/button_signin"
                   required: false
+                  properties:
+                    - $ref: "#/properties/base_mobile_props/username"
+                      required: true
+                    - $ref: "#/properties/base_mobile_props/remember_me_checkbox_clicked"
+                      required: false
+                    - $ref: "#/properties/base_mobile_props/captcha"
+                      required: false
+                      properties:
+                        - $ref: "#/properties/base_mobile_props/captcha_solved"
+                          required: false
+                        - $ref: "#/properties/base_mobile_props/captcha_type"
+                          required: false
         `)
 
 		s, err = specs.New(byt)
@@ -188,6 +214,30 @@ func TestExtractCatalogEntity(t *testing.T) {
 						{
 							Ref:      "#/properties/base_mobile_props/button_signin",
 							Required: false,
+							Properties: []*TPRuleProperty{
+								{
+									Ref:      "#/properties/base_mobile_props/username",
+									Required: true,
+								},
+								{
+									Ref:      "#/properties/base_mobile_props/remember_me_checkbox_clicked",
+									Required: false,
+								},
+								{
+									Ref:      "#/properties/base_mobile_props/captcha",
+									Required: false,
+									Properties: []*TPRuleProperty{
+										{
+											Ref:      "#/properties/base_mobile_props/captcha_solved",
+											Required: false,
+										},
+										{
+											Ref:      "#/properties/base_mobile_props/captcha_type",
+											Required: false,
+										},
+									},
+								},
+							},
 						},
 					},
 				},
