@@ -100,7 +100,7 @@ type TrackingPlanEventPropertyIdentifiers struct {
 	UpdatedAt            time.Time `json:"updatedAt"`
 	IdentitySection      string    `json:"identitySection"`
 	AdditionalProperties bool      `json:"additionalProperties"`
-	Properties           struct {
+	Properties           []struct {
 		ID       string `json:"id"`
 		Required bool   `json:"required"`
 	} `json:"properties"`
