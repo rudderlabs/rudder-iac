@@ -45,7 +45,7 @@
                         "required": true
                     }
                 ],
-                "variants": [],
+                "variants": []
             },
             {
                 "allowUnplanned": true,
@@ -89,7 +89,7 @@
                         "required": true
                     }
                 ],
-                "variants": [],
+                "variants": []
             },
             {
                 "allowUnplanned": false,
@@ -116,7 +116,7 @@
                         "required": true
                     }
                 ],
-                "variants": [],
+                "variants": []
             }
         ],
         "localId": "api_tracking",
@@ -188,7 +188,7 @@
                         {
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "localId": "api_method",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "api_path",
