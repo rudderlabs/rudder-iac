@@ -12,7 +12,7 @@
       "id": "ev_2yzYxszrUnzSogGdZOAPO7yF47u",
       "identitySection": "properties",
       "name": "API Error",
-      "additionalProperties": "true",
+      "additionalProperties": true,
       "properties": [
         {
           "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",

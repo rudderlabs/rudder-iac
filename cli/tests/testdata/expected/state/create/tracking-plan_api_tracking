@@ -128,7 +128,6 @@
                             "required": true
                         }
                     ],
-                    "type": "track",
                     "variants": []
                 },
                 {
@@ -148,8 +147,7 @@
                             "required": true
                         }
                     ],
-                    "variants": [],
-                    "type": "track"
+                    "variants": []
                 }
             ],
             "localId": "api_tracking",

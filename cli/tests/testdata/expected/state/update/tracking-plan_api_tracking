@@ -34,7 +34,8 @@
                         "id": {
                             "$__rudderRef": "property:user_mail",
                             "property": "id"
-                        }
+                        },
+                        "required": true
                     },
                     {
                         "localId": "password",
@@ -176,8 +177,7 @@
                             "required": true
                         }
                     ],
-                    "variants": [],
-                    "type": "track"
+                    "variants": []
                 },
                 {
                     "allowUnplanned": true,
@@ -206,8 +206,7 @@
                             "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo"
                         }
                     ],
-                    "variants": [],
-                    "type": "track"
+                    "variants": []
                 },
                 {
                     "allowUnplanned": false,
@@ -226,8 +225,7 @@
                             "required": true
                         }
                     ],
-                    "variants": [],
-                    "type": "track"
+                    "variants": []
                 }
             ],
             "localId": "api_tracking",

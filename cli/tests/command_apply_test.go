@@ -85,6 +85,11 @@ func verifyState(t *testing.T, dir string) {
 			"output.trackingPlanArgs.events[1].id",
 			"output.trackingPlanArgs.events[1].properties[0].id",
 			"output.trackingPlanArgs.events[1].properties[1].id",
+			"output.trackingPlanArgs.events[1].properties[2].id",
+			"output.trackingPlanArgs.events[1].properties[3].id",
+			"output.trackingPlanArgs.events[2].id",
+			"output.trackingPlanArgs.events[2].properties[0].id",
+			"output.trackingPlanArgs.events[2].properties[1].id",
 		},
 	)
 
