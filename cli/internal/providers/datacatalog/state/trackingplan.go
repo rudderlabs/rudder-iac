@@ -232,10 +232,11 @@ func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPro
 }
 
 type TrackingPlanPropertyArgs struct {
-	ID       any
-	LocalID  string
-	Required bool
-	Properties       []*TrackingPlanPropertyArgs `json:"properties,omitempty"`
+	ID                   any
+	LocalID              string
+	Required             bool
+	Properties           []*TrackingPlanPropertyArgs `json:"properties,omitempty"`
+	AdditionalProperties bool                        `json:"additionalProperties"`
 }
 
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
@@ -301,6 +302,8 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 			nestedProperties = append(nestedProperties, nestedArgs)
 		}
 		args.Properties = nestedProperties
+		// set additionalProperties to true if there are nested properties
+		args.AdditionalProperties = true
 	}
 
 	return nil
@@ -309,9 +312,10 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 // ToResourceData converts TrackingPlanPropertyArgs to resource data map
 func (args *TrackingPlanPropertyArgs) ToResourceData() map[string]interface{} {
 	propMap := map[string]interface{}{
-		"id":       args.ID,
-		"localId":  args.LocalID,
-		"required": args.Required,
+		"id":                   args.ID,
+		"localId":              args.LocalID,
+		"required":             args.Required,
+		"additionalProperties": args.AdditionalProperties,
 	}
 
 	// Handle nested properties recursively
@@ -331,6 +335,7 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	args.LocalID = MustString(propMap, "localId")
 	args.Required = MustBool(propMap, "required")
 	args.ID = String(propMap, "id", "")
+	args.AdditionalProperties = MustBool(propMap, "additionalProperties")
 
 	// Handle nested properties recursively
 	nestedProps := MapStringInterfaceSlice(propMap, "properties", nil)

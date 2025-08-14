@@ -223,13 +223,26 @@ func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventId
 		Properties: lo.Map(
 			from.Properties,
 			func(prop *state.TrackingPlanPropertyArgs, _ int) catalog.PropertyIdentifierDetail {
-				return catalog.PropertyIdentifierDetail{
-					ID:       prop.ID.(string),
-					Required: prop.Required,
-				}
+				return GetUpsertPropertyIdentifier(prop)
 			}),
 		AdditionalProperties: from.AllowUnplanned,
 		IdentitySection:      identitySection,
 		Variants:             from.Variants.ToCatalogVariants(),
 	}
+}
+
+func GetUpsertPropertyIdentifier(from *state.TrackingPlanPropertyArgs) catalog.PropertyIdentifierDetail {
+	res := catalog.PropertyIdentifierDetail{
+		ID:                   from.ID.(string),
+		Required:             from.Required,
+		AdditionalProperties: from.AdditionalProperties,
+	}
+
+	if len(from.Properties) > 0 {
+		res.Properties = lo.Map(from.Properties, func(prop *state.TrackingPlanPropertyArgs, _ int) catalog.PropertyIdentifierDetail {
+			return GetUpsertPropertyIdentifier(prop)
+		})
+	}
+
+	return res
 }

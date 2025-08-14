@@ -83,8 +83,9 @@ type TPRuleEvent struct {
 }
 
 type TPRuleProperty struct {
-	Ref        string            `json:"$ref"`
-	Required   bool              `json:"required"`
+	Ref      string            `json:"$ref"`
+	Required bool              `json:"required"`
+	LocalID  string            `json:"id"`
 	Properties []*TPRuleProperty `json:"properties,omitempty"` // NEW: Recursive nesting
 }
 
@@ -219,21 +220,16 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	// Load the properties from the data catalog (including nested properties)
 	// into corresponding event on the tracking plan
 	for _, prop := range rule.Properties {
-		matches = PropRegex.FindStringSubmatch(prop.Ref)
-		if len(matches) != 3 {
-			return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
-		}
-
-		propertyGroup, propertyID := matches[1], matches[2]
-		property := fetcher.Property(propertyGroup, propertyID)
-		if property == nil {
-			return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
+		property, err := expandPropertyRefs(prop, fetcher)
+		if err != nil {
+			return nil, fmt.Errorf("expanding property refs within the property: %s failed, err: %w", prop.LocalID, err)
 		}
 
 		toReturn.Properties = append(toReturn.Properties, &TPEventProperty{
 			Name:        property.Name,
 			Ref:         prop.Ref,
 			LocalID:     property.LocalID,
+			Properties:  property.Properties,
 			Description: property.Description,
 			Type:        property.Type,
 			Required:    prop.Required,
@@ -242,6 +238,41 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	}
 
 	return &toReturn, nil
+}
+
+func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*TPEventProperty, error) {
+	log.Debug("expanding property refs within the property", "propertyID", prop.LocalID)
+
+	matches := PropRegex.FindStringSubmatch(prop.Ref)
+	if len(matches) != 3 {
+		return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
+	}
+
+	propertyGroup, propertyID := matches[1], matches[2]
+	property := fetcher.Property(propertyGroup, propertyID)
+	if property == nil {
+		return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
+	}
+
+	properties := make([]*TPEventProperty, 0)
+	for _, nestedProp := range prop.Properties {
+		nestedProp, err := expandPropertyRefs(nestedProp, fetcher)
+		if err != nil {
+			return nil, fmt.Errorf("expanding nested property refs within the property: %s failed, err: %w", prop.LocalID, err)
+		}
+		properties = append(properties, nestedProp)
+	}
+
+	return &TPEventProperty{
+		Name:        property.Name,
+		Ref:         prop.Ref,
+		Properties:  properties,
+		LocalID:     property.LocalID,
+		Description: property.Description,
+		Type:        property.Type,
+		Required:    prop.Required,
+		Config:      shallowCopy(property.Config),
+	}, nil
 }
 
 func shallowCopy(input map[string]any) map[string]any {
