@@ -52,4 +52,10 @@ type resourceHandler interface {
 	// with the specified localID. The workspaceID is used for proper resource scoping.
 	// Returns the resource data with import metadata or an error if import fails.
 	FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error)
+
+	// Import imports a single remote resource with local ID mapping.
+	// This method fetches a remote resource by remoteID and prepares it for local import
+	// with the specified localID. The workspaceID is used for proper resource scoping.
+	// Returns the resource data with import metadata or an error if import fails.
+	Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error)
 }

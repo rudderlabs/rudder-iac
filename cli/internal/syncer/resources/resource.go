@@ -28,6 +28,12 @@ func NewResource(id string, resourceType string, data ResourceData, dependencies
 	}
 }
 
+func NewResourceWithImportMetadata(id string, resourceType string, data ResourceData, dependencies []string, importMetadata map[string]interface{}) *Resource {
+	resource := NewResource(id, resourceType, data, dependencies)
+	resource.r.ImportMetadata = importMetadata
+	return resource
+}
+
 func (r *Resource) ID() string {
 	return r.r.ID
 }
@@ -46,4 +52,8 @@ func (r *Resource) URN() string {
 
 func (r *Resource) Dependencies() []string {
 	return r.r.Dependencies
+}
+
+func (r *Resource) ImportMetadata() map[string]interface{} {
+	return r.r.ImportMetadata
 }

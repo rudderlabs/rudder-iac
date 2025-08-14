@@ -185,6 +185,15 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 	return handler.List(ctx)
 }
 
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.Import(ctx, ID, data, metadata)
+}
+
 // Import imports a single remote RETL resource with local ID mapping
 func (p *Provider) FetchImportData(ctx context.Context, resourceType string, args importremote.ImportArgs) ([]importremote.ImportData, error) {
 	// Only support SQL models for import in this phase

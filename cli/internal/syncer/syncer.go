@@ -22,6 +22,7 @@ type SyncProvider interface {
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
+	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error)
 }
 
 func New(p SyncProvider) (*ProjectSyncer, error) {
@@ -179,6 +180,35 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 	return st, nil
 }
 
+func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+	input := r.Data()
+	dereferenced, err := state.Dereference(input, st)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata())
+	if err != nil {
+		return nil, err
+	}
+
+	sr := &state.ResourceState{
+		ID:           r.ID(),
+		Type:         r.Type(),
+		Input:        input,
+		Output:       *output,
+		Dependencies: r.Dependencies(),
+	}
+
+	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
+		return nil, fmt.Errorf("failed to update resource state: %w", err)
+	}
+
+	st.AddResource(sr)
+
+	return st, nil
+}
+
 func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
 	input := r.Data()
 	dereferenced, err := state.Dereference(input, st)
@@ -243,6 +273,8 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 		return s.updateOperation(ctx, r, st)
 	case planner.Delete:
 		return s.deleteOperation(ctx, r, st)
+	case planner.Import:
+		return s.importOperation(ctx, r, st)
 	default:
 		return nil, fmt.Errorf("unknown operation type with code: %d", o.Type)
 	}

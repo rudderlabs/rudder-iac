@@ -12,6 +12,10 @@ func PrintDiff(diff *Diff) {
 		listResources("New resources", diff.NewResources, nil)
 	}
 
+	if len(diff.ImportResources) > 0 {
+		listResources("Import resources", diff.ImportResources, nil)
+	}
+
 	if len(diff.UpdatedResources) > 0 {
 		urns := []string{}
 		for _, r := range diff.UpdatedResources {
