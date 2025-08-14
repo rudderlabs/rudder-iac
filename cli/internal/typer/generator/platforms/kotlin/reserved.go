@@ -1,0 +1,35 @@
+package kotlin
+
+// KotlinReservedKeywords contains all Kotlin reserved keywords that cannot be used as identifiers
+// TODO: Review and update this list as needed
+var KotlinReservedKeywords = map[string]bool{
+	"as":        true,
+	"break":     true,
+	"catch":     true,
+	"class":     true,
+	"continue":  true,
+	"do":        true,
+	"else":      true,
+	"false":     true,
+	"for":       true,
+	"fun":       true,
+	"if":        true,
+	"in":        true,
+	"interface": true,
+	"is":        true,
+	"null":      true,
+	"object":    true,
+	"package":   true,
+	"return":    true,
+	"super":     true,
+	"this":      true,
+	"throw":     true,
+	"true":      true,
+	"try":       true,
+	"typealias": true,
+	"typeof":    true,
+	"val":       true,
+	"var":       true,
+	"when":      true,
+	"while":     true,
+}
