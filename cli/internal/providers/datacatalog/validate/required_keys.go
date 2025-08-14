@@ -530,11 +530,12 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.V
 
 			for k, matchValue := range variantCase.Match {
 				switch matchValue.(type) {
-				case string, bool:
-				case float32, float64:
+				case string, bool,
+					int, int8, int16, int32, int64,
+					uint, uint8, uint16, uint32, uint64:
 				default:
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("match value at index %d must be string, bool or number type (got: %T)", k, matchValue),
+						error:     fmt.Errorf("match value at index %d must be string, bool or integer type (got: %T)", k, matchValue),
 						Reference: caseReference,
 					})
 				}

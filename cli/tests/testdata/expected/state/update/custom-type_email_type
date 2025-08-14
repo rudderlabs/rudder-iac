@@ -12,7 +12,8 @@
     "localId": "email_type",
     "name": "EmailType",
     "properties": [],
-    "type": "string"
+    "type": "string",
+    "variants": []
   },
   "output": {
     "config": {
@@ -33,6 +34,7 @@
       "localId": "email_type",
       "name": "EmailType",
       "properties": [],
+      "variants": [],
       "type": "string"
     },
     "description": "Custom type for email validation",

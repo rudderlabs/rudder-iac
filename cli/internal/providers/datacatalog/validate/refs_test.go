@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -283,6 +284,12 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							Event: &catalog.TPRuleEvent{
 								Ref: "#/events/test-group/test-event",
 							},
+							Properties: []*catalog.TPRuleProperty{
+								{
+									Ref:      "#/properties/test-group/page_name",
+									Required: true,
+								},
+							},
 							Variants: catalog.Variants{
 								{
 									Type:          "discriminator",
@@ -315,6 +322,12 @@ func TestVariantsReferenceValidation(t *testing.T) {
 						Name:        "TestType",
 						Description: "Test custom type with variants",
 						Type:        "object",
+						Properties: []catalog.CustomTypeProperty{
+							{
+								Ref:      "#/properties/test-group/user_id",
+								Required: true,
+							},
+						},
 						Variants: catalog.Variants{
 							{
 								Type:          "discriminator",
@@ -336,7 +349,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			errors: nil,
 		},
 		{
-			name: "invalid property reference in variant case",
+			name: "invalid discriminator and property reference in variant case",
 			trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
 				"test-group": {
 					LocalID: "test-tp",
@@ -369,8 +382,12 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			},
 			errors: []ValidationError{
 				{
-					error:     fmt.Errorf("property reference '#/properties/test-group/non_existent_property' not found in catalog"),
-					Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]/properties[0]",
+					error:     errors.New("property reference '#/properties/test-group/non_existent_property' not found in catalog"),
+					Reference: "#/tp/test-group/test-tp/event_rule/test-rule/variants[0]/cases[0]/properties[0]",
+				},
+				{
+					error:     errors.New("discriminator reference has invalid format, should be #/properties/<group>/<id>"),
+					Reference: "#/tp/test-group/test-tp/event_rule/test-rule/variants[0]",
 				},
 			},
 		},
@@ -386,6 +403,12 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: &catalog.TPRuleEvent{
 								Ref: "#/events/test-group/test-event",
+							},
+							Properties: []*catalog.TPRuleProperty{
+								{
+									Ref:      "#/properties/test-group/page_name",
+									Required: true,
+								},
 							},
 							Variants: catalog.Variants{
 								{
@@ -412,7 +435,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			errors: []ValidationError{
 				{
 					error:     fmt.Errorf("default property reference '#/properties/test-group/non_existent_property' not found in catalog"),
-					Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/default/properties[0]",
+					Reference: "#/tp/test-group/test-tp/event_rule/test-rule/variants[0]/default/properties[0]",
 				},
 			},
 		},
@@ -442,7 +465,13 @@ func TestVariantsReferenceValidation(t *testing.T) {
 					}
 
 					if !found {
-						assert.Failf(t, "variants_reference_validation_failures", "Expected to find error: %v with reference: %s in expected", actual, actual.Reference)
+						assert.Failf(
+							t,
+							"variants_reference_validation_failures",
+							"Expected to find error: %s with reference: %s in expected",
+							actual.Error(),
+							actual.Reference,
+						)
 					}
 				}
 			}

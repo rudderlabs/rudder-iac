@@ -44,6 +44,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Type:        toArgs.Type,
 		Config:      toArgs.Config,
 		Properties:  properties,
+		Variants:    toArgs.Variants.ToCatalogVariants(),
 	}
 
 	customType, err := p.client.CreateCustomType(ctx, input)
@@ -95,6 +96,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		Type:        toArgs.Type,
 		Config:      toArgs.Config,
 		Properties:  properties,
+		Variants:    toArgs.Variants.ToCatalogVariants(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)

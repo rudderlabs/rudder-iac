@@ -127,6 +127,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return customTypeIDToURN[id]
 		case "categories":
 			return categoryIDToURN[id]
+		case "events":
+			return eventIDToURN[id]
 		default:
 			return ""
 		}

@@ -24,7 +24,8 @@
         "required": true
       }
     ],
-    "type": "object"
+    "type": "object",
+    "variants": []
   },
   "output": {
     "config": {},
@@ -46,6 +47,7 @@
           "required": true
         }
       ],
+      "variants": [],
       "type": "object"
     },
     "description": "Object containing login details",
