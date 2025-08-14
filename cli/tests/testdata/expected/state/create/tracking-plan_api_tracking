@@ -9,14 +9,14 @@
                 "identitySection": "",
                 "localId": "api_tracking",
                 "id": {
-                   "$__rudderRef": "events:api_tracking",
+                   "$__rudderRef": "event:api_tracking",
                    "property": "id"
                 },
                 "properties": [
                     {
                         "localId": "api_method",
                         "id": {
-                            "$__rudderRef": "properties:api_method",
+                            "$__rudderRef": "property:api_method",
                             "property": "id"
                         },
                         "required": true
@@ -24,7 +24,7 @@
                     {
                         "localId": "api_path",
                         "id": {
-                            "$__rudderRef": "properties:api_path",
+                            "$__rudderRef": "property:api_path",
                             "property": "id"
                         },
                         "required": true
@@ -32,7 +32,7 @@
                     {
                         "localId": "username",
                         "id": {
-                            "$__rudderRef": "properties:username",
+                            "$__rudderRef": "property:username",
                             "property": "id"
                         },
                         "required": true
@@ -40,28 +40,27 @@
                     {
                         "localId": "password",
                         "id": {
-                            "$__rudderRef": "properties:password",
+                            "$__rudderRef": "property:password",
                             "property": "id"
                         },
                         "required": true
                     }
                 ],
                 "variants": [],
-                "type": "track"
             },
             {
                 "allowUnplanned": false,
                 "identitySection": "",
                 "localId": "login",
                 "id": {
-                    "$__rudderRef": "events:login",
+                    "$__rudderRef": "event:login",
                     "property": "id"
                 },
                 "properties": [
                     {
                         "localId": "username",
                         "id": {
-                            "$__rudderRef": "properties:username",
+                            "$__rudderRef": "property:username",
                             "property": "id"
                         },
                         "required": true
@@ -69,14 +68,13 @@
                     {
                         "localId": "password",
                         "id": {
-                            "$__rudderRef": "properties:password",
+                            "$__rudderRef": "property:password",
                             "property": "id"
                         },
                         "required": true
                     }
                 ],
                 "variants": [],
-                "type": "track"
             }
         ],
         "localId": "api_tracking",

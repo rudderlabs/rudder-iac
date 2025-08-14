@@ -8,11 +8,15 @@
                 "allowUnplanned": true,
                 "identitySection": "",
                 "localId": "api_tracking",
+                "id": {
+                    "$__rudderRef": "event:api_tracking",
+                    "property": "id"
+                },
                 "properties": [
                     {
                         "localId": "api_method",
                         "id": {
-                            "$__rudderRef": "properties:api_method",
+                            "$__rudderRef": "property:api_method",
                             "property": "id"
                         },
                         "required": true
@@ -20,7 +24,7 @@
                     {
                         "localId": "api_path",
                         "id": {
-                            "$__rudderRef": "properties:api_path",
+                            "$__rudderRef": "property:api_path",
                             "property": "id"
                         },
                         "required": true
@@ -28,35 +32,34 @@
                     {
                         "localId": "user_mail",
                         "id": {
-                            "$__rudderRef": "properties:user_mail",
+                            "$__rudderRef": "property:user_mail",
                             "property": "id"
                         }
                     },
                     {
                         "localId": "password",
                         "id": {
-                            "$__rudderRef": "properties:password",
+                            "$__rudderRef": "property:password",
                             "property": "id"
                         },
                         "required": true
                     }
                 ],
                 "variants": [],
-                "type": "track"
             },
             {
                 "allowUnplanned": true,
                 "identitySection": "",
                 "localId": "api_error",
                 "id": {
-                    "$__rudderRef": "events:api_error",
+                    "$__rudderRef": "event:api_error",
                     "property": "id"
                 },
                 "properties": [
                     {
                         "localId": "api_method",
                         "id": {
-                            "$__rudderRef": "properties:api_method",
+                            "$__rudderRef": "property:api_method",
                             "property": "id"
                         },
                         "required": true
@@ -64,7 +67,7 @@
                     {
                         "localId": "api_path",
                         "id": {
-                            "$__rudderRef": "properties:api_path",
+                            "$__rudderRef": "property:api_path",
                             "property": "id"
                         },
                         "required": true
@@ -72,7 +75,7 @@
                     {
                         "localId": "http_retry_count",
                         "id": {
-                            "$__rudderRef": "properties:http_retry_count",
+                            "$__rudderRef": "property:http_retry_count",
                             "property": "id"
                         },
                         "required": false
@@ -80,42 +83,40 @@
                     {
                         "localId": "error_code",
                         "id": {
-                            "$__rudderRef": "properties:error_code",
+                            "$__rudderRef": "property:error_code",
                             "property": "id"
                         },
                         "required": true
                     }
                 ],
                 "variants": [],
-                "type": "track"
             },
             {
                 "allowUnplanned": false,
                 "identitySection": "",
                 "localId": "login",
                 "id": {
-                    "$__rudderRef": "events:login",
+                    "$__rudderRef": "event:login",
                     "property": "id"
                 },
                 "properties": [
                     {
                         "localId": "user_mail",
                         "id": {
-                            "$__rudderRef": "properties:user_mail",
+                            "$__rudderRef": "property:user_mail",
                             "property": "id"
                         }
                     },
                     {
                         "localId": "password",
                         "id": {
-                            "$__rudderRef": "properties:password",
+                            "$__rudderRef": "property:password",
                             "property": "id"
                         },
                         "required": true
                     }
                 ],
                 "variants": [],
-                "type": "track"
             }
         ],
         "localId": "api_tracking",
@@ -187,9 +188,7 @@
                         {
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "localId": "api_method",
-                            "name": "API Method",
                             "required": true,
-                            "type": "string"
                         },
                         {
                             "localId": "api_path",
