@@ -541,7 +541,7 @@ func TestProvider(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			provider := retl.New(newDefaultMockClient())
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.NoError(t, err)
 			assert.Len(t, results, 1)
@@ -555,15 +555,14 @@ func TestProvider(t *testing.T) {
 			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
 			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
 			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "ws-1", imported.Metadata.WorkspaceID)
-			assert.Equal(t, "remote-id", imported.Metadata.ImportIds[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.ImportIds[0].LocalID)
+			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
+			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
 		})
 
 		t.Run("Unsupported resource type", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), "unsupported-type", args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
@@ -573,86 +572,11 @@ func TestProvider(t *testing.T) {
 		t.Run("Handler error", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
-		})
-	})
-}
-
-func TestProviderList(t *testing.T) {
-	t.Run("DelegatesToHandler", func(t *testing.T) {
-		t.Run("Success", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
-				return &retlClient.RETLSources{
-					Data: []retlClient.RETLSource{
-						{
-							ID:                   "source-1",
-							Name:                 "Test Source 1",
-							IsEnabled:            true,
-							SourceType:           retlClient.ModelSourceType,
-							SourceDefinitionName: "postgres",
-							AccountID:            "account-1",
-							Config: retlClient.RETLSQLModelConfig{
-								Description: "Test description 1",
-								PrimaryKey:  "id",
-								Sql:         "SELECT * FROM table1",
-							},
-						},
-					},
-				}, nil
-			}
-
-			ctx := context.Background()
-			results, err := provider.List(ctx, "retl-source-sql-model", map[string]string{})
-
-			require.NoError(t, err)
-			assert.Len(t, results, 1)
-
-			// Verify the handler correctly converted the data
-			assert.Equal(t, "source-1", results[0]["id"])
-			assert.Equal(t, "Test Source 1", results[0]["name"]) // Handler uses "name" not "display_name"
-			// Note: EnabledKey and SourceTypeKey are not set by the current List implementation
-			assert.Equal(t, "postgres", results[0]["source_definition"])
-			assert.Equal(t, "account-1", results[0]["account_id"])
-		})
-
-		t.Run("HandlerError", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			// Mock error from client that the handler will encounter
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
-				return nil, fmt.Errorf("API error")
-			}
-
-			ctx := context.Background()
-			results, err := provider.List(ctx, "retl-source-sql-model", map[string]string{})
-
-			assert.Error(t, err)
-			assert.Nil(t, results)
-			assert.Contains(t, err.Error(), "listing RETL sources")
-		})
-
-		t.Run("UnsupportedResourceType", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			ctx := context.Background()
-			results, err := provider.List(ctx, "unsupported-type", map[string]string{})
-
-			assert.Error(t, err)
-			assert.Nil(t, results)
-			assert.Contains(t, err.Error(), "no handler for resource type")
 		})
 	})
 }

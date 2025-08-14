@@ -26,14 +26,13 @@ func NewCmdRetlSource() *cobra.Command {
 	var (
 		localID     string
 		remoteID    string
-		workspaceID string
 		location    string
 		sqlLocation string
 		err         error
 	)
 
 	cmd := &cobra.Command{
-		Use:   "retl-source",
+		Use:   "retl-sources",
 		Short: "Import remote RETL SQL Model to local configuration",
 		Long: heredoc.Doc(`
 			Import a remote RETL SQL Model source into a local YAML configuration file.
@@ -46,33 +45,19 @@ func NewCmdRetlSource() *cobra.Command {
 			YAML configuration will reference it using the 'file' field instead of inline 'sql'.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli import retl-source --local-id my-model --remote-id abc123 --workspace-id ws456
-			$ rudder-cli import retl-source -i analytics-model -r def789 -w ws123 -l ./models
-			$ rudder-cli import retl-source --local-id analytics-model --remote-id def789 --workspace-id ws123 --location ./models --sql-location ./sql
-			$ rudder-cli import retl-source -i analytics-model -r def789 -w ws123 -l ./models -s ./sql
+			$ rudder-cli import retl-source --local-id my-model --remote-id abc123
+			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models
+			$ rudder-cli import retl-source --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
+			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models -s ./sql
 		`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validate required flags
-			if localID == "" {
-				return fmt.Errorf("--local-id is required")
-			}
-			if remoteID == "" {
-				return fmt.Errorf("--remote-id is required")
-			}
-			if workspaceID == "" {
-				return fmt.Errorf("--workspace-id is required")
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			retlSourceImportLog.Debug("import retl-source", "localID", localID, "remoteID", remoteID, "workspaceID", workspaceID, "location", location, "sqlLocation", sqlLocation)
+			retlSourceImportLog.Debug("import retl-source", "localID", localID, "remoteID", remoteID, "location", location, "sqlLocation", sqlLocation)
 			retlSourceImportLog.Debug("importing remote RETL SQL Model to local configuration")
 
 			defer func() {
 				telemetry.TrackCommand("import retl-source", err, []telemetry.KV{
 					{K: "localID", V: localID},
 					{K: "remoteID", V: remoteID},
-					{K: "workspaceID", V: workspaceID},
 					{K: "location", V: location},
 					{K: "sqlLocation", V: sqlLocation},
 				}...)
@@ -91,9 +76,8 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			resources, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, importremote.ImportArgs{
-				RemoteID:    remoteID,
-				LocalID:     localID,
-				WorkspaceID: workspaceID,
+				RemoteID: remoteID,
+				LocalID:  localID,
 			})
 			if err != nil {
 				return fmt.Errorf("importing RETL SQL Model: %w", err)
@@ -112,7 +96,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			// Perform the import
-			err = importremote.Import(cmd.Context(), sqlmodel.ResourceType, resources, location)
+			err = importremote.Import(cmd.Context(), resources, location)
 			if err != nil {
 				return fmt.Errorf("importing RETL SQL Model: %w", err)
 			}
@@ -128,14 +112,12 @@ func NewCmdRetlSource() *cobra.Command {
 
 	cmd.Flags().StringVarP(&localID, "local-id", "i", "", "Local identifier for the imported SQL Model (required)")
 	cmd.Flags().StringVarP(&remoteID, "remote-id", "r", "", "Remote RETL source ID to import (required)")
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace ID for the import metadata (required)")
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Directory where to save the YAML configuration file (default: current directory)")
 	cmd.Flags().StringVarP(&sqlLocation, "sql-location", "s", "", "Directory where to save SQL files separately (optional, if not provided SQL will be inline in YAML)")
 
 	// Mark required flags
 	cmd.MarkFlagRequired("local-id")
 	cmd.MarkFlagRequired("remote-id")
-	cmd.MarkFlagRequired("workspace-id")
 
 	return cmd
 }

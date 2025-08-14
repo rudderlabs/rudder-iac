@@ -1,6 +1,7 @@
 package importremote
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	CLIVersion = "rudder/v0.1"
+	SpecVersion = "rudder/v0.1"
 )
 
 type ImportIds struct {
@@ -21,29 +22,31 @@ type ImportIds struct {
 	RemoteID string `yaml:"remote_id" mapstructure:"remote_id"`
 }
 
-type ImportMetadata struct {
+type Metadata struct {
+	Name   string                   `yaml:"name" mapstructure:"name"`
+	Import WorkspacesImportMetadata `yaml:"import" mapstructure:"import"`
+}
+
+type WorkspacesImportMetadata struct {
+	Workspaces []WorkspaceImportMetadata `yaml:"workspaces" mapstructure:"workspaces"`
+}
+type WorkspaceImportMetadata struct {
 	WorkspaceID string      `yaml:"workspace_id" mapstructure:"workspace_id"`
-	Name        string      `yaml:"name" mapstructure:"name"`
-	ImportIds   []ImportIds `yaml:"import_ids" mapstructure:"import_ids"`
+	Resources   []ImportIds `yaml:"resources" mapstructure:"resources"`
 }
 type ImportData struct {
 	ResourceData *resources.ResourceData
-	Metadata     ImportMetadata
-}
-
-type ImportProvider interface {
-	Import(ctx context.Context, resourceType string, args ImportArgs) ([]ImportData, error)
+	Metadata     Metadata
+	ResourceType string
 }
 
 type ImportArgs struct {
-	RemoteID    string
-	LocalID     string
-	WorkspaceID string
+	RemoteID string
+	LocalID  string
 }
 
-func Import(ctx context.Context, resourceType string, resources []ImportData, location string) error {
+func Import(ctx context.Context, resources []ImportData, location string) error {
 	for _, resourceData := range resources {
-
 		metadata := make(map[string]interface{})
 		err := mapstructure.Decode(resourceData.Metadata, &metadata)
 		if err != nil {
@@ -51,17 +54,17 @@ func Import(ctx context.Context, resourceType string, resources []ImportData, lo
 		}
 
 		spec := &specs.Spec{
-			Version:  CLIVersion,
-			Kind:     resourceType,
+			Version:  SpecVersion,
+			Kind:     resourceData.ResourceType,
 			Metadata: metadata,
 			Spec:     *resourceData.ResourceData,
 		}
 
-		// write spec to file
-		specYAML, err := yaml.Marshal(spec)
+		specYAML, err := encodeYaml(spec)
 		if err != nil {
 			return err
 		}
+
 		specPath := filepath.Join(location, fmt.Sprintf("%s.yaml", resourceData.Metadata.Name))
 		err = os.WriteFile(specPath, specYAML, 0644)
 		if err != nil {
@@ -70,4 +73,56 @@ func Import(ctx context.Context, resourceType string, resources []ImportData, lo
 	}
 
 	return nil
+}
+
+func encodeYaml(spec *specs.Spec) ([]byte, error) {
+	var node yaml.Node
+	err := node.Encode(spec)
+	if err != nil {
+		return nil, err
+	}
+	forceStringQuotes(&node)
+
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+
+	err = encoder.Encode(&node)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Function to force quote only string values (not keys)
+func forceStringQuotes(node *yaml.Node) {
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		// Process all children
+		for _, child := range node.Content {
+			forceStringQuotes(child)
+		}
+	case yaml.MappingNode:
+		// For mapping nodes, skip keys (even indices) and only process values (odd indices)
+		for i, child := range node.Content {
+			if i%2 == 1 { // Only process values (odd indices)
+				forceStringQuotes(child)
+			} else {
+				// Still need to recurse into keys in case they contain nested structures
+				// but don't quote the key itself if it's a string
+				if child.Kind != yaml.ScalarNode {
+					forceStringQuotes(child)
+				}
+			}
+		}
+	case yaml.ScalarNode:
+		// Only quote if it's a string
+		if node.Tag == "!!str" {
+			node.Style = yaml.DoubleQuotedStyle
+		}
+	}
 }

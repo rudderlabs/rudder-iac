@@ -31,7 +31,7 @@ type mockRETLClient struct {
 	createRetlSourceFunc func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
-	getRetlSourceFunc    func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) // <-- add this
+	getRetlSourceFunc    func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
 	readStateFunc        func(ctx context.Context) (*retlClient.State, error)
 }
 
@@ -1075,9 +1075,8 @@ func TestSQLModelHandler(t *testing.T) {
 			}
 
 			args := importremote.ImportArgs{
-				RemoteID:    "remote-id",
-				LocalID:     "local-id",
-				WorkspaceID: "ws-1",
+				RemoteID: "remote-id",
+				LocalID:  "local-id",
 			}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.NoError(t, err)
@@ -1092,9 +1091,8 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
 			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
 			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "ws-1", imported.Metadata.WorkspaceID)
-			assert.Equal(t, "remote-id", imported.Metadata.ImportIds[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.ImportIds[0].LocalID)
+			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
+			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
 		})
 
 		t.Run("Non-SQL-model type", func(t *testing.T) {
@@ -1109,7 +1107,7 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			}
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
@@ -1125,42 +1123,31 @@ func TestSQLModelHandler(t *testing.T) {
 				return nil, fmt.Errorf("api error")
 			}
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
 		})
 
-		t.Run("Already imported", func(t *testing.T) {
+		t.Run("Missing local id", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			handler := sqlmodel.NewHandler(mockClient)
-
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
-			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
-				return &retlClient.State{
-					Resources: map[string]retlClient.ResourceState{
-						"retl-source-sql-model:remote-id": {Output: map[string]interface{}{"id": "remote-id"}},
-					},
-				}, nil
-			}
-
-			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
-				return &retlClient.RETLSource{
-					ID:                   "remote-id",
-					Name:                 "Imported Model",
-					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
-					SourceType:           retlClient.ModelSourceType,
-					SourceDefinitionName: "postgres",
-					AccountID:            "acc123",
-					IsEnabled:            true,
-				}, nil
-			}
-
+			args := importremote.ImportArgs{RemoteID: "remote-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
-			assert.Contains(t, err.Error(), "is already imported")
+			assert.Contains(t, err.Error(), "local id is required")
+		})
+
+		t.Run("Missing remote id", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+			args := importremote.ImportArgs{LocalID: "local-id"}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "remote id is required")
 		})
 	})
 }
