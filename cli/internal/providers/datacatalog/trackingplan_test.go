@@ -652,7 +652,7 @@ func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
 				Name:             "prop2",
 				LocalID:          "prop-id-2",
 				Description:      "Custom type property",
-				Type:             "CustomType", // This would be the resolved value after dereferencing
+				Type:             "CustomType",
 				Required:         true,
 				HasCustomTypeRef: true,
 				HasItemTypesRef:  false,

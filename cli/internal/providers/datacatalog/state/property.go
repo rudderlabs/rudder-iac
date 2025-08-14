@@ -12,7 +12,26 @@ type PropertyArgs struct {
 	Name        string
 	Description string
 	Type        any
-	Config      map[string]interface{}
+	Config      map[string]any
+}
+
+func (args *PropertyArgs) ResolveType() string {
+	if propertyRef, ok := args.Type.(resources.PropertyRef); ok {
+		return propertyRef.ResolvedValue.(string)
+	}
+	return args.Type.(string)
+}
+
+func (args *PropertyArgs) ResolveConfig() map[string]any {
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, itemType := range itemTypes.([]any) {
+			if propertyRef, ok := itemType.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+		args.Config["itemTypes"] = itemTypes
+	}
+	return args.Config
 }
 
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
@@ -75,8 +94,26 @@ func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 func (args *PropertyArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
-	args.Type = MustString(from, "type")
-	args.Config = MapStringInterface(from, "config", make(map[string]interface{}))
+	args.Config = MapStringInterface(from, "config", make(map[string]any))
+
+	// Resolve the PropertyRef in itemTypes array within the config
+	if itemTypes, ok := args.Config["itemTypes"]; ok {
+		for idx, itemType := range itemTypes.([]any) {
+			if propertyRef, ok := itemType.(resources.PropertyRef); ok {
+				itemTypes.([]any)[idx] = propertyRef.ResolvedValue.(string)
+			}
+		}
+	}
+
+	// Resolve the PropertyRef in the type field
+	if propertyRef := SafePropertyRef(from, "type", resources.PropertyRef{}); !propertyRef.IsEmpty() {
+		args.Type = propertyRef.ResolvedValue.(string)
+	} else {
+		// For backward compatibility, we need to support the old type field
+		// so that apply operations on already existing properties generated
+		// work without any issues.
+		args.Type = MustString(from, "type")
+	}
 }
 
 type PropertyState struct {
