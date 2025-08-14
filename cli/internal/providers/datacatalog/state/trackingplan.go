@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -179,11 +178,8 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 }
 
 type TrackingPlanEventArgs struct {
-	Name            string
+	ID              any
 	LocalID         string
-	Description     string
-	CategoryId      any
-	Type            string
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TrackingPlanPropertyArgs
@@ -236,14 +232,11 @@ func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPro
 }
 
 type TrackingPlanPropertyArgs struct {
-	Name             string
-	LocalID          string
-	Description      string
-	Type             any
-	Config           map[string]interface{}
-	Required         bool
-	HasCustomTypeRef bool
-	HasItemTypesRef  bool
+	ID                   any
+	LocalID              string
+	Required             bool
+	Properties           []*TrackingPlanPropertyArgs `json:"properties,omitempty"`
+	AdditionalProperties bool                        `json:"additionalProperties"`
 }
 
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
@@ -251,56 +244,111 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 		return true
 	}
 
-	return args.Required != other.Required
+	if args.Required != other.Required {
+		return true
+	}
+
+	// Compare nested properties
+	if len(args.Properties) != len(other.Properties) {
+		return true
+	}
+
+	for _, prop := range args.Properties {
+		otherProp := other.PropertyByLocalID(prop.LocalID)
+		if otherProp == nil {
+			return true
+		}
+
+		if prop.Diff(otherProp) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Helper method to find nested property by LocalID
+func (args *TrackingPlanPropertyArgs) PropertyByLocalID(id string) *TrackingPlanPropertyArgs {
+	for _, prop := range args.Properties {
+		if prop.LocalID == id {
+			return prop
+		}
+	}
+	return nil
 }
 
 func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
-	args.Name = prop.Name
-	args.Description = prop.Description
-	args.LocalID = prop.LocalID
-	args.Required = prop.Required
-	args.Type = prop.Type
-	args.Config = prop.Config
-	args.HasCustomTypeRef = false
-	args.HasItemTypesRef = false
 
-	// Check if Type is a custom type reference
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
-		customTypeURN := urnFromRef(prop.Type)
-		if customTypeURN == "" {
-			return fmt.Errorf("unable to resolve custom type reference urn: %s", prop.Type)
-		}
-
-		args.Type = resources.PropertyRef{
-			URN:      customTypeURN,
-			Property: "name",
-		}
-		args.HasCustomTypeRef = true
+	urn := urnFromRef(prop.Ref)
+	if urn == "" {
+		return fmt.Errorf("unable to resolve ref to the property urn: %s", prop.Ref)
 	}
 
-	// Check if Config has itemTypes with custom type reference
-	if prop.Config != nil {
-		if itemTypes, ok := prop.Config["itemTypes"].([]any); ok && len(itemTypes) > 0 {
-			val := itemTypes[0].(string)
+	args.ID = resources.PropertyRef{
+		URN:      urn,
+		Property: "id",
+	}
+	args.LocalID = prop.LocalID
+	args.Required = prop.Required
 
-			if strings.HasPrefix(val, "#/custom-types/") {
-				customTypeURN := urnFromRef(val)
-				if customTypeURN == "" {
-					return fmt.Errorf("unable to resolve custom type reference urn in itemTypes: %s", val)
-				}
-
-				args.Config["itemTypes"] = []any{
-					resources.PropertyRef{
-						URN:      customTypeURN,
-						Property: "name",
-					},
-				}
-				args.HasItemTypesRef = true
+	// Handle nested properties recursively
+	if len(prop.Properties) > 0 {
+		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(prop.Properties))
+		for _, nestedProp := range prop.Properties {
+			nestedArgs := &TrackingPlanPropertyArgs{}
+			if err := nestedArgs.FromCatalogTrackingPlanEventProperty(nestedProp, urnFromRef); err != nil {
+				return fmt.Errorf("processing nested property %s: %w", nestedProp.LocalID, err)
 			}
+			nestedProperties = append(nestedProperties, nestedArgs)
 		}
+		args.Properties = nestedProperties
+		// set additionalProperties to true if there are nested properties
+		args.AdditionalProperties = true
 	}
 
 	return nil
+}
+
+// ToResourceData converts TrackingPlanPropertyArgs to resource data map
+func (args *TrackingPlanPropertyArgs) ToResourceData() map[string]interface{} {
+	propMap := map[string]interface{}{
+		"id":                   args.ID,
+		"localId":              args.LocalID,
+		"required":             args.Required,
+		"additionalProperties": args.AdditionalProperties,
+	}
+
+	// Handle nested properties recursively
+	if len(args.Properties) > 0 {
+		nestedProps := make([]map[string]interface{}, 0, len(args.Properties))
+		for _, nestedProp := range args.Properties {
+			nestedProps = append(nestedProps, nestedProp.ToResourceData())
+		}
+		propMap["properties"] = nestedProps
+	}
+
+	return propMap
+}
+
+// FromResourceData populates TrackingPlanPropertyArgs from resource data map
+func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interface{}) {
+	args.LocalID = MustString(propMap, "localId")
+	args.Required = MustBool(propMap, "required")
+	args.ID = String(propMap, "id", "")
+	args.AdditionalProperties = MustBool(propMap, "additionalProperties")
+
+	// Handle nested properties recursively
+	nestedProps := MapStringInterfaceSlice(propMap, "properties", nil)
+	if len(nestedProps) > 0 {
+		nestedProperties := make([]*TrackingPlanPropertyArgs, len(nestedProps))
+		for nestedIdx, nestedProp := range nestedProps {
+			nestedProperty := nestedProp
+			nestedArg := &TrackingPlanPropertyArgs{}
+			nestedArg.FromResourceData(nestedProperty)
+			nestedProperties[nestedIdx] = nestedArg
+		}
+		args.Properties = nestedProperties
+	}
 }
 
 func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan, urnFromRef func(string) string) error {
@@ -325,19 +373,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			properties = append(properties, tpProperty)
 		}
 
-		var categoryIDRef *resources.PropertyRef
-		if event.CategoryRef != nil {
-			categoryIDRef = &resources.PropertyRef{
-				URN:      urnFromRef(*event.CategoryRef),
-				Property: "id",
-			}
-		}
-
-		localIDToURN := make(map[string]string)
-		for _, prop := range event.Properties {
-			localIDToURN[prop.LocalID] = prop.Type
-		}
-
 		var variants Variants
 		for _, localVariant := range event.Variants {
 			variant := &Variant{}
@@ -345,7 +380,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			if err := variant.FromLocalCatalogVariant(
 				localVariant,
 				urnFromRef,
-				func(a string) string { return localIDToURN[a] },
 			); err != nil {
 				return fmt.Errorf("converting variant for event %s: %w", event.LocalID, err)
 			}
@@ -353,11 +387,11 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 		}
 
 		events = append(events, &TrackingPlanEventArgs{
-			Name:            event.Name,
+			ID: resources.PropertyRef{
+				URN:      urnFromRef(event.Ref),
+				Property: "id",
+			},
 			LocalID:         event.LocalID,
-			Description:     event.Description,
-			CategoryId:      categoryIDRef,
-			Type:            event.Type,
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: event.IdentitySection,
 			Properties:      properties,
@@ -374,20 +408,6 @@ func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
 	for _, event := range args.Events {
 		if event.LocalID == id {
 			return event
-		}
-	}
-	return nil
-}
-
-func (args *TrackingPlanArgs) PropertyByLocalID(eventID, id string) *TrackingPlanPropertyArgs {
-	event := args.EventByLocalID(eventID)
-	if event == nil {
-		return nil
-	}
-
-	for _, property := range event.Properties {
-		if property.LocalID == id {
-			return property
 		}
 	}
 	return nil
@@ -418,15 +438,18 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		event := event.(map[string]interface{})
 
 		eventProps[idx] = &TrackingPlanEventArgs{
-			Name:            MustString(event, "name"),
-			Description:     MustString(event, "description"),
+			ID:              String(event, "id", ""),
 			LocalID:         MustString(event, "localId"),
-			CategoryId:      String(event, "categoryId", ""),
-			Type:            MustString(event, "type"),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
 		}
+
+		variants := NormalizeToSliceMap(event, "variants")
+
+		var variantsToAdd Variants
+		variantsToAdd.FromResourceData(variants)
+		eventProps[idx].Variants = variantsToAdd
 
 		// Same situation as the events
 		properties := InterfaceSlice(event, "properties", nil)
@@ -440,16 +463,14 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		tpProperties := make([]*TrackingPlanPropertyArgs, len(properties))
 		for idx, property := range properties {
 			property := property.(map[string]interface{})
-			tpProperties[idx] = &TrackingPlanPropertyArgs{
-				LocalID:          MustString(property, "localId"),
-				Name:             MustString(property, "name"),
-				Description:      MustString(property, "description"),
-				Type:             property["type"],
-				Config:           MapStringInterface(property, "config", make(map[string]interface{})),
-				Required:         MustBool(property, "required"),
-				HasCustomTypeRef: Bool(property, "hasCustomTypeRef", false),
-				HasItemTypesRef:  Bool(property, "hasItemTypesRef", false),
-			}
+			tpProperty := &TrackingPlanPropertyArgs{}
+			tpProperty.FromResourceData(property)
+			tpProperties[idx] = tpProperty
+			// tpProperties[idx] = &TrackingPlanPropertyArgs{
+			// 	ID:       String(property, "id", ""),
+			// 	LocalID:  MustString(property, "localId"),
+			// 	Required: MustBool(property, "required"),
+			// }
 		}
 		eventProps[idx].Properties = tpProperties
 	}
@@ -463,27 +484,21 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
-			properties = append(properties, map[string]interface{}{
-				"name":             property.Name,
-				"description":      property.Description,
-				"localId":          property.LocalID,
-				"type":             property.Type,
-				"config":           property.Config,
-				"required":         property.Required,
-				"hasCustomTypeRef": property.HasCustomTypeRef,
-				"hasItemTypesRef":  property.HasItemTypesRef,
-			})
+			properties = append(properties, property.ToResourceData())
+			// properties = append(properties, map[string]interface{}{
+			// 	"id":       property.ID,
+			// 	"localId":  property.LocalID,
+			// 	"required": property.Required,
+			// })
 		}
 
 		events = append(events, map[string]interface{}{
+			"id":              event.ID,
 			"localId":         event.LocalID,
-			"name":            event.Name,
-			"description":     event.Description,
-			"categoryId":      event.CategoryId,
-			"type":            event.Type,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
+			"variants":        event.Variants.ToResourceData(),
 		})
 	}
 
