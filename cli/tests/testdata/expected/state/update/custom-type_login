@@ -24,7 +24,7 @@
         "required": true
       }
     ],
-    "varaints": [],
+    "variants": [],
     "type": "object"
   },
   "output": {

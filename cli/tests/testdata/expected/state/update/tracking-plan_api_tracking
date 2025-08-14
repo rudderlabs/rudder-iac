@@ -15,7 +15,7 @@
                             "$__rudderRef": "properties:api_method",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "api_path",
@@ -23,7 +23,7 @@
                             "$__rudderRef": "properties:api_path",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "user_mail",
@@ -38,7 +38,7 @@
                             "$__rudderRef": "properties:password",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     }
                 ],
                 "variants": [],
@@ -59,7 +59,7 @@
                             "$__rudderRef": "properties:api_method",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "api_path",
@@ -67,7 +67,7 @@
                             "$__rudderRef": "properties:api_path",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "http_retry_count",
@@ -75,7 +75,7 @@
                             "$__rudderRef": "properties:http_retry_count",
                             "property": "id"
                         },
-                        "required": false,
+                        "required": false
                     },
                     {
                         "localId": "error_code",
@@ -83,7 +83,7 @@
                             "$__rudderRef": "properties:error_code",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     }
                 ],
                 "variants": [],
@@ -111,7 +111,7 @@
                             "$__rudderRef": "properties:password",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     }
                 ],
                 "variants": [],
@@ -157,22 +157,22 @@
                         {
                             "localId": "api_method",
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "user_mail",
                             "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
-                            "required": true,
+                            "required": true
                         }
                     ],
                     "variants": [],
@@ -194,17 +194,17 @@
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
                             "localId": "http_retry_count",
-                            "required": false,
+                            "required": false
                         },
                         {
                             "localId": "error_code",
                             "required": true,
-                            "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
+                            "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo"
                         }
                     ],
                     "variants": [],
@@ -219,12 +219,12 @@
                         {
                             "localId": "user_mail",
                             "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
-                            "required": true,
+                            "required": true
                         }
                     ],
                     "variants": [],

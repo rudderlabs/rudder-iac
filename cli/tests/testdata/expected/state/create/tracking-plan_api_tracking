@@ -11,7 +11,7 @@
                 "id": {
                    "$__rudderRef": "events:api_tracking",
                    "property": "id"
-                }
+                },
                 "properties": [
                     {
                         "localId": "api_method",
@@ -19,7 +19,7 @@
                             "$__rudderRef": "properties:api_method",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "api_path",
@@ -27,7 +27,7 @@
                             "$__rudderRef": "properties:api_path",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "username",
@@ -35,7 +35,7 @@
                             "$__rudderRef": "properties:username",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "password",
@@ -43,7 +43,7 @@
                             "$__rudderRef": "properties:password",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     }
                 ],
                 "variants": [],
@@ -64,7 +64,7 @@
                             "$__rudderRef": "properties:username",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     },
                     {
                         "localId": "password",
@@ -72,7 +72,7 @@
                             "$__rudderRef": "properties:password",
                             "property": "id"
                         },
-                        "required": true,
+                        "required": true
                     }
                 ],
                 "variants": [],
@@ -112,22 +112,22 @@
                         {
                             "localId": "api_method",
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "username",
                             "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-                            "required": true,
+                            "required": true
                         }
                     ],
                     "type": "track",
@@ -142,12 +142,12 @@
                         {
                             "localId": "username",
                             "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-                            "required": true,
+                            "required": true
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-                            "required": true,
+                            "required": true
                         }
                     ],
                     "variants": [],
