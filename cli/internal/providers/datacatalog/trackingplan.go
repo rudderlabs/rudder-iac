@@ -113,7 +113,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		}
 	}
 
-	diff := prevState.Diff(toArgs)
+	diff := prevState.TrackingPlanArgs.Diff(toArgs)
 
 	var deletedEvents []string
 	for _, event := range diff.Deleted {

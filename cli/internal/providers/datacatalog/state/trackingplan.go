@@ -445,9 +445,11 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
 		}
 
-		var variants Variants
-		variants.FromResourceData(MapStringInterfaceSlice(event, "variants", nil))
-		eventProps[idx].Variants = variants
+		variants := NormalizeToSliceMap(event, "variants")
+
+		var variantsToAdd Variants
+		variantsToAdd.FromResourceData(variants)
+		eventProps[idx].Variants = variantsToAdd
 
 		// Same situation as the events
 		properties := InterfaceSlice(event, "properties", nil)

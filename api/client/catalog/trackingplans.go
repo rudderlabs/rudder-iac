@@ -63,6 +63,18 @@ type TrackingPlanEvent struct {
 	SchemaID       string `json:"schemaId"`
 }
 
+type TrackingPlanWithIdentifiers struct {
+	ID           string                                 `json:"id"`
+	Name         string                                 `json:"name"`
+	Description  *string                                `json:"description,omitempty"`
+	CreationType string                                 `json:"creationType"`
+	Version      int                                    `json:"version"`
+	WorkspaceID  string                                 `json:"workspaceId"`
+	CreatedAt    time.Time                              `json:"createdAt"`
+	UpdatedAt    time.Time                              `json:"updatedAt"`
+	Events       []TrackingPlanEventPropertyIdentifiers `json:"events"`
+}
+
 type TrackingPlanWithSchemas struct {
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
@@ -73,6 +85,25 @@ type TrackingPlanWithSchemas struct {
 	CreatedAt    time.Time                 `json:"createdAt"`
 	UpdatedAt    time.Time                 `json:"updatedAt"`
 	Events       []TrackingPlanEventSchema `json:"events"`
+}
+
+type TrackingPlanEventPropertyIdentifiers struct {
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	Description          string    `json:"description"`
+	EventType            string    `json:"eventType"`
+	CategoryId           *string   `json:"categoryId"` // Can be null
+	WorkspaceId          string    `json:"workspaceId"`
+	CreatedBy            string    `json:"createdBy"`
+	UpdatedBy            *string   `json:"updatedBy"` // Can be null
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+	IdentitySection      string    `json:"identitySection"`
+	AdditionalProperties bool      `json:"additionalProperties"`
+	Properties           []struct {
+		ID       string `json:"id"`
+		Required bool   `json:"required"`
+	} `json:"properties"`
 }
 
 type TrackingPlanEventSchema struct {
@@ -126,8 +157,9 @@ type TrackingPlanStore interface {
 	UpdateTrackingPlan(ctx context.Context, id string, name, description string) (*TrackingPlan, error)
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
-	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
+	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
+	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
 	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
 }
 
@@ -212,13 +244,13 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 	return nil
 }
 
-func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithSchemas, error) {
+func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithIdentifiers, error) {
 	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
 	}
 
-	trackingPlan := TrackingPlanWithSchemas{}
+	trackingPlan := TrackingPlanWithIdentifiers{}
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&trackingPlan); err != nil {
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
@@ -238,9 +270,9 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		return nil, fmt.Errorf("decoding events response: %w, response: %s", err, string(eventsResp))
 	}
 
-	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events.Data))
+	trackingPlan.Events = make([]TrackingPlanEventPropertyIdentifiers, len(events.Data))
 	for i, event := range events.Data {
-		schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
+		schema, err := c.GetTrackingPlanEventWithIdentifiers(ctx, id, event.ID)
 		if err != nil {
 			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
 		}
@@ -248,6 +280,20 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 	}
 
 	return &trackingPlan, nil
+}
+
+func (c *RudderDataCatalog) GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties", id, eventId), nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request: %w", err)
+	}
+
+	eventWithProps := TrackingPlanEventPropertyIdentifiers{}
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&eventWithProps); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &eventWithProps, nil
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error) {

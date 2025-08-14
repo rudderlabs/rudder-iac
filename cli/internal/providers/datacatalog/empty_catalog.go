@@ -68,11 +68,15 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
 func (m *EmptyCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlanEventWithIdentifiers(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventPropertyIdentifiers, error) {
 	return nil, nil
 }
 

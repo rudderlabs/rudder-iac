@@ -81,6 +81,20 @@ func (v *Variants) ToResourceData() []map[string]any {
 	return toReturn
 }
 
+func NormalizeToSliceMap(from map[string]any, key string) []map[string]any {
+	var toReturn []map[string]any
+
+	toReturn = MapStringInterfaceSlice(from, key, nil)
+	if len(toReturn) == 0 {
+		fallBack := InterfaceSlice(from, key, nil)
+		for _, entity := range fallBack {
+			toReturn = append(toReturn, entity.(map[string]any))
+		}
+	}
+
+	return toReturn
+}
+
 func (v *Variants) FromResourceData(from []map[string]any) {
 	for _, entry := range from {
 		variantMap := entry
@@ -89,14 +103,14 @@ func (v *Variants) FromResourceData(from []map[string]any) {
 			Discriminator: variantMap["discriminator"].(string),
 		}
 
-		cases := variantMap["cases"].([]map[string]any)
+		cases := NormalizeToSliceMap(variantMap, "cases")
 		for _, entry := range cases {
 			variantCase := entry
 			variant.Cases = append(variant.Cases, VariantCase{
 				DisplayName: variantCase["display_name"].(string),
 				Match:       variantCase["match"].([]any),
 				Description: variantCase["description"].(string),
-				Properties: lo.Map(variantCase["properties"].([]map[string]any), func(pr map[string]any, _ int) PropertyReference {
+				Properties: lo.Map(NormalizeToSliceMap(variantCase, "properties"), func(pr map[string]any, _ int) PropertyReference {
 					return PropertyReference{
 						ID:       pr["id"].(string),
 						Required: pr["required"].(bool),
@@ -105,7 +119,7 @@ func (v *Variants) FromResourceData(from []map[string]any) {
 			})
 		}
 
-		variant.Default = lo.Map(variantMap["default"].([]map[string]any), func(pr map[string]any, _ int) PropertyReference {
+		variant.Default = lo.Map(NormalizeToSliceMap(variantMap, "default"), func(pr map[string]any, _ int) PropertyReference {
 			return PropertyReference{
 				ID:       pr["id"].(string),
 				Required: pr["required"].(bool),
@@ -177,13 +191,14 @@ type PropertyReference struct {
 }
 
 func (v Variants) Diff(against Variants) bool {
+	if v == nil && against == nil {
+		return false
+	}
+
 	if len(v) != len(against) {
 		return true
 	}
 
-	if v == nil && against == nil {
-		return false
-	}
 	if v == nil || against == nil {
 		return true
 	}
@@ -215,13 +230,8 @@ func (v Variant) diffVariant(against Variant) bool {
 		}
 	}
 
-	if len(v.Default) != len(against.Default) {
+	if diffPropertyReferences(v.Default, against.Default) {
 		return true
-	}
-	for i := range v.Default {
-		if v.Default[i].diffPropertyReference(against.Default[i]) {
-			return true
-		}
 	}
 
 	return false
@@ -243,22 +253,32 @@ func (vc VariantCase) diffVariantCase(against VariantCase) bool {
 		return true
 	}
 
-	if len(vc.Properties) != len(against.Properties) {
+	if diffPropertyReferences(vc.Properties, against.Properties) {
 		return true
-	}
-	for i := range vc.Properties {
-		if vc.Properties[i].diffPropertyReference(against.Properties[i]) {
-			return true
-		}
 	}
 
 	return false
 }
 
-func (pr PropertyReference) diffPropertyReference(against PropertyReference) bool {
-	if !reflect.DeepEqual(pr.ID, against.ID) {
+// diffPropertyReferencesUnordered compares two slices of PropertyReference irrespective of order.
+// Properties are matched by equality of ID (using reflect.DeepEqual) and then Required flag is compared.
+// Returns true if they differ.
+func diffPropertyReferences(left []PropertyReference, right []PropertyReference) bool {
+	if len(left) != len(right) {
 		return true
 	}
 
-	return pr.Required != against.Required
+	for _, l := range left {
+		matched, found := lo.Find(right, func(r PropertyReference) bool {
+			return reflect.DeepEqual(l.ID, r.ID)
+		})
+		if !found {
+			return true
+		}
+		if l.Required != matched.Required {
+			return true
+		}
+	}
+
+	return false
 }
