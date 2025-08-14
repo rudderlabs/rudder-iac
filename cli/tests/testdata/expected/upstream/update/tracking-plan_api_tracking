@@ -12,60 +12,28 @@
       "id": "ev_2yzYxszrUnzSogGdZOAPO7yF47u",
       "identitySection": "properties",
       "name": "API Error",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": true,
-            "properties": {
-              "API Method": {
-                "enum": [
-                  "GET",
-                  "PUT",
-                  "POST",
-                  "DELETE",
-                  "PATCH",
-                  "HEAD"
-                ],
-                "type": [
-                  "string"
-                ]
-              },
-              "API Path": {
-                "type": [
-                  "string"
-                ]
-              },
-              "Error Code": {
-                "enum": [
-                  400,
-                  401,
-                  404,
-                  500
-                ],
-                "type": [
-                  "integer"
-                ]
-              },
-              "HTTP Retry Count": {
-                "maximum": 10,
-                "minimum": 0,
-                "multipleOf": 2,
-                "type": [
-                  "integer"
-                ]
-              }
-            },
-            "required": [
-              "API Method",
-              "API Path",
-              "Error Code"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": "true",
+      "properties": [
+        {
+          "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "required": true
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "required": true
+
+        },
+        {
+          "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
+          "required": false
+
+        },
+        {
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "required": true
+
+        }
+      ],
       "updatedAt": "2025-06-25T08:12:07.417Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -79,52 +47,25 @@
       "id": "ev_2yzYvjMKk0y4X6GzlgLW9uJi7Er",
       "identitySection": "properties",
       "name": "API Tracking",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": true,
-            "properties": {
-              "API Method": {
-                "enum": [
-                  "GET",
-                  "PUT",
-                  "POST",
-                  "DELETE",
-                  "PATCH",
-                  "HEAD"
-                ],
-                "type": [
-                  "string"
-                ]
-              },
-              "API Path": {
-                "type": [
-                  "string"
-                ]
-              },
-              "Password": {
-                "maxLength": 64,
-                "minLength": 10,
-                "type": [
-                  "string"
-                ]
-              },
-              "User Email": {
-                "$ref": "#/$defs/EmailType"
-              }
-            },
-            "required": [
-              "API Method",
-              "API Path",
-              "Password",
-              "User Email"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": true,
+      "properties": [
+        {
+          "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "required": true
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "required": true
+        },
+        {
+          "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+          "required": true
+        },
+        {
+          "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+          "required": true
+        }
+      ],
       "updatedAt": "2025-06-25T08:11:46.632Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -138,32 +79,17 @@
       "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
       "identitySection": "properties",
       "name": "Login Event",
-      "rules": {
-          "$schema": "",
-          "properties": {
-              "properties": {
-                  "additionalProperties": false,
-                  "properties": {
-                      "Password": {
-                          "maxLength": 64,
-                          "minLength": 10,
-                          "type": [
-                              "string"
-                          ]
-                      },
-                      "User Email": {
-                          "$ref": "#/$defs/EmailType"
-                      }
-                  },
-                  "required": [
-                      "Password", 
-                      "User Email"
-                  ],
-                  "type": "object"
-              }
-          },
-          "type": "object"
-      },
+      "additionalProperties": false,
+      "properties": [
+        {
+          "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+          "required": true
+        },
+        {
+          "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+          "required": true
+        }
+      ],
       "updatedAt": "2025-07-21T20:59:56.665Z",
       "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"

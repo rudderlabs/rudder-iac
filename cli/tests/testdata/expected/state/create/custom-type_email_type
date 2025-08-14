@@ -12,6 +12,7 @@
     "localId": "email_type",
     "name": "EmailType",
     "properties": [],
+    "variants": [],
     "type": "string"
   },
   "output": {

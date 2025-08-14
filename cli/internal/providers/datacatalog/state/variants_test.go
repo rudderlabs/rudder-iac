@@ -524,7 +524,7 @@ func TestVariants_ResourceData(t *testing.T) {
 			)
 
 			actualVariants.FromResourceData([]map[string]any{
-				map[string]any{
+				{
 					"type":          "discriminator",
 					"discriminator": "test",
 					"cases": []map[string]any{

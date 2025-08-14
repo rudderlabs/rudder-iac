@@ -6,182 +6,115 @@
         "events": [
             {
                 "allowUnplanned": true,
-                "categoryId": null,
-                "description": "This event is triggered every time a user views a product.",
                 "identitySection": "",
                 "localId": "api_tracking",
-                "name": "API Tracking",
                 "properties": [
                     {
-                        "config": {
-                            "enum": [
-                                "GET",
-                                "PUT",
-                                "POST",
-                                "DELETE",
-                                "PATCH",
-                                "HEAD"
-                            ]
-                        },
-                        "description": "http method of the api called",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "api_method",
-                        "name": "API Method",
+                        "id": {
+                            "$__rudderRef": "properties:api_method",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     },
                     {
-                        "config": {},
-                        "description": "subpath of the api requested",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "api_path",
-                        "name": "API Path",
+                        "id": {
+                            "$__rudderRef": "properties:api_path",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     },
                     {
-                        "config": {},
-                        "description": "User's email address",
-                        "hasCustomTypeRef": true,
-                        "hasItemTypesRef": false,
                         "localId": "user_mail",
-                        "name": "User Email",
-                        "required": true,
-                        "type": {
-                            "$__rudderRef": "custom-type:email_type",
-                            "property": "name"
+                        "id": {
+                            "$__rudderRef": "properties:user_mail",
+                            "property": "id"
                         }
                     },
                     {
-                        "config": {
-                            "maxLength": 64,
-                            "minLength": 10
-                        },
-                        "description": "Password for the API",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "password",
-                        "name": "Password",
+                        "id": {
+                            "$__rudderRef": "properties:password",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     }
                 ],
+                "variants": [],
                 "type": "track"
             },
             {
                 "allowUnplanned": true,
-                "categoryId": {
-                    "$__rudderRefPtr": "category:admin_actions",
-                    "property": "id"
-                },
-                "description": "This event is triggered when an API error occurs.",
                 "identitySection": "",
                 "localId": "api_error",
-                "name": "API Error",
+                "id": {
+                    "$__rudderRef": "events:api_error",
+                    "property": "id"
+                },
                 "properties": [
                     {
-                        "config": {
-                            "enum": [
-                                "GET",
-                                "PUT",
-                                "POST",
-                                "DELETE",
-                                "PATCH",
-                                "HEAD"
-                            ]
-                        },
-                        "description": "http method of the api called",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "api_method",
-                        "name": "API Method",
+                        "id": {
+                            "$__rudderRef": "properties:api_method",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     },
                     {
-                        "config": {},
-                        "description": "subpath of the api requested",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "api_path",
-                        "name": "API Path",
+                        "id": {
+                            "$__rudderRef": "properties:api_path",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     },
                     {
-                        "config": {
-                            "maximum": 10,
-                            "minimum": 0,
-                            "multipleOf": 2
-                        },
-                        "description": "Number of times to retry the API call",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "http_retry_count",
-                        "name": "HTTP Retry Count",
+                        "id": {
+                            "$__rudderRef": "properties:http_retry_count",
+                            "property": "id"
+                        },
                         "required": false,
-                        "type": "integer"
                     },
                     {
-                        "config": {
-                            "enum": [
-                                400,
-                                401,
-                                404,
-                                500
-                            ]
-                        },
-                        "description": "The HTTP error code.",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "error_code",
-                        "name": "Error Code",
+                        "id": {
+                            "$__rudderRef": "properties:error_code",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "integer"
                     }
                 ],
+                "variants": [],
                 "type": "track"
             },
             {
                 "allowUnplanned": false,
-                "categoryId": {
-                    "$__rudderRefPtr": "category:user_actions",
-                    "property": "id"
-                },
-                "description": "This is a login event",
                 "identitySection": "",
                 "localId": "login",
-                "name": "Login Event",
+                "id": {
+                    "$__rudderRef": "events:login",
+                    "property": "id"
+                },
                 "properties": [
                     {
-                        "config": {},
-                        "description": "User's email address",
-                        "hasCustomTypeRef": true,
-                        "hasItemTypesRef": false,
                         "localId": "user_mail",
-                        "name": "User Email",
-                        "required": true,
-                        "type": {
-                            "$__rudderRef": "custom-type:email_type",
-                            "property": "name"
+                        "id": {
+                            "$__rudderRef": "properties:user_mail",
+                            "property": "id"
                         }
                     },
                     {
-                        "config": {
-                            "maxLength": 64,
-                            "minLength": 10
-                        },
-                        "description": "Password for the API",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "password",
-                        "name": "Password",
+                        "id": {
+                            "$__rudderRef": "properties:password",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": "string"
                     }
                 ],
+                "variants": [],
                 "type": "track"
             }
         ],
@@ -217,170 +150,84 @@
             "events": [
                 {
                     "allowUnplanned": true,
-                    "categoryId": "",
-                    "description": "This event is triggered every time a user views a product.",
                     "identitySection": "",
                     "localId": "api_tracking",
-                    "name": "API Tracking",
+                    "id": "ev_2yzT9moeasqOjAnECGEjlTKfagA",
                     "properties": [
                         {
-                            "config": {
-                                "enum": [
-                                    "GET",
-                                    "PUT",
-                                    "POST",
-                                    "DELETE",
-                                    "PATCH",
-                                    "HEAD"
-                                ]
-                            },
-                            "description": "http method of the api called",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "api_method",
-                            "name": "API Method",
+                            "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "required": true,
-                            "type": "string"
                         },
                         {
-                            "config": {},
-                            "description": "subpath of the api requested",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "api_path",
-                            "name": "API Path",
+                            "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
                             "required": true,
-                            "type": "string"
                         },
                         {
-                            "config": {},
-                            "description": "User's email address",
-                            "hasCustomTypeRef": true,
-                            "hasItemTypesRef": false,
                             "localId": "user_mail",
-                            "name": "User Email",
+                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
                             "required": true,
-                            "type": "EmailType"
                         },
                         {
-                            "config": {
-                                "maxLength": 64,
-                                "minLength": 10
-                            },
-                            "description": "Password for the API",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "password",
-                            "name": "Password",
+                            "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
                             "required": true,
-                            "type": "string"
                         }
                     ],
+                    "variants": [],
                     "type": "track"
                 },
                 {
                     "allowUnplanned": true,
-                    "categoryId": "some-category-id",
-                    "description": "This event is triggered when an API error occurs.",
                     "identitySection": "",
                     "localId": "api_error",
-                    "name": "API Error",
+                    "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                     "properties": [
                         {
-                            "config": {
-                                "enum": [
-                                    "GET",
-                                    "PUT",
-                                    "POST",
-                                    "DELETE",
-                                    "PATCH",
-                                    "HEAD"
-                                ]
-                            },
-                            "description": "http method of the api called",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
+                            "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "localId": "api_method",
                             "name": "API Method",
                             "required": true,
                             "type": "string"
                         },
                         {
-                            "config": {},
-                            "description": "subpath of the api requested",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "api_path",
-                            "name": "API Path",
+                            "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
                             "required": true,
-                            "type": "string"
                         },
                         {
-                            "config": {
-                                "maximum": 10,
-                                "minimum": 0,
-                                "multipleOf": 2
-                            },
-                            "description": "Number of times to retry the API call",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
+                            "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
                             "localId": "http_retry_count",
-                            "name": "HTTP Retry Count",
                             "required": false,
-                            "type": "integer"
                         },
                         {
-                            "config": {
-                                "enum": [
-                                    400,
-                                    401,
-                                    404,
-                                    500
-                                ]
-                            },
-                            "description": "The HTTP error code.",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "error_code",
-                            "name": "Error Code",
                             "required": true,
-                            "type": "integer"
+                            "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
                         }
                     ],
+                    "variants": [],
                     "type": "track"
                 },
                 {
                     "allowUnplanned": false,
-                    "categoryId": "some-other-category-id",
-                    "description": "This is a login event",
                     "identitySection": "",
                     "localId": "login",
-                    "name": "Login Event",
+                    "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                     "properties": [
                         {
-                            "config": {},
-                            "description": "User's email address",
-                            "hasCustomTypeRef": true,
-                            "hasItemTypesRef": false,
                             "localId": "user_mail",
-                            "name": "User Email",
+                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
                             "required": true,
-                            "type": "EmailType"
                         },
                         {
-                            "config": {
-                                "maxLength": 64,
-                                "minLength": 10
-                            },
-                            "description": "Password for the API",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "password",
-                            "name": "Password",
+                            "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
                             "required": true,
-                            "type": "string"
                         }
                     ],
+                    "variants": [],
                     "type": "track"
                 }
             ],
