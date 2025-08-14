@@ -541,7 +541,7 @@ func TestProvider(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			provider := retl.New(newDefaultMockClient())
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.NoError(t, err)
 			assert.Len(t, results, 1)
@@ -555,15 +555,14 @@ func TestProvider(t *testing.T) {
 			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
 			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
 			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "ws-1", imported.Metadata.WorkspaceID)
-			assert.Equal(t, "remote-id", imported.Metadata.ImportIds[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.ImportIds[0].LocalID)
+			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
+			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
 		})
 
 		t.Run("Unsupported resource type", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), "unsupported-type", args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
@@ -573,7 +572,7 @@ func TestProvider(t *testing.T) {
 		t.Run("Handler error", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id", WorkspaceID: "ws-1"}
+			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.Error(t, err)
 			assert.Nil(t, results)

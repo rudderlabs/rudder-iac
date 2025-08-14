@@ -56,6 +56,10 @@ func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID st
 	return nil, nil
 }
 
+func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, input catalog.TrackingPlanEventsUpdate) (*catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) DeleteTrackingPlan(ctx context.Context, trackingPlanID string) error {
 	return nil
 }

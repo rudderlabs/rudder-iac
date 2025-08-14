@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"fmt"
 	"testing"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -242,4 +243,209 @@ func TestEventCategoryReferences(t *testing.T) {
 // Helper function to create string pointer
 func stringPtr(s string) *string {
 	return &s
+}
+
+func TestVariantsReferenceValidation(t *testing.T) {
+	validator := &RefValidator{}
+
+	// Create test properties for reference validation
+	testProperties := map[catalog.EntityGroup][]catalog.Property{
+		"test-group": {
+			{LocalID: "page_name", Name: "Page Name", Type: "string"},
+			{LocalID: "search_term", Name: "Search Term", Type: "string"},
+			{LocalID: "product_id", Name: "Product ID", Type: "string"},
+			{LocalID: "user_id", Name: "User ID", Type: "string"},
+		},
+	}
+
+	testEvents := map[catalog.EntityGroup][]catalog.Event{
+		"test-group": {
+			{LocalID: "test-event", Name: "Test Event", Type: "track"},
+		},
+	}
+
+	testCases := []struct {
+		name          string
+		trackingPlans map[catalog.EntityGroup]*catalog.TrackingPlan
+		customTypes   map[catalog.EntityGroup][]catalog.CustomType
+		errors        []ValidationError
+	}{
+		{
+			name: "valid variants references in tracking plan",
+			trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+				"test-group": {
+					LocalID: "test-tp",
+					Name:    "Test Tracking Plan",
+					Rules: []*catalog.TPRule{
+						{
+							LocalID: "test-rule",
+							Type:    "event_rule",
+							Event: &catalog.TPRuleEvent{
+								Ref: "#/events/test-group/test-event",
+							},
+							Variants: catalog.Variants{
+								{
+									Type:          "discriminator",
+									Discriminator: "#/properties/test-group/page_name",
+									Cases: []catalog.VariantCase{
+										{
+											DisplayName: "Search Page",
+											Match:       []any{"search", "search_bar"},
+											Properties: []catalog.PropertyReference{
+												{Ref: "#/properties/test-group/search_term", Required: true},
+											},
+										},
+									},
+									Default: []catalog.PropertyReference{
+										{Ref: "#/properties/test-group/product_id", Required: true},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "valid variants references in custom type",
+			customTypes: map[catalog.EntityGroup][]catalog.CustomType{
+				"test-group": {
+					{
+						LocalID:     "TestType",
+						Name:        "TestType",
+						Description: "Test custom type with variants",
+						Type:        "object",
+						Variants: catalog.Variants{
+							{
+								Type:          "discriminator",
+								Discriminator: "#/properties/test-group/user_id",
+								Cases: []catalog.VariantCase{
+									{
+										DisplayName: "Admin User",
+										Match:       []any{"admin", "superuser"},
+										Properties: []catalog.PropertyReference{
+											{Ref: "#/properties/test-group/product_id", Required: true},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			errors: nil,
+		},
+		{
+			name: "invalid property reference in variant case",
+			trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+				"test-group": {
+					LocalID: "test-tp",
+					Name:    "Test Tracking Plan",
+					Rules: []*catalog.TPRule{
+						{
+							LocalID: "test-rule",
+							Type:    "event_rule",
+							Event: &catalog.TPRuleEvent{
+								Ref: "#/events/test-group/test-event",
+							},
+							Variants: catalog.Variants{
+								{
+									Type:          "discriminator",
+									Discriminator: "page_name",
+									Cases: []catalog.VariantCase{
+										{
+											DisplayName: "Search Page",
+											Match:       []any{"search"},
+											Properties: []catalog.PropertyReference{
+												{Ref: "#/properties/test-group/non_existent_property", Required: true},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			errors: []ValidationError{
+				{
+					error:     fmt.Errorf("property reference '#/properties/test-group/non_existent_property' not found in catalog"),
+					Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]/properties[0]",
+				},
+			},
+		},
+		{
+			name: "invalid property reference in variant default",
+			trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+				"test-group": {
+					LocalID: "test-tp",
+					Name:    "Test Tracking Plan",
+					Rules: []*catalog.TPRule{
+						{
+							LocalID: "test-rule",
+							Type:    "event_rule",
+							Event: &catalog.TPRuleEvent{
+								Ref: "#/events/test-group/test-event",
+							},
+							Variants: catalog.Variants{
+								{
+									Type:          "discriminator",
+									Discriminator: "#/properties/test-group/page_name",
+									Cases: []catalog.VariantCase{
+										{
+											DisplayName: "Search Page",
+											Match:       []any{"search"},
+											Properties: []catalog.PropertyReference{
+												{Ref: "#/properties/test-group/search_term", Required: true},
+											},
+										},
+									},
+									Default: []catalog.PropertyReference{
+										{Ref: "#/properties/test-group/non_existent_property", Required: true},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			errors: []ValidationError{
+				{
+					error:     fmt.Errorf("default property reference '#/properties/test-group/non_existent_property' not found in catalog"),
+					Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/default/properties[0]",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dc := &catalog.DataCatalog{
+				Properties:    testProperties,
+				TrackingPlans: tc.trackingPlans,
+				CustomTypes:   tc.customTypes,
+				Events:        testEvents,
+			}
+
+			errs := validator.Validate(dc)
+			assert.Len(t, errs, len(tc.errors), "Expected %d validation errors, got %d", len(tc.errors), len(errs))
+
+			if len(tc.errors) > 0 {
+				for _, actual := range errs {
+					found := false
+
+					for _, expected := range tc.errors {
+						if actual.Error() == expected.Error() && actual.Reference == expected.Reference {
+							found = true
+							break
+						}
+					}
+
+					if !found {
+						assert.Failf(t, "variants_reference_validation_failures", "Expected to find error: %v with reference: %s in expected", actual, actual.Reference)
+					}
+				}
+			}
+		})
+	}
 }

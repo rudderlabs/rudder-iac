@@ -128,11 +128,12 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 	// Tracking Plan required keys
 	for group, tp := range dc.TrackingPlans {
+		reference := fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID)
 
 		if tp.Name == "" {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("name field is mandatory on the tracking plan"),
-				Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+				Reference: reference,
 			})
 		}
 
@@ -140,31 +141,34 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			if rule.LocalID == "" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("id field is mandatory on the rules in tracking plan"),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+					Reference: reference,
 				})
 			}
 
 			if rule.Event == nil && rule.Includes == nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event or includes section within the rules: %s in tracking plan are mandatory", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+					Reference: reference,
 				})
 			}
 
 			if rule.Event != nil && rule.Includes != nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event and includes both section within the rules: %s in tracking plan are not allowed", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+					Reference: reference,
 				})
 			}
 
 			if rule.Event == nil && len(rule.Properties) > 0 {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("properties without events in rule: %s are not allowed", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+					Reference: reference,
 				})
 			}
 
+			if len(rule.Variants) > 0 {
+				errors = append(errors, rk.validateVariantsRequiredKeys(rule.Variants, fmt.Sprintf("%s/rules/%s", reference, rule.LocalID))...)
+			}
 		}
 	}
 
@@ -226,6 +230,18 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 					errors = append(errors, rk.validateNumberConfig(customType.Config, reference, customType.Type)...)
 				case "array":
 					errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
+				}
+			}
+
+			if len(customType.Variants) > 0 {
+				if customType.Type != "object" {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("variants are only allowed for custom type of type object"),
+						Reference: reference,
+					})
+				} else {
+
+					errors = append(errors, rk.validateVariantsRequiredKeys(customType.Variants, reference)...)
 				}
 			}
 		}
@@ -448,6 +464,103 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 				error:     fmt.Errorf("uniqueItems must be a boolean"),
 				Reference: reference,
 			})
+		}
+	}
+
+	return errors
+}
+
+func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.Variants, reference string) []ValidationError {
+	var errors []ValidationError
+
+	if len(variants) > 1 {
+		errors = append(errors, ValidationError{
+			error:     fmt.Errorf("variants array cannot have more than 1 variant (current length: %d)", len(variants)),
+			Reference: reference,
+		})
+	}
+
+	for i, variant := range variants {
+		variantReference := fmt.Sprintf("%s/variants[%d]", reference, i)
+
+		if variant.Type != "discriminator" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("type field is mandatory for variant and must be 'discriminator'"),
+				Reference: variantReference,
+			})
+		}
+
+		if variant.Discriminator == "" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("discriminator field is mandatory for variant"),
+				Reference: variantReference,
+			})
+		}
+
+		if len(variant.Cases) == 0 {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("cases array must have at least one element"),
+				Reference: variantReference,
+			})
+		}
+
+		for j, variantCase := range variant.Cases {
+			caseReference := fmt.Sprintf("%s/cases[%d]", variantReference, j)
+
+			if variantCase.DisplayName == "" {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("display_name field is mandatory for variant case"),
+					Reference: caseReference,
+				})
+			}
+
+			if len(variantCase.Match) == 0 {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("match array must have at least one element"),
+					Reference: caseReference,
+				})
+			}
+
+			if len(variantCase.Properties) == 0 {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("properties array must have at least one element"),
+					Reference: caseReference,
+				})
+			}
+
+			for k, matchValue := range variantCase.Match {
+				switch matchValue.(type) {
+				case string, bool:
+				case float32, float64:
+				default:
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("match value at index %d must be string, bool or number type (got: %T)", k, matchValue),
+						Reference: caseReference,
+					})
+				}
+			}
+
+			for k, propRef := range variantCase.Properties {
+				propReference := fmt.Sprintf("%s/properties[%d]", caseReference, k)
+
+				if propRef.Ref == "" {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("$ref field is mandatory for property reference"),
+						Reference: propReference,
+					})
+				}
+			}
+		}
+
+		for j, propRef := range variant.Default {
+			propReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, j)
+
+			if propRef.Ref == "" {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("$ref field is mandatory for property reference"),
+					Reference: propReference,
+				})
+			}
 		}
 	}
 

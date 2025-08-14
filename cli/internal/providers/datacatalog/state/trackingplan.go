@@ -187,6 +187,7 @@ type TrackingPlanEventArgs struct {
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TrackingPlanPropertyArgs
+	Variants        Variants
 }
 
 func (args *TrackingPlanEventArgs) Diff(other *TrackingPlanEventArgs) bool {
@@ -216,6 +217,10 @@ func (args *TrackingPlanEventArgs) Diff(other *TrackingPlanEventArgs) bool {
 		if prop.Diff(otherProp) {
 			return true
 		}
+	}
+
+	if args.Variants.Diff(other.Variants) {
+		return true
 	}
 
 	return false
@@ -327,6 +332,26 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 				Property: "id",
 			}
 		}
+
+		localIDToURN := make(map[string]string)
+		for _, prop := range event.Properties {
+			localIDToURN[prop.LocalID] = prop.Type
+		}
+
+		var variants Variants
+		for _, localVariant := range event.Variants {
+			variant := &Variant{}
+
+			if err := variant.FromLocalCatalogVariant(
+				localVariant,
+				urnFromRef,
+				func(a string) string { return localIDToURN[a] },
+			); err != nil {
+				return fmt.Errorf("converting variant for event %s: %w", event.LocalID, err)
+			}
+			variants = append(variants, *variant)
+		}
+
 		events = append(events, &TrackingPlanEventArgs{
 			Name:            event.Name,
 			LocalID:         event.LocalID,
@@ -336,6 +361,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: event.IdentitySection,
 			Properties:      properties,
+			Variants:        variants,
 		})
 	}
 

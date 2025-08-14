@@ -267,6 +267,13 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 }
 
 func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+	if args.LocalID == "" {
+		return nil, fmt.Errorf("local id is required")
+	}
+	if args.RemoteID == "" {
+		return nil, fmt.Errorf("remote id is required")
+	}
+
 	// First, get all sources to find the one we want to import
 	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
 	if err != nil {
@@ -275,16 +282,6 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 	// Validate that this is a SQL model source
 	if source.SourceType != retlClient.ModelSourceType {
 		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
-	}
-
-	state, err := h.client.ReadState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading state: %w", err)
-	}
-	for _, resource := range state.Resources {
-		if resource.Output["id"] == args.RemoteID {
-			return nil, fmt.Errorf("source %s is already imported", args.RemoteID)
-		}
 	}
 
 	// Create the base resource data structure for the imported source
@@ -299,17 +296,27 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		SQLKey:              source.Config.Sql,
 	}
 
-	importMetadata := importremote.ImportMetadata{
-		WorkspaceID: args.WorkspaceID,
-		Name:        args.LocalID,
-		ImportIds: []importremote.ImportIds{
-			{LocalID: args.LocalID, RemoteID: args.RemoteID},
+	importMetadata := importremote.Metadata{
+		Name: args.LocalID,
+		Import: importremote.WorkspacesImportMetadata{
+			Workspaces: []importremote.WorkspaceImportMetadata{
+				{
+					WorkspaceID: source.WorkspaceID,
+					Resources: []importremote.ImportIds{
+						{
+							LocalID:  args.LocalID,
+							RemoteID: args.RemoteID,
+						},
+					},
+				},
+			},
 		},
 	}
 
 	importData := importremote.ImportData{
 		ResourceData: &importedData,
 		Metadata:     importMetadata,
+		ResourceType: ResourceType,
 	}
 	return []importremote.ImportData{importData}, nil
 }

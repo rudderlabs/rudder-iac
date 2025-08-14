@@ -132,7 +132,7 @@ func printTableWithDetails(rs []resources.ResourceData) error {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(len(rows)),
+		table.WithHeight(len(rows)+1), // +1 for the header
 	)
 
 	s := table.DefaultStyles()
