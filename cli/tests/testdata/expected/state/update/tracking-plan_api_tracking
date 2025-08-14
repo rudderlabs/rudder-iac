@@ -1,16 +1,16 @@
 {
-    "id": "api_tracking",
-    "type": "tracking-plan",
-    "input": {
-        "description": "Tracking plan for an e-commerce application.",
-        "events": [
+   "id": "api_tracking",
+   "type": "tracking-plan",
+   "input": {
+       "description": "Tracking plan for an e-commerce application.",
+       "events": [
             {
                 "allowUnplanned": true,
                 "identitySection": "",
                 "localId": "api_tracking",
                 "id": {
-                    "$__rudderRef": "event:api_tracking",
-                    "property": "id"
+                   "$__rudderRef": "event:api_tracking",
+                   "property": "id"
                 },
                 "properties": [
                     {
@@ -106,7 +106,8 @@
                         "id": {
                             "$__rudderRef": "property:user_mail",
                             "property": "id"
-                        }
+                        },
+                        "required": true
                     },
                     {
                         "localId": "password",
