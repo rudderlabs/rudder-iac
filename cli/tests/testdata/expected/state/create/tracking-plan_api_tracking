@@ -19,7 +19,8 @@
                             "$__rudderRef": "property:api_method",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     },
                     {
                         "localId": "api_path",
@@ -27,7 +28,8 @@
                             "$__rudderRef": "property:api_path",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     },
                     {
                         "localId": "username",
@@ -35,7 +37,8 @@
                             "$__rudderRef": "property:username",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     },
                     {
                         "localId": "password",
@@ -43,7 +46,8 @@
                             "$__rudderRef": "property:password",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     }
                 ],
                 "variants": []
@@ -63,7 +67,8 @@
                             "$__rudderRef": "property:username",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     },
                     {
                         "localId": "password",
@@ -71,7 +76,8 @@
                             "$__rudderRef": "property:password",
                             "property": "id"
                         },
-                        "required": true
+                        "required": true,
+                        "additionalProperties": false
                     }
                 ],
                 "variants": []
@@ -110,22 +116,26 @@
                         {
                             "localId": "api_method",
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         },
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         },
                         {
                             "localId": "username",
                             "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         }
                     ],
                     "variants": []
@@ -139,12 +149,14 @@
                         {
                             "localId": "username",
                             "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-                            "required": true
+                            "required": true,
+                            "additionalProperties": false
                         }
                     ],
                     "variants": []
