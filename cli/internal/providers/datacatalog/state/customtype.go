@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -13,6 +15,7 @@ type CustomTypeArgs struct {
 	Type        string
 	Config      map[string]any
 	Properties  []*CustomTypeProperty // For object-type custom types
+	Variants    Variants
 }
 
 // CustomTypeProperty represents a property reference in a custom type
@@ -40,6 +43,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 		"type":        args.Type,
 		"config":      args.Config,
 		"properties":  properties,
+		"variants":    args.Variants.ToResourceData(),
 	}
 }
 
@@ -50,6 +54,11 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Description = MustString(from, "description")
 	args.Type = MustString(from, "type")
 	args.Config = MapStringInterface(from, "config", make(map[string]any))
+
+	variants := NormalizeToSliceMap(from, "variants")
+	var variantsToAdd Variants
+	variantsToAdd.FromResourceData(variants)
+	args.Variants = variantsToAdd
 
 	// Handle properties array using similar pattern to TrackingPlan
 	var properties []any
@@ -80,7 +89,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Properties = customTypeProperties
 }
 
-func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) {
+func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) error {
 	args.LocalID = from.LocalID
 	args.Name = from.Name
 	args.Description = from.Description
@@ -97,6 +106,18 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 			Required: prop.Required,
 		})
 	}
+
+	// VARIANT HANDLING
+	variants := make([]Variant, 0, len(from.Variants))
+	for _, variant := range from.Variants {
+		toAdd := Variant{}
+
+		if err := toAdd.FromLocalCatalogVariant(variant, urnFromRef); err != nil {
+			return fmt.Errorf("processing %s variant %s: %w", variant.Type, variant.Discriminator, err)
+		}
+		variants = append(variants, toAdd)
+	}
+	args.Variants = variants
 
 	// BUGGY CODE TO BE FIXED IN A BETTER
 	itemTypes, ok := args.Config["itemTypes"]
@@ -120,6 +141,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	}
 
 	args.Properties = properties
+	return nil
 }
 
 type CustomTypeState struct {

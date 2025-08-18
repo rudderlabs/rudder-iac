@@ -12,51 +12,28 @@
       "id": "ev_30B7DBoeJPEMamGNLstEqsuIHaJ",
       "identitySection": "properties",
       "name": "API Tracking",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": false,
-            "properties": {
-              "API Method": {
-                "enum": [
-                  "GET",
-                  "PUT",
-                  "POST", 
-                  "DELETE",
-                  "PATCH"
-                ],
-                "type": [
-                  "string"
-                ]
-              },
-              "API Path": {
-                "type": [
-                  "string"
-                ]
-              },
-              "Password": {
-                "maxLength": 64,
-                "minLength": 10,
-                "type": [
-                  "string"
-                ]
-              },
-              "Username": {
-                "$ref": "#/$defs/EmailType"
-              }
-            },
-            "required": [
-              "API Method",
-              "API Path",
-              "Password",
-              "Username"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": false,
+      "properties": [
+        {
+          "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "required": true
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "required": true
+
+        },
+        {
+          "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "required": true
+
+        },
+        {
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "required": true
+
+        }
+      ],
       "updatedAt": "2025-07-21T09:09:56.070Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -70,32 +47,19 @@
       "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eS",
       "identitySection": "properties",
       "name": "Login Event",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": false,
-            "properties": {
-              "Password": {
-                "maxLength": 64,
-                "minLength": 10,
-                "type": [
-                  "string"
-                ]
-              },
-              "Username": {
-                "$ref": "#/$defs/EmailType"
-              }
-            },
-            "required": [
-              "Password",
-              "Username"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": false,
+      "properties": [
+        {
+          "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "required": true
+
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "required": true
+
+        }
+      ],
       "updatedAt": "2025-07-21T09:09:56.892Z",
       "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
