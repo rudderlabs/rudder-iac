@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -47,10 +46,10 @@ func NewCmdRetlSource() *cobra.Command {
 			YAML configuration will reference it using the 'file' field instead of inline 'sql'.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli import retl-source --local-id my-model --remote-id abc123
-			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models
-			$ rudder-cli import retl-source --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
-			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models -s ./sql
+			$ rudder-cli import retl-sources --local-id my-model --remote-id abc123
+			$ rudder-cli import retl-sources -i analytics-model -r def789 -l ./models
+			$ rudder-cli import retl-sources --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
+			$ rudder-cli import retl-sources -i analytics-model -r def789 -l ./models -s ./sql
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			retlSourceImportLog.Debug("import retl-source", "localID", localID, "remoteID", remoteID, "location", location, "sqlLocation", sqlLocation)
