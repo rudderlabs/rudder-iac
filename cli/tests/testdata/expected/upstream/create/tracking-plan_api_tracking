@@ -16,21 +16,25 @@
       "properties": [
         {
           "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
-          "required": true
+          "required": true,
+          "additionalProperties": false
         },
         {
           "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
-          "required": true
+          "required": true,
+          "additionalProperties": false
 
         },
         {
           "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-          "required": true
+          "required": true,
+          "additionalProperties": false
 
         },
         {
           "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-          "required": true
+          "required": true,
+          "additionalProperties": false
 
         }
       ],
@@ -50,14 +54,50 @@
       "additionalProperties": false,
       "properties": [
         {
-          "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
-          "required": true
-
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "required": true,
+          "additionalProperties": false
         },
         {
-          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
-          "required": true
-
+          "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "required": true,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_31TA42kdL1UNUtR1PtKpi9hxWt7",
+          "required": true,
+          "additionalProperties": true,
+          "properties": [
+            {
+              "id": "prop_31TA3Qk24n8NExMntP7PgffBRlG",
+              "required": true,
+              "additionalProperties": true,
+              "properties": [
+                {
+                  "id": "prop_31TA3Z2ASEI7CGaf2RsTpqBXd2O",
+                  "required": true,
+                  "additionalProperties": true,
+                  "properties": [
+                    {
+                      "id": "prop_31TA3ltAM0RP3yLCe4g0cxm0oCm",
+                      "required": true,
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                {
+                  "id": "prop_31TA3VQw3zNqCtBTl2fWT6jiacq",
+                  "required": true,
+                  "additionalProperties": false
+                }
+              ]
+            },
+            {
+              "id": "prop_31TA3wtIcbJwsNHK6ot7Sh7NwvK",
+              "required": false,
+              "additionalProperties": false
+            }
+          ]
         }
       ],
       "updatedAt": "2025-07-21T09:09:56.892Z",

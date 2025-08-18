@@ -1,0 +1,17 @@
+{
+  "propConfig": {
+    "enum": [
+      "image",
+      "audio"
+    ]
+  },
+  "id": "prop_31TA3ltAM0RP3yLCe4g0cxm0oCm",
+  "name": "Captcha Type",
+  "description": "Captcha type",
+  "type": "string",
+  "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+  "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+  "updatedBy": null,
+  "createdAt": "2025-08-18T17:18:11.026Z",
+  "updatedAt": "2025-08-18T17:18:11.026Z"
+}
