@@ -22,6 +22,35 @@ spec:
         - $ref: "#/properties/api_tracking/password"
           required: true
 
+      variants:
+        - type: discriminator
+          discriminator: "#/properties/api_tracking/api_method"
+          cases:
+            - display_name: "Create Entity"
+              match:
+              - "POST"
+              description: "applies when creating a new entity"
+              properties:
+              - $ref: "#/properties/api_tracking/host"
+                required: false
+
+            - display_name: "Update Entity"
+              match:
+              - "PUT"
+              - "PATCH"
+              description: "applies when updating an existing entity"
+              properties:
+              - $ref: "#/properties/api_tracking/referrer"
+                required: true
+
+          default:
+            - $ref: "#/properties/api_tracking/user_agent"
+              required: false
+            - $ref: "#/properties/api_tracking/content_type"
+              required: true
+
+
+
     - type: "event_rule"
       id: "login_error"
       event:

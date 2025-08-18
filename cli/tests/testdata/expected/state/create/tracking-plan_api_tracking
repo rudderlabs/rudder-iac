@@ -50,7 +50,41 @@
                         "additionalProperties": false
                     }
                 ],
-                "variants": []
+                "variants": [
+                    {
+                        "cases": [
+                            {
+                                "description": "applies when creating a new entity",
+                                "display_name": "Create Entity",
+                                "match": [
+                                    "POST"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": {
+                                            "$__rudderRef": "property:user_agent",
+                                            "property": "id"
+                                        },
+                                        "required": true
+                                    },
+                                    {
+                                        "id": {
+                                            "$__rudderRef": "property:host",
+                                            "property": "id"
+                                        },
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": [],
+                        "discriminator": {
+                            "$__rudderRef": "property:api_method",
+                            "property": "id"
+                        },
+                        "type": "discriminator"
+                    }
+                ]
             },
             {
                 "allowUnplanned": false,
@@ -198,7 +232,30 @@
                             "additionalProperties": false
                         }
                     ],
-                    "variants": []
+                    "variants": [{
+                        "cases": [
+                            {
+                                "description": "applies when creating a new entity",
+                                "display_name": "Create Entity",
+                                "match": [
+                                    "POST"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": "prop_31S8bPPNOQoWfpRVZWHX4TDcWVm",
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "prop_31S8apfLBLpdSXTEPZ43c6UGAuY",
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": [],
+                        "discriminator": "prop_31S8aMA5BJ8yA0mmlXKQNnE3M5Y",
+                        "type": "discriminator"
+                    }]
                 },
                 {
                     "allowUnplanned": false,

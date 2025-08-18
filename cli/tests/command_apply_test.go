@@ -103,6 +103,12 @@ func verifyState(t *testing.T, dir string) {
 			"output.trackingPlanArgs.events[2].id",
 			"output.trackingPlanArgs.events[2].properties[0].id",
 			"output.trackingPlanArgs.events[2].properties[1].id",
+			"output.trackingPlanArgs.events[0].variants[0].discriminator",
+			"output.trackingPlanArgs.events[0].variants[0].cases[0].properties[0].id",
+			"output.trackingPlanArgs.events[0].variants[0].cases[0].properties[1].id",
+			"output.trackingPlanArgs.events[0].variants[0].cases[1].properties[0].id",
+			"output.trackingPlanArgs.events[0].variants[0].default[0].id",
+			"output.trackingPlanArgs.events[0].variants[0].default[1].id",
 		},
 	)
 
