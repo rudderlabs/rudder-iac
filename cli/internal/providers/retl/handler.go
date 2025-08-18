@@ -58,4 +58,5 @@ type resourceHandler interface {
 	// with the specified localID. The workspaceID is used for proper resource scoping.
 	// Returns the resource data with import metadata or an error if import fails.
 	Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error)
+
 }
