@@ -1,10 +1,12 @@
 package validate
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/samber/lo"
 )
 
 var errInvalidRefFormat = fmt.Errorf("invalid reference format")
@@ -57,7 +59,15 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				// Step 2: Validate references in custom type variants
 				errs = append(
 					errs,
-					rv.validateVariantsReferences(customType.Variants, reference, dc)...)
+					rv.validateVariantsReferences(
+						customType.Variants,
+						reference,
+						dc,
+						func(ref string) bool {
+							return lo.ContainsBy(customType.Properties, func(p catalog.CustomTypeProperty) bool {
+								return p.Ref == ref
+							})
+						})...)
 			}
 		}
 	}
@@ -228,8 +238,13 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, baseReference string, f
 			errs,
 			rv.validateVariantsReferences(
 				rule.Variants,
-				fmt.Sprintf("%s/rules/%s", baseReference, rule.LocalID),
+				fmt.Sprintf("%s/event_rule/%s", baseReference, rule.LocalID),
 				fetcher,
+				func(ref string) bool {
+					return lo.ContainsBy(rule.Properties, func(p *catalog.TPRuleProperty) bool {
+						return p.Ref == ref
+					})
+				},
 			)...,
 		)
 	}
@@ -241,11 +256,39 @@ func (rv *RefValidator) validateVariantsReferences(
 	variants catalog.Variants,
 	reference string,
 	fetcher catalog.CatalogResourceFetcher,
+	rulePropertyExists func(ref string) bool,
 ) []ValidationError {
 	errs := make([]ValidationError, 0)
 
 	for idx, variant := range variants {
 		variantReference := fmt.Sprintf("%s/variants[%d]", reference, idx)
+
+		matches := catalog.PropRegex.FindStringSubmatch(variant.Discriminator)
+		if len(matches) != 3 {
+			errs = append(errs, ValidationError{
+				Reference: variantReference,
+				error:     errors.New("discriminator reference has invalid format, should be #/properties/<group>/<id>"),
+			})
+		} else {
+			group, propID := matches[1], matches[2]
+			if prop := fetcher.Property(group, propID); prop != nil {
+				if !strings.HasPrefix(prop.Type, "#/custom-types/") {
+					if !strings.Contains(prop.Type, "string") && !strings.Contains(prop.Type, "integer") && !strings.Contains(prop.Type, "boolean") {
+						errs = append(errs, ValidationError{
+							Reference: variantReference,
+							error:     fmt.Errorf("discriminator reference '%s' has invalid type, should be one of 'string', 'integer', 'boolean'", variant.Discriminator),
+						})
+					}
+				}
+			}
+
+			if !rulePropertyExists(fmt.Sprintf("#/properties/%s/%s", group, propID)) {
+				errs = append(errs, ValidationError{
+					Reference: variantReference,
+					error:     fmt.Errorf("discriminator reference '%s' not found in rule properties", variant.Discriminator),
+				})
+			}
+		}
 
 		for idx, variantCase := range variant.Cases {
 			caseReference := fmt.Sprintf("%s/cases[%d]", variantReference, idx)

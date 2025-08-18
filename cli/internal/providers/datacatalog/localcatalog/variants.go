@@ -14,7 +14,7 @@ type Variant struct {
 type VariantCase struct {
 	DisplayName string              `json:"display_name"`
 	Match       []any               `json:"match"`
-	Description *string             `json:"description"`
+	Description string              `json:"description"`
 	Properties  []PropertyReference `json:"properties"`
 }
 
