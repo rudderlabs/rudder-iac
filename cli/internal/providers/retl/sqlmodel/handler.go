@@ -250,14 +250,14 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 }
 
 func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
-	importData := &importremote.ImportMetadata{}
+	importData := &importremote.Metadata{}
 	if err := mapstructure.Decode(metadata, importData); err != nil {
 		return nil, fmt.Errorf("decoding import metadata: %w", err)
 	}
-	if len(importData.ImportIds) == 0 {
-		return nil, fmt.Errorf("import metadata is required")
+	if len(importData.Import.Workspaces) != 1 {
+		return nil, fmt.Errorf("import metadata must have exactly one workspace")
 	}
-	remoteID := importData.ImportIds[0].RemoteID
+	remoteID := importData.Import.Workspaces[0].Resources[0].RemoteID
 	_, err := h.client.GetRetlSource(ctx, remoteID)
 	if err == nil {
 		return h.updateCall(ctx, remoteID, data)

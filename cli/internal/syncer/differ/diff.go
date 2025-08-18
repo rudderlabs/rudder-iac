@@ -53,7 +53,7 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 	for urn, r := range target.Resources() {
 		if sourceResource, exists := source.GetResource(urn); !exists {
 			metadata := r.ImportMetadata()
-			if _, ok := metadata["import_ids"]; ok {
+			if _, ok := metadata["import"]; ok {
 				// Resource is import if it has import_metadata
 				importResources = append(importResources, urn)
 			} else {
