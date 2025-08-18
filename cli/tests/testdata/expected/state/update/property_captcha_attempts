@@ -1,0 +1,36 @@
+{
+  "id": "captcha_attempts",
+  "type": "property",
+  "input": {
+    "config": {
+      "maximum": 10,
+      "minimum": 0
+    },
+    "description": "Captcha attempts",
+    "name": "Captcha Attempts",
+    "type": "integer"
+  },
+  "output": {
+    "config": {
+      "maximum": 10,
+      "minimum": 0
+    },
+    "createdAt": "2025-08-18 19:56:10.540 +0000 UTC",
+    "description": "Captcha attempts",
+    "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
+    "name": "Captcha Attempts",
+    "propertyArgs": {
+      "config": {
+        "maximum": 10,
+        "minimum": 0
+      },
+      "description": "Captcha attempts",
+      "name": "Captcha Attempts",
+      "type": "integer"
+    },
+    "type": "integer",
+    "updatedAt": "2025-08-18 19:56:10.540 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

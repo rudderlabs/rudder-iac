@@ -26,11 +26,11 @@ func TestProjectApply(t *testing.T) {
 		verifyState(t, "create")
 	})
 
-	// t.Run("should update entities in catalog from project", func(t *testing.T) {
-	// 	output, err := executor.Execute(cliBinPath, "tp", "apply", "-l", filepath.Join("testdata", "project", "update"), "--confirm=false")
-	// 	require.NoError(t, err, "Update apply command failed with output: %s", string(output))
-	// 	verifyState(t, "update")
-	// })
+	t.Run("should update entities in catalog from project", func(t *testing.T) {
+		output, err := executor.Execute(cliBinPath, "tp", "apply", "-l", filepath.Join("testdata", "project", "update"), "--confirm=false")
+		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
+		verifyState(t, "update")
+	})
 
 }
 
@@ -64,6 +64,7 @@ func verifyState(t *testing.T, dir string) {
 			"output.categoryId",
 			"input.categoryId",
 			"output.eventArgs.categoryId",
+			"output.version",
 			"output.events[0].eventId",
 			"output.events[0].id",
 			"output.events[1].eventId",
@@ -91,6 +92,13 @@ func verifyState(t *testing.T, dir string) {
 			"output.trackingPlanArgs.events[1].properties[2].properties[1].properties[0].id",
 			"output.trackingPlanArgs.events[1].properties[2].properties[1].properties[1].id",
 			"output.trackingPlanArgs.events[1].properties[2].properties[1].properties[1].properties[0].id",
+			"output.trackingPlanArgs.events[2].properties[2].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[0].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[1].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[1].properties[0].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[1].properties[1].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[1].properties[1].properties[0].id",
+			"output.trackingPlanArgs.events[2].properties[2].properties[1].properties[1].properties[1].id",
 			"output.trackingPlanArgs.events[1].properties[3].id",
 			"output.trackingPlanArgs.events[2].id",
 			"output.trackingPlanArgs.events[2].properties[0].id",
@@ -117,6 +125,7 @@ func verifyState(t *testing.T, dir string) {
 			"updatedBy",
 			"workspaceId",
 			"categoryId",
+			"version",
 			"properties[0].id",
 			"properties[1].id",
 			"events[0].properties[0].id",
@@ -142,6 +151,20 @@ func verifyState(t *testing.T, dir string) {
 			"events[1].properties[2].properties[1].properties[1].id",
 			"events[1].properties[2].properties[1].properties[1].properties[0].id",
 			"events[1].properties[3].id",
+			"events[2].properties[0].id",
+			"events[2].properties[1].id",
+			"events[2].properties[1].properties[0].id",
+			"events[2].properties[1].properties[0].properties[0].id",
+			"events[2].properties[1].properties[0].properties[0].properties[0].id",
+			"events[2].properties[1].properties[0].properties[0].properties[1].id",
+			"events[2].properties[1].properties[1].id",
+			"events[2].properties[2].id",
+			"events[2].properties[2].properties[0].id",
+			"events[2].properties[2].properties[1].id",
+			"events[2].properties[2].properties[0].properties[0].id",
+			"events[2].properties[2].properties[0].properties[1].id",
+			"events[2].properties[2].properties[0].properties[0].properties[0].id",
+			"events[2].properties[2].properties[0].properties[0].properties[1].id",
 			"events[1].id",
 			"events[1].createdAt",
 			"events[1].updatedAt",
