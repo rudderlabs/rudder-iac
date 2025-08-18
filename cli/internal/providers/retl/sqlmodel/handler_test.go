@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -30,6 +31,8 @@ type mockRETLClient struct {
 	createRetlSourceFunc func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
+	getRetlSourceFunc    func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
+	readStateFunc        func(ctx context.Context) (*retlClient.State, error)
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
@@ -51,6 +54,9 @@ func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.R
 }
 
 func (m *mockRETLClient) GetRetlSource(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+	if m.getRetlSourceFunc != nil {
+		return m.getRetlSourceFunc(ctx, sourceID)
+	}
 	return &retlClient.RETLSource{
 		ID:                   sourceID,
 		Name:                 "Test Model",
@@ -110,6 +116,9 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context) (*retlClient.RETLS
 }
 
 func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, error) {
+	if m.readStateFunc != nil {
+		return m.readStateFunc(ctx)
+	}
 	return &retlClient.State{
 		Resources: map[string]retlClient.ResourceState{},
 	}, nil
@@ -1043,5 +1052,102 @@ func TestSQLModelHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("FetchImportData", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("Success", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// In Import tests, set mockClient.getRetlSourceFunc instead of mockClient.GetRetlSource
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+
+			args := importremote.ImportArgs{
+				RemoteID: "remote-id",
+				LocalID:  "local-id",
+			}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.NoError(t, err)
+			assert.Len(t, results, 1)
+			imported := results[0]
+			assert.Equal(t, "local-id", (*imported.ResourceData)[sqlmodel.IDKey])
+			assert.Equal(t, "Imported Model", (*imported.ResourceData)[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc", (*imported.ResourceData)[sqlmodel.DescriptionKey])
+			assert.Equal(t, "id", (*imported.ResourceData)[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM t", (*imported.ResourceData)[sqlmodel.SQLKey])
+			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
+			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
+			assert.Equal(t, "local-id", imported.Metadata.Name)
+			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
+			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
+		})
+
+		t.Run("Non-SQL-model type", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Non-SQL-model type
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:         "remote-id",
+					SourceType: "not-model",
+				}, nil
+			}
+
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "is not a SQL model")
+		})
+
+		t.Run("API error", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// API error
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("api error")
+			}
+
+			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "getting RETL source for import")
+		})
+
+		t.Run("Missing local id", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+			args := importremote.ImportArgs{RemoteID: "remote-id"}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "local id is required")
+		})
+
+		t.Run("Missing remote id", func(t *testing.T) {
+			mockClient := &mockRETLClient{}
+			handler := sqlmodel.NewHandler(mockClient)
+			args := importremote.ImportArgs{LocalID: "local-id"}
+			results, err := handler.FetchImportData(context.Background(), args)
+			assert.Error(t, err)
+			assert.Nil(t, results)
+			assert.Contains(t, err.Error(), "remote id is required")
+		})
 	})
 }
