@@ -3,7 +3,7 @@ package importcmd
 import (
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -92,9 +92,17 @@ func NewCmdRetlSource() *cobra.Command {
 						return fmt.Errorf("writing SQL file: %w", err)
 					}
 
-					relativeSqlLocation := strings.TrimPrefix(sqlLocation, location)
-					relativeSqlLocation = strings.TrimLeft(relativeSqlLocation, "/")
-					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relativeSqlLocation, localID)
+					// Create a relative path from spec location to SQL file location
+					relPath, err := filepath.Rel(location, sqlLocation)
+					if err != nil {
+						return fmt.Errorf("calculating relative path: %w", err)
+					}
+
+					// Always use forward slashes for consistency across OS
+					relPath = filepath.ToSlash(relPath)
+
+					// Generate the SQL file path relative to the spec file
+					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relPath, localID)
 					delete(resourceData, sqlmodel.SQLKey)
 				}
 			}

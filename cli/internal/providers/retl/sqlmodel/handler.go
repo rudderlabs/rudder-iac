@@ -55,13 +55,14 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		filePath := *spec.File
 		if !filepath.IsAbs(filePath) {
 			// If path is relative, resolve it relative to the spec file
+			// This properly handles "../" in paths
 			specDir := filepath.Dir(path)
-			filePath = filepath.Join(specDir, filePath)
+			filePath = filepath.Clean(filepath.Join(specDir, filePath))
 		}
 
 		sqlContent, err := os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("reading SQL file %s: %w", *spec.File, err)
+			return fmt.Errorf("reading SQL file %s (resolved to %s): %w", *spec.File, filePath, err)
 		}
 		sqlStr = string(sqlContent)
 	}
