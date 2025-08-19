@@ -338,7 +338,7 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	args.AdditionalProperties = MustBool(propMap, "additionalProperties")
 
 	// Handle nested properties recursively
-	nestedProps := MapStringInterfaceSlice(propMap, "properties", nil)
+	nestedProps := NormalizeToSliceMap(propMap, "properties")
 	if len(nestedProps) > 0 {
 		nestedProperties := make([]*TrackingPlanPropertyArgs, len(nestedProps))
 		for nestedIdx, nestedProp := range nestedProps {
