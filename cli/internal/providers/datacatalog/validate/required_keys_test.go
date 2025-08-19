@@ -756,7 +756,7 @@ func TestVariantsValidation(t *testing.T) {
 										Cases: []catalog.VariantCase{
 											{
 												DisplayName: "Admin User",
-												Match:       []any{123.0, 456.78, true, "admin"}, // Fixed: using float64 instead of int
+												Match:       []any{123, 123.0, true, "admin"},
 												Properties: []catalog.PropertyReference{
 													{Ref: "#/properties/test-group/admin_level", Required: true},
 												},

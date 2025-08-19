@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -529,12 +530,19 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.V
 			}
 
 			for k, matchValue := range variantCase.Match {
-				switch matchValue.(type) {
-				case string, bool:
-				case float32, float64:
+				switch matchValue := matchValue.(type) {
+				case string, bool, int:
+				case float64:
+					if matchValue != math.Trunc(matchValue) {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("match value at index %d must be an integer", k),
+							Reference: caseReference,
+						})
+					}
+
 				default:
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("match value at index %d must be string, bool or number type (got: %T)", k, matchValue),
+						error:     fmt.Errorf("match value at index %d must be string, bool or integer type (got: %T)", k, matchValue),
 						Reference: caseReference,
 					})
 				}
