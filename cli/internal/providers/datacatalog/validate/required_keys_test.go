@@ -1093,7 +1093,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	depthErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/exceed_depth_rule")
 	depthFound := false
 	for _, err := range depthErrors {
-		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in rule") {
+		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in event_rule") {
 			depthFound = true
 			break
 		}
