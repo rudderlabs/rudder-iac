@@ -202,10 +202,6 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, baseReference string, f
 					})
 				}
 			}
-
-			if len(prop.Properties) > 0 {
-				errs = append(errs, rv.validateNestedPropertyRefs(prop, fmt.Sprintf("%s/rules/%s", baseReference, rule.LocalID), fetcher)...)
-			}
 		}
 	}
 	if rule.Includes != nil {
@@ -251,35 +247,6 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRule, baseReference string, f
 				},
 			)...,
 		)
-	}
-
-	return errs
-}
-
-func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRuleProperty, ruleRef string, dc catalog.CatalogResourceFetcher) []ValidationError {
-	errs := make([]ValidationError, 0)
-
-	for _, nestedProp := range prop.Properties {
-		matches := catalog.PropRegex.FindStringSubmatch(nestedProp.Ref)
-		if len(matches) != 3 {
-			errs = append(errs, ValidationError{
-				Reference: nestedProp.Ref,
-				error:     fmt.Errorf("property reference '%s' has invalid format in rule '%s'. Should be '#/properties/<group>/<id>'", nestedProp.Ref, ruleRef),
-			})
-			continue
-		}
-
-		group, propID := matches[1], matches[2]
-		if property := dc.Property(group, propID); property == nil {
-			errs = append(errs, ValidationError{
-				Reference: nestedProp.Ref,
-				error:     fmt.Errorf("property reference '%s' in rule '%s' not found in catalog", nestedProp.Ref, ruleRef),
-			})
-		}
-
-		if len(nestedProp.Properties) > 0 {
-			errs = append(errs, rv.validateNestedPropertyRefs(nestedProp, ruleRef, dc)...)
-		}
 	}
 
 	return errs
