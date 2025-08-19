@@ -166,7 +166,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			if rule.Event == nil && len(rule.Properties) > 0 {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("properties without events in rule: %s are not allowed", rule.LocalID),
+					error:     fmt.Errorf("properties without events in event_rule: %s are not allowed", rule.LocalID),
 					Reference: reference,
 				})
 			}
@@ -624,7 +624,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	if prop.Ref == "" {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("ref field is mandatory for property %s in rule %s", prop.Ref, ruleRef),
+				error:     fmt.Errorf("ref field is mandatory for property %s in event_rule %s", prop.Ref, ruleRef),
 				Reference: ruleRef,
 			},
 		}
@@ -640,7 +640,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	if len(matches) != 3 {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("invalid property reference format: %s in rule %s", prop.Ref, ruleRef),
+				error:     fmt.Errorf("invalid property reference format: %s in event_rule %s", prop.Ref, ruleRef),
 				Reference: ruleRef,
 			},
 		}
@@ -663,7 +663,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	if property.Type != "object" {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("property %s in rule %s must have type 'object', but has type '%s' - nested properties are only supported for object type properties", prop.Ref, ruleRef, property.Type),
+				error:     fmt.Errorf("property %s in event_rule %s must have type 'object', but has type '%s' - nested properties are only supported for object type properties", prop.Ref, ruleRef, property.Type),
 				Reference: ruleRef,
 			},
 		}
@@ -685,7 +685,7 @@ func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRu
 
 	if currentDepth > maxDepth {
 		errors = append(errors, ValidationError{
-			error:     fmt.Errorf("maximum property nesting depth of %d levels exceeded in rule %s", maxDepth, ruleRef),
+			error:     fmt.Errorf("maximum property nesting depth of %d levels exceeded in event_rule %s", maxDepth, ruleRef),
 			Reference: ruleRef,
 		})
 		return errors
