@@ -63,13 +63,11 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	sortedNew := sortByDependencies(diff.NewResources, target)
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
-	}
-
-	sortedImport := sortByDependencies(diff.ImportResources, target)
-	for _, urn := range sortedImport {
-		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
+		var opType OperationType = Create
+		if resource.ImportMetadata().IsImport() {
+			opType = Import
+		}
+		plan.Operations = append(plan.Operations, &Operation{Type: opType, Resource: resource})
 	}
 
 	updatedURNs := make([]string, 0, len(diff.UpdatedResources))

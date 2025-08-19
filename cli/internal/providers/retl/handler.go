@@ -56,5 +56,5 @@ type resourceHandler interface {
 	// This method takes the local ID, resource data from YAML definitions, and import metadata
 	// to align the remote resource with the local configuration.
 	// Returns the processed resource data or an error if import fails.
-	Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error)
+	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 }

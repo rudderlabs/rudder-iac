@@ -22,7 +22,7 @@ type SyncProvider interface {
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
-	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error)
+	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
 }
 
 func New(p SyncProvider) (*ProjectSyncer, error) {
@@ -187,7 +187,7 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 		return nil, err
 	}
 
-	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata())
+	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
 	if err != nil {
 		return nil, err
 	}

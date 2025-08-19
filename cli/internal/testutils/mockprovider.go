@@ -80,7 +80,8 @@ type ImportArgs struct {
 	ID           string
 	ResourceType string
 	Data         resources.ResourceData
-	Metadata     map[string]interface{}
+	WorkspaceId  string
+	RemoteId     string
 }
 
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
@@ -143,8 +144,8 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 	return m.DeleteErr
 }
 
-func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
-	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, Metadata: metadata}
+func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
 	return m.ImportVal, m.ImportErr
 }
 

@@ -7,5 +7,14 @@ type Resource struct {
 	Data         map[string]interface{}
 	Dependencies []string
 
-	ImportMetadata map[string]interface{}
+	ImportMetadata *ResourceImportInfo
+}
+
+type ResourceImportInfo struct {
+	WorkspaceId string
+	RemoteId    string
+}
+
+func (i *ResourceImportInfo) IsImport() bool {
+	return i.RemoteId != ""
 }

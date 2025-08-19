@@ -16,22 +16,35 @@ func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
 }
 
-func NewResource(id string, resourceType string, data ResourceData, dependencies []string) *Resource {
-	return &Resource{
-		r: &internal.Resource{
-			URN:          URN(id, resourceType),
-			ID:           id,
-			Type:         resourceType,
-			Data:         data,
-			Dependencies: dependencies,
-		},
+type ImportOpts func(*internal.ResourceImportInfo)
+
+func WithWorkspaceId(workspaceId string) ImportOpts {
+	return func(i *internal.ResourceImportInfo) {
+		i.WorkspaceId = workspaceId
+	}
+}
+func WithRemoteId(remoteId string) ImportOpts {
+	return func(i *internal.ResourceImportInfo) {
+		i.RemoteId = remoteId
 	}
 }
 
-func NewResourceWithImportMetadata(id string, resourceType string, data ResourceData, dependencies []string, importMetadata map[string]interface{}) *Resource {
-	resource := NewResource(id, resourceType, data, dependencies)
-	resource.r.ImportMetadata = importMetadata
-	return resource
+func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ImportOpts) *Resource {
+	importMetadata := &internal.ResourceImportInfo{}
+	for _, opt := range opts {
+		opt(importMetadata)
+	}
+
+	return &Resource{
+		r: &internal.Resource{
+			URN:            URN(id, resourceType),
+			ID:             id,
+			Type:           resourceType,
+			Data:           data,
+			Dependencies:   dependencies,
+			ImportMetadata: importMetadata,
+		},
+	}
 }
 
 func (r *Resource) ID() string {
@@ -54,6 +67,6 @@ func (r *Resource) Dependencies() []string {
 	return r.r.Dependencies
 }
 
-func (r *Resource) ImportMetadata() map[string]interface{} {
+func (r *Resource) ImportMetadata() *internal.ResourceImportInfo {
 	return r.r.ImportMetadata
 }

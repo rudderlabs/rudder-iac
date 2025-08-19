@@ -145,12 +145,12 @@ func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType 
 	return provider.Delete(ctx, ID, resourceType, state)
 }
 
-func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
+func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	provider := p.providerForType(resourceType)
 	if provider == nil {
 		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
 	}
-	return provider.Import(ctx, ID, resourceType, data, metadata)
+	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
 }
 
 // Helper methods

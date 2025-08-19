@@ -79,10 +79,26 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SQL:              sqlStr,
 	}
 
-	if len(s.Metadata) > 0 {
-		h.resources[spec.ID].ImportMetadata = s.Metadata
-	}
+	return h.loadImportMetadata(s.Metadata)
+}
 
+func (h *Handler) loadImportMetadata(fileMetadata map[string]interface{}) error {
+	metadata := importremote.Metadata{}
+	err := mapstructure.Decode(fileMetadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+	workspaces := metadata.Import.Workspaces
+	for _, workspaceMetadata := range workspaces {
+		workspaceId := workspaceMetadata.WorkspaceID
+		resources := workspaceMetadata.Resources
+		for _, resourceMetadata := range resources {
+			importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+				WorkspaceId: workspaceId,
+				RemoteId:    resourceMetadata.RemoteID,
+			}
+		}
+	}
 	return nil
 }
 
@@ -113,20 +129,20 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			SQLKey:              spec.SQL,
 		}
 
-		var metadata map[string]interface{}
-		if len(spec.ImportMetadata) > 0 {
-			metadata = spec.ImportMetadata
+		var opts []resources.ImportOpts
+		if importMetadata, ok := importMetadata[spec.ID]; ok {
+			opts = []resources.ImportOpts{
+				resources.WithWorkspaceId(importMetadata.WorkspaceId),
+				resources.WithRemoteId(importMetadata.RemoteId),
+			}
 		}
-
-		// Create resource with SQL Model resource type
-		resource := resources.NewResourceWithImportMetadata(
+		resource := resources.NewResource(
 			spec.ID,
 			ResourceType,
 			data,
 			[]string{}, // No dependencies for now
-			metadata,
+			opts...,
 		)
-
 		result = append(result, resource)
 	}
 
@@ -250,18 +266,10 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 	return resourceData, nil
 }
 
-func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, metadata map[string]interface{}) (*resources.ResourceData, error) {
-	importData := &importremote.Metadata{}
-	if err := mapstructure.Decode(metadata, importData); err != nil {
-		return nil, fmt.Errorf("decoding import metadata: %w", err)
-	}
-	if len(importData.Import.Workspaces) != 1 {
-		return nil, fmt.Errorf("import metadata must have exactly one workspace")
-	}
-	remoteID := importData.Import.Workspaces[0].Resources[0].RemoteID
-	_, err := h.client.GetRetlSource(ctx, remoteID)
+func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	_, err := h.client.GetRetlSource(ctx, remoteId)
 	if err == nil {
-		return h.updateCall(ctx, remoteID, data)
+		return h.updateCall(ctx, remoteId, data)
 	}
 
 	return h.createCall(ctx, data)
