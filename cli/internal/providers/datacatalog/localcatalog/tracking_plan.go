@@ -20,6 +20,7 @@ type CatalogResourceFetcher interface {
 	Event(group, id string) *Event
 	Property(group, id string) *Property
 	Category(group, id string) *Category
+	CustomType(group, id string) *CustomType
 	TPEventRule(group, id string) *TPRule
 	TPEventRules(group string) ([]*TPRule, bool)
 }
@@ -37,6 +38,7 @@ type TrackingPlan struct {
 type TPEvent struct {
 	Name            string
 	LocalID         string
+	Ref             string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -57,6 +59,7 @@ func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
 
 type TPEventProperty struct {
 	Name        string                 `json:"name"`
+	Ref         string                 `json:"$ref"`
 	LocalID     string                 `json:"id"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
@@ -245,6 +248,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
+		Ref:             rule.Event.Ref,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
 		Type:            event.Type,

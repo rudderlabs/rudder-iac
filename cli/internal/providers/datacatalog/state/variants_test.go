@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVariantsDiffMethod(t *testing.T) {
+func TestVariants_Diff(t *testing.T) {
 	t.Parallel()
 
 	t.Run("identical variants", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 					{
 						DisplayName: "Login",
 						Match:       []any{"login"},
-						Description: &description,
+						Description: description,
 						Properties: []PropertyReference{
 							{ID: propID, Required: true},
 						},
@@ -44,7 +44,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 					{
 						DisplayName: "Login",
 						Match:       []any{"login"},
-						Description: &description,
+						Description: description,
 						Properties: []PropertyReference{
 							{ID: propID, Required: true},
 						},
@@ -210,7 +210,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc1},
+					{DisplayName: "Case1", Description: desc1},
 				},
 			},
 		}
@@ -219,7 +219,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc2},
+					{DisplayName: "Case1", Description: desc2},
 				},
 			},
 		}
@@ -236,7 +236,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: nil},
+					{DisplayName: "Case1", Description: ""},
 				},
 			},
 		}
@@ -245,7 +245,7 @@ func TestVariantsDiffMethod(t *testing.T) {
 				Type:          "discriminator",
 				Discriminator: "test",
 				Cases: []VariantCase{
-					{DisplayName: "Case1", Description: &desc},
+					{DisplayName: "Case1", Description: desc},
 				},
 			},
 		}
@@ -369,5 +369,187 @@ func TestVariantsDiffMethod(t *testing.T) {
 		}
 
 		assert.False(t, variants1.Diff(variants2))
+	})
+}
+
+func TestVariants_ResourceData(t *testing.T) {
+
+	t.Run("ToResourceData()", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("nil variants generates empty map", func(t *testing.T) {
+			t.Parallel()
+			var variants Variants
+			assert.Equal(t, []map[string]any{}, variants.ToResourceData())
+		})
+
+		t.Run("variants with empty cases and default generates correct resource data", func(t *testing.T) {
+			t.Parallel()
+
+			var variants Variants
+			variants = append(variants, Variant{
+				Type:          "discriminator",
+				Discriminator: "test",
+			})
+
+			assert.Equal(t, []map[string]any{
+				{
+					"type":          "discriminator",
+					"discriminator": "test",
+					"cases":         []map[string]any{}, // empty cases
+					"default":       []map[string]any{}, // empty default
+				},
+			}, variants.ToResourceData())
+		})
+
+		t.Run("variants with valid cases and default generates correct resource data", func(t *testing.T) {
+			t.Parallel()
+
+			var variants Variants
+			variants = append(variants, Variant{
+				Type:          "discriminator",
+				Discriminator: "test",
+				Cases: []VariantCase{
+					{
+						DisplayName: "Case1",
+						Match:       []any{"value1"},
+						Description: "Description 1",
+						Properties: []PropertyReference{
+							{ID: "upstream-prop1", Required: true},
+							{ID: "upstream-prop2", Required: false},
+						},
+					},
+					{
+						DisplayName: "Case2",
+						Match:       []any{"value1, value2"},
+						Description: "Description 2",
+						Properties: []PropertyReference{
+							{ID: "upstream-prop3", Required: true},
+							{ID: "upstream-prop4", Required: false},
+						},
+					},
+				},
+				Default: []PropertyReference{
+					{ID: "default1", Required: true},
+				},
+			})
+			assert.Equal(t, []map[string]any{
+				{
+					"type":          "discriminator",
+					"discriminator": "test",
+					"cases": []map[string]any{
+						{
+							"display_name": "Case1",
+							"match":        []any{"value1"},
+							"description":  "Description 1",
+							"properties": []map[string]any{
+								{
+									"id":       "upstream-prop1",
+									"required": true,
+								},
+								{
+									"id":       "upstream-prop2",
+									"required": false,
+								},
+							},
+						},
+						{
+							"display_name": "Case2",
+							"match":        []any{"value1, value2"},
+							"description":  "Description 2",
+							"properties": []map[string]any{
+								{
+									"id":       "upstream-prop3",
+									"required": true,
+								},
+								{
+									"id":       "upstream-prop4",
+									"required": false,
+								},
+							},
+						},
+					},
+					"default": []map[string]any{
+						{
+							"id":       "default1",
+							"required": true,
+						},
+					},
+				},
+			}, variants.ToResourceData())
+
+		})
+
+	})
+
+	t.Run("FromResourceData()", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("empty resource data generates empty variants", func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				actualVariants   Variants
+				expectedVariants Variants
+			)
+
+			actualVariants.FromResourceData([]map[string]any{})
+			assert.Equal(t, expectedVariants, actualVariants)
+		})
+
+		t.Run("resource data with valid cases and default generates correct variants", func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				actualVariants   Variants
+				expectedVariants Variants = []Variant{
+					{
+						Type:          "discriminator",
+						Discriminator: "test",
+						Cases: []VariantCase{
+							{
+								DisplayName: "Case1",
+								Match:       []any{"value1"},
+								Description: "Description 1",
+								Properties: []PropertyReference{
+									{ID: "upstream-prop1", Required: true},
+								},
+							},
+						},
+						Default: []PropertyReference{
+							{ID: "default1", Required: true},
+						},
+					},
+				}
+			)
+
+			actualVariants.FromResourceData([]map[string]any{
+				{
+					"type":          "discriminator",
+					"discriminator": "test",
+					"cases": []map[string]any{
+						{
+							"display_name": "Case1",
+							"match":        []any{"value1"},
+							"description":  "Description 1",
+							"properties": []map[string]any{
+								{
+									"id":       "upstream-prop1",
+									"required": true,
+								},
+							},
+						},
+					},
+					"default": []map[string]any{
+						{
+							"id":       "default1",
+							"required": true,
+						},
+					},
+				},
+			})
+
+			assert.Equal(t, expectedVariants, actualVariants)
+		})
 	})
 }

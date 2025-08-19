@@ -374,7 +374,7 @@ func TestCustomTypeValidation(t *testing.T) {
 				// We only count errors related to custom types
 				customTypeErrs := 0
 				for _, err := range errs {
-					if _, ok := err.error.(error); ok && strings.Contains(err.Reference, "custom-types") {
+					if strings.Contains(err.Reference, "custom-types") {
 						customTypeErrs++
 					}
 				}
