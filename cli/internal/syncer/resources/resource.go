@@ -16,23 +16,22 @@ func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
 }
 
-type ImportOpts func(*internal.ResourceImportMetadata) *internal.ResourceImportMetadata
+type ImportOpts func(*internal.ResourceImportMetadata)
 
 func WithResourceImportInfo(remoteId, workspaceId string) ImportOpts {
-	return func(i *internal.ResourceImportMetadata) *internal.ResourceImportMetadata {
-		if i == nil {
-			i = &internal.ResourceImportMetadata{}
-		}
+	return func(i *internal.ResourceImportMetadata) {
 		i.RemoteId = remoteId
 		i.WorkspaceId = workspaceId
-		return i
 	}
 }
 
 func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ImportOpts) *Resource {
 	var importMetadata *internal.ResourceImportMetadata = nil
-	for _, opt := range opts {
-		importMetadata = opt(importMetadata)
+	if len(opts) > 0 {
+		importMetadata = &internal.ResourceImportMetadata{}
+		for _, opt := range opts {
+			opt(importMetadata)
+		}
 	}
 
 	return &Resource{
