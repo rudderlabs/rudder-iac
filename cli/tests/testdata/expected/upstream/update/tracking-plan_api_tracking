@@ -20,11 +20,11 @@
         },
         {
           "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
-          "required": false
+          "required": true
         },
         {
           "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
-          "required": true
+          "required": false
 
         },
         {
