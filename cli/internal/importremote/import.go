@@ -34,6 +34,7 @@ type WorkspaceImportMetadata struct {
 	WorkspaceID string      `yaml:"workspace_id" mapstructure:"workspace_id"`
 	Resources   []ImportIds `yaml:"resources" mapstructure:"resources"`
 }
+
 type ImportData struct {
 	ResourceData *resources.ResourceData
 	Metadata     Metadata

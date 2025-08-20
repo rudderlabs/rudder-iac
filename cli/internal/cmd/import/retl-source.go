@@ -3,6 +3,7 @@ package importcmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -45,10 +46,10 @@ func NewCmdRetlSource() *cobra.Command {
 			YAML configuration will reference it using the 'file' field instead of inline 'sql'.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli import retl-source --local-id my-model --remote-id abc123
-			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models
-			$ rudder-cli import retl-source --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
-			$ rudder-cli import retl-source -i analytics-model -r def789 -l ./models -s ./sql
+			$ rudder-cli import retl-sources --local-id my-model --remote-id abc123
+			$ rudder-cli import retl-sources -i analytics-model -r def789 -l ./models
+			$ rudder-cli import retl-sources --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
+			$ rudder-cli import retl-sources -i analytics-model -r def789 -l ./models -s ./sql
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			retlSourceImportLog.Debug("import retl-source", "localID", localID, "remoteID", remoteID, "location", location, "sqlLocation", sqlLocation)
@@ -90,7 +91,18 @@ func NewCmdRetlSource() *cobra.Command {
 					if err != nil {
 						return fmt.Errorf("writing SQL file: %w", err)
 					}
-					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", sqlLocation, localID)
+
+					// Create a relative path from spec location to SQL file location
+					relPath, err := filepath.Rel(location, sqlLocation)
+					if err != nil {
+						return fmt.Errorf("calculating relative path: %w", err)
+					}
+
+					// Always use forward slashes for consistency across OS
+					relPath = filepath.ToSlash(relPath)
+
+					// Generate the SQL file path relative to the spec file
+					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relPath, localID)
 					delete(resourceData, sqlmodel.SQLKey)
 				}
 			}

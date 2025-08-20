@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-  
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -183,6 +183,15 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 	return handler.List(ctx)
+}
+
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.Import(ctx, ID, data, remoteId)
 }
 
 // Import imports a single remote RETL resource with local ID mapping

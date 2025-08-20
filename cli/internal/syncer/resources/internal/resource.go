@@ -6,4 +6,11 @@ type Resource struct {
 	Type         string
 	Data         map[string]interface{}
 	Dependencies []string
+
+	ImportMetadata *ResourceImportMetadata
+}
+
+type ResourceImportMetadata struct {
+	WorkspaceId string
+	RemoteId    string
 }

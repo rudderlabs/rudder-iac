@@ -55,13 +55,14 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		filePath := *spec.File
 		if !filepath.IsAbs(filePath) {
 			// If path is relative, resolve it relative to the spec file
+			// This properly handles "../" in paths
 			specDir := filepath.Dir(path)
-			filePath = filepath.Join(specDir, filePath)
+			filePath = filepath.Clean(filepath.Join(specDir, filePath))
 		}
 
 		sqlContent, err := os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("reading SQL file %s: %w", *spec.File, err)
+			return fmt.Errorf("reading SQL file %s (resolved to %s): %w", *spec.File, filePath, err)
 		}
 		sqlStr = string(sqlContent)
 	}
@@ -76,6 +77,27 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SourceDefinition: string(spec.SourceDefinition),
 		Enabled:          spec.Enabled,
 		SQL:              sqlStr,
+	}
+
+	return h.loadImportMetadata(s.Metadata)
+}
+
+func (h *Handler) loadImportMetadata(fileMetadata map[string]interface{}) error {
+	metadata := importremote.Metadata{}
+	err := mapstructure.Decode(fileMetadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+	workspaces := metadata.Import.Workspaces
+	for _, workspaceMetadata := range workspaces {
+		workspaceId := workspaceMetadata.WorkspaceID
+		resources := workspaceMetadata.Resources
+		for _, resourceMetadata := range resources {
+			importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+				WorkspaceId: workspaceId,
+				RemoteId:    resourceMetadata.RemoteID,
+			}
+		}
 	}
 	return nil
 }
@@ -107,14 +129,19 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			SQLKey:              spec.SQL,
 		}
 
-		// Create resource with SQL Model resource type
+		var opts []resources.ResourceOpts
+		if importMetadata, ok := importMetadata[spec.ID]; ok {
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			}
+		}
 		resource := resources.NewResource(
 			spec.ID,
 			ResourceType,
 			data,
 			[]string{}, // No dependencies for now
+			opts...,
 		)
-
 		result = append(result, resource)
 	}
 
@@ -144,6 +171,24 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	return toResourceData(resp), nil
 }
 
+func (h *Handler) createCall(ctx context.Context, data resources.ResourceData) (*resources.ResourceData, error) {
+	source := &retlClient.RETLSourceCreateRequest{
+		Name:                 data[DisplayNameKey].(string),
+		Config:               toRETLSQLModelConfig(data),
+		SourceType:           retlClient.ModelSourceType,
+		SourceDefinitionName: data[SourceDefinitionKey].(string),
+		AccountID:            data[AccountIDKey].(string),
+	}
+
+	// Call API to create RETL source
+	resp, err := h.client.CreateRetlSource(ctx, source)
+	if err != nil {
+		return nil, fmt.Errorf("creating RETL source: %w", err)
+	}
+
+	return toResourceData(resp), nil
+}
+
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
@@ -156,6 +201,10 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("source definition name cannot be changed")
 	}
 
+	return h.updateCall(ctx, sourceID, data)
+}
+
+func (h *Handler) updateCall(ctx context.Context, sourceID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name:      data[DisplayNameKey].(string),
 		Config:    toRETLSQLModelConfig(data),
@@ -214,6 +263,15 @@ func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
 	}
 
 	return resourceData, nil
+}
+
+func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	_, err := h.client.GetRetlSource(ctx, remoteId)
+	if err == nil {
+		return h.updateCall(ctx, remoteId, data)
+	}
+
+	return h.createCall(ctx, data)
 }
 
 func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {

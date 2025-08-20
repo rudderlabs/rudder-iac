@@ -46,10 +46,15 @@ type resourceHandler interface {
 	// dependency resolution and state management.
 	List(ctx context.Context) ([]resources.ResourceData, error)
 
-
-	// Import imports a single remote resource with local ID mapping.
-	// This method fetches a remote resource by remoteID and prepares it for local import
-	// with the specified localID. The workspaceID is used for proper resource scoping.
-	// Returns the resource data with import metadata or an error if import fails.
+	// FetchImportData retrieves data for multiple resources to be imported.
+	// This method fetches remote resources based on the provided import arguments
+	// and prepares them for local import. It handles resource discovery and metadata collection.
+	// Returns a list of import data structures or an error if fetching fails.
 	FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error)
+
+	// Import updates the remote state to match the resource defined in YAML projects.
+	// This method takes the local ID, resource data from YAML definitions, and import metadata
+	// to align the remote resource with the local configuration.
+	// Returns the processed resource data or an error if import fails.
+	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 }
