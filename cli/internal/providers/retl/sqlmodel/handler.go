@@ -129,10 +129,10 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			SQLKey:              spec.SQL,
 		}
 
-		var opts []resources.ImportOpts
+		var opts []resources.ResourceOpts
 		if importMetadata, ok := importMetadata[spec.ID]; ok {
-			opts = []resources.ImportOpts{
-				resources.WithResourceImportInfo(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
 			}
 		}
 		resource := resources.NewResource(
