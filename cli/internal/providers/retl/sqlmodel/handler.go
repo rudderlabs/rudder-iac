@@ -132,8 +132,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		var opts []resources.ImportOpts
 		if importMetadata, ok := importMetadata[spec.ID]; ok {
 			opts = []resources.ImportOpts{
-				resources.WithWorkspaceId(importMetadata.WorkspaceId),
-				resources.WithRemoteId(importMetadata.RemoteId),
+				resources.WithResourceImportInfo(importMetadata.RemoteId, importMetadata.WorkspaceId),
 			}
 		}
 		resource := resources.NewResource(

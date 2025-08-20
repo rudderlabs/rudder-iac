@@ -64,7 +64,7 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
 		var opType OperationType = Create
-		if resource.ImportMetadata().IsImport() {
+		if resource.ImportMetadata() != nil {
 			opType = Import
 		}
 		plan.Operations = append(plan.Operations, &Operation{Type: opType, Resource: resource})
