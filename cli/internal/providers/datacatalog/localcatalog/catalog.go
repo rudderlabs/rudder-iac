@@ -134,21 +134,21 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		if err != nil {
 			return fmt.Errorf("extracting properties: %w", err)
 		}
-		dc.Properties[EntityGroup(name)] = properties
+		dc.Properties[EntityGroup(name)] = append(dc.Properties[EntityGroup(name)], properties...)
 
 	case "events":
 		events, err := ExtractEvents(s)
 		if err != nil {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
-		dc.Events[EntityGroup(name)] = events
+		dc.Events[EntityGroup(name)] = append(dc.Events[EntityGroup(name)], events...)
 
 	case "categories":
 		categories, err := ExtractCategories(s)
 		if err != nil {
 			return fmt.Errorf("extracting categories: %w", err)
 		}
-		dc.Categories[EntityGroup(name)] = categories
+		dc.Categories[EntityGroup(name)] = append(dc.Categories[EntityGroup(name)], categories...)
 
 	case "tp":
 		tp, err := ExtractTrackingPlan(s)
@@ -156,6 +156,9 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
+		if _, exists := dc.TrackingPlans[EntityGroup(name)]; exists {
+			return fmt.Errorf("duplicate tracking plan with metadata.name '%s' found - only one tracking plan per entity group is allowed", name)
+		}
 		dc.TrackingPlans[EntityGroup(name)] = &tp
 
 	case "custom-types":
@@ -163,7 +166,7 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		if err != nil {
 			return fmt.Errorf("extracting custom types: %w", err)
 		}
-		dc.CustomTypes[EntityGroup(name)] = customTypes
+		dc.CustomTypes[EntityGroup(name)] = append(dc.CustomTypes[EntityGroup(name)], customTypes...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)

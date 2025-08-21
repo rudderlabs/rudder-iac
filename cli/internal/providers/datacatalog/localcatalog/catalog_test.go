@@ -551,4 +551,292 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Name:    "Payment Events",
 		}, emptyCatalog.Categories["app_categories"][2])
 	})
+
+	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
+		catalog := DataCatalog{
+			Events:        make(map[EntityGroup][]Event),
+			Properties:    make(map[EntityGroup][]Property),
+			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+			CustomTypes:   make(map[EntityGroup][]CustomType),
+			Categories:    make(map[EntityGroup][]Category),
+		}
+
+		// First events file with metadata.name "shared_events"
+		byt1 := []byte(`
+        version: rudder/0.1
+        kind: events
+        metadata:
+          name: shared_events
+        spec:
+          events:
+            - id: event_a
+              name: "Event A"
+              event_type: track
+              description: "First event from file 1"
+            - id: event_b
+              name: "Event B"
+              event_type: track
+              description: "Second event from file 1"
+        `)
+
+		s1, err := specs.New(byt1)
+		require.Nil(t, err)
+		err = extractEntities(s1, &catalog)
+		require.Nil(t, err)
+
+		// Verify first file loaded correctly
+		assert.Len(t, catalog.Events["shared_events"], 2)
+		assert.Equal(t, "event_a", catalog.Events["shared_events"][0].LocalID)
+		assert.Equal(t, "event_b", catalog.Events["shared_events"][1].LocalID)
+
+		// Second events file with same metadata.name "shared_events"
+		byt2 := []byte(`
+        version: rudder/0.1
+        kind: events
+        metadata:
+          name: shared_events
+        spec:
+          events:
+            - id: event_c
+              name: "Event C"
+              event_type: track
+              description: "First event from file 2"
+            - id: event_d
+              name: "Event D"
+              event_type: track
+              description: "Second event from file 2"
+        `)
+
+		s2, err := specs.New(byt2)
+		require.Nil(t, err)
+		err = extractEntities(s2, &catalog)
+		require.Nil(t, err)
+
+		// Verify both files are merged - should have 4 events total
+		assert.Len(t, catalog.Events["shared_events"], 4)
+		assert.Equal(t, "event_a", catalog.Events["shared_events"][0].LocalID)
+		assert.Equal(t, "event_b", catalog.Events["shared_events"][1].LocalID)
+		assert.Equal(t, "event_c", catalog.Events["shared_events"][2].LocalID)
+		assert.Equal(t, "event_d", catalog.Events["shared_events"][3].LocalID)
+	})
+
+	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
+		catalog := DataCatalog{
+			Events:        make(map[EntityGroup][]Event),
+			Properties:    make(map[EntityGroup][]Property),
+			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+			CustomTypes:   make(map[EntityGroup][]CustomType),
+			Categories:    make(map[EntityGroup][]Category),
+		}
+
+		// First properties file
+		byt1 := []byte(`
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: shared_props
+        spec:
+          properties:
+            - id: prop_a
+              name: "Property A"
+              type: string
+              description: "First property from file 1"
+            - id: prop_b
+              name: "Property B"
+              type: integer
+              description: "Second property from file 1"
+        `)
+
+		s1, err := specs.New(byt1)
+		require.Nil(t, err)
+		err = extractEntities(s1, &catalog)
+		require.Nil(t, err)
+
+		// Second properties file with same metadata.name
+		byt2 := []byte(`
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: shared_props
+        spec:
+          properties:
+            - id: prop_c
+              name: "Property C"
+              type: boolean
+              description: "First property from file 2"
+        `)
+
+		s2, err := specs.New(byt2)
+		require.Nil(t, err)
+		err = extractEntities(s2, &catalog)
+		require.Nil(t, err)
+
+		// Verify both files are merged - should have 3 properties total
+		assert.Len(t, catalog.Properties["shared_props"], 3)
+		assert.Equal(t, "prop_a", catalog.Properties["shared_props"][0].LocalID)
+		assert.Equal(t, "prop_b", catalog.Properties["shared_props"][1].LocalID)
+		assert.Equal(t, "prop_c", catalog.Properties["shared_props"][2].LocalID)
+	})
+
+	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
+		catalog := DataCatalog{
+			Events:        make(map[EntityGroup][]Event),
+			Properties:    make(map[EntityGroup][]Property),
+			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+			CustomTypes:   make(map[EntityGroup][]CustomType),
+			Categories:    make(map[EntityGroup][]Category),
+		}
+
+		// First categories file
+		byt1 := []byte(`
+        version: rudder/0.1
+        kind: categories
+        metadata:
+          name: shared_categories
+        spec:
+          categories:
+            - id: cat_a
+              name: "Category A"
+            - id: cat_b
+              name: "Category B"
+        `)
+
+		s1, err := specs.New(byt1)
+		require.Nil(t, err)
+		err = extractEntities(s1, &catalog)
+		require.Nil(t, err)
+
+		// Second categories file with same metadata.name
+		byt2 := []byte(`
+        version: rudder/0.1
+        kind: categories
+        metadata:
+          name: shared_categories
+        spec:
+          categories:
+            - id: cat_c
+              name: "Category C"
+        `)
+
+		s2, err := specs.New(byt2)
+		require.Nil(t, err)
+		err = extractEntities(s2, &catalog)
+		require.Nil(t, err)
+
+		// Verify both files are merged - should have 3 categories total
+		assert.Len(t, catalog.Categories["shared_categories"], 3)
+		assert.Equal(t, "cat_a", catalog.Categories["shared_categories"][0].LocalID)
+		assert.Equal(t, "cat_b", catalog.Categories["shared_categories"][1].LocalID)
+		assert.Equal(t, "cat_c", catalog.Categories["shared_categories"][2].LocalID)
+	})
+
+	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
+		catalog := DataCatalog{
+			Events:        make(map[EntityGroup][]Event),
+			Properties:    make(map[EntityGroup][]Property),
+			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+			CustomTypes:   make(map[EntityGroup][]CustomType),
+			Categories:    make(map[EntityGroup][]Category),
+		}
+
+		// First custom-types file
+		byt1 := []byte(`
+        version: rudder/0.1
+        kind: custom-types
+        metadata:
+          name: shared_types
+        spec:
+          types:
+            - id: type_a
+              name: "Type A"
+              type: string
+              description: "First type from file 1"
+            - id: type_b
+              name: "Type B"
+              type: integer
+              description: "Second type from file 1"
+        `)
+
+		s1, err := specs.New(byt1)
+		require.Nil(t, err)
+		err = extractEntities(s1, &catalog)
+		require.Nil(t, err)
+
+		// Second custom-types file with same metadata.name
+		byt2 := []byte(`
+        version: rudder/0.1
+        kind: custom-types
+        metadata:
+          name: shared_types
+        spec:
+          types:
+            - id: type_c
+              name: "Type C"
+              type: boolean
+              description: "First type from file 2"
+        `)
+
+		s2, err := specs.New(byt2)
+		require.Nil(t, err)
+		err = extractEntities(s2, &catalog)
+		require.Nil(t, err)
+
+		// Verify both files are merged - should have 3 custom types total
+		assert.Len(t, catalog.CustomTypes["shared_types"], 3)
+		assert.Equal(t, "type_a", catalog.CustomTypes["shared_types"][0].LocalID)
+		assert.Equal(t, "type_b", catalog.CustomTypes["shared_types"][1].LocalID)
+		assert.Equal(t, "type_c", catalog.CustomTypes["shared_types"][2].LocalID)
+	})
+
+	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
+		catalog := DataCatalog{
+			Events:        make(map[EntityGroup][]Event),
+			Properties:    make(map[EntityGroup][]Property),
+			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
+			CustomTypes:   make(map[EntityGroup][]CustomType),
+			Categories:    make(map[EntityGroup][]Category),
+		}
+
+		// First tracking plan file
+		byt1 := []byte(`
+        version: rudder/0.1
+        kind: tp
+        metadata:
+          name: shared_tp
+        spec:
+          id: tp_1
+          display_name: "Tracking Plan 1"
+          description: "First tracking plan"
+          rules: []
+        `)
+
+		s1, err := specs.New(byt1)
+		require.Nil(t, err)
+		err = extractEntities(s1, &catalog)
+		require.Nil(t, err)
+
+		// Verify first tracking plan loaded correctly
+		assert.Len(t, catalog.TrackingPlans, 1)
+		assert.NotNil(t, catalog.TrackingPlans["shared_tp"])
+
+		// Second tracking plan file with same metadata.name should fail
+		byt2 := []byte(`
+        version: rudder/0.1
+        kind: tp
+        metadata:
+          name: shared_tp
+        spec:
+          id: tp_2
+          display_name: "Tracking Plan 2"
+          description: "Second tracking plan"
+          rules: []
+        `)
+
+		s2, err := specs.New(byt2)
+		require.Nil(t, err)
+		err = extractEntities(s2, &catalog)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate tracking plan with metadata.name 'shared_tp' found")
+		assert.Contains(t, err.Error(), "only one tracking plan per entity group is allowed")
+	})
 }
