@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -23,6 +24,23 @@ type CustomTypeProperty struct {
 	RefToID  any
 	ID       string
 	Required bool
+}
+
+// Diff compares two CustomTypeProperty instances and returns true if they differ
+func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
+	if prop.ID != other.ID {
+		return true
+	}
+	
+	if prop.Required != other.Required {
+		return true
+	}
+	
+	if !reflect.DeepEqual(prop.RefToID, other.RefToID) {
+		return true
+	}
+	
+	return false
 }
 
 // ToResourceData converts CustomTypeArgs to ResourceData for use in the resource graph
@@ -144,6 +162,64 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	return nil
 }
 
+// PropertyByID finds a property by its ID within the custom type
+func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
+	for _, prop := range args.Properties {
+		if prop.ID == id {
+			return prop
+		}
+	}
+	return nil
+}
+
+// Diff compares two CustomTypeArgs instances and returns true if they differ
+func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
+	// Compare basic fields
+	if args.LocalID != other.LocalID {
+		return true
+	}
+	
+	if args.Name != other.Name {
+		return true
+	}
+	
+	if args.Description != other.Description {
+		return true
+	}
+	
+	if args.Type != other.Type {
+		return true
+	}
+	
+	// Compare config maps using deep equality
+	if !reflect.DeepEqual(args.Config, other.Config) {
+		return true
+	}
+	
+	// Compare properties arrays
+	if len(args.Properties) != len(other.Properties) {
+		return true
+	}
+	
+	for _, prop := range args.Properties {
+		otherProp := other.PropertyByID(prop.ID)
+		if otherProp == nil {
+			return true
+		}
+		
+		if prop.Diff(otherProp) {
+			return true
+		}
+	}
+	
+	// Compare variants using existing Variants.Diff method
+	if args.Variants.Diff(other.Variants) {
+		return true
+	}
+	
+	return false
+}
+
 type CustomTypeState struct {
 	CustomTypeArgs
 	ID              string
@@ -180,7 +256,7 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 		"workspaceId":     s.WorkspaceID,
 		"createdAt":       s.CreatedAt,
 		"updatedAt":       s.UpdatedAt,
-		"customTypeArgs":  map[string]interface{}(s.CustomTypeArgs.ToResourceData()),
+		"customTypeArgs":  map[string]any(s.CustomTypeArgs.ToResourceData()),
 	}
 }
 
