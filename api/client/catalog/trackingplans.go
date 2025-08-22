@@ -105,6 +105,7 @@ type TrackingPlanEventPropertyIdentifiers struct {
 
 type TrackingPlanEventProperty struct {
 	ID                   string                       `json:"id"`
+	Name                 string                       `json:"name"`
 	Required             bool                         `json:"required"`
 	AdditionalProperties bool                         `json:"additionalProperties"`
 	Properties           []*TrackingPlanEventProperty `json:"properties,omitempty"`

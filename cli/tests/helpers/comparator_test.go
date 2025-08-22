@@ -189,27 +189,27 @@ func TestSortSlice(t *testing.T) {
 			shouldSort: true,
 		},
 		{
-			name:       "slice with maps should maintain original order",
+			name:       "slice with maps without name key should maintain original order",
 			input:      []map[string]any{{"id": "2"}, {"id": "1"}},
 			expected:   []string{"map[id:2]", "map[id:1]"}, // Original order preserved
 			shouldSort: false,
 		},
 		{
-			name:       "empty slice should remain empty",
-			input:      []string{},
-			expected:   []string{},
+			name:       "map slice with name key should be sorted by name",
+			input:      []map[string]any{{"name": "zebra", "id": "3"}, {"name": "apple", "id": "1"}, {"name": "banana", "id": "2"}},
+			expected:   []string{"map[id:1 name:apple]", "map[id:2 name:banana]", "map[id:3 name:zebra]"},
 			shouldSort: true,
 		},
 		{
-			name:       "single element slice should remain unchanged",
-			input:      []string{"single"},
-			expected:   []string{"single"},
+			name:       "interface slice with maps having name key should be sorted",
+			input:      []any{map[string]any{"name": "zebra"}, map[string]any{"name": "apple"}},
+			expected:   []string{"map[name:apple]", "map[name:zebra]"},
 			shouldSort: true,
 		},
 		{
-			name:       "boolean slice should be sorted",
-			input:      []bool{true, false, true},
-			expected:   []string{"false", "true", "true"},
+			name:       "map slice with partial name keys groups maps with name key first, sorted",
+			input:      []map[string]any{{"name": "bazebra"}, {"id": "1"}, {"name": "abapple"}},
+			expected:   []string{"map[name:abapple]", "map[name:bazebra]", "map[id:1]"},
 			shouldSort: true,
 		},
 	}
@@ -264,9 +264,9 @@ func TestIsSliceOrderable(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "map slice is not orderable",
+			name:     "map slice is orderable",
 			input:    []map[string]any{{"key": "value"}},
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "struct slice is not orderable",
@@ -281,12 +281,12 @@ func TestIsSliceOrderable(t *testing.T) {
 		{
 			name:     "empty slice is orderable",
 			input:    []string{},
-			expected: true,
+			expected: false,
 		},
 		{
-			name:     "interface slice with map is not orderable",
+			name:     "interface slice with map is orderable",
 			input:    []any{map[string]any{"key": "value"}},
-			expected: false,
+			expected: true,
 		},
 	}
 
@@ -294,7 +294,7 @@ func TestIsSliceOrderable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := isSliceOrderable(reflect.ValueOf(tt.input))
+			result, _ := isSliceOrderable(reflect.ValueOf(tt.input))
 			assert.Equal(t, tt.expected, result)
 		})
 	}

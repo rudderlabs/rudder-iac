@@ -214,16 +214,15 @@
                 "localId": "api_tracking"
             },
             {
-                "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
-                "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
-                "localId": "api_error"
-            },
-            {
                 "eventId": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                 "id": "tpe_30CVISL0E9XhrxH6OeB9vtnedcv",
                 "localId": "login"
-            }
-            
+            },
+            {
+                "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
+                "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
+                "localId": "api_error"
+            }  
         ],
         "id": "tp_2yzTAKlo8XTDcoPezOYjo2dNn5r",
         "name": "API Tracking",
