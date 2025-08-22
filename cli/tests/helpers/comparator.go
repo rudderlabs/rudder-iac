@@ -18,6 +18,10 @@ func (e Errors) Error() string {
 	}), "\n")
 }
 
+const (
+	STABLE_KEY_NAME = "name"
+)
+
 // CompareStates recursively compares two interface{} values while ignoring specified fields
 // It returns an error containing all differences found, nil if they match
 func CompareStates(actual, expected any, ignore []string) error {
@@ -137,7 +141,8 @@ func compareSlices(path string, actual, expected reflect.Value, ignore []string,
 // It only sorts slices containing elements with ordered constraints (strings, numbers, bools)
 // Complex types like maps and structs are left in their original order
 func sortSlice(input reflect.Value) reflect.Value {
-	if input.Len() == 0 || !isSliceOrderable(input) {
+	orderable, kind := isSliceOrderable(input)
+	if !orderable {
 		return input
 	}
 
@@ -146,11 +151,11 @@ func sortSlice(input reflect.Value) reflect.Value {
 		anyslice[i] = input.Index(i).Interface()
 	}
 
-	// Sort based on string representation for consistent ordering
-	// which is a predictable way to sort slices
-	sort.Slice(anyslice, func(i, j int) bool {
-		return fmt.Sprintf("%v", anyslice[i]) < fmt.Sprintf("%v", anyslice[j])
-	})
+	if kind == reflect.Map {
+		anyslice = sortMapSlice(anyslice, STABLE_KEY_NAME)
+	} else {
+		anyslice = sortPrimitiveSlice(anyslice)
+	}
 
 	sorted := reflect.MakeSlice(input.Type(), len(anyslice), len(anyslice))
 	for i, val := range anyslice {
@@ -158,14 +163,52 @@ func sortSlice(input reflect.Value) reflect.Value {
 	}
 
 	return sorted
+
+}
+
+func sortPrimitiveSlice(input []any) []any {
+	// Sort based on string representation for consistent ordering
+	// which is a predictable way to sort slices
+	sort.Slice(input, func(i, j int) bool {
+		return fmt.Sprintf("%v", input[i]) < fmt.Sprintf("%v", input[j])
+	})
+	return input
+}
+
+func sortMapSlice(input []any, stableKey string) []any {
+	// Maps with the stable key: Grouped at the beginning, sorted alphabetically
+	// Maps without the stable key: Grouped at the end, in original order
+	sort.Slice(input, func(i, j int) bool {
+		iVal, iOk := input[i].(map[string]any)[stableKey]
+		jVal, jOk := input[j].(map[string]any)[stableKey]
+
+		// If both have the key, sort by value
+		if iOk && jOk {
+			return fmt.Sprintf("%v", iVal) < fmt.Sprintf("%v", jVal)
+		}
+
+		// If only i has the key, i comes first
+		if iOk && !jOk {
+			return true
+		}
+
+		// If only j has the key, j comes first
+		if !iOk && jOk {
+			return false
+		}
+
+		// If neither has the key, maintain original order
+		return false
+	})
+	return input
 }
 
 // isSliceOrderable determines if a slice contains elements that have ordered constraints
 // Returns true for slices of primitive types (strings, numbers, bools)
 // Returns false for slices of complex types (maps, structs, interfaces, etc.)
-func isSliceOrderable(slice reflect.Value) bool {
+func isSliceOrderable(slice reflect.Value) (bool, reflect.Kind) {
 	if slice.Len() == 0 {
-		return true
+		return false, reflect.Invalid // Empty slices are not orderable(there is nothing to sort)
 	}
 
 	firstElem := slice.Index(0)
@@ -174,14 +217,15 @@ func isSliceOrderable(slice reflect.Value) bool {
 		firstElem = firstElem.Elem()
 	}
 
-	switch firstElem.Kind() {
+	kind := firstElem.Kind()
+	switch kind {
 	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64, reflect.Bool:
-		return true
+		reflect.Float32, reflect.Float64, reflect.Bool, reflect.Map:
+		return true, kind
 	}
 
-	return false
+	return false, kind
 }
 
 func buildPath(basePath, key string) string {

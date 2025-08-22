@@ -16,23 +16,27 @@
       "properties": [
         {
           "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "name": "Password",
           "required": true,
           "additionalProperties": false
         },
         {
           "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "name": "API Method",
           "required": true,
           "additionalProperties": false
 
         },
         {
           "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "name": "API Path",
           "required": true,
           "additionalProperties": false
 
         },
         {
           "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "name": "Username",
           "required": true,
           "additionalProperties": false
 
@@ -55,31 +59,37 @@
       "properties": [
         {
           "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "name": "Username",
           "required": true,
           "additionalProperties": false
         },
         {
           "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
+          "name": "Password",
           "required": true,
           "additionalProperties": false
         },
         {
           "id": "prop_31TA42kdL1UNUtR1PtKpi9hxWt7",
+          "name": "Signin Info",
           "required": true,
           "additionalProperties": true,
           "properties": [
             {
               "id": "prop_31TA3Qk24n8NExMntP7PgffBRlG",
+              "name": "Captcha",
               "required": true,
               "additionalProperties": true,
               "properties": [
                 {
                   "id": "prop_31TA3Z2ASEI7CGaf2RsTpqBXd2O",
+                  "name": "Captcha Info",
                   "required": true,
                   "additionalProperties": true,
                   "properties": [
                     {
                       "id": "prop_31TA3ltAM0RP3yLCe4g0cxm0oCm",
+                      "name": "Captcha Type",
                       "required": true,
                       "additionalProperties": false
                     }
@@ -87,6 +97,7 @@
                 },
                 {
                   "id": "prop_31TA3VQw3zNqCtBTl2fWT6jiacq",
+                  "name": "Captcha Solved",
                   "required": true,
                   "additionalProperties": false
                 }
@@ -94,6 +105,7 @@
             },
             {
               "id": "prop_31TA3wtIcbJwsNHK6ot7Sh7NwvK",
+              "name": "Remember Me Checkbox Clicked",
               "required": false,
               "additionalProperties": false
             }
