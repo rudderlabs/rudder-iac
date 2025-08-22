@@ -18,10 +18,11 @@ const (
 	SourceDefinitionKey = "source_definition"
 	EnabledKey          = "enabled"
 	SQLKey              = "sql"
+	FileKey             = "file"
 	IDKey               = "id"
 	SourceTypeKey       = "source_type"
-	CreatedAtKey        = "created_at"
-	UpdatedAtKey        = "updated_at"
+	CreatedAtKey        = "createdAt"
+	UpdatedAtKey        = "updatedAt"
 
 	SourceDefinitionPostgres   SourceDefinition = "postgres"
 	SourceDefinitionRedshift   SourceDefinition = "redshift"
@@ -42,6 +43,13 @@ var validSourceDefinitions = map[SourceDefinition]bool{
 	SourceDefinitionDatabricks: true,
 	SourceDefinitionTrino:      true,
 }
+
+type ImportResourceInfo struct {
+	WorkspaceId string
+	RemoteId    string
+}
+
+var importMetadata = map[string]*ImportResourceInfo{}
 
 // isValidSourceDefinition checks if the given source definition is valid
 func isValidSourceDefinition(sd SourceDefinition) bool {

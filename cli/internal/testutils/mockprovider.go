@@ -25,6 +25,8 @@ type MockProvider struct {
 	UpdateVal              *resources.ResourceData
 	UpdateErr              error
 	DeleteErr              error
+	ImportVal              *resources.ResourceData
+	ImportErr              error
 
 	// Tracking calls
 	ValidateCalledCount              int
@@ -36,6 +38,7 @@ type MockProvider struct {
 	CreateCalledWithArg              CreateArgs
 	UpdateCalledWithArg              UpdateArgs
 	DeleteCalledWithArg              DeleteArgs
+	ImportCalledWithArg              ImportArgs
 }
 
 // LoadSpecArgs stores arguments for LoadSpec calls
@@ -70,6 +73,15 @@ type DeleteArgs struct {
 	ID           string
 	ResourceType string
 	State        resources.ResourceData
+}
+
+// ImportArgs stores arguments for Import calls
+type ImportArgs struct {
+	ID           string
+	ResourceType string
+	Data         resources.ResourceData
+	WorkspaceId  string
+	RemoteId     string
 }
 
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
@@ -130,6 +142,11 @@ func (m *MockProvider) Update(ctx context.Context, ID string, resourceType strin
 func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType string, s resources.ResourceData) error {
 	m.DeleteCalledWithArg = DeleteArgs{ID: ID, ResourceType: resourceType, State: s}
 	return m.DeleteErr
+}
+
+func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
+	return m.ImportVal, m.ImportErr
 }
 
 // ResetCallCounters resets all call counters and argument trackers.

@@ -171,6 +171,8 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].properties[2].properties[0].properties[1].id",
 			"events[2].properties[2].properties[0].properties[0].properties[0].id",
 			"events[2].properties[2].properties[0].properties[0].properties[1].id",
+			"events[1].properties[2].id",
+			"events[1].properties[3].id",
 			"events[1].id",
 			"events[1].createdAt",
 			"events[1].updatedAt",

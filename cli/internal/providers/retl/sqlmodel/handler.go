@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -53,13 +55,14 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		filePath := *spec.File
 		if !filepath.IsAbs(filePath) {
 			// If path is relative, resolve it relative to the spec file
+			// This properly handles "../" in paths
 			specDir := filepath.Dir(path)
-			filePath = filepath.Join(specDir, filePath)
+			filePath = filepath.Clean(filepath.Join(specDir, filePath))
 		}
 
 		sqlContent, err := os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("reading SQL file %s: %w", *spec.File, err)
+			return fmt.Errorf("reading SQL file %s (resolved to %s): %w", *spec.File, filePath, err)
 		}
 		sqlStr = string(sqlContent)
 	}
@@ -74,6 +77,27 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SourceDefinition: string(spec.SourceDefinition),
 		Enabled:          spec.Enabled,
 		SQL:              sqlStr,
+	}
+
+	return h.loadImportMetadata(s.Metadata)
+}
+
+func (h *Handler) loadImportMetadata(fileMetadata map[string]interface{}) error {
+	metadata := importremote.Metadata{}
+	err := mapstructure.Decode(fileMetadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+	workspaces := metadata.Import.Workspaces
+	for _, workspaceMetadata := range workspaces {
+		workspaceId := workspaceMetadata.WorkspaceID
+		resources := workspaceMetadata.Resources
+		for _, resourceMetadata := range resources {
+			importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+				WorkspaceId: workspaceId,
+				RemoteId:    resourceMetadata.RemoteID,
+			}
+		}
 	}
 	return nil
 }
@@ -105,14 +129,19 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			SQLKey:              spec.SQL,
 		}
 
-		// Create resource with SQL Model resource type
+		var opts []resources.ResourceOpts
+		if importMetadata, ok := importMetadata[spec.ID]; ok {
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			}
+		}
 		resource := resources.NewResource(
 			spec.ID,
 			ResourceType,
 			data,
 			[]string{}, // No dependencies for now
+			opts...,
 		)
-
 		result = append(result, resource)
 	}
 
@@ -142,6 +171,24 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	return toResourceData(resp), nil
 }
 
+func (h *Handler) createCall(ctx context.Context, data resources.ResourceData) (*resources.ResourceData, error) {
+	source := &retlClient.RETLSourceCreateRequest{
+		Name:                 data[DisplayNameKey].(string),
+		Config:               toRETLSQLModelConfig(data),
+		SourceType:           retlClient.ModelSourceType,
+		SourceDefinitionName: data[SourceDefinitionKey].(string),
+		AccountID:            data[AccountIDKey].(string),
+	}
+
+	// Call API to create RETL source
+	resp, err := h.client.CreateRetlSource(ctx, source)
+	if err != nil {
+		return nil, fmt.Errorf("creating RETL source: %w", err)
+	}
+
+	return toResourceData(resp), nil
+}
+
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
@@ -154,6 +201,10 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("source definition name cannot be changed")
 	}
 
+	return h.updateCall(ctx, sourceID, data)
+}
+
+func (h *Handler) updateCall(ctx context.Context, sourceID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name:      data[DisplayNameKey].(string),
 		Config:    toRETLSQLModelConfig(data),
@@ -184,6 +235,98 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 	}
 
 	return nil
+}
+
+func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
+	sources, err := h.client.ListRetlSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing RETL sources: %w", err)
+	}
+	re := regexp.MustCompile(`\s+`)
+	var resourceData []resources.ResourceData
+	for _, source := range sources.Data {
+		// Replace newlines with spaces and collapse multiple spaces into one
+		sql := re.ReplaceAllString(source.Config.Sql, " ")
+		resourceData = append(resourceData, resources.ResourceData{
+			IDKey:               source.ID,
+			"name":              source.Name,
+			AccountIDKey:        source.AccountID,
+			SourceDefinitionKey: source.SourceDefinitionName,
+			CreatedAtKey:        source.CreatedAt,
+			UpdatedAtKey:        source.UpdatedAt,
+			"config": map[string]interface{}{
+				PrimaryKeyKey:  source.Config.PrimaryKey,
+				SQLKey:         sql,
+				DescriptionKey: source.Config.Description,
+			},
+		})
+	}
+
+	return resourceData, nil
+}
+
+func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	_, err := h.client.GetRetlSource(ctx, remoteId)
+	if err == nil {
+		return h.updateCall(ctx, remoteId, data)
+	}
+
+	return h.createCall(ctx, data)
+}
+
+func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+	if args.LocalID == "" {
+		return nil, fmt.Errorf("local id is required")
+	}
+	if args.RemoteID == "" {
+		return nil, fmt.Errorf("remote id is required")
+	}
+
+	// First, get all sources to find the one we want to import
+	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
+	if err != nil {
+		return nil, fmt.Errorf("getting RETL source for import: %w", err)
+	}
+	// Validate that this is a SQL model source
+	if source.SourceType != retlClient.ModelSourceType {
+		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
+	}
+
+	// Create the base resource data structure for the imported source
+	importedData := resources.ResourceData{
+		IDKey:               args.LocalID,
+		DisplayNameKey:      source.Name,
+		DescriptionKey:      source.Config.Description,
+		AccountIDKey:        source.AccountID,
+		PrimaryKeyKey:       source.Config.PrimaryKey,
+		SourceDefinitionKey: source.SourceDefinitionName,
+		EnabledKey:          source.IsEnabled,
+		SQLKey:              source.Config.Sql,
+	}
+
+	importMetadata := importremote.Metadata{
+		Name: args.LocalID,
+		Import: importremote.WorkspacesImportMetadata{
+			Workspaces: []importremote.WorkspaceImportMetadata{
+				{
+					WorkspaceID: source.WorkspaceID,
+					Resources: []importremote.ImportIds{
+						{
+							LocalID:  args.LocalID,
+							RemoteID: args.RemoteID,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	importData := importremote.ImportData{
+		ResourceData: &importedData,
+		Metadata:     importMetadata,
+		ResourceType: ResourceType,
+	}
+	return []importremote.ImportData{importData}, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {

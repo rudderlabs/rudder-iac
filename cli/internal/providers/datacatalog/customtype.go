@@ -75,47 +75,77 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resources.ResourceData, olds resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("updating custom type in upstream catalog", "id", ID)
 
+	prevState := state.CustomTypeState{}
+	prevState.FromResourceData(olds)
+
 	toArgs := state.CustomTypeArgs{}
 	toArgs.FromResourceData(input)
 
-	oldState := state.CustomTypeState{}
-	oldState.FromResourceData(olds)
+	var (
+		updated *catalog.CustomType
+		err     error
+	)
 
-	properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
-	for _, prop := range toArgs.Properties {
-		properties = append(properties, catalog.CustomTypeProperty{
-			ID:       prop.ID,
-			Required: prop.Required,
+	// Check if there are any changes using the Diff method
+	if prevState.CustomTypeArgs.Diff(&toArgs) {
+		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
+		for _, prop := range toArgs.Properties {
+			properties = append(properties, catalog.CustomTypeProperty{
+				ID:       prop.ID,
+				Required: prop.Required,
+			})
+		}
+
+		updated, err = p.client.UpdateCustomType(ctx, prevState.ID, &catalog.CustomType{
+			ID:          prevState.ID,
+			Name:        toArgs.Name,
+			Description: toArgs.Description,
+			Type:        toArgs.Type,
+			Config:      toArgs.Config,
+			Properties:  properties,
+			Variants:    toArgs.Variants.ToCatalogVariants(),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)
+		}
 	}
 
-	updated, err := p.client.UpdateCustomType(ctx, oldState.ID, &catalog.CustomType{
-		ID:          oldState.ID,
-		Name:        toArgs.Name,
-		Description: toArgs.Description,
-		Type:        toArgs.Type,
-		Config:      toArgs.Config,
-		Properties:  properties,
-		Variants:    toArgs.Variants.ToCatalogVariants(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)
-	}
+	var toState state.CustomTypeState
 
-	toState := state.CustomTypeState{
-		CustomTypeArgs:  toArgs,
-		ID:              updated.ID,
-		LocalID:         toArgs.LocalID,
-		Name:            updated.Name,
-		Description:     updated.Description,
-		Type:            updated.Type,
-		Config:          updated.Config,
-		Version:         updated.Version,
-		ItemDefinitions: updated.ItemDefinitions,
-		Rules:           updated.Rules,
-		WorkspaceID:     updated.WorkspaceId,
-		CreatedAt:       updated.CreatedAt.String(),
-		UpdatedAt:       updated.UpdatedAt.String(),
+	if updated == nil {
+		// No changes were made, copy from previous state with new args
+		toState = state.CustomTypeState{
+			CustomTypeArgs:  toArgs,
+			ID:              prevState.ID,
+			LocalID:         toArgs.LocalID,
+			Name:            prevState.Name,
+			Description:     prevState.Description,
+			Type:            prevState.Type,
+			Config:          prevState.Config,
+			Version:         prevState.Version,
+			ItemDefinitions: prevState.ItemDefinitions,
+			Rules:           prevState.Rules,
+			WorkspaceID:     prevState.WorkspaceID,
+			CreatedAt:       prevState.CreatedAt,
+			UpdatedAt:       prevState.UpdatedAt,
+		}
+	} else {
+		// Changes were made, use updated state
+		toState = state.CustomTypeState{
+			CustomTypeArgs:  toArgs,
+			ID:              updated.ID,
+			LocalID:         toArgs.LocalID,
+			Name:            updated.Name,
+			Description:     updated.Description,
+			Type:            updated.Type,
+			Config:          updated.Config,
+			Version:         updated.Version,
+			ItemDefinitions: updated.ItemDefinitions,
+			Rules:           updated.Rules,
+			WorkspaceID:     updated.WorkspaceId,
+			CreatedAt:       updated.CreatedAt.String(),
+			UpdatedAt:       updated.UpdatedAt.String(),
+		}
 	}
 
 	resourceData := toState.ToResourceData()

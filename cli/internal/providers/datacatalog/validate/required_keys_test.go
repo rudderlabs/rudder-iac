@@ -756,7 +756,7 @@ func TestVariantsValidation(t *testing.T) {
 										Cases: []catalog.VariantCase{
 											{
 												DisplayName: "Admin User",
-												Match:       []any{123, true, "admin"},
+												Match:       []any{123, 123.0, true, "admin"},
 												Properties: []catalog.PropertyReference{
 													{Ref: "#/properties/test-group/admin_level", Required: true},
 												},
@@ -1093,7 +1093,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	depthErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/exceed_depth_rule")
 	depthFound := false
 	for _, err := range depthErrors {
-		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in rule") {
+		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in event_rule") {
 			depthFound = true
 			break
 		}

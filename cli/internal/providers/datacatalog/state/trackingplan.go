@@ -338,7 +338,7 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	args.AdditionalProperties = MustBool(propMap, "additionalProperties")
 
 	// Handle nested properties recursively
-	nestedProps := MapStringInterfaceSlice(propMap, "properties", nil)
+	nestedProps := NormalizeToSliceMap(propMap, "properties")
 	if len(nestedProps) > 0 {
 		nestedProperties := make([]*TrackingPlanPropertyArgs, len(nestedProps))
 		for nestedIdx, nestedProp := range nestedProps {
@@ -466,11 +466,6 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 			tpProperty := &TrackingPlanPropertyArgs{}
 			tpProperty.FromResourceData(property)
 			tpProperties[idx] = tpProperty
-			// tpProperties[idx] = &TrackingPlanPropertyArgs{
-			// 	ID:       String(property, "id", ""),
-			// 	LocalID:  MustString(property, "localId"),
-			// 	Required: MustBool(property, "required"),
-			// }
 		}
 		eventProps[idx].Properties = tpProperties
 	}
@@ -485,11 +480,6 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		properties := make([]map[string]interface{}, 0)
 		for _, property := range event.Properties {
 			properties = append(properties, property.ToResourceData())
-			// properties = append(properties, map[string]interface{}{
-			// 	"id":       property.ID,
-			// 	"localId":  property.LocalID,
-			// 	"required": property.Required,
-			// })
 		}
 
 		events = append(events, map[string]interface{}{

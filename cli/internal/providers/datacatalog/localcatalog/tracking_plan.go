@@ -86,7 +86,6 @@ type TPRuleEvent struct {
 type TPRuleProperty struct {
 	Ref      string            `json:"$ref"`
 	Required bool              `json:"required"`
-	LocalID  string            `json:"id"`
 	Properties []*TPRuleProperty `json:"properties,omitempty"` // NEW: Recursive nesting
 }
 
@@ -223,7 +222,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	for _, prop := range rule.Properties {
 		property, err := expandPropertyRefs(prop, fetcher)
 		if err != nil {
-			return nil, fmt.Errorf("expanding property refs within the property: %s failed, err: %w", prop.LocalID, err)
+			return nil, fmt.Errorf("expanding property refs within the property: %s failed, err: %w", prop.Ref, err)
 		}
 
 		toReturn.Properties = append(toReturn.Properties, &TPEventProperty{
@@ -242,7 +241,7 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 }
 
 func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*TPEventProperty, error) {
-	log.Debug("expanding property refs within the property", "propertyID", prop.LocalID)
+	log.Debug("expanding property refs within the property", "propertyID", prop.Ref)
 
 	matches := PropRegex.FindStringSubmatch(prop.Ref)
 	if len(matches) != 3 {
@@ -259,7 +258,7 @@ func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*
 	for _, nestedProp := range prop.Properties {
 		nestedProp, err := expandPropertyRefs(nestedProp, fetcher)
 		if err != nil {
-			return nil, fmt.Errorf("expanding nested property refs within the property: %s failed, err: %w", prop.LocalID, err)
+			return nil, fmt.Errorf("expanding nested property refs within the property: %s failed, err: %w", prop.Ref, err)
 		}
 		properties = append(properties, nestedProp)
 	}
