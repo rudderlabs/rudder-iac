@@ -88,22 +88,27 @@ type TrackingPlanWithSchemas struct {
 }
 
 type TrackingPlanEventPropertyIdentifiers struct {
-	ID                   string    `json:"id"`
-	Name                 string    `json:"name"`
-	Description          string    `json:"description"`
-	EventType            string    `json:"eventType"`
-	CategoryId           *string   `json:"categoryId"` // Can be null
-	WorkspaceId          string    `json:"workspaceId"`
-	CreatedBy            string    `json:"createdBy"`
-	UpdatedBy            *string   `json:"updatedBy"` // Can be null
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
-	IdentitySection      string    `json:"identitySection"`
-	AdditionalProperties bool      `json:"additionalProperties"`
-	Properties           []struct {
-		ID       string `json:"id"`
-		Required bool   `json:"required"`
-	} `json:"properties"`
+	ID                   string                       `json:"id"`
+	Name                 string                       `json:"name"`
+	Description          string                       `json:"description"`
+	EventType            string                       `json:"eventType"`
+	CategoryId           *string                      `json:"categoryId"` // Can be null
+	WorkspaceId          string                       `json:"workspaceId"`
+	CreatedBy            string                       `json:"createdBy"`
+	UpdatedBy            *string                      `json:"updatedBy"` // Can be null
+	CreatedAt            time.Time                    `json:"createdAt"`
+	UpdatedAt            time.Time                    `json:"updatedAt"`
+	IdentitySection      string                       `json:"identitySection"`
+	AdditionalProperties bool                         `json:"additionalProperties"`
+	Properties           []*TrackingPlanEventProperty `json:"properties,omitempty"`
+}
+
+type TrackingPlanEventProperty struct {
+	ID                   string                       `json:"id"`
+	Name                 string                       `json:"name"`
+	Required             bool                         `json:"required"`
+	AdditionalProperties bool                         `json:"additionalProperties"`
+	Properties           []*TrackingPlanEventProperty `json:"properties,omitempty"`
 }
 
 type TrackingPlanEventSchema struct {

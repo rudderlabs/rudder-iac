@@ -126,6 +126,75 @@
                         },
                         "required": true,
                         "additionalProperties": false
+                    },
+                    {
+                        "localId": "signin_info",
+                        "id": {
+                            "$__rudderRef": "property:signin_info",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": true,
+                        "properties": [
+                            {
+                                "localId": "remember_me_checkbox_clicked",
+                                "id": {
+                                    "$__rudderRef": "property:remember_me_checkbox_clicked",
+                                    "property": "id"
+                                },
+                                "required": true,
+                                "additionalProperties": false
+                            },
+                            {
+                                "localId": "captcha",
+                                "id": {
+                                    "$__rudderRef": "property:captcha",
+                                    "property": "id"
+                                },
+                                "required": true,
+                                "additionalProperties": true,
+                                "properties": [
+                                    {
+                                        "localId": "captcha_solved",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_solved",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": false
+                                    },
+                                    {
+                                        "localId": "captcha_info",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_info",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": true,
+                                        "properties": [
+                                            {
+                                                "localId": "captcha_type",
+                                                "id": {
+                                                    "$__rudderRef": "property:captcha_type",
+                                                    "property": "id"
+                                                },
+                                                "required": true,
+                                                "additionalProperties": false
+                                            },
+                                            {
+                                                "localId": "captcha_attempts",
+                                                "id": {
+                                                    "$__rudderRef": "property:captcha_attempts",
+                                                    "property": "id"
+                                                },
+                                                "required": true,
+                                                "additionalProperties": false
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ],
                 "variants": []
@@ -153,8 +222,7 @@
                 "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
                 "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
                 "localId": "api_error"
-            }
-            
+            }  
         ],
         "id": "tp_2yzTAKlo8XTDcoPezOYjo2dNn5r",
         "name": "API Tracking",
@@ -241,9 +309,57 @@
                         },
                         {
                             "localId": "password",
-                            "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+                            "id": "prop_31TQTDK6nIWxPmbHhtvlfDGh3lU",
                             "required": true,
                             "additionalProperties": false
+                        },
+                        {
+                            "localId": "signin_info",
+                            "id": "prop_31TQUoDDQ5EbbgFKJn0hxwr7iST",
+                            "required": true,
+                            "additionalProperties": true,
+                            "properties": [
+                                {
+                                    "localId": "remember_me_checkbox_clicked",
+                                    "id": "prop_31TQUiZ1eqVBdWZbcclQ0Nqk6Oi",
+                                    "required": true,
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "localId": "captcha",
+                                    "id": "prop_31TQU28M4YA6hKRPmuaoGMAtBAO",
+                                    "required": true,
+                                    "additionalProperties": true,
+                                    "properties": [
+                                        {
+                                            "localId": "captcha_solved",
+                                            "id": "prop_31TQUFQtCYGSKXmCSlyxfADSkUh",
+                                            "required": true,
+                                            "additionalProperties": false
+                                        },
+                                        {
+                                            "localId": "captcha_info",
+                                            "id": "prop_31TQUCE6IP0tBTBTDnWa29YkzOA",
+                                            "required": true,
+                                            "additionalProperties": true,
+                                            "properties": [
+                                                {
+                                                    "localId": "captcha_type",
+                                                    "id": "prop_31TQUKqiEt200DvzYmENWbfq6d6",
+                                                    "required": true,
+                                                    "additionalProperties": false
+                                                },
+                                                {
+                                                    "localId": "captcha_attempts",
+                                                    "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
+                                                    "required": true,
+                                                    "additionalProperties": false
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "variants": []

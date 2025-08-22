@@ -47,3 +47,20 @@ spec:
           required: true
         - $ref: "#/properties/api_tracking/password"
           required: true
+        - $ref: "#/properties/api_tracking/signin_info"
+          required: true
+          properties:
+            - $ref: "#/properties/api_tracking/remember_me_checkbox_clicked"
+              required: true
+            - $ref: "#/properties/api_tracking/captcha"
+              required: true
+              properties:
+                - $ref: "#/properties/api_tracking/captcha_solved"
+                  required: true
+                - $ref: "#/properties/api_tracking/captcha_info"
+                  required: true
+                  properties:
+                    - $ref: "#/properties/api_tracking/captcha_type"
+                      required: true
+                    - $ref: "#/properties/api_tracking/captcha_attempts"
+                      required: true

@@ -78,6 +78,66 @@
                         },
                         "required": true,
                         "additionalProperties": false
+                    },
+                    {
+                        "localId": "signin_info",
+                        "id": {
+                            "$__rudderRef": "property:signin_info",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": true,
+                        "properties": [
+                            {
+                                "localId": "remember_me_checkbox_clicked",
+                                "id": {
+                                    "$__rudderRef": "property:remember_me_checkbox_clicked",
+                                    "property": "id"
+                                },
+                                "required": false,
+                                "additionalProperties": false
+                            },
+                            {
+                                "localId": "captcha",
+                                "id": {
+                                    "$__rudderRef": "property:captcha",
+                                    "property": "id"
+                                },
+                                "required": true,
+                                "additionalProperties": true,
+                                "properties": [
+                                    {
+                                        "localId": "captcha_solved",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_solved",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": false
+                                    },
+                                    {
+                                        "localId": "captcha_info",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_info",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": true,
+                                        "properties": [
+                                            {
+                                                "localId": "captcha_type",
+                                                "id": {
+                                                    "$__rudderRef": "property:captcha_type",
+                                                    "property": "id"
+                                                },
+                                                "required": true,
+                                                "additionalProperties": false
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ],
                 "variants": []
@@ -157,6 +217,48 @@
                             "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
                             "required": true,
                             "additionalProperties": false
+                        },
+                        {
+                            "localId": "signin_info",
+                            "id": "prop_31T8RMRIm7LFE4Ks28CF5sN8PIU",
+                            "required": true,
+                            "additionalProperties": true,
+                            "properties": [
+                                {
+                                    "localId": "remember_me_checkbox_clicked",
+                                    "id": "prop_31T8RErKzrgZkFcaEDjGQzC3MdX",
+                                    "required": false,
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "localId": "captcha",
+                                    "id": "prop_31T8QUcgapNbwhFpuux9WBiwBeK",
+                                    "required": true,
+                                    "additionalProperties": true,
+                                    "properties": [
+                                        {
+                                            "localId": "captcha_solved",
+                                            "id": "prop_31T8QrNiCqKZeczxQp8EGqfF8Qa",
+                                            "required": true,
+                                            "additionalProperties": false
+                                        },
+                                        {
+                                            "localId": "captcha_info",
+                                            "id": "prop_31T8QmJh6TRdeocjZ9XlZTWAxcX",
+                                            "required": true,
+                                            "additionalProperties": true,
+                                            "properties": [
+                                                {
+                                                    "localId": "captcha_type",
+                                                    "id": "prop_31T8QvC0GzeU2rX1PjjFgwuofex",
+                                                    "required": true,
+                                                    "additionalProperties": false
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "variants": []
