@@ -96,7 +96,7 @@
       "properties": [
         {
           "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
-          "name": "Username",
+          "name": "User Email",
           "required": true,
           "additionalProperties": false
         },
