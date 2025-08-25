@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.9.0](https://github.com/rudderlabs/rudder-iac/compare/v0.8.0...v0.9.0) (2025-08-25)
+
+
+### Features
+
+* add base support for variants model within trackingplans and customtypes ([#127](https://github.com/rudderlabs/rudder-iac/issues/127)) ([de60651](https://github.com/rudderlabs/rudder-iac/commit/de606510bd825cec1ea4f70f0a4f671c2d36a487))
+* add variants to catalog api ([#138](https://github.com/rudderlabs/rudder-iac/issues/138)) ([f24ac67](https://github.com/rudderlabs/rudder-iac/commit/f24ac67f0054516a13a894a9799e0a601025b278))
+* **cli:** add import command for RETL SQL models ([#129](https://github.com/rudderlabs/rudder-iac/issues/129)) ([49d7ff0](https://github.com/rudderlabs/rudder-iac/commit/49d7ff0bc155bf85dedf378d961fe3a72bb55318))
+* **cli:** implementing import operation for sql models ([#130](https://github.com/rudderlabs/rudder-iac/issues/130)) ([40422bc](https://github.com/rudderlabs/rudder-iac/commit/40422bc31a2b5fa3881266bd9ee2477389efe464))
+* **cli:** new command to list retl sources supports only sql models ([#126](https://github.com/rudderlabs/rudder-iac/issues/126)) ([2650b13](https://github.com/rudderlabs/rudder-iac/commit/2650b13d282cd079b9bab65665606c8cec1203cd))
+* implement custom differ for custom types to prevent unnecessary updates ([#150](https://github.com/rudderlabs/rudder-iac/issues/150)) ([700633c](https://github.com/rudderlabs/rudder-iac/commit/700633c51f014b1431e4b6ca80568c89f5af36bd))
+
+
+### Bug Fixes
+
+* make additionalProperties as optional to allow for backward compatible state ([#153](https://github.com/rudderlabs/rudder-iac/issues/153)) ([d110986](https://github.com/rudderlabs/rudder-iac/commit/d110986d80ff77cebe830c194c0b19c48bcb6d78))
+* remove unnecessary UnmarshalJSON when handling variantcase and updated the match value validation ([#144](https://github.com/rudderlabs/rudder-iac/issues/144)) ([6fc0592](https://github.com/rudderlabs/rudder-iac/commit/6fc059221b72ab453619ab5bd65084a9c69f3c3d))
+* support defining events with the same metadata.name in separate files ([#151](https://github.com/rudderlabs/rudder-iac/issues/151)) ([29a5115](https://github.com/rudderlabs/rudder-iac/commit/29a5115ee1ccf565992f92bdcdbbd673de67ea3a))
+
+
+### Miscellaneous
+
+* add e2e tests for nested properties ([#146](https://github.com/rudderlabs/rudder-iac/issues/146)) ([8d55f32](https://github.com/rudderlabs/rudder-iac/commit/8d55f325f9661413bc1c4343260bc32876206556))
+* add e2e tests for variant support in trackingplan ([#145](https://github.com/rudderlabs/rudder-iac/issues/145)) ([6d9f327](https://github.com/rudderlabs/rudder-iac/commit/6d9f327023378d2f55c9f8ef76058624d11e46e8))
+* add nested properties in the CLI ([#136](https://github.com/rudderlabs/rudder-iac/issues/136)) ([95220c3](https://github.com/rudderlabs/rudder-iac/commit/95220c307b654edb46bde5ce88041613b1e9dba3))
+* add variants custom type provider ([#142](https://github.com/rudderlabs/rudder-iac/issues/142)) ([fff0487](https://github.com/rudderlabs/rudder-iac/commit/fff04875515d54f1702e90ae8b1dff759ad842b8))
+
 ## [0.8.0](https://github.com/rudderlabs/rudder-iac/compare/v0.7.0...v0.8.0) (2025-07-22)
 
 
