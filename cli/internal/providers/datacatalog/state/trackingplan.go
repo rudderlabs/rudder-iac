@@ -335,7 +335,7 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	args.LocalID = MustString(propMap, "localId")
 	args.Required = MustBool(propMap, "required")
 	args.ID = String(propMap, "id", "")
-	args.AdditionalProperties = MustBool(propMap, "additionalProperties")
+	args.AdditionalProperties = Bool(propMap, "additionalProperties", false)
 
 	// Handle nested properties recursively
 	nestedProps := NormalizeToSliceMap(propMap, "properties")
