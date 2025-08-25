@@ -50,7 +50,64 @@
                         "additionalProperties": false
                     }
                 ],
-                "variants": []
+                "variants": [{
+                    "cases": [
+                        {
+                            "description": "applies when creating a new entity",
+                            "display_name": "Create Entity",
+                            "match": [
+                                "POST"
+                            ],
+                            "properties": [
+                                {
+                                    "id": {
+                                        "$__rudderRef": "property:host",
+                                        "property": "id"
+                                    },
+                                    "required": false
+                                }
+                            ]
+                        },
+                        {
+                            "description": "applies when updating an existing entity",
+                            "display_name": "Update Entity",
+                            "match": [
+                                "PUT",
+                                "PATCH"
+                            ],
+                            "properties": [
+                                {
+                                    "id": {
+                                        "$__rudderRef": "property:referrer",
+                                        "property": "id"
+                                    },
+                                    "required": true
+                                }
+                            ]
+                        }
+                    ],
+                    "default": [
+                        {
+                            "id": {
+                                "$__rudderRef": "property:user_agent",
+                                "property": "id"
+                            },
+                            "required": false
+                        },
+                        {
+                            "id": {
+                                "$__rudderRef": "property:content_type",
+                                "property": "id"
+                            },
+                            "required": true
+                        }
+                    ],
+                    "discriminator": {
+                        "$__rudderRef": "property:api_method",
+                        "property": "id"
+                    },
+                    "type": "discriminator"
+                }]
             },
             {
                 "allowUnplanned": true,
@@ -260,7 +317,49 @@
                             "additionalProperties": false
                         }
                     ],
-                    "variants": []
+                    "variants": [{
+                        "cases": [
+                            {
+                                "description": "applies when creating a new entity",
+                                "display_name": "Create Entity",
+                                "match": [
+                                    "POST"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": "prop_31SFJSKX468nXeL5FewW38zJn9N",
+                                        "required": false
+                                    }
+                                ]
+                            },
+                            {
+                                "description": "applies when updating an existing entity",
+                                "display_name": "Update Entity",
+                                "match": [
+                                    "PUT",
+                                    "PATCH"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": "prop_31SFJjWxmSjRyv1H28gzL9hMi2q",
+                                        "required": true
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": [
+                            {
+                                "id": "prop_31SFJqEyuE5ghyb4UHtFnKfa2GO",
+                                "required": false
+                            },
+                            {
+                                "id": "prop_31SFJFSDLe9h8AFewvnCV4Q2dsP",
+                                "required": true
+                            }
+                        ],
+                        "discriminator": "prop_31SFIxJ3PkzUCHskBc0R9WvhuAa",
+                        "type": "discriminator"
+                    }]
                 },
                 {
                     "allowUnplanned": true,

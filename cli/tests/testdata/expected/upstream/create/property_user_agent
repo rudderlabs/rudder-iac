@@ -1,0 +1,12 @@
+{
+    "propConfig": {},
+    "id": "prop_user_agent_upstream_1",
+    "name": "User Agent",
+    "description": "User agent of the API Request",
+    "type": "string",
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+    "updatedBy": null,
+    "createdAt": "2025-06-24T11:31:37.337Z",
+    "updatedAt": "2025-06-24T11:31:37.337Z"
+}

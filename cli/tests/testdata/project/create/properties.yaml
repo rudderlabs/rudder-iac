@@ -81,3 +81,24 @@ spec:
       enum:
         - "image"
         - "audio"
+
+  - id: "user_agent"
+    name: "User Agent"
+    description: "User agent of the API Request"
+    type: "string"
+
+  - id: "host"
+    name: "Host"
+    description: "Host of the API Request"
+    type: "string"
+
+  - id: "referrer"
+    name: "Referrer"
+    description: "Referrer of the API Request"
+    type: "string"
+
+  - id: "content_type"
+    name: "Content Type"
+    description: "Content type of the API Request"
+    type: "string"
+  
