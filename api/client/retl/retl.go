@@ -10,6 +10,7 @@ import (
 type RETLStore interface {
 	StateStore
 	RETLSourceStore
+	PreviewStore
 }
 
 // StateStore is the interface for RETL state operations
@@ -37,6 +38,15 @@ type RETLSourceStore interface {
 
 	// ListRetlSources lists all RETL sources
 	ListRetlSources(ctx context.Context) (*RETLSources, error)
+}
+
+// PreviewStore is the interface for RETL source preview operations
+type PreviewStore interface {
+	// SubmitSourcePreview submits a request to preview a RETL source
+	SubmitSourcePreview(ctx context.Context, role string, request *PreviewSubmitRequest) (*PreviewSubmitResponse, error)
+
+	// GetSourcePreviewResult retrieves the results of a RETL source preview
+	GetSourcePreviewResult(ctx context.Context, role string, resultID string) (*PreviewResultResponse, error)
 }
 
 // RudderRETLStore implements the RETLStore interface
