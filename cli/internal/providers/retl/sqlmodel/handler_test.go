@@ -296,6 +296,173 @@ func TestSQLModelHandler(t *testing.T) {
 		}
 	})
 
+	// Preview workflow tests
+	t.Run("Preview", func(t *testing.T) {
+		// common valid data
+		validData := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT id, name FROM users",
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: "postgres",
+		}
+
+		t.Run("Success with polling", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{}
+			// Submit returns success with request id
+			mockClient.submitSourcePreviewFunc = func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+				resp := &retlClient.PreviewSubmitResponse{}
+				resp.Success = true
+				resp.Data.RequestID = "req-123"
+				return resp, nil
+			}
+
+			// First call RUNNING, second call returns result
+			call := 0
+			mockClient.getSourcePreviewResultFunc = func(ctx context.Context, role string, resultID string) (*retlClient.PreviewResultResponse, error) {
+				call++
+				if call == 1 {
+					resp := &retlClient.PreviewResultResponse{}
+					resp.Success = true
+					resp.Data.State = "Processing"
+					return resp, nil
+				}
+				resp := &retlClient.PreviewResultResponse{}
+				resp.Success = true
+				resp.Data.State = "Completed"
+				resp.Data.Result.Success = true
+				resp.Data.Result.Data = &struct {
+					Columns  []retlClient.PreviewColumn `json:"columns"`
+					Rows     []map[string]any           `json:"rows"`
+					RowCount int                        `json:"rowCount"`
+				}{
+					Columns: []retlClient.PreviewColumn{{Name: "id"}, {Name: "name"}},
+					Rows: []map[string]any{
+						{"id": 1, "name": "alice"},
+						{"id": 2, "name": "bob"},
+					},
+					RowCount: 2,
+				}
+				return resp, nil
+			}
+
+			h := sqlmodel.NewHandler(mockClient)
+			cols, rows, err := h.Preview(context.Background(), "id", validData, 10)
+
+			require.NoError(t, err)
+			assert.Equal(t, []string{"id", "name"}, cols)
+			require.Len(t, rows, 2)
+			assert.Equal(t, any(1), rows[0]["id"])
+			assert.Equal(t, any("alice"), rows[0]["name"])
+		})
+
+		t.Run("Submit API error", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.submitSourcePreviewFunc = func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+				return nil, fmt.Errorf("boom")
+			}
+			h := sqlmodel.NewHandler(mockClient)
+			cols, rows, err := h.Preview(context.Background(), "id", validData, 5)
+			assert.Error(t, err)
+			assert.Nil(t, cols)
+			assert.Nil(t, rows)
+			assert.Contains(t, err.Error(), "submitting preview request")
+		})
+
+		t.Run("Submit success=false with message", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.submitSourcePreviewFunc = func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+				resp := &retlClient.PreviewSubmitResponse{}
+				resp.Success = false
+				resp.Data.Error = &retlClient.PreviewResultError{Message: "bad query"}
+				return resp, nil
+			}
+			h := sqlmodel.NewHandler(mockClient)
+			_, _, err := h.Preview(context.Background(), "id", validData, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "preview request failed: bad query")
+		})
+
+		t.Run("Result API error", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.submitSourcePreviewFunc = func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+				resp := &retlClient.PreviewSubmitResponse{}
+				resp.Success = true
+				resp.Data.RequestID = "req-1"
+				return resp, nil
+			}
+			mockClient.getSourcePreviewResultFunc = func(ctx context.Context, role string, resultID string) (*retlClient.PreviewResultResponse, error) {
+				return nil, fmt.Errorf("network")
+			}
+			h := sqlmodel.NewHandler(mockClient)
+			_, _, err := h.Preview(context.Background(), "id", validData, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "getting preview results")
+		})
+
+		t.Run("Result failure with error message", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.submitSourcePreviewFunc = func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+				resp := &retlClient.PreviewSubmitResponse{}
+				resp.Success = true
+				resp.Data.RequestID = "req-1"
+				return resp, nil
+			}
+			mockClient.getSourcePreviewResultFunc = func(ctx context.Context, role string, resultID string) (*retlClient.PreviewResultResponse, error) {
+				resp := &retlClient.PreviewResultResponse{}
+				resp.Success = true
+				resp.Data.State = "Completed"
+				resp.Data.Result.Success = false
+				resp.Data.Result.ErrorDetails = &retlClient.PreviewResultError{Message: "syntax error"}
+				return resp, nil
+			}
+			h := sqlmodel.NewHandler(mockClient)
+			_, _, err := h.Preview(context.Background(), "id", validData, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "preview request failed: syntax error")
+		})
+
+		t.Run("Missing SQL", func(t *testing.T) {
+			t.Parallel()
+			data := resources.ResourceData{
+				sqlmodel.AccountIDKey:        "acc123",
+				sqlmodel.SourceDefinitionKey: "postgres",
+			}
+			h := sqlmodel.NewHandler(&mockRETLClient{})
+			_, _, err := h.Preview(context.Background(), "id", data, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "SQL not found")
+		})
+
+		t.Run("Missing AccountID", func(t *testing.T) {
+			t.Parallel()
+			data := resources.ResourceData{
+				sqlmodel.SQLKey:              "SELECT 1",
+				sqlmodel.SourceDefinitionKey: "postgres",
+			}
+			h := sqlmodel.NewHandler(&mockRETLClient{})
+			_, _, err := h.Preview(context.Background(), "id", data, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "account ID not found")
+		})
+
+		t.Run("Missing SourceDefinition", func(t *testing.T) {
+			t.Parallel()
+			data := resources.ResourceData{
+				sqlmodel.SQLKey:       "SELECT 1",
+				sqlmodel.AccountIDKey: "acc123",
+			}
+			h := sqlmodel.NewHandler(&mockRETLClient{})
+			_, _, err := h.Preview(context.Background(), "id", data, 5)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "source definition not found")
+		})
+	})
+
 	t.Run("LoadSpec with duplicate id", func(t *testing.T) {
 		t.Parallel()
 

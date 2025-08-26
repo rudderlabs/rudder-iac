@@ -81,7 +81,7 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 			}
 
 			// Check if still in progress
-			if resultResp.Data.State == "RUNNING" {
+			if resultResp.Data.State == "Processing" {
 				continue
 			}
 
