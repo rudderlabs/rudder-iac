@@ -22,17 +22,19 @@ import (
 
 // mockRETLClient is a mock implementation of the RETL client
 type mockRETLClient struct {
-	createCalled         bool
-	updateCalled         bool
-	deleteCalled         bool
-	sourceID             string
-	deleteError          bool
-	updateError          bool
-	createRetlSourceFunc func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
-	updateRetlSourceFunc func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
-	getRetlSourceFunc    func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
-	readStateFunc        func(ctx context.Context) (*retlClient.State, error)
+	createCalled               bool
+	updateCalled               bool
+	deleteCalled               bool
+	sourceID                   string
+	deleteError                bool
+	updateError                bool
+	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
+	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
+	listRetlSourcesFunc        func(ctx context.Context) (*retlClient.RETLSources, error)
+	getRetlSourceFunc          func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
+	readStateFunc              func(ctx context.Context) (*retlClient.State, error)
+	submitSourcePreviewFunc    func(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
+	getSourcePreviewResultFunc func(ctx context.Context, role string, resultID string) (*retlClient.PreviewResultResponse, error)
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
@@ -126,6 +128,24 @@ func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, erro
 
 func (m *mockRETLClient) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
 	return nil
+}
+
+func (m *mockRETLClient) SubmitSourcePreview(ctx context.Context, sourceDefinition string, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+	if m.submitSourcePreviewFunc != nil {
+		return m.submitSourcePreviewFunc(ctx, sourceDefinition, request)
+	}
+	return &retlClient.PreviewSubmitResponse{
+		Success: true,
+	}, nil
+}
+
+func (m *mockRETLClient) GetSourcePreviewResult(ctx context.Context, role string, resultID string) (*retlClient.PreviewResultResponse, error) {
+	if m.getSourcePreviewResultFunc != nil {
+		return m.getSourcePreviewResultFunc(ctx, role, resultID)
+	}
+	return &retlClient.PreviewResultResponse{
+		Success: true,
+	}, nil
 }
 
 func TestSQLModelHandler(t *testing.T) {

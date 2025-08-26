@@ -71,3 +71,52 @@ type RETLSQLModelConfig struct {
 type RETLSources struct {
 	Data []RETLSource `json:"data"`
 }
+
+// PreviewResultError represents an error in the preview result
+type PreviewResultError struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+// PreviewSubmitRequest represents the request to submit a RETL source preview
+type PreviewSubmitRequest struct {
+	AccountID    string `json:"accountId"`
+	FetchRows    bool   `json:"fetchRows"`
+	FetchColumns bool   `json:"fetchColumns"`
+	RowLimit     int    `json:"rowLimit"`
+	SQL          string `json:"sql"`
+	WorkspaceID  string `json:"workspaceId"`
+}
+
+// PreviewSubmitResponse represents the response from submitting a RETL source preview
+type PreviewSubmitResponse struct {
+	Data struct {
+		RequestID string              `json:"requestId"`
+		Error     *PreviewResultError `json:"error,omitempty"`
+	} `json:"data"`
+	Success bool `json:"success"`
+}
+
+// PreviewResultResponse represents the response containing preview results
+type PreviewResultResponse struct {
+	Data struct {
+		State  string `json:"state"`
+		Result struct {
+			Success      bool                `json:"success"`
+			ErrorDetails *PreviewResultError `json:"errorDetails,omitempty"`
+			Data         *struct {
+				Columns  []PreviewColumn  `json:"columns"`
+				Rows     []map[string]any `json:"rows"`
+				RowCount int              `json:"rowCount"`
+			} `json:"data,omitempty"`
+		} `json:"result"`
+	} `json:"data"`
+	Success bool `json:"success"`
+}
+
+// PreviewColumn represents a column in the preview results
+type PreviewColumn struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	RawType string `json:"rawType"`
+}
