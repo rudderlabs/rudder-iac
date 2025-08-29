@@ -13,6 +13,7 @@ type PropertyCreate struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"propConfig,omitempty"`
+	ProjectId   string                 `json:"projectId"`
 }
 
 type Property struct {
@@ -21,6 +22,7 @@ type Property struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	WorkspaceId string                 `json:"workspaceId"`
+	ProjectId   string                 `json:"projectId"`
 	Config      map[string]interface{} `json:"propConfig"`
 	CreatedAt   time.Time              `json:"createdAt"`
 	UpdatedAt   time.Time              `json:"updatedAt"`
