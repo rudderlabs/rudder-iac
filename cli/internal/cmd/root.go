@@ -66,6 +66,7 @@ func init() {
 	// Add subcommands to the root command
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
