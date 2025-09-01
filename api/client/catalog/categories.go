@@ -32,6 +32,7 @@ type CategoryStore interface {
 	UpdateCategory(ctx context.Context, id string, input CategoryUpdate) (*Category, error)
 	DeleteCategory(ctx context.Context, id string) error
 	GetCategory(ctx context.Context, id string) (*Category, error)
+	GetCategories(ctx context.Context) ([]*Category, error)
 }
 
 func (c *RudderDataCatalog) CreateCategory(ctx context.Context, input CategoryCreate) (*Category, error) {
@@ -93,4 +94,8 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 	}
 
 	return &category, nil
+}
+
+func (c *RudderDataCatalog) GetCategories(ctx context.Context) ([]*Category, error) {
+	return getAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
 }

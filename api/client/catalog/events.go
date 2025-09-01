@@ -33,6 +33,7 @@ type EventStore interface {
 	UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
+	GetEvents(ctx context.Context) ([]*Event, error)
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
@@ -94,4 +95,8 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 	}
 
 	return &event, nil
+}
+
+func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
+	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
 }
