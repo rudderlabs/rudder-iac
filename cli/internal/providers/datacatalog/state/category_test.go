@@ -2,6 +2,7 @@ package state_test
 
 import (
 	"testing"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,8 @@ import (
 
 func TestCategoryArgs_ResourceData(t *testing.T) {
 	args := state.CategoryArgs{
-		Name: "Marketing",
+		ProjectId: "test-category-id",
+		Name:      "Marketing",
 	}
 
 	t.Run("to resource data", func(t *testing.T) {
@@ -17,7 +19,8 @@ func TestCategoryArgs_ResourceData(t *testing.T) {
 
 		resourceData := args.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
-			"name": "Marketing",
+			"projectId": "test-category-id",
+			"name":      "Marketing",
 		}, resourceData)
 	})
 
@@ -33,7 +36,8 @@ func TestCategoryArgs_ResourceData(t *testing.T) {
 func TestCategoryState_ResourceData(t *testing.T) {
 	categoryState := state.CategoryState{
 		CategoryArgs: state.CategoryArgs{
-			Name: "Marketing",
+			ProjectId: "test-category-id",
+			Name:      "Marketing",
 		},
 		ID:          "category-id",
 		Name:        "Marketing",
@@ -53,7 +57,8 @@ func TestCategoryState_ResourceData(t *testing.T) {
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"categoryArgs": map[string]interface{}{
-				"name": "Marketing",
+				"projectId": "test-category-id",
+				"name":      "Marketing",
 			},
 		}, resourceData)
 	})

@@ -1,22 +1,31 @@
 package state
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 // CategoryArgs holds the necessary information to create a category
 type CategoryArgs struct {
-	Name string
+	ProjectId string
+	Name      string
 }
 
 func (args *CategoryArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
-		"name": args.Name,
+		"projectId": args.ProjectId,
+		"name":      args.Name,
 	}
 }
 
 func (args *CategoryArgs) FromResourceData(from resources.ResourceData) {
+	args.ProjectId = String(from, "projectId", "")
 	args.Name = MustString(from, "name")
+}
+
+func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.Category) {
+	args.ProjectId = category.LocalID
+	args.Name = category.Name
 }
 
 // CategoryState represents the full state of a category

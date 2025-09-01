@@ -6,6 +6,7 @@ import (
 )
 
 type EventArgs struct {
+	ProjectId   string
 	Name        string
 	Description string
 	EventType   string
@@ -14,6 +15,7 @@ type EventArgs struct {
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
+		"projectId":   args.ProjectId,
 		"name":        args.Name,
 		"description": args.Description,
 		"eventType":   args.EventType,
@@ -22,6 +24,7 @@ func (args *EventArgs) ToResourceData() resources.ResourceData {
 }
 
 func (args *EventArgs) FromResourceData(from resources.ResourceData) {
+	args.ProjectId = MustString(from, "projectId")
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
@@ -31,6 +34,7 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 }
 
 func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef func(ref string) string) {
+	args.ProjectId = event.LocalID
 	args.Name = event.Name
 	args.Description = event.Description
 	args.EventType = event.Type

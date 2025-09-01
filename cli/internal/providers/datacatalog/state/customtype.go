@@ -10,7 +10,7 @@ import (
 
 // CustomTypeArgs holds the necessary information to create a custom type
 type CustomTypeArgs struct {
-	LocalID     string
+	ProjectId   string
 	Name        string
 	Description string
 	Type        string
@@ -31,15 +31,15 @@ func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
 	if prop.ID != other.ID {
 		return true
 	}
-	
+
 	if prop.Required != other.Required {
 		return true
 	}
-	
+
 	if !reflect.DeepEqual(prop.RefToID, other.RefToID) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -55,7 +55,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 	}
 
 	return resources.ResourceData{
-		"localId":     args.LocalID,
+		"projectId":   args.ProjectId,
 		"name":        args.Name,
 		"description": args.Description,
 		"type":        args.Type,
@@ -67,7 +67,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 
 // FromResourceData populates CustomTypeArgs from ResourceData
 func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
-	args.LocalID = MustString(from, "localId")
+	args.ProjectId = MustString(from, "projectId")
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.Type = MustString(from, "type")
@@ -108,7 +108,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 }
 
 func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) error {
-	args.LocalID = from.LocalID
+	args.ProjectId = from.LocalID
 	args.Name = from.Name
 	args.Description = from.Description
 	args.Type = from.Type
@@ -175,55 +175,55 @@ func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
 // Diff compares two CustomTypeArgs instances and returns true if they differ
 func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 	// Compare basic fields
-	if args.LocalID != other.LocalID {
+	if args.ProjectId != other.ProjectId {
 		return true
 	}
-	
+
 	if args.Name != other.Name {
 		return true
 	}
-	
+
 	if args.Description != other.Description {
 		return true
 	}
-	
+
 	if args.Type != other.Type {
 		return true
 	}
-	
+
 	// Compare config maps using deep equality
 	if !reflect.DeepEqual(args.Config, other.Config) {
 		return true
 	}
-	
+
 	// Compare properties arrays
 	if len(args.Properties) != len(other.Properties) {
 		return true
 	}
-	
+
 	for _, prop := range args.Properties {
 		otherProp := other.PropertyByID(prop.ID)
 		if otherProp == nil {
 			return true
 		}
-		
+
 		if prop.Diff(otherProp) {
 			return true
 		}
 	}
-	
+
 	// Compare variants using existing Variants.Diff method
 	if args.Variants.Diff(other.Variants) {
 		return true
 	}
-	
+
 	return false
 }
 
 type CustomTypeState struct {
 	CustomTypeArgs
 	ID              string
-	LocalID         string
+	ProjectId       string
 	Name            string
 	Description     string
 	Type            string
@@ -245,7 +245,7 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 
 	return resources.ResourceData{
 		"id":              s.ID,
-		"localId":         s.LocalID,
+		"projectId":       s.ProjectId,
 		"name":            s.Name,
 		"description":     s.Description,
 		"type":            s.Type,
@@ -262,7 +262,7 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 
 func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.ID = MustString(from, "id")
-	s.LocalID = MustString(from, "localId")
+	s.ProjectId = MustString(from, "projectId")
 	s.Name = MustString(from, "name")
 	s.Description = MustString(from, "description")
 	s.Type = MustString(from, "type")
