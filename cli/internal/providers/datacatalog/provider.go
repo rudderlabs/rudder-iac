@@ -183,9 +183,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		for _, category := range categories {
 			log.Debug("adding category to graph", "id", category.LocalID, "group", group)
 
-			args := pstate.CategoryArgs{
-				Name: category.Name,
-			}
+			args := pstate.CategoryArgs{}
+			args.FromCatalogCategory(&category)
 			resource := resources.NewResource(category.LocalID, CategoryResourceType, args.ToResourceData(), make([]string, 0))
 			graph.AddResource(resource)
 		}

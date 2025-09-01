@@ -57,6 +57,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				ID:          "cat-123",
 				Name:        "User Actions",
 				WorkspaceID: "ws-456",
+				ProjectId:   "test-project-id",
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			}
@@ -65,7 +66,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name": "User Actions",
+				"projectId": "test-project-id",
+				"name":      "User Actions",
 			}
 
 			result, err := provider.Create(context.Background(), "test-id", inputData)
@@ -83,6 +85,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			// Verify args are properly embedded
 			categoryArgs, ok := resultData["categoryArgs"].(map[string]interface{})
 			require.True(t, ok)
+			assert.Equal(t, "test-project-id", categoryArgs["projectId"])
 			assert.Equal(t, "User Actions", categoryArgs["name"])
 		})
 
@@ -95,7 +98,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name": "User Actions",
+				"projectId": "test-project-id",
+				"name":      "User Actions",
 			}
 
 			result, err := provider.Create(context.Background(), "test-id", inputData)
@@ -116,6 +120,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				ID:          "cat-123",
 				Name:        "Updated User Actions",
 				WorkspaceID: "ws-456",
+				ProjectId:   "test-project-id",
 				CreatedAt:   now.Add(-time.Hour),
 				UpdatedAt:   now,
 			}
@@ -124,7 +129,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name": "Updated User Actions",
+				"projectId": "test-project-id",
+				"name":      "Updated User Actions",
 			}
 
 			oldStateData := resources.ResourceData{
@@ -134,7 +140,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 				"createdAt":   now.Add(-time.Hour).String(),
 				"updatedAt":   now.Add(-time.Minute).String(),
 				"categoryArgs": map[string]interface{}{
-					"name": "User Actions",
+					"projectId": "test-project-id",
+					"name":      "User Actions",
 				},
 			}
 
@@ -153,6 +160,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			// Verify args are properly embedded
 			categoryArgs, ok := resultData["categoryArgs"].(map[string]interface{})
 			require.True(t, ok)
+			assert.Equal(t, "test-project-id", categoryArgs["projectId"])
 			assert.Equal(t, "Updated User Actions", categoryArgs["name"])
 		})
 
@@ -165,7 +173,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name": "Updated User Actions",
+				"projectId": "test-project-id",
+				"name":      "Updated User Actions",
 			}
 
 			oldStateData := resources.ResourceData{
@@ -175,7 +184,8 @@ func TestCategoryProviderOperations(t *testing.T) {
 				"createdAt":   time.Now().Add(-time.Hour).String(),
 				"updatedAt":   time.Now().Add(-time.Minute).String(),
 				"categoryArgs": map[string]interface{}{
-					"name": "User Actions",
+					"projectId": "test-project-id",
+					"name":      "User Actions",
 				},
 			}
 

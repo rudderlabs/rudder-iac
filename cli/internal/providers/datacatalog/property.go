@@ -35,6 +35,7 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
 		Config:      toArgs.Config,
+		ProjectId:   toArgs.ProjectId,
 	})
 
 	if err != nil {
@@ -72,6 +73,7 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
 		Config:      toArgs.Config,
+		ProjectId:   toArgs.ProjectId,
 		WorkspaceId: oldState.WorkspaceID,
 	})
 
