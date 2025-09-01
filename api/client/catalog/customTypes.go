@@ -48,6 +48,7 @@ type CustomTypeStore interface {
 	UpdateCustomType(ctx context.Context, id string, input *CustomType) (*CustomType, error)
 	DeleteCustomType(ctx context.Context, id string) error
 	GetCustomType(ctx context.Context, id string) (*CustomType, error)
+	GetCustomTypes(ctx context.Context) ([]*CustomType, error)
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
@@ -108,4 +109,8 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 	}
 
 	return &customType, nil
+}
+
+func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context) ([]*CustomType, error) {
+	return getAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
 }
