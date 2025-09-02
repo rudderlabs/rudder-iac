@@ -22,12 +22,11 @@ func TestSubmitSourcePreview(t *testing.T) {
 			FetchColumns: true,
 			RowLimit:     100,
 			SQL:          "SELECT * FROM users LIMIT 100",
-			WorkspaceID:  "ws123",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100","workspaceId":"ws123"}`
+				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview/role/test-role/submit", expected)
 			},
 			ResponseStatus: 200,
@@ -64,12 +63,11 @@ func TestSubmitSourcePreview(t *testing.T) {
 			FetchColumns: true,
 			RowLimit:     100,
 			SQL:          "SELECT * FROM users LIMIT 100",
-			WorkspaceID:  "ws123",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100","workspaceId":"ws123"}`
+				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview/role/test-role/submit", expected)
 			},
 			ResponseStatus: 200,
@@ -111,7 +109,6 @@ func TestSubmitSourcePreview(t *testing.T) {
 			FetchColumns: true,
 			RowLimit:     100,
 			SQL:          "SELECT * FROM users LIMIT 100",
-			WorkspaceID:  "ws123",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t)
@@ -135,12 +132,11 @@ func TestSubmitSourcePreview(t *testing.T) {
 			FetchColumns: true,
 			RowLimit:     100,
 			SQL:          "SELECT * FROM users LIMIT 100",
-			WorkspaceID:  "ws123",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100","workspaceId":"ws123"}`
+				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview/role/test-role/submit", expected)
 			},
 			ResponseError: assert.AnError,
@@ -168,12 +164,11 @@ func TestSubmitSourcePreview(t *testing.T) {
 			FetchColumns: true,
 			RowLimit:     100,
 			SQL:          "SELECT * FROM users LIMIT 100",
-			WorkspaceID:  "ws123",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100","workspaceId":"ws123"}`
+				expected := `{"accountId":"acc123","fetchRows":true,"fetchColumns":true,"rowLimit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview/role/test-role/submit", expected)
 			},
 			ResponseStatus: 200,
