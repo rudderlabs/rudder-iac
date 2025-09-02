@@ -85,7 +85,6 @@ type PreviewSubmitRequest struct {
 	FetchColumns bool   `json:"fetchColumns"`
 	RowLimit     int    `json:"rowLimit"`
 	SQL          string `json:"sql"`
-	WorkspaceID  string `json:"workspaceId"`
 }
 
 // PreviewSubmitResponse represents the response from submitting a RETL source preview
