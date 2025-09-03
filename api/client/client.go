@@ -87,6 +87,15 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 		return nil, err
 	}
 
+	// For 5xx errors, return a generic message instead of parsing the response
+	if res.StatusCode >= 500 && res.StatusCode <= 599 {
+		return nil, &APIError{
+			HTTPStatusCode: res.StatusCode,
+			Message: "Something went wrong. Try again shortly.",
+		}
+	}
+	
+
 	// check if response has an error status code and parse API error accordingly
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		apiError := &APIError{HTTPStatusCode: res.StatusCode}
