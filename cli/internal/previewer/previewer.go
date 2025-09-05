@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -28,14 +29,21 @@ func WithJson(json bool) PreviewerOpts {
 	}
 }
 
+func WithInteractive(interactive bool) PreviewerOpts {
+	return func(p *Previewer) {
+		p.Interactive = interactive
+	}
+}
+
 type Previewer struct {
-	Provider PreviewProvider
-	Limit    int
-	Json     bool
+	Provider    PreviewProvider
+	Limit       int
+	Json        bool
+	Interactive bool
 }
 
 type PreviewProvider interface {
-	Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]string, []map[string]any, error)
+	Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]map[string]any, error)
 }
 
 func New(provider PreviewProvider, opts ...PreviewerOpts) *Previewer {
@@ -109,7 +117,7 @@ func (m previewModel) View() string {
 func (p *Previewer) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {
 	spinner := ui.NewSpinner(fmt.Sprintf("Previewing %s...", ID))
 	spinner.Start()
-	columns, rowsData, err := p.Provider.Preview(ctx, ID, resourceType, data, p.Limit)
+	rowsData, err := p.Provider.Preview(ctx, ID, resourceType, data, p.Limit)
 	spinner.Stop()
 
 	if err != nil {
@@ -118,17 +126,17 @@ func (p *Previewer) Preview(ctx context.Context, ID string, resourceType string,
 
 	// Handle empty results
 	if len(rowsData) == 0 {
-		fmt.Println("No preview data available.")
+		fmt.Println("ℹ️  No preview data available. The query executed successfully but returned no rows.")
 		return nil
 	}
 
 	if p.Json {
-		return previewJson(rowsData)
+		return p.previewJson(rowsData)
 	}
-	return previewTable(columns, rowsData)
+	return p.previewTable(rowsData)
 }
 
-func previewJson(rowsData []map[string]any) error {
+func (p *Previewer) previewJson(rowsData []map[string]any) error {
 	b, err := json.MarshalIndent(rowsData, "", "  ")
 	if err != nil {
 		return err
@@ -137,10 +145,11 @@ func previewJson(rowsData []map[string]any) error {
 	return nil
 }
 
-func previewTable(columns []string, rowsData []map[string]any) error {
+func (p *Previewer) previewTable(rowsData []map[string]any) error {
 	// Calculate column widths based on content
-	tableColumns := make([]table.Column, len(columns))
-	for i, col := range columns {
+	columns := maps.Keys(rowsData[0])
+	tableColumns := make([]table.Column, 0)
+	for col := range columns {
 		width := len(col) // Start with column name length
 
 		// Check all rows to find the maximum width for this column
@@ -162,18 +171,17 @@ func previewTable(columns []string, rowsData []map[string]any) error {
 			width = 50
 		}
 
-		tableColumns[i] = table.Column{Title: col, Width: width}
+		tableColumns = append(tableColumns, table.Column{Title: col, Width: width})
 	}
 
 	// Convert rows to table rows
 	tableRows := make([]table.Row, len(rowsData))
 	for i, row := range rowsData {
-		tableRow := make(table.Row, len(columns))
-		for j, col := range columns {
-			if value, exists := row[col]; exists {
+		tableRow := make(table.Row, len(row))
+		for j, col := range tableColumns {
+			tableRow[j] = ""
+			if value, exists := row[col.Title]; exists {
 				tableRow[j] = fmt.Sprintf("%v", value)
-			} else {
-				tableRow[j] = ""
 			}
 		}
 		tableRows[i] = tableRow
@@ -183,7 +191,7 @@ func previewTable(columns []string, rowsData []map[string]any) error {
 	t := table.New(
 		table.WithColumns(tableColumns),
 		table.WithRows(tableRows),
-		table.WithFocused(true),
+		table.WithFocused(p.Interactive),
 		table.WithHeight(len(tableRows)+1), // +1 for the header
 	)
 
@@ -206,9 +214,14 @@ func previewTable(columns []string, rowsData []map[string]any) error {
 		keys:  keys,
 	}
 
-	program := tea.NewProgram(m)
-	if _, err := program.Run(); err != nil {
-		return err
+	if p.Interactive {
+		program := tea.NewProgram(m)
+		if _, err := program.Run(); err != nil {
+			return err
+		}
+	} else {
+		// Non-interactive mode: just print the table
+		fmt.Println(m.View())
 	}
 
 	return nil

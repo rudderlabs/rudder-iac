@@ -8,17 +8,13 @@ import (
 )
 
 // SubmitSourcePreview submits a request to preview a RETL source
-func (r *RudderRETLStore) SubmitSourcePreview(ctx context.Context, role string, request *PreviewSubmitRequest) (*PreviewSubmitResponse, error) {
-	if role == "" {
-		return nil, fmt.Errorf("role cannot be empty")
-	}
-
+func (r *RudderRETLStore) SubmitSourcePreview(ctx context.Context, request *PreviewSubmitRequest) (*PreviewSubmitResponse, error) {
 	data, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling preview request: %w", err)
 	}
 
-	path := fmt.Sprintf("/v2/retl-sources/preview/role/%s/submit", role)
+	path := "/v2/retl-sources/preview"
 	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("submitting source preview: %w", err)
@@ -33,16 +29,12 @@ func (r *RudderRETLStore) SubmitSourcePreview(ctx context.Context, role string, 
 }
 
 // GetSourcePreviewResult retrieves the results of a RETL source preview
-func (r *RudderRETLStore) GetSourcePreviewResult(ctx context.Context, role string, resultID string) (*PreviewResultResponse, error) {
-	if role == "" {
-		return nil, fmt.Errorf("role cannot be empty")
-	}
-
+func (r *RudderRETLStore) GetSourcePreviewResult(ctx context.Context, resultID string) (*PreviewResultResponse, error) {
 	if resultID == "" {
 		return nil, fmt.Errorf("result ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("/v2/retl-sources/preview/role/%s/result/%s", role, resultID)
+	path := fmt.Sprintf("/v2/retl-sources/preview/%s", resultID)
 	resp, err := r.client.Do(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting source preview result: %w", err)
