@@ -63,5 +63,5 @@ type resourceHandler interface {
 	// - []string: column names
 	// - map[string]any: contains result data with keys: "errorMessage", "rows", "rowCount", and "columns" (array of column info)
 	// - error: any error that occurred
-	Preview(ctx context.Context, ID string, data resources.ResourceData, limit int) ([]string, []map[string]any, error)
+	Preview(ctx context.Context, ID string, data resources.ResourceData, limit int) ([]map[string]any, error)
 }

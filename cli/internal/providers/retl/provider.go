@@ -214,10 +214,10 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 // - []string: column names
 // - map[string]any: contains result data with keys: "errorMessage", "rows", "rowCount", and "columns" (array of column info)
 // - error: any error that occurred
-func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]string, []map[string]any, error) {
+func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]map[string]any, error) {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
-		return nil, nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 
 	return handler.Preview(ctx, ID, data, limit)
