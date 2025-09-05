@@ -164,3 +164,9 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 
 	return nil
 }
+
+// LoadResourcesFromRemote loads all custom types from the remote catalog
+func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+	p.log.Debug("loading custom types from remote catalog")
+	return p.client.GetCustomTypes(ctx)
+}

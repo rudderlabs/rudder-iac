@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -134,6 +135,10 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	}
 
 	t.Events = tpEvents
+}
+
+// FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
+func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan) {
 }
 
 // Encapsulates the catalog argument which is added as a resource
@@ -401,6 +406,10 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 
 	args.Events = events
 	return nil
+}
+
+// FromRemoteTrackingPlan converts from remote API TrackingPlan to TrackingPlanArgs
+func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan) {
 }
 
 func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {

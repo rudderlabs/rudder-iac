@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -162,6 +163,10 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	return nil
 }
 
+// FromRemoteCustomType converts from remote API CustomType to CustomTypeArgs
+func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType, resourceCollection *resources.ResourceCollection) {
+}
+
 // PropertyByID finds a property by its ID within the custom type
 func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
 	for _, prop := range args.Properties {
@@ -277,4 +282,8 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.CustomTypeArgs.FromResourceData(
 		MustMapStringInterface(from, "customTypeArgs"),
 	)
+}
+
+// FromRemoteCustomType converts from catalog.CustomType to CustomTypeState
+func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, resourceCollection *resources.ResourceCollection) {
 }

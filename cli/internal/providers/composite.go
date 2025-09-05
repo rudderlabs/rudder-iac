@@ -85,24 +85,45 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error) {
-	var state *state.State = state.EmptyState()
+	var astate *state.State = state.EmptyState()
+	var rstate *state.State = state.EmptyState()
+
 	for _, provider := range p.Providers {
+		resources, err := provider.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, err
+		}
+		rs, err := provider.LoadStateFromResources(ctx, resources)
+		if err != nil {
+			return nil, err
+		}
+		if rstate == nil {
+			rstate = rs
+		} else {
+			rstate, err = rstate.Merge(rs)
+			if err != nil {
+				return nil, fmt.Errorf("error merging provider states: %s", err)
+			}
+		}
+
 		s, err := provider.LoadState(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		if state == nil {
-			state = s
+		if astate == nil {
+			astate = s
 		} else {
-			state, err = state.Merge(s)
+			astate, err = astate.Merge(s)
 			if err != nil {
 				return nil, fmt.Errorf("error merging provider states: %s", err)
 			}
 		}
 	}
 
-	return state, nil
+	// TODO: compare rstate and astate for events and categories
+
+	return astate, nil
 }
 
 func (p *CompositeProvider) PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error {
@@ -160,4 +181,12 @@ func (p *CompositeProvider) providerForKind(kind string) project.Provider {
 
 func (p *CompositeProvider) providerForType(resourceType string) project.Provider {
 	return p.registeredTypes[resourceType]
+}
+
+func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p *CompositeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	return nil, fmt.Errorf("not implemented")
 }
