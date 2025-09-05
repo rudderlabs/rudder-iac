@@ -6,8 +6,17 @@ import (
 
 type SourceType string
 
+type AsyncStatus string
+
 const (
 	ModelSourceType SourceType = "model"
+
+	Processing AsyncStatus = "Processing"
+	Accepted   AsyncStatus = "Accepted"
+	Failed     AsyncStatus = "Failed"
+	TimedOut   AsyncStatus = "TimedOut"
+	Cancelled  AsyncStatus = "Cancelled"
+	Completed  AsyncStatus = "Completed"
 )
 
 // State represents the complete RETL state
@@ -70,4 +79,30 @@ type RETLSQLModelConfig struct {
 // RETLSources represents a response of RETL sources
 type RETLSources struct {
 	Data []RETLSource `json:"data"`
+}
+
+// PreviewResultError represents an error in the preview result
+type PreviewResultError struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+// PreviewSubmitRequest represents the request to submit a RETL source preview
+type PreviewSubmitRequest struct {
+	AccountID        string `json:"accountId"`
+	Limit            int    `json:"limit,omitempty"`
+	SQL              string `json:"sql"`
+	SourceDefinition string `json:"sourceDefinition"`
+}
+
+// PreviewSubmitResponse represents the response from submitting a RETL source preview
+type PreviewSubmitResponse struct {
+	ID string `json:"id"`
+}
+
+// PreviewResultResponse represents the response containing preview results
+type PreviewResultResponse struct {
+	Status AsyncStatus      `json:"status"`
+	Rows   []map[string]any `json:"rows,omitempty"`
+	Error  string           `json:"error,omitempty"`
 }
