@@ -2,7 +2,9 @@ package state_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
@@ -70,4 +72,30 @@ func TestCategoryState_ResourceData(t *testing.T) {
 		loopback.FromResourceData(categoryState.ToResourceData())
 		assert.Equal(t, categoryState, loopback)
 	})
+}
+
+func TestCategoryArgs_FromRemoteCategory(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	remoteCategory := &catalog.Category{
+		ID:          "category-123",
+		Name:        "Test Category",
+		WorkspaceID: "workspace-456",
+		ProjectId:   "category-123-local",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	resourceCollection := resources.NewResourceCollection()
+	resourceCollection.SetCategories([]*catalog.Category{
+		remoteCategory,
+	})
+
+	args := &state.CategoryArgs{}
+	args.FromRemoteCategory(remoteCategory, resourceCollection)
+
+	assert.Equal(t, "category-123-local", args.ProjectId)
+	assert.Equal(t, "Test Category", args.Name)
 }

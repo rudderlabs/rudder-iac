@@ -1,9 +1,14 @@
 package state
 
 import (
+	"fmt"
+
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
+
+const EventResourceType = "event"
 
 type EventArgs struct {
 	ProjectId   string
@@ -41,6 +46,26 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 	if event.CategoryRef != nil {
 		args.CategoryId = &resources.PropertyRef{
 			URN:      getURNFromRef(*event.CategoryRef),
+			Property: "id",
+		}
+	}
+}
+
+// FromRemoteEvent converts from remote API Event to EventArgs
+func (args *EventArgs) FromRemoteEvent(event *catalog.Event, resourceCollection *resources.ResourceCollection) {
+	args.ProjectId = event.ProjectId
+	args.Name = event.Name
+	args.Description = event.Description
+	args.EventType = event.EventType
+	if event.CategoryId != nil {
+		// get category from map
+		category, ok := resourceCollection.GetCategory(*event.CategoryId)
+		if !ok {
+			// TODO: decide on panic vs error out
+			panic(fmt.Sprintf("category with id not found in remote %s", *event.CategoryId))
+		}
+		args.CategoryId = &resources.PropertyRef{
+			URN:      resources.URN(category.ProjectId, CategoryResourceType),
 			Property: "id",
 		}
 	}
@@ -85,3 +110,17 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 		MustMapStringInterface(from, "eventArgs"),
 	))
 }
+
+// FromRemoteEvent converts from catalog.Event to EventState
+func (e *EventState) FromRemoteEvent(event *catalog.Event, resourceCollection *resources.ResourceCollection) {
+	e.EventArgs.FromRemoteEvent(event,  resourceCollection)
+	e.ID = event.ID
+	e.Name = event.Name
+	e.Description = event.Description
+	e.EventType = event.EventType
+	e.WorkspaceID = event.WorkspaceId
+	e.CategoryID = event.CategoryId
+	e.CreatedAt = event.CreatedAt.String()
+	e.UpdatedAt = event.UpdatedAt.String()
+}
+	

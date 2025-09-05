@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -65,6 +66,10 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 	return nil
 }
 
+// FromRemoteProperty converts from remote API Property to PropertyArgs
+func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, resourceCollection *resources.ResourceCollection) {
+}
+
 func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
 		"projectId":   args.ProjectId,
@@ -122,4 +127,8 @@ func (p *PropertyState) FromResourceData(from resources.ResourceData) {
 	p.PropertyArgs.FromResourceData(
 		MustMapStringInterface(from, "propertyArgs"),
 	)
+}
+
+// FromRemoteProperty converts from catalog.Property to PropertyState
+func (p *PropertyState) FromRemoteProperty(property *catalog.Property, resourceCollection *resources.ResourceCollection) {
 }

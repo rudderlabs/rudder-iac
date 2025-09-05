@@ -108,3 +108,9 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 
 	return nil
 }
+
+// LoadResourcesFromRemote loads all properties from the remote catalog
+func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+	p.log.Debug("loading properties from remote catalog")
+	return p.client.GetProperties(ctx)
+}

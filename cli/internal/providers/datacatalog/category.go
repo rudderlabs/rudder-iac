@@ -94,3 +94,9 @@ func (p *CategoryProvider) Delete(ctx context.Context, ID string, data resources
 
 	return nil
 }
+
+// LoadResourcesFromRemote loads all categories from the remote catalog
+func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+	p.log.Debug("loading categories from remote catalog")
+	return p.client.GetCategories(ctx)
+}
