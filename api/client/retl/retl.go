@@ -43,10 +43,10 @@ type RETLSourceStore interface {
 // PreviewStore is the interface for RETL source preview operations
 type PreviewStore interface {
 	// SubmitSourcePreview submits a request to preview a RETL source
-	SubmitSourcePreview(ctx context.Context, role string, request *PreviewSubmitRequest) (*PreviewSubmitResponse, error)
+	SubmitSourcePreview(ctx context.Context, request *PreviewSubmitRequest) (*PreviewSubmitResponse, error)
 
 	// GetSourcePreviewResult retrieves the results of a RETL source preview
-	GetSourcePreviewResult(ctx context.Context, role string, resultID string) (*PreviewResultResponse, error)
+	GetSourcePreviewResult(ctx context.Context, resultID string) (*PreviewResultResponse, error)
 }
 
 // RudderRETLStore implements the RETLStore interface
