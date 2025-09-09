@@ -292,7 +292,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:  "different ProjectId",
+			name:  "different LocalID",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
 				LocalID:     "DifferentType",
