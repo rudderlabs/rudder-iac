@@ -7,24 +7,20 @@ import (
 
 // CategoryArgs holds the necessary information to create a category
 type CategoryArgs struct {
-	ProjectId string
-	Name      string
+	Name string
 }
 
 func (args *CategoryArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
-		"projectId": args.ProjectId,
-		"name":      args.Name,
+		"name": args.Name,
 	}
 }
 
 func (args *CategoryArgs) FromResourceData(from resources.ResourceData) {
-	args.ProjectId = String(from, "projectId", "")
 	args.Name = MustString(from, "name")
 }
 
 func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.Category) {
-	args.ProjectId = category.LocalID
 	args.Name = category.Name
 }
 

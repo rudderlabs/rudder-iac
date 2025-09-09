@@ -45,7 +45,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Config:      toArgs.Config,
 		Properties:  properties,
 		Variants:    toArgs.Variants.ToCatalogVariants(),
-		ProjectId:   toArgs.ProjectId,
+		ProjectId:   ID,
 	}
 
 	customType, err := p.client.CreateCustomType(ctx, input)
@@ -56,7 +56,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 	customTypeState := state.CustomTypeState{
 		CustomTypeArgs:  toArgs,
 		ID:              customType.ID,
-		ProjectId:       toArgs.ProjectId,
+		LocalID:         toArgs.LocalID,
 		Name:            customType.Name,
 		Description:     customType.Description,
 		Type:            customType.Type,
@@ -105,7 +105,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			Config:      toArgs.Config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
-			ProjectId:   toArgs.ProjectId,
+			ProjectId:   toArgs.LocalID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)
@@ -119,7 +119,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		toState = state.CustomTypeState{
 			CustomTypeArgs:  toArgs,
 			ID:              prevState.ID,
-			ProjectId:       toArgs.ProjectId,
+			LocalID:         toArgs.LocalID,
 			Name:            prevState.Name,
 			Description:     prevState.Description,
 			Type:            prevState.Type,
@@ -136,7 +136,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 		toState = state.CustomTypeState{
 			CustomTypeArgs:  toArgs,
 			ID:              updated.ID,
-			ProjectId:       toArgs.ProjectId,
+			LocalID:         toArgs.LocalID,
 			Name:            updated.Name,
 			Description:     updated.Description,
 			Type:            updated.Type,

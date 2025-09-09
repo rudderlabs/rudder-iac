@@ -11,7 +11,7 @@ import (
 func TestCustomTypeArgsToResourceData(t *testing.T) {
 	// Create a CustomTypeArgs instance
 	args := CustomTypeArgs{
-		ProjectId:   "EmailType",
+		LocalID:     "EmailType",
 		Name:        "Email Type",
 		Description: "Custom type for email validation",
 		Type:        "string",
@@ -36,7 +36,7 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 	data := args.ToResourceData()
 
 	// Verify the conversion
-	assert.Equal(t, "EmailType", data["projectId"])
+	assert.Equal(t, "EmailType", data["localId"])
 	assert.Equal(t, "Email Type", data["name"])
 	assert.Equal(t, "Custom type for email validation", data["description"])
 	assert.Equal(t, "string", data["type"])
@@ -57,7 +57,7 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 func TestCustomTypeArgsFromResourceData(t *testing.T) {
 	// Create resource data
 	data := resources.ResourceData{
-		"projectId":   "EmailType",
+		"localId":     "EmailType",
 		"name":        "Email Type",
 		"description": "Custom type for email validation",
 		"type":        "string",
@@ -85,7 +85,7 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 	args.FromResourceData(data)
 
 	// Verify the conversion
-	assert.Equal(t, "EmailType", args.ProjectId)
+	assert.Equal(t, "EmailType", args.LocalID)
 	assert.Equal(t, "Email Type", args.Name)
 	assert.Equal(t, "Custom type for email validation", args.Description)
 	assert.Equal(t, "string", args.Type)
@@ -136,7 +136,7 @@ func TestFromCatalogCustomType(t *testing.T) {
 	args.FromCatalogCustomType(customType, getURN)
 
 	// Verify basic fields
-	assert.Equal(t, "ObjectType", args.ProjectId)
+	assert.Equal(t, "ObjectType", args.LocalID)
 	assert.Equal(t, "Object Type", args.Name)
 	assert.Equal(t, "Object type with properties", args.Description)
 	assert.Equal(t, "object", args.Type)
@@ -254,7 +254,7 @@ func TestCustomTypePropertyDiff(t *testing.T) {
 
 func TestCustomTypeArgs_Diff(t *testing.T) {
 	baseArgs := &CustomTypeArgs{
-		ProjectId:   "TestType",
+		LocalID:     "TestType",
 		Name:        "Test Type",
 		Description: "Test description",
 		Type:        "string",
@@ -295,7 +295,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different ProjectId",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "DifferentType",
+				LocalID:     "DifferentType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",
@@ -325,7 +325,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Name",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Different Name",
 				Description: "Test description",
 				Type:        "string",
@@ -355,7 +355,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Description",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Different description",
 				Type:        "string",
@@ -385,7 +385,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Type",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "number",
@@ -415,7 +415,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Config",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",
@@ -445,7 +445,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Properties length",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",
@@ -480,7 +480,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "property not found",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",
@@ -510,7 +510,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "property differs",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",
@@ -540,7 +540,7 @@ func TestCustomTypeArgs_Diff(t *testing.T) {
 			name:  "different Variants",
 			args1: baseArgs,
 			args2: &CustomTypeArgs{
-				ProjectId:   "TestType",
+				LocalID:     "TestType",
 				Name:        "Test Type",
 				Description: "Test description",
 				Type:        "string",

@@ -10,7 +10,7 @@ import (
 
 // CustomTypeArgs holds the necessary information to create a custom type
 type CustomTypeArgs struct {
-	ProjectId   string
+	LocalID     string
 	Name        string
 	Description string
 	Type        string
@@ -55,7 +55,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 	}
 
 	return resources.ResourceData{
-		"projectId":   args.ProjectId,
+		"localId":     args.LocalID,
 		"name":        args.Name,
 		"description": args.Description,
 		"type":        args.Type,
@@ -67,7 +67,7 @@ func (args *CustomTypeArgs) ToResourceData() resources.ResourceData {
 
 // FromResourceData populates CustomTypeArgs from ResourceData
 func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
-	args.ProjectId = MustString(from, "projectId")
+	args.LocalID = MustString(from, "localId")
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.Type = MustString(from, "type")
@@ -108,7 +108,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 }
 
 func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) error {
-	args.ProjectId = from.LocalID
+	args.LocalID = from.LocalID
 	args.Name = from.Name
 	args.Description = from.Description
 	args.Type = from.Type
@@ -175,7 +175,7 @@ func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
 // Diff compares two CustomTypeArgs instances and returns true if they differ
 func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 	// Compare basic fields
-	if args.ProjectId != other.ProjectId {
+	if args.LocalID != other.LocalID {
 		return true
 	}
 
@@ -223,7 +223,7 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 type CustomTypeState struct {
 	CustomTypeArgs
 	ID              string
-	ProjectId       string
+	LocalID         string
 	Name            string
 	Description     string
 	Type            string
@@ -245,7 +245,7 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 
 	return resources.ResourceData{
 		"id":              s.ID,
-		"projectId":       s.ProjectId,
+		"localId":         s.LocalID,
 		"name":            s.Name,
 		"description":     s.Description,
 		"type":            s.Type,
@@ -262,7 +262,7 @@ func (s *CustomTypeState) ToResourceData() resources.ResourceData {
 
 func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.ID = MustString(from, "id")
-	s.ProjectId = MustString(from, "projectId")
+	s.LocalID = MustString(from, "localId")
 	s.Name = MustString(from, "name")
 	s.Description = MustString(from, "description")
 	s.Type = MustString(from, "type")

@@ -10,8 +10,7 @@ import (
 
 func TestCategoryArgs_ResourceData(t *testing.T) {
 	args := state.CategoryArgs{
-		ProjectId: "test-category-id",
-		Name:      "Marketing",
+		Name: "Marketing",
 	}
 
 	t.Run("to resource data", func(t *testing.T) {
@@ -19,8 +18,7 @@ func TestCategoryArgs_ResourceData(t *testing.T) {
 
 		resourceData := args.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
-			"projectId": "test-category-id",
-			"name":      "Marketing",
+			"name": "Marketing",
 		}, resourceData)
 	})
 
@@ -36,8 +34,7 @@ func TestCategoryArgs_ResourceData(t *testing.T) {
 func TestCategoryState_ResourceData(t *testing.T) {
 	categoryState := state.CategoryState{
 		CategoryArgs: state.CategoryArgs{
-			ProjectId: "test-category-id",
-			Name:      "Marketing",
+			Name: "Marketing",
 		},
 		ID:          "category-id",
 		Name:        "Marketing",
@@ -57,8 +54,7 @@ func TestCategoryState_ResourceData(t *testing.T) {
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"categoryArgs": map[string]interface{}{
-				"projectId": "test-category-id",
-				"name":      "Marketing",
+				"name": "Marketing",
 			},
 		}, resourceData)
 	})
