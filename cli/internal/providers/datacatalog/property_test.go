@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,6 +61,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Description: "property description",
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
+			ProjectId:   "test-project-id",
 			Config:      map[string]interface{}{"key": "value"},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,

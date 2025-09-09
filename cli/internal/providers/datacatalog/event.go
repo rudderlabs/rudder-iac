@@ -42,6 +42,7 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
 		CategoryId:  categoryId,
+		ProjectId:   ID,
 	})
 
 	if err != nil {
@@ -95,6 +96,7 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		EventType:   toArgs.EventType,
 		WorkspaceId: prevState.WorkspaceID,
 		CategoryId:  categoryId,
+		ProjectId:   ID,
 	})
 
 	if err != nil {

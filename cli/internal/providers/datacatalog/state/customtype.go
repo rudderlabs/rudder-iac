@@ -31,15 +31,15 @@ func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
 	if prop.ID != other.ID {
 		return true
 	}
-	
+
 	if prop.Required != other.Required {
 		return true
 	}
-	
+
 	if !reflect.DeepEqual(prop.RefToID, other.RefToID) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -178,45 +178,45 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 	if args.LocalID != other.LocalID {
 		return true
 	}
-	
+
 	if args.Name != other.Name {
 		return true
 	}
-	
+
 	if args.Description != other.Description {
 		return true
 	}
-	
+
 	if args.Type != other.Type {
 		return true
 	}
-	
+
 	// Compare config maps using deep equality
 	if !reflect.DeepEqual(args.Config, other.Config) {
 		return true
 	}
-	
+
 	// Compare properties arrays
 	if len(args.Properties) != len(other.Properties) {
 		return true
 	}
-	
+
 	for _, prop := range args.Properties {
 		otherProp := other.PropertyByID(prop.ID)
 		if otherProp == nil {
 			return true
 		}
-		
+
 		if prop.Diff(otherProp) {
 			return true
 		}
 	}
-	
+
 	// Compare variants using existing Variants.Diff method
 	if args.Variants.Diff(other.Variants) {
 		return true
 	}
-	
+
 	return false
 }
 
