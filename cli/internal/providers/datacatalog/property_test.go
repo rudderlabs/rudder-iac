@@ -86,7 +86,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"propertyArgs": map[string]interface{}{
-				"projectId":   "test-project-id",
 				"name":        "property",
 				"description": "property description",
 				"type":        "property type",
