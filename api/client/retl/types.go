@@ -11,12 +11,9 @@ type AsyncStatus string
 const (
 	ModelSourceType SourceType = "model"
 
-	Processing AsyncStatus = "Processing"
-	Accepted   AsyncStatus = "Accepted"
-	Failed     AsyncStatus = "Failed"
-	TimedOut   AsyncStatus = "TimedOut"
-	Cancelled  AsyncStatus = "Cancelled"
-	Completed  AsyncStatus = "Completed"
+	Pending   AsyncStatus = "pending"
+	Failed    AsyncStatus = "failed"
+	Completed AsyncStatus = "completed"
 )
 
 // State represents the complete RETL state

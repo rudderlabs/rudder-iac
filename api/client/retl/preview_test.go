@@ -122,7 +122,7 @@ func TestGetSourcePreviewResult(t *testing.T) {
 			},
 			ResponseStatus: 200,
 			ResponseBody: `{
-				"status": "Completed",
+				"status": "completed",
 				"rows": [
 					{
 						"id": 1,
@@ -162,7 +162,7 @@ func TestGetSourcePreviewResult(t *testing.T) {
 			},
 			ResponseStatus: 200,
 			ResponseBody: `{
-				"status": "Failed",
+				"status": "failed",
 				"error": "Database connection failed"
 			}`,
 		})
@@ -191,7 +191,7 @@ func TestGetSourcePreviewResult(t *testing.T) {
 			},
 			ResponseStatus: 200,
 			ResponseBody: `{
-				"status": "Processing"
+				"status": "pending"
 			}`,
 		})
 		c, err := client.New("test-token", client.WithHTTPClient(httpClient))
@@ -201,7 +201,7 @@ func TestGetSourcePreviewResult(t *testing.T) {
 
 		response, err := retlClient.GetSourcePreviewResult(context.Background(), "req123")
 		require.NoError(t, err)
-		assert.Equal(t, retl.Processing, response.Status)
+		assert.Equal(t, retl.Pending, response.Status)
 
 		httpClient.AssertNumberOfCalls()
 	})
@@ -277,7 +277,7 @@ func TestGetSourcePreviewResult(t *testing.T) {
 			},
 			ResponseStatus: 200,
 			ResponseBody: `{
-				"status": "Completed",
+				"status": "completed",
 				"rows": []
 			}`,
 		})

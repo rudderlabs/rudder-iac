@@ -73,14 +73,10 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 
 			status := resultResp.Status
 			switch status {
-			case retlClient.Processing, retlClient.Accepted:
+			case retlClient.Pending:
 				continue
 			case retlClient.Failed:
 				return nil, fmt.Errorf("preview request failed: %s", resultResp.Error)
-			case retlClient.TimedOut:
-				return nil, fmt.Errorf("preview request timed out")
-			case retlClient.Cancelled:
-				return nil, fmt.Errorf("preview request cancelled")
 			case retlClient.Completed:
 				return resultResp.Rows, nil
 			}
