@@ -323,7 +323,7 @@ func TestSQLModelHandler(t *testing.T) {
 				call++
 				if call == 1 {
 					resp := &retlClient.PreviewResultResponse{}
-					resp.Status = retlClient.Processing
+					resp.Status = retlClient.Pending
 					return resp, nil
 				}
 				resp := &retlClient.PreviewResultResponse{}
