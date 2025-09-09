@@ -96,7 +96,18 @@ func (p *CategoryProvider) Delete(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all categories from the remote catalog
-func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
 	p.log.Debug("loading categories from remote catalog")
-	return p.client.GetCategories(ctx)
+	categories, err := p.client.GetCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key = category's remoteId
+	resourceMap := make(map[string]interface{})
+	for _, category := range categories {
+		resourceMap[category.ID] = category
+	}
+
+	return resourceMap, nil
 }

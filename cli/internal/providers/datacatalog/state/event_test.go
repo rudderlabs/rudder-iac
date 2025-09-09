@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEventState_ResourceData(t *testing.T) {
@@ -99,15 +98,13 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 	categoryID := "category-123"
 	now := time.Now()
 
-	// Create a resource collection for the test
-	resourceCollection := resources.NewResourceCollection()
-	resourceCollection.SetCategories([]*catalog.Category{
-		{
-			ID:        categoryID,
-			ProjectId: "category-123-local",
-			Name:      "Test Category",
-		},
-	})
+	// Create a mock getURNFromRemoteId function for the test
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		if resourceType == "category" && remoteId == categoryID {
+			return "category:category-123-local"
+		}
+		return ""
+	}
 
 	remoteEvent := &catalog.Event{
 		ID:          "event-123",
@@ -115,16 +112,15 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  &categoryID,
-		ProjectId:   "project-456",
+		ProjectId:   "category-123-local",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
 	args := &state.EventArgs{}
-	args.FromRemoteEvent(remoteEvent, resourceCollection)
+	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
 
-	assert.Equal(t, "project-456", args.ProjectId)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)
 	assert.Equal(t, "track", args.EventType)
@@ -151,14 +147,14 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 		UpdatedAt:   now,
 	}
 
-	// Create a resource collection for the test
-	resourceCollection := resources.NewResourceCollection()
-	require.NotNil(t, resourceCollection)
+	// Create a mock getURNFromRemoteId function for the test
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		return "" // No resources found for this test
+	}
 
 	args := &state.EventArgs{}
-	args.FromRemoteEvent(remoteEvent, resourceCollection)
+	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
 
-	assert.Equal(t, "project-456", args.ProjectId)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)
 	assert.Equal(t, "track", args.EventType)

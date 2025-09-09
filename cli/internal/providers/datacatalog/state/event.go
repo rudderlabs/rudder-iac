@@ -48,20 +48,19 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 }
 
 // FromRemoteEvent converts from remote API Event to EventArgs
-func (args *EventArgs) FromRemoteEvent(event *catalog.Event, resourceCollection *resources.ResourceCollection) {
-	args.ProjectId = event.ProjectId
+func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(string, string) string) {
 	args.Name = event.Name
 	args.Description = event.Description
 	args.EventType = event.EventType
 	if event.CategoryId != nil {
-		// get category from map
-		category, ok := resourceCollection.GetCategory(*event.CategoryId)
-		if !ok {
+		// get URN for the category using remoteId
+		urn := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
+		if urn == "" {
 			// TODO: decide on panic vs error out
 			panic(fmt.Sprintf("category with id not found in remote %s", *event.CategoryId))
 		}
 		args.CategoryId = &resources.PropertyRef{
-			URN:      resources.URN(category.ProjectId, CategoryResourceType),
+			URN:      urn,
 			Property: "id",
 		}
 	}
@@ -108,8 +107,8 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteEvent converts from catalog.Event to EventState
-func (e *EventState) FromRemoteEvent(event *catalog.Event, resourceCollection *resources.ResourceCollection) {
-	e.EventArgs.FromRemoteEvent(event,  resourceCollection)
+func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(string, string) string) {
+	e.EventArgs.FromRemoteEvent(event, getURNFromRemoteId)
 	e.ID = event.ID
 	e.Name = event.Name
 	e.Description = event.Description
@@ -119,4 +118,3 @@ func (e *EventState) FromRemoteEvent(event *catalog.Event, resourceCollection *r
 	e.CreatedAt = event.CreatedAt.String()
 	e.UpdatedAt = event.UpdatedAt.String()
 }
-	

@@ -110,7 +110,18 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all properties from the remote catalog
-func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
 	p.log.Debug("loading properties from remote catalog")
-	return p.client.GetProperties(ctx)
+	properties, err := p.client.GetProperties(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key is the property's remoteId
+	resourceMap := make(map[string]interface{})
+	for _, property := range properties {
+		resourceMap[property.ID] = property
+	}
+
+	return resourceMap, nil
 }

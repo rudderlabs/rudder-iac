@@ -28,8 +28,7 @@ func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.Category) {
 }
 
 // FromRemoteCategory converts from remote API Category to CategoryArgs
-func (args *CategoryArgs) FromRemoteCategory(category *catalog.Category, resourceCollection *resources.ResourceCollection) {
-	args.ProjectId = category.ProjectId
+func (args *CategoryArgs) FromRemoteCategory(category *catalog.Category, getURNFromRemoteId func(string, string) string) {
 	args.Name = category.Name
 }
 
@@ -66,8 +65,8 @@ func (c *CategoryState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteCategory converts from catalog.Category to CategoryState
-func (c *CategoryState) FromRemoteCategory(category *catalog.Category, resourceCollection *resources.ResourceCollection) {
-	c.CategoryArgs.FromRemoteCategory(category, resourceCollection)
+func (c *CategoryState) FromRemoteCategory(category *catalog.Category, getURNFromRemoteId func(string, string) string) {
+	c.CategoryArgs.FromRemoteCategory(category, getURNFromRemoteId)
 	c.ID = category.ID
 	c.Name = category.Name
 	c.WorkspaceID = category.WorkspaceID

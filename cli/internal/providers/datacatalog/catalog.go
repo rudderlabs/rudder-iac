@@ -30,16 +30,30 @@ type resourceProvider interface {
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
-	LoadResourcesFromRemote(ctx context.Context) (interface{}, error)
+	LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error)
 }
 
 func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
+	var apistate *state.State = state.EmptyState()
+
+	// Load resources and reconstruct state from them
+	resources, err := p.LoadResourcesFromRemote(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resourcestate, err := p.LoadStateFromResources(ctx, resources)
+	if err != nil {
+		return nil, err
+	}
+	_ = resourcestate // TODO: compare rstate and astate for events and categories
+
+	// Load state from API
 	cs, err := p.client.ReadState(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	s := &state.State{
+	apistate = &state.State{
 		Version:   cs.Version,
 		Resources: make(map[string]*state.ResourceState),
 	}
@@ -52,10 +66,11 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 			Output:       rs.Output,
 			Dependencies: rs.Dependencies,
 		})
-		s.Resources[id] = decodedState
+		apistate.Resources[id] = decodedState
 	}
+	
 
-	return s, nil
+	return apistate, nil
 }
 
 func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
@@ -117,59 +132,15 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	log.Debug("loading all resources from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	// Load events
-	if provider, ok := p.providerStore[EventResourceType]; ok {
-		eventsRaw, err := provider.LoadResourcesFromRemote(ctx)
+	// Load resources for each provider store
+	for resourceType, provider := range p.providerStore {
+		resourceMap, err := provider.LoadResourcesFromRemote(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("loading events: %w", err)
+			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
 		}
-		events := eventsRaw.([]*catalog.Event)
-		collection.SetEvents(events)
-		log.Debug("loaded events", "count", len(events))
-	}
 
-	// Load properties
-	if provider, ok := p.providerStore[PropertyResourceType]; ok {
-		propertiesRaw, err := provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading properties: %w", err)
-		}
-		properties := propertiesRaw.([]*catalog.Property)
-		collection.SetProperties(properties)
-		log.Debug("loaded properties", "count", len(properties))
-	}
-
-	// Load categories
-	if provider, ok := p.providerStore[CategoryResourceType]; ok {
-		categoriesRaw, err := provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading categories: %w", err)
-		}
-		categories := categoriesRaw.([]*catalog.Category)
-		collection.SetCategories(categories)
-		log.Debug("loaded categories", "count", len(categories))
-	}
-
-	// Load custom types
-	if provider, ok := p.providerStore[CustomTypeResourceType]; ok {
-		customTypesRaw, err := provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading custom types: %w", err)
-		}
-		customTypes := customTypesRaw.([]*catalog.CustomType)
-		collection.SetCustomTypes(customTypes)
-		log.Debug("loaded custom types", "count", len(customTypes))
-	}
-
-	// Load tracking plans
-	if provider, ok := p.providerStore[TrackingPlanResourceType]; ok {
-		trackingPlansRaw, err := provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading tracking plans: %w", err)
-		}
-		trackingPlans := trackingPlansRaw.([]*catalog.TrackingPlan)
-		collection.SetTrackingPlans(trackingPlans)
-		log.Debug("loaded tracking plans", "count", len(trackingPlans))
+		collection.Set(resourceType, resourceMap)
+		log.Debug("loaded resources", "type", resourceType, "count", len(resourceMap))
 	}
 
 	return collection, nil
@@ -181,17 +152,60 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 
 	s := state.EmptyState()
 
+	// Create URN resolver function that can get URN from remoteId and resourceType
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		resource, exists := collection.GetById(resourceType, remoteId)
+		if !exists {
+			return ""
+		}
+
+		var projectId string
+		switch resourceType {
+		case EventResourceType:
+			if event, ok := resource.(*catalog.Event); ok {
+				projectId = event.ProjectId
+			}
+		case CategoryResourceType:
+			if category, ok := resource.(*catalog.Category); ok {
+				projectId = category.ProjectId
+			}
+		case PropertyResourceType:
+			if property, ok := resource.(*catalog.Property); ok {
+				projectId = property.ProjectId
+			}
+		case CustomTypeResourceType:
+			if customType, ok := resource.(*catalog.CustomType); ok {
+				projectId = customType.ProjectId
+			}
+		case TrackingPlanResourceType:
+			if trackingPlan, ok := resource.(*catalog.TrackingPlan); ok {
+				projectId = trackingPlan.ID // TrackingPlan uses ID as projectId
+			}
+		}
+
+		if projectId == "" {
+			return ""
+		}
+
+		return resources.URN(projectId, resourceType)
+	}
+
 	// Convert events to state
-	for _, event := range collection.GetEvents() {
+	events := collection.GetAll(EventResourceType)
+	for _, eventInterface := range events {
+		event, ok := eventInterface.(*catalog.Event)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast event to catalog.Event")
+		}
 		args := &dcstate.EventArgs{}
-		args.FromRemoteEvent(event, collection)
+		args.FromRemoteEvent(event, getURNFromRemoteId)
 
 		stateArgs := dcstate.EventState{}
-		stateArgs.FromRemoteEvent(event, collection)
+		stateArgs.FromRemoteEvent(event, getURNFromRemoteId)
 
 		resourceState := &state.ResourceState{
 			Type:         EventResourceType,
-			ID:           event.ID,
+			ID:           event.ProjectId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
@@ -202,16 +216,21 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 	}
 
 	// Convert categories to state
-	for _, category := range collection.GetCategories() {
+	categories := collection.GetAll(CategoryResourceType)
+	for _, categoryInterface := range categories {
+		category, ok := categoryInterface.(*catalog.Category)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast category to catalog.Category")
+		}
 		args := &dcstate.CategoryArgs{}
-		args.FromRemoteCategory(category, collection)
+		args.FromRemoteCategory(category, getURNFromRemoteId)
 
 		stateArgs := dcstate.CategoryState{}
-		stateArgs.FromRemoteCategory(category, collection)
+		stateArgs.FromRemoteCategory(category, getURNFromRemoteId)
 
 		resourceState := &state.ResourceState{
 			Type:         CategoryResourceType,
-			ID:           category.ID,
+			ID:           category.ProjectId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
@@ -222,16 +241,21 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 	}
 
 	// Convert properties to state
-	for _, property := range collection.GetProperties() {
+	properties := collection.GetAll(PropertyResourceType)
+	for _, propertyInterface := range properties {
+		property, ok := propertyInterface.(*catalog.Property)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast property to catalog.Property")
+		}
 		args := &dcstate.PropertyArgs{}
-		args.FromRemoteProperty(property, collection)
+		args.FromRemoteProperty(property, getURNFromRemoteId)
 
 		stateArgs := dcstate.PropertyState{}
-		stateArgs.FromRemoteProperty(property, collection)
+		stateArgs.FromRemoteProperty(property, getURNFromRemoteId)
 
 		resourceState := &state.ResourceState{
 			Type:         PropertyResourceType,
-			ID:           property.ID,
+			ID:           property.ProjectId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
@@ -242,16 +266,21 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 	}
 
 	// Convert custom types to state
-	for _, customType := range collection.GetCustomTypes() {
+	customTypes := collection.GetAll(CustomTypeResourceType)
+	for _, customTypeInterface := range customTypes {
+		customType, ok := customTypeInterface.(*catalog.CustomType)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast custom type to catalog.CustomType")
+		}
 		args := &dcstate.CustomTypeArgs{}
-		args.FromRemoteCustomType(customType, collection)
+		args.FromRemoteCustomType(customType, getURNFromRemoteId)
 
 		stateArgs := dcstate.CustomTypeState{}
-		stateArgs.FromRemoteCustomType(customType, collection)
+		stateArgs.FromRemoteCustomType(customType, getURNFromRemoteId)
 
 		resourceState := &state.ResourceState{
 			Type:         CustomTypeResourceType,
-			ID:           customType.ID,
+			ID:           customType.ProjectId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
@@ -262,7 +291,12 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 	}
 
 	// Convert tracking plans to state
-	for _, trackingPlan := range collection.GetTrackingPlans() {
+	trackingPlans := collection.GetAll(TrackingPlanResourceType)
+	for _, trackingPlanInterface := range trackingPlans {
+		trackingPlan, ok := trackingPlanInterface.(*catalog.TrackingPlan)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast tracking plan to catalog.TrackingPlan")
+		}
 		args := &dcstate.TrackingPlanArgs{}
 		args.FromRemoteTrackingPlan(trackingPlan)
 

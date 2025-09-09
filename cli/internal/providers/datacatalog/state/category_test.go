@@ -84,14 +84,13 @@ func TestCategoryArgs_FromRemoteCategory(t *testing.T) {
 		UpdatedAt:   now,
 	}
 
-	resourceCollection := resources.NewResourceCollection()
-	resourceCollection.SetCategories([]*catalog.Category{
-		remoteCategory,
-	})
+	// Create a mock getURNFromRemoteId function for the test
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		return "" // Categories don't currently use other resources in FromRemote
+	}
 
 	args := &state.CategoryArgs{}
-	args.FromRemoteCategory(remoteCategory, resourceCollection)
+	args.FromRemoteCategory(remoteCategory, getURNFromRemoteId)
 
-	assert.Equal(t, "category-123-local", args.ProjectId)
 	assert.Equal(t, "Test Category", args.Name)
 }

@@ -214,10 +214,10 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 }
 
 // LoadResourcesFromRemote loads all tracking plans from the remote catalog
-func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (interface{}, error) {
+func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
 	p.log.Debug("loading tracking plans from remote catalog - not yet implemented")
-	// Return empty slice since GetTrackingPlans is not available in catalog API
-	return []*catalog.TrackingPlan{}, nil
+	// Return empty map since GetTrackingPlans is not available in catalog API
+	return make(map[string]interface{}), nil
 }
 
 func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {

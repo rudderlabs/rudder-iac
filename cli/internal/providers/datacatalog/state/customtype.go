@@ -164,7 +164,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 }
 
 // FromRemoteCustomType converts from remote API CustomType to CustomTypeArgs
-func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType, resourceCollection *resources.ResourceCollection) {
+func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(string, string) string) {
 }
 
 // PropertyByID finds a property by its ID within the custom type
@@ -285,5 +285,5 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteCustomType converts from catalog.CustomType to CustomTypeState
-func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, resourceCollection *resources.ResourceCollection) {
+func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(string, string) string) {
 }
