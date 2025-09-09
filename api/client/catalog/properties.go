@@ -13,6 +13,7 @@ type PropertyCreate struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"propConfig,omitempty"`
+	ProjectId   string                 `json:"projectId"`
 }
 
 type Property struct {
@@ -21,6 +22,7 @@ type Property struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	WorkspaceId string                 `json:"workspaceId"`
+	ProjectId   string                 `json:"projectId"`
 	Config      map[string]interface{} `json:"propConfig"`
 	CreatedAt   time.Time              `json:"createdAt"`
 	UpdatedAt   time.Time              `json:"updatedAt"`
@@ -33,6 +35,7 @@ type PropertyStore interface {
 	UpdateProperty(ctx context.Context, id string, input *Property) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
 	GetProperty(ctx context.Context, id string) (*Property, error)
+	GetProperties(ctx context.Context) ([]*Property, error)
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {
@@ -93,4 +96,8 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 	}
 
 	return &property, nil
+}
+
+func (c *RudderDataCatalog) GetProperties(ctx context.Context) ([]*Property, error) {
+	return getAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
 }

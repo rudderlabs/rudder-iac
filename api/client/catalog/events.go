@@ -13,6 +13,7 @@ type EventCreate struct {
 	Description string  `json:"description"`
 	EventType   string  `json:"eventType"`
 	CategoryId  *string `json:"categoryId"`
+	ProjectId   string  `json:"projectId"`
 }
 
 type Event struct {
@@ -22,6 +23,7 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
+	ProjectId   string    `json:"projectId"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -31,6 +33,7 @@ type EventStore interface {
 	UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
+	GetEvents(ctx context.Context) ([]*Event, error)
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
@@ -92,4 +95,8 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 	}
 
 	return &event, nil
+}
+
+func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
+	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
 }

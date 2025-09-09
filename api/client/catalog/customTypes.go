@@ -15,6 +15,7 @@ type CustomTypeCreate struct {
 	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
 	Variants    Variants               `json:"variants,omitempty"`
+	ProjectId   string                 `json:"projectId"`
 }
 
 type CustomType struct {
@@ -25,6 +26,7 @@ type CustomType struct {
 	Type            string                 `json:"type"`
 	DataType        string                 `json:"dataType"`
 	WorkspaceId     string                 `json:"workspaceId"`
+	ProjectId       string                 `json:"projectId"`
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`
@@ -46,6 +48,7 @@ type CustomTypeStore interface {
 	UpdateCustomType(ctx context.Context, id string, input *CustomType) (*CustomType, error)
 	DeleteCustomType(ctx context.Context, id string) error
 	GetCustomType(ctx context.Context, id string) (*CustomType, error)
+	GetCustomTypes(ctx context.Context) ([]*CustomType, error)
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
@@ -106,4 +109,8 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 	}
 
 	return &customType, nil
+}
+
+func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context) ([]*CustomType, error) {
+	return getAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
 }
