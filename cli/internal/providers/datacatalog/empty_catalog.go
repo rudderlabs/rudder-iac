@@ -123,3 +123,19 @@ func (m *EmptyCatalog) DeleteCategory(ctx context.Context, categoryID string) er
 func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
 	return nil, nil
 }
+
+func (m *EmptyCatalog) GetEvents(ctx context.Context) ([]*catalog.Event, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetProperties(ctx context.Context) ([]*catalog.Property, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
+	return nil, nil
+}
