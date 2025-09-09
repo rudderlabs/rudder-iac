@@ -10,7 +10,6 @@ import (
 )
 
 type PropertyArgs struct {
-	ProjectId   string
 	Name        string
 	Description string
 	Type        any
@@ -18,7 +17,6 @@ type PropertyArgs struct {
 }
 
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
-	args.ProjectId = prop.LocalID
 	args.Name = prop.Name
 	args.Description = prop.Description
 	args.Type = prop.Type
@@ -72,7 +70,6 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, resourc
 
 func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
-		"projectId":   args.ProjectId,
 		"name":        args.Name,
 		"description": args.Description,
 		"type":        args.Type,
@@ -81,7 +78,6 @@ func (args *PropertyArgs) ToResourceData() resources.ResourceData {
 }
 
 func (args *PropertyArgs) FromResourceData(from resources.ResourceData) {
-	args.ProjectId = MustString(from, "projectId")
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.Type = MustString(from, "type")

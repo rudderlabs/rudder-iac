@@ -22,7 +22,6 @@ func TestEventState_ResourceData(t *testing.T) {
 		CreatedAt:   "2021-09-01T00:00:00Z",
 		UpdatedAt:   "2021-09-01T00:00:00Z",
 		EventArgs: state.EventArgs{
-			ProjectId:   "test-event-id",
 			Name:        "event-name",
 			Description: "event-description",
 			EventType:   "event-type",
@@ -44,7 +43,6 @@ func TestEventState_ResourceData(t *testing.T) {
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"eventArgs": map[string]interface{}{
-				"projectId":   "test-event-id",
 				"name":        "event-name",
 				"description": "event-description",
 				"eventType":   "event-type",
@@ -66,7 +64,6 @@ func TestEventState_ResourceData(t *testing.T) {
 func TestEventArgs_ResourceData(t *testing.T) {
 
 	args := state.EventArgs{
-		ProjectId:   "test-event-id",
 		Name:        "event-name",
 		Description: "event-description",
 		EventType:   "event-type",
@@ -78,7 +75,6 @@ func TestEventArgs_ResourceData(t *testing.T) {
 
 		resourceData := args.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
-			"projectId":   "test-event-id",
 			"name":        "event-name",
 			"description": "event-description",
 			"eventType":   "event-type",

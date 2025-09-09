@@ -68,7 +68,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 		})
 
 		toArgs := state.PropertyArgs{
-			ProjectId:   "test-project-id",
 			Name:        "property",
 			Description: "property description",
 			Type:        "property type",
@@ -87,7 +86,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"propertyArgs": map[string]interface{}{
-				"projectId":   "test-project-id",
 				"name":        "property",
 				"description": "property description",
 				"type":        "property type",
@@ -99,7 +97,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 	t.Run("Update", func(t *testing.T) {
 		prevState := state.PropertyState{
 			PropertyArgs: state.PropertyArgs{
-				ProjectId:   "test-project-id",
 				Name:        "property",
 				Description: "property description",
 				Type:        "property type",
@@ -116,7 +113,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 		}
 
 		toArgs := state.PropertyArgs{
-			ProjectId:   "test-project-id",
 			Name:        "property",
 			Description: "property new description",
 			Type:        "property type",
@@ -129,7 +125,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Description: "property new description",
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
-			ProjectId:   "test-project-id",
 			Config:      map[string]interface{}{"key": "value", "key2": "value2"},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,
@@ -155,7 +150,6 @@ func TestPropertyProviderOperations(t *testing.T) {
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"propertyArgs": map[string]interface{}{
-				"projectId":   "test-project-id",
 				"name":        "property",
 				"description": "property new description",
 				"type":        "property type",

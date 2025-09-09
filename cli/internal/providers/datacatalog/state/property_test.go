@@ -12,7 +12,6 @@ import (
 func TestPropertyArgs_ResourceData(t *testing.T) {
 
 	argsWithConfig := state.PropertyArgs{
-		ProjectId:   "test-property-id",
 		Name:        "property-name",
 		Description: "property-description",
 		Type:        "property-type",
@@ -22,7 +21,6 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 	}
 
 	argsWithoutConfig := state.PropertyArgs{
-		ProjectId:   "test-property-id",
 		Name:        "property-name",
 		Description: "property-description",
 		Type:        "property-type",
@@ -34,7 +32,6 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 
 		resourceData := argsWithConfig.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
-			"projectId":   "test-property-id",
 			"name":        "property-name",
 			"description": "property-description",
 			"type":        "property-type",
@@ -45,7 +42,6 @@ func TestPropertyArgs_ResourceData(t *testing.T) {
 
 		resourceData = argsWithoutConfig.ToResourceData()
 		assert.Equal(t, resources.ResourceData{
-			"projectId":   "test-property-id",
 			"name":        "property-name",
 			"description": "property-description",
 			"type":        "property-type",
@@ -192,7 +188,6 @@ func TestPropertyState_ResourceData(t *testing.T) {
 
 	propertyState := state.PropertyState{
 		PropertyArgs: state.PropertyArgs{
-			ProjectId:   "test-property-id",
 			Name:        "property-name",
 			Description: "property-description",
 			Type:        "property-type",
@@ -222,7 +217,6 @@ func TestPropertyState_ResourceData(t *testing.T) {
 			"createdAt":   "2021-09-01T00:00:00Z",
 			"updatedAt":   "2021-09-01T00:00:00Z",
 			"propertyArgs": map[string]interface{}{
-				"projectId":   "test-property-id",
 				"name":        "property-name",
 				"description": "property-description",
 				"type":        "property-type",

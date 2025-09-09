@@ -32,7 +32,7 @@ func (p *CategoryProvider) Create(ctx context.Context, ID string, data resources
 
 	category, err := p.client.CreateCategory(ctx, catalog.CategoryCreate{
 		Name:      toArgs.Name,
-		ProjectId: toArgs.ProjectId,
+		ProjectId: ID,
 	})
 
 	if err != nil {
@@ -63,7 +63,7 @@ func (p *CategoryProvider) Update(ctx context.Context, ID string, input resource
 
 	updated, err := p.client.UpdateCategory(ctx, oldState.ID, catalog.CategoryUpdate{
 		Name:      toArgs.Name,
-		ProjectId: toArgs.ProjectId,
+		ProjectId: ID,
 	})
 
 	if err != nil {

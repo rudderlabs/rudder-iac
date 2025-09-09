@@ -59,7 +59,6 @@ func TestEventProviderOperations(t *testing.T) {
 	)
 
 	toArgs := state.EventArgs{
-		ProjectId:   "test-project-id",
 		Name:        "event",
 		Description: "event description",
 		EventType:   "event type",
@@ -73,7 +72,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
-			ProjectId:   "test-project-id",
+			ProjectId:   "event-id-1",
 			CategoryId:  nil,
 			CreatedAt:   created,
 			UpdatedAt:   updated,
@@ -92,7 +91,6 @@ func TestEventProviderOperations(t *testing.T) {
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"eventArgs": map[string]interface{}{
-				"projectId":   "test-project-id",
 				"name":        "event",
 				"description": "event description",
 				"eventType":   "event type",
@@ -104,7 +102,6 @@ func TestEventProviderOperations(t *testing.T) {
 	t.Run("Update", func(t *testing.T) {
 
 		newArgs := state.EventArgs{
-			ProjectId:   "test-project-id",
 			Name:        "event",
 			Description: "event new description",
 			EventType:   "event type",
@@ -124,7 +121,6 @@ func TestEventProviderOperations(t *testing.T) {
 			CreatedAt:   "2021-09-01 00:00:00 +0000 UTC",
 			UpdatedAt:   "2021-09-01 00:00:00 +0000 UTC",
 			EventArgs: state.EventArgs{
-				ProjectId:   "test-project-id",
 				Name:        "event",
 				Description: "event description",
 				EventType:   "event type",
@@ -169,7 +165,6 @@ func TestEventProviderOperations(t *testing.T) {
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
 			"eventArgs": map[string]interface{}{
-				"projectId":   "test-project-id",
 				"name":        "event",
 				"description": "event new description",
 				"eventType":   "event type",
@@ -216,7 +211,6 @@ func TestEventProviderDuplicateError(t *testing.T) {
 		{
 			name: "duplicate track event with name",
 			args: state.EventArgs{
-				ProjectId:   "test-project-id",
 				Name:        "Signup Click",
 				Description: "desc",
 				EventType:   "track",
@@ -230,7 +224,6 @@ func TestEventProviderDuplicateError(t *testing.T) {
 		{
 			name: "duplicate identify event without name",
 			args: state.EventArgs{
-				ProjectId:   "test-project-id",
 				Name:        "",
 				Description: "identify desc",
 				EventType:   "identify",
@@ -244,7 +237,6 @@ func TestEventProviderDuplicateError(t *testing.T) {
 		{
 			name: "not an API error",
 			args: state.EventArgs{
-				ProjectId:   "test-project-id",
 				Name:        "Signup Click",
 				Description: "desc",
 				EventType:   "track",
@@ -255,7 +247,6 @@ func TestEventProviderDuplicateError(t *testing.T) {
 		{
 			name: "internal server error",
 			args: state.EventArgs{
-				ProjectId:   "test-project-id",
 				Name:        "Signup Click",
 				Description: "desc",
 				EventType:   "track",
