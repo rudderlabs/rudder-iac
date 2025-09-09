@@ -105,7 +105,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			Config:      toArgs.Config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
-			ProjectId:   toArgs.LocalID,
+			ProjectId:   ID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)

@@ -66,7 +66,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name":      "User Actions",
+				"name": "User Actions",
 			}
 
 			result, err := provider.Create(context.Background(), "test-id", inputData)
@@ -96,7 +96,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name":      "User Actions",
+				"name": "User Actions",
 			}
 
 			result, err := provider.Create(context.Background(), "test-id", inputData)
@@ -126,7 +126,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name":      "Updated User Actions",
+				"name": "Updated User Actions",
 			}
 
 			oldStateData := resources.ResourceData{
@@ -136,7 +136,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				"createdAt":   now.Add(-time.Hour).String(),
 				"updatedAt":   now.Add(-time.Minute).String(),
 				"categoryArgs": map[string]interface{}{
-					"name":      "User Actions",
+					"name": "User Actions",
 				},
 			}
 
@@ -167,7 +167,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			provider := datacatalog.NewCategoryProvider(mockCatalog)
 
 			inputData := resources.ResourceData{
-				"name":      "Updated User Actions",
+				"name": "Updated User Actions",
 			}
 
 			oldStateData := resources.ResourceData{
@@ -177,7 +177,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				"createdAt":   time.Now().Add(-time.Hour).String(),
 				"updatedAt":   time.Now().Add(-time.Minute).String(),
 				"categoryArgs": map[string]interface{}{
-					"name":      "User Actions",
+					"name": "User Actions",
 				},
 			}
 
