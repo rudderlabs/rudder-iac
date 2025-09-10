@@ -7,7 +7,7 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * {{ .Comment }}
      */
-    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Optional }}?{{ end }}{{- if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
+    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
             {{- if $i }},{{ end }}

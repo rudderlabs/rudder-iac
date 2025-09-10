@@ -13,7 +13,7 @@ type KotlinProperty struct {
 	SerialName string // The serialized property name. (e.g., "first_name")
 	Type       string // The property type (e.g., "String", "CustomTypeEmail")
 	Comment    string // Documentation comment for the property
-	Optional   bool   // Whether the property is optional (nullable)
+	Nullable   bool   // Whether the property is nullable
 }
 
 // KotlinDataClass represents a Kotlin data class declaration
@@ -27,7 +27,7 @@ type KotlinDataClass struct {
 type KotlinMethodArgument struct {
 	Name     string // e.g., "groupId", "properties"
 	Type     string // e.g., "String", "TrackProductClickedProperties"
-	Optional bool   // e.g., true for "userId: String?"
+	Nullable bool   // e.g., true for "userId: String?"
 	Default  string // The default value for the argument, e.g., ""
 }
 

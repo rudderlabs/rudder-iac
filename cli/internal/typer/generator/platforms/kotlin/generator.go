@@ -180,7 +180,7 @@ func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *c
 			SerialName: propName,
 			Type:       kotlinType,
 			Comment:    propSchema.Property.Description,
-			Optional:   !propSchema.Required,
+			Nullable:   !propSchema.Required,
 		}
 		properties = append(properties, property)
 	}

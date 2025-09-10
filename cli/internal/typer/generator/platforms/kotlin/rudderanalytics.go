@@ -60,7 +60,7 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 	}
 
 	method.MethodArguments = []KotlinMethodArgument{
-		{Name: paramName, Type: className, Optional: false},
+		{Name: paramName, Type: className, Nullable: false},
 	}
 	method.SDKCall = SDKCall{
 		MethodName: "track",
@@ -141,9 +141,9 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 	}
 
 	method.MethodArguments = []KotlinMethodArgument{
-		{Name: "screenName", Type: "String", Optional: false},
+		{Name: "screenName", Type: "String", Nullable: false},
 		{Name: "category", Type: "String", Default: "\"\""},
-		{Name: paramName, Type: className, Optional: false},
+		{Name: paramName, Type: className, Nullable: false},
 	}
 	method.SDKCall = SDKCall{
 		MethodName: "screen",
