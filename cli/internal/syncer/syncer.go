@@ -19,6 +19,8 @@ type SyncProvider interface {
 	LoadState(ctx context.Context) (*state.State, error)
 	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
 	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error

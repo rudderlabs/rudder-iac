@@ -33,10 +33,19 @@ type OperationLogEntry struct {
 
 type DataCatalogProvider struct {
 	InitialState *state.State
+	InitialResources *resources.ResourceCollection
 	OperationLog []OperationLogEntry
 }
 
 func (p *DataCatalogProvider) LoadState(_ context.Context) (*state.State, error) {
+	return p.InitialState, nil
+}
+
+func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.ResourceCollection, error) {
+	return p.InitialResources, nil
+}
+
+func (p *DataCatalogProvider) LoadStateFromResources(_ context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	return p.InitialState, nil
 }
 

@@ -164,3 +164,20 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 
 	return nil
 }
+
+// LoadResourcesFromRemote loads all custom types from the remote catalog
+func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
+	p.log.Debug("loading custom types from remote catalog")
+	customTypes, err := p.client.GetCustomTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key = customType's remoteId
+	resourceMap := make(map[string]interface{})
+	for _, customType := range customTypes {
+		resourceMap[customType.ID] = customType
+	}
+
+	return resourceMap, nil
+}

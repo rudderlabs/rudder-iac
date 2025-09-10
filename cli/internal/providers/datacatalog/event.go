@@ -130,3 +130,20 @@ func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.R
 
 	return nil
 }
+
+// LoadResourcesFromRemote loads all events from the remote catalog
+func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
+	p.log.Debug("loading events from remote catalog")
+	events, err := p.catalog.GetEvents(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key is the event's remoteId
+	resourceMap := make(map[string]interface{})
+	for _, event := range events {
+		resourceMap[event.ID] = event
+	}
+
+	return resourceMap, nil
+}

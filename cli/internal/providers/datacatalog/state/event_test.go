@@ -2,7 +2,9 @@ package state_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
@@ -88,4 +90,73 @@ func TestEventArgs_ResourceData(t *testing.T) {
 		assert.Equal(t, args, loopback)
 	})
 
+}
+
+func TestEventArgs_FromRemoteEvent(t *testing.T) {
+	t.Parallel()
+
+	categoryID := "category-123"
+	now := time.Now()
+
+	// Create a mock getURNFromRemoteId function for the test
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		if resourceType == "category" && remoteId == categoryID {
+			return "category:category-123-local"
+		}
+		return ""
+	}
+
+	remoteEvent := &catalog.Event{
+		ID:          "event-123",
+		Name:        "Test Event",
+		Description: "Test Description",
+		EventType:   "track",
+		CategoryId:  &categoryID,
+		ProjectId:   "category-123-local",
+		WorkspaceId: "workspace-789",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	args := &state.EventArgs{}
+	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
+
+	assert.Equal(t, "Test Event", args.Name)
+	assert.Equal(t, "Test Description", args.Description)
+	assert.Equal(t, "track", args.EventType)
+
+	assert.NotNil(t, args.CategoryId)
+	assert.Equal(t, "category:category-123-local", args.CategoryId.URN)
+	assert.Equal(t, "id", args.CategoryId.Property)
+}
+
+func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	remoteEvent := &catalog.Event{
+		ID:          "event-123",
+		Name:        "Test Event",
+		Description: "Test Description",
+		EventType:   "track",
+		CategoryId:  nil,
+		ProjectId:   "project-456",
+		WorkspaceId: "workspace-789",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Create a mock getURNFromRemoteId function for the test
+	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+		return "" // No resources found for this test
+	}
+
+	args := &state.EventArgs{}
+	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
+
+	assert.Equal(t, "Test Event", args.Name)
+	assert.Equal(t, "Test Description", args.Description)
+	assert.Equal(t, "track", args.EventType)
+	assert.Nil(t, args.CategoryId)
 }
