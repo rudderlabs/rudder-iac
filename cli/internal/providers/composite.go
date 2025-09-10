@@ -85,8 +85,8 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error) {
-	var astate *state.State = state.EmptyState()
-	var rstate *state.State = state.EmptyState()
+	var apistate *state.State = state.EmptyState()
+	var resourcestate *state.State = state.EmptyState()
 
 	for _, provider := range p.Providers {
 		resources, err := provider.LoadResourcesFromRemote(ctx)
@@ -97,10 +97,10 @@ func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error)
 		if err != nil {
 			return nil, err
 		}
-		if rstate == nil {
-			rstate = rs
+		if resourcestate == nil {
+			resourcestate = rs
 		} else {
-			rstate, err = rstate.Merge(rs)
+			resourcestate, err = resourcestate.Merge(rs)
 			if err != nil {
 				return nil, fmt.Errorf("error merging provider states: %s", err)
 			}
@@ -111,19 +111,19 @@ func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error)
 			return nil, err
 		}
 
-		if astate == nil {
-			astate = s
+		if apistate == nil {
+			apistate = s
 		} else {
-			astate, err = astate.Merge(s)
+			apistate, err = apistate.Merge(s)
 			if err != nil {
 				return nil, fmt.Errorf("error merging provider states: %s", err)
 			}
 		}
 	}
 
-	// TODO: compare rstate and astate for events and categories
+	// TODO: compare resourceState and apiState for events and categories
 
-	return astate, nil
+	return apistate, nil
 }
 
 func (p *CompositeProvider) PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error {
