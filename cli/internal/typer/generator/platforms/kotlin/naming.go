@@ -14,7 +14,7 @@ var (
 	DataclassScope = "dataclass"
 )
 
-// FormatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
+// formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
 	trimmedName := strings.TrimSpace(name)
@@ -62,6 +62,36 @@ func formatPropertyName(name string) string {
 	// Handle reserved keywords
 	if KotlinReservedKeywords[originalLower] {
 		formatted = "_" + formatted
+	}
+
+	return formatted
+}
+
+// FormatMethodName converts a name to camelCase suitable for Kotlin method names
+// If prefix is provided, it's prepended to the formatted name with proper casing
+func FormatMethodName(prefix, name string) string {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return ""
+	}
+
+	originalLower := strings.ToLower(trimmedName)
+	formatted := core.ToCamelCase(trimmedName)
+
+	// If it starts with a number, prefix with underscore
+	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
+		formatted = "_" + formatted
+	}
+
+	// Handle reserved keywords
+	if KotlinReservedKeywords[originalLower] {
+		formatted = "_" + formatted
+	}
+
+	// Add prefix if provided
+	if prefix != "" {
+		// Convert prefix to camelCase and append the PascalCase name
+		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(name)
 	}
 
 	return formatted
