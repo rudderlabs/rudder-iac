@@ -9,7 +9,7 @@ data class {{ .Name }}(
 {{- if $prop.Comment }}
     /** {{ $prop.Comment }} */
 {{- end }}
-    @SerialName("{{ $prop.OriginalName }}")
+    @SerialName("{{ $prop.SerialName }}")
     val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Optional }}?{{ end }}
 {{- end }}
 )

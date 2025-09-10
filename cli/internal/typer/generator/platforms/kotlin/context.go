@@ -9,11 +9,11 @@ type KotlinTypeAlias struct {
 
 // KotlinProperty represents a property in a Kotlin data class
 type KotlinProperty struct {
-	Name         string // The property name in camelCase (e.g., "firstName")
-	OriginalName string // The original property name from the plan (e.g., "first_name"), used for serialization
-	Type         string // The property type (e.g., "String", "CustomTypeEmail")
-	Comment      string // Documentation comment for the property
-	Optional     bool   // Whether the property is optional (nullable)
+	Name       string // The property name in camelCase (e.g., "firstName")
+	SerialName string // The serialized property name. (e.g., "first_name")
+	Type       string // The property type (e.g., "String", "CustomTypeEmail")
+	Comment    string // Documentation comment for the property
+	Optional   bool   // Whether the property is optional (nullable)
 }
 
 // KotlinDataClass represents a Kotlin data class declaration

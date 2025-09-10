@@ -176,11 +176,11 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 		}
 
 		property := KotlinProperty{
-			Name:         formatPropertyName(propName),
-			OriginalName: propName,
-			Type:         kotlinType,
-			Comment:      propSchema.Property.Description,
-			Optional:     !propSchema.Required,
+			Name:       formatPropertyName(propName),
+			SerialName: propName,
+			Type:       kotlinType,
+			Comment:    propSchema.Property.Description,
+			Optional:   !propSchema.Required,
 		}
 		properties = append(properties, property)
 	}
