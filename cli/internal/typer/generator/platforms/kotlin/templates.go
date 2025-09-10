@@ -14,6 +14,9 @@ var kotlinTemplate string
 //go:embed templates/typealias.tmpl
 var typealiasTemplate string
 
+//go:embed templates/dataclass.tmpl
+var dataclassTemplate string
+
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
 	if err != nil {
@@ -22,6 +25,11 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 
 	// Parse and add sub-templates
 	_, err = tmpl.New("typealias.tmpl").Parse(typealiasTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("dataclass.tmpl").Parse(dataclassTemplate)
 	if err != nil {
 		return nil, err
 	}

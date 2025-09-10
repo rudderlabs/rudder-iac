@@ -1,0 +1,16 @@
+{{- range .DataClasses }}
+{{- if .Comment }}
+/** {{ .Comment }} */
+{{- end }}
+@Serializable
+data class {{ .Name }}(
+{{- range $index, $prop := .Properties }}{{- if $index }},
+{{ end }}
+{{- if $prop.Comment }}
+    /** {{ $prop.Comment }} */
+{{- end }}
+    @SerialName("{{ $prop.SerialName }}")
+    val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Optional }}?{{ end }}
+{{- end }}
+)
+{{ end }}

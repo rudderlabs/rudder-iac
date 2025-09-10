@@ -4,17 +4,18 @@ import (
 	_ "embed"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
 //go:embed testdata/Main.kt
-var mainContents string
+var mainContent string
 
 func TestGenerate(t *testing.T) {
 	// Create a tracking plan with primitive custom types
-	trackingPlan := createTestTrackingPlan()
+	trackingPlan := testutils.GetReferenceTrackingPlan()
 
 	files, err := kotlin.Generate(trackingPlan)
 
@@ -22,81 +23,9 @@ func TestGenerate(t *testing.T) {
 	assert.Len(t, files, 1)
 	assert.NotNil(t, files[0])
 	assert.Equal(t, "Main.kt", files[0].Path)
-	assert.Contains(t, files[0].Content, mainContents)
-}
 
-// createTestTrackingPlan creates a tracking plan with various primitive custom types for testing
-func createTestTrackingPlan() *plan.TrackingPlan {
-	// Create primitive custom types
-	emailType := plan.CustomType{
-		Name:        "email",
-		Description: "Custom type for email validation",
-		Type:        plan.PrimitiveTypeString,
-	}
-
-	ageType := plan.CustomType{
-		Name:        "age",
-		Description: "User's age in years",
-		Type:        plan.PrimitiveTypeNumber,
-	}
-
-	activeType := plan.CustomType{
-		Name:        "active",
-		Description: "Whether user is active",
-		Type:        plan.PrimitiveTypeBoolean,
-	}
-
-	// Create properties that reference custom types
-	emailProperty := plan.Property{
-		Name:        "email",
-		Description: "User's email address",
-		Type:        emailType,
-	}
-
-	ageProperty := plan.Property{
-		Name:        "age",
-		Description: "User's age",
-		Type:        ageType,
-	}
-
-	activeProperty := plan.Property{
-		Name:        "active",
-		Description: "User active status",
-		Type:        activeType,
-	}
-
-	// Create an event that uses these custom types
-	userSignedUpEvent := plan.Event{
-		EventType:   plan.EventTypeTrack,
-		Name:        "User Signed Up",
-		Description: "Triggered when a user signs up",
-	}
-
-	// Create event rule with properties using custom types
-	eventRule := plan.EventRule{
-		Event:   userSignedUpEvent,
-		Section: plan.EventRuleSectionProperties,
-		Schema: plan.ObjectSchema{
-			Properties: map[string]plan.PropertySchema{
-				"email": {
-					Property: emailProperty,
-					Required: true,
-				},
-				"age": {
-					Property: ageProperty,
-					Required: false,
-				},
-				"active": {
-					Property: activeProperty,
-					Required: true,
-				},
-			},
-			AdditionalProperties: false,
-		},
-	}
-
-	return &plan.TrackingPlan{
-		Name:  "Test Plan",
-		Rules: []plan.EventRule{eventRule},
+	// Use go-cmp to provide a nice diff if the content doesn't match
+	if diff := cmp.Diff(mainContent, files[0].Content); diff != "" {
+		t.Errorf("Generated content does not match expected (-expected +actual):\n%s", diff)
 	}
 }

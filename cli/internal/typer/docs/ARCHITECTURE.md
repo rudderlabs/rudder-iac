@@ -13,7 +13,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### Core Generator
 
 - **Purpose**: Defines interfaces and common types for platform-specific code generation
-- **Current Implementation**: Located in `generator/core/`
+- **Current Implementation**: Located in `cli/internal/typer/generator/core/`
 - **Key Types**:
 
   ```go
@@ -35,7 +35,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### NameRegistry
 
 - **Purpose**: Manages name collision resolution across all generated code constructs
-- **Current Implementation**: Located in `generator/core/name_registry.go`
+- **Current Implementation**: Located in `cli/internal/typer/generator/core/name_registry.go`
 - **Key Features**:
   - Registers names under scope/id pairs with bidirectional mapping
   - Applies configurable collision handlers
@@ -51,15 +51,17 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### Platform Generators
 
 - **Purpose**: Platform-specific code generation implementations
-- **Current Implementation**: Kotlin generator in `generator/platforms/kotlin/`
+- **Current Implementation**: Kotlin generator in `cli/internal/typer/generator/platforms/kotlin/`
 - **Architecture**:
   - Direct function-based approach rather than full strategy pattern
   - Template-based code generation using Go embed
   - Context-driven template rendering
+  - **Extraction Pattern**: Generators use TrackingPlan helper methods for data extraction instead of implementing custom traversal logic
 - **Kotlin Generator**:
   ```go
   func Generate(plan *plan.TrackingPlan) ([]*core.File, error)
   ```
+- **Data Flow**: Plan extraction → Context transformation → Template rendering
 
 ### Template System
 
@@ -102,7 +104,16 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 - Input source independence (API, YAML, JSON, etc.)
 - Domain-driven design alignment
 
-**Current Implementation**: Located in `plan/plan.go`
+**Current Implementation**: Located in `cli/internal/typer/plan/plan.go`
+
+**Helper Methods**:
+
+The TrackingPlan model provides convenience methods for extracting nested entities:
+
+- `ExtractAllCustomTypes()` - Recursively extracts all custom types from event rules and their schemas
+- `ExtractAllProperties()` - Recursively extracts all properties from event rules and nested schemas
+
+These helper methods provide convenient access to nested data without violating domain model principles. They extract existing entities rather than deriving new information, maintaining the separation between domain representation and processing logic.
 
 ### TemplateContext Model
 
@@ -120,13 +131,14 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 - ❌ Shared literals requiring template processing
 - ❌ Business logic for code generation
 
-**Template Design**:
+**Template Design Principles**:
 
-- Specific contexts for different constructs (KotlinDataClass, KotlinTypeAlias)
-- Pre-processed values (no escaping or formatting in templates)
-- Minimal conditional logic
+- **Platform-specific contexts**: Each platform defines context types for all supported code constructs (e.g., Kotlin supports both type aliases for primitive types and data classes for object types)
+- **Pre-processed values**: All values are escaped, formatted, and ready for template rendering with no additional processing required
+- **Minimal conditional logic**: Templates focus on formatting rather than business logic
+- **Construct-specific modeling**: Different context types for different code constructs ensure templates remain simple and focused
 
-**Current Implementation**: Located in `generator/platforms/kotlin/context.go`
+**Current Implementation**: Located in `cli/internal/typer/generator/platforms/kotlin/context.go`
 
 ## Design Principles
 
@@ -157,16 +169,36 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 - No coupling to specific APIs or file formats
 - Consistent generation logic across input types
 
+## Testing Strategy
+
+### Reference Tracking Plan
+
+The testing approach leverages a comprehensive reference tracking plan that provides consistent test data across all components:
+
+- **Location**: `cli/internal/typer/plan/testutils/reference_plan.go`
+- **Purpose**: Provides known test data with predictable structure for reliable testing
+- **Coverage**: Includes primitive custom types (email, age, active), object custom types (user_profile), and nested properties
+- **Constants**: Defines expected counts for validation (`ExpectedCustomTypeCount`, `ExpectedPropertyCount`, `ExpectedEventCount`)
+
+### Benefits
+
+- **Consistency**: All tests use the same reference data, ensuring consistent behavior across components
+- **Reliability**: Known structure enables precise validation of extraction and generation logic
+- **Maintainability**: Centralized test data reduces duplication and simplifies updates
+- **Documentation**: Reference plan serves as living documentation of supported features
+
 ## Implementation Guidelines
 
 ### Adding New Platforms
 
-1. Create a new package under `generator/platforms/{platform}/`
+1. Create a new package under `cli/internal/typer/generator/platforms/{platform}/`
 2. Define platform-specific context types (like `KotlinContext`)
 3. Implement a `Generate` function following the current pattern
-4. Create embedded Go templates using `//go:embed`
-5. Implement platform-specific collision handlers and naming functions
-6. Add template processing functions
+4. **Use plan helper methods** (`ExtractAllCustomTypes`, `ExtractAllProperties`) for data extraction instead of implementing custom traversal logic
+5. Create embedded Go templates using `//go:embed`
+6. Implement platform-specific collision handlers and naming functions
+7. Add template processing functions
+8. **Leverage the reference tracking plan** for comprehensive testing of your generator
 
 ### Extending TrackingPlan Model
 
