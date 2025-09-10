@@ -87,7 +87,7 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 	}
 
 	method.MethodArguments = []KotlinMethodArgument{
-		{Name: "userId", Type: "String", Optional: true},
+		{Name: "userId", Type: "String", Default: "\"\""},
 		{Name: paramName, Type: className},
 	}
 	method.SDKCall = SDKCall{
@@ -142,7 +142,7 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 
 	method.MethodArguments = []KotlinMethodArgument{
 		{Name: "screenName", Type: "String", Optional: false},
-		{Name: "category", Type: "String", Optional: true},
+		{Name: "category", Type: "String", Default: "\"\""},
 		{Name: paramName, Type: className, Optional: false},
 	}
 	method.SDKCall = SDKCall{

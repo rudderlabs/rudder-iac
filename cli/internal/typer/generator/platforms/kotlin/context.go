@@ -28,6 +28,7 @@ type KotlinMethodArgument struct {
 	Name     string // e.g., "groupId", "properties"
 	Type     string // e.g., "String", "TrackProductClickedProperties"
 	Optional bool   // e.g., true for "userId: String?"
+	Default  string // The default value for the argument, e.g., ""
 }
 
 // SDKCallArgument represents an argument passed to an internal RudderStack SDK method

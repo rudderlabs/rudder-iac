@@ -121,7 +121,7 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * User identification event
      */
-    fun identify(userId: String?, traits: IdentifyTraits) {
+    fun identify(userId: String = "", traits: IdentifyTraits) {
         analytics.identify(
             userId = userId,
             traits = json.encodeToJsonElement(traits).jsonObject
@@ -131,7 +131,7 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Screen view event
      */
-    fun screen(screenName: String, category: String?, properties: ScreenProperties) {
+    fun screen(screenName: String, category: String = "", properties: ScreenProperties) {
         analytics.screen(
             screenName = screenName,
             category = category,
