@@ -14,6 +14,7 @@ type KotlinProperty struct {
 	Type       string // The property type (e.g., "String", "CustomTypeEmail")
 	Comment    string // Documentation comment for the property
 	Nullable   bool   // Whether the property is nullable
+	Default    string // The default value for the property, e.g., "null"
 }
 
 // KotlinDataClass represents a Kotlin data class declaration

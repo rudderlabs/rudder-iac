@@ -182,6 +182,11 @@ func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *c
 			Comment:    propSchema.Property.Description,
 			Nullable:   !propSchema.Required,
 		}
+
+		if !propSchema.Required {
+			property.Default = "null"
+		}
+
 		properties = append(properties, property)
 	}
 

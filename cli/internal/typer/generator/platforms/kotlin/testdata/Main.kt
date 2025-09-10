@@ -47,7 +47,7 @@ data class CustomTypeUserProfile(
 
     /** User's last name */
     @SerialName("last_name")
-    val lastName: PropertyLastName?
+    val lastName: PropertyLastName? = null
 )
 
 /** Group association event */
@@ -63,7 +63,7 @@ data class GroupTraits(
 data class IdentifyTraits(
     /** User active status */
     @SerialName("active")
-    val active: PropertyActive?,
+    val active: PropertyActive? = null,
 
     /** User's email address */
     @SerialName("email")
@@ -83,7 +83,7 @@ data class PageProperties(
 data class ScreenProperties(
     /** User profile data */
     @SerialName("profile")
-    val profile: PropertyProfile?
+    val profile: PropertyProfile? = null
 )
 
 /** Triggered when a user signs up */
@@ -95,7 +95,7 @@ data class TrackUserSignedUpProperties(
 
     /** User's age */
     @SerialName("age")
-    val age: PropertyAge?,
+    val age: PropertyAge? = null,
 
     /** User profile data */
     @SerialName("profile")
