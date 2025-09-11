@@ -86,10 +86,9 @@ type PreviewResultError struct {
 
 // PreviewSubmitRequest represents the request to submit a RETL source preview
 type PreviewSubmitRequest struct {
-	AccountID        string `json:"accountId"`
-	Limit            int    `json:"limit,omitempty"`
-	SQL              string `json:"sql"`
-	SourceDefinition string `json:"sourceDefinition"`
+	AccountID string `json:"accountId"`
+	Limit     int    `json:"limit,omitempty"`
+	SQL       string `json:"sql"`
 }
 
 // PreviewSubmitResponse represents the response from submitting a RETL source preview

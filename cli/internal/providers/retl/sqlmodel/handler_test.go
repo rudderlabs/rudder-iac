@@ -429,18 +429,6 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "account ID not found")
 		})
-
-		t.Run("Missing SourceDefinition", func(t *testing.T) {
-			t.Parallel()
-			data := resources.ResourceData{
-				sqlmodel.SQLKey:       "SELECT 1",
-				sqlmodel.AccountIDKey: "acc123",
-			}
-			h := sqlmodel.NewHandler(&mockRETLClient{})
-			_, err := h.Preview(context.Background(), "id", data, 5)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "source definition not found")
-		})
 	})
 
 	t.Run("LoadSpec with duplicate id", func(t *testing.T) {

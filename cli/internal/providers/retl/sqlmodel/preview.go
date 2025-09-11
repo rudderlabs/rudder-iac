@@ -34,17 +34,11 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		return nil, fmt.Errorf("account ID not found in resource data")
 	}
 
-	sourceDefinition, ok := data[SourceDefinitionKey].(string)
-	if !ok {
-		return nil, fmt.Errorf("source definition not found in resource data")
-	}
-
 	// Create preview request
 	previewReq := &retlClient.PreviewSubmitRequest{
-		SQL:              sql,
-		AccountID:        accountID,
-		Limit:            limit,
-		SourceDefinition: sourceDefinition,
+		SQL:       sql,
+		AccountID: accountID,
+		Limit:     limit,
 	}
 
 	submitResp, err := h.client.SubmitSourcePreview(ctx, previewReq)
