@@ -743,20 +743,6 @@ func TestProviderPreview(t *testing.T) {
 		assert.Contains(t, err.Error(), "account ID not found")
 	})
 
-	t.Run("MissingSourceDefinition", func(t *testing.T) {
-		t.Parallel()
-		mockClient := newDefaultMockClient()
-		provider := retl.New(mockClient)
-		ctx := context.Background()
-		data := resources.ResourceData{
-			sqlmodel.SQLKey:       "SELECT 1",
-			sqlmodel.AccountIDKey: "acc123",
-		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "source definition not found")
-	})
-
 	t.Run("SubmitError", func(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()

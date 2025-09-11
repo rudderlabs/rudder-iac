@@ -17,15 +17,14 @@ func TestSubmitSourcePreview(t *testing.T) {
 		t.Parallel()
 
 		request := &retl.PreviewSubmitRequest{
-			AccountID:        "acc123",
-			Limit:            100,
-			SQL:              "SELECT * FROM users LIMIT 100",
-			SourceDefinition: "postgres",
+			AccountID: "acc123",
+			Limit:     100,
+			SQL:       "SELECT * FROM users LIMIT 100",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","limit":100,"sourceDefinition":"postgres","sql":"SELECT * FROM users LIMIT 100"}`
+				expected := `{"accountId":"acc123","limit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview", expected)
 			},
 			ResponseStatus: 200,
@@ -51,15 +50,14 @@ func TestSubmitSourcePreview(t *testing.T) {
 		t.Parallel()
 
 		request := &retl.PreviewSubmitRequest{
-			AccountID:        "acc123",
-			Limit:            100,
-			SQL:              "SELECT * FROM users LIMIT 100",
-			SourceDefinition: "postgres",
+			AccountID: "acc123",
+			Limit:     100,
+			SQL:       "SELECT * FROM users LIMIT 100",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","limit":100,"sourceDefinition":"postgres","sql":"SELECT * FROM users LIMIT 100"}`
+				expected := `{"accountId":"acc123","limit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview", expected)
 			},
 			ResponseError: assert.AnError,
@@ -82,15 +80,14 @@ func TestSubmitSourcePreview(t *testing.T) {
 		t.Parallel()
 
 		request := &retl.PreviewSubmitRequest{
-			AccountID:        "acc123",
-			Limit:            100,
-			SQL:              "SELECT * FROM users LIMIT 100",
-			SourceDefinition: "postgres",
+			AccountID: "acc123",
+			Limit:     100,
+			SQL:       "SELECT * FROM users LIMIT 100",
 		}
 
 		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 			Validate: func(req *http.Request) bool {
-				expected := `{"accountId":"acc123","limit":100,"sourceDefinition":"postgres","sql":"SELECT * FROM users LIMIT 100"}`
+				expected := `{"accountId":"acc123","limit":100,"sql":"SELECT * FROM users LIMIT 100"}`
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources/preview", expected)
 			},
 			ResponseStatus: 200,
