@@ -57,4 +57,11 @@ type resourceHandler interface {
 	// to align the remote resource with the local configuration.
 	// Returns the processed resource data or an error if import fails.
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
+
+	// Preview returns the preview results for a resource.
+	// Returns:
+	// - []string: column names
+	// - map[string]any: contains result data with keys: "errorMessage", "rows", "rowCount", and "columns" (array of column info)
+	// - error: any error that occurred
+	Preview(ctx context.Context, ID string, data resources.ResourceData, limit int) ([]map[string]any, error)
 }
