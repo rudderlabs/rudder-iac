@@ -39,7 +39,7 @@ func newJob(tasks []Task, concurrency int, continueOnFail bool) *job {
 	return job
 }
 
-func (job *job) Run(ctx context.Context, command func(task Task) error) []error {
+func (job *job) run(ctx context.Context, command func(task Task) error) []error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

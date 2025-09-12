@@ -154,7 +154,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 	}
 	job := newJob(tasks, concurrency, continueOnFail)
 	st := newSharedState(state)
-	return job.Run(ctx, func(task Task) error {
+	return job.run(ctx, func(task Task) error {
 		opTask, ok := task.(*operationTask)
 		if !ok {
 			return fmt.Errorf("invalid task type: %T", task)
