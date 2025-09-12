@@ -40,6 +40,8 @@ type SyncOptions struct {
 	DryRun bool
 	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
 	Confirm bool
+	// Concurrency is the number of concurrent operations to run
+	Concurrency int
 }
 
 func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph, options SyncOptions) error {
@@ -87,7 +89,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 		}
 	}
 
-	return s.executePlan(ctx, state, plan, continueOnFail)
+	return s.executePlan(ctx, state, plan, target, continueOnFail, options)
 }
 
 func stateToGraph(state *state.State) *resources.Graph {
@@ -116,51 +118,72 @@ func (e *OperationError) Unwrap() error {
 	return e.Err
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var (
-		errors       []error
-		currentState = state
-	)
+type operationTask struct {
+	operation   *planner.Operation
+	sourceGraph *resources.Graph
+	targetGraph *resources.Graph
+}
 
+func newOperationTask(operation *planner.Operation, sourceGraph *resources.Graph, targetGraph *resources.Graph) *operationTask {
+	return &operationTask{operation: operation, sourceGraph: sourceGraph, targetGraph: targetGraph}
+}
+
+func (t *operationTask) Id() string {
+	return t.operation.Resource.URN()
+}
+
+func (t *operationTask) Dependencies() []string {
+	// For delete operations, we need to invert the dependency order
+	// If A depends on B, then for deletion: B should be deleted before A
+	if t.operation.Type == planner.Delete {
+		// For delete operations, we need to find which resources currently depend on the resource being deleted.
+		// This information exists in the source graph. Target graph may not even contain the dependents
+		return t.sourceGraph.GetDependents(t.operation.Resource.URN())
+	}
+	return t.targetGraph.GetDependencies(t.operation.Resource.URN())
+}
+
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
+	tasks := make([]Task, 0, len(plan.Operations))
 	for _, o := range plan.Operations {
+		tasks = append(tasks, newOperationTask(o, stateToGraph(state), target))
+	}
+	concurrency := options.Concurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	job := newJob(tasks, concurrency, continueOnFail)
+	st := newSharedState(state)
+	return job.Run(ctx, func(task Task) error {
+		opTask, ok := task.(*operationTask)
+		if !ok {
+			return fmt.Errorf("invalid task type: %T", task)
+		}
+		o := opTask.operation
 		operationString := o.String()
 		spinner := ui.NewSpinner(operationString)
 		spinner.Start()
-
-		outputState, providerErr := s.providerOperation(ctx, o, currentState)
+		providerErr := s.providerOperation(ctx, o, st)
 		spinner.Stop()
 		if providerErr != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
-			errors = append(errors, &OperationError{Operation: o, Err: providerErr})
-			if !continueOnFail {
-				return errors
-			}
+			return &OperationError{Operation: o, Err: providerErr}
 		}
-
-		if outputState == nil {
-			outputState = currentState
-		}
-
-		if providerErr == nil {
-			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
-		}
-
-		currentState = outputState
-	}
-
-	return errors
+		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+		return nil
+	})
 }
 
-func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *sharedState) error {
 	input := r.Data()
-	dereferenced, err := state.Dereference(input, st)
+	dereferenced, err := st.Dereference(input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	output, err := s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := &state.ResourceState{
@@ -172,24 +195,24 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
 
 	st.AddResource(sr)
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *sharedState) error {
 	input := r.Data()
-	dereferenced, err := state.Dereference(input, st)
+	dereferenced, err := st.Dereference(input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := &state.ResourceState{
@@ -201,29 +224,29 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
 
 	st.AddResource(sr)
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *sharedState) error {
 	input := r.Data()
-	dereferenced, err := state.Dereference(input, st)
+	dereferenced, err := st.Dereference(input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := st.GetResource(r.URN())
 	if sr == nil {
-		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
 	output, err := s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr = &state.ResourceState{
@@ -235,35 +258,35 @@ func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
 
 	st.AddResource(sr)
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resource, st *sharedState) error {
 	sr := st.GetResource(r.URN())
 	if sr == nil {
-		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
 	if err := s.provider.DeleteResourceState(ctx, sr); err != nil {
-		return nil, fmt.Errorf("failed to delete resource state: %w", err)
+		return fmt.Errorf("failed to delete resource state: %w", err)
 	}
 
 	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	st.RemoveResource(r.URN())
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *sharedState) error {
 	r := o.Resource
 
 	switch o.Type {
@@ -276,6 +299,6 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 	case planner.Import:
 		return s.importOperation(ctx, r, st)
 	default:
-		return nil, fmt.Errorf("unknown operation type with code: %d", o.Type)
+		return fmt.Errorf("unknown operation type with code: %d", o.Type)
 	}
 }
