@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0](https://github.com/rudderlabs/rudder-iac/compare/v0.9.0...v0.10.0) (2025-09-12)
+
+
+### Features
+
+* add sample file manager ([#162](https://github.com/rudderlabs/rudder-iac/issues/162)) ([6b7ce6c](https://github.com/rudderlabs/rudder-iac/commit/6b7ce6c06e678c4529e091aa363b3167ab8cbd2f))
+* rudder-typer 2.0, basic infrastructure type aliases ([#132](https://github.com/rudderlabs/rudder-iac/issues/132)) ([ecd5814](https://github.com/rudderlabs/rudder-iac/commit/ecd5814996034bd54eb710458f5b253653221076))
+* rudder-typer 2.0, object custom types and properties ([#133](https://github.com/rudderlabs/rudder-iac/issues/133)) ([8ee24b9](https://github.com/rudderlabs/rudder-iac/commit/8ee24b9adde0f47cae0b25abccdd7b8eca4aaf54))
+* rudder-typer 2.0, phase3, adds support for event property payloads ([#134](https://github.com/rudderlabs/rudder-iac/issues/134)) ([c496c0b](https://github.com/rudderlabs/rudder-iac/commit/c496c0b97d1cbe4b9721a4cb2ab9424cd9b5bb30))
+* rudder-typer 2.0, RudderAnalytics object with event methods ([#135](https://github.com/rudderlabs/rudder-iac/issues/135)) ([9d6fdb0](https://github.com/rudderlabs/rudder-iac/commit/9d6fdb062d78becb85b3415a038e004ff220b7da))
+
 ## [0.9.0](https://github.com/rudderlabs/rudder-iac/compare/v0.8.0...v0.9.0) (2025-08-25)
 
 
