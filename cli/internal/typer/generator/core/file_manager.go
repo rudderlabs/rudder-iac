@@ -11,18 +11,12 @@ import (
 type FileManager struct {
 	// BaseDir is the base directory for all file operations
 	BaseDir string
-	// FileMode is the permission mode for created files (default: 0644)
-	FileMode os.FileMode
-	// DirMode is the permission mode for created directories (default: 0755)
-	DirMode os.FileMode
 }
 
-// NewFileManager creates a new FileManager with default settings
+// NewFileManager creates a new FileManager
 func NewFileManager(baseDir string) *FileManager {
 	return &FileManager{
-		BaseDir:  baseDir,
-		FileMode: 0644,
-		DirMode:  0755,
+		BaseDir: baseDir,
 	}
 }
 
@@ -33,7 +27,11 @@ func (fm *FileManager) WriteFile(file File) error {
 		return err
 	}
 
-	fullPath := filepath.Join(fm.BaseDir, file.Path)
+	baseDir := fm.BaseDir
+	if baseDir == "" {
+		baseDir = "." // Use current working directory as default
+	}
+	fullPath := filepath.Join(baseDir, file.Path)
 
 	// Create parent directories if they don't exist
 	if err := fm.ensureParentDir(fullPath); err != nil {
@@ -73,9 +71,6 @@ func (fm *FileManager) WriteFiles(files []File) error {
 
 // validateFile validates file input parameters
 func (fm *FileManager) validateFile(file File) error {
-	if fm.BaseDir == "" {
-		return fmt.Errorf("base directory cannot be empty")
-	}
 	if file.Path == "" {
 		return fmt.Errorf("file path cannot be empty")
 	}
@@ -91,7 +86,7 @@ func (fm *FileManager) validateFile(file File) error {
 // ensureParentDir creates parent directories if they don't exist
 func (fm *FileManager) ensureParentDir(fullPath string) error {
 	parentDir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(parentDir, fm.DirMode); err != nil {
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
 		return fmt.Errorf("creating directory %s: %w", parentDir, err)
 	}
 	return nil
@@ -99,11 +94,10 @@ func (fm *FileManager) ensureParentDir(fullPath string) error {
 
 // writeFileAtomically writes file content atomically using a temporary file
 func (fm *FileManager) writeFileAtomically(path, content string) error {
-	dir := filepath.Dir(path)
 	name := filepath.Base(path)
 
-	// Create temporary file in the same directory
-	tmpFile, err := os.CreateTemp(dir, name+".tmp.*")
+	// Create temporary file in system temp directory to avoid leaving temp files in output dir
+	tmpFile, err := os.CreateTemp("", name+".tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating temporary file: %w", err)
 	}
@@ -134,17 +128,10 @@ func (fm *FileManager) writeFileAtomically(path, content string) error {
 		return fmt.Errorf("renaming temporary file to target: %w", err)
 	}
 
-	// Set proper file permissions
-	if err := os.Chmod(path, fm.FileMode); err != nil {
+	// Set proper file permissions (0644 - owner read/write, group/others read)
+	if err := os.Chmod(path, 0644); err != nil {
 		return fmt.Errorf("setting file permissions: %w", err)
 	}
 
 	return nil
-}
-
-// WriteFile is a convenience function that uses the default FileManager behavior
-// Deprecated: Use FileManager.WriteFile for better control and testability
-func WriteFile(outputDir string, file File) error {
-	fm := NewFileManager(outputDir)
-	return fm.WriteFile(file)
 }
