@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
-	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-source"
+	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"

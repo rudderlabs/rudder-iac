@@ -13,7 +13,7 @@ const (
 	// DefaultTimeout is the default timeout for preview operations
 	DefaultTimeout = 60 * time.Second
 	// DefaultPollInterval is the default interval for polling preview results
-	DefaultPollInterval = 5 * time.Second
+	DefaultPollInterval = 1 * time.Second
 )
 
 // Preview submits a preview request for an SQL model and polls for results
