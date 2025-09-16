@@ -20,7 +20,7 @@ func NewWorkspaceImport() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace",
 		Short: "Import workspace resources",
-		Long:  "Import workspace resources from various providers into configuration files",
+		Long:  "Import upstream workspace resources using available providers into configuration files",
 		Example: heredoc.Doc(`
 			$ rudder-cli import workspace --location </path/to/project_dir>
 		`),
