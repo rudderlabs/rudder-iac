@@ -36,6 +36,7 @@ func TestKebabCase_Name(t *testing.T) {
 
 func TestExternalIdNamer_Name(t *testing.T) {
 	t.Parallel()
+	n := NewExternalIdNamer(NewKebabCase())
 
 	tests := []struct {
 		name     string
@@ -44,13 +45,12 @@ func TestExternalIdNamer_Name(t *testing.T) {
 	}{
 		{"unique names", []string{"HelloWorld", "Another Event"}, []string{"helloworld", "another-event"}},
 		{"collisions", []string{"Hello World", "Hello World", "Hello World"}, []string{"hello-world", "hello-world-1", "hello-world-2"}},
+		{"extra collisions", []string{"Test", "Test", "Test", "Test"}, []string{"test", "test-1", "test-2", "test-3"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			n := NewExternalIdNamer(NewKebabCase())
 			for i, input := range tt.inputs {
 				result, err := n.Name(input)
 				assert.NoError(t, err)
@@ -62,7 +62,7 @@ func TestExternalIdNamer_Name(t *testing.T) {
 
 func TestExternalIdNamer_Load(t *testing.T) {
 	t.Parallel()
-	strategy := NewKebabCase()
+	n := NewExternalIdNamer(NewKebabCase())
 
 	tests := []struct {
 		name    string
@@ -70,15 +70,14 @@ func TestExternalIdNamer_Load(t *testing.T) {
 		wantErr bool
 		errMsg  string
 	}{
-		{"no duplicates", []string{"one", "two"}, false, ""},
+		{"no duplicates", []string{"three", "four"}, false, ""},
 		{"with duplicates", []string{"one", "one"}, true, "loading name: one errored with: duplicate name exception"},
+		{"extra duplicates", []string{"test", "test", "test"}, true, "loading name: test errored with: duplicate name exception"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			n := NewExternalIdNamer(strategy)
 			err := n.Load(tt.names)
 			if tt.wantErr {
 				assert.Error(t, err)

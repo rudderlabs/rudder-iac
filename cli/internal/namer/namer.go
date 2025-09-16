@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core" // Import for NameRegistry
 )
@@ -31,6 +33,7 @@ type ExternalIdNamer struct {
 	*core.NameRegistry
 	strategy NamingStrategy
 	scope    string
+	mu       sync.Mutex
 }
 
 // NewNamer creates a new Namer instance using the provided strategy.
@@ -45,6 +48,9 @@ func NewExternalIdNamer(strategy NamingStrategy) Namer {
 
 // Name generates a unique name using the strategy and handles collisions.
 func (p *ExternalIdNamer) Name(input string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	baseName := p.strategy.Name(input)
 
 	registered, err := p.RegisterName(uuid.New().String(), p.scope, baseName)
@@ -57,6 +63,9 @@ func (p *ExternalIdNamer) Name(input string) (string, error) {
 
 // Load adds existing names to the registry, returning error on duplicates.
 func (p *ExternalIdNamer) Load(names []string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	for _, name := range names {
 		registered, err := p.RegisterName(uuid.New().String(), p.scope, name)
 		if err != nil {
