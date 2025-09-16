@@ -16,7 +16,7 @@ func newCmdValidate() *cobra.Command {
 	var location string
 
 	cmd := &cobra.Command{
-		Use:   "validate <local-id>",
+		Use:   "validate <project-id>",
 		Short: "Validate a RETL source SQL model",
 		Long:  "Validate a RETL source SQL model by executing the query without returning data",
 		Example: heredoc.Doc(`
@@ -27,15 +27,10 @@ func newCmdValidate() *cobra.Command {
 			if len(args) == 0 {
 				return fmt.Errorf("retl-source project id is required")
 			}
-			localID := args[0]
-			location, _ := cmd.Flags().GetString("location")
-
+			projectID := args[0]
 			var err error
 			defer func() {
-				telemetry.TrackCommand("retl-sources validate", err, []telemetry.KV{
-					{K: "local_id", V: localID},
-					{K: "location", V: location},
-				}...)
+				telemetry.TrackCommand("retl-sources validate", err)
 			}()
 
 			d, err := app.NewDeps()
@@ -52,9 +47,9 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + localID)
+			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + projectID)
 			if !ok {
-				return fmt.Errorf("resource with local ID '%s' not found in project", localID)
+				return fmt.Errorf("resource with project id '%s' not found in project", projectID)
 			}
 			resourceData := resource.Data()
 
@@ -65,7 +60,7 @@ func newCmdValidate() *cobra.Command {
 			}
 
 			// Validate by attempting to preview with limit=0
-			_, err = retlProvider.Preview(cmd.Context(), localID, sqlmodel.ResourceType, resourceData, 0)
+			_, err = retlProvider.Preview(cmd.Context(), projectID, sqlmodel.ResourceType, resourceData, 0)
 			if err != nil {
 				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
 				return err
