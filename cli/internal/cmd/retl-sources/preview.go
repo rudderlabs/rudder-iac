@@ -20,7 +20,7 @@ func newCmdPreview() *cobra.Command {
 	var interactive bool
 
 	cmd := &cobra.Command{
-		Use:   "preview <project-id>",
+		Use:   "preview <external-id>",
 		Short: "Preview a RETL source SQL model",
 		Long:  "Preview a RETL source SQL model to see the data structure and sample rows",
 		Example: heredoc.Doc(`
@@ -31,9 +31,9 @@ func newCmdPreview() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return fmt.Errorf("retl-source project id is required")
+				return fmt.Errorf("retl-source external id is required")
 			}
-			projectID := args[0]
+			externalID := args[0]
 
 			var err error
 			defer func() {
@@ -58,9 +58,9 @@ func newCmdPreview() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + projectID)
+			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
 			if !ok {
-				return fmt.Errorf("resource with project id '%s' not found in project", projectID)
+				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
 			}
 			resourceData := resource.Data()
 			resourceType := resource.Type()
@@ -76,7 +76,7 @@ func newCmdPreview() *cobra.Command {
 			opts = append(opts, previewer.WithInteractive(interactive))
 			previewer := previewer.New(retlProvider, opts...)
 
-			return previewer.Preview(cmd.Context(), projectID, resourceType, resourceData)
+			return previewer.Preview(cmd.Context(), externalID, resourceType, resourceData)
 		},
 	}
 

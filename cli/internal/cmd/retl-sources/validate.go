@@ -16,7 +16,7 @@ func newCmdValidate() *cobra.Command {
 	var location string
 
 	cmd := &cobra.Command{
-		Use:   "validate <project-id>",
+		Use:   "validate <external-id>",
 		Short: "Validate a RETL source SQL model",
 		Long:  "Validate a RETL source SQL model by executing the query without returning data",
 		Example: heredoc.Doc(`
@@ -25,9 +25,9 @@ func newCmdValidate() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return fmt.Errorf("retl-source project id is required")
+				return fmt.Errorf("retl-source external id is required")
 			}
-			projectID := args[0]
+			externalID := args[0]
 			var err error
 			defer func() {
 				telemetry.TrackCommand("retl-sources validate", err)
@@ -47,9 +47,9 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + projectID)
+			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
 			if !ok {
-				return fmt.Errorf("resource with project id '%s' not found in project", projectID)
+				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
 			}
 			resourceData := resource.Data()
 
@@ -60,7 +60,7 @@ func newCmdValidate() *cobra.Command {
 			}
 
 			// Validate by attempting to preview with limit=0
-			_, err = retlProvider.Preview(cmd.Context(), projectID, sqlmodel.ResourceType, resourceData, 0)
+			_, err = retlProvider.Preview(cmd.Context(), externalID, sqlmodel.ResourceType, resourceData, 0)
 			if err != nil {
 				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
 				return err
