@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -207,4 +208,10 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 	}
 
 	return handler.FetchImportData(ctx, args)
+}
+
+// WorkspaceImport is a dummy implementation to satisfy the interface.
+// TODO: Implement actual logic in future ticket.
+func (p *Provider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
+	return []importremote.FormattableEntity{}, nil
 }
