@@ -156,6 +156,41 @@ type PropertyIdentifierDetail struct {
 	Properties           []PropertyIdentifierDetail `json:"properties,omitempty"`
 }
 
+// Response types for list operations
+type TrackingPlanListResponse struct {
+	TrackingPlans []TrackingPlan `json:"trackingPlans"`
+}
+
+type EventListResponse struct {
+	Data        []Event `json:"data"`
+	Total       int     `json:"total"`
+	CurrentPage int     `json:"currentPage"`
+	PageSize    int     `json:"pageSize"`
+}
+
+type PropertyListResponse struct {
+	Data        []Property `json:"data"`
+	Total       int        `json:"total"`
+	CurrentPage int        `json:"currentPage"`
+	PageSize    int        `json:"pageSize"`
+}
+
+type CustomTypeListResponse struct {
+	Data        []CustomType `json:"data"`
+	Total       int          `json:"total"`
+	CurrentPage int          `json:"currentPage"`
+	PageSize    int          `json:"pageSize"`
+}
+
+type CategoryListResponse struct {
+	Data        []Category `json:"data"`
+	Total       int        `json:"total"`
+	CurrentPage int        `json:"currentPage"`
+	PageSize    int        `json:"pageSize"`
+}
+
+// Note: Entity types (Event, Property, CustomType, Category) are defined in their respective files
+
 type TrackingPlanStore interface {
 	CreateTrackingPlan(ctx context.Context, input TrackingPlanCreate) (*TrackingPlan, error)
 	UpsertTrackingPlan(ctx context.Context, id string, input TrackingPlanUpsertEvent) (*TrackingPlan, error)
@@ -166,6 +201,13 @@ type TrackingPlanStore interface {
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
 	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
+	// New list methods
+	ListTrackingPlans(ctx context.Context) ([]TrackingPlan, error)
+	ListTrackingPlansWithFilter(ctx context.Context, ids []string) ([]TrackingPlan, error)
+	ListEvents(ctx context.Context, trackingPlanIds []string, page int) (*EventListResponse, error)
+	ListProperties(ctx context.Context, trackingPlanIds []string, page int) (*PropertyListResponse, error)
+	ListCustomTypes(ctx context.Context, page int) (*CustomTypeListResponse, error)
+	ListCategories(ctx context.Context, page int) (*CategoryListResponse, error)
 }
 
 // TODO: Make this create idempotent so that we can call it multiple times without error
@@ -332,4 +374,130 @@ func (c *RudderDataCatalog) UpdateTrackingPlanEvent(ctx context.Context, id stri
 	}
 
 	return &trackingPlan, nil
+}
+
+// New list methods implementation
+
+func (c *RudderDataCatalog) ListTrackingPlans(ctx context.Context) ([]TrackingPlan, error) {
+	resp, err := c.client.Do(ctx, "GET", "v2/catalog/tracking-plans", nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list tracking plans: %w", err)
+	}
+
+	var response TrackingPlanListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding tracking plans response: %w", err)
+	}
+
+	return response.TrackingPlans, nil
+}
+
+func (c *RudderDataCatalog) ListTrackingPlansWithFilter(ctx context.Context, ids []string) ([]TrackingPlan, error) {
+	url := "v2/catalog/tracking-plans"
+	if len(ids) > 0 {
+		idsParam := ""
+		for i, id := range ids {
+			if i > 0 {
+				idsParam += ","
+			}
+			idsParam += id
+		}
+		url += "?ids=" + idsParam
+	}
+
+	resp, err := c.client.Do(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list tracking plans with filter: %w", err)
+	}
+
+	var response TrackingPlanListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding tracking plans response: %w", err)
+	}
+
+	return response.TrackingPlans, nil
+}
+
+func (c *RudderDataCatalog) ListEvents(ctx context.Context, trackingPlanIds []string, page int) (*EventListResponse, error) {
+	url := fmt.Sprintf("v2/catalog/events?page=%d", page)
+	if len(trackingPlanIds) > 0 {
+		idsParam := ""
+		for i, id := range trackingPlanIds {
+			if i > 0 {
+				idsParam += ","
+			}
+			idsParam += id
+		}
+		url += "&trackingPlanIds=" + idsParam
+	}
+
+	resp, err := c.client.Do(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list events: %w", err)
+	}
+
+	var response EventListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding events response: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *RudderDataCatalog) ListProperties(ctx context.Context, trackingPlanIds []string, page int) (*PropertyListResponse, error) {
+	url := fmt.Sprintf("v2/catalog/properties?page=%d", page)
+	if len(trackingPlanIds) > 0 {
+		idsParam := ""
+		for i, id := range trackingPlanIds {
+			if i > 0 {
+				idsParam += ","
+			}
+			idsParam += id
+		}
+		url += "&trackingPlanIds=" + idsParam
+	}
+
+	resp, err := c.client.Do(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list properties: %w", err)
+	}
+
+	var response PropertyListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding properties response: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *RudderDataCatalog) ListCustomTypes(ctx context.Context, page int) (*CustomTypeListResponse, error) {
+	url := fmt.Sprintf("v2/catalog/custom-types?page=%d", page)
+
+	resp, err := c.client.Do(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list custom types: %w", err)
+	}
+
+	var response CustomTypeListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding custom types response: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *RudderDataCatalog) ListCategories(ctx context.Context, page int) (*CategoryListResponse, error) {
+	url := fmt.Sprintf("v2/catalog/categories?page=%d", page)
+
+	resp, err := c.client.Do(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to list categories: %w", err)
+	}
+
+	var response CategoryListResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decoding categories response: %w", err)
+	}
+
+	return &response, nil
 }

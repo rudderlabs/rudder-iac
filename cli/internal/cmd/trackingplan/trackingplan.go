@@ -5,7 +5,10 @@ import (
 	"github.com/spf13/cobra"
 
 	tpApplyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/apply"
+	tpConvertCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/convert"
 	tpDestroyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/destroy"
+	tpDownloadCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/download"
+	tpListCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/list"
 	tpValidateCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/validate"
 )
 
@@ -16,11 +19,17 @@ func NewCmdTrackingPlan() *cobra.Command {
 		Short: "Manage datacatalog resources",
 		Long:  "Manage the lifecycle of datacatalog resources using user defined state",
 		Example: heredoc.Doc(`
+			$ rudder-cli tp list
+			$ rudder-cli tp download
+			$ rudder-cli tp convert
 			$ rudder-cli tp validate
 			$ rudder-cli tp apply
 		`),
 	}
 
+	cmd.AddCommand(tpListCmd.NewCmdTPList())
+	cmd.AddCommand(tpDownloadCmd.NewCmdTPDownload())
+	cmd.AddCommand(tpConvertCmd.NewCmdTPConvert())
 	cmd.AddCommand(tpValidateCmd.NewCmdTPValidate())
 	cmd.AddCommand(tpApplyCmd.NewCmdTPApply())
 	cmd.AddCommand(tpDestroyCmd.NewCmdTPDestroy())

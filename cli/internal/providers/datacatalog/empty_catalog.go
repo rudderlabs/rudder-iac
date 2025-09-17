@@ -123,3 +123,27 @@ func (m *EmptyCatalog) DeleteCategory(ctx context.Context, categoryID string) er
 func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
 	return nil, nil
 }
+
+func (m *EmptyCatalog) ListTrackingPlans(ctx context.Context) ([]catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ListTrackingPlansWithFilter(ctx context.Context, ids []string) ([]catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ListEvents(ctx context.Context, trackingPlanIds []string, page int) (*catalog.EventListResponse, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ListProperties(ctx context.Context, trackingPlanIds []string, page int) (*catalog.PropertyListResponse, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ListCustomTypes(ctx context.Context, page int) (*catalog.CustomTypeListResponse, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) ListCategories(ctx context.Context, page int) (*catalog.CategoryListResponse, error) {
+	return nil, nil
+}
