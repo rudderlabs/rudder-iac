@@ -8,6 +8,9 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
+	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
@@ -49,6 +52,11 @@ func recovery() {
 	}
 }
 
+var (
+	debugCmd        *cobra.Command
+	experimentalCmd *cobra.Command
+)
+
 func init() {
 	cobra.OnInitialize(initConfig)
 	cobra.OnInitialize(initLogger)
@@ -64,8 +72,7 @@ func init() {
 	)
 
 	// Add subcommands to the root command
-	rootCmd.AddCommand(authCmd)
-	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(auth.NewCmdAuth())
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
@@ -74,19 +81,31 @@ func init() {
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
+
+	debugCmd = d.NewCmdDebug()
+	experimentalCmd = experimental.NewCmdExperimental()
+
+	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(experimentalCmd)
 }
 
 func initConfig() {
 	config.InitConfig(cfgFile)
 
 	// only add debug command if enabled in config
-	if viper.GetBool("debug") {
+	if config.GetConfig().Debug {
 		debugCmd.Hidden = false
+	}
+
+	// reading this property from viper directly as it is not exposed in Config,
+	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
+	if viper.GetBool("experimental") {
+		experimentalCmd.Hidden = false
 	}
 }
 
 func initLogger() {
-	if viper.GetBool("debug") {
+	if config.GetConfig().Debug {
 		logger.SetLogLevel(slog.LevelDebug)
 	}
 }
