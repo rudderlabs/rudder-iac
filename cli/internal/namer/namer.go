@@ -53,6 +53,8 @@ func (p *ExternalIdNamer) Name(input string) (string, error) {
 
 	baseName := p.strategy.Name(input)
 
+	// The reason we are generating id uniquely everytime we register name is
+	// as we just need to make sure that the name is unique within the scope.
 	registered, err := p.RegisterName(uuid.New().String(), p.scope, baseName)
 	if err != nil {
 		return "", fmt.Errorf("registering name: %s errored with: %w", baseName, err)

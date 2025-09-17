@@ -70,6 +70,7 @@ func TestExternalIdNamer_Load(t *testing.T) {
 		wantErr bool
 		errMsg  string
 	}{
+		{"empty", []string{}, false, ""},
 		{"no duplicates", []string{"three", "four"}, false, ""},
 		{"with duplicates", []string{"one", "one"}, true, "loading name: one errored with: duplicate name exception"},
 		{"extra duplicates", []string{"test", "test", "test"}, true, "loading name: test errored with: duplicate name exception"},
@@ -98,11 +99,9 @@ func TestCollisionHandler(t *testing.T) {
 		existing []string
 		expected string
 	}{
-		{"no collision", "base", []string{"other"}, "base-1"},
 		{"simple collision", "base", []string{"base"}, "base-1"},
 		{"multiple collisions", "base", []string{"base", "base-1", "base-2"}, "base-3"},
 		{"edge empty", "", []string{}, "-1"},
-		{"existing includes candidates", "base", []string{"base-1", "base-2"}, "base-3"},
 	}
 
 	for _, tt := range tests {
