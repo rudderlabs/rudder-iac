@@ -1,11 +1,14 @@
 package datacatalog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -274,4 +277,10 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 		}
 	}
 	return nil
+}
+
+// WorkspaceImport is a dummy implementation to satisfy the interface.
+// TODO: Implement actual logic in future ticket.
+func (p *Provider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
+	return []importremote.FormattableEntity{}, nil
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -152,6 +154,19 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
 	}
 	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
+}
+
+// WorkspaceImport collects imports from all providers (dummy delegation for now).
+func (p *CompositeProvider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
+	var allEntities []importremote.FormattableEntity
+	for _, provider := range p.Providers {
+		entities, err := provider.(importremote.WorkspaceImporter).WorkspaceImport(ctx, idNamer) // Type assert and call
+		if err != nil {
+			return nil, err
+		}
+		allEntities = append(allEntities, entities...)
+	}
+	return allEntities, nil
 }
 
 // Helper methods
