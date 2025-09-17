@@ -3,6 +3,8 @@ package testutils
 import (
 	"context"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -163,6 +165,11 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
 	return m.ImportVal, m.ImportErr
+}
+
+// WorkspaceImport mock implementation.
+func (m *MockProvider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
+	return nil, nil
 }
 
 // ResetCallCounters resets all call counters and argument trackers.
