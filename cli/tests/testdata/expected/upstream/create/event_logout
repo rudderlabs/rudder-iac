@@ -1,7 +1,7 @@
 {
-    "id": "ev_30B3DyAMUbeE04TELNn4X4z6IUu",
-    "name": "Login Event",
-    "description": "This event is triggered when a user logs in.",
+    "id": "ev_30B3DyAMUbeE04TELNn4X4z7JpT",
+    "name": "Logout Event",
+    "description": "This event is triggered when a user logs out.",
     "eventType": "track",
     "categoryId": null,
     "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",

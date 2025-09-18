@@ -60,4 +60,10 @@ spec:
                   properties:
                     - $ref: "#/properties/api_tracking/captcha_type"
                       required: true
+    
+    - type: "event_rule"
+      id: "logout_event"
+      event:
+        $ref: "#/events/api_tracking/logout"
+        allow_unplanned: false
                     
