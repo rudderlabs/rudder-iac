@@ -129,13 +129,13 @@ func TestFileManager_WriteFiles(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		files         []File
+		files         []*File
 		expectError   bool
 		errorContains []string
 		verifyNoFiles bool // whether to verify no files were created on error
 	}{
 		"writes multiple files successfully": {
-			files: []File{
+			files: []*File{
 				{Path: "file1.txt", Content: "Content 1"},
 				{Path: "dir/file2.txt", Content: "Content 2"},
 				{Path: "dir/subdir/file3.txt", Content: "Content 3"},
@@ -143,11 +143,11 @@ func TestFileManager_WriteFiles(t *testing.T) {
 			expectError: false,
 		},
 		"handles empty file list": {
-			files:       []File{},
+			files:       []*File{},
 			expectError: false,
 		},
 		"fails fast on invalid file": {
-			files: []File{
+			files: []*File{
 				{Path: "valid.txt", Content: "Valid content"},
 				{Path: "", Content: "Invalid - empty path"},
 				{Path: "another.txt", Content: "Another valid"},
