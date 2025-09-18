@@ -79,7 +79,7 @@ func TestCategoryArgs_FromRemoteCategory(t *testing.T) {
 		ID:          "category-123",
 		Name:        "Test Category",
 		WorkspaceID: "workspace-456",
-		ProjectId:   "category-123-local",
+		ExternalId:  "category-123-local",
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

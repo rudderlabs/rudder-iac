@@ -9,20 +9,20 @@ import (
 )
 
 type CategoryCreate struct {
-	Name      string `json:"name"`
-	ProjectId string `json:"projectId"`
+	Name       string `json:"name"`
+	ExternalId string `json:"externalId"`
 }
 
 type CategoryUpdate struct {
-	Name      string `json:"name"`
-	ProjectId string `json:"projectId"`
+	Name       string `json:"name"`
+	ExternalId string `json:"externalId"`
 }
 
 type Category struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	WorkspaceID string    `json:"workspaceId"`
-	ProjectId   string    `json:"projectId"`
+	ExternalId  string    `json:"externalId"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

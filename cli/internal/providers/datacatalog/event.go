@@ -43,7 +43,7 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
 		CategoryId:  categoryId,
-		ProjectId:   ID,
+		ExternalId:  ID,
 	})
 
 	if err != nil {
@@ -97,7 +97,7 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		EventType:   toArgs.EventType,
 		WorkspaceId: prevState.WorkspaceID,
 		CategoryId:  categoryId,
-		ProjectId:   ID,
+		ExternalId:  ID,
 	})
 
 	if err != nil {
@@ -134,9 +134,9 @@ func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.R
 
 // LoadResourcesFromRemote loads all events from the remote catalog
 func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	p.log.Debug("loading events from remote catalog")	
+	p.log.Debug("loading events from remote catalog")
 	collection := resources.NewResourceCollection()
-	
+
 	// fetch events from remote
 	events, err := p.catalog.GetEvents(ctx)
 	if err != nil {
@@ -147,16 +147,15 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, event := range events {
 		resourceMap[event.ID] = &resources.RemoteResource{
-			ID: event.ID,
-			ExternalID: event.ProjectId,
-			Data: event,
+			ID:         event.ID,
+			ExternalID: event.ExternalId,
+			Data:       event,
 		}
 	}
 	collection.Set(EventResourceType, resourceMap)
 
 	return collection, nil
 }
-
 
 func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
 	s := syncerstate.EmptyState()
@@ -174,13 +173,13 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 
 		resourceState := &syncerstate.ResourceState{
 			Type:         EventResourceType,
-			ID:           event.ProjectId,
+			ID:           event.ExternalId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(event.ProjectId, EventResourceType)
+		urn := resources.URN(event.ExternalId, EventResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil
