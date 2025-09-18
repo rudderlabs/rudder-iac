@@ -150,16 +150,13 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
-	if enabled, ok := data[EnabledKey].(bool); ok && !enabled {
-		return nil, fmt.Errorf("cannot create disabled sql model")
-	}
-
 	source := &retlClient.RETLSourceCreateRequest{
 		Name:                 data[DisplayNameKey].(string),
 		Config:               toRETLSQLModelConfig(data),
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
+		IsEnabled:            data[EnabledKey].(bool),
 	}
 
 	// Call API to create RETL source
