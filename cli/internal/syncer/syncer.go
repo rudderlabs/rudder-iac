@@ -159,16 +159,46 @@ func (e *OperationError) Unwrap() error {
 }
 
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
+	// TODO: Replace with experimental flag
+	if options.Concurrency <= 0 {
+		return s.executePlanSequentially(ctx, state, plan, continueOnFail)
+	}
+	return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail, options)
+}
+
+func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
+	var errors       []error
+
+	for _, o := range plan.Operations {
+		operationString := o.String()
+		spinner := ui.NewSpinner(operationString)
+		spinner.Start()
+
+		providerErr := s.providerOperation(ctx, o, state)
+		spinner.Stop()
+		if providerErr != nil {
+			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
+			errors = append(errors, &OperationError{Operation: o, Err: providerErr})
+			if !continueOnFail {
+				return errors
+			}
+		}
+
+		if providerErr == nil {
+			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+		}
+	}
+
+	return errors
+}
+
+func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
 	tasks := make([]Task, 0, len(plan.Operations))
 	sourceGraph := stateToGraph(state)
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
 	}
-	concurrency := options.Concurrency
-	if concurrency <= 0 {
-		concurrency = 1
-	}
-	return RunTasks(ctx, tasks, concurrency, continueOnFail, func(task Task) error {
+	return RunTasks(ctx, tasks, options.Concurrency, continueOnFail, func(task Task) error {
 		opTask, ok := task.(*operationTask)
 		if !ok {
 			return fmt.Errorf("invalid task type: %T", task)
