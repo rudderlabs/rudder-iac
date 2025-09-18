@@ -1,25 +1,25 @@
 {
-    "id": "login",
+    "id": "logout",
     "type": "event",
     "input": {
         "categoryId": null,
-        "description": "This event is triggered when a user logs in.",
+        "description": "This event is triggered when a user logs out.",
         "eventType": "track",
-        "name": "Login Event"
+        "name": "Logout Event"
     },
     "output": {
         "categoryId": null,
         "createdAt": "2025-07-21 07:59:36.517 +0000 UTC",
-        "description": "This event is triggered when a user logs in.",
+        "description": "This event is triggered when a user logs out.",
         "eventArgs": {
             "categoryId": null,
-            "description": "This event is triggered when a user logs in.",
+            "description": "This event is triggered when a user logs out.",
             "eventType": "track",
-            "name": "Login Event"
+            "name": "Logout Event"
         },
         "eventType": "track",
         "id": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
-        "name": "Login Event",
+        "name": "Logout Event",
         "updatedAt": "2025-07-21 07:59:36.517 +0000 UTC",
         "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
     },
