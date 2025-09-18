@@ -20,7 +20,7 @@ type ExperimentalConfig struct {
 }
 
 // GetExperimentalFlags returns information about all available experimental flags
-func GetAvailableExperimentalFlags() []string {
+func getAvailableExperimentalFlags() []string {
 	cfg := GetConfig()
 	experimental := cfg.ExperimentalFlags
 	expType := reflect.TypeOf(experimental)
@@ -41,7 +41,7 @@ func GetAvailableExperimentalFlags() []string {
 
 // IsValidExperimentalFlag checks if a flag name is valid
 func IsValidExperimentalFlag(flagName string) bool {
-	flags := GetAvailableExperimentalFlags()
+	flags := getAvailableExperimentalFlags()
 	for _, flag := range flags {
 		if flag == flagName {
 			return true
@@ -63,23 +63,15 @@ func GetEnvironmentVariableName(flagName string) string {
 
 // BindExperimentalFlags automatically binds environment variables for all experimental flags
 func BindExperimentalFlags() {
-	expType := reflect.TypeOf(ExperimentalConfig{})
+	flags := getAvailableExperimentalFlags()
 
-	for i := 0; i < expType.NumField(); i++ {
-		field := expType.Field(i)
-
-		// Get the mapstructure tag as the flag name
-		flagName := field.Tag.Get("mapstructure")
-		if flagName == "" {
-			continue
-		}
-
+	for _, flag := range flags {
 		// Set default value to false (all experimental flags are disabled by default)
-		viperKey := fmt.Sprintf("experimental.%s", flagName)
+		viperKey := fmt.Sprintf("flags.%s", flag)
 		viper.SetDefault(viperKey, false)
 
 		// Generate environment variable name
-		envVarName := GetEnvironmentVariableName(flagName)
+		envVarName := GetEnvironmentVariableName(flag)
 
 		// Bind environment variable
 		viper.BindEnv(viperKey, envVarName)
