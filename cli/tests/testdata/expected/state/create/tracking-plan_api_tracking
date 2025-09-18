@@ -175,6 +175,17 @@
                     }
                 ],
                 "variants": []
+            },
+            {
+                "allowUnplanned": false,
+                "identitySection": "",
+                "localId": "logout",
+                "id": {
+                    "$__rudderRef": "event:logout",
+                    "property": "id"
+                },
+                "properties": [],
+                "variants": []
             }
         ],
         "localId": "api_tracking",
@@ -194,6 +205,11 @@
                 "eventId": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
                 "id": "tpe_30AygUBAlPdHGNZ84ufoK9X5eCr",
                 "localId": "login"
+            },
+            {
+                "eventId": "ev_30AyfkI5RPrtJDZw5aypsZzEftS",
+                "id": "tpe_30AygUBAlPdHGNZ84ufoK9X5eCs",
+                "localId": "logout"
             }
         ],
         "id": "tp_30AygDmnmMYbmyP4mMfl9ZNi4MG",
@@ -318,6 +334,14 @@
                             ]
                         }
                     ],
+                    "variants": []
+                },
+                {
+                    "allowUnplanned": false,
+                    "identitySection": "",
+                    "localId": "logout",
+                    "id": "ev_30AyfkI5RPrtJDZw5aypsZzEftS",
+                    "properties": [],
                     "variants": []
                 }
             ],
