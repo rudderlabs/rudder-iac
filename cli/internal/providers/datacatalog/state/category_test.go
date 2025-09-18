@@ -85,8 +85,8 @@ func TestCategoryArgs_FromRemoteCategory(t *testing.T) {
 	}
 
 	// Create a mock getURNFromRemoteId function for the test
-	getURNFromRemoteId := func(resourceType string, remoteId string) string {
-		return "" // Categories don't currently use other resources in FromRemote
+	getURNFromRemoteId := func(resourceType string, remoteId string) (string, error) {
+		return "", resources.ErrRemoteResourceNotFound
 	}
 
 	args := &state.CategoryArgs{}

@@ -65,7 +65,8 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 }
 
 // FromRemoteProperty converts from remote API Property to PropertyArgs
-func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(string, string) string) {
+func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (args *PropertyArgs) ToResourceData() resources.ResourceData {
@@ -126,5 +127,6 @@ func (p *PropertyState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteProperty converts from catalog.Property to PropertyState
-func (p *PropertyState) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(string, string) string) {
+func (p *PropertyState) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type PropertyProvider struct {
@@ -110,18 +111,30 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all properties from the remote catalog
-func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
+func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading properties from remote catalog")
+	collection := resources.NewResourceCollection()
+	
+	// fetch properties from remote
 	properties, err := p.client.GetProperties(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert slice to map[string]interface{} where key is the property's remoteId
-	resourceMap := make(map[string]interface{})
+	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
-		resourceMap[property.ID] = property
+		resourceMap[property.ID] = &resources.RemoteResource{
+			ID: property.ID,
+			ExternalID: property.ProjectId,
+			Data: property,
+		}
 	}
+	collection.Set(PropertyResourceType, resourceMap)
 
-	return resourceMap, nil
+	return collection, nil
+}
+
+func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	return nil, fmt.Errorf("not implemented")
 }

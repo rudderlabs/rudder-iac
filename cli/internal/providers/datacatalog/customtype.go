@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type CustomTypeProvider struct {
@@ -166,18 +167,31 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 }
 
 // LoadResourcesFromRemote loads all custom types from the remote catalog
-func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
+func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading custom types from remote catalog")
+	collection := resources.NewResourceCollection()
+	
+	// fetch custom types from remote
 	customTypes, err := p.client.GetCustomTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert slice to map[string]interface{} where key = customType's remoteId
-	resourceMap := make(map[string]interface{})
+	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, customType := range customTypes {
-		resourceMap[customType.ID] = customType
+		resourceMap[customType.ID] = &resources.RemoteResource{
+			ID: customType.ID,
+			ExternalID: customType.ProjectId,
+			Data: customType,
+		}
 	}
+	collection.Set(CustomTypeResourceType, resourceMap)
 
-	return resourceMap, nil
+	return collection, nil
+}
+
+
+func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	return nil, fmt.Errorf("not implemented")
 }

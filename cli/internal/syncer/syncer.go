@@ -57,7 +57,24 @@ func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []erro
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
-	state, err := s.provider.LoadState(ctx)
+	// Load state from the state API
+	apistate, err := s.provider.LoadState(ctx)
+	if err != nil {
+		return []error{err}
+	}
+
+	// Reconstruct state for stateless resoruces
+	resources, err := s.provider.LoadResourcesFromRemote(ctx)
+	if err != nil {
+		return []error{err}
+	}
+	reconstate, err := s.provider.LoadStateFromResources(ctx, resources)
+	if err != nil {
+		return []error{err}
+	}
+
+	// Merge the state from the state API and the reconstructed state
+	state, err := apistate.Merge(reconstate)
 	if err != nil {
 		return []error{err}
 	}

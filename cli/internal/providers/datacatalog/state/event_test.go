@@ -99,11 +99,11 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 	now := time.Now()
 
 	// Create a mock getURNFromRemoteId function for the test
-	getURNFromRemoteId := func(resourceType string, remoteId string) string {
+	getURNFromRemoteId := func(resourceType string, remoteId string) (string, error) {
 		if resourceType == "category" && remoteId == categoryID {
-			return "category:category-123-local"
+			return "category:category-123-local", nil
 		}
-		return ""
+		return "", resources.ErrRemoteResourceNotFound
 	}
 
 	remoteEvent := &catalog.Event{
@@ -119,8 +119,9 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 	}
 
 	args := &state.EventArgs{}
-	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
-
+	err := args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
+	
+	assert.NoError(t, err)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)
 	assert.Equal(t, "track", args.EventType)
@@ -148,13 +149,14 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 	}
 
 	// Create a mock getURNFromRemoteId function for the test
-	getURNFromRemoteId := func(resourceType string, remoteId string) string {
-		return "" // No resources found for this test
+	getURNFromRemoteId := func(resourceType string, remoteId string) (string, error) {
+		return "", resources.ErrRemoteResourceNotFound
 	}
 
 	args := &state.EventArgs{}
-	args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
-
+	err := args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
+	
+	assert.NoError(t, err)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)
 	assert.Equal(t, "track", args.EventType)

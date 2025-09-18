@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/samber/lo"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type TrackingPlanProvider struct {
@@ -214,9 +215,13 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 }
 
 // LoadResourcesFromRemote loads all tracking plans from the remote catalog
-func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
+func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading tracking plans from remote catalog - not yet implemented")
-	return make(map[string]interface{}), nil
+	return resources.NewResourceCollection(), nil
+}
+
+func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {

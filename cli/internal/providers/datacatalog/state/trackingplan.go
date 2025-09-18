@@ -138,7 +138,8 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
-func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan) {
+func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
 }
 
 // Encapsulates the catalog argument which is added as a resource
@@ -409,7 +410,8 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 }
 
 // FromRemoteTrackingPlan converts from remote API TrackingPlan to TrackingPlanArgs
-func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan) {
+func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {

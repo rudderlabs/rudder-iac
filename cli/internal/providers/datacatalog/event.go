@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // TODO: implement on the same lines as the propertyProvider
@@ -132,18 +133,55 @@ func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.R
 }
 
 // LoadResourcesFromRemote loads all events from the remote catalog
-func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (map[string]interface{}, error) {
-	p.log.Debug("loading events from remote catalog")
+func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	p.log.Debug("loading events from remote catalog")	
+	collection := resources.NewResourceCollection()
+	
+	// fetch events from remote
 	events, err := p.catalog.GetEvents(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert slice to map[string]interface{} where key is the event's remoteId
-	resourceMap := make(map[string]interface{})
+	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, event := range events {
-		resourceMap[event.ID] = event
+		resourceMap[event.ID] = &resources.RemoteResource{
+			ID: event.ID,
+			ExternalID: event.ProjectId,
+			Data: event,
+		}
 	}
+	collection.Set(EventResourceType, resourceMap)
 
-	return resourceMap, nil
+	return collection, nil
+}
+
+
+func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	s := syncerstate.EmptyState()
+	events := collection.GetAll(EventResourceType)
+	for _, remoteEvent := range events {
+		event, ok := remoteEvent.Data.(*catalog.Event)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Event")
+		}
+		args := &state.EventArgs{}
+		args.FromRemoteEvent(event, collection.GetURNByID)
+
+		stateArgs := state.EventState{}
+		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         EventResourceType,
+			ID:           event.ProjectId,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(event.ProjectId, EventResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
 }

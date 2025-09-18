@@ -1,8 +1,6 @@
 package state
 
 import (
-	"fmt"
-
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -48,22 +46,22 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 }
 
 // FromRemoteEvent converts from remote API Event to EventArgs
-func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(string, string) string) {
+func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
 	args.Name = event.Name
 	args.Description = event.Description
 	args.EventType = event.EventType
 	if event.CategoryId != nil {
 		// get URN for the category using remoteId
-		urn := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
-		if urn == "" {
-			// TODO: decide on panic vs error out
-			panic(fmt.Sprintf("category with id not found in remote %s", *event.CategoryId))
+		urn, err := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
+		if err != nil {
+			return err
 		}
 		args.CategoryId = &resources.PropertyRef{
 			URN:      urn,
 			Property: "id",
 		}
 	}
+	return nil
 }
 
 type EventState struct {
@@ -107,8 +105,7 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteEvent converts from catalog.Event to EventState
-func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(string, string) string) {
-	e.EventArgs.FromRemoteEvent(event, getURNFromRemoteId)
+func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
 	e.ID = event.ID
 	e.Name = event.Name
 	e.Description = event.Description
@@ -117,4 +114,5 @@ func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId fu
 	e.CategoryID = event.CategoryId
 	e.CreatedAt = event.CreatedAt.String()
 	e.UpdatedAt = event.UpdatedAt.String()
+	return e.EventArgs.FromRemoteEvent(event, getURNFromRemoteId)
 }

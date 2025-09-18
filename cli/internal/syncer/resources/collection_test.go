@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -17,267 +18,135 @@ func TestNewResourceCollection(t *testing.T) {
 	assert.NotNil(t, collection.resources)
 }
 
-func TestResourceCollection_Generic_Events(t *testing.T) {
+func TestResourceCollection_BasicOperations(t *testing.T) {
 	t.Parallel()
 
-	collection := NewResourceCollection()
-
-	// Test with no events
-	assert.Nil(t, collection.GetAll("events"))
-
-	// Test GetById with no events
-	event, found := collection.GetById("events", "nonexistent")
-	assert.Nil(t, event)
-	assert.False(t, found)
-
-	// Create test events map
 	now := time.Now()
-	eventsMap := map[string]interface{}{
-		"event-1": &catalog.Event{
-			ID:          "event-1",
-			Name:        "Test Event 1",
-			Description: "First test event",
-			EventType:   "track",
-			WorkspaceId: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+
+	testCases := []struct {
+		name          string
+		resourceType  string
+		testData      map[string]*RemoteResource
+		expectedLen   int
+		testKey       string
+		expectedID    string
+		expectedExtID string
+	}{
+		{
+			name:         "Events",
+			resourceType: "events",
+			testData: map[string]*RemoteResource{
+				"event-1": {
+					ID:         "event-1",
+					ExternalID: "ext-event-1",
+					Data: &catalog.Event{
+						ID:          "event-1",
+						Name:        "Test Event 1",
+						EventType:   "track",
+						WorkspaceId: "workspace-1",
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+				},
+				"event-2": {
+					ID:         "event-2",
+					ExternalID: "ext-event-2",
+					Data: &catalog.Event{
+						ID:          "event-2",
+						Name:        "Test Event 2",
+						EventType:   "identify",
+						WorkspaceId: "workspace-1",
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+				},
+			},
+			expectedLen:   2,
+			testKey:       "event-1",
+			expectedID:    "event-1",
+			expectedExtID: "ext-event-1",
 		},
-		"event-2": &catalog.Event{
-			ID:          "event-2",
-			Name:        "Test Event 2",
-			Description: "Second test event",
-			EventType:   "identify",
-			WorkspaceId: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+		{
+			name:         "Properties",
+			resourceType: "properties",
+			testData: map[string]*RemoteResource{
+				"prop-1": {
+					ID:         "prop-1",
+					ExternalID: "ext-prop-1",
+					Data: &catalog.Property{
+						ID:          "prop-1",
+						Name:        "Test Property 1",
+						Type:        "string",
+						WorkspaceId: "workspace-1",
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+				},
+			},
+			expectedLen:   1,
+			testKey:       "prop-1",
+			expectedID:    "prop-1",
+			expectedExtID: "ext-prop-1",
 		},
-	}
-
-	// Set events
-	collection.Set("events", eventsMap)
-
-	// Test GetAll
-	retrievedEvents := collection.GetAll("events")
-	require.NotNil(t, retrievedEvents)
-	assert.Len(t, retrievedEvents, 2)
-
-	// Verify events are correct (need to convert and check)
-	eventFound1 := false
-	eventFound2 := false
-	for _, eventInterface := range retrievedEvents {
-		event := eventInterface.(*catalog.Event)
-		if event.Name == "Test Event 1" {
-			eventFound1 = true
-			assert.Equal(t, "track", event.EventType)
-		}
-		if event.Name == "Test Event 2" {
-			eventFound2 = true
-			assert.Equal(t, "identify", event.EventType)
-		}
-	}
-	assert.True(t, eventFound1, "Test Event 1 should be found")
-	assert.True(t, eventFound2, "Test Event 2 should be found")
-
-	// Test GetById - found
-	foundEvent, exists := collection.GetById("events", "event-1")
-	require.True(t, exists)
-	require.NotNil(t, foundEvent)
-	event1 := foundEvent.(*catalog.Event)
-	assert.Equal(t, "Test Event 1", event1.Name)
-	assert.Equal(t, "track", event1.EventType)
-
-	// Test GetById - not found
-	notFoundEvent, notExists := collection.GetById("events", "nonexistent")
-	assert.Nil(t, notFoundEvent)
-	assert.False(t, notExists)
-}
-
-func TestResourceCollection_Generic_Properties(t *testing.T) {
-	t.Parallel()
-
-	collection := NewResourceCollection()
-
-	// Test with no properties
-	assert.Nil(t, collection.GetAll("properties"))
-
-	// Test GetById with no properties
-	prop, found := collection.GetById("properties", "nonexistent")
-	assert.Nil(t, prop)
-	assert.False(t, found)
-
-	// Create test properties map
-	now := time.Now()
-	propertiesMap := map[string]interface{}{
-		"prop-1": &catalog.Property{
-			ID:          "prop-1",
-			Name:        "Test Property 1",
-			Description: "First test property",
-			Type:        "string",
-			WorkspaceId: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		"prop-2": &catalog.Property{
-			ID:          "prop-2",
-			Name:        "Test Property 2",
-			Description: "Second test property",
-			Type:        "integer",
-			WorkspaceId: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+		{
+			name:         "Categories",
+			resourceType: "categories",
+			testData: map[string]*RemoteResource{
+				"cat-1": {
+					ID:         "cat-1",
+					ExternalID: "ext-cat-1",
+					Data: &catalog.Category{
+						ID:          "cat-1",
+						Name:        "Test Category 1",
+						WorkspaceID: "workspace-1",
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+				},
+			},
+			expectedLen:   1,
+			testKey:       "cat-1",
+			expectedID:    "cat-1",
+			expectedExtID: "ext-cat-1",
 		},
 	}
 
-	// Set properties
-	collection.Set("properties", propertiesMap)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Test GetAll
-	retrievedProps := collection.GetAll("properties")
-	require.NotNil(t, retrievedProps)
-	assert.Len(t, retrievedProps, 2)
+			collection := NewResourceCollection()
 
-	// Test GetById - found
-	foundProp, exists := collection.GetById("properties", "prop-1")
-	require.True(t, exists)
-	require.NotNil(t, foundProp)
-	prop1 := foundProp.(*catalog.Property)
-	assert.Equal(t, "Test Property 1", prop1.Name)
-	assert.Equal(t, "string", prop1.Type)
+			// Test with no resources
+			assert.Nil(t, collection.GetAll(tc.resourceType))
 
-	// Test GetById - not found
-	notFoundProp, notExists := collection.GetById("properties", "nonexistent")
-	assert.Nil(t, notFoundProp)
-	assert.False(t, notExists)
-}
+			// Test GetById with no resources
+			resource, found := collection.GetByID(tc.resourceType, "nonexistent")
+			assert.Nil(t, resource)
+			assert.False(t, found)
 
-func TestResourceCollection_Generic_Categories(t *testing.T) {
-	t.Parallel()
+			// Set test data
+			collection.Set(tc.resourceType, tc.testData)
 
-	collection := NewResourceCollection()
+			// Test GetAll
+			retrieved := collection.GetAll(tc.resourceType)
+			require.NotNil(t, retrieved)
+			assert.Len(t, retrieved, tc.expectedLen)
 
-	// Test with no categories
-	assert.Nil(t, collection.GetAll("categories"))
+			// Test GetById - found
+			foundResource, exists := collection.GetByID(tc.resourceType, tc.testKey)
+			require.True(t, exists)
+			require.NotNil(t, foundResource)
+			assert.Equal(t, tc.expectedID, foundResource.ID)
+			assert.Equal(t, tc.expectedExtID, foundResource.ExternalID)
+			assert.NotNil(t, foundResource.Data)
 
-	// Create test categories map
-	now := time.Now()
-	categoriesMap := map[string]interface{}{
-		"cat-1": &catalog.Category{
-			ID:          "cat-1",
-			Name:        "Test Category 1",
-			WorkspaceID: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		"cat-2": &catalog.Category{
-			ID:          "cat-2",
-			Name:        "Test Category 2",
-			WorkspaceID: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
+			// Test GetById - not found
+			notFound, notExists := collection.GetByID(tc.resourceType, "nonexistent")
+			assert.Nil(t, notFound)
+			assert.False(t, notExists)
+		})
 	}
-
-	// Set categories
-	collection.Set("categories", categoriesMap)
-
-	// Test GetAll
-	retrievedCats := collection.GetAll("categories")
-	require.NotNil(t, retrievedCats)
-	assert.Len(t, retrievedCats, 2)
-
-	// Test GetById - found
-	foundCat, exists := collection.GetById("categories", "cat-1")
-	require.True(t, exists)
-	require.NotNil(t, foundCat)
-	cat1 := foundCat.(*catalog.Category)
-	assert.Equal(t, "Test Category 1", cat1.Name)
-
-	// Test GetById - not found
-	notFoundCat, notExists := collection.GetById("categories", "nonexistent")
-	assert.Nil(t, notFoundCat)
-	assert.False(t, notExists)
-}
-
-func TestResourceCollection_Generic_CustomTypes(t *testing.T) {
-	t.Parallel()
-
-	collection := NewResourceCollection()
-
-	// Test with no custom types
-	assert.Nil(t, collection.GetAll("customTypes"))
-
-	// Create test custom types map
-	now := time.Now()
-	customTypesMap := map[string]interface{}{
-		"ct-1": &catalog.CustomType{
-			ID:          "ct-1",
-			Name:        "Test Custom Type 1",
-			WorkspaceId: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-	}
-
-	// Set custom types
-	collection.Set("customTypes", customTypesMap)
-
-	// Test GetAll
-	retrievedTypes := collection.GetAll("customTypes")
-	require.NotNil(t, retrievedTypes)
-	assert.Len(t, retrievedTypes, 1)
-
-	// Test GetById - found
-	foundType, exists := collection.GetById("customTypes", "ct-1")
-	require.True(t, exists)
-	require.NotNil(t, foundType)
-	ct1 := foundType.(*catalog.CustomType)
-	assert.Equal(t, "Test Custom Type 1", ct1.Name)
-
-	// Test GetById - not found
-	notFoundType, notExists := collection.GetById("customTypes", "nonexistent")
-	assert.Nil(t, notFoundType)
-	assert.False(t, notExists)
-}
-
-func TestResourceCollection_Generic_TrackingPlans(t *testing.T) {
-	t.Parallel()
-
-	collection := NewResourceCollection()
-
-	// Test with no tracking plans
-	assert.Nil(t, collection.GetAll("trackingPlans"))
-
-	// Create test tracking plans map
-	now := time.Now()
-	trackingPlansMap := map[string]interface{}{
-		"tp-1": &catalog.TrackingPlan{
-			ID:          "tp-1",
-			Name:        "Test Tracking Plan 1",
-			WorkspaceID: "workspace-1",
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-	}
-
-	// Set tracking plans
-	collection.Set("trackingPlans", trackingPlansMap)
-
-	// Test GetAll
-	retrievedTPs := collection.GetAll("trackingPlans")
-	require.NotNil(t, retrievedTPs)
-	assert.Len(t, retrievedTPs, 1)
-
-	// Test GetById - found
-	foundTP, exists := collection.GetById("trackingPlans", "tp-1")
-	require.True(t, exists)
-	require.NotNil(t, foundTP)
-	tp1 := foundTP.(*catalog.TrackingPlan)
-	assert.Equal(t, "Test Tracking Plan 1", tp1.Name)
-
-	// Test GetById - not found
-	notFoundTP, notExists := collection.GetById("trackingPlans", "nonexistent")
-	assert.Nil(t, notFoundTP)
-	assert.False(t, notExists)
 }
 
 func TestResourceCollection_EmptyMaps(t *testing.T) {
@@ -286,8 +155,8 @@ func TestResourceCollection_EmptyMaps(t *testing.T) {
 	collection := NewResourceCollection()
 
 	// Set empty maps
-	collection.Set("events", make(map[string]interface{}))
-	collection.Set("properties", make(map[string]interface{}))
+	collection.Set("events", make(map[string]*RemoteResource))
+	collection.Set("properties", make(map[string]*RemoteResource))
 
 	// Should return nil for empty resource maps
 	events := collection.GetAll("events")
@@ -297,8 +166,8 @@ func TestResourceCollection_EmptyMaps(t *testing.T) {
 	assert.Nil(t, properties)
 
 	// GetById lookups should return not found
-	event, eventFound := collection.GetById("events", "any-id")
-	prop, propFound := collection.GetById("properties", "any-id")
+	event, eventFound := collection.GetByID("events", "any-id")
+	prop, propFound := collection.GetByID("properties", "any-id")
 
 	assert.Nil(t, event)
 	assert.False(t, eventFound)
@@ -316,7 +185,7 @@ func TestResourceCollection_NonExistentResourceType(t *testing.T) {
 	assert.Nil(t, resources)
 
 	// Test GetById with non-existent resource type
-	resource, found := collection.GetById("nonexistent", "some-id")
+	resource, found := collection.GetByID("nonexistent", "some-id")
 	assert.Nil(t, resource)
 	assert.False(t, found)
 }
@@ -327,33 +196,206 @@ func TestResourceCollection_OverwriteResourceType(t *testing.T) {
 	collection := NewResourceCollection()
 
 	// Set initial map
-	initialMap := map[string]interface{}{
-		"test-1": "initial value",
+	initialMap := map[string]*RemoteResource{
+		"test-1": {
+			ID:         "test-1",
+			ExternalID: "ext-test-1",
+			Data:       "initial value",
+		},
 	}
 	collection.Set("test-type", initialMap)
 
 	// Verify initial value
-	resource, found := collection.GetById("test-type", "test-1")
+	resource, found := collection.GetByID("test-type", "test-1")
 	assert.True(t, found)
-	assert.Equal(t, "initial value", resource)
+	assert.Equal(t, "initial value", resource.Data)
+	assert.Equal(t, "test-1", resource.ID)
 
 	// Overwrite with new map
-	newMap := map[string]interface{}{
-		"test-2": "new value",
+	newMap := map[string]*RemoteResource{
+		"test-2": {
+			ID:         "test-2",
+			ExternalID: "ext-test-2",
+			Data:       "new value",
+		},
 	}
 	collection.Set("test-type", newMap)
 
 	// Verify old value is gone, new value exists
-	oldResource, oldFound := collection.GetById("test-type", "test-1")
+	oldResource, oldFound := collection.GetByID("test-type", "test-1")
 	assert.Nil(t, oldResource)
 	assert.False(t, oldFound)
 
-	newResource, newFound := collection.GetById("test-type", "test-2")
+	newResource, newFound := collection.GetByID("test-type", "test-2")
 	assert.True(t, newFound)
-	assert.Equal(t, "new value", newResource)
+	assert.Equal(t, "new value", newResource.Data)
+	assert.Equal(t, "test-2", newResource.ID)
 
 	// Verify GetAll returns only new resources
 	allResources := collection.GetAll("test-type")
 	assert.Len(t, allResources, 1)
-	assert.Equal(t, "new value", allResources["test-2"])
+	assert.Equal(t, "new value", allResources["test-2"].Data)
+}
+
+func TestResourceCollection_Merge(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		collection1    map[string]map[string]*RemoteResource
+		collection2    map[string]map[string]*RemoteResource
+		expectError    bool
+		errorContains  string
+		expectedResult map[string]int // resourceType -> expected count
+	}{
+		{
+			name: "SuccessfulMerge",
+			collection1: map[string]map[string]*RemoteResource{
+				"events": {
+					"event-1": {
+						ID:         "event-1",
+						ExternalID: "ext-event-1",
+						Data:       "test-event",
+					},
+				},
+			},
+			collection2: map[string]map[string]*RemoteResource{
+				"properties": {
+					"prop-1": {
+						ID:         "prop-1",
+						ExternalID: "ext-prop-1",
+						Data:       "test-prop",
+					},
+				},
+			},
+			expectError: false,
+			expectedResult: map[string]int{
+				"events":     1,
+				"properties": 1,
+			},
+		},
+		{
+			name: "ResourceTypeOverlap",
+			collection1: map[string]map[string]*RemoteResource{
+				"events": {
+					"event-1": {
+						ID:         "event-1",
+						ExternalID: "ext-event-1",
+						Data:       "test-event-1",
+					},
+				},
+			},
+			collection2: map[string]map[string]*RemoteResource{
+				"events": {
+					"event-2": {
+						ID:         "event-2",
+						ExternalID: "ext-event-2",
+						Data:       "test-event-2",
+					},
+				},
+			},
+			expectError:   true,
+			errorContains: "at events",
+		},
+		{
+			name: "MergeWithEmpty",
+			collection1: map[string]map[string]*RemoteResource{
+				"events": {
+					"event-1": {
+						ID:         "event-1",
+						ExternalID: "ext-event-1",
+						Data:       "test-event",
+					},
+				},
+			},
+			collection2: map[string]map[string]*RemoteResource{},
+			expectError: false,
+			expectedResult: map[string]int{
+				"events": 1,
+			},
+		},
+		{
+			name:        "MergeEmptyIntoPopulated",
+			collection1: map[string]map[string]*RemoteResource{},
+			collection2: map[string]map[string]*RemoteResource{
+				"properties": {
+					"prop-1": {
+						ID:         "prop-1",
+						ExternalID: "ext-prop-1",
+						Data:       "test-prop",
+					},
+				},
+			},
+			expectError: false,
+			expectedResult: map[string]int{
+				"properties": 1,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup collections
+			collection1 := NewResourceCollection()
+			for resourceType, resources := range tc.collection1 {
+				collection1.Set(resourceType, resources)
+			}
+
+			collection2 := NewResourceCollection()
+			for resourceType, resources := range tc.collection2 {
+				collection2.Set(resourceType, resources)
+			}
+
+			// Perform merge
+			result, err := collection1.Merge(collection2)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Nil(t, result)
+				assert.True(t, errors.Is(err, ErrDuplicateResource))
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				// Verify it's a different object reference (not same pointer)
+				assert.NotSame(t, collection1, result) // Should be a new collection object
+
+				// Verify expected results
+				for resourceType, expectedCount := range tc.expectedResult {
+					resources := result.GetAll(resourceType)
+					require.NotNil(t, resources, "resourceType %s should exist", resourceType)
+					assert.Len(t, resources, expectedCount, "resourceType %s should have %d resources", resourceType, expectedCount)
+
+					// Verify each resource has proper RemoteResource structure
+					for _, resource := range resources {
+						assert.NotEmpty(t, resource.ID)
+						assert.NotEmpty(t, resource.ExternalID)
+						assert.NotNil(t, resource.Data)
+					}
+				}
+			}
+		})
+	}
+
+	// Test merge with nil (separate test since it returns the same collection)
+	t.Run("MergeWithNil", func(t *testing.T) {
+		t.Parallel()
+
+		collection := NewResourceCollection()
+		collection.Set("events", map[string]*RemoteResource{
+			"event-1": {
+				ID:         "event-1",
+				ExternalID: "ext-event-1",
+				Data:       "test",
+			},
+		})
+
+		result, err := collection.Merge(nil)
+		require.NoError(t, err)
+		assert.Same(t, collection, result) // Should return same collection object when merging with nil
+	})
 }
