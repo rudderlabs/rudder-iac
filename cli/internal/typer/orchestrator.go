@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
@@ -13,101 +12,93 @@ import (
 )
 
 var (
-	orchestratorLog = logger.New("typer.orchestrator")
+	rudderTyperLog = logger.New("typer.ruddertyper")
 )
 
-// Orchestrator coordinates the RudderTyper code generation process
-type Orchestrator struct {
-	deps app.Deps
+// PlanProvider defines the interface for retrieving tracking plan data
+// This interface is defined by RudderTyper to specify exactly what it needs
+// from its dependency, following the dependency inversion principle
+type PlanProvider interface {
+	// GetTrackingPlan retrieves the tracking plan data
+	// The tracking plan ID is an internal detail of the provider
+	GetTrackingPlan(ctx context.Context) (*plan.TrackingPlan, error)
+}
+
+// RudderTyper coordinates the RudderTyper code generation process
+type RudderTyper struct {
+	planProvider PlanProvider
 }
 
 // GenerationOptions contains configuration for code generation
 type GenerationOptions struct {
-	TrackingPlanID string
-	Platform       string
-	OutputPath     string
+	Platform   string
+	OutputPath string
 }
 
-// NewOrchestrator creates a new RudderTyper orchestrator
-func NewOrchestrator(deps app.Deps) *Orchestrator {
-	return &Orchestrator{
-		deps: deps,
+// NewRudderTyper creates a new RudderTyper instance
+func NewRudderTyper(planProvider PlanProvider) *RudderTyper {
+	return &RudderTyper{
+		planProvider: planProvider,
 	}
 }
 
 // Generate orchestrates the complete code generation process
-func (o *Orchestrator) Generate(ctx context.Context, options GenerationOptions) error {
-	orchestratorLog.Debug("starting code generation",
-		"trackingPlanID", options.TrackingPlanID,
+func (rt *RudderTyper) Generate(ctx context.Context, options GenerationOptions) error {
+	rudderTyperLog.Debug("starting code generation",
 		"platform", options.Platform,
 		"outputPath", options.OutputPath)
 
 	// Step 1: Fetch tracking plan data
-	fmt.Println("(mock) 📥 Fetching tracking plan data...")
-	trackingPlan, err := o.fetchTrackingPlan(ctx, options.TrackingPlanID)
+	fmt.Println("📥 Fetching tracking plan data...")
+	trackingPlan, err := rt.fetchTrackingPlan(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching tracking plan: %w", err)
 	}
-	orchestratorLog.Debug("(mock) fetched tracking plan", "rules", len(trackingPlan.Rules))
+	rudderTyperLog.Debug("fetched tracking plan", "rules", len(trackingPlan.Rules))
 
 	// Step 2: Generate platform-specific code
 	fmt.Printf("⚡ Generating %s code...\n", options.Platform)
-	files, err := o.generateCode(trackingPlan, options.Platform)
+	files, err := rt.generateCode(trackingPlan, options.Platform)
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}
-	orchestratorLog.Debug("generated files", "count", len(files))
+	rudderTyperLog.Debug("generated files", "count", len(files))
 
 	// Step 3: Write files to output directory (only if there are files to write)
 	if len(files) > 0 {
 		fmt.Printf("📁 Writing files to %s...\n", options.OutputPath)
-		err = o.writeGeneratedFiles(files, options.OutputPath)
+		err = rt.writeGeneratedFiles(files, options.OutputPath)
 		if err != nil {
 			return fmt.Errorf("writing generated files: %w", err)
 		}
 	} else {
-		orchestratorLog.Debug("No files to write, skipping file operations")
+		rudderTyperLog.Debug("No files to write, skipping file operations")
 	}
 
 	fmt.Printf("✅ Successfully generated %s bindings in %s\n", options.Platform, options.OutputPath)
 
-	orchestratorLog.Info("successfully generated code", "platform", options.Platform, "outputPath", options.OutputPath)
+	rudderTyperLog.Info("successfully generated code", "platform", options.Platform, "outputPath", options.OutputPath)
 	return nil
 }
 
 // fetchTrackingPlan retrieves tracking plan data from the provider
-func (o *Orchestrator) fetchTrackingPlan(ctx context.Context, trackingPlanID string) (*plan.TrackingPlan, error) {
-	orchestratorLog.Debug("(mock) fetching tracking plan", "id", trackingPlanID)
+func (rt *RudderTyper) fetchTrackingPlan(ctx context.Context) (*plan.TrackingPlan, error) {
+	rudderTyperLog.Debug("fetching tracking plan")
 
-	// Mock: fetch tracking plan from data catalog provider
-	orchestratorLog.Debug("mock: would call o.deps.Providers().DataCatalog.GetTrackingPlan()", "id", trackingPlanID)
-
-	// Mock: create sample tracking plan data
-	mockPlan := &plan.TrackingPlan{
-		Name: fmt.Sprintf("Tracking Plan %s", trackingPlanID),
-		Rules: []plan.EventRule{
-			{
-				Event: plan.Event{
-					EventType:   plan.EventTypeTrack,
-					Name:        "UserSignupMockData",
-					Description: "User signup event",
-				},
-				Section: plan.EventRuleSectionProperties,
-				Schema: plan.ObjectSchema{
-					Properties:           make(map[string]plan.PropertySchema),
-					AdditionalProperties: false,
-				},
-			},
-		},
+	// Use the injected PlanProvider to get tracking plan data
+	plan, err := rt.planProvider.GetTrackingPlan(ctx)
+	if err != nil {
+		rudderTyperLog.Debug("failed to fetch tracking plan", "error", err)
+		return nil, fmt.Errorf("failed to get tracking plan: %w", err)
 	}
 
-	orchestratorLog.Debug("mock: tracking plan fetched successfully", "name", mockPlan.Name)
-	return mockPlan, nil
+	rudderTyperLog.Debug("tracking plan fetched successfully", "name", plan.Name, "rulesCount", len(plan.Rules))
+	return plan, nil
 }
 
 // generateCode generates platform-specific code from the tracking plan
-func (o *Orchestrator) generateCode(trackingPlan *plan.TrackingPlan, platform string) ([]*core.File, error) {
-	orchestratorLog.Debug("generating code for platform", "platform", platform, "rulesCount", len(trackingPlan.Rules))
+func (rt *RudderTyper) generateCode(trackingPlan *plan.TrackingPlan, platform string) ([]*core.File, error) {
+	rudderTyperLog.Debug("generating code for platform", "platform", platform, "rulesCount", len(trackingPlan.Rules))
 
 	switch platform {
 	case "kotlin":
@@ -118,11 +109,11 @@ func (o *Orchestrator) generateCode(trackingPlan *plan.TrackingPlan, platform st
 }
 
 // writeGeneratedFiles writes the generated files to the output directory
-func (o *Orchestrator) writeGeneratedFiles(files []*core.File, outputPath string) error {
-	orchestratorLog.Debug("writing generated files", "filesCount", len(files), "outputPath", outputPath)
+func (rt *RudderTyper) writeGeneratedFiles(files []*core.File, outputPath string) error {
+	rudderTyperLog.Debug("writing generated files", "filesCount", len(files), "outputPath", outputPath)
 
 	if len(files) == 0 {
-		orchestratorLog.Debug("no files to write, returning early")
+		rudderTyperLog.Debug("no files to write, returning early")
 		return nil
 	}
 
@@ -132,19 +123,9 @@ func (o *Orchestrator) writeGeneratedFiles(files []*core.File, outputPath string
 		return fmt.Errorf("resolving output path: %w", err)
 	}
 
-	orchestratorLog.Debug("creating FileManager for atomic operations", "absPath", absOutputPath)
+	rudderTyperLog.Debug("creating FileManager for atomic operations", "absPath", absOutputPath)
 	fileManager := core.NewFileManager(absOutputPath)
 
-	// Convert []*core.File to []core.File for WriteFiles
-	coreFiles := make([]core.File, len(files))
-	for i, file := range files {
-		coreFiles[i] = core.File{
-			Path:    file.Path,
-			Content: file.Content,
-		}
-		orchestratorLog.Debug("prepared file for writing", "path", file.Path)
-	}
-
-	orchestratorLog.Debug("would call fileManager.WriteFiles() for atomic batch write")
-	return fileManager.WriteFiles(coreFiles)
+	rudderTyperLog.Debug("would call fileManager.WriteFiles() for atomic batch write")
+	return fileManager.WriteFiles(files)
 }

@@ -3,23 +3,49 @@ package typer
 import (
 	"context"
 	"testing"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-func TestNewOrchestrator(t *testing.T) {
+// mockPlanProvider is a test implementation of PlanProvider
+type mockPlanProvider struct{}
+
+func (m *mockPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.TrackingPlan, error) {
+	return &plan.TrackingPlan{
+		Name: "Test Tracking Plan",
+		Rules: []plan.EventRule{
+			{
+				Event: plan.Event{
+					EventType:   plan.EventTypeTrack,
+					Name:        "TestEvent",
+					Description: "Test event",
+				},
+				Section: plan.EventRuleSectionProperties,
+				Schema: plan.ObjectSchema{
+					Properties:           make(map[string]plan.PropertySchema),
+					AdditionalProperties: false,
+				},
+			},
+		},
+	}, nil
+}
+
+func TestNewRudderTyper(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 	}{
-		{name: "constructor with nil deps"},
+		{name: "constructor with mock plan provider"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			orchestrator := NewOrchestrator(nil)
-			if orchestrator == nil {
-				t.Fatal("NewOrchestrator() returned nil")
+			mockProvider := &mockPlanProvider{}
+			rudderTyper := NewRudderTyper(mockProvider)
+			if rudderTyper == nil {
+				t.Fatal("NewRudderTyper() returned nil")
 			}
 		})
 	}
@@ -35,17 +61,15 @@ func TestGenerationOptions(t *testing.T) {
 		{
 			name: "kotlin output path default",
 			options: GenerationOptions{
-				TrackingPlanID: "tp_123",
-				Platform:       "kotlin",
-				OutputPath:     "./output",
+				Platform:   "kotlin",
+				OutputPath: "./output",
 			},
 		},
 		{
 			name: "different values",
 			options: GenerationOptions{
-				TrackingPlanID: "another_tp",
-				Platform:       "kotlin",
-				OutputPath:     "/tmp/out",
+				Platform:   "kotlin",
+				OutputPath: "/tmp/out",
 			},
 		},
 	}
@@ -54,9 +78,7 @@ func TestGenerationOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.options.TrackingPlanID == "" {
-				t.Error("TrackingPlanID should not be empty")
-			}
+			// TrackingPlanID is now handled by the PlanProvider, not in options
 			if tt.options.Platform != "kotlin" {
 				t.Errorf("expected Platform 'kotlin', got %s", tt.options.Platform)
 			}
@@ -67,7 +89,7 @@ func TestGenerationOptions(t *testing.T) {
 	}
 }
 
-func TestOrchestrator_Generate(t *testing.T) {
+func TestRudderTyper_Generate(t *testing.T) {
 	t.Run("Generate (table)", func(t *testing.T) {
 		t.Parallel()
 
@@ -80,18 +102,16 @@ func TestOrchestrator_Generate(t *testing.T) {
 			{
 				name: "valid kotlin generation",
 				options: GenerationOptions{
-					TrackingPlanID: "tp_123",
-					Platform:       "kotlin",
-					OutputPath:     "./output",
+					Platform:   "kotlin",
+					OutputPath: "./output",
 				},
 				expectErr: false,
 			},
 			{
 				name: "unsupported platform",
 				options: GenerationOptions{
-					TrackingPlanID: "tp_123",
-					Platform:       "unsupported",
-					OutputPath:     "./output",
+					Platform:   "unsupported",
+					OutputPath: "./output",
 				},
 				expectErr: true,
 				wantErr:   "generating code: unsupported platform: unsupported (supported platforms: kotlin)",
@@ -102,9 +122,10 @@ func TestOrchestrator_Generate(t *testing.T) {
 			tt := tt
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				orchestrator := NewOrchestrator(nil)
+				mockProvider := &mockPlanProvider{}
+				rudderTyper := NewRudderTyper(mockProvider)
 
-				err := orchestrator.Generate(context.Background(), tt.options)
+				err := rudderTyper.Generate(context.Background(), tt.options)
 
 				if tt.expectErr {
 					if err == nil {
