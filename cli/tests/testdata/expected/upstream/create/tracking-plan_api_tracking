@@ -50,7 +50,7 @@
       "categoryId": null,
       "createdAt": "2025-07-21T09:09:51.019Z",
       "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
-      "description": "This is a login event without a category",
+      "description": "This event is triggered when a user logs in.",
       "eventType": "track",
       "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eS",
       "identitySection": "properties",
@@ -115,11 +115,25 @@
       "updatedAt": "2025-07-21T09:09:56.892Z",
       "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
+    },
+    {
+      "categoryId": null,
+      "createdAt": "2025-07-21T09:09:51.019Z",
+      "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "description": "This event is triggered when a user logs out.",
+      "eventType": "track",
+      "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eT",
+      "identitySection": "properties",
+      "name": "Logout Event",
+      "additionalProperties": false,
+      "updatedAt": "2025-07-21T09:09:56.892Z",
+      "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
+      "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
     }
   ],
   "id": "tp_2yzYAEjZTRyI156F8eDawGyA3nJ",
   "name": "API Tracking",
   "updatedAt": "2025-06-25T08:05:24.102Z",
-  "version": 3,
+  "version": 4,
   "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
 }

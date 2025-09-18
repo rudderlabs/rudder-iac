@@ -1,0 +1,19 @@
+class RudderAnalytics(private val analytics: Analytics) {
+    private val json = Json {
+        prettyPrint = true
+        encodeDefaults = false
+    }
+{{ range .RudderAnalyticsMethods }}
+    /**
+     * {{ .Comment }}
+     */
+    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
+        analytics.{{ .SDKCall.MethodName }}(
+        {{- range $i, $arg := .SDKCall.Arguments }}
+            {{- if $i }},{{ end }}
+            {{ .Name }} = {{- if .ShouldSerialize }} json.encodeToJsonElement({{ .Value }}).jsonObject{{- else }} {{ .Value }}{{- end }}
+        {{- end }}
+        )
+    }
+{{ end -}}
+}

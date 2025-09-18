@@ -142,7 +142,7 @@ type TrackingPlanEventsUpdate struct {
 
 type EventIdentifierDetail struct {
 	ID                   string                     `json:"id"`
-	Properties           []PropertyIdentifierDetail `json:"properties,omitempty"`
+	Properties           []PropertyIdentifierDetail `json:"properties"`
 	AdditionalProperties bool                       `json:"additionalProperties"`
 	IdentitySection      string                     `json:"identitySection"`
 	Variants             []Variant                  `json:"variants,omitempty"`

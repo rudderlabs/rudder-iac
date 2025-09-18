@@ -30,6 +30,9 @@ type mockRETLStore struct {
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
+	// Preview functions
+	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
+	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
 }
 
 func (m *mockRETLStore) ReadState(ctx context.Context) (*retlClient.State, error) {
@@ -90,6 +93,21 @@ func (m *mockRETLStore) ListRetlSources(ctx context.Context) (*retlClient.RETLSo
 	return &retlClient.RETLSources{}, nil
 }
 
+// Preview methods
+func (m *mockRETLStore) SubmitSourcePreview(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+	if m.submitPreviewFunc != nil {
+		return m.submitPreviewFunc(ctx, request)
+	}
+	return &retlClient.PreviewSubmitResponse{ID: "req-123"}, nil
+}
+
+func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error) {
+	if m.getPreviewResultFunc != nil {
+		return m.getPreviewResultFunc(ctx, resultID)
+	}
+	return &retlClient.PreviewResultResponse{Status: retlClient.Completed}, nil
+}
+
 // newDefaultMockClient creates a new mock client with default behavior
 func newDefaultMockClient() *mockRETLStore {
 	return &mockRETLStore{
@@ -130,6 +148,17 @@ func newDefaultMockClient() *mockRETLStore {
 				AccountID:            "acc123",
 				IsEnabled:            true,
 				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+			}, nil
+		},
+		submitPreviewFunc: func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			return &retlClient.PreviewSubmitResponse{
+				ID: "req-123",
+			}, nil
+		},
+		getPreviewResultFunc: func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error) {
+			return &retlClient.PreviewResultResponse{
+				Status: retlClient.Completed,
+				Rows:   []map[string]any{{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}},
 			}, nil
 		},
 	}
@@ -653,5 +682,121 @@ func TestProviderList(t *testing.T) {
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "no handler for resource type")
 		})
+	})
+}
+
+func TestProviderPreview(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT 1 as id, 'Alice' as name UNION ALL SELECT 2, 'Bob'",
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+
+		rows, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.NoError(t, err)
+		require.Len(t, rows, 2)
+		assert.Equal(t, any(1), rows[0]["id"])
+		assert.Equal(t, any("Alice"), rows[0]["name"])
+	})
+
+	t.Run("UnsupportedType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		_, err := provider.Preview(ctx, "test", "unknown-type", resources.ResourceData{}, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no handler for resource type")
+	})
+
+	t.Run("MissingSQL", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SQL not found")
+	})
+
+	t.Run("MissingAccountID", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT 1",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "account ID not found")
+	})
+
+	t.Run("SubmitError", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		mockClient.submitPreviewFunc = func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			return nil, fmt.Errorf("network down")
+		}
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT 1",
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "submitting preview request")
+	})
+
+	t.Run("SubmitFailureResponse", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		mockClient.submitPreviewFunc = func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			return nil, fmt.Errorf("bad sql")
+		}
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT BROKEN",
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "submitting preview request")
+	})
+
+	t.Run("ResultFailure", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		mockClient.getPreviewResultFunc = func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error) {
+			return &retlClient.PreviewResultResponse{
+				Status: retlClient.Failed,
+				Error:  "execution error",
+			}, nil
+		}
+		provider := retl.New(mockClient)
+		ctx := context.Background()
+		data := resources.ResourceData{
+			sqlmodel.SQLKey:              "SELECT 1",
+			sqlmodel.AccountIDKey:        "acc123",
+			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
+		}
+		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "preview request failed")
 	})
 }
