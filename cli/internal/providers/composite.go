@@ -86,6 +86,7 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 
 func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error) {
 	var state *state.State = state.EmptyState()
+
 	for _, provider := range p.Providers {
 		s, err := provider.LoadState(ctx)
 		if err != nil {
@@ -160,4 +161,39 @@ func (p *CompositeProvider) providerForKind(kind string) project.Provider {
 
 func (p *CompositeProvider) providerForType(resourceType string) project.Provider {
 	return p.registeredTypes[resourceType]
+}
+
+func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	for _, provider := range p.Providers {
+		resources, err := provider.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, err
+		}
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return collection, nil
+}
+
+func (p *CompositeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	s := state.EmptyState()
+	// Load and merge state from all providers
+	for _, provider := range p.Providers {
+		state, err := provider.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, err
+		}
+		if (s == nil) {
+			s = state
+		} else {
+			s, err = s.Merge(state)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return s, nil
 }

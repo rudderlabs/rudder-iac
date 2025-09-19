@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -26,20 +27,22 @@ type CustomTypeProperty struct {
 	Required bool
 }
 
+const CustomTypeResourceType = "custom-type"
+
 // Diff compares two CustomTypeProperty instances and returns true if they differ
 func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
 	if prop.ID != other.ID {
 		return true
 	}
-	
+
 	if prop.Required != other.Required {
 		return true
 	}
-	
+
 	if !reflect.DeepEqual(prop.RefToID, other.RefToID) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -162,6 +165,11 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	return nil
 }
 
+// FromRemoteCustomType converts from remote API CustomType to CustomTypeArgs
+func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
+}
+
 // PropertyByID finds a property by its ID within the custom type
 func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
 	for _, prop := range args.Properties {
@@ -178,45 +186,45 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 	if args.LocalID != other.LocalID {
 		return true
 	}
-	
+
 	if args.Name != other.Name {
 		return true
 	}
-	
+
 	if args.Description != other.Description {
 		return true
 	}
-	
+
 	if args.Type != other.Type {
 		return true
 	}
-	
+
 	// Compare config maps using deep equality
 	if !reflect.DeepEqual(args.Config, other.Config) {
 		return true
 	}
-	
+
 	// Compare properties arrays
 	if len(args.Properties) != len(other.Properties) {
 		return true
 	}
-	
+
 	for _, prop := range args.Properties {
 		otherProp := other.PropertyByID(prop.ID)
 		if otherProp == nil {
 			return true
 		}
-		
+
 		if prop.Diff(otherProp) {
 			return true
 		}
 	}
-	
+
 	// Compare variants using existing Variants.Diff method
 	if args.Variants.Diff(other.Variants) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -277,4 +285,9 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.CustomTypeArgs.FromResourceData(
 		MustMapStringInterface(from, "customTypeArgs"),
 	)
+}
+
+// FromRemoteCustomType converts from catalog.CustomType to CustomTypeState
+func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	return fmt.Errorf("not implemented")
 }

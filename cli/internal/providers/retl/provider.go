@@ -209,6 +209,20 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 	return handler.FetchImportData(ctx, args)
 }
 
+// LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	// TODO: Implement when ready - will use p.client.ListRetlSources()
+	// For now, return empty collection to keep provider functional
+	return resources.NewResourceCollection(), nil
+}
+
+// LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
+func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	// TODO: Implement when ready
+	// For now, fall back to existing LoadState behavior
+	return state.EmptyState(), nil
+}
+
 // Preview returns the preview results for a resource
 func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]map[string]any, error) {
 	handler, ok := p.handlers[resourceType]

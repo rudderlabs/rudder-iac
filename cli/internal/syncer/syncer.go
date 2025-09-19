@@ -3,7 +3,10 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"slices"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -19,6 +22,8 @@ type SyncProvider interface {
 	LoadState(ctx context.Context) (*state.State, error)
 	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
 	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
@@ -55,7 +60,30 @@ func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []erro
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
-	state, err := s.provider.LoadState(ctx)
+	// Load state from the state API
+	apistate, err := s.provider.LoadState(ctx)
+	if err != nil {
+		return []error{err}
+	}
+
+	var reconstate *state.State
+	if config.GetConfig().ExperimentalFlags.StatelessCLI {
+		// remove state for stateless resources - this is to avoid conflicts b/w the api state and the reconstructed state
+		apistate = removeStateForResourceTypes(apistate, []string{dcstate.CategoryResourceType, dcstate.EventResourceType})
+		// load resources
+		resources, err := s.provider.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return []error{err}
+		}
+		// reconstruct state
+		reconstate, err = s.provider.LoadStateFromResources(ctx, resources)
+		if err != nil {
+			return []error{err}
+		}
+	}
+
+	// Merge the state from the state API and the reconstructed state
+	state, err := apistate.Merge(reconstate)
 	if err != nil {
 		return []error{err}
 	}
@@ -101,6 +129,16 @@ func stateToGraph(state *state.State) *resources.Graph {
 	}
 
 	return graph
+}
+
+func removeStateForResourceTypes(state *state.State, resourceTypes []string) *state.State {
+	// loop over all resources in the state and remove a resource if it matches any of the resource types
+	for _, resource := range state.Resources {
+		if slices.Contains(resourceTypes, resource.Type) {
+			delete(state.Resources, resources.URN(resource.ID, resource.Type))
+		}
+	}
+	return state
 }
 
 type OperationError struct {

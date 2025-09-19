@@ -13,7 +13,14 @@ type EventCreate struct {
 	Description string  `json:"description"`
 	EventType   string  `json:"eventType"`
 	CategoryId  *string `json:"categoryId"`
-	ProjectId   string  `json:"projectId"`
+	ExternalId  string  `json:"externalId"`
+}
+
+type EventUpdate struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	EventType   string  `json:"eventType"`
+	CategoryId  *string `json:"categoryId"`
 }
 
 type Event struct {
@@ -23,14 +30,14 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
-	ProjectId   string    `json:"projectId"`
+	ExternalId  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type EventStore interface {
 	CreateEvent(ctx context.Context, input EventCreate) (*Event, error)
-	UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error)
+	UpdateEvent(ctx context.Context, id string, input *EventUpdate) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
 	GetEvents(ctx context.Context) ([]*Event, error)
@@ -64,7 +71,7 @@ func (c *RudderDataCatalog) CreateEvent(ctx context.Context, input EventCreate) 
 	return &event, nil
 }
 
-func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error) {
+func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *EventUpdate) (*Event, error) {
 	byt, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
