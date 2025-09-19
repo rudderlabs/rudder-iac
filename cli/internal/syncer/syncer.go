@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -69,7 +69,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 	var reconstate *state.State
 	if config.GetConfig().ExperimentalFlags.StatelessCLI {
 		// remove state for stateless resources - this is to avoid conflicts b/w the api state and the reconstructed state
-		apistate = removeStateForResourceTypes(apistate, []string{datacatalog.CategoryResourceType, datacatalog.EventResourceType})
+		apistate = removeStateForResourceTypes(apistate, []string{dcstate.CategoryResourceType, dcstate.EventResourceType})
 		// load resources
 		resources, err := s.provider.LoadResourcesFromRemote(ctx)
 		if err != nil {

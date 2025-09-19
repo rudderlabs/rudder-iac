@@ -91,13 +91,11 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		categoryId = &cId
 	}
 
-	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.Event{
+	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.EventUpdate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
-		WorkspaceId: prevState.WorkspaceID,
 		CategoryId:  categoryId,
-		ExternalId:  ID,
 	})
 
 	if err != nil {
@@ -152,14 +150,14 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 			Data:       event,
 		}
 	}
-	collection.Set(EventResourceType, resourceMap)
+	collection.Set(state.EventResourceType, resourceMap)
 
 	return collection, nil
 }
 
 func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
 	s := syncerstate.EmptyState()
-	events := collection.GetAll(EventResourceType)
+	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {
 		event, ok := remoteEvent.Data.(*catalog.Event)
 		if !ok {
@@ -172,14 +170,14 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
 
 		resourceState := &syncerstate.ResourceState{
-			Type:         EventResourceType,
+			Type:         state.EventResourceType,
 			ID:           event.ExternalId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(event.ExternalId, EventResourceType)
+		urn := resources.URN(event.ExternalId, state.EventResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

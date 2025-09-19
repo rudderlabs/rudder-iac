@@ -64,7 +64,6 @@ func (p *CategoryProvider) Update(ctx context.Context, ID string, input resource
 
 	updated, err := p.client.UpdateCategory(ctx, oldState.ID, catalog.CategoryUpdate{
 		Name:       toArgs.Name,
-		ExternalId: ID,
 	})
 
 	if err != nil {
@@ -116,14 +115,14 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 			Data:       category,
 		}
 	}
-	collection.Set(CategoryResourceType, resourceMap)
+	collection.Set(state.CategoryResourceType, resourceMap)
 
 	return collection, nil
 }
 
 func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
 	s := syncerstate.EmptyState()
-	categories := collection.GetAll(CategoryResourceType)
+	categories := collection.GetAll(state.CategoryResourceType)
 	for _, remoteCategory := range categories {
 		category, ok := remoteCategory.Data.(*catalog.Category)
 		if !ok {
@@ -136,14 +135,14 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 		stateArgs.FromRemoteCategory(category, collection.GetURNByID)
 
 		resourceState := &syncerstate.ResourceState{
-			Type:         CategoryResourceType,
+			Type:         state.CategoryResourceType,
 			ID:           category.ExternalId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(category.ExternalId, CategoryResourceType)
+		urn := resources.URN(category.ExternalId, state.CategoryResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

@@ -16,6 +16,13 @@ type PropertyCreate struct {
 	ExternalId  string                 `json:"externalId"`
 }
 
+type PropertyUpdate struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"propConfig,omitempty"`
+}
+
 type Property struct {
 	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
@@ -32,7 +39,7 @@ type Property struct {
 
 type PropertyStore interface {
 	CreateProperty(ctx context.Context, input PropertyCreate) (*Property, error)
-	UpdateProperty(ctx context.Context, id string, input *Property) (*Property, error)
+	UpdateProperty(ctx context.Context, id string, input *PropertyUpdate) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
 	GetProperty(ctx context.Context, id string) (*Property, error)
 	GetProperties(ctx context.Context) ([]*Property, error)
@@ -46,7 +53,7 @@ func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error
 	return nil
 }
 
-func (c *RudderDataCatalog) UpdateProperty(ctx context.Context, id string, new *Property) (*Property, error) {
+func (c *RudderDataCatalog) UpdateProperty(ctx context.Context, id string, new *PropertyUpdate) (*Property, error) {
 	byt, err := json.Marshal(new)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)

@@ -15,7 +15,6 @@ type CategoryCreate struct {
 
 type CategoryUpdate struct {
 	Name       string `json:"name"`
-	ExternalId string `json:"externalId"`
 }
 
 type Category struct {

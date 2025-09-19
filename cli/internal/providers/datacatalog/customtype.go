@@ -98,15 +98,13 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			})
 		}
 
-		updated, err = p.client.UpdateCustomType(ctx, prevState.ID, &catalog.CustomType{
-			ID:          prevState.ID,
+		updated, err = p.client.UpdateCustomType(ctx, prevState.ID, &catalog.CustomTypeUpdate{
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type,
 			Config:      toArgs.Config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
-			ExternalId:  ID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)
@@ -186,7 +184,7 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 			Data:       customType,
 		}
 	}
-	collection.Set(CustomTypeResourceType, resourceMap)
+	collection.Set(state.CustomTypeResourceType, resourceMap)
 
 	return collection, nil
 }

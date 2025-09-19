@@ -68,14 +68,11 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 	oldState := state.PropertyState{}
 	oldState.FromResourceData(olds)
 
-	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &catalog.Property{
-		ID:          oldState.ID,
+	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &catalog.PropertyUpdate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
 		Config:      toArgs.Config,
-		ExternalId:  ID,
-		WorkspaceId: oldState.WorkspaceID,
 	})
 
 	if err != nil {
@@ -130,7 +127,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 			Data:       property,
 		}
 	}
-	collection.Set(PropertyResourceType, resourceMap)
+	collection.Set(state.PropertyResourceType, resourceMap)
 
 	return collection, nil
 }

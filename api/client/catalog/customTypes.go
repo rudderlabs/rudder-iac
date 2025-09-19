@@ -18,6 +18,15 @@ type CustomTypeCreate struct {
 	ExternalId  string                 `json:"externalId"`
 }
 
+type CustomTypeUpdate struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"config"`
+	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+	Variants    Variants               `json:"variants,omitempty"`
+}
+
 type CustomType struct {
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
@@ -45,7 +54,7 @@ type CustomTypeProperty struct {
 
 type CustomTypeStore interface {
 	CreateCustomType(ctx context.Context, input CustomTypeCreate) (*CustomType, error)
-	UpdateCustomType(ctx context.Context, id string, input *CustomType) (*CustomType, error)
+	UpdateCustomType(ctx context.Context, id string, input *CustomTypeUpdate) (*CustomType, error)
 	DeleteCustomType(ctx context.Context, id string) error
 	GetCustomType(ctx context.Context, id string) (*CustomType, error)
 	GetCustomTypes(ctx context.Context) ([]*CustomType, error)
@@ -59,7 +68,7 @@ func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) err
 	return nil
 }
 
-func (c *RudderDataCatalog) UpdateCustomType(ctx context.Context, id string, new *CustomType) (*CustomType, error) {
+func (c *RudderDataCatalog) UpdateCustomType(ctx context.Context, id string, new *CustomTypeUpdate) (*CustomType, error) {
 	byt, err := json.Marshal(new)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)

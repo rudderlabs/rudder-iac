@@ -27,6 +27,8 @@ type CustomTypeProperty struct {
 	Required bool
 }
 
+const CustomTypeResourceType = "custom-type"
+
 // Diff compares two CustomTypeProperty instances and returns true if they differ
 func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
 	if prop.ID != other.ID {

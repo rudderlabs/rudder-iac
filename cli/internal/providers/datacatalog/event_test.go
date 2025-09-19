@@ -36,7 +36,7 @@ func (m *MockEventCatalog) CreateEvent(ctx context.Context, eventCreate catalog.
 	return m.mockEvent, m.err
 }
 
-func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
+func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.EventUpdate) (*catalog.Event, error) {
 	return m.mockEvent, m.err
 }
 

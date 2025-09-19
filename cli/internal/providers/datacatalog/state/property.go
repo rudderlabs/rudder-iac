@@ -16,6 +16,8 @@ type PropertyArgs struct {
 	Config      map[string]interface{}
 }
 
+const PropertyResourceType     = "property"
+
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description

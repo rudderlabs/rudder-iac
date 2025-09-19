@@ -24,7 +24,7 @@ func (m *MockPropertyCatalog) CreateProperty(ctx context.Context, propertyCreate
 	return m.property, m.err
 }
 
-func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
+func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.PropertyUpdate) (*catalog.Property, error) {
 	return m.property, m.err
 }
 

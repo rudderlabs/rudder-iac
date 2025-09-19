@@ -5,24 +5,17 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
-const (
-	PropertyResourceType     = "property"
-	EventResourceType        = "event"
-	TrackingPlanResourceType = "tracking-plan"
-	CustomTypeResourceType   = "custom-type"
-	CategoryResourceType     = "category"
-)
-
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
-	PropertyResourceType:     catalog.ResourceCollectionProperties,
-	EventResourceType:        catalog.ResourceCollectionEvents,
-	TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
-	CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
-	CategoryResourceType:     catalog.ResourceCollectionCategories,
+	dcstate.PropertyResourceType:     catalog.ResourceCollectionProperties,
+	dcstate.EventResourceType:        catalog.ResourceCollectionEvents,
+	dcstate.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
+	dcstate.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
+	dcstate.CategoryResourceType:     catalog.ResourceCollectionCategories,
 }
 
 type resourceProvider interface {
@@ -148,10 +141,10 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
 		}
 
-    s, err = s.Merge(providerState)
-    if err != nil {
-      return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
-    }
+		s, err = s.Merge(providerState)
+		if err != nil {
+			return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
+		}
 	}
 
 	log.Debug("reconstructed state", "resource_count", len(s.Resources))
