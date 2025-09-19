@@ -5,39 +5,36 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
-const (
-	PropertyResourceType     = "property"
-	EventResourceType        = "event"
-	TrackingPlanResourceType = "tracking-plan"
-	CustomTypeResourceType   = "custom-type"
-	CategoryResourceType     = "category"
-)
-
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
-	PropertyResourceType:     catalog.ResourceCollectionProperties,
-	EventResourceType:        catalog.ResourceCollectionEvents,
-	TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
-	CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
-	CategoryResourceType:     catalog.ResourceCollectionCategories,
+	dcstate.PropertyResourceType:     catalog.ResourceCollectionProperties,
+	dcstate.EventResourceType:        catalog.ResourceCollectionEvents,
+	dcstate.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
+	dcstate.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
+	dcstate.CategoryResourceType:     catalog.ResourceCollectionCategories,
 }
 
 type resourceProvider interface {
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 }
 
 func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
+	var apistate *state.State = state.EmptyState()
+
 	cs, err := p.client.ReadState(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	s := &state.State{
+	apistate = &state.State{
 		Version:   cs.Version,
 		Resources: make(map[string]*state.ResourceState),
 	}
@@ -50,10 +47,10 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 			Output:       rs.Output,
 			Dependencies: rs.Dependencies,
 		})
-		s.Resources[id] = decodedState
+		apistate.Resources[id] = decodedState
 	}
 
-	return s, nil
+	return apistate, nil
 }
 
 func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
@@ -98,14 +95,58 @@ func (p *Provider) Update(ctx context.Context, ID string, resourceType string, d
 	return provider.Update(ctx, ID, data, state)
 }
 
-func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return fmt.Errorf("unknown resource type: %s", resourceType)
 	}
-	return provider.Delete(ctx, ID, state)
+	return provider.Delete(ctx, ID, data)
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	return nil, fmt.Errorf("import is not supported for %s", resourceType)
+}
+
+// LoadResourcesFromRemote loads all resources from remote catalog into a ResourceCollection
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	log.Debug("loading all resources from remote catalog")
+	collection := resources.NewResourceCollection()
+
+	// Load resources for stateless resources from provider store
+	for resourceType, provider := range p.providerStore {
+		c, err := provider.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
+		}
+
+		collection, err = collection.Merge(c)
+		if err != nil {
+			return nil, err
+		}
+		log.Debug("loaded resources from remote", "type", resourceType)
+	}
+
+	return collection, nil
+}
+
+// LoadStateFromResources reconstructs CLI state from loaded remote resources
+func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	log.Debug("reconstructing state from loaded resources")
+	s := state.EmptyState()
+
+	// loop over stateless resources and load state
+	for resourceType, provider := range p.providerStore {
+		providerState, err := provider.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
+		}
+
+		s, err = s.Merge(providerState)
+		if err != nil {
+			return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
+		}
+	}
+
+	log.Debug("reconstructed state", "resource_count", len(s.Resources))
+	return s, nil
 }

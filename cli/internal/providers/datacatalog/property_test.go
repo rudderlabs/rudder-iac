@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func (m *MockPropertyCatalog) CreateProperty(ctx context.Context, propertyCreate
 	return m.property, m.err
 }
 
-func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
+func (m *MockPropertyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.PropertyUpdate) (*catalog.Property, error) {
 	return m.property, m.err
 }
 
@@ -61,6 +61,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Description: "property description",
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
+			ExternalId:  "test-project-id",
 			Config:      map[string]interface{}{"key": "value"},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,

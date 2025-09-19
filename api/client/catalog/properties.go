@@ -13,6 +13,14 @@ type PropertyCreate struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"propConfig,omitempty"`
+	ExternalId  string                 `json:"externalId"`
+}
+
+type PropertyUpdate struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"propConfig,omitempty"`
 }
 
 type Property struct {
@@ -21,6 +29,7 @@ type Property struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	WorkspaceId string                 `json:"workspaceId"`
+	ExternalId  string                 `json:"externalId,omitempty"`
 	Config      map[string]interface{} `json:"propConfig"`
 	CreatedAt   time.Time              `json:"createdAt"`
 	UpdatedAt   time.Time              `json:"updatedAt"`
@@ -30,9 +39,10 @@ type Property struct {
 
 type PropertyStore interface {
 	CreateProperty(ctx context.Context, input PropertyCreate) (*Property, error)
-	UpdateProperty(ctx context.Context, id string, input *Property) (*Property, error)
+	UpdateProperty(ctx context.Context, id string, input *PropertyUpdate) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
 	GetProperty(ctx context.Context, id string) (*Property, error)
+	GetProperties(ctx context.Context) ([]*Property, error)
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {
@@ -43,7 +53,7 @@ func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error
 	return nil
 }
 
-func (c *RudderDataCatalog) UpdateProperty(ctx context.Context, id string, new *Property) (*Property, error) {
+func (c *RudderDataCatalog) UpdateProperty(ctx context.Context, id string, new *PropertyUpdate) (*Property, error) {
 	byt, err := json.Marshal(new)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
@@ -93,4 +103,8 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 	}
 
 	return &property, nil
+}
+
+func (c *RudderDataCatalog) GetProperties(ctx context.Context) ([]*Property, error) {
+	return getAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
 }

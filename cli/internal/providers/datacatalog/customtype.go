@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type CustomTypeProvider struct {
@@ -45,6 +46,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Config:      toArgs.Config,
 		Properties:  properties,
 		Variants:    toArgs.Variants.ToCatalogVariants(),
+		ExternalId:  ID,
 	}
 
 	customType, err := p.client.CreateCustomType(ctx, input)
@@ -96,8 +98,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			})
 		}
 
-		updated, err = p.client.UpdateCustomType(ctx, prevState.ID, &catalog.CustomType{
-			ID:          prevState.ID,
+		updated, err = p.client.UpdateCustomType(ctx, prevState.ID, &catalog.CustomTypeUpdate{
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type,
@@ -161,4 +162,33 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 	}
 
 	return nil
+}
+
+// LoadResourcesFromRemote loads all custom types from the remote catalog
+func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	p.log.Debug("loading custom types from remote catalog")
+	collection := resources.NewResourceCollection()
+
+	// fetch custom types from remote
+	customTypes, err := p.client.GetCustomTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key = customType's remoteId
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, customType := range customTypes {
+		resourceMap[customType.ID] = &resources.RemoteResource{
+			ID:         customType.ID,
+			ExternalID: customType.ExternalId,
+			Data:       customType,
+		}
+	}
+	collection.Set(state.CustomTypeResourceType, resourceMap)
+
+	return collection, nil
+}
+
+func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	return syncerstate.EmptyState(), nil
 }

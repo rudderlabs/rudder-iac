@@ -15,7 +15,7 @@ func (m *EmptyCatalog) CreateEvent(ctx context.Context, eventCreate catalog.Even
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
+func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.EventUpdate) (*catalog.Event, error) {
 	return nil, nil
 }
 
@@ -32,7 +32,7 @@ func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate catalo
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
+func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.PropertyUpdate) (*catalog.Property, error) {
 	return nil, nil
 }
 
@@ -84,7 +84,7 @@ func (m *EmptyCatalog) CreateCustomType(ctx context.Context, customTypeCreate ca
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomType) (*catalog.CustomType, error) {
+func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomTypeUpdate) (*catalog.CustomType, error) {
 	return nil, nil
 }
 
@@ -121,5 +121,21 @@ func (m *EmptyCatalog) DeleteCategory(ctx context.Context, categoryID string) er
 }
 
 func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetEvents(ctx context.Context) ([]*catalog.Event, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetProperties(ctx context.Context) ([]*catalog.Property, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
 	return nil, nil
 }

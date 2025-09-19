@@ -36,7 +36,7 @@ func (m *MockEventCatalog) CreateEvent(ctx context.Context, eventCreate catalog.
 	return m.mockEvent, m.err
 }
 
-func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
+func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.EventUpdate) (*catalog.Event, error) {
 	return m.mockEvent, m.err
 }
 
@@ -72,6 +72,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
+			ExternalId:  "event-id-1",
 			CategoryId:  nil,
 			CreatedAt:   created,
 			UpdatedAt:   updated,
@@ -145,6 +146,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event new description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
+			ExternalId:  "test-project-id",
 			CategoryId:  strptr("Marketing"),
 			CreatedAt:   created,
 			UpdatedAt:   updated,

@@ -114,9 +114,9 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"localId":  "property-id",
-							"id":       "",
-							"required": true,
+							"localId":              "property-id",
+							"id":                   "",
+							"required":             true,
 							"additionalProperties": false,
 						},
 					},
@@ -209,9 +209,9 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":       "",
-							"localId":  "property-id",
-							"required": true,
+							"id":                   "",
+							"localId":              "property-id",
+							"required":             true,
 							"additionalProperties": false,
 						},
 					},
@@ -303,9 +303,9 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":       "",
-							"localId":  "property-id-1",
-							"required": false,
+							"id":                   "",
+							"localId":              "property-id-1",
+							"required":             false,
 							"additionalProperties": false,
 						},
 					},

@@ -1,6 +1,8 @@
 package state
 
 import (
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
@@ -8,6 +10,8 @@ import (
 type CategoryArgs struct {
 	Name string
 }
+
+const CategoryResourceType = "category"
 
 func (args *CategoryArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
@@ -17,6 +21,16 @@ func (args *CategoryArgs) ToResourceData() resources.ResourceData {
 
 func (args *CategoryArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
+}
+
+func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.Category) {
+	args.Name = category.Name
+}
+
+// FromRemoteCategory converts from remote API Category to CategoryArgs
+func (args *CategoryArgs) FromRemoteCategory(category *catalog.Category, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	args.Name = category.Name
+	return nil
 }
 
 // CategoryState represents the full state of a category
@@ -49,4 +63,14 @@ func (c *CategoryState) FromResourceData(from resources.ResourceData) {
 	c.CategoryArgs.FromResourceData(resources.ResourceData(
 		MustMapStringInterface(from, "categoryArgs"),
 	))
+}
+
+// FromRemoteCategory converts from catalog.Category to CategoryState
+func (c *CategoryState) FromRemoteCategory(category *catalog.Category, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	c.ID = category.ID
+	c.Name = category.Name
+	c.WorkspaceID = category.WorkspaceID
+	c.CreatedAt = category.CreatedAt.String()
+	c.UpdatedAt = category.UpdatedAt.String()
+	return c.CategoryArgs.FromRemoteCategory(category, getURNFromRemoteId)
 }
