@@ -46,7 +46,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Config:      toArgs.Config,
 		Properties:  properties,
 		Variants:    toArgs.Variants.ToCatalogVariants(),
-		ExternalId:  ID,
+		ProjectId:   ID,
 	}
 
 	customType, err := p.client.CreateCustomType(ctx, input)
@@ -106,7 +106,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			Config:      toArgs.Config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
-			ExternalId:  ID,
+			ProjectId:   ID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating custom type resource in upstream catalog: %w", err)
@@ -170,7 +170,7 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading custom types from remote catalog")
 	collection := resources.NewResourceCollection()
-
+	
 	// fetch custom types from remote
 	customTypes, err := p.client.GetCustomTypes(ctx)
 	if err != nil {
@@ -181,15 +181,16 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, customType := range customTypes {
 		resourceMap[customType.ID] = &resources.RemoteResource{
-			ID:         customType.ID,
-			ExternalID: customType.ExternalId,
-			Data:       customType,
+			ID: customType.ID,
+			ExternalID: customType.ProjectId,
+			Data: customType,
 		}
 	}
 	collection.Set(CustomTypeResourceType, resourceMap)
 
 	return collection, nil
 }
+
 
 func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
 	return nil, fmt.Errorf("not implemented")
