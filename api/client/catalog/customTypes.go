@@ -15,7 +15,7 @@ type CustomTypeCreate struct {
 	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
 	Variants    Variants               `json:"variants,omitempty"`
-	ExternalId  string                 `json:"externalId"`
+	ProjectId   string                 `json:"projectId"`
 }
 
 type CustomType struct {
@@ -26,7 +26,7 @@ type CustomType struct {
 	Type            string                 `json:"type"`
 	DataType        string                 `json:"dataType"`
 	WorkspaceId     string                 `json:"workspaceId"`
-	ExternalId      string                 `json:"externalId"`
+	ProjectId       string                 `json:"projectId"`
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`

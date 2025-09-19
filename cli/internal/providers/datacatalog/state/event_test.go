@@ -112,7 +112,7 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  &categoryID,
-		ExternalId:  "category-123-local",
+		ProjectId:   "category-123-local",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -120,7 +120,7 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 
 	args := &state.EventArgs{}
 	err := args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
-
+	
 	assert.NoError(t, err)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)
@@ -142,7 +142,7 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  nil,
-		ExternalId:  "project-456",
+		ProjectId:   "project-456",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -155,7 +155,7 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 
 	args := &state.EventArgs{}
 	err := args.FromRemoteEvent(remoteEvent, getURNFromRemoteId)
-
+	
 	assert.NoError(t, err)
 	assert.Equal(t, "Test Event", args.Name)
 	assert.Equal(t, "Test Description", args.Description)

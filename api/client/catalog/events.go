@@ -13,7 +13,7 @@ type EventCreate struct {
 	Description string  `json:"description"`
 	EventType   string  `json:"eventType"`
 	CategoryId  *string `json:"categoryId"`
-	ExternalId  string  `json:"externalId"`
+	ProjectId   string  `json:"projectId"`
 }
 
 type Event struct {
@@ -23,7 +23,7 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
-	ExternalId  string    `json:"externalId"`
+	ProjectId   string    `json:"projectId"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
