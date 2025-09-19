@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/rudderlabs/rudder-iac/compare/v0.10.0...v0.11.0) (2025-09-19)
+
+
+### Features
+
+* add CRUD APIs for event stream sources ([#172](https://github.com/rudderlabs/rudder-iac/issues/172)) ([220267f](https://github.com/rudderlabs/rudder-iac/commit/220267fe697ea855f1042edaee38aa6ac1ef57b3))
+
+
+### Miscellaneous
+
+* apiClient - add projectId for events, categories, properties and custom types ([#156](https://github.com/rudderlabs/rudder-iac/issues/156)) ([c407b52](https://github.com/rudderlabs/rudder-iac/commit/c407b52050dd51a37474b3bfe10270ffc1a3986a))
+
 ## [0.10.0](https://github.com/rudderlabs/rudder-iac/compare/v0.9.0...v0.10.0) (2025-09-18)
 
 
