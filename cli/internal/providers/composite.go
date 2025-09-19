@@ -170,7 +170,10 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 		if err != nil {
 			return nil, err
 		}
-		collection.Merge(resources)
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return collection, nil
 }
