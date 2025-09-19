@@ -61,7 +61,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Description: "property description",
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
-			ProjectId:   "test-project-id",
+			ExternalId:  "test-project-id",
 			Config:      map[string]interface{}{"key": "value"},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,

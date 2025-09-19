@@ -32,8 +32,8 @@ func (p *CategoryProvider) Create(ctx context.Context, ID string, data resources
 	toArgs.FromResourceData(data)
 
 	category, err := p.client.CreateCategory(ctx, catalog.CategoryCreate{
-		Name:      toArgs.Name,
-		ProjectId: ID,
+		Name:       toArgs.Name,
+		ExternalId: ID,
 	})
 
 	if err != nil {
@@ -63,8 +63,8 @@ func (p *CategoryProvider) Update(ctx context.Context, ID string, input resource
 	oldState.FromResourceData(olds)
 
 	updated, err := p.client.UpdateCategory(ctx, oldState.ID, catalog.CategoryUpdate{
-		Name:      toArgs.Name,
-		ProjectId: ID,
+		Name:       toArgs.Name,
+		ExternalId: ID,
 	})
 
 	if err != nil {
@@ -100,7 +100,7 @@ func (p *CategoryProvider) Delete(ctx context.Context, ID string, data resources
 func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading categories from remote catalog")
 	collection := resources.NewResourceCollection()
-	
+
 	// fetch categories from remote
 	categories, err := p.client.GetCategories(ctx)
 	if err != nil {
@@ -111,9 +111,9 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, category := range categories {
 		resourceMap[category.ID] = &resources.RemoteResource{
-			ID: category.ID,
-			ExternalID: category.ProjectId,
-			Data: category,
+			ID:         category.ID,
+			ExternalID: category.ExternalId,
+			Data:       category,
 		}
 	}
 	collection.Set(CategoryResourceType, resourceMap)
@@ -137,15 +137,14 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 
 		resourceState := &syncerstate.ResourceState{
 			Type:         CategoryResourceType,
-			ID:           category.ProjectId,
+			ID:           category.ExternalId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(category.ProjectId, CategoryResourceType)
+		urn := resources.URN(category.ExternalId, CategoryResourceType)
 		s.Resources[urn] = resourceState
-	}	
+	}
 	return s, nil
 }
-
