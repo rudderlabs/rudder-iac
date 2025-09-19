@@ -29,7 +29,7 @@ type Property struct {
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
 	WorkspaceId string                 `json:"workspaceId"`
-	ExternalId  string                 `json:"externalId"`
+	ExternalId  string                 `json:"externalId,omitempty"`
 	Config      map[string]interface{} `json:"propConfig"`
 	CreatedAt   time.Time              `json:"createdAt"`
 	UpdatedAt   time.Time              `json:"updatedAt"`

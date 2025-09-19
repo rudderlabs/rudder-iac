@@ -21,7 +21,7 @@ type Category struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	WorkspaceID string    `json:"workspaceId"`
-	ExternalId  string    `json:"externalId"`
+	ExternalId  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

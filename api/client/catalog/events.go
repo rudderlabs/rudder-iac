@@ -30,7 +30,7 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
-	ExternalId  string    `json:"externalId"`
+	ExternalId  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
