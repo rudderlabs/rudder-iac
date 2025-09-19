@@ -19,7 +19,7 @@ type ExperimentalConfig struct {
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 }
 
-// GetExperimentalFlags returns information about all available experimental flags
+// getExperimentalFlags returns information about all available experimental flags
 func getAvailableExperimentalFlags() []string {
 	cfg := GetConfig()
 	experimental := cfg.ExperimentalFlags

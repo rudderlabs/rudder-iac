@@ -192,5 +192,5 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 }
 
 func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	return nil, fmt.Errorf("not implemented")
+	return syncerstate.EmptyState(), nil
 }

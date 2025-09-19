@@ -3,7 +3,6 @@ package datacatalog
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -17,8 +16,6 @@ const (
 	CustomTypeResourceType   = "custom-type"
 	CategoryResourceType     = "category"
 )
-
-var statelessResources = []string{CategoryResourceType, EventResourceType}
 
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
 	PropertyResourceType:     catalog.ResourceCollectionProperties,
@@ -50,10 +47,6 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 	}
 
 	for id, rs := range cs.Resources {
-		// skip adding stateless resources to the state
-		if slices.Contains(statelessResources, rs.Type) {
-			continue
-		}
 		decodedState := state.DecodeResourceState(&state.ResourceState{
 			ID:           rs.ID,
 			Type:         rs.Type,
@@ -63,7 +56,6 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 		})
 		apistate.Resources[id] = decodedState
 	}
-	
 
 	return apistate, nil
 }
@@ -130,9 +122,6 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 
 	// Load resources for stateless resources from provider store
 	for resourceType, provider := range p.providerStore {
-		if !slices.Contains(statelessResources, resourceType) {
-			continue
-		}
 		c, err := provider.LoadResourcesFromRemote(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
@@ -152,21 +141,19 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	log.Debug("reconstructing state from loaded resources")
 	s := state.EmptyState()
-	
+
 	// loop over stateless resources and load state
 	for resourceType, provider := range p.providerStore {
-		if slices.Contains(statelessResources, resourceType) {
-			providerState, err := provider.LoadStateFromResources(ctx, collection)
+		providerState, err := provider.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
+		}
+		if s == nil {
+			s = providerState
+		} else {
+			s, err = s.Merge(providerState)
 			if err != nil {
-				return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
-			}
-			if s == nil {
-				s = providerState
-			} else {
-				s, err = s.Merge(providerState)
-				if err != nil {
-					return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
-				}
+				return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
 			}
 		}
 	}
