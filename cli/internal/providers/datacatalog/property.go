@@ -36,7 +36,7 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
 		Config:      toArgs.Config,
-		ProjectId:   ID,
+		ExternalId:  ID,
 	})
 
 	if err != nil {
@@ -74,7 +74,7 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
 		Config:      toArgs.Config,
-		ProjectId:   ID,
+		ExternalId:  ID,
 		WorkspaceId: oldState.WorkspaceID,
 	})
 
@@ -114,7 +114,7 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading properties from remote catalog")
 	collection := resources.NewResourceCollection()
-	
+
 	// fetch properties from remote
 	properties, err := p.client.GetProperties(ctx)
 	if err != nil {
@@ -125,9 +125,9 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
 		resourceMap[property.ID] = &resources.RemoteResource{
-			ID: property.ID,
-			ExternalID: property.ProjectId,
-			Data: property,
+			ID:         property.ID,
+			ExternalID: property.ExternalId,
+			Data:       property,
 		}
 	}
 	collection.Set(PropertyResourceType, resourceMap)
