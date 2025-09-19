@@ -63,7 +63,6 @@ func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
 func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
 	encodedState := state.EncodeResourceState(s)
 
-	// we are updating state for all resources(stateless/stateful) to ensure backward compatibility with older versions
 	remoteID := s.Output["id"].(string)
 	return p.client.PutResourceState(ctx, catalog.PutStateRequest{
 		Collection: resourceTypeCollection[s.Type],
@@ -148,14 +147,11 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 		if err != nil {
 			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
 		}
-		if s == nil {
-			s = providerState
-		} else {
-			s, err = s.Merge(providerState)
-			if err != nil {
-				return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
-			}
-		}
+
+    s, err = s.Merge(providerState)
+    if err != nil {
+      return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
+    }
 	}
 
 	log.Debug("reconstructed state", "resource_count", len(s.Resources))
