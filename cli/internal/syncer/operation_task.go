@@ -20,6 +20,11 @@ func (t *operationTask) Id() string {
 	return t.operation.Resource.URN()
 }
 
+/*
+	Dependencies are currently defined at the resource level,
+	which means multiple operations for the same resource
+	may run concurrently. This behavior may not always be desirable.
+*/
 func (t *operationTask) Dependencies() []string {
 	// For delete operations, we need to invert the dependency order
 	// If A depends on B, then for deletion: B should be deleted before A

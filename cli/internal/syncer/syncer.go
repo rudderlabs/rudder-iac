@@ -159,11 +159,10 @@ func (e *OperationError) Unwrap() error {
 }
 
 func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
-	// TODO: Replace with experimental flag
-	if options.Concurrency <= 0 {
-		return s.executePlanSequentially(ctx, state, plan, continueOnFail)
+	if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
+		return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail, options)
 	}
-	return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail, options)
+	return s.executePlanSequentially(ctx, state, plan, continueOnFail)
 }
 
 func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {

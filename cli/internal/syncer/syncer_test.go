@@ -3,14 +3,24 @@ package syncer_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
+
+func enableConcurrentSyncs(t *testing.T) {
+	os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "true")
+	config.InitConfig("")
+	t.Cleanup(func() {
+		os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "false")
+	})
+}
 
 func TestSyncerCreate(t *testing.T) {
 	event := testutils.NewMockEvent("event1", resources.ResourceData{
@@ -204,6 +214,8 @@ func TestSyncerDelete(t *testing.T) {
 }
 
 func TestSyncerConcurrencyCreate(t *testing.T) {
+	enableConcurrentSyncs(t)
+
 	events, properties := createBasicResources()
 	trackingPlans := createTrackingPlans(events, properties)
 	targetGraph := createGraphWithResources(events, properties, trackingPlans)
@@ -303,6 +315,8 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 }
 
 func TestSyncerConcurrencyDelete(t *testing.T) {
+	enableConcurrentSyncs(t)
+
 	events, properties := createBasicResources()
 	trackingPlans := createTrackingPlans(events, properties)
 
@@ -405,6 +419,7 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 	t.Run("sync operations stop on first failure", func(t *testing.T) {
+		enableConcurrentSyncs(t)
 
 		events, properties := createBasicResources()
 		trackingPlans := createTrackingPlans(events, properties)
@@ -440,6 +455,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 	})
 
 	t.Run("destroy operations continue despite failures", func(t *testing.T) {
+		enableConcurrentSyncs(t)
 
 		events, properties := createBasicResources()
 		trackingPlans := createTrackingPlans(events, properties)
