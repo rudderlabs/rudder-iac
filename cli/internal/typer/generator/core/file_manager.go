@@ -47,21 +47,21 @@ func (fm *FileManager) WriteFile(file File) error {
 }
 
 // WriteFiles writes multiple files atomically as a batch operation
-func (fm *FileManager) WriteFiles(files []File) error {
+func (fm *FileManager) WriteFiles(files []*File) error {
 	if len(files) == 0 {
 		return nil
 	}
 
 	// Validate all files first
 	for i, file := range files {
-		if err := fm.validateFile(file); err != nil {
+		if err := fm.validateFile(*file); err != nil {
 			return fmt.Errorf("file %d: %w", i, err)
 		}
 	}
 
 	// Write all files
 	for _, file := range files {
-		if err := fm.WriteFile(file); err != nil {
+		if err := fm.WriteFile(*file); err != nil {
 			return err
 		}
 	}
