@@ -3,7 +3,6 @@ package typer
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -19,8 +18,6 @@ var (
 // This interface is defined by RudderTyper to specify exactly what it needs
 // from its dependency, following the dependency inversion principle
 type PlanProvider interface {
-	// GetTrackingPlan retrieves the tracking plan data
-	// The tracking plan ID is an internal detail of the provider
 	GetTrackingPlan(ctx context.Context) (*plan.TrackingPlan, error)
 }
 
@@ -54,7 +51,6 @@ func (rt *RudderTyper) Generate(ctx context.Context, options GenerationOptions) 
 	if err != nil {
 		return fmt.Errorf("fetching tracking plan: %w", err)
 	}
-	rudderTyperLog.Debug("fetched tracking plan", "rules", len(trackingPlan.Rules))
 
 	// Step 2: Generate platform-specific code
 	fmt.Printf("⚡ Generating %s code...\n", options.Platform)
@@ -117,14 +113,8 @@ func (rt *RudderTyper) writeGeneratedFiles(files []*core.File, outputPath string
 		return nil
 	}
 
-	// Convert absolute path to avoid issues
-	absOutputPath, err := filepath.Abs(outputPath)
-	if err != nil {
-		return fmt.Errorf("resolving output path: %w", err)
-	}
-
-	rudderTyperLog.Debug("creating FileManager for atomic operations", "absPath", absOutputPath)
-	fileManager := core.NewFileManager(absOutputPath)
+	rudderTyperLog.Debug("creating FileManager for atomic operations", "outputPath", outputPath)
+	fileManager := core.NewFileManager(outputPath)
 
 	rudderTyperLog.Debug("would call fileManager.WriteFiles() for atomic batch write")
 	return fileManager.WriteFiles(files)

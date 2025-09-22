@@ -15,44 +15,44 @@ func TestFileManager_WriteFile(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		file           File
-		verifyDirPerms bool                                          // whether to verify directory permissions were set correctly
-		setupFunc      func(tempDir string, fm *FileManager) error   // setup before main test
-		verifyFunc     func(t *testing.T, tempDir string, file File) // custom verification logic
+		file           *File
+		verifyDirPerms bool                                           // whether to verify directory permissions were set correctly
+		setupFunc      func(tempDir string, fm *FileManager) error    // setup before main test
+		verifyFunc     func(t *testing.T, tempDir string, file *File) // custom verification logic
 	}{
 		"single file": {
-			file: File{
+			file: &File{
 				Path:    "test.txt",
 				Content: "Hello, World!",
 			},
 		},
 		"nested directories": {
-			file: File{
+			file: &File{
 				Path:    "nested/deep/dir/test.txt",
 				Content: "Nested content",
 			},
 			verifyDirPerms: true,
 		},
 		"file with special characters": {
-			file: File{
+			file: &File{
 				Path:    "special/file-name_with.chars.txt",
 				Content: "Content with special chars: 🎉 & symbols!",
 			},
 		},
 		"empty content": {
-			file: File{
+			file: &File{
 				Path:    "empty.txt",
 				Content: "",
 			},
 		},
 		"large file content": {
-			file: File{
+			file: &File{
 				Path:    "large.txt",
 				Content: strings.Repeat("A", 1024*1024), // 1MB
 			},
 		},
 		"multiline content": {
-			file: File{
+			file: &File{
 				Path: "multiline.txt",
 				Content: `Line 1
 Line 2
@@ -61,16 +61,16 @@ With some special chars: 🚀`,
 			},
 		},
 		"overwrites existing file atomically": {
-			file: File{
+			file: &File{
 				Path:    "test.txt",
 				Content: "Updated content",
 			},
 			setupFunc: func(tempDir string, fm *FileManager) error {
 				// Create initial file
-				initialFile := File{Path: "test.txt", Content: "Initial content"}
+				initialFile := &File{Path: "test.txt", Content: "Initial content"}
 				return fm.WriteFile(initialFile)
 			},
-			verifyFunc: func(t *testing.T, tempDir string, file File) {
+			verifyFunc: func(t *testing.T, tempDir string, file *File) {
 				// Verify the file was overwritten with new content
 				fullPath := filepath.Join(tempDir, file.Path)
 				content, err := os.ReadFile(fullPath)
@@ -206,7 +206,7 @@ func TestFileManager_Validation(t *testing.T) {
 		expectSuccess    bool
 		useEmptyBaseDir  bool                               // special case: test empty BaseDir behavior
 		setupFunc        func() (cleanup func(), err error) // for directory change setup
-		customVerifyFunc func(t *testing.T, file File)      // custom verification for special cases
+		customVerifyFunc func(t *testing.T, file *File)     // custom verification for special cases
 	}{
 		"empty base directory defaults to current directory": {
 			path:            "test.txt",
@@ -238,7 +238,7 @@ func TestFileManager_Validation(t *testing.T) {
 					os.RemoveAll(tempDir)
 				}, nil
 			},
-			customVerifyFunc: func(t *testing.T, file File) {
+			customVerifyFunc: func(t *testing.T, file *File) {
 				// Verify file was created in current directory
 				content, err := os.ReadFile(file.Path)
 				require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestFileManager_Validation(t *testing.T) {
 		expectSuccess    bool
 		useEmptyBaseDir  bool
 		setupFunc        func() (cleanup func(), err error)
-		customVerifyFunc func(t *testing.T, file File)
+		customVerifyFunc func(t *testing.T, file *File)
 	}{
 		path:          absolutePath,
 		content:       "content",
@@ -316,7 +316,7 @@ func TestFileManager_Validation(t *testing.T) {
 				fm = NewFileManager(tempDir)
 			}
 
-			file := File{Path: test.path, Content: test.content}
+			file := &File{Path: test.path, Content: test.content}
 			err := fm.WriteFile(file)
 
 			if test.expectSuccess {
@@ -339,14 +339,14 @@ func TestFileManager_AtomicOperations(t *testing.T) {
 
 	tests := map[string]struct {
 		setupFunc   func(tempDir string, fm *FileManager) error // setup before main test
-		testFile    File
+		testFile    *File
 		expectError bool
 		verifyFunc  func(t *testing.T, tempDir string) // custom verification logic
 	}{
 		"atomic write preserves existing file on failure": {
 			setupFunc: func(tempDir string, fm *FileManager) error {
 				// Create initial file
-				file := File{Path: "test.txt", Content: "Original content"}
+				file := &File{Path: "test.txt", Content: "Original content"}
 				err := fm.WriteFile(file)
 				if err != nil {
 					return err
@@ -356,7 +356,7 @@ func TestFileManager_AtomicOperations(t *testing.T) {
 				readOnlyDir := filepath.Join(tempDir, "readonly")
 				return os.MkdirAll(readOnlyDir, 0444) // Read-only
 			},
-			testFile:    File{Path: "readonly/test.txt", Content: "Should fail"},
+			testFile:    &File{Path: "readonly/test.txt", Content: "Should fail"},
 			expectError: true,
 			verifyFunc: func(t *testing.T, tempDir string) {
 				// Verify original file is still intact
@@ -366,7 +366,7 @@ func TestFileManager_AtomicOperations(t *testing.T) {
 			},
 		},
 		"no temporary files left behind": {
-			testFile:    File{Path: "test.txt", Content: "Test content"},
+			testFile:    &File{Path: "test.txt", Content: "Test content"},
 			expectError: false,
 			verifyFunc: func(t *testing.T, tempDir string) {
 				// Check for any temporary files
@@ -417,7 +417,7 @@ func TestFileManager_ErrorHandling(t *testing.T) {
 	tests := map[string]struct {
 		skipOnWindows bool
 		setupFunc     func(tempDir string) error
-		testFile      File
+		testFile      *File
 		errorContains string
 	}{
 		"handles directory creation failure": {
@@ -427,7 +427,7 @@ func TestFileManager_ErrorHandling(t *testing.T) {
 				conflictFile := filepath.Join(tempDir, "conflict")
 				return os.WriteFile(conflictFile, []byte("blocking"), 0644)
 			},
-			testFile: File{
+			testFile: &File{
 				Path:    "conflict/test.txt", // This should fail because "conflict" is a file, not a directory
 				Content: "content",
 			},
