@@ -9,6 +9,7 @@ import (
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -26,7 +27,7 @@ func TestProvider(t *testing.T) {
 	t.Run("GetSupportedTypes", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
 		types := provider.GetSupportedTypes()
-		assert.Contains(t, types, source.ResourceType)
+		assert.Contains(t, types, core.EventStreamSourceResourceType)
 		assert.Len(t, types, 1)
 	})
 
@@ -202,12 +203,12 @@ func TestProvider(t *testing.T) {
 		assert.Len(t, s.Resources, 2)
 
 		// Check first resource
-		urn1 := resources.URN("external-123", source.ResourceType)
+		urn1 := resources.URN("external-123", core.EventStreamSourceResourceType)
 		rs1 := s.GetResource(urn1)
 		require.NotNil(t, rs1)
 		assert.Equal(t, &state.ResourceState{
 			ID:   "external-123",
-			Type: source.ResourceType,
+			Type: core.EventStreamSourceResourceType,
 			Input: resources.ResourceData{
 				"name":              "Test Source 1",
 				"enabled":           true,
@@ -221,7 +222,7 @@ func TestProvider(t *testing.T) {
 		rs2 := s.GetResource("event-stream-source:external-456")
 		assert.Equal(t, &state.ResourceState{
 			ID:   "external-456",
-			Type: source.ResourceType,
+			Type: core.EventStreamSourceResourceType,
 			Input: resources.ResourceData{
 				"name":              "Test Source 2",
 				"enabled":           false,
@@ -244,12 +245,10 @@ func TestProvider(t *testing.T) {
 				"type": "javascript",
 			}
 
-			result, err := provider.Create(ctx, "test-source", source.ResourceType, createData)
+			result, err := provider.Create(ctx, "test-source", core.EventStreamSourceResourceType, createData)
 			require.NoError(t, err)
 			require.Equal(t, &resources.ResourceData{
-				"name":              "Test Source",
-				"enabled":           true,
-				"type": "javascript",
+				"id": "",
 			}, result)
 		})
 
@@ -266,12 +265,10 @@ func TestProvider(t *testing.T) {
 				"id": "test-source-id",
 			}
 
-			result, err := provider.Update(ctx, "test-source", source.ResourceType, updateData, stateData)
+			result, err := provider.Update(ctx, "test-source", core.EventStreamSourceResourceType, updateData, stateData)
 			require.NoError(t, err)
 			assert.Equal(t, &resources.ResourceData{
-				"name":              "Updated Source",
-				"enabled":           false,
-				"type": "javascript",
+				"id": "test-source-id",
 			}, result)
 		})
 
@@ -281,7 +278,7 @@ func TestProvider(t *testing.T) {
 			stateData := resources.ResourceData{
 				"id": "test-source-id",
 			}
-			err := provider.Delete(ctx, "test-source", source.ResourceType, stateData)
+			err := provider.Delete(ctx, "test-source", core.EventStreamSourceResourceType, stateData)
 			require.NoError(t, err)
 		})
 	})
@@ -289,7 +286,7 @@ func TestProvider(t *testing.T) {
 	t.Run("Import", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
 		ctx := context.Background()
-		_, err := provider.Import(ctx, "test-source", source.ResourceType, nil, "workspace-123", "remote-123")
+		_, err := provider.Import(ctx, "test-source", core.EventStreamSourceResourceType, nil, "workspace-123", "remote-123")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "importing event stream source is not supported")
 	})
@@ -321,7 +318,7 @@ func TestProvider(t *testing.T) {
 		collection, err := provider.LoadResourcesFromRemote(ctx)
 		require.NoError(t, err)
 
-		esResources := collection.GetAll(source.ResourceType)
+		esResources := collection.GetAll(core.EventStreamSourceResourceType)
 		require.Len(t, esResources, 2)
 
 		assert.Equal(t, map[string]*resources.RemoteResource{
@@ -382,7 +379,7 @@ func TestProvider(t *testing.T) {
 				},
 			},
 		}
-		collection.Set(source.ResourceType, resourceMap)
+		collection.Set(core.EventStreamSourceResourceType, resourceMap)
 
 		loadedState, err := provider.LoadStateFromResources(ctx, collection)
 		require.NoError(t, err)

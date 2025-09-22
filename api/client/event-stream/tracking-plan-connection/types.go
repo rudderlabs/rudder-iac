@@ -24,14 +24,14 @@ type ConnectionConfig struct {
 }
 
 type EventTypeConfig struct {
-	PropagateValidationErrors bool   `json:"propagateValidationErrors"`
-	UnplannedProperties       Action `json:"unplannedProperties"`
-	AnyOtherViolations        Action `json:"anyOtherViolations"`
+	PropagateValidationErrors *bool   `json:"propagateValidationErrors,omitempty"`
+	UnplannedProperties       *Action `json:"unplannedProperties,omitempty"`
+	AnyOtherViolations        *Action `json:"anyOtherViolation,omitempty"`
 }
 
 type TrackConfig struct {
 	*EventTypeConfig
-	AllowUnplannedEvents bool `json:"allowUnplannedEvents"`
+	AllowUnplannedEvents *bool `json:"allowUnplannedEvents,omitempty"`
 }
 
 type requestBody struct {

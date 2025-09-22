@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -76,7 +77,7 @@ func NewCmdRetlSource() *cobra.Command {
 				return fmt.Errorf("failed to cast RETL provider")
 			}
 
-			resources, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, importremote.ImportArgs{
+			resources, err := retlProvider.FetchImportData(cmd.Context(), core.SQLModelResourceType, importremote.ImportArgs{
 				RemoteID: remoteID,
 				LocalID:  localID,
 			})

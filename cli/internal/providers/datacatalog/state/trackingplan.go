@@ -12,7 +12,6 @@ const (
 	PropertiesIdentity    = "properties"
 	TraitsIdentity        = "traits"
 	ContextTraitsIdentity = "context.traits"
-	TrackingPlanResourceType = "tracking-plan"
 )
 
 type TrackingPlanState struct {

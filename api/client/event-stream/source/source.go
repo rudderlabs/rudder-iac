@@ -73,14 +73,5 @@ func (r *rudderSourceStore) Delete(ctx context.Context, sourceId string) error {
 }
 
 func (r *rudderSourceStore) GetSources(ctx context.Context) ([]EventStreamSource, error) {
-	data, err := r.client.Do(ctx, "GET", "/v2/sources", nil)
-	if err != nil {
-		return nil, fmt.Errorf("sending read state request: %w", err)
-	}
-
-	var response eventStreamSources
-	if err := json.Unmarshal(data, &response); err != nil {
-		return nil, fmt.Errorf("unmarshalling response: %w", err)
-	}
-	return response.Sources, nil
+	return client.GetAllResourcesWithPagination[EventStreamSource](ctx, r.client, prefix)
 }

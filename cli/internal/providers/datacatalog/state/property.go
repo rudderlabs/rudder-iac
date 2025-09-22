@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -15,8 +16,6 @@ type PropertyArgs struct {
 	Type        any
 	Config      map[string]interface{}
 }
-
-const PropertyResourceType = "property"
 
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
 	args.Name = prop.Name
@@ -79,7 +78,7 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 
 	// Check if the property is referring to a customType using property.DefinitionId
 	if property.DefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.DefinitionId)
+		urn, err := getURNFromRemoteId(core.CustomTypeResourceType, property.DefinitionId)
 		if err != nil {
 			return err
 		}
@@ -92,7 +91,7 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 
 	// Handle array types with custom type references in itemTypes
 	if property.Type == "array" && property.Config != nil && property.ItemDefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.ItemDefinitionId)
+		urn, err := getURNFromRemoteId(core.CustomTypeResourceType, property.ItemDefinitionId)
 		if err != nil {
 			return err
 		}
