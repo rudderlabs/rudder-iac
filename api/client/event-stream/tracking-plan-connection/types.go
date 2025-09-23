@@ -1,0 +1,39 @@
+package trackingplanconnection
+
+import "context"
+
+type TrackingPlanConnectionStore interface {
+	LinkTP(ctx context.Context, trackingPlanId string, sourceId string, config *ConnectionConfig) error
+	UpdateTPConnection(ctx context.Context, trackingPlanId string, sourceId string, config *ConnectionConfig) error
+	UnlinkTP(ctx context.Context, trackingPlanId string, sourceId string) error
+}
+
+type Action string
+
+const (
+	Forward Action = "forward"
+	Drop    Action = "drop"
+)
+
+type ConnectionConfig struct {
+	Track    *TrackConfig     `json:"track,omitempty"`
+	Identify *EventTypeConfig `json:"identify,omitempty"`
+	Group    *EventTypeConfig `json:"group,omitempty"`
+	Page     *EventTypeConfig `json:"page,omitempty"`
+	Screen   *EventTypeConfig `json:"screen,omitempty"`
+}
+
+type EventTypeConfig struct {
+	PropagateValidationErrors bool   `json:"propagateValidationErrors"`
+	UnplannedProperties       Action `json:"unplannedProperties"`
+	AnyOtherViolations        Action `json:"anyOtherViolations"`
+}
+
+type TrackConfig struct {
+	*EventTypeConfig
+	AllowUnplannedEvents bool `json:"allowUnplannedEvents"`
+}
+
+type requestBody struct {
+	Config *ConnectionConfig `json:"config"`
+}
