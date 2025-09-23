@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -16,6 +17,7 @@ import (
 
 type ProjectSyncer struct {
 	provider SyncProvider
+	stateMutex sync.RWMutex
 }
 
 type SyncProvider interface {
@@ -45,6 +47,8 @@ type SyncOptions struct {
 	DryRun bool
 	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
 	Confirm bool
+	// Concurrency is the number of concurrent operations to run
+	Concurrency int
 }
 
 func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph, options SyncOptions) error {
@@ -115,7 +119,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 		}
 	}
 
-	return s.executePlan(ctx, state, plan, continueOnFail)
+	return s.executePlan(ctx, state, plan, target, continueOnFail, options)
 }
 
 func stateToGraph(state *state.State) *resources.Graph {
@@ -154,18 +158,22 @@ func (e *OperationError) Unwrap() error {
 	return e.Err
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var (
-		errors       []error
-		currentState = state
-	)
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
+	if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
+		return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail, options)
+	}
+	return s.executePlanSequentially(ctx, state, plan, continueOnFail)
+}
+
+func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
+	var errors       []error
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
 		spinner := ui.NewSpinner(operationString)
 		spinner.Start()
 
-		outputState, providerErr := s.providerOperation(ctx, o, currentState)
+		providerErr := s.providerOperation(ctx, o, state)
 		spinner.Stop()
 		if providerErr != nil {
 			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
@@ -175,30 +183,52 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 			}
 		}
 
-		if outputState == nil {
-			outputState = currentState
-		}
-
 		if providerErr == nil {
 			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
 		}
-
-		currentState = outputState
 	}
 
 	return errors
 }
 
-func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
+	tasks := make([]Task, 0, len(plan.Operations))
+	sourceGraph := stateToGraph(state)
+	for _, o := range plan.Operations {
+		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
+	}
+	return RunTasks(ctx, tasks, options.Concurrency, continueOnFail, func(task Task) error {
+		opTask, ok := task.(*operationTask)
+		if !ok {
+			return fmt.Errorf("invalid task type: %T", task)
+		}
+		o := opTask.operation
+		operationString := o.String()
+		spinner := ui.NewSpinner(operationString)
+		spinner.Start()
+		providerErr := s.providerOperation(ctx, o, state)
+		spinner.Stop()
+		if providerErr != nil {
+			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
+			return &OperationError{Operation: o, Err: providerErr}
+		}
+		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+		return nil
+	})
+}
+
+func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
+	s.stateMutex.RLock()
 	dereferenced, err := state.Dereference(input, st)
+	s.stateMutex.RUnlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	output, err := s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := &state.ResourceState{
@@ -210,24 +240,26 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
-
+	s.stateMutex.Lock()
 	st.AddResource(sr)
-
-	return st, nil
+	s.stateMutex.Unlock()
+	return nil
 }
 
-func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
+	s.stateMutex.RLock()
 	dereferenced, err := state.Dereference(input, st)
+	s.stateMutex.RUnlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := &state.ResourceState{
@@ -239,29 +271,31 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
-
+	s.stateMutex.Lock()
 	st.AddResource(sr)
-
-	return st, nil
+	s.stateMutex.Unlock()
+	return nil
 }
 
-func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
+	s.stateMutex.RLock()
 	dereferenced, err := state.Dereference(input, st)
+	s.stateMutex.RUnlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr := st.GetResource(r.URN())
 	if sr == nil {
-		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
 	output, err := s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sr = &state.ResourceState{
@@ -273,35 +307,39 @@ func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return nil, fmt.Errorf("failed to update resource state: %w", err)
+		return fmt.Errorf("failed to update resource state: %w", err)
 	}
-
+	s.stateMutex.Lock()
 	st.AddResource(sr)
+	s.stateMutex.Unlock()
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resource, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
+	s.stateMutex.RLock()
 	sr := st.GetResource(r.URN())
+	s.stateMutex.RUnlock()
 	if sr == nil {
-		return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
 	if err := s.provider.DeleteResourceState(ctx, sr); err != nil {
-		return nil, fmt.Errorf("failed to delete resource state: %w", err)
+		return fmt.Errorf("failed to delete resource state: %w", err)
 	}
 
 	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())
 	if err != nil {
-		return nil, err
+		return err
 	}
-
+	s.stateMutex.Lock()
 	st.RemoveResource(r.URN())
+	s.stateMutex.Unlock()
 
-	return st, nil
+	return nil
 }
 
-func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) (*state.State, error) {
+func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operation, st *state.State) error {
 	r := o.Resource
 
 	switch o.Type {
@@ -314,6 +352,6 @@ func (s *ProjectSyncer) providerOperation(ctx context.Context, o *planner.Operat
 	case planner.Import:
 		return s.importOperation(ctx, r, st)
 	default:
-		return nil, fmt.Errorf("unknown operation type with code: %d", o.Type)
+		return fmt.Errorf("unknown operation type with code: %d", o.Type)
 	}
 }
