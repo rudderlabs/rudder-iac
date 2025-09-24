@@ -69,7 +69,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 	var reconstate *state.State
 	if config.GetConfig().ExperimentalFlags.StatelessCLI {
 		// remove state for stateless resources - this is to avoid conflicts b/w the api state and the reconstructed state
-		apistate = removeStateForResourceTypes(apistate, []string{dcstate.CategoryResourceType, dcstate.EventResourceType})
+		apistate = removeStateForResourceTypes(apistate, []string{dcstate.CategoryResourceType, dcstate.EventResourceType, dcstate.PropertyResourceType, dcstate.CustomTypeResourceType})
 		// load resources
 		resources, err := s.provider.LoadResourcesFromRemote(ctx)
 		if err != nil {

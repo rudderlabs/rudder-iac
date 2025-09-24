@@ -159,6 +159,9 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 	s := syncerstate.EmptyState()
 	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {
+		if remoteEvent.ExternalID == "" {
+			continue
+		}
 		event, ok := remoteEvent.Data.(*catalog.Event)
 		if !ok {
 			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Event")

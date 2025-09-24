@@ -12,7 +12,7 @@ type EventArgs struct {
 	Name        string
 	Description string
 	EventType   string
-	CategoryId  *resources.PropertyRef
+	CategoryId  any
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
@@ -28,8 +28,8 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
-	if categoryId, ok := from["categoryId"].(*resources.PropertyRef); ok {
-		args.CategoryId = categoryId
+	if from["categoryId"] != nil {
+		args.CategoryId = String(from, "categoryId", "")
 	}
 }
 
@@ -106,6 +106,14 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 
 // FromRemoteEvent converts from catalog.Event to EventState
 func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	e.EventArgs = EventArgs{
+		Name:        event.Name,
+		Description: event.Description,
+		EventType:   event.EventType,
+	}
+	if event.CategoryId != nil {
+		e.EventArgs.CategoryId = *event.CategoryId
+	}
 	e.ID = event.ID
 	e.Name = event.Name
 	e.Description = event.Description
@@ -114,5 +122,5 @@ func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId fu
 	e.CategoryID = event.CategoryId
 	e.CreatedAt = event.CreatedAt.String()
 	e.UpdatedAt = event.UpdatedAt.String()
-	return e.EventArgs.FromRemoteEvent(event, getURNFromRemoteId)
+	return nil
 }

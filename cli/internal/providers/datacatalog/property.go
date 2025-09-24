@@ -133,5 +133,32 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 }
 
 func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	return syncerstate.EmptyState(), nil
+	s := syncerstate.EmptyState()
+	properties := collection.GetAll(state.PropertyResourceType)
+	for _, remoteProperty := range properties {
+		if remoteProperty.ExternalID == "" {
+			continue
+		}
+		property, ok := remoteProperty.Data.(*catalog.Property)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+		}
+		args := &state.PropertyArgs{}
+		args.FromRemoteProperty(property, collection.GetURNByID)
+
+		stateArgs := state.PropertyState{}
+		stateArgs.FromRemoteProperty(property, collection.GetURNByID)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         state.PropertyResourceType,
+			ID:           property.ExternalId,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(property.ExternalId, state.PropertyResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
 }

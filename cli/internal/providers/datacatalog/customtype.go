@@ -190,5 +190,32 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 }
 
 func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	return syncerstate.EmptyState(), nil
+	s := syncerstate.EmptyState()
+	customTypes := collection.GetAll(state.CustomTypeResourceType)
+	for _, remoteCustomType := range customTypes {
+		if remoteCustomType.ExternalID == "" {
+			continue
+		}
+		customType, ok := remoteCustomType.Data.(*catalog.CustomType)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+		}
+		args := &state.CustomTypeArgs{}
+		args.FromRemoteCustomType(customType, collection.GetURNByID)
+
+		stateArgs := state.CustomTypeState{}
+		stateArgs.FromRemoteCustomType(customType, collection.GetURNByID)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         state.CustomTypeResourceType,
+			ID:           remoteCustomType.ExternalID,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(remoteCustomType.ExternalID, state.CustomTypeResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
 }
