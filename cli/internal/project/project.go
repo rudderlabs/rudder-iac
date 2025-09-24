@@ -18,6 +18,7 @@ type Loader interface {
 }
 
 type ProjectProvider interface {
+	GetName() string
 	GetSupportedKinds() []string
 	GetSupportedTypes() []string
 	Validate() error

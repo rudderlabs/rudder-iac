@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -36,6 +37,10 @@ func New(client retlClient.RETLStore) *Provider {
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
 
 	return p
+}
+
+func (p *Provider) GetName() string {
+	return "retl"
 }
 
 func (p *Provider) GetSupportedKinds() []string {
@@ -234,8 +239,14 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 	return handler.Preview(ctx, ID, data, limit)
 }
 
-// WorkspaceImport is a dummy implementation to satisfy the interface.
-// TODO: Implement actual logic in future ticket.
-func (p *Provider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
-	return []importremote.FormattableEntity{}, nil
+func (p *Provider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+	return resources.NewResourceCollection(), nil
+}
+
+func (p *Provider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+	return nil
+}
+
+func (p *Provider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	return nil, nil
 }
