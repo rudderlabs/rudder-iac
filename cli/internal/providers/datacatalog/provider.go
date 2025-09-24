@@ -1,14 +1,11 @@
 package datacatalog
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -21,21 +18,25 @@ var log = logger.New("datacatalogprovider")
 type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
-	providerStore map[string]resourceProvider
+	providerStore map[string]entityProvider
 }
 
 func New(client catalog.DataCatalog) *Provider {
 	return &Provider{
 		client: client,
 		dc:     localcatalog.New(),
-		providerStore: map[string]resourceProvider{
-			pstate.PropertyResourceType:     NewPropertyProvider(client),
-			pstate.EventResourceType:        NewEventProvider(client),
-			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
-			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
-			pstate.CategoryResourceType:     NewCategoryProvider(client),
+		providerStore: map[string]entityProvider{
+			pstate.PropertyResourceType: NewPropertyProvider(client),
+			// pstate.EventResourceType:        NewEventProvider(client),
+			// pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
+			// pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
+			// pstate.CategoryResourceType:     NewCategoryProvider(client),
 		},
 	}
+}
+
+func (p *Provider) GetName() string {
+	return "datacatalog"
 }
 
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
@@ -277,10 +278,4 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 		}
 	}
 	return nil
-}
-
-// WorkspaceImport is a dummy implementation to satisfy the interface.
-// TODO: Implement actual logic in future ticket.
-func (p *Provider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
-	return []importremote.FormattableEntity{}, nil
 }

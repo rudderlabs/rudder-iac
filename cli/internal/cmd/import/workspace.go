@@ -1,16 +1,19 @@
 package importcmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/spf13/cobra"
 )
 
-func NewWorkspaceImport() *cobra.Command {
+func NewCmdWorkspaceImport() *cobra.Command {
 	var (
 		deps     app.Deps
 		p        project.Project
@@ -59,8 +62,8 @@ func NewWorkspaceImport() *cobra.Command {
 				return fmt.Errorf("preloading namer with project IDs: %w", err)
 			}
 
-			if _, err := deps.CompositeProvider().WorkspaceImport(cmd.Context(), idNamer); err != nil {
-				return fmt.Errorf("workspace import (no-op): %w", err)
+			if err := WorkspaceImport(cmd.Context(), deps.CompositeProvider(), location, idNamer, graph); err != nil {
+				return fmt.Errorf("workspace import: %w", err)
 			}
 
 			return nil
@@ -69,4 +72,32 @@ func NewWorkspaceImport() *cobra.Command {
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files")
 	return cmd
+}
+
+func WorkspaceImport(ctx context.Context, p project.Provider, loc string, idNamer namer.Namer, rslv resolver.ReferenceResolver) error {
+
+	collection, err := p.LoadImportableResources(ctx)
+	if err != nil {
+		return fmt.Errorf("loading importable resources: %w", err)
+	}
+
+	err = p.AssignExternalIDs(ctx, collection, idNamer)
+	if err != nil {
+		return fmt.Errorf("assigning external IDs: %w", err)
+	}
+
+	entities, err := p.NormalizeForImport(ctx, collection, idNamer, rslv)
+	if err != nil {
+		return fmt.Errorf("normalizing for import: %w", err)
+	}
+
+	f := formatter.YAMLFormatter{}
+	for _, entity := range entities {
+		if err := f.Format(loc, entity); err != nil {
+			return fmt.Errorf("formatting entity: %w", err)
+		}
+	}
+
+	// format the entities
+	return nil
 }

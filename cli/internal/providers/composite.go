@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"golang.org/x/exp/maps"
@@ -49,6 +50,10 @@ func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, er
 	}, nil
 }
 
+func (p *CompositeProvider) GetName() string {
+	return "composite"
+}
+
 func (p *CompositeProvider) GetSupportedKinds() []string {
 	return maps.Keys(p.registeredKinds)
 }
@@ -72,6 +77,24 @@ func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 		return fmt.Errorf("no provider found for kind %s", s.Kind)
 	}
 	return provider.LoadSpec(path, s)
+}
+
+type JointAbstraction struct {
+	*resources.Graph
+	*resources.ResourceCollection
+}
+
+func (j *JointAbstraction) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
+	entity, ok := j.ResourceCollection.GetByID(entityType, remoteID)
+	if !ok {
+		return "", resolver.ErrReferenceNotFound
+	}
+
+	if entity.ExternalID == "" {
+		return "", resolver.ErrReferenceNotFound
+	}
+
+	return j.Graph.ResolveToReference(ctx, entityType, remoteID)
 }
 
 func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
@@ -156,17 +179,59 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
 }
 
-// WorkspaceImport collects imports from all providers (dummy delegation for now).
-func (p *CompositeProvider) WorkspaceImport(ctx context.Context, idNamer namer.Namer) ([]importremote.FormattableEntity, error) {
-	var allEntities []importremote.FormattableEntity
+// LoadImportableResources loads the resources from upstream which are
+// present in the workspace and ready to be imported.
+func (p *CompositeProvider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+
 	for _, provider := range p.Providers {
-		entities, err := provider.(importremote.WorkspaceImporter).WorkspaceImport(ctx, idNamer) // Type assert and call
+		resources, err := provider.LoadImportableResources(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("loading importable resources from provider %s: %w", provider.GetName(), err)
 		}
-		allEntities = append(allEntities, entities...)
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collection for provider %s: %w", provider.GetName(), err)
+		}
 	}
-	return allEntities, nil
+
+	return collection, nil
+}
+
+// AssignExternalIDs offers a point of synchronization between providers
+// where the outcome assumes that all the resources in collection will have allocated externalIds
+func (p *CompositeProvider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+	for _, provider := range p.Providers {
+
+		err := provider.AssignExternalIDs(
+			ctx,
+			collection,
+			idNamer,
+		)
+		if err != nil {
+			return fmt.Errorf("assigning externalIds to provider %s: %w", provider.GetName(), err)
+		}
+	}
+
+	return nil
+}
+
+func (p *CompositeProvider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	normalized := make([]importremote.FormattableEntity, 0)
+
+	for _, provider := range p.Providers {
+		entities, err := provider.NormalizeForImport(
+			ctx,
+			collection,
+			idNamer,
+			resolver.ChainResolvers(inputResolver, collection))
+		if err != nil {
+			return nil, fmt.Errorf("normalizing for import for provider %s: %w", provider.GetName(), err)
+		}
+		normalized = append(normalized, entities...)
+	}
+
+	return normalized, nil
 }
 
 // Helper methods
@@ -201,7 +266,7 @@ func (p *CompositeProvider) LoadStateFromResources(ctx context.Context, collecti
 		if err != nil {
 			return nil, err
 		}
-		if (s == nil) {
+		if s == nil {
 			s = state
 		} else {
 			s, err = s.Merge(state)

@@ -1,8 +1,11 @@
 package resources
 
 import (
+	"context"
 	"errors"
 	"fmt"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
 
 // RemoteResource represents a resource that is fetched from the remote catalog
@@ -11,6 +14,7 @@ import (
 type RemoteResource struct {
 	ID         string
 	ExternalID string
+	Reference  string
 	Data       interface{}
 }
 
@@ -56,7 +60,7 @@ func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteRe
 	return resource, exists
 }
 
-func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string,error) {
+func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string, error) {
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound
@@ -97,4 +101,19 @@ func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollect
 	}
 
 	return newCollection, nil
+}
+
+func (rc *ResourceCollection) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
+	resources := rc.GetAll(entityType)
+	if resources == nil {
+		return "", resolver.ErrReferenceNotFound
+	}
+
+	for id, resource := range resources {
+		if id == remoteID {
+			return resource.Reference, nil
+		}
+	}
+
+	return "", resolver.ErrReferenceNotFound
 }
