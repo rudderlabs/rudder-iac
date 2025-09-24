@@ -22,7 +22,7 @@ func NewFileManager(baseDir string) *FileManager {
 
 // WriteFile writes a single file to the filesystem atomically
 // It creates parent directories as needed and handles file writing safely
-func (fm *FileManager) WriteFile(file File) error {
+func (fm *FileManager) WriteFile(file *File) error {
 	if err := fm.validateFile(file); err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (fm *FileManager) WriteFile(file File) error {
 }
 
 // WriteFiles writes multiple files atomically as a batch operation
-func (fm *FileManager) WriteFiles(files []File) error {
+func (fm *FileManager) WriteFiles(files []*File) error {
 	if len(files) == 0 {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (fm *FileManager) WriteFiles(files []File) error {
 }
 
 // validateFile validates file input parameters
-func (fm *FileManager) validateFile(file File) error {
+func (fm *FileManager) validateFile(file *File) error {
 	if file.Path == "" {
 		return fmt.Errorf("file path cannot be empty")
 	}
