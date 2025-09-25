@@ -9,7 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
-const prefix = "/v2/sources"
+const prefix = "/v2/event-stream-sources"
 
 type SourceStore interface {
 	Create(ctx context.Context, source *CreateSourceRequest) (*EventStreamSource, error)
@@ -38,11 +38,11 @@ func (r *rudderSourceStore) Create(ctx context.Context, source *CreateSourceRequ
 	if err != nil {
 		return nil, fmt.Errorf("creating event stream source: %w", err)
 	}
-	var result sourceResponse
+	var result EventStreamSource
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling create source response: %w", err)
 	}
-	return &result.Source, nil
+	return &result, nil
 }
 
 func (r *rudderSourceStore) Update(ctx context.Context, sourceId string, source *UpdateSourceRequest) (*EventStreamSource, error) {
@@ -56,11 +56,11 @@ func (r *rudderSourceStore) Update(ctx context.Context, sourceId string, source 
 		return nil, fmt.Errorf("updating event stream source: %w", err)
 	}
 
-	var result sourceResponse
+	var result EventStreamSource
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling update source response: %w", err)
 	}
-	return &result.Source, nil
+	return &result, nil
 }
 
 func (r *rudderSourceStore) Delete(ctx context.Context, sourceId string) error {
@@ -73,7 +73,7 @@ func (r *rudderSourceStore) Delete(ctx context.Context, sourceId string) error {
 }
 
 func (r *rudderSourceStore) GetSources(ctx context.Context) ([]EventStreamSource, error) {
-	data, err := r.client.Do(ctx, "GET", prefix, nil)
+	data, err := r.client.Do(ctx, "GET", "/v2/sources", nil)
 	if err != nil {
 		return nil, fmt.Errorf("sending read state request: %w", err)
 	}

@@ -4,32 +4,32 @@ const (
 	ResourceType = "event-stream-source"
 
 	IDKey               = "id" // remote id
-	NameKey          = "name"
+	NameKey             = "name"
 	EnabledKey          = "enabled"
-	SourceDefinitionKey = "source_definition"
+	SourceDefinitionKey = "type"
 )
 
 var sourceDefinitions = []string{
-	"Java",	
-	"DotNet",
-	"PHP",
-	"Flutter",
-	"Cordova",
-	"Rust",
-	"ReactNative",
-	"Python",
-	"iOS",
-	"Android",
-	"Javascript",
-	"Go",
-	"Node",
-	"Ruby",
-	"Unity",
+	"java",
+	"dotnet",
+	"php",
+	"flutter",
+	"cordova",
+	"rust",
+	"react_native",
+	"python",
+	"ios",
+	"android",
+	"javascript",
+	"go",
+	"node",
+	"ruby",
+	"unity",
 }
 
 type sourceSpec struct {
-	LocalId      string `mapstructure:"id"`
-	Name    string `mapstructure:"name"`
-	SourceDefinition string `mapstructure:"source_definition"`
-	Enabled bool   `mapstructure:"enabled"`
+	LocalId          string `mapstructure:"id"`
+	Name             string `mapstructure:"name"`
+	SourceDefinition string `mapstructure:"type"`
+	Enabled          bool   `mapstructure:"enabled"`
 }

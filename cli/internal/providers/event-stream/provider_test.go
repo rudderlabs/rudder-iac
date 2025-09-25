@@ -45,7 +45,7 @@ func TestProvider(t *testing.T) {
 				Spec: map[string]interface{}{
 					"id":                "test-source",
 					"name":              "Test Source",
-					"source_definition": "Javascript",
+					"type": "javascript",
 					"enabled":           true,
 				},
 			})
@@ -82,7 +82,7 @@ func TestProvider(t *testing.T) {
 						Spec: map[string]interface{}{
 							"id":                "test-source-1",
 							"name":              "Test Source 1",
-							"source_definition": "Javascript",
+							"type": "javascript",
 							"enabled":           true,
 						},
 					},
@@ -138,7 +138,7 @@ func TestProvider(t *testing.T) {
 			Spec: map[string]interface{}{
 				"id":                "test-source-1",
 				"name":              "Test Source 1",
-				"source_definition": "Javascript",
+				"type": "javascript",
 				"enabled":           true,
 			},
 		})
@@ -149,7 +149,7 @@ func TestProvider(t *testing.T) {
 			Spec: map[string]interface{}{
 				"id":                "test-source-2",
 				"name":              "Test Source 2",
-				"source_definition": "Python",
+				"type": "python",
 				"enabled":           false,
 			},
 		})
@@ -182,14 +182,14 @@ func TestProvider(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 				{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 			}, nil
@@ -211,7 +211,7 @@ func TestProvider(t *testing.T) {
 			Input: resources.ResourceData{
 				"name":              "Test Source 1",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			},
 			Output: resources.ResourceData{
 				"id": "remote123",
@@ -225,7 +225,7 @@ func TestProvider(t *testing.T) {
 			Input: resources.ResourceData{
 				"name":              "Test Source 2",
 				"enabled":           false,
-				"source_definition": "Python",
+				"type": "python",
 			},
 			Output: resources.ResourceData{
 				"id": "remote456",
@@ -241,7 +241,7 @@ func TestProvider(t *testing.T) {
 			createData := resources.ResourceData{
 				"name":              "Test Source",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}
 
 			result, err := provider.Create(ctx, "test-source", source.ResourceType, createData)
@@ -249,7 +249,7 @@ func TestProvider(t *testing.T) {
 			require.Equal(t, &resources.ResourceData{
 				"name":              "Test Source",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}, result)
 		})
 
@@ -271,7 +271,7 @@ func TestProvider(t *testing.T) {
 			assert.Equal(t, &resources.ResourceData{
 				"name":              "Updated Source",
 				"enabled":           false,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}, result)
 		})
 
@@ -305,7 +305,7 @@ func TestProvider(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 				{
@@ -332,7 +332,7 @@ func TestProvider(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 			},
@@ -366,7 +366,7 @@ func TestProvider(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 			},
@@ -377,7 +377,7 @@ func TestProvider(t *testing.T) {
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 			},
@@ -397,7 +397,7 @@ func TestProvider(t *testing.T) {
 				Input: resources.ResourceData{
 					"name":              "Test Source 1",
 					"enabled":           true,
-					"source_definition": "Javascript",
+					"type": "javascript",
 				},
 				Output: resources.ResourceData{
 					"id": "remote123",
@@ -409,7 +409,7 @@ func TestProvider(t *testing.T) {
 				Input: resources.ResourceData{
 					"name":              "Test Source 2",
 					"enabled":           false,
-					"source_definition": "Python",
+					"type": "python",
 				},
 				Output: resources.ResourceData{
 					"id": "remote456",

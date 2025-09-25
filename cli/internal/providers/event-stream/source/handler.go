@@ -41,10 +41,10 @@ func validateSource(source *sourceSpec) error {
 		return fmt.Errorf("name is required")
 	}
 	if source.SourceDefinition == "" {
-		return fmt.Errorf("source_definition is required")
+		return fmt.Errorf("type is required")
 	}
 	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
-		return fmt.Errorf("source_definition '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
+		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
 	}
 	return nil
 }
@@ -88,7 +88,7 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 
 func (h *Handler) Update(ctx context.Context, id string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	if state[SourceDefinitionKey] != data[SourceDefinitionKey] {
-		return nil, fmt.Errorf("source_definition cannot be changed")
+		return nil, fmt.Errorf("type cannot be changed")
 	}
 	remoteID, ok := state[IDKey].(string)
 	if !ok {

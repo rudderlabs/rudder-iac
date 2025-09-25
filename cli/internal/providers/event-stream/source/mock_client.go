@@ -34,7 +34,7 @@ func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sou
 		ID:         sourceID,
 		ExternalID: "external-123",
 		Name:       req.Name,
-		Type:       "Javascript",
+		Type:       "javascript",
 		Enabled:    req.Enabled,
 	}, nil
 }
