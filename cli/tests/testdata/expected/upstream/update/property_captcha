@@ -1,6 +1,7 @@
 {
   "propConfig": {},
   "id": "prop_31TA3Qk24n8NExMntP7PgffBRlG",
+  "externalId": "captcha",
   "name": "Captcha",
   "description": "Captcha",
   "type": "object",
@@ -8,5 +9,7 @@
   "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
   "updatedBy": null,
   "createdAt": "2025-08-18T17:18:08.311Z",
-  "updatedAt": "2025-08-18T17:18:08.311Z"
+  "updatedAt": "2025-08-18T17:18:08.311Z",
+  "itemDefinitionId": "",
+  "definitionId": ""
 }

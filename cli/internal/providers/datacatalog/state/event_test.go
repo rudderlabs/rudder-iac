@@ -45,7 +45,7 @@ func TestEventState_ResourceData(t *testing.T) {
 				"name":        "event-name",
 				"description": "event-description",
 				"eventType":   "event-type",
-				"categoryId":  (*resources.PropertyRef)(nil),
+				"categoryId":  nil,
 			},
 		}, resourceData)
 	})
@@ -77,7 +77,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 			"name":        "event-name",
 			"description": "event-description",
 			"eventType":   "event-type",
-			"categoryId":  (*resources.PropertyRef)(nil),
+			"categoryId":  nil,
 		}, resourceData)
 
 	})

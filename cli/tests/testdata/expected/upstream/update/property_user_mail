@@ -3,6 +3,7 @@
         "$ref": "#/$defs/EmailType"
     },
     "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+    "externalId": "user_mail",
     "name": "User Email",
     "description": "User's email address",
     "type": "EmailType",
@@ -10,5 +11,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T19:43:00.344Z",
-    "updatedAt": "2025-06-24T19:43:00.344Z"
+    "updatedAt": "2025-06-24T19:43:00.344Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

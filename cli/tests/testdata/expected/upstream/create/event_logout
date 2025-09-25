@@ -1,5 +1,6 @@
 {
     "id": "ev_30B3DyAMUbeE04TELNn4X4z7JpT",
+    "externalId": "logout",
     "name": "Logout Event",
     "description": "This event is triggered when a user logs out.",
     "eventType": "track",
