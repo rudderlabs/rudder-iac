@@ -4,12 +4,16 @@ import (
 	"context"
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
+	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 )
 
 type MockSourceClient struct {
 	createCalled     bool
 	updateCalled     bool
 	deleteCalled     bool
+	linkTPCalled     bool
+	unlinkTPCalled   bool
+	updateTPConnectionCalled bool
 	getSourcesCalled bool
 	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
@@ -17,21 +21,21 @@ type MockSourceClient struct {
 func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.EventStreamSource, error) {
 	m.createCalled = true
 	return &sourceClient.EventStreamSource{
-		ExternalID:  req.ExternalID,
-		Name:        req.Name,
-		Type:        req.Type,
-		Enabled:     req.Enabled,
+		ExternalID: req.ExternalID,
+		Name:       req.Name,
+		Type:       req.Type,
+		Enabled:    req.Enabled,
 	}, nil
 }
 
 func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sourceClient.UpdateSourceRequest) (*sourceClient.EventStreamSource, error) {
 	m.updateCalled = true
 	return &sourceClient.EventStreamSource{
-		ID:          sourceID,
-		ExternalID:  "external-123",
-		Name:        req.Name,
-		Type:        "Javascript",
-		Enabled:     req.Enabled,
+		ID:         sourceID,
+		ExternalID: "external-123",
+		Name:       req.Name,
+		Type:       "Javascript",
+		Enabled:    req.Enabled,
 	}, nil
 }
 
@@ -46,6 +50,21 @@ func (m *MockSourceClient) GetSources(ctx context.Context) ([]sourceClient.Event
 		return m.getSourcesFunc(ctx)
 	}
 	return []sourceClient.EventStreamSource{}, nil
+}
+
+func (m *MockSourceClient) LinkTP(ctx context.Context, trackingPlanID string, sourceID string, req *trackingplanClient.ConnectionConfig) error {
+	m.linkTPCalled = true
+	return nil
+}
+
+func (m *MockSourceClient) UnlinkTP(ctx context.Context, trackingPlanID string, sourceID string) error {
+	m.unlinkTPCalled = true
+	return nil
+}
+
+func (m *MockSourceClient) UpdateTPConnection(ctx context.Context, trackingPlanID string, sourceId string, config *trackingplanClient.ConnectionConfig) error {
+	m.updateTPConnectionCalled = true
+	return nil
 }
 
 func NewMockSourceClient() *MockSourceClient {
@@ -70,4 +89,16 @@ func (m *MockSourceClient) DeleteCalled() bool {
 
 func (m *MockSourceClient) GetSourcesCalled() bool {
 	return m.getSourcesCalled
+}
+
+func (m *MockSourceClient) LinkTPCalled() bool {
+	return m.linkTPCalled
+}
+
+func (m *MockSourceClient) UnlinkTPCalled() bool {
+	return m.unlinkTPCalled
+}
+
+func (m *MockSourceClient) UpdateTPConnectionCalled() bool {
+	return m.updateTPConnectionCalled
 }
