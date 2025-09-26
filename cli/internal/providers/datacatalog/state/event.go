@@ -2,11 +2,10 @@ package state
 
 import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
-
-const EventResourceType = "event"
 
 type EventArgs struct {
 	Name        string
@@ -52,7 +51,7 @@ func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId 
 	args.EventType = event.EventType
 	if event.CategoryId != nil {
 		// get URN for the category using remoteId
-		urn, err := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
+		urn, err := getURNFromRemoteId(core.CategoryResourceType, *event.CategoryId)
 		if err != nil {
 			return err
 		}

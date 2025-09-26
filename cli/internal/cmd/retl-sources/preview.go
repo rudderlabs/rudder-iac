@@ -8,8 +8,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/previewer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +59,7 @@ func newCmdPreview() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
+			resource, ok := graph.GetResource(resources.URN(externalID, core.SQLModelResourceType))
 			if !ok {
 				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
 			}

@@ -6,6 +6,7 @@ import (
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -32,11 +33,11 @@ type Provider struct {
 func New(client esClient.EventStreamStore) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
+			"event-stream-source": core.EventStreamSourceResourceType,
 		},
 		handlers: make(map[string]handler),
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client)
+	p.handlers[core.EventStreamSourceResourceType] = sourceHandler.NewHandler(client)
 	return p
 }
 

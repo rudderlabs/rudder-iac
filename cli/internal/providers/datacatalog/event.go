@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -150,14 +151,14 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 			Data:       event,
 		}
 	}
-	collection.Set(state.EventResourceType, resourceMap)
+	collection.Set(core.EventResourceType, resourceMap)
 
 	return collection, nil
 }
 
 func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
 	s := syncerstate.EmptyState()
-	events := collection.GetAll(state.EventResourceType)
+	events := collection.GetAll(core.EventResourceType)
 	for _, remoteEvent := range events {
 		if remoteEvent.ExternalID == "" {
 			continue
@@ -173,14 +174,14 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
 
 		resourceState := &syncerstate.ResourceState{
-			Type:         state.EventResourceType,
+			Type:         core.EventResourceType,
 			ID:           event.ExternalId,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(event.ExternalId, state.EventResourceType)
+		urn := resources.URN(event.ExternalId, core.EventResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

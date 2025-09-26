@@ -7,8 +7,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +48,7 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
+			resource, ok := graph.GetResource(resources.URN(externalID, core.SQLModelResourceType))
 			if !ok {
 				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
 			}
@@ -60,7 +61,7 @@ func newCmdValidate() *cobra.Command {
 			}
 
 			// Validate by attempting to preview with limit=0
-			_, err = retlProvider.Preview(cmd.Context(), externalID, sqlmodel.ResourceType, resourceData, 0)
+			_, err = retlProvider.Preview(cmd.Context(), externalID, core.SQLModelResourceType, resourceData, 0)
 			if err != nil {
 				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
 				return err

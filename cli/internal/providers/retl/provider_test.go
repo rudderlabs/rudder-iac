@@ -11,6 +11,7 @@ import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -176,7 +177,7 @@ func TestProvider(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
 		types := provider.GetSupportedTypes()
-		assert.Contains(t, types, sqlmodel.ResourceType)
+		assert.Contains(t, types, core.SQLModelResourceType)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
@@ -352,7 +353,7 @@ func TestProvider(t *testing.T) {
 
 			rs := &state.ResourceState{
 				ID:   "test",
-				Type: sqlmodel.ResourceType,
+				Type: core.SQLModelResourceType,
 				Output: map[string]interface{}{
 					sqlmodel.IDKey: "test",
 				},
@@ -375,7 +376,7 @@ func TestProvider(t *testing.T) {
 
 			rs := &state.ResourceState{
 				ID:   "test",
-				Type: sqlmodel.ResourceType,
+				Type: core.SQLModelResourceType,
 				Output: map[string]interface{}{
 					sqlmodel.IDKey: "test",
 				},
@@ -415,7 +416,7 @@ func TestProvider(t *testing.T) {
 				"enabled":           true,
 			}
 
-			result, err := provider.Create(ctx, "test", sqlmodel.ResourceType, createData)
+			result, err := provider.Create(ctx, "test", core.SQLModelResourceType, createData)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			assert.Equal(t, "test-source-id", (*result)[sqlmodel.IDKey])
@@ -453,7 +454,7 @@ func TestProvider(t *testing.T) {
 				"enabled":                true,
 			}
 
-			result, err := provider.Update(ctx, "test", sqlmodel.ResourceType, createData, stateData)
+			result, err := provider.Update(ctx, "test", core.SQLModelResourceType, createData, stateData)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
@@ -471,7 +472,7 @@ func TestProvider(t *testing.T) {
 				sqlmodel.IDKey: "test-source-id",
 			}
 
-			err := provider.Delete(ctx, "test", sqlmodel.ResourceType, stateData)
+			err := provider.Delete(ctx, "test", core.SQLModelResourceType, stateData)
 			require.NoError(t, err)
 
 			err = provider.Delete(ctx, "test", "unknown", stateData)
@@ -571,7 +572,7 @@ func TestProvider(t *testing.T) {
 			provider := retl.New(newDefaultMockClient())
 
 			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
-			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
+			results, err := provider.FetchImportData(context.Background(), core.SQLModelResourceType, args)
 			assert.NoError(t, err)
 			assert.Len(t, results, 1)
 			imported := results[0]
@@ -602,7 +603,7 @@ func TestProvider(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
 			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id"}
-			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
+			results, err := provider.FetchImportData(context.Background(), core.SQLModelResourceType, args)
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
@@ -698,7 +699,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
 
-		rows, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		rows, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.NoError(t, err)
 		require.Len(t, rows, 2)
 		assert.Equal(t, any(1), rows[0]["id"])
@@ -724,7 +725,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.AccountIDKey:        "acc123",
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		_, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "SQL not found")
 	})
@@ -738,7 +739,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.SQLKey:              "SELECT 1",
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		_, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "account ID not found")
 	})
@@ -756,7 +757,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.AccountIDKey:        "acc123",
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		_, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "submitting preview request")
 	})
@@ -774,7 +775,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.AccountIDKey:        "acc123",
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		_, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "submitting preview request")
 	})
@@ -795,7 +796,7 @@ func TestProviderPreview(t *testing.T) {
 			sqlmodel.AccountIDKey:        "acc123",
 			sqlmodel.SourceDefinitionKey: string(sqlmodel.SourceDefinitionPostgres),
 		}
-		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
+		_, err := provider.Preview(ctx, "test", core.SQLModelResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "preview request failed")
 	})

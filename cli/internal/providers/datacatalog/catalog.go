@@ -5,17 +5,17 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
-	dcstate.PropertyResourceType:     catalog.ResourceCollectionProperties,
-	dcstate.EventResourceType:        catalog.ResourceCollectionEvents,
-	dcstate.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
-	dcstate.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
-	dcstate.CategoryResourceType:     catalog.ResourceCollectionCategories,
+	core.PropertyResourceType:     catalog.ResourceCollectionProperties,
+	core.EventResourceType:        catalog.ResourceCollectionEvents,
+	core.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
+	core.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
+	core.CategoryResourceType:     catalog.ResourceCollectionCategories,
 }
 
 type resourceProvider interface {

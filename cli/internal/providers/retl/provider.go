@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -27,12 +28,12 @@ func New(client retlClient.RETLStore) *Provider {
 		client:   client,
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
-			"retl-source-sql-model": sqlmodel.ResourceType,
+			"retl-source-sql-model": core.SQLModelResourceType,
 		},
 	}
 
 	// Register handlers
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
+	p.handlers[core.SQLModelResourceType] = sqlmodel.NewHandler(client)
 
 	return p
 }
@@ -197,7 +198,7 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 // Import imports a single remote RETL resource with local ID mapping
 func (p *Provider) FetchImportData(ctx context.Context, resourceType string, args importremote.ImportArgs) ([]importremote.ImportData, error) {
 	// Only support SQL models for import in this phase
-	if resourceType != sqlmodel.ResourceType {
+	if resourceType != core.SQLModelResourceType {
 		return nil, fmt.Errorf("import is only supported for SQL models, got: %s", resourceType)
 	}
 

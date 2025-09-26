@@ -6,8 +6,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +55,7 @@ func newCmdListRetlSources() *cobra.Command {
 			}
 			l := lister.New(retlProvider, format)
 
-			err = l.List(cmd.Context(), sqlmodel.ResourceType, nil)
+			err = l.List(cmd.Context(), core.SQLModelResourceType, nil)
 			return err
 		},
 	}

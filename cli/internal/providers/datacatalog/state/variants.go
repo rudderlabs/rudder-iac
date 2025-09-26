@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -287,7 +288,7 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 	v.Type = remoteVariant.Type
 
 	// set discriminator as a propertyRef
-	discriminatorURN, err := getURNFromRemoteId(PropertyResourceType, remoteVariant.Discriminator)
+	discriminatorURN, err := getURNFromRemoteId(core.PropertyResourceType, remoteVariant.Discriminator)
 	if err != nil {
 		return err
 	}
@@ -300,7 +301,7 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 	for _, remoteCase := range remoteVariant.Cases {
 		properties := make([]PropertyReference, len(remoteCase.Properties))
 		for i, prop := range remoteCase.Properties {
-			urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+			urn, err := getURNFromRemoteId(core.PropertyResourceType, prop.ID)
 			if err != nil {
 				return err
 			}
@@ -322,7 +323,7 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 
 	v.Default = make([]PropertyReference, len(remoteVariant.Default))
 	for i, prop := range remoteVariant.Default {
-		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+		urn, err := getURNFromRemoteId(core.PropertyResourceType, prop.ID)
 		if err != nil {
 			return err
 		}

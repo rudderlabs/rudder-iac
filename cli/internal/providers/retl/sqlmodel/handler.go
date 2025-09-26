@@ -11,6 +11,7 @@ import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
@@ -137,7 +138,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		}
 		resource := resources.NewResource(
 			spec.ID,
-			ResourceType,
+			core.SQLModelResourceType,
 			data,
 			[]string{}, // No dependencies for now
 			opts...,
@@ -324,7 +325,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 	importData := importremote.ImportData{
 		ResourceData: &importedData,
 		Metadata:     importMetadata,
-		ResourceType: ResourceType,
+		ResourceType: core.SQLModelResourceType,
 	}
 	return []importremote.ImportData{importData}, nil
 }

@@ -16,6 +16,7 @@ import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
@@ -581,7 +582,7 @@ func TestSQLModelHandler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, resources, 1)
 		assert.Equal(t, "test-model", resources[0].ID())
-		assert.Equal(t, sqlmodel.ResourceType, resources[0].Type())
+		assert.Equal(t, core.SQLModelResourceType, resources[0].Type())
 	})
 
 	t.Run("Create", func(t *testing.T) {
