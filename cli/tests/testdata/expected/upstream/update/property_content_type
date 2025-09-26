@@ -1,6 +1,7 @@
 {
     "propConfig": {},
     "id": "prop_content_type_upstream_1",
+    "externalId": "content_type",
     "name": "Content Type",
     "description": "Content type of the API Request",
     "type": "string",
@@ -8,5 +9,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T11:31:37.337Z",
-    "updatedAt": "2025-06-24T11:31:37.337Z"
+    "updatedAt": "2025-06-24T11:31:37.337Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

@@ -331,15 +331,23 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.Description = MustString(from, "description")
 	s.Type = MustString(from, "type")
 	s.Config = MapStringInterface(from, "config", make(map[string]any))
-	s.Version = int(MustFloat64(from, "version"))
-	if itemDef, ok :=from["itemDefinitions"].([]any); ok {
-		s.ItemDefinitions = itemDef
-	}
 	s.Rules = MapStringInterface(from, "rules", make(map[string]any))
 	s.WorkspaceID = MustString(from, "workspaceId")
 	s.CreatedAt = MustString(from, "createdAt")
 	s.UpdatedAt = MustString(from, "updatedAt")
-
+	
+	// version can be either an int or a float64
+	// in our old stateful approach, we used to get the version as a float64 as we used json.Unmarshall to decode the state api's response into a map[string]interface{}
+	// in the stateless approach, we derive the state from the remote CustomType which is a strongly typed struct where the version field is of type int
+	// we handle both types to be compatible with both approaches
+	s.Version = Int(from, "version", 0)
+	if s.Version == 0 {
+		s.Version = int(Float64(from, "version", 0))
+	}
+	
+	if itemDef, ok :=from["itemDefinitions"].([]any); ok {
+		s.ItemDefinitions = itemDef
+	}
 	s.CustomTypeArgs.FromResourceData(
 		MustMapStringInterface(from, "customTypeArgs"),
 	)
