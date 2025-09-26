@@ -45,7 +45,7 @@ func TestEventState_ResourceData(t *testing.T) {
 				"name":        "event-name",
 				"description": "event-description",
 				"eventType":   "event-type",
-				"categoryId":  (*resources.PropertyRef)(nil),
+				"categoryId":  nil,
 			},
 		}, resourceData)
 	})
@@ -77,7 +77,7 @@ func TestEventArgs_ResourceData(t *testing.T) {
 			"name":        "event-name",
 			"description": "event-description",
 			"eventType":   "event-type",
-			"categoryId":  (*resources.PropertyRef)(nil),
+			"categoryId":  nil,
 		}, resourceData)
 
 	})
@@ -127,8 +127,9 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 	assert.Equal(t, "track", args.EventType)
 
 	assert.NotNil(t, args.CategoryId)
-	assert.Equal(t, "category:category-123-local", args.CategoryId.URN)
-	assert.Equal(t, "id", args.CategoryId.Property)
+	assert.IsType(t, &resources.PropertyRef{}, args.CategoryId)
+	assert.Equal(t, "category:category-123-local", args.CategoryId.(*resources.PropertyRef).URN)
+	assert.Equal(t, "id", args.CategoryId.(*resources.PropertyRef).Property)
 }
 
 func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {

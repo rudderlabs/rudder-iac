@@ -39,7 +39,7 @@ type CustomType struct {
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`
-	ItemDefinitions []string               `json:"itemDefinitions"`
+	ItemDefinitions []any                  `json:"itemDefinitions"`
 	Variants        Variants               `json:"variants,omitempty"`
 	CreatedAt       time.Time              `json:"createdAt"`
 	UpdatedAt       time.Time              `json:"updatedAt"`

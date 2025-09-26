@@ -132,6 +132,8 @@ func verifyState(t *testing.T, dir string) {
 			"workspaceId",
 			"categoryId",
 			"version",
+			"definitionId",
+			"itemDefinitionId",
 			"properties[0].id",
 			"properties[1].id",
 			"events[0].properties[0].id",

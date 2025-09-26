@@ -124,6 +124,9 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 	s := syncerstate.EmptyState()
 	categories := collection.GetAll(state.CategoryResourceType)
 	for _, remoteCategory := range categories {
+		if remoteCategory.ExternalID == "" {
+			continue
+		}
 		category, ok := remoteCategory.Data.(*catalog.Category)
 		if !ok {
 			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Category")
