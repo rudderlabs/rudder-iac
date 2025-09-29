@@ -14,10 +14,15 @@ func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceColle
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.providerStore {
-		resources, err := provider.LoadImportable(ctx)
+		if _, ok := provider.(resourceImportProvider); !ok {
+			continue
+		}
+
+		resources, err := provider.(resourceImportProvider).LoadImportable(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %w", err)
 		}
+
 		collection, err = collection.Merge(resources)
 		if err != nil {
 			return nil, fmt.Errorf("merging importable resource collection for provider %w", err)
@@ -31,9 +36,16 @@ func (p *Provider) IDResources(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer) error {
 	for _, provider := range p.providerStore {
-		err := provider.IDResources(ctx, collection, idNamer)
-		if err != nil {
-			return fmt.Errorf("assigning external IDs to provider %w", err)
+		if _, ok := provider.(resourceImportProvider); !ok {
+			continue
+		}
+
+		if err := provider.(resourceImportProvider).IDResources(
+			ctx,
+			collection,
+			idNamer,
+		); err != nil {
+			return fmt.Errorf("assigning identifier to resources to provider %w", err)
 		}
 	}
 	return nil
@@ -43,14 +55,25 @@ func (p *Provider) FormatForExport(
 	ctx context.Context,
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
-	resolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
-
+	resolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
 	normalized := make([]importremote.FormattableEntity, 0)
+
 	for _, provider := range p.providerStore {
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, resolver)
+		if _, ok := provider.(resourceImportProvider); !ok {
+			continue
+		}
+
+		entities, err := provider.(resourceImportProvider).FormatForExport(
+			ctx,
+			collection,
+			idNamer,
+			resolver,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("normalizing for import for provider %w", err)
 		}
+
 		normalized = append(normalized, entities...)
 	}
 	return normalized, nil

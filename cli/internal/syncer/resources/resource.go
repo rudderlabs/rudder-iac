@@ -18,10 +18,9 @@ func URN(ID string, resourceType string) string {
 
 type ResourceOpts func(*internal.Resource)
 
-func WithResourceFileMetadata(filePath, metadataRef string) ResourceOpts {
+func WithResourceFileMetadata(metadataRef string) ResourceOpts {
 	return func(r *internal.Resource) {
 		r.FileMetadata = &internal.ResourceFileMetadata{
-			FilePath:    filePath,
 			MetadataRef: metadataRef,
 		}
 	}
