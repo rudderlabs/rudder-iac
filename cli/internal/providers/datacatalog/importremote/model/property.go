@@ -14,37 +14,30 @@ type ImportableProperty struct {
 	localcatalog.Property
 }
 
-func (p *ImportableProperty) FromUpstream(externalID string, upstream *catalog.Property) error {
+// ForExport loads the property from the upstream and resolves references to custom types.
+// It then returns the property in a format that can be exported to a file.
+func (p *ImportableProperty) ForExport(externalID string, upstream *catalog.Property, resolver resolver.ReferenceResolver) (map[string]any, error) {
 	p.Property.LocalID = externalID
 	p.Property.Name = upstream.Name
 	p.Property.Description = upstream.Description
 	p.Property.Type = upstream.Type // This could point to custom-type and needs to be referenced properly
 	p.Property.Config = upstream.Config
 
-	return nil
-}
-
-func (p *ImportableProperty) Flatten(inputResolver resolver.ReferenceResolver) (map[string]any, error) {
-	flattened := map[string]any{
-		"id":          p.Property.LocalID,
-		"name":        p.Property.Name,
-		"description": p.Property.Description,
-		"propConfig":  p.Property.Config,
-	}
-
-	// property -> type -> def_123abc
-	if !localcatalog.CustomTypeRegex.MatchString(p.Property.Type) {
-		flattened["type"] = p.Property.Type
-	} else {
-		customTypeRef, err := inputResolver.ResolveToReference(
+	if localcatalog.CustomTypeRegex.MatchString(p.Property.Type) {
+		customTypeRef, err := resolver.ResolveToReference(
 			context.Background(),
 			state.CustomTypeResourceType,
 			p.Property.Type)
 		if err != nil {
-			return nil, fmt.Errorf("resolving custom type reference: %w", err)
+			return nil, fmt.Errorf("custom type reference resolution for resource: %s: %w", p.Property.LocalID, err)
 		}
-		flattened["type"] = customTypeRef // #/custom-types/metadata-name/
+
+		if customTypeRef == "" {
+			return nil, fmt.Errorf("resolved custom type reference is empty")
+		}
+
+		p.Property.Type = customTypeRef
 	}
 
-	return flattened, nil
+	return nil, nil
 }

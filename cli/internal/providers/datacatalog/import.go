@@ -10,11 +10,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-func (p *Provider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.providerStore {
-		resources, err := provider.LoadImportableResources(ctx)
+		resources, err := provider.LoadImportable(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %w", err)
 		}
@@ -26,12 +26,12 @@ func (p *Provider) LoadImportableResources(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-func (p *Provider) AssignExternalIDs(
+func (p *Provider) IDResources(
 	ctx context.Context,
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer) error {
 	for _, provider := range p.providerStore {
-		err := provider.AssignExternalIDs(ctx, collection, idNamer)
+		err := provider.IDResources(ctx, collection, idNamer)
 		if err != nil {
 			return fmt.Errorf("assigning external IDs to provider %w", err)
 		}
@@ -39,15 +39,15 @@ func (p *Provider) AssignExternalIDs(
 	return nil
 }
 
-func (p *Provider) NormalizeForImport(
+func (p *Provider) FormatForExport(
 	ctx context.Context,
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
-	inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	resolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
 
 	normalized := make([]importremote.FormattableEntity, 0)
 	for _, provider := range p.providerStore {
-		entities, err := provider.NormalizeForImport(ctx, collection, idNamer, inputResolver)
+		entities, err := provider.FormatForExport(ctx, collection, idNamer, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("normalizing for import for provider %w", err)
 		}

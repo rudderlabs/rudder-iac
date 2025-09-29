@@ -12,8 +12,8 @@ type Resource struct {
 }
 
 type ResourceFileMetadata struct {
-	FilePath     string
-	MetadataName string // #/tp/:metadata-name/:id
+	FilePath    string
+	MetadataRef string
 }
 
 type ResourceImportMetadata struct {

@@ -239,14 +239,14 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 	return handler.Preview(ctx, ID, data, limit)
 }
 
-func (p *Provider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
 	return resources.NewResourceCollection(), nil
 }
 
-func (p *Provider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+func (p *Provider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
 	return nil
 }
 
-func (p *Provider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
 	return nil, nil
 }

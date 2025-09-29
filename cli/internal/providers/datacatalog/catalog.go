@@ -27,9 +27,14 @@ type entityProvider interface {
 }
 
 type resourceImportProvider interface {
-	LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error)
-	AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
-	NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error)
+	LoadImportable(ctx context.Context) (*resources.ResourceCollection, error)
+	IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
+	FormatForExport(
+		ctx context.Context,
+		collection *resources.ResourceCollection,
+		idNamer namer.Namer,
+		inputResolver resolver.ReferenceResolver,
+	) ([]importremote.FormattableEntity, error)
 }
 
 type resourceProvider interface {

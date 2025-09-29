@@ -1,15 +1,13 @@
 package importcmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
-	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,6 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
-
 			p = project.New(location, deps.CompositeProvider())
 
 			if err := p.Load(); err != nil {
@@ -43,61 +40,15 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Namer is initialized here to ensure it's ready for use
-			// by the composite provider
-			idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-
-			graph, err := p.GetResourceGraph()
-			if err != nil {
-				return fmt.Errorf("getting resource graph: %w", err)
-			}
-
-			resourcesMap := graph.Resources()
-			projectIDs := make([]string, 0, len(resourcesMap))
-			for _, r := range resourcesMap {
-				projectIDs = append(projectIDs, r.ID())
-			}
-
-			if err := idNamer.Load(projectIDs); err != nil {
-				return fmt.Errorf("preloading namer with project IDs: %w", err)
-			}
-
-			if err := WorkspaceImport(cmd.Context(), deps.CompositeProvider(), location, idNamer, graph); err != nil {
-				return fmt.Errorf("workspace import: %w", err)
-			}
-
-			return nil
+			var err error
+			defer func() {
+				telemetry.TrackCommand("import workspace", err)
+			}()
+			err = importer.WorkspaceImport(cmd.Context(), location, p, deps.CompositeProvider())
+			return err
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files")
 	return cmd
-}
-
-func WorkspaceImport(ctx context.Context, p project.Provider, loc string, idNamer namer.Namer, rslv resolver.ReferenceResolver) error {
-
-	collection, err := p.LoadImportableResources(ctx)
-	if err != nil {
-		return fmt.Errorf("loading importable resources: %w", err)
-	}
-
-	err = p.AssignExternalIDs(ctx, collection, idNamer)
-	if err != nil {
-		return fmt.Errorf("assigning external IDs: %w", err)
-	}
-
-	entities, err := p.NormalizeForImport(ctx, collection, idNamer, rslv)
-	if err != nil {
-		return fmt.Errorf("normalizing for import: %w", err)
-	}
-
-	f := formatter.YAMLFormatter{}
-	for _, entity := range entities {
-		if err := f.Format(loc, entity); err != nil {
-			return fmt.Errorf("formatting entity: %w", err)
-		}
-	}
-
-	// format the entities
-	return nil
 }

@@ -1,11 +1,13 @@
-package resolver
+package importer
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
+
+var ErrReferenceNotFound = errors.New("reference not found")
 
 type ReferenceResolver interface {
 	ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error)
@@ -27,21 +29,20 @@ func (i *ImportRefResolver) ResolveToReference(ctx context.Context, entityType s
 
 	resource, ok = i.Remote.GetByID(entityType, remoteID)
 	if !ok {
-		return "", fmt.Errorf("resource not present in resources collection")
+		return "", ErrReferenceNotFound
 	}
 
-	graphResource, ok := i.Graph.GetResource(
-		resources.URN(
-			resource.ExternalID,
-			entityType,
-		),
-	)
+	graphResource, ok := i.Graph.GetResource(resources.URN(resource.ExternalID, entityType))
 	if !ok {
-		return "", fmt.Errorf("resource not present in resources graph")
+		return "", ErrReferenceNotFound
 	}
 
-	if graphResource.FileMetadata() == nil || graphResource.FileMetadata().MetadataRef == "" {
-		return "", fmt.Errorf("file metadata on the graph resource is not present")
+	if graphResource.FileMetadata() == nil {
+		return "", ErrReferenceNotFound
+	}
+
+	if graphResource.FileMetadata().MetadataRef == "" {
+		return "", ErrReferenceNotFound
 	}
 
 	return graphResource.FileMetadata().MetadataRef, nil

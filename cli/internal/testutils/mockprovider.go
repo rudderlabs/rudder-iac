@@ -172,15 +172,15 @@ func (m *MockProvider) Import(ctx context.Context, ID string, resourceType strin
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+func (m *MockProvider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
 	return nil, nil
 }
 
-func (m *MockProvider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+func (m *MockProvider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
 	return nil
 }
 
-func (m *MockProvider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+func (m *MockProvider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
 	return nil, nil
 }
 
