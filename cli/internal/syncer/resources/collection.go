@@ -1,11 +1,8 @@
 package resources
 
 import (
-	"context"
 	"errors"
 	"fmt"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
 
 // RemoteResource represents a resource that is fetched from the remote catalog
@@ -24,14 +21,20 @@ type ResourceCollection struct {
 	resources map[string]map[string]*RemoteResource
 }
 
-var ErrDuplicateResource = errors.New("duplicate resource detected")
-var ErrRemoteResourceNotFound = errors.New("remote resource not found")
+var (
+	ErrDuplicateResource      = errors.New("duplicate resource detected")
+	ErrRemoteResourceNotFound = errors.New("remote resource not found")
+)
 
 // NewResourceCollection creates a new empty ResourceCollection
 func NewResourceCollection() *ResourceCollection {
 	return &ResourceCollection{
 		resources: make(map[string]map[string]*RemoteResource),
 	}
+}
+
+func (rc *ResourceCollection) Len() int {
+	return len(rc.resources)
 }
 
 // Set stores a resource map for the given resource type
@@ -101,19 +104,4 @@ func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollect
 	}
 
 	return newCollection, nil
-}
-
-func (rc *ResourceCollection) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
-	resources := rc.GetAll(entityType)
-	if resources == nil {
-		return "", resolver.ErrReferenceNotFound
-	}
-
-	for id, resource := range resources {
-		if id == remoteID {
-			return resource.Reference, nil
-		}
-	}
-
-	return "", resolver.ErrReferenceNotFound
 }

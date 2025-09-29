@@ -1,11 +1,5 @@
 package resources
 
-import (
-	"context"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-)
-
 type Graph struct {
 	resources    map[string]*Resource
 	dependencies map[string][]string
@@ -18,10 +12,6 @@ func NewGraph() *Graph {
 		dependencies: map[string][]string{},
 		dependents:   map[string][]string{},
 	}
-}
-
-func (s *Graph) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
-	return "", resolver.ErrReferenceNotFound
 }
 
 func (s *Graph) Resources() map[string]*Resource {

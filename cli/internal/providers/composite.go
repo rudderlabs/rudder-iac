@@ -79,24 +79,6 @@ func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 	return provider.LoadSpec(path, s)
 }
 
-type JointAbstraction struct {
-	*resources.Graph
-	*resources.ResourceCollection
-}
-
-func (j *JointAbstraction) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
-	entity, ok := j.ResourceCollection.GetByID(entityType, remoteID)
-	if !ok {
-		return "", resolver.ErrReferenceNotFound
-	}
-
-	if entity.ExternalID == "" {
-		return "", resolver.ErrReferenceNotFound
-	}
-
-	return j.Graph.ResolveToReference(ctx, entityType, remoteID)
-}
-
 func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for _, provider := range p.Providers {
@@ -181,11 +163,11 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.Providers {
-		resources, err := provider.LoadImportableResources(ctx)
+		resources, err := provider.LoadImportable(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %s: %w", provider.GetName(), err)
 		}
@@ -200,10 +182,10 @@ func (p *CompositeProvider) LoadImportableResources(ctx context.Context) (*resou
 
 // AssignExternalIDs offers a point of synchronization between providers
 // where the outcome assumes that all the resources in collection will have allocated externalIds
-func (p *CompositeProvider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+func (p *CompositeProvider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
 	for _, provider := range p.Providers {
 
-		err := provider.AssignExternalIDs(
+		err := provider.IDResources(
 			ctx,
 			collection,
 			idNamer,
@@ -216,22 +198,28 @@ func (p *CompositeProvider) AssignExternalIDs(ctx context.Context, collection *r
 	return nil
 }
 
-func (p *CompositeProvider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
-	normalized := make([]importremote.FormattableEntity, 0)
+func (p *CompositeProvider) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	resolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
+	formattable := make([]importremote.FormattableEntity, 0)
 
 	for _, provider := range p.Providers {
-		entities, err := provider.NormalizeForImport(
+		entities, err := provider.FormatForExport(
 			ctx,
 			collection,
 			idNamer,
-			resolver.ChainResolvers(inputResolver, collection))
+			resolver,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("normalizing for import for provider %s: %w", provider.GetName(), err)
+			return nil, fmt.Errorf("formatting for export for provider %s: %w", provider.GetName(), err)
 		}
-		normalized = append(normalized, entities...)
+		formattable = append(formattable, entities...)
 	}
 
-	return normalized, nil
+	return formattable, nil
 }
 
 // Helper methods

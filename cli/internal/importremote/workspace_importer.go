@@ -10,9 +10,14 @@ import (
 
 // WorkspaceImporter defines methods for importing workspace resources using a namer for unique IDs.
 type WorkspaceImporter interface {
-	LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error)
-	AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
-	NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, resolver resolver.ReferenceResolver) ([]FormattableEntity, error)
+	LoadImportable(ctx context.Context) (*resources.ResourceCollection, error)
+	IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
+	FormatForExport(
+		ctx context.Context,
+		collection *resources.ResourceCollection,
+		idNamer namer.Namer,
+		resolver resolver.ReferenceResolver,
+	) ([]FormattableEntity, error)
 }
 
 // FormattableEntity represents an importable entity with content, path, and optional template.

@@ -23,7 +23,9 @@ const (
 	RelativePath = "./imported/data-catalog/properties/properties.yaml"
 )
 
-var _ importremote.WorkspaceImporter = &PropertyImportProvider{}
+var (
+	_ importremote.WorkspaceImporter = &PropertyImportProvider{}
+)
 
 type PropertyImportProvider struct {
 	client catalog.DataCatalog
@@ -37,7 +39,7 @@ func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger) *P
 	}
 }
 
-func (p *PropertyImportProvider) LoadImportableResources(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *PropertyImportProvider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewResourceCollection()
 
@@ -58,19 +60,20 @@ func (p *PropertyImportProvider) LoadImportableResources(ctx context.Context) (*
 	return collection, nil
 }
 
-func (p *PropertyImportProvider) AssignExternalIDs(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
-	p.log.Debug("assigning external IDs to properties")
+func (p *PropertyImportProvider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+	p.log.Debug("assigning identifiers to properties")
+
 	properties := collection.GetAll(state.PropertyResourceType)
 
 	for _, property := range properties {
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
-			return fmt.Errorf("unable to cast remote resource to catalog Property")
+			return fmt.Errorf("unable to cast remote resource to catalog property")
 		}
 
 		externalID, err := idNamer.Name(data.Name)
 		if err != nil {
-			return fmt.Errorf("generating external ID for property %s: %w", data.Name, err)
+			return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
 		}
 
 		property.ExternalID = externalID
@@ -80,8 +83,13 @@ func (p *PropertyImportProvider) AssignExternalIDs(ctx context.Context, collecti
 }
 
 // NormalizeForImport normalizes the properties for import
-func (p *PropertyImportProvider) NormalizeForImport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
-	p.log.Debug("normalizing properties for import")
+func (p *PropertyImportProvider) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	resolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
+	p.log.Debug("formatting properties for export to file")
 
 	properties := collection.GetAll(state.PropertyResourceType)
 
@@ -93,15 +101,14 @@ func (p *PropertyImportProvider) NormalizeForImport(ctx context.Context, collect
 		Resources: make([]importremote.ImportIds, 0),
 	}
 
-	normalizedProps := make([]map[string]any, 0)
+	formattedProps := make([]map[string]any, 0)
 	for _, property := range properties {
+		p.log.Debug("formatting property", "remoteID", property.ID, "externalID", property.ExternalID)
+
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast remote resource to catalog property")
 		}
-
-		importableProp := &model.ImportableProperty{}
-		importableProp.FromUpstream(property.ExternalID, data)
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, importremote.ImportIds{
@@ -109,14 +116,15 @@ func (p *PropertyImportProvider) NormalizeForImport(ctx context.Context, collect
 			RemoteID: property.ID,
 		})
 
-		flattened, err := importableProp.Flatten(inputResolver)
+		importableProp := &model.ImportableProperty{}
+		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("flattening property: %w", err)
+			return nil, fmt.Errorf("formatting property: %w", err)
 		}
-		normalizedProps = append(normalizedProps, flattened)
+		formattedProps = append(formattedProps, formatted)
 	}
 
-	spec, err := p.toSpec(normalizedProps, workspaceMetadata)
+	spec, err := p.toSpec(formattedProps, workspaceMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("creating spec: %w", err)
 	}

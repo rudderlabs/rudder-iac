@@ -32,7 +32,7 @@ func NewPropertyProvider(dc catalog.DataCatalog) *PropertyEntityProvider {
 	}
 
 	imp := impProvider.NewPropertyImportProvider(dc, logger.Logger{
-		Logger: logger.New("provider").With("type", "property"),
+		Logger: logger.New("importremote.provider").With("type", "property"),
 	})
 
 	return &PropertyEntityProvider{

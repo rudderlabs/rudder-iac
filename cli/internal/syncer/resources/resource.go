@@ -18,11 +18,11 @@ func URN(ID string, resourceType string) string {
 
 type ResourceOpts func(*internal.Resource)
 
-func WithResourceFileMetadata(filePath, metadataName string) ResourceOpts {
+func WithResourceFileMetadata(filePath, metadataRef string) ResourceOpts {
 	return func(r *internal.Resource) {
 		r.FileMetadata = &internal.ResourceFileMetadata{
-			FilePath:     filePath,
-			MetadataName: metadataName,
+			FilePath:    filePath,
+			MetadataRef: metadataRef,
 		}
 	}
 }
@@ -75,4 +75,8 @@ func (r *Resource) Dependencies() []string {
 
 func (r *Resource) ImportMetadata() *internal.ResourceImportMetadata {
 	return r.r.ImportMetadata
+}
+
+func (r *Resource) FileMetadata() *internal.ResourceFileMetadata {
+	return r.r.FileMetadata
 }
