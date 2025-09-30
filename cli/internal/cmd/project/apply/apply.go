@@ -77,6 +77,11 @@ func NewCmdApply() *cobra.Command {
 				}...)
 			}()
 
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
 			// Get resource graph to understand dependencies
 			graph, err := p.GetResourceGraph()
 			if err != nil {
@@ -84,7 +89,7 @@ func NewCmdApply() *cobra.Command {
 			}
 
 			// Create syncer to handle the changes
-			s, err := syncer.New(deps.CompositeProvider())
+			s, err := syncer.New(deps.CompositeProvider(), workspace)
 			if err != nil {
 				return fmt.Errorf("creating syncer: %w", err)
 			}

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -17,6 +18,7 @@ import (
 
 type ProjectSyncer struct {
 	provider   SyncProvider
+	workspace  *client.Workspace
 	stateMutex sync.RWMutex
 }
 
@@ -32,13 +34,17 @@ type SyncProvider interface {
 	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
 }
 
-func New(p SyncProvider) (*ProjectSyncer, error) {
+func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
+	if workspace == nil {
+		return nil, fmt.Errorf("workspace is required")
+	}
 
 	return &ProjectSyncer{
-		provider: p,
+		provider:  p,
+		workspace: workspace,
 	}, nil
 }
 

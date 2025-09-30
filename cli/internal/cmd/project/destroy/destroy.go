@@ -67,8 +67,12 @@ func NewCmdDestroy() *cobra.Command {
 				}...)
 			}()
 
-			// Create syncer to handle the deletion
-			s, err := syncer.New(deps.CompositeProvider())
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
+			s, err := syncer.New(deps.CompositeProvider(), workspace)
 			if err != nil {
 				return fmt.Errorf("creating syncer: %w", err)
 			}

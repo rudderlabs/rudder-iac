@@ -61,12 +61,17 @@ func NewCmdTPApply() *cobra.Command {
 				}...)
 			}()
 
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
 			graph, err := p.GetResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog)
+			s, err := syncer.New(deps.Providers().DataCatalog, workspace)
 			if err != nil {
 				return err
 			}

@@ -48,7 +48,13 @@ func NewCmdTPDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog)
+			// Get workspace information
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
+			s, err := syncer.New(deps.Providers().DataCatalog, workspace)
 			if err != nil {
 				return err
 			}
