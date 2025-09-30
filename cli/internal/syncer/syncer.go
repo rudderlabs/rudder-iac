@@ -16,7 +16,7 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider SyncProvider
+	provider   SyncProvider
 	stateMutex sync.RWMutex
 }
 
@@ -166,7 +166,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 }
 
 func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var errors       []error
+	var errors []error
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
