@@ -47,29 +47,29 @@ func TestLinkTP(t *testing.T) {
 			EventTypeConfig: &trackingplanconnection.EventTypeConfig{
 				PropagateValidationErrors: boolPtr(true),
 				UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-				AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
+				AnyOtherViolation:         actionPtr(trackingplanconnection.Forward),
 			},
 			AllowUnplannedEvents: boolPtr(false),
 		},
 		Identify: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: boolPtr(false),
 			UnplannedProperties:       actionPtr(trackingplanconnection.Drop),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Forward),
 		},
 		Group: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: boolPtr(true),
 			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Forward),
 		},
 		Page: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: boolPtr(false),
 			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Drop),
 		},
 		Screen: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: boolPtr(true),
 			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Forward),
 		},
 	}
 
@@ -103,19 +103,19 @@ func TestUpdateTPConnection(t *testing.T) {
 			EventTypeConfig: &trackingplanconnection.EventTypeConfig{
 				PropagateValidationErrors: boolPtr(false),
 				UnplannedProperties:       actionPtr(trackingplanconnection.Drop),
-				AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
+				AnyOtherViolation:         actionPtr(trackingplanconnection.Forward),
 			},
 			AllowUnplannedEvents: boolPtr(true),
 		},
 		Identify: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: nil,
 			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Drop),
 		},
 		Group: &trackingplanconnection.EventTypeConfig{
 			PropagateValidationErrors: boolPtr(false),
 			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
-			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
+			AnyOtherViolation:         actionPtr(trackingplanconnection.Drop),
 		},
 	}
 

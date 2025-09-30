@@ -577,7 +577,7 @@ func mapStateEventTypeConfigToRemote(config map[string]interface{}, key string) 
 	if val, exists := configMap[DropOtherViolationsKey]; exists {
 		if dropOtherViolations, ok := val.(bool); ok {
 			action := dropToAction(dropOtherViolations)
-			eventTypeConfig.AnyOtherViolations = &action
+			eventTypeConfig.AnyOtherViolation = &action
 		}
 	}
 
@@ -630,8 +630,8 @@ func buildStateEventConfigMap(config *trackingplanClient.EventTypeConfig) map[st
 		result[DropUnplannedPropertiesKey] = shouldDrop(config.UnplannedProperties)
 	}
 
-	if config.AnyOtherViolations != nil {
-		result[DropOtherViolationsKey] = shouldDrop(config.AnyOtherViolations)
+	if config.AnyOtherViolation != nil {
+		result[DropOtherViolationsKey] = shouldDrop(config.AnyOtherViolation)
 	}
 
 	return result
