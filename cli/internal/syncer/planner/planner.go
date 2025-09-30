@@ -10,6 +10,7 @@ import (
 )
 
 type Planner struct {
+	workspaceId string
 }
 
 type OperationType int
@@ -50,8 +51,10 @@ type Plan struct {
 	Operations []*Operation
 }
 
-func New() *Planner {
-	return &Planner{}
+func New(workspaceId string) *Planner {
+	return &Planner{
+		workspaceId: workspaceId,
+	}
 }
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
@@ -64,7 +67,9 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
 		var opType OperationType = Create
-		if resource.ImportMetadata() != nil {
+
+		// Only import resources that are defined for the current workspace
+		if resource.ImportMetadata() != nil && resource.ImportMetadata().WorkspaceId == p.workspaceId {
 			opType = Import
 		}
 		plan.Operations = append(plan.Operations, &Operation{Type: opType, Resource: resource})

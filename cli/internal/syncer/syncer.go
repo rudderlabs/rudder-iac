@@ -100,7 +100,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 
 	source := stateToGraph(state)
 
-	p := planner.New()
+	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
 	differ.PrintDiff(plan.Diff)
