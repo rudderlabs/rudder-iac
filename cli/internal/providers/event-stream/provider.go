@@ -5,8 +5,12 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -22,7 +26,17 @@ type handler interface {
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	LoadImportable(ctx context.Context) (*resources.ResourceCollection, error)
+	IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
+	FormatForExport(
+		ctx context.Context,
+		collection *resources.ResourceCollection,
+		idNamer namer.Namer,
+		inputResolver resolver.ReferenceResolver,
+	) ([]importremote.FormattableEntity, error)
 }
+
+var _ project.Provider = &Provider{}
 
 type Provider struct {
 	kindToType map[string]string
@@ -177,4 +191,25 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 	return handler.Import(ctx, ID, data, remoteId)
+}
+
+func (p *Provider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+	return nil
+}
+
+func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+	return nil, nil
+}
+
+func (p *Provider) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
+	return nil, nil
+}
+
+func (p *Provider) GetName() string {
+	return "event-stream"
 }
