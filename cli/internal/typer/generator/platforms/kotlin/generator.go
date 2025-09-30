@@ -83,7 +83,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	return nil
 }
 
-// processPropertiesIntoContext processes individual properties and creates type aliases for all properties
+// processPropertiesIntoContext processes individual properties and creates type aliases or enums for all properties
 func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	// Sort property names for deterministic output
 	var sortedNames []string
@@ -92,14 +92,24 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases for all properties
+	// Generate type aliases or enums for all properties
 	for _, name := range sortedNames {
 		property := allProperties[name]
-		alias, err := createPropertyTypeAlias(property, nameRegistry)
-		if err != nil {
-			return err
+
+		// Check if this property has enum constraints
+		if hasEnumConstraints(property) {
+			enum, err := createPropertyEnum(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.Enums = append(ctx.Enums, *enum)
+		} else {
+			alias, err := createPropertyTypeAlias(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 		}
-		ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 	}
 	return nil
 }
@@ -220,8 +230,12 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 	}, nil
 }
 
-// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases
+// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases or enum classes
 func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	// Check if this property has enum constraints
+	if hasEnumConstraints(&property) {
+		return getOrRegisterPropertyEnumName(&property, nameRegistry)
+	}
 	return getOrRegisterPropertyAliasName(&property, nameRegistry)
 }
 
@@ -284,6 +298,34 @@ func createEventDataClass(rule *plan.EventRule, nameRegistry *core.NameRegistry)
 		Name:       className,
 		Comment:    rule.Event.Description,
 		Properties: properties,
+	}, nil
+}
+
+// hasEnumConstraints checks if a property has enum constraints defined
+func hasEnumConstraints(property *plan.Property) bool {
+	return property.Config != nil && property.Config.Enum != nil && len(property.Config.Enum) > 0
+}
+
+// createPropertyEnum creates a KotlinEnum from a property with enum constraints
+func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterPropertyEnumName(property, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range property.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       formatEnumConstantName(value),
+			SerialName: value,
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: property.Description,
+		Values:  enumValues,
 	}, nil
 }
 

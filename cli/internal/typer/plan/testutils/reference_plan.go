@@ -80,6 +80,15 @@ func init() {
 		Type:        []plan.PropertyType{*ReferenceCustomTypes["active"]},
 	}
 
+	ReferenceProperties["device_type"] = &plan.Property{
+		Name:        "device_type",
+		Description: "Type of device",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []string{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -131,6 +140,10 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"profile": {
 					Property: *ReferenceProperties["profile"],
 					Required: true,
+				},
+				"device_type": {
+					Property: *ReferenceProperties["device_type"],
+					Required: false,
 				},
 			},
 			AdditionalProperties: false,
@@ -210,6 +223,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 4 // email, age, active, user_profile
-	ExpectedPropertyCount   = 6 // email, first_name, last_name, age, active, profile
+	ExpectedPropertyCount   = 7 // email, first_name, last_name, age, active, device_type, profile
 	ExpectedEventCount      = 5 // User Signed Up, Identify, Page, Screen, Group
 )

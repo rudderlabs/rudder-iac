@@ -20,6 +20,9 @@ var dataclassTemplate string
 //go:embed templates/rudderanalytics.tmpl
 var rudderanalyticsTemplate string
 
+//go:embed templates/enum.tmpl
+var enumTemplate string
+
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
 	if err != nil {
@@ -38,6 +41,11 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	}
 
 	_, err = tmpl.New("rudderanalytics.tmpl").Parse(rudderanalyticsTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("enum.tmpl").Parse(enumTemplate)
 	if err != nil {
 		return nil, err
 	}
