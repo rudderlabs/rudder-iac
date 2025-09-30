@@ -490,6 +490,34 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 	}, nil
 }
 
+// hasEnumConstraints checks if a property has enum constraints defined
+func hasEnumConstraints(property *plan.Property) bool {
+	return property.Config != nil && property.Config.Enum != nil && len(property.Config.Enum) > 0
+}
+
+// createPropertyEnum creates a KotlinEnum from a property with enum constraints
+func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterPropertyEnumName(property, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range property.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       formatEnumConstantName(value),
+			SerialName: value,
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: property.Description,
+		Values:  enumValues,
+	}, nil
+}
+
 // mapPrimitiveToKotlinType maps plan primitive types to Kotlin types
 func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 	switch primitiveType {

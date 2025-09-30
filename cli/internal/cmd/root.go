@@ -81,6 +81,7 @@ func init() {
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
 	rootCmd.AddCommand(importcmd.NewCmdImport())
 	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
+	rootCmd.AddCommand(typer.NewCmdTyper())
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
