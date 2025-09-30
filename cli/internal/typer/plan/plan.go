@@ -1,5 +1,9 @@
 package plan
 
+import (
+	"fmt"
+)
+
 /*
  * Event related types
  */
@@ -20,6 +24,24 @@ type Event struct {
 	EventType   EventType `json:"eventType"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
+}
+
+// ParseEventType converts a string to an EventType, returning an error for unknown types
+func ParseEventType(s string) (EventType, error) {
+	switch s {
+	case string(EventTypeTrack):
+		return EventTypeTrack, nil
+	case string(EventTypeIdentify):
+		return EventTypeIdentify, nil
+	case string(EventTypePage):
+		return EventTypePage, nil
+	case string(EventTypeScreen):
+		return EventTypeScreen, nil
+	case string(EventTypeGroup):
+		return EventTypeGroup, nil
+	default:
+		return "", fmt.Errorf("invalid event type: %s", s)
+	}
 }
 
 /*
@@ -139,6 +161,18 @@ const (
 	IdentitySectionProperties IdentitySection = "properties"
 	IdentitySectionTraits     IdentitySection = "traits"
 )
+
+// ParseIdentitySection converts a string to an IdentitySection, returning an error for unknown sections
+func ParseIdentitySection(s string) (IdentitySection, error) {
+	switch s {
+	case string(IdentitySectionProperties):
+		return IdentitySectionProperties, nil
+	case string(IdentitySectionTraits):
+		return IdentitySectionTraits, nil
+	default:
+		return "", fmt.Errorf("invalid identity section: %s", s)
+	}
+}
 
 // EventRule represents a rule for an event
 type EventRule struct {
