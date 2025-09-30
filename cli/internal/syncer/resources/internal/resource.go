@@ -8,6 +8,12 @@ type Resource struct {
 	Dependencies []string
 
 	ImportMetadata *ResourceImportMetadata
+	FileMetadata   *ResourceFileMetadata
+}
+
+type ResourceFileMetadata struct {
+	FilePath    string
+	MetadataRef string
 }
 
 type ResourceImportMetadata struct {

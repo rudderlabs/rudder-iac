@@ -5,11 +5,13 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/spf13/cobra"
 )
 
-func NewWorkspaceImport() *cobra.Command {
+func NewCmdWorkspaceImport() *cobra.Command {
 	var (
 		deps     app.Deps
 		p        project.Project
@@ -29,7 +31,6 @@ func NewWorkspaceImport() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
-
 			p = project.New(location, deps.CompositeProvider())
 
 			if err := p.Load(); err != nil {
@@ -39,7 +40,12 @@ func NewWorkspaceImport() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			var err error
+			defer func() {
+				telemetry.TrackCommand("import workspace", err)
+			}()
+			err = importer.WorkspaceImport(cmd.Context(), location, p, deps.CompositeProvider())
+			return err
 		},
 	}
 

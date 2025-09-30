@@ -7,7 +7,10 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -170,10 +173,27 @@ func (h *Handler) Import(_ context.Context, _ string, data resources.ResourceDat
 	return nil, fmt.Errorf("importing event stream source is not supported")
 }
 
+func (h *Handler) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+	return nil, fmt.Errorf("loading importable event stream sources is not supported")
+}
+
+func (h *Handler) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+	return fmt.Errorf("assigning identifiers to event stream sources is not supported")
+}
+
+func (h *Handler) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
+	return nil, fmt.Errorf("formatting event stream sources for export is not supported")
+}
+
 func mapRemoteToState(source sourceClient.EventStreamSource) *state.ResourceState {
 	return &state.ResourceState{
-		Type: ResourceType,
-		ID:   source.ExternalID,
+		Type:  ResourceType,
+		ID:    source.ExternalID,
 		Input: *mapRemoteToResourceData(&source),
 		Output: resources.ResourceData{
 			IDKey: source.ID,
