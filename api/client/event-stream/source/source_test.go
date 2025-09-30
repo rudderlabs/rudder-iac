@@ -117,7 +117,7 @@ func TestGetSources(t *testing.T) {
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"sources": [
+			"data": [
 				{
 					"id": "src-123",
 					"externalId": "ext-123",

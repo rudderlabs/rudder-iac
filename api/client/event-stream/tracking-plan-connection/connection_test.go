@@ -11,16 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to convert boolean to pointer
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+// Helper function to convert Action to pointer
+func actionPtr(a trackingplanconnection.Action) *trackingplanconnection.Action {
+	return &a
+}
+
 func TestLinkTP(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{
 				"config": {
-					"track":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolations":"forward","allowUnplannedEvents":false},
-					"identify":{"propagateValidationErrors":false,"unplannedProperties":"drop","anyOtherViolations":"forward"},
-					"group":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolations":"forward"},
-					"page":{"propagateValidationErrors":false,"unplannedProperties":"forward","anyOtherViolations":"drop"},
-					"screen":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolations":"forward"}
+					"track":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolation":"forward","allowUnplannedEvents":false},
+					"identify":{"propagateValidationErrors":false,"unplannedProperties":"drop","anyOtherViolation":"forward"},
+					"group":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolation":"forward"},
+					"page":{"propagateValidationErrors":false,"unplannedProperties":"forward","anyOtherViolation":"drop"},
+					"screen":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolation":"forward"}
 				}
 			}`
 			return testutils.ValidateRequest(t, req, "POST", "v2/catalog/tracking-plans/tp-123/sources/src-456", expected)
@@ -35,31 +45,31 @@ func TestLinkTP(t *testing.T) {
 	config := &trackingplanconnection.ConnectionConfig{
 		Track: &trackingplanconnection.TrackConfig{
 			EventTypeConfig: &trackingplanconnection.EventTypeConfig{
-				PropagateValidationErrors: true,
-				UnplannedProperties:       trackingplanconnection.Forward,
-				AnyOtherViolations:        trackingplanconnection.Forward,
+				PropagateValidationErrors: boolPtr(true),
+				UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+				AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
 			},
-			AllowUnplannedEvents: false,
+			AllowUnplannedEvents: boolPtr(false),
 		},
 		Identify: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: false,
-			UnplannedProperties:       trackingplanconnection.Drop,
-			AnyOtherViolations:        trackingplanconnection.Forward,
+			PropagateValidationErrors: boolPtr(false),
+			UnplannedProperties:       actionPtr(trackingplanconnection.Drop),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
 		},
 		Group: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: true,
-			UnplannedProperties:       trackingplanconnection.Forward,
-			AnyOtherViolations:        trackingplanconnection.Forward,
+			PropagateValidationErrors: boolPtr(true),
+			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
 		},
 		Page: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: false,
-			UnplannedProperties:       trackingplanconnection.Forward,
-			AnyOtherViolations:        trackingplanconnection.Drop,
+			PropagateValidationErrors: boolPtr(false),
+			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
 		},
 		Screen: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: true,
-			UnplannedProperties:       trackingplanconnection.Forward,
-			AnyOtherViolations:        trackingplanconnection.Forward,
+			PropagateValidationErrors: boolPtr(true),
+			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
 		},
 	}
 
@@ -73,9 +83,9 @@ func TestUpdateTPConnection(t *testing.T) {
 		Validate: func(req *http.Request) bool {
 			expected := `{
 				"config": {
-					"track":{"propagateValidationErrors":false,"unplannedProperties":"drop","anyOtherViolations":"forward","allowUnplannedEvents":true},
-					"identify":{"propagateValidationErrors":true,"unplannedProperties":"forward","anyOtherViolations":"drop"},
-					"group":{"propagateValidationErrors":false,"unplannedProperties":"forward","anyOtherViolations":"drop"}
+					"track":{"propagateValidationErrors":false,"unplannedProperties":"drop","anyOtherViolation":"forward","allowUnplannedEvents":true},
+					"identify":{"unplannedProperties":"forward","anyOtherViolation":"drop"},
+					"group":{"propagateValidationErrors":false,"unplannedProperties":"forward","anyOtherViolation":"drop"}
 				}
 			}`
 			return testutils.ValidateRequest(t, req, "PUT", "v2/catalog/tracking-plans/tp-123/sources/src-456", expected)
@@ -91,21 +101,21 @@ func TestUpdateTPConnection(t *testing.T) {
 	config := &trackingplanconnection.ConnectionConfig{
 		Track: &trackingplanconnection.TrackConfig{
 			EventTypeConfig: &trackingplanconnection.EventTypeConfig{
-				PropagateValidationErrors: false,
-				UnplannedProperties:       trackingplanconnection.Drop,
-				AnyOtherViolations:        trackingplanconnection.Forward,
+				PropagateValidationErrors: boolPtr(false),
+				UnplannedProperties:       actionPtr(trackingplanconnection.Drop),
+				AnyOtherViolations:        actionPtr(trackingplanconnection.Forward),
 			},
-			AllowUnplannedEvents: true,
+			AllowUnplannedEvents: boolPtr(true),
 		},
 		Identify: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: true,
-			UnplannedProperties:       trackingplanconnection.Forward,
-			AnyOtherViolations:        trackingplanconnection.Drop,
+			PropagateValidationErrors: nil,
+			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
 		},
 		Group: &trackingplanconnection.EventTypeConfig{
-			PropagateValidationErrors: false,
-			UnplannedProperties:       trackingplanconnection.Forward,
-			AnyOtherViolations:        trackingplanconnection.Drop,
+			PropagateValidationErrors: boolPtr(false),
+			UnplannedProperties:       actionPtr(trackingplanconnection.Forward),
+			AnyOtherViolations:        actionPtr(trackingplanconnection.Drop),
 		},
 	}
 
