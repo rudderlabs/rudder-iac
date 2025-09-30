@@ -34,6 +34,21 @@ typealias PropertyLastName = String
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
 
+/** Type of device */
+@Serializable
+enum class PropertyDeviceType {
+    @SerialName("mobile")
+    MOBILE,
+    @SerialName("tablet")
+    TABLET,
+    @SerialName("desktop")
+    DESKTOP,
+    @SerialName("smartTV")
+    SMARTTV,
+    @SerialName("IoT-Device")
+    IOT_DEVICE
+}
+
 /** User profile information */
 @Serializable
 data class CustomTypeUserProfile(
@@ -96,6 +111,10 @@ data class TrackUserSignedUpProperties(
     /** User's age */
     @SerialName("age")
     val age: PropertyAge? = null,
+
+    /** Type of device */
+    @SerialName("device_type")
+    val deviceType: PropertyDeviceType? = null,
 
     /** User profile data */
     @SerialName("profile")

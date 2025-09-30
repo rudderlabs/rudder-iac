@@ -12,6 +12,7 @@ import (
 var (
 	TypeAliasScope = "typealias"
 	DataclassScope = "dataclass"
+	EnumScope      = "enum"
 )
 
 // formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
@@ -113,6 +114,48 @@ func getOrRegisterCustomTypeAliasName(customType *plan.CustomType, nameRegistry 
 func getOrRegisterPropertyAliasName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	aliasName := FormatClassName("Property", property.Name)
 	return nameRegistry.RegisterName("property:"+property.Name, TypeAliasScope, aliasName)
+}
+
+// getOrRegisterPropertyEnumName returns the registered enum class name for a property with enum constraints
+func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	enumName := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
+}
+
+// formatEnumConstantName converts a string value to UPPER_CASE suitable for Kotlin enum constants
+func formatEnumConstantName(value string) string {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return ""
+	}
+
+	// Convert to upper case and replace invalid characters with underscores
+	formatted := strings.ToUpper(trimmedValue)
+
+	// Replace non-alphanumeric characters with underscores
+	var result strings.Builder
+	for _, r := range formatted {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+		} else {
+			result.WriteRune('_')
+		}
+	}
+
+	formatted = result.String()
+
+	// If it starts with a number, prefix with underscore
+	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
+		formatted = "_" + formatted
+	}
+
+	// Handle reserved keywords by prefixing with underscore
+	originalLower := strings.ToLower(trimmedValue)
+	if KotlinReservedKeywords[originalLower] {
+		formatted = "_" + formatted
+	}
+
+	return formatted
 }
 
 func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.NameRegistry) (string, error) {

@@ -24,6 +24,19 @@ type KotlinDataClass struct {
 	Properties []KotlinProperty // Properties of the data class
 }
 
+// KotlinEnumValue represents a single value in a Kotlin enum
+type KotlinEnumValue struct {
+	Name       string // The Kotlin constant name (e.g., "GET")
+	SerialName string // The serialized name (e.g., "GET" for @SerialName("GET"))
+}
+
+// KotlinEnum represents a Kotlin enum class declaration
+type KotlinEnum struct {
+	Name    string            // The enum name in PascalCase (e.g., "PropertyMyEnum")
+	Comment string            // Documentation comment for the enum
+	Values  []KotlinEnumValue // The enum values with their serial names
+}
+
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature
 type KotlinMethodArgument struct {
 	Name     string // e.g., "groupId", "properties"
@@ -57,6 +70,7 @@ type RudderAnalyticsMethod struct {
 type KotlinContext struct {
 	TypeAliases            []KotlinTypeAlias       // Type aliases for primitive custom types
 	DataClasses            []KotlinDataClass       // Data classes for object custom types
+	Enums                  []KotlinEnum            // Enum classes for properties with enum constraints
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
 }
 
@@ -65,6 +79,7 @@ func NewKotlinContext() *KotlinContext {
 	return &KotlinContext{
 		TypeAliases:            make([]KotlinTypeAlias, 0),
 		DataClasses:            make([]KotlinDataClass, 0),
+		Enums:                  make([]KotlinEnum, 0),
 		RudderAnalyticsMethods: make([]RudderAnalyticsMethod, 0),
 	}
 }
