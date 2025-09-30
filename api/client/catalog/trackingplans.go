@@ -47,7 +47,7 @@ type TrackingPlanUpsertEvent struct {
 
 type TrackingPlan struct {
 	ID           string              `json:"id"`
-	ExternalId   string              `json:"externalId"`
+	ExternalID   string              `json:"externalId"`
 	Name         string              `json:"name"`
 	Description  *string             `json:"description,omitempty"`
 	CreationType string              `json:"creationType"`
