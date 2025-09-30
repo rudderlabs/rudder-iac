@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/samber/lo"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type TrackingPlanProvider struct {
@@ -41,6 +41,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 	created, err := p.client.CreateTrackingPlan(ctx, catalog.TrackingPlanCreate{
 		Name:        args.Name,
 		Description: args.Description,
+		ExternalID:  ID,
 	})
 
 	if err != nil {
@@ -51,6 +52,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		eventStates []*state.TrackingPlanEventState
 	)
 
+	version := created.Version
 	for _, event := range args.Events {
 		lastupserted, err := p.client.UpdateTrackingPlanEvent(
 			ctx,
@@ -68,13 +70,14 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 			EventID: lastEvent.EventID,
 			LocalID: event.LocalID,
 		})
+		version = lastupserted.Version
 	}
 
 	tpState := state.TrackingPlanState{
 		TrackingPlanArgs: args,
 		ID:               created.ID,
 		Name:             created.Name,
-		Version:          created.Version,
+		Version:          version,
 		CreationType:     created.CreationType,
 		Description:      *created.Description,
 		WorkspaceID:      created.WorkspaceID,
@@ -216,12 +219,54 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 
 // LoadResourcesFromRemote loads all tracking plans from the remote catalog
 func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	p.log.Debug("loading tracking plans from remote catalog - not yet implemented")
-	return resources.NewResourceCollection(), nil
+	p.log.Debug("loading tracking plans from remote catalog ")
+	collection := resources.NewResourceCollection()
+	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, trackingPlan := range trackingPlans {
+		resourceMap[trackingPlan.ID] = &resources.RemoteResource{
+			ID:         trackingPlan.ID,
+			ExternalID: trackingPlan.ExternalID,
+			Data:       trackingPlan,
+		}
+	}
+	collection.Set(state.TrackingPlanResourceType, resourceMap)
+	return collection, nil
 }
 
 func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	return syncerstate.EmptyState(), nil
+	s := syncerstate.EmptyState()
+	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
+	for _, remoteTP := range trackingPlans {
+		if remoteTP.ExternalID == "" {
+			continue
+		}
+		trackingPlan, ok := remoteTP.Data.(*catalog.TrackingPlanWithIdentifiers)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.TrackingPlan")
+		}
+		args := &state.TrackingPlanArgs{}
+		args.FromRemoteTrackingPlan(trackingPlan, collection)
+
+		stateArgs := state.TrackingPlanState{}
+		stateArgs.FromRemoteTrackingPlan(trackingPlan, collection)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         state.TrackingPlanResourceType,
+			ID:           remoteTP.ExternalID,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(remoteTP.ExternalID, state.TrackingPlanResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
 }
 
 func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {
