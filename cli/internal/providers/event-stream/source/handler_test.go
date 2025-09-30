@@ -26,7 +26,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				Spec: map[string]interface{}{
 					"id":                123,
 					"name":              "Test Source",
-					"source_definition": "Javascript",
+					"type": "javascript",
 					"enabled":           true,
 				},
 			}
@@ -45,7 +45,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				Spec: map[string]interface{}{
 					"id":                "test-source",
 					"name":              "Test Source",
-					"source_definition": "Javascript",
+					"type": "javascript",
 					"enabled":           true,
 				},
 			}
@@ -75,7 +75,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Spec: map[string]interface{}{
 							"id":                "test-source-1",
 							"name":              "Test Source 1",
-							"source_definition": "Javascript",
+							"type": "javascript",
 							"enabled":           true,
 						},
 					},
@@ -85,7 +85,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Spec: map[string]interface{}{
 							"id":                "test-source-2",
 							"name":              "Test Source 2",
-							"source_definition": "Python",
+							"type": "python",
 							"enabled":           false,
 						},
 					},
@@ -100,7 +100,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Kind:    "event-stream-source",
 						Spec: map[string]interface{}{
 							"name":              "Test Source",
-							"source_definition": "Javascript",
+							"type": "javascript",
 							"enabled":           true,
 						},
 					},
@@ -116,7 +116,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Kind:    "event-stream-source",
 						Spec: map[string]interface{}{
 							"id":                "test-source",
-							"source_definition": "Javascript",
+							"type": "javascript",
 							"enabled":           true,
 						},
 					},
@@ -125,7 +125,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				errorMessage:  "name is required",
 			},
 			{
-				name: "Missing source_definition",
+				name: "Missing type",
 				specs: []*specs.Spec{
 					{
 						Version: "rudder/v0.1",
@@ -138,10 +138,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					},
 				},
 				expectedError: true,
-				errorMessage:  "source_definition is required",
+				errorMessage:  "type is required",
 			},
 			{
-				name: "Invalid source_definition",
+				name: "Invalid type",
 				specs: []*specs.Spec{
 					{
 						Version: "rudder/v0.1",
@@ -149,13 +149,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Spec: map[string]interface{}{
 							"id":                "test-source",
 							"name":              "Test Source",
-							"source_definition": "InvalidSDK",
+							"type": "InvalidSDK",
 							"enabled":           true,
 						},
 					},
 				},
 				expectedError: true,
-				errorMessage:  "source_definition 'InvalidSDK' is invalid",
+				errorMessage:  "type 'InvalidSDK' is invalid",
 			},
 		}
 
@@ -193,7 +193,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			Spec: map[string]interface{}{
 				"id":                "test-source-1",
 				"name":              "Test Source 1",
-				"source_definition": "Javascript",
+				"type": "javascript",
 				"enabled":           true,
 			},
 		}
@@ -210,7 +210,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, resources.ResourceData{
 			"name":              "Test Source 1",
 			"enabled":           true,
-			"source_definition": "Javascript",
+			"type": "javascript",
 		}, res[0].Data())
 		assert.Empty(t, res[0].Dependencies())
 	})
@@ -222,7 +222,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		data := resources.ResourceData{
 			"name":              "Test Source",
 			"enabled":           true,
-			"source_definition": "Javascript",
+			"type": "javascript",
 		}
 
 		result, err := handler.Create(context.Background(), "test-source", data)
@@ -232,7 +232,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.ResourceData{
 			"name":              "Test Source",
 			"enabled":           true,
-			"source_definition": "Javascript",
+			"type": "javascript",
 		}, result)
 	})
 
@@ -244,13 +244,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			data := resources.ResourceData{
 				"name":              "Updated Source",
 				"enabled":           false,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}
 			state := resources.ResourceData{
 				"id":                "remote123",
 				"name":              "Original Source",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}
 
 			result, err := handler.Update(context.Background(), "test-source", data, state)
@@ -260,7 +260,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			assert.Equal(t, &resources.ResourceData{
 				"name":              "Updated Source",
 				"enabled":           false,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}, result)
 		})
 
@@ -269,19 +269,19 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			handler := source.NewHandler(mockClient)
 
 			data := resources.ResourceData{
-				"source_definition": "Python",
+				"type": "python",
 			}
 			state := resources.ResourceData{
 				"id":                "remote123",
 				"name":              "Original Source",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			}
 
 			_, err := handler.Update(context.Background(), "test-source", data, state)
 
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "source_definition cannot be changed")
+			assert.Contains(t, err.Error(), "type cannot be changed")
 			assert.False(t, mockClient.UpdateCalled())
 		})
 	})
@@ -308,21 +308,21 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 				{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 				{
 					ID:         "remote789",
 					ExternalID: "", // This should be skipped
 					Name:       "Test Source 3",
-					Type:       "Go",
+					Type:       "go",
 					Enabled:    true,
 				},
 			}, nil
@@ -344,7 +344,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			Input: resources.ResourceData{
 				"name":              "Test Source 1",
 				"enabled":           true,
-				"source_definition": "Javascript",
+				"type": "javascript",
 			},
 			Output: resources.ResourceData{
 				"id": "remote123",
@@ -358,7 +358,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			Input: resources.ResourceData{
 				"name":              "Test Source 2",
 				"enabled":           false,
-				"source_definition": "Python",
+				"type": "python",
 			},
 			Output: resources.ResourceData{
 				"id": "remote456",
@@ -374,14 +374,14 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 				{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 			}, nil
@@ -404,7 +404,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 			},
@@ -415,7 +415,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 			},
@@ -435,7 +435,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
-					Type:       "Javascript",
+					Type:       "javascript",
 					Enabled:    true,
 				},
 			},
@@ -446,7 +446,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID:         "remote456",
 					ExternalID: "",
 					Name:       "Test Source 2",
-					Type:       "Python",
+					Type:       "python",
 					Enabled:    false,
 				},
 			},
@@ -466,7 +466,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				Input: resources.ResourceData{
 					"name":              "Test Source 1",
 					"enabled":           true,
-					"source_definition": "Javascript",
+					"type": "javascript",
 				},
 				Output: resources.ResourceData{
 					"id": "remote123",
