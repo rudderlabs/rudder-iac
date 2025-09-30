@@ -77,7 +77,7 @@ func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog
 }
 
 func (m *EmptyCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
-  return nil, nil
+	return nil, nil
 }
 
 func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context) ([]*catalog.TrackingPlanWithIdentifiers, error) {
