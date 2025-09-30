@@ -16,17 +16,15 @@ func TestCreateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"externalId":"ext-123","name":"Test Source","type":"webhook","enabled":true}`
-			return testutils.ValidateRequest(t, req, "POST", "/v2/sources", expected)
+			return testutils.ValidateRequest(t, req, "POST", "/v2/event-stream-sources", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"source": {
-				"id": "src-123",
-				"externalId": "ext-123",
-				"name": "Test Source",
-				"type": "webhook",
-				"enabled": true
-			}
+			"id": "src-123",
+			"externalId": "ext-123",
+			"name": "Test Source",
+			"type": "webhook",
+			"enabled": true
 		}`,
 	})
 
@@ -46,11 +44,11 @@ func TestCreateSource(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, &esSource.EventStreamSource{
-		ID:          "src-123",
-		ExternalID:  "ext-123",
-		Name:        "Test Source",
-		Type:        "webhook",
-		Enabled:     true,
+		ID:         "src-123",
+		ExternalID: "ext-123",
+		Name:       "Test Source",
+		Type:       "webhook",
+		Enabled:    true,
 	}, created)
 	httpClient.AssertNumberOfCalls()
 }
@@ -59,17 +57,15 @@ func TestUpdateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"name":"Updated Source"}`
-			return testutils.ValidateRequest(t, req, "PUT", "/v2/sources/src-123", expected)
+			return testutils.ValidateRequest(t, req, "PUT", "/v2/event-stream-sources/src-123", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
-			"source": {
-				"id": "src-123",
-				"externalId": "ext-123",
-				"name": "Updated Source",
-				"type": "webhook",
-				"enabled": true
-			}
+			"id": "src-123",
+			"externalId": "ext-123",
+			"name": "Updated Source",
+			"type": "webhook",
+			"enabled": true
 		}`,
 	})
 
@@ -86,11 +82,11 @@ func TestUpdateSource(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, &esSource.EventStreamSource{
-		ID:          "src-123",
-		ExternalID:  "ext-123",
-		Name:        "Updated Source",
-		Type:        "webhook",
-		Enabled:     true,
+		ID:         "src-123",
+		ExternalID: "ext-123",
+		Name:       "Updated Source",
+		Type:       "webhook",
+		Enabled:    true,
 	}, updated)
 
 	httpClient.AssertNumberOfCalls()
@@ -99,7 +95,7 @@ func TestUpdateSource(t *testing.T) {
 func TestDeleteSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "DELETE", "/v2/sources/src-123", "")
+			return testutils.ValidateRequest(t, req, "DELETE", "/v2/event-stream-sources/src-123", "")
 		},
 		ResponseStatus: 204,
 	})
@@ -150,18 +146,18 @@ func TestGetSources(t *testing.T) {
 
 	assert.Equal(t, []esSource.EventStreamSource{
 		{
-			ID:          "src-123",
-			ExternalID:  "ext-123",
-			Name:        "Source 1",
-			Type:        "webhook",
-			Enabled:     true,
+			ID:         "src-123",
+			ExternalID: "ext-123",
+			Name:       "Source 1",
+			Type:       "webhook",
+			Enabled:    true,
 		},
 		{
-			ID:          "src-456",
-			ExternalID:  "ext-456",
-			Name:        "Source 2",
-			Type:        "api",
-			Enabled:     false,
+			ID:         "src-456",
+			ExternalID: "ext-456",
+			Name:       "Source 2",
+			Type:       "api",
+			Enabled:    false,
 		},
 	}, sources)
 }

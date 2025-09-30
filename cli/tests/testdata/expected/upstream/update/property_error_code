@@ -8,6 +8,7 @@
         ]
     },
     "id": "prop_2yx92y20oAfsXePRbQ8wAqTGlcv",
+    "externalId": "error_code",
     "name": "Error Code",
     "description": "The HTTP error code.",
     "type": "integer",
@@ -15,5 +16,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T11:39:13.439Z",
-    "updatedAt": "2025-06-24T11:39:13.439Z"
+    "updatedAt": "2025-06-24T11:39:13.439Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

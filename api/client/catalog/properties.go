@@ -24,17 +24,19 @@ type PropertyUpdate struct {
 }
 
 type Property struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	WorkspaceId string                 `json:"workspaceId"`
-	ExternalId  string                 `json:"externalId,omitempty"`
-	Config      map[string]interface{} `json:"propConfig"`
-	CreatedAt   time.Time              `json:"createdAt"`
-	UpdatedAt   time.Time              `json:"updatedAt"`
-	CreatedBy   string                 `json:"createdBy"`
-	UpdatedBy   string                 `json:"updatedBy"`
+	ID               string                 `json:"id"`
+	Name             string                 `json:"name"`
+	Description      string                 `json:"description"`
+	Type             string                 `json:"type"`
+	WorkspaceId      string                 `json:"workspaceId"`
+	DefinitionId     string                 `json:"definitionId"`
+	ItemDefinitionId string                 `json:"itemDefinitionId"`
+	ExternalId       string                 `json:"externalId,omitempty"`
+	Config           map[string]interface{} `json:"propConfig"`
+	CreatedAt        time.Time              `json:"createdAt"`
+	UpdatedAt        time.Time              `json:"updatedAt"`
+	CreatedBy        string                 `json:"createdBy"`
+	UpdatedBy        string                 `json:"updatedBy"`
 }
 
 type PropertyStore interface {

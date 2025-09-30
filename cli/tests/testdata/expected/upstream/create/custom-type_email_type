@@ -16,6 +16,7 @@
     },
     "itemDefinitions": [],
     "id": "def_2yxtvosyg7cxDtP48BZwFRHL72S",
+    "externalId": "email_type",
     "name": "EmailType",
     "type": "string",
     "dataType": "string",

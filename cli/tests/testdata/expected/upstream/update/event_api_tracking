@@ -1,5 +1,6 @@
 {
     "id": "ev_2yy5tT5llx29Ks3mj4sw9as3FrJ",
+    "externalId": "api_tracking",
     "name": "API Tracking",
     "description": "This event is triggered every time a user views a product.",
     "eventType": "track",

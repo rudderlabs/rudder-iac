@@ -10,6 +10,7 @@
         ]
     },
     "id": "prop_2yx92HDgsrF6Z9bThYaN24R7IN7",
+    "externalId": "api_method",
     "name": "API Method",
     "description": "http method of the api called",
     "type": "string",
@@ -17,5 +18,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T11:39:08.046Z",
-    "updatedAt": "2025-06-24T11:39:08.046Z"
+    "updatedAt": "2025-06-24T11:39:08.046Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

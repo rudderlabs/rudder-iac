@@ -282,3 +282,58 @@ func diffPropertyReferences(left []PropertyReference, right []PropertyReference)
 
 	return false
 }
+
+func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRemoteId func(string, string) (string, error)) error {
+	v.Type = remoteVariant.Type
+
+	// set discriminator as a propertyRef
+	discriminatorURN, err := getURNFromRemoteId(PropertyResourceType, remoteVariant.Discriminator)
+	if err != nil {
+		return err
+	}
+	v.Discriminator = resources.PropertyRef{
+		URN:      discriminatorURN,
+		Property: "id",
+	}
+
+	v.Cases = make([]VariantCase, 0, len(remoteVariant.Cases))
+	for _, remoteCase := range remoteVariant.Cases {
+		properties := make([]PropertyReference, len(remoteCase.Properties))
+		for i, prop := range remoteCase.Properties {
+			urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+			if err != nil {
+				return err
+			}
+			properties[i] = PropertyReference{
+				ID: resources.PropertyRef{
+					URN:      urn,
+					Property: "id",
+				},
+				Required: prop.Required,
+			}
+		}
+		v.Cases = append(v.Cases, VariantCase{
+			DisplayName: remoteCase.DisplayName,
+			Match:       remoteCase.Match,
+			Description: remoteCase.Description,
+			Properties:  properties,
+		})
+	}
+
+	v.Default = make([]PropertyReference, len(remoteVariant.Default))
+	for i, prop := range remoteVariant.Default {
+		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+		if err != nil {
+			return err
+		}
+		v.Default[i] = PropertyReference{
+			ID: resources.PropertyRef{
+				URN:      urn,
+				Property: "id",
+			},
+			Required: prop.Required,
+		}
+	}
+
+	return nil
+}

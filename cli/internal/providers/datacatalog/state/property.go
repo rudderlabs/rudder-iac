@@ -16,7 +16,7 @@ type PropertyArgs struct {
 	Config      map[string]interface{}
 }
 
-const PropertyResourceType     = "property"
+const PropertyResourceType = "property"
 
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
 	args.Name = prop.Name
@@ -67,8 +67,45 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 }
 
 // FromRemoteProperty converts from remote API Property to PropertyArgs
-func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
-	return fmt.Errorf("not implemented")
+func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(string, string) (string, error)) error {
+	args.Name = property.Name
+	args.Description = property.Description
+	args.Type = property.Type
+	// Deep copy the config map
+	args.Config = make(map[string]interface{})
+	for k, v := range property.Config {
+		args.Config[k] = v
+	}
+
+	// Check if the property is referring to a customType using property.DefinitionId
+	if property.DefinitionId != "" {
+		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.DefinitionId)
+		if err != nil {
+			return err
+		}
+		args.Type = resources.PropertyRef{
+			URN:      urn,
+			Property: "name",
+		}
+		args.Config = map[string]interface{}{}
+	}
+
+	// Handle array types with custom type references in itemTypes
+	if property.Type == "array" && property.Config != nil && property.ItemDefinitionId != "" {
+		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.ItemDefinitionId)
+		if err != nil {
+			return err
+		}
+
+		// Update itemTypes in config to reference the same custom type
+		args.Config["itemTypes"] = []interface{}{
+			resources.PropertyRef{
+				URN:      urn,
+				Property: "name",
+			},
+		}
+	}
+	return nil
 }
 
 func (args *PropertyArgs) ToResourceData() resources.ResourceData {
@@ -129,6 +166,21 @@ func (p *PropertyState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteProperty converts from catalog.Property to PropertyState
-func (p *PropertyState) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
-	return fmt.Errorf("not implemented")
+func (p *PropertyState) FromRemoteProperty(property *catalog.Property, getURNFromRemoteId func(string, string) (string, error)) error {
+	p.PropertyArgs.Name = property.Name
+	p.PropertyArgs.Description = property.Description
+	p.PropertyArgs.Type = property.Type
+	// Do not copy config for custom types. Copy only for non-custom types
+	if property.DefinitionId == "" {
+		p.PropertyArgs.Config = property.Config
+	}
+	p.ID = property.ID
+	p.Name = property.Name
+	p.Description = property.Description
+	p.Type = property.Type
+	p.WorkspaceID = property.WorkspaceId
+	p.Config = property.Config
+	p.CreatedAt = property.CreatedAt.String()
+	p.UpdatedAt = property.UpdatedAt.String()
+	return nil
 }

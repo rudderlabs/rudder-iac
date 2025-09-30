@@ -1,5 +1,6 @@
 {
     "id": "ev_2yy5tTQsAcFQTmQMEQxakuLxaHf",
+    "externalId": "api_error",
     "name": "API Error",
     "description": "This event is triggered when an API error occurs.",
     "eventType": "track",

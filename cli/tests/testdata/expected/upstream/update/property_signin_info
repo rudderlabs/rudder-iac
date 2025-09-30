@@ -1,6 +1,7 @@
 {
   "propConfig": {},
   "id": "prop_31TA42kdL1UNUtR1PtKpi9hxWt7",
+  "externalId": "signin_info",
   "name": "Signin Info",
   "description": "Signin info",
   "type": "object",
@@ -8,5 +9,7 @@
   "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
   "updatedBy": null,
   "createdAt": "2025-08-18T17:18:13.222Z",
-  "updatedAt": "2025-08-18T17:18:13.222Z"
+  "updatedAt": "2025-08-18T17:18:13.222Z",
+  "itemDefinitionId": "",
+  "definitionId": ""
 }

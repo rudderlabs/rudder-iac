@@ -6,6 +6,7 @@
     ]
   },
   "id": "prop_31TA3ltAM0RP3yLCe4g0cxm0oCm",
+  "externalId": "captcha_type",
   "name": "Captcha Type",
   "description": "Captcha type",
   "type": "string",
@@ -13,5 +14,7 @@
   "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
   "updatedBy": null,
   "createdAt": "2025-08-18T17:18:11.026Z",
-  "updatedAt": "2025-08-18T17:18:11.026Z"
+  "updatedAt": "2025-08-18T17:18:11.026Z",
+  "itemDefinitionId": "",
+  "definitionId": ""
 }

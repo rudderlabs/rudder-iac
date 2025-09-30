@@ -3,12 +3,14 @@ package resources
 type Graph struct {
 	resources    map[string]*Resource
 	dependencies map[string][]string
+	dependents   map[string][]string
 }
 
 func NewGraph() *Graph {
 	return &Graph{
 		resources:    map[string]*Resource{},
 		dependencies: map[string][]string{},
+		dependents:   map[string][]string{},
 	}
 }
 
@@ -34,6 +36,10 @@ func (s *Graph) GetDependencies(urn string) []string {
 	return s.dependencies[urn]
 }
 
+func (s *Graph) GetDependents(urn string) []string {
+	return s.dependents[urn]
+}
+
 func (s *Graph) AddDependency(addedTo string, dependency string) {
 	deps := s.dependencies[addedTo]
 	for _, dep := range deps {
@@ -42,12 +48,23 @@ func (s *Graph) AddDependency(addedTo string, dependency string) {
 		}
 	}
 	s.dependencies[addedTo] = append(s.dependencies[addedTo], dependency)
+	s.addDependent(dependency, addedTo)
 }
 
 func (s *Graph) AddDependencies(addedTo string, dependencies []string) {
 	for _, dep := range dependencies {
 		s.AddDependency(addedTo, dep)
 	}
+}
+
+func (s *Graph) addDependent(dependency string, dependent string) {
+	deps := s.dependents[dependency]
+	for _, dep := range deps {
+		if dep == dependent {
+			return
+		}
+	}
+	s.dependents[dependency] = append(s.dependents[dependency], dependent)
 }
 
 func (s *Graph) Merge(g *Graph) {

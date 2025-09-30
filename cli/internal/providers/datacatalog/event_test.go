@@ -94,7 +94,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event description",
 				"eventType":   "event type",
-				"categoryId":  (*resources.PropertyRef)(nil),
+				"categoryId":  nil,
 			},
 		}, *createdResource)
 	})
@@ -105,10 +105,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Name:        "event",
 			Description: "event new description",
 			EventType:   "event type",
-			CategoryId: &resources.PropertyRef{
-				URN:      "category:123",
-				Property: "id",
-			},
+			CategoryId:  "Marketing",
 		}
 
 		prevState := state.EventState{
@@ -168,10 +165,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event new description",
 				"eventType":   "event type",
-				"categoryId": &resources.PropertyRef{
-					URN:      "category:123",
-					Property: "id",
-				},
+				"categoryId":  "Marketing",
 			},
 		}, *updatedResource)
 
