@@ -192,6 +192,15 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
+	ReferenceProperties["device_type"] = &plan.Property{
+		Name:        "device_type",
+		Description: "Type of device",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []string{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",

@@ -38,6 +38,19 @@ type KotlinEnum struct {
 	Values  []KotlinEnumValue // The enum values with their serial names
 }
 
+// KotlinEnumValue represents a single value in a Kotlin enum
+type KotlinEnumValue struct {
+	Name       string // The Kotlin constant name (e.g., "GET")
+	SerialName string // The serialized name (e.g., "GET" for @SerialName("GET"))
+}
+
+// KotlinEnum represents a Kotlin enum class declaration
+type KotlinEnum struct {
+	Name    string            // The enum name in PascalCase (e.g., "PropertyMyEnum")
+	Comment string            // Documentation comment for the enum
+	Values  []KotlinEnumValue // The enum values with their serial names
+}
+
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature
 type KotlinMethodArgument struct {
 	Name     string // e.g., "groupId", "properties"
