@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -17,10 +15,9 @@ import (
 )
 
 const (
-	SpecVersion  = "rudder/v0.1"
-	Kind         = "properties"
-	MetadataName = "properties"
-	RelativePath = "./imported/data-catalog/properties/properties.yaml"
+	PropertiesKind         = "properties"
+	PropertiesRelativePath = "./imported/data-catalog/properties/properties.yaml"
+	PropertiesMetadataName = "properties"
 )
 
 var (
@@ -60,9 +57,12 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context) (*resources
 	return collection, nil
 }
 
-func (p *PropertyImportProvider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
+func (p *PropertyImportProvider) IDResources(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+) error {
 	p.log.Debug("assigning identifiers to properties")
-
 	properties := collection.GetAll(state.PropertyResourceType)
 
 	for _, property := range properties {
@@ -77,7 +77,7 @@ func (p *PropertyImportProvider) IDResources(ctx context.Context, collection *re
 		}
 
 		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#/properties/%s/%s", MetadataName, externalID)
+		property.Reference = fmt.Sprintf("#/properties/%s/%s", MetadataNameProperties, externalID)
 	}
 	return nil
 }
@@ -92,7 +92,6 @@ func (p *PropertyImportProvider) FormatForExport(
 	p.log.Debug("formatting properties for export to file")
 
 	properties := collection.GetAll(state.PropertyResourceType)
-
 	if len(properties) == 0 {
 		return nil, nil
 	}
@@ -124,7 +123,13 @@ func (p *PropertyImportProvider) FormatForExport(
 		formattedProps = append(formattedProps, formatted)
 	}
 
-	spec, err := p.toSpec(formattedProps, workspaceMetadata)
+	spec, err := toImportSpec(
+		PropertiesKind,
+		PropertiesMetadataName,
+		workspaceMetadata,
+		map[string]any{
+			"properties": formattedProps,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("creating spec: %w", err)
 	}
@@ -132,31 +137,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	return []importremote.FormattableEntity{
 		{
 			Content:      spec,
-			RelativePath: RelativePath,
-		},
-	}, nil
-}
-
-func (p *PropertyImportProvider) toSpec(properties []map[string]any, workspaceMetadata importremote.WorkspaceImportMetadata) (*specs.Spec, error) {
-	metadata := importremote.Metadata{
-		Name: MetadataName,
-		Import: importremote.WorkspacesImportMetadata{
-			Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
-		},
-	}
-
-	metadataMap := make(map[string]any)
-	err := mapstructure.Decode(metadata, &metadataMap)
-	if err != nil {
-		return nil, fmt.Errorf("decoding metadata: %w", err)
-	}
-
-	return &specs.Spec{
-		Version:  SpecVersion,
-		Kind:     Kind,
-		Metadata: metadataMap,
-		Spec: map[string]any{
-			"properties": properties,
+			RelativePath: PropertiesRelativePath,
 		},
 	}, nil
 }

@@ -13,7 +13,7 @@ import (
 type RequiredKeysValidator struct {
 }
 
-var validTypes = []string{
+var ValidTypes = []string{
 	"string", "number", "integer", "boolean", "null", "array", "object",
 }
 
@@ -233,9 +233,9 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Type validation
-			if !slices.Contains(validTypes, customType.Type) {
+			if !slices.Contains(ValidTypes, customType.Type) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(validTypes, ", ")),
+					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(ValidTypes, ", ")),
 					Reference: reference,
 				})
 			}
@@ -452,9 +452,9 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 				continue
 			}
 
-			if !slices.Contains(validTypes, val) {
+			if !slices.Contains(ValidTypes, val) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(validTypes, ",")),
+					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
 					Reference: reference,
 				})
 			}

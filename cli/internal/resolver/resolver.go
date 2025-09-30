@@ -1,14 +1,13 @@
 package resolver
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 type ReferenceResolver interface {
-	ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error)
+	ResolveToReference(entityType string, remoteID string) (string, error)
 }
 
 type ImportRefResolver struct {
@@ -17,7 +16,7 @@ type ImportRefResolver struct {
 	Importable *resources.ResourceCollection
 }
 
-func (i *ImportRefResolver) ResolveToReference(ctx context.Context, entityType string, remoteID string) (string, error) {
+func (i *ImportRefResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
 	// If we find a resource in importable,
 	// we should always find the reference in it
 	resource, ok := i.Importable.GetByID(entityType, remoteID)
