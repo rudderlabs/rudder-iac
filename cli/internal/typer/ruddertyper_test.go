@@ -24,7 +24,7 @@ func (m *mockPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.TrackingP
 					Name:        "TestEvent",
 					Description: "Test event",
 				},
-				Section: plan.EventRuleSectionProperties,
+				Section: plan.IdentitySectionProperties,
 				Schema: plan.ObjectSchema{
 					Properties:           make(map[string]plan.PropertySchema),
 					AdditionalProperties: false,

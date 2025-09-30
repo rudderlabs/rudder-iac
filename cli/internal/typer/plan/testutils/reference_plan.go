@@ -53,31 +53,31 @@ func init() {
 	ReferenceProperties["email"] = &plan.Property{
 		Name:        "email",
 		Description: "User's email address",
-		Type:        *ReferenceCustomTypes["email"],
+		Type:        []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
 	ReferenceProperties["first_name"] = &plan.Property{
 		Name:        "first_name",
 		Description: "User's first name",
-		Type:        plan.PrimitiveTypeString,
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
 	ReferenceProperties["last_name"] = &plan.Property{
 		Name:        "last_name",
 		Description: "User's last name",
-		Type:        plan.PrimitiveTypeString,
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
 	ReferenceProperties["age"] = &plan.Property{
 		Name:        "age",
 		Description: "User's age",
-		Type:        *ReferenceCustomTypes["age"],
+		Type:        []plan.PropertyType{*ReferenceCustomTypes["age"]},
 	}
 
 	ReferenceProperties["active"] = &plan.Property{
 		Name:        "active",
 		Description: "User active status",
-		Type:        *ReferenceCustomTypes["active"],
+		Type:        []plan.PropertyType{*ReferenceCustomTypes["active"]},
 	}
 
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
@@ -106,7 +106,7 @@ func init() {
 	ReferenceProperties["profile"] = &plan.Property{
 		Name:        "profile",
 		Description: "User profile data",
-		Type:        *ReferenceCustomTypes["user_profile"],
+		Type:        []plan.PropertyType{*ReferenceCustomTypes["user_profile"]},
 	}
 }
 
@@ -117,7 +117,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	// Track event - properties
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["User Signed Up"],
-		Section: plan.EventRuleSectionProperties,
+		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"age": {
@@ -140,7 +140,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	// Identify event - traits
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Identify"],
-		Section: plan.EventRuleSectionTraits,
+		Section: plan.IdentitySectionTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"email": {
@@ -159,7 +159,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	// Page event - properties
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Page"],
-		Section: plan.EventRuleSectionProperties,
+		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"profile": {
@@ -174,7 +174,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	// Screen event - properties
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Screen"],
-		Section: plan.EventRuleSectionProperties,
+		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"profile": {
@@ -189,7 +189,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	// Group event - traits
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Group"],
-		Section: plan.EventRuleSectionTraits,
+		Section: plan.IdentitySectionTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"active": {
