@@ -717,22 +717,22 @@ func TestEventStreamSourceHandler(t *testing.T) {
 							Identify: &trackingplanClient.EventTypeConfig{
 								PropagateValidationErrors: boolPtr(false),
 								UnplannedProperties:       actionPtr(trackingplanClient.Drop),
-								AnyOtherViolations:        actionPtr(trackingplanClient.Forward),
+								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
 							},
 							Group: &trackingplanClient.EventTypeConfig{
 								PropagateValidationErrors: boolPtr(true),
 								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolations:        actionPtr(trackingplanClient.Forward),
+								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
 							},
 							Page: &trackingplanClient.EventTypeConfig{
 								PropagateValidationErrors: boolPtr(false),
 								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolations:        actionPtr(trackingplanClient.Drop),
+								AnyOtherViolation:         actionPtr(trackingplanClient.Drop),
 							},
 							Screen: &trackingplanClient.EventTypeConfig{
 								PropagateValidationErrors: boolPtr(true),
 								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolations:        actionPtr(trackingplanClient.Forward),
+								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
 							},
 						},
 					},
