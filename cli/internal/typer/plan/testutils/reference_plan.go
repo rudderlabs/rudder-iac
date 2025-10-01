@@ -103,6 +103,33 @@ func init() {
 		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
+	// Add properties for testing "any" type support
+	ReferenceProperties["property_of_any"] = &plan.Property{
+		Name:        "property_of_any",
+		Description: "A field that can contain any type of value",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_field"] = &plan.Property{
+		Name:        "untyped_field",
+		Description: "A field with no explicit type (treated as any)",
+		Type:        []plan.PropertyType{},
+	}
+
+	ReferenceProperties["array_of_any"] = &plan.Property{
+		Name:        "array_of_any",
+		Description: "An array that can contain any type of items",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_array"] = &plan.Property{
+		Name:        "untyped_array",
+		Description: "An array with no explicit item type (treated as any)",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -165,6 +192,22 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				},
 				"contacts": {
 					Property: *ReferenceProperties["contacts"],
+					Required: false,
+				},
+				"property_of_any": {
+					Property: *ReferenceProperties["property_of_any"],
+					Required: false,
+				},
+				"untyped_field": {
+					Property: *ReferenceProperties["untyped_field"],
+					Required: false,
+				},
+				"array_of_any": {
+					Property: *ReferenceProperties["array_of_any"],
+					Required: false,
+				},
+				"untyped_array": {
+					Property: *ReferenceProperties["untyped_array"],
 					Required: false,
 				},
 			},
@@ -244,7 +287,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 4 // email, age, active, user_profile
-	ExpectedPropertyCount   = 9 // email, first_name, last_name, age, active, device_type, profile, tags, contacts
-	ExpectedEventCount      = 5 // User Signed Up, Identify, Page, Screen, Group
+	ExpectedCustomTypeCount = 4  // email, age, active, user_profile
+	ExpectedPropertyCount   = 13 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array
+	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )
