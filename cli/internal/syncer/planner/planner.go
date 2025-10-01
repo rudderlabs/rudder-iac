@@ -69,7 +69,8 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 		var opType OperationType = Create
 
 		// Only import resources that are defined for the current workspace
-		if resource.ImportMetadata() != nil && resource.ImportMetadata().WorkspaceId == p.workspaceId {
+		if resource.ImportMetadata() != nil &&
+			resource.ImportMetadata().WorkspaceId == p.workspaceId {
 			opType = Import
 		}
 		plan.Operations = append(plan.Operations, &Operation{Type: opType, Resource: resource})
