@@ -17,6 +17,9 @@ type ExperimentalConfig struct {
 
 	// ConcurrentSyncs enables concurrent sync operations when applying changes
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
+
+	// RudderTyper enables the new typer engine for type checking and validation
+	RudderTyper bool `mapstructure:"rudderTyper"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
