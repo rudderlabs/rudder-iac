@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
 type EventCreate struct {
@@ -107,5 +105,5 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 }
 
 func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
-	return client.GetAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
+	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
 }

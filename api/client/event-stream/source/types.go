@@ -1,6 +1,9 @@
 package source
 
-import trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
+import (
+	"github.com/rudderlabs/rudder-iac/api/client"
+	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
+)
 
 type CreateSourceRequest struct {
 	ExternalID string `json:"externalId"`
@@ -28,6 +31,7 @@ type TrackingPlan struct {
 	Config *trackingplanClient.ConnectionConfig `json:"config"`
 }
 
-type eventStreamSources struct {
-	Sources []EventStreamSource `json:"sources"`
+type eventStreamSourcesPage struct {
+	client.APIPage
+	Sources []EventStreamSource `json:"data"`
 }
