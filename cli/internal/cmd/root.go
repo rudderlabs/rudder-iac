@@ -18,6 +18,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -56,6 +57,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
+	typerCmd        *cobra.Command
 )
 
 func init() {
@@ -89,6 +91,9 @@ func init() {
 
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
+
+	typerCmd = typer.NewCmdTyper()
+	rootCmd.AddCommand(typerCmd)
 }
 
 func initConfig() {
@@ -97,6 +102,10 @@ func initConfig() {
 	// only add debug command if enabled in config
 	if config.GetConfig().Debug {
 		debugCmd.Hidden = false
+	}
+
+	if config.GetConfig().ExperimentalFlags.RudderTyper {
+		typerCmd.Hidden = false
 	}
 
 	// reading this property from viper directly as it is not exposed in Config,
