@@ -2,6 +2,7 @@
   "createdAt": "2025-06-25T08:05:23.061Z",
   "creationType": "Data catalog API",
   "description": "Tracking plan for an e-commerce application.",
+  "externalId": "api_tracking",
   "events": [
     {
       "categoryId": null,
@@ -13,6 +14,7 @@
       "identitySection": "properties",
       "name": "API Tracking",
       "additionalProperties": false,
+      "externalId": "api_tracking",
       "properties": [
         {
           "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
@@ -25,21 +27,43 @@
           "name": "API Method",
           "required": true,
           "additionalProperties": false
-
         },
         {
           "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
           "name": "API Path",
           "required": true,
           "additionalProperties": false
-
         },
         {
           "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
           "name": "Username",
           "required": true,
           "additionalProperties": false
-
+        }
+      ],
+      "variants": [
+        {
+          "type": "discriminator",
+          "discriminator": "prop_33Siftg6QQ8PiqLbuCF9Rq5hmWO",
+          "cases": [
+            {
+              "display_name": "Create Entity",
+              "match": [
+                "POST"
+              ],
+              "description": "applies when creating a new entity",
+              "properties": [
+                {
+                  "id": "prop_33SihM1GUYqfjyNmfscEVod7RSU",
+                  "required": true
+                },
+                {
+                  "id": "prop_33Sigq9ytPBqYkImSjVFKv7Bu3y",
+                  "required": false
+                }
+              ]
+            }
+          ]
         }
       ],
       "updatedAt": "2025-07-21T09:09:56.070Z",
@@ -52,6 +76,7 @@
       "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "description": "This event is triggered when a user logs in.",
       "eventType": "track",
+      "externalId": "login",
       "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eS",
       "identitySection": "properties",
       "name": "Login Event",
@@ -122,6 +147,7 @@
       "createdBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "description": "This event is triggered when a user logs out.",
       "eventType": "track",
+      "externalId": "logout",
       "id": "ev_30B7DOLrwGBY2MjnwJPKskp43eT",
       "identitySection": "properties",
       "name": "Logout Event",
