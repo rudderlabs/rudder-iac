@@ -171,6 +171,16 @@ These helper methods provide convenient access to nested data without violating 
 
 ## Testing Strategy
 
+### Running Tests
+
+Tests are executed using the Makefile at the project root:
+
+```bash
+make test
+```
+
+This runs all tests across the project, including the typer generator tests that validate the plan model functionality.
+
 ### Reference Tracking Plan
 
 The testing approach leverages a comprehensive reference tracking plan that provides consistent test data across all components:
@@ -187,6 +197,16 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 - **Reliability**: Known structure enables precise validation of extraction and generation logic
 - **Maintainability**: Centralized test data reduces duplication and simplifies updates
 - **Documentation**: Reference plan serves as living documentation of supported features
+
+### Testing Approach
+
+The plan model is tested indirectly through platform generator tests rather than direct unit tests. This approach:
+
+- **Validates the complete pipeline**: Tests the entire flow from plan model through code generation
+- **Reduces test maintenance**: Changes to the plan model are automatically tested through generator tests
+- **Provides comprehensive coverage**: The reference plan includes diverse scenarios that exercise all plan model features
+
+Platform generators (like the Kotlin generator) use the reference tracking plan to validate their output against expected generated code, ensuring both plan model correctness and generation logic accuracy for all plan scenarios.
 
 ## Implementation Guidelines
 
