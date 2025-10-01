@@ -74,6 +74,7 @@ type Property struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Type        []PropertyType  `json:"type"`
+	ItemType    []PropertyType  `json:"itemType,omitempty"` // Used if Type includes PrimitiveTypeArray
 	Config      *PropertyConfig `json:"config,omitempty"`
 }
 

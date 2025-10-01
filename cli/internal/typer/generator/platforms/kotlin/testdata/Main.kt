@@ -22,6 +22,9 @@ typealias PropertyActive = CustomTypeActive
 /** User's age */
 typealias PropertyAge = CustomTypeAge
 
+/** Array of user contacts */
+typealias PropertyContacts = List<CustomTypeEmail>
+
 /** User's email address */
 typealias PropertyEmail = CustomTypeEmail
 
@@ -33,6 +36,24 @@ typealias PropertyLastName = String
 
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
+
+/** User tags as array of strings */
+typealias PropertyTags = List<String>
+
+/** Type of device */
+@Serializable
+enum class PropertyDeviceType {
+    @SerialName("mobile")
+    MOBILE,
+    @SerialName("tablet")
+    TABLET,
+    @SerialName("desktop")
+    DESKTOP,
+    @SerialName("smartTV")
+    SMARTTV,
+    @SerialName("IoT-Device")
+    IOT_DEVICE
+}
 
 /** User profile information */
 @Serializable
@@ -97,9 +118,21 @@ data class TrackUserSignedUpProperties(
     @SerialName("age")
     val age: PropertyAge? = null,
 
+    /** Array of user contacts */
+    @SerialName("contacts")
+    val contacts: PropertyContacts? = null,
+
+    /** Type of device */
+    @SerialName("device_type")
+    val deviceType: PropertyDeviceType? = null,
+
     /** User profile data */
     @SerialName("profile")
-    val profile: PropertyProfile
+    val profile: PropertyProfile,
+
+    /** User tags as array of strings */
+    @SerialName("tags")
+    val tags: PropertyTags? = null
 )
 
 class RudderAnalytics(private val analytics: Analytics) {

@@ -80,6 +80,29 @@ func init() {
 		Type:        []plan.PropertyType{*ReferenceCustomTypes["active"]},
 	}
 
+	ReferenceProperties["device_type"] = &plan.Property{
+		Name:        "device_type",
+		Description: "Type of device",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []string{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
+	ReferenceProperties["tags"] = &plan.Property{
+		Name:        "tags",
+		Description: "User tags as array of strings",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["contacts"] = &plan.Property{
+		Name:        "contacts",
+		Description: "Array of user contacts",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -131,6 +154,18 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"profile": {
 					Property: *ReferenceProperties["profile"],
 					Required: true,
+				},
+				"device_type": {
+					Property: *ReferenceProperties["device_type"],
+					Required: false,
+				},
+				"tags": {
+					Property: *ReferenceProperties["tags"],
+					Required: false,
+				},
+				"contacts": {
+					Property: *ReferenceProperties["contacts"],
+					Required: false,
 				},
 			},
 			AdditionalProperties: false,
@@ -210,6 +245,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 4 // email, age, active, user_profile
-	ExpectedPropertyCount   = 6 // email, first_name, last_name, age, active, profile
+	ExpectedPropertyCount   = 9 // email, first_name, last_name, age, active, device_type, profile, tags, contacts
 	ExpectedEventCount      = 5 // User Signed Up, Identify, Page, Screen, Group
 )
