@@ -215,6 +215,33 @@ func init() {
 		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
+	// Add properties for testing "any" type support
+	ReferenceProperties["property_of_any"] = &plan.Property{
+		Name:        "property_of_any",
+		Description: "A field that can contain any type of value",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_field"] = &plan.Property{
+		Name:        "untyped_field",
+		Description: "A field with no explicit type (treated as any)",
+		Type:        []plan.PropertyType{},
+	}
+
+	ReferenceProperties["array_of_any"] = &plan.Property{
+		Name:        "array_of_any",
+		Description: "An array that can contain any type of items",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_array"] = &plan.Property{
+		Name:        "untyped_array",
+		Description: "An array with no explicit item type (treated as any)",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
