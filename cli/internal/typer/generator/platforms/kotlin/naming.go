@@ -122,8 +122,8 @@ func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.N
 	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
 }
 
-// formatEnumConstantName converts a string value to UPPER_CASE suitable for Kotlin enum constants
-func formatEnumConstantName(value string) string {
+// FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
+func FormatEnumValue(value string) string {
 	trimmedValue := strings.TrimSpace(value)
 	if trimmedValue == "" {
 		return ""
