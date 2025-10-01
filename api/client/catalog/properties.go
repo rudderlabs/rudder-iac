@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
 type PropertyCreate struct {
@@ -111,7 +109,7 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 }
 
 func (c *RudderDataCatalog) GetProperties(ctx context.Context) ([]*Property, error) {
-	return client.GetAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
+	return getAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
 }
 
 func (c *RudderDataCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {

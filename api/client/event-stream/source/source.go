@@ -73,5 +73,41 @@ func (r *rudderSourceStore) Delete(ctx context.Context, sourceId string) error {
 }
 
 func (r *rudderSourceStore) GetSources(ctx context.Context) ([]EventStreamSource, error) {
-	return client.GetAllResourcesWithPagination[EventStreamSource](ctx, r.client, prefix)
+	page := &eventStreamSourcesPage{
+		APIPage: client.APIPage{
+			Paging: client.Paging{
+				Next: prefix,
+			},
+		},
+	}
+	var (
+		err        error
+		allSources []EventStreamSource
+	)
+	for {
+		page, err = r.list(ctx, page.Paging)
+		if err != nil {
+			return nil, fmt.Errorf("next event stream sources: %w", err)
+		}
+		if page == nil {
+			break
+		}
+		allSources = append(allSources, page.Sources...)
+	}
+	return allSources, nil
+}
+
+func (r *rudderSourceStore) list(ctx context.Context, paging client.Paging) (*eventStreamSourcesPage, error) {
+	if paging.Next == "" {
+		return nil, nil
+	}
+	res, err := r.client.Do(ctx, "GET", paging.Next, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+	var result *eventStreamSourcesPage
+	if err = json.Unmarshal(res, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling next event stream sources: %w", err)
+	}
+	return result, nil
 }

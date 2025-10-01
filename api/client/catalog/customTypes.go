@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
 type CustomTypeCreate struct {
@@ -123,5 +121,5 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 }
 
 func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context) ([]*CustomType, error) {
-	return client.GetAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
+	return getAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
 }

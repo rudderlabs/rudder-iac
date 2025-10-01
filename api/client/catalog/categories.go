@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
 type CategoryCreate struct {
@@ -98,5 +96,5 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 }
 
 func (c *RudderDataCatalog) GetCategories(ctx context.Context) ([]*Category, error) {
-	return client.GetAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
+	return getAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
 }
