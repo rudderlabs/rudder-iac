@@ -201,6 +201,20 @@ func init() {
 		},
 	}
 
+	ReferenceProperties["tags"] = &plan.Property{
+		Name:        "tags",
+		Description: "User tags as array of strings",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["contacts"] = &plan.Property{
+		Name:        "contacts",
+		Description: "Array of user contacts",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
