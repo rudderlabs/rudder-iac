@@ -18,6 +18,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
