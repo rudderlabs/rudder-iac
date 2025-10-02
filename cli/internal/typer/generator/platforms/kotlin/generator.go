@@ -158,7 +158,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 
 	var propertyType plan.PropertyType
 	if len(property.Type) == 0 {
-		return "Any", nil
+		return "JsonElement", nil
 	} else if len(property.Type) == 1 {
 		propertyType = property.Type[0]
 	} else {
@@ -173,7 +173,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 		if primitiveType == plan.PrimitiveTypeArray {
 			if len(property.ItemType) == 0 {
 				// No item type specified means array can contain any type
-				return "List<Any>", nil
+				return "List<JsonElement>", nil
 			} else if len(property.ItemType) == 1 {
 				itemType := property.ItemType[0]
 				innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
@@ -377,8 +377,10 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 	case plan.PrimitiveTypeBoolean:
 		return "Boolean"
 	case plan.PrimitiveTypeAny:
-		return "Any"
+		return "JsonElement"
+	case plan.PrimitiveTypeObject:
+		return "JsonObject"
 	default:
-		return "Any" // Fallback for unknown types
+		return "JsonElement" // Fallback for unknown types
 	}
 }

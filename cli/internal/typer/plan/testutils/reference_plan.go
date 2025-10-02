@@ -130,6 +130,12 @@ func init() {
 		ItemType:    []plan.PropertyType{},
 	}
 
+	ReferenceProperties["object_property"] = &plan.Property{
+		Name:        "object_property",
+		Description: "An object field with no defined structure",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -210,6 +216,10 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 					Property: *ReferenceProperties["untyped_array"],
 					Required: false,
 				},
+				"object_property": {
+					Property: *ReferenceProperties["object_property"],
+					Required: false,
+				},
 			},
 			AdditionalProperties: false,
 		},
@@ -288,6 +298,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 4  // email, age, active, user_profile
-	ExpectedPropertyCount   = 13 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array
+	ExpectedPropertyCount   = 14 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

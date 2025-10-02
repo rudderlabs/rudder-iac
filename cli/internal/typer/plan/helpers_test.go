@@ -30,7 +30,7 @@ func TestExtractAllProperties(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
 	properties := trackingPlan.ExtractAllProperties()
-	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile", "device_type", "tags", "contacts", "property_of_any", "untyped_field", "array_of_any", "untyped_array"}
+	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile", "device_type", "tags", "contacts", "property_of_any", "untyped_field", "array_of_any", "untyped_array", "object_property"}
 
 	assert.Len(t, properties, testutils.ExpectedPropertyCount)
 	assert.Len(t, expectedNames, testutils.ExpectedPropertyCount) // consistency check
