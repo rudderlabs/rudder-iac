@@ -155,28 +155,35 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	// TODO: handle multiple types (union types) if needed
 	// For now, we only handle single-type properties
-	if len(property.Type) != 1 {
-		return "", fmt.Errorf("only properties with a single type are supported: %v", property.Type)
-	}
 
-	var propertyType = property.Type[0]
+	var propertyType plan.PropertyType
+	if len(property.Type) == 0 {
+		return "JsonElement", nil
+	} else if len(property.Type) == 1 {
+		propertyType = property.Type[0]
+	} else {
+		// TODO: Future enhancement for union types
+		return "", fmt.Errorf("union types not yet supported: %v", property.Type)
+	}
 
 	if plan.IsPrimitiveType(propertyType) {
 		primitiveType := *plan.AsPrimitiveType(propertyType)
 
 		// Handle array types by using ItemType
 		if primitiveType == plan.PrimitiveTypeArray {
-			if len(property.ItemType) != 1 {
+			if len(property.ItemType) == 0 {
+				// No item type specified means array can contain any type
+				return "List<JsonElement>", nil
+			} else if len(property.ItemType) == 1 {
+				itemType := property.ItemType[0]
+				innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("List<%s>", innerKotlinType), nil
+			} else {
 				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemType)
 			}
-
-			itemType := property.ItemType[0]
-			innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
-			if err != nil {
-				return "", err
-			}
-
-			return fmt.Sprintf("List<%s>", innerKotlinType), nil
 		}
 
 		return mapPrimitiveToKotlinType(primitiveType), nil
@@ -369,7 +376,11 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 		return "Double"
 	case plan.PrimitiveTypeBoolean:
 		return "Boolean"
+	case plan.PrimitiveTypeAny:
+		return "JsonElement"
+	case plan.PrimitiveTypeObject:
+		return "JsonObject"
 	default:
-		return "Any" // Fallback for unknown types
+		return "JsonElement" // Fallback for unknown types
 	}
 }
