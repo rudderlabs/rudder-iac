@@ -50,3 +50,7 @@ docker-build: ## Build Docker image
 
 .PHONY: test-all
 test-all: test test-e2e ## Run all unit and end-to-end tests
+
+.PHONY: typer-validate-kotlin
+typer-validate-kotlin: ## Validate generated Kotlin code inside a Kotlin project
+	cd cli/internal/typer/generator/platforms/kotlin/validator && make run

@@ -208,6 +208,34 @@ The plan model is tested indirectly through platform generator tests rather than
 
 Platform generators (like the Kotlin generator) use the reference tracking plan to validate their output against expected generated code, ensuring both plan model correctness and generation logic accuracy for all plan scenarios.
 
+### Docker-based Validation
+
+The Kotlin generator includes an additional layer of validation through a Docker-based runtime verification system:
+
+- **Location**: `cli/internal/typer/generator/platforms/kotlin/validator/`
+- **Purpose**: Validates that generated Kotlin code not only matches expected output but also compiles and executes correctly in a real Kotlin runtime environment
+- **Implementation**: Complete Docker-containerized Kotlin project with Gradle build system and RudderStack SDK integration
+- **Test Coverage**: Comprehensive validation scenarios covering all supported RudderTyper features including:
+  - All RudderStack event types (Track, Identify, Page, Screen, Group)
+  - Custom types and properties with various data types
+  - Enum handling and array support
+  - Edge cases with minimal and comprehensive data sets
+
+**Key Benefits**:
+
+- **Runtime Verification**: Ensures generated code compiles and executes without errors
+- **SDK Integration Testing**: Validates compatibility with actual RudderStack Kotlin SDK
+- **Environment Consistency**: Docker containerization provides consistent testing environment across different development machines
+- **End-to-End Validation**: Tests the complete pipeline from plan model to executable Kotlin code
+
+**Usage**:
+
+```bash
+make typer-validate-kotlin
+```
+
+The validator uses the same test data as the unit tests (`testdata/Main.kt`), ensuring consistency between static code generation tests and runtime validation tests.
+
 ## Implementation Guidelines
 
 ### Adding New Platforms

@@ -1,0 +1,1 @@
+rootProject.name = "rudder-typer-kotlin-validator"
