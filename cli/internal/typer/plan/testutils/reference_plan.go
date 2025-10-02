@@ -192,6 +192,12 @@ func init() {
 		ItemType:    []plan.PropertyType{},
 	}
 
+	ReferenceProperties["object_property"] = &plan.Property{
+		Name:        "object_property",
+		Description: "An object field with no defined structure",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
