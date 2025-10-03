@@ -110,3 +110,7 @@ func (d *deps) Providers() *Providers {
 func (d *deps) CompositeProvider() project.Provider {
 	return d.compositeProvider
 }
+
+func GetVersion() string {
+	return v
+}

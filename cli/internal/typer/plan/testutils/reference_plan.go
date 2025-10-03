@@ -292,6 +292,10 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	return &plan.TrackingPlan{
 		Name:  "Test Plan",
 		Rules: rules,
+		Metadata: plan.PlanMetadata{
+			TrackingPlanID:      "plan_12345",
+			TrackingPlanVersion: 13,
+		},
 	}
 }
 

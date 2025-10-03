@@ -26,12 +26,6 @@ type RudderTyper struct {
 	planProvider PlanProvider
 }
 
-// GenerationOptions contains configuration for code generation
-type GenerationOptions struct {
-	Platform   string
-	OutputPath string
-}
-
 // NewRudderTyper creates a new RudderTyper instance
 func NewRudderTyper(planProvider PlanProvider) *RudderTyper {
 	return &RudderTyper{
@@ -40,7 +34,7 @@ func NewRudderTyper(planProvider PlanProvider) *RudderTyper {
 }
 
 // Generate orchestrates the complete code generation process
-func (rt *RudderTyper) Generate(ctx context.Context, options GenerationOptions) error {
+func (rt *RudderTyper) Generate(ctx context.Context, options core.GenerationOptions) error {
 	rudderTyperLog.Debug("starting code generation",
 		"platform", options.Platform,
 		"outputPath", options.OutputPath)
@@ -54,7 +48,7 @@ func (rt *RudderTyper) Generate(ctx context.Context, options GenerationOptions) 
 
 	// Step 2: Generate platform-specific code
 	fmt.Printf("⚡ Generating %s code...\n", options.Platform)
-	files, err := rt.generateCode(trackingPlan, options.Platform)
+	files, err := rt.generateCode(trackingPlan, options)
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}
@@ -93,14 +87,14 @@ func (rt *RudderTyper) fetchTrackingPlan(ctx context.Context) (*plan.TrackingPla
 }
 
 // generateCode generates platform-specific code from the tracking plan
-func (rt *RudderTyper) generateCode(trackingPlan *plan.TrackingPlan, platform string) ([]*core.File, error) {
-	rudderTyperLog.Debug("generating code for platform", "platform", platform, "rulesCount", len(trackingPlan.Rules))
+func (rt *RudderTyper) generateCode(trackingPlan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
+	rudderTyperLog.Debug("generating code for platform", "platform", options.Platform, "rulesCount", len(trackingPlan.Rules))
 
-	switch platform {
+	switch options.Platform {
 	case "kotlin":
-		return kotlin.Generate(trackingPlan)
+		return kotlin.Generate(trackingPlan, options)
 	default:
-		return nil, fmt.Errorf("unsupported platform: %s (supported platforms: kotlin)", platform)
+		return nil, fmt.Errorf("unsupported platform: %s (supported platforms: kotlin)", options.Platform)
 	}
 }
 

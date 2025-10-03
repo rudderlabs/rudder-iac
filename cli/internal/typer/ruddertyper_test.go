@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,13 +41,13 @@ func TestRudderTyper_Generate(t *testing.T) {
 
 		tests := []struct {
 			name      string
-			options   GenerationOptions
+			options   core.GenerationOptions
 			expectErr bool
 			wantErr   string
 		}{
 			{
 				name: "valid kotlin generation",
-				options: GenerationOptions{
+				options: core.GenerationOptions{
 					Platform:   "kotlin",
 					OutputPath: "./output",
 				},
@@ -54,7 +55,7 @@ func TestRudderTyper_Generate(t *testing.T) {
 			},
 			{
 				name: "unsupported platform",
-				options: GenerationOptions{
+				options: core.GenerationOptions{
 					Platform:   "unsupported",
 					OutputPath: "./output",
 				},

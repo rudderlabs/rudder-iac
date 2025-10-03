@@ -9,8 +9,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
+const (
+	Platform = "kotlin"
+)
+
+func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
 	ctx := NewKotlinContext()
+	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
@@ -31,6 +36,15 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	return []*core.File{
 		mainFile,
 	}, nil
+}
+
+func formatEventContext(ec plan.PlanMetadata, rudderCLIVersion string) map[string]string {
+	return map[string]string{
+		"platform":            fmt.Sprintf("%q", Platform),
+		"rudderCLIVersion":    fmt.Sprintf("%q", rudderCLIVersion),
+		"trackingPlanId":      fmt.Sprintf("%q", ec.TrackingPlanID),
+		"trackingPlanVersion": fmt.Sprintf("%d", ec.TrackingPlanVersion),
+	}
 }
 
 // processPropertiesAndCustomTypes extracts custom types and properties from the tracking plan and generates corresponding Kotlin types
