@@ -130,10 +130,18 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 
 	// Get the appropriate Kotlin type for this property
 	var kotlinType string
-	if property.IsPrimitive() {
-		kotlinType = mapPrimitiveToKotlinType(property.PrimitiveType())
-	} else if property.IsCustomType() {
-		customType := property.CustomType()
+	// TODO: handle multiple types (union types) if needed
+	// For now, we only handle single-type properties
+	if len(property.Type) != 1 {
+		return nil, fmt.Errorf("only properties with a single type are supported: %v", property.Type)
+	}
+
+	var propertyType = property.Type[0]
+
+	if plan.IsPrimitiveType(propertyType) {
+		kotlinType = mapPrimitiveToKotlinType(*plan.AsPrimitiveType(propertyType))
+	} else if plan.IsCustomType(propertyType) {
+		customType := plan.AsCustomType(propertyType)
 		if customType.IsPrimitive() {
 			// Reference the custom type alias
 			kotlinType, err = getOrRegisterCustomTypeAliasName(customType, nameRegistry)
@@ -284,14 +292,12 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 	switch primitiveType {
 	case plan.PrimitiveTypeString:
 		return "String"
+	case plan.PrimitiveTypeInteger:
+		return "Long"
 	case plan.PrimitiveTypeNumber:
 		return "Double"
 	case plan.PrimitiveTypeBoolean:
 		return "Boolean"
-	case plan.PrimitiveTypeDate:
-		return "String" // For now, represent dates as strings
-	case plan.PrimitiveTypeArray:
-		return "List<Any>" // Generic array type for now
 	default:
 		return "Any" // Fallback for unknown types
 	}
