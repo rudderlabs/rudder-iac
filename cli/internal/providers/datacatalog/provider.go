@@ -107,6 +107,14 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		}
 	}
 
+	getResourceImportMetadata := func(id string) resources.ResourceOpts {
+		metadata, ok := catalog.ImportMetadata[id]
+		if !ok {
+			return nil
+		}
+		return resources.WithResourceImportMetadata(metadata.RemoteID, metadata.WorkspaceID)
+	}
+
 	// Helper function to get URN from reference
 	getURNFromRef := func(ref string) string {
 		// Format: #/entities/group/id
@@ -144,7 +152,14 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				return nil, fmt.Errorf("creating property args from catalog property: %s, err:%w", prop.LocalID, err)
 			}
 
-			resource := resources.NewResource(prop.LocalID, pstate.PropertyResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(
+				prop.LocalID,
+				pstate.PropertyResourceType,
+				args.ToResourceData(),
+				make([]string, 0),
+				getResourceImportMetadata(prop.LocalID),
+			)
+
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -158,9 +173,14 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 			args := pstate.EventArgs{}
 			args.FromCatalogEvent(&event, getURNFromRef)
-			resource := resources.NewResource(event.LocalID, pstate.EventResourceType, args.ToResourceData(), make([]string, 0))
-			graph.AddResource(resource)
+			resource := resources.NewResource(
+				event.LocalID,
+				pstate.EventResourceType,
+				args.ToResourceData(),
+				make([]string, 0),
+				getResourceImportMetadata(event.LocalID))
 
+			graph.AddResource(resource)
 			eventIDToURN[event.LocalID] = resource.URN()
 		}
 	}
@@ -173,7 +193,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			// Add CustomTypeArgs
 			args := pstate.CustomTypeArgs{}
 			args.FromCatalogCustomType(&customType, getURNFromRef)
-			resource := resources.NewResource(customType.LocalID, pstate.CustomTypeResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(
+				customType.LocalID,
+				pstate.CustomTypeResourceType,
+				args.ToResourceData(),
+				make([]string, 0),
+				getResourceImportMetadata(customType.LocalID),
+			)
 			graph.AddResource(resource)
 		}
 	}
@@ -185,7 +211,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 			args := pstate.CategoryArgs{}
 			args.FromCatalogCategory(&category)
-			resource := resources.NewResource(category.LocalID, pstate.CategoryResourceType, args.ToResourceData(), make([]string, 0))
+			resource := resources.NewResource(
+				category.LocalID,
+				pstate.CategoryResourceType,
+				args.ToResourceData(),
+				make([]string, 0),
+				getResourceImportMetadata(category.LocalID),
+			)
 			graph.AddResource(resource)
 		}
 	}
@@ -199,7 +231,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return nil, fmt.Errorf("creating tracking plan args: %w", err)
 		}
 
-		resource := resources.NewResource(tp.LocalID, pstate.TrackingPlanResourceType, args.ToResourceData(), make([]string, 0))
+		resource := resources.NewResource(
+			tp.LocalID,
+			pstate.TrackingPlanResourceType,
+			args.ToResourceData(),
+			make([]string, 0),
+			getResourceImportMetadata(tp.LocalID),
+		)
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -13,6 +14,16 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
+
+func mockWorkspace() *client.Workspace {
+	return &client.Workspace{
+		ID:          "test-workspace-id",
+		Name:        "Test Workspace",
+		Environment: "DEVELOPMENT",
+		Status:      "ACTIVE",
+		Region:      "US",
+	}
+}
 
 func enableConcurrentSyncs(t *testing.T) {
 	os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "true")
@@ -54,7 +65,7 @@ func TestSyncerCreate(t *testing.T) {
 		InitialState: state.EmptyState(),
 	}
 
-	s, _ := syncer.New(provider)
+	s, _ := syncer.New(provider, mockWorkspace())
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
@@ -161,7 +172,7 @@ func TestSyncerDelete(t *testing.T) {
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, _ := syncer.New(provider)
+	s, _ := syncer.New(provider, mockWorkspace())
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
@@ -225,7 +236,7 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 		InitialState: state.EmptyState(),
 	}
 
-	s, err := syncer.New(provider)
+	s, err := syncer.New(provider, mockWorkspace())
 	assert.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
@@ -330,7 +341,7 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, err := syncer.New(provider)
+	s, err := syncer.New(provider, mockWorkspace())
 	assert.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
@@ -434,7 +445,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2"},
 		}
 
-		s, err := syncer.New(failingProvider)
+		s, err := syncer.New(failingProvider, mockWorkspace())
 		assert.NoError(t, err)
 
 		targetGraph := createGraphWithResources(events, properties, trackingPlans)
@@ -448,7 +459,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 		// Expected operation count: 12 total operations in success case.
 		// When event2 fails, its 2 operations + 2 tracking plan operations are skipped.
 		// Therefore, we expect at most 8 operations to be executed.
-	
+
 		// FIXME: This assertion is not very helpful because if there is bug in the
 		// continueOnFail logic, the assertion will still not fail.
 		assert.LessOrEqual(t, len(failingProvider.OperationLog), 8, "Should have fewer operations due to early failure")
@@ -470,7 +481,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2", "property2"},
 		}
 
-		s, err := syncer.New(failingProvider)
+		s, err := syncer.New(failingProvider, mockWorkspace())
 		assert.NoError(t, err)
 
 		errors := s.Destroy(context.Background(), syncer.SyncOptions{Concurrency: 2})

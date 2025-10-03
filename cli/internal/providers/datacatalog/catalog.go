@@ -22,6 +22,7 @@ type resourceProvider interface {
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
+	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 }
@@ -104,7 +105,11 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, d
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
-	return nil, fmt.Errorf("import is not supported for %s", resourceType)
+	provider, ok := p.providerStore[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
+	}
+	return provider.Import(ctx, ID, data, remoteId)
 }
 
 // LoadResourcesFromRemote loads all resources from remote catalog into a ResourceCollection

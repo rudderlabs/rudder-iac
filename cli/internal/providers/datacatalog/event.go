@@ -130,6 +130,10 @@ func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.R
 	return nil
 }
 
+func (p *EventProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	return nil, fmt.Errorf("import is not supported for event resources")
+}
+
 // LoadResourcesFromRemote loads all events from the remote catalog
 func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading events from remote catalog")

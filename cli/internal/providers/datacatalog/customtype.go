@@ -164,6 +164,10 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 	return nil
 }
 
+func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	return nil, fmt.Errorf("import is not supported for custom type resources")
+}
+
 // LoadResourcesFromRemote loads all custom types from the remote catalog
 func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading custom types from remote catalog")

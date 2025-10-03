@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -233,4 +234,124 @@ func TestPropertyState_ResourceData(t *testing.T) {
 		assert.Equal(t, propertyState, loopback)
 	})
 
+}
+
+func TestPropertyArgs_DiffUpstream(t *testing.T) {
+
+	t.Run("no diff", func(t *testing.T) {
+		t.Parallel()
+
+		args := &state.PropertyArgs{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": 5,
+				"maxLength": 10,
+			},
+		}
+
+		upstream := &catalog.Property{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": 5,
+				"maxLength": 10,
+			},
+		}
+
+		diffed := args.DiffUpstream(upstream)
+		assert.False(t, diffed)
+	})
+
+	t.Run("diff - name changed", func(t *testing.T) {
+		t.Parallel()
+
+		args := &state.PropertyArgs{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config:      map[string]interface{}{},
+		}
+
+		upstream := &catalog.Property{
+			Name:        "test-property-updated",
+			Description: "A test property",
+			Type:        "string",
+			Config:      map[string]interface{}{},
+		}
+
+		diffed := args.DiffUpstream(upstream)
+		assert.True(t, diffed)
+	})
+
+	t.Run("diff - description changed", func(t *testing.T) {
+		t.Parallel()
+
+		args := &state.PropertyArgs{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config:      map[string]interface{}{},
+		}
+
+		upstream := &catalog.Property{
+			Name:        "test-property",
+			Description: "Updated description",
+			Type:        "string",
+			Config:      map[string]interface{}{},
+		}
+
+		diffed := args.DiffUpstream(upstream)
+		assert.True(t, diffed)
+	})
+
+	t.Run("diff - type changed", func(t *testing.T) {
+		t.Parallel()
+
+		args := &state.PropertyArgs{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config:      map[string]interface{}{},
+		}
+
+		upstream := &catalog.Property{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "number",
+			Config:      map[string]interface{}{},
+		}
+
+		diffed := args.DiffUpstream(upstream)
+		assert.True(t, diffed)
+	})
+
+	t.Run("diff - config changed", func(t *testing.T) {
+		t.Parallel()
+
+		args := &state.PropertyArgs{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": 5,
+				"maxLength": 10,
+			},
+		}
+
+		upstream := &catalog.Property{
+			Name:        "test-property",
+			Description: "A test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"minLength": 5,
+				"maxLength": 20,
+			},
+		}
+
+		diffed := args.DiffUpstream(upstream)
+		assert.True(t, diffed)
+	})
 }

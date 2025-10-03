@@ -45,6 +45,7 @@ type PropertyStore interface {
 	DeleteProperty(ctx context.Context, id string) error
 	GetProperty(ctx context.Context, id string) (*Property, error)
 	GetProperties(ctx context.Context) ([]*Property, error)
+	SetPropertyExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) DeleteProperty(ctx context.Context, id string) error {
@@ -109,4 +110,22 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 
 func (c *RudderDataCatalog) GetProperties(ctx context.Context) ([]*Property, error) {
 	return getAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
+}
+
+func (c *RudderDataCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/properties/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

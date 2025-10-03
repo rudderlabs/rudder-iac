@@ -95,6 +95,10 @@ func (p *CategoryProvider) Delete(ctx context.Context, ID string, data resources
 	return nil
 }
 
+func (p *CategoryProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	return nil, fmt.Errorf("import is not supported for category resources")
+}
+
 // LoadResourcesFromRemote loads all categories from the remote catalog
 func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading categories from remote catalog")

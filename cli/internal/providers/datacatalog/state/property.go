@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -14,6 +15,23 @@ type PropertyArgs struct {
 	Description string
 	Type        any
 	Config      map[string]interface{}
+}
+
+// DiffUpstream compares PropertyArgs with an upstream Property and returns true if they are different
+func (args *PropertyArgs) DiffUpstream(upstream *catalog.Property) bool {
+	if args.Name != upstream.Name {
+		return true
+	}
+
+	if args.Description != upstream.Description {
+		return true
+	}
+
+	if args.Type.(string) != upstream.Type {
+		return true
+	}
+
+	return !reflect.DeepEqual(args.Config, upstream.Config)
 }
 
 const PropertyResourceType = "property"

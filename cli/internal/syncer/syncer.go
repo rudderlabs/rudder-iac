@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -16,7 +17,8 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider SyncProvider
+	provider   SyncProvider
+	workspace  *client.Workspace
 	stateMutex sync.RWMutex
 }
 
@@ -32,13 +34,17 @@ type SyncProvider interface {
 	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
 }
 
-func New(p SyncProvider) (*ProjectSyncer, error) {
+func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
+	if workspace == nil {
+		return nil, fmt.Errorf("workspace is required")
+	}
 
 	return &ProjectSyncer{
-		provider: p,
+		provider:  p,
+		workspace: workspace,
 	}, nil
 }
 
@@ -94,7 +100,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 
 	source := stateToGraph(state)
 
-	p := planner.New()
+	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
 	differ.PrintDiff(plan.Diff)
@@ -166,7 +172,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 }
 
 func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var errors       []error
+	var errors []error
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
