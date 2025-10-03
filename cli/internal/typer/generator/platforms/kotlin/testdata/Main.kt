@@ -1,7 +1,7 @@
 package com.rudderstack.ruddertyper
 
 import com.rudderstack.sdk.kotlin.core.Analytics
-import com.rudderstack.sdk.kotlin.core.internals.models.RudderOptions
+import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
@@ -183,7 +183,7 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     private val context = buildJsonObject {
         put("ruddertyper", buildJsonObject {
-            put("platform", "test")
+            put("platform", "kotlin")
             put("rudderCLIVersion", "1.0.0")
             put("trackingPlanId", "plan_12345")
             put("trackingPlanVersion", 13)
@@ -197,7 +197,7 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.group(
             groupId = groupId,
             traits = json.encodeToJsonElement(traits).jsonObject,
-            options = RudderOptions(customContext = context)
+            options = RudderOption(customContext = context)
         )
     }
 
@@ -208,7 +208,7 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.identify(
             userId = userId,
             traits = json.encodeToJsonElement(traits).jsonObject,
-            options = RudderOptions(customContext = context)
+            options = RudderOption(customContext = context)
         )
     }
 
@@ -220,7 +220,7 @@ class RudderAnalytics(private val analytics: Analytics) {
             screenName = screenName,
             category = category,
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOptions(customContext = context)
+            options = RudderOption(customContext = context)
         )
     }
 
@@ -231,7 +231,7 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.track(
             name = "User Signed Up",
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOptions(customContext = context)
+            options = RudderOption(customContext = context)
         )
     }
 }

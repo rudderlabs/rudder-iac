@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
 	"github.com/spf13/cobra"
 )
@@ -68,9 +69,10 @@ func newCmdGenerate() *cobra.Command {
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)
 
-			options := typer.GenerationOptions{
-				Platform:   platform,
-				OutputPath: outputDir,
+			options := core.GenerationOptions{
+				RudderCLIVersion: app.GetVersion(),
+				Platform:         platform,
+				OutputPath:       outputDir,
 			}
 
 			ctx := context.Background()
