@@ -1,11 +1,14 @@
 package com.rudderstack.ruddertyper
 
 import com.rudderstack.sdk.kotlin.core.Analytics
+import com.rudderstack.sdk.kotlin.core.internals.models.RudderOptions
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
@@ -178,13 +181,23 @@ class RudderAnalytics(private val analytics: Analytics) {
         encodeDefaults = false
     }
 
+    private val context = buildJsonObject {
+        put("ruddertyper", buildJsonObject {
+            put("platform", "test")
+            put("rudderCLIVersion", "1.0.0")
+            put("trackingPlanId", "plan_12345")
+            put("trackingPlanVersion", 13)
+        })
+    }
+
     /**
      * Group association event
      */
     fun group(groupId: String, traits: GroupTraits) {
         analytics.group(
             groupId = groupId,
-            traits = json.encodeToJsonElement(traits).jsonObject
+            traits = json.encodeToJsonElement(traits).jsonObject,
+            options = RudderOptions(customContext = context)
         )
     }
 
@@ -194,7 +207,8 @@ class RudderAnalytics(private val analytics: Analytics) {
     fun identify(userId: String = "", traits: IdentifyTraits) {
         analytics.identify(
             userId = userId,
-            traits = json.encodeToJsonElement(traits).jsonObject
+            traits = json.encodeToJsonElement(traits).jsonObject,
+            options = RudderOptions(customContext = context)
         )
     }
 
@@ -205,7 +219,8 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.screen(
             screenName = screenName,
             category = category,
-            properties = json.encodeToJsonElement(properties).jsonObject
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOptions(customContext = context)
         )
     }
 
@@ -215,7 +230,8 @@ class RudderAnalytics(private val analytics: Analytics) {
     fun trackUserSignedUp(properties: TrackUserSignedUpProperties) {
         analytics.track(
             name = "User Signed Up",
-            properties = json.encodeToJsonElement(properties).jsonObject
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOptions(customContext = context)
         )
     }
 }

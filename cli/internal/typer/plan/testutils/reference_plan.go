@@ -292,6 +292,12 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 	return &plan.TrackingPlan{
 		Name:  "Test Plan",
 		Rules: rules,
+		EventContext: plan.EventContext{
+			Platform:            "test",
+			RudderCLIVersion:    "1.0.0",
+			TrackingPlanID:      "plan_12345",
+			TrackingPlanVersion: 13,
+		},
 	}
 }
 

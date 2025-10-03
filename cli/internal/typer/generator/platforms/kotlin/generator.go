@@ -11,6 +11,7 @@ import (
 
 func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	ctx := NewKotlinContext()
+	ctx.EventContext = formatEventContext(plan.EventContext)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
@@ -31,6 +32,15 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	return []*core.File{
 		mainFile,
 	}, nil
+}
+
+func formatEventContext(ec plan.EventContext) map[string]string {
+	return map[string]string{
+		"platform":            fmt.Sprintf("%q", ec.Platform),
+		"rudderCLIVersion":    fmt.Sprintf("%q", ec.RudderCLIVersion),
+		"trackingPlanId":      fmt.Sprintf("%q", ec.TrackingPlanID),
+		"trackingPlanVersion": fmt.Sprintf("%d", ec.TrackingPlanVersion),
+	}
 }
 
 // processPropertiesAndCustomTypes extracts custom types and properties from the tracking plan and generates corresponding Kotlin types
