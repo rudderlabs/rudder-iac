@@ -51,7 +51,7 @@ func TestComputeDiff(t *testing.T) {
 	g2.AddResource(resources.NewResource("r1", "some-type", resources.ResourceData{"key1": "value1", "key2": "value3"}, []string{}))
 	g2.AddResource(resources.NewResource("r3", "some-type", resources.ResourceData{"key1": "value1", "key2": "value3"}, []string{}))
 
-	diff := differ.ComputeDiff(g1, g2)
+	diff := differ.ComputeDiff(g1, g2, differ.DiffOptions{WorkspaceID: "workspace1"})
 
 	assert.Len(t, diff.NewResources, 1)
 	assert.Len(t, diff.UpdatedResources, 1)
