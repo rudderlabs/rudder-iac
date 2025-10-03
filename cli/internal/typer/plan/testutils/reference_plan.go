@@ -80,6 +80,62 @@ func init() {
 		Type:        []plan.PropertyType{*ReferenceCustomTypes["active"]},
 	}
 
+	ReferenceProperties["device_type"] = &plan.Property{
+		Name:        "device_type",
+		Description: "Type of device",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []string{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
+	ReferenceProperties["tags"] = &plan.Property{
+		Name:        "tags",
+		Description: "User tags as array of strings",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["contacts"] = &plan.Property{
+		Name:        "contacts",
+		Description: "Array of user contacts",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
+	}
+
+	// Add properties for testing "any" type support
+	ReferenceProperties["property_of_any"] = &plan.Property{
+		Name:        "property_of_any",
+		Description: "A field that can contain any type of value",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_field"] = &plan.Property{
+		Name:        "untyped_field",
+		Description: "A field with no explicit type (treated as any)",
+		Type:        []plan.PropertyType{},
+	}
+
+	ReferenceProperties["array_of_any"] = &plan.Property{
+		Name:        "array_of_any",
+		Description: "An array that can contain any type of items",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_array"] = &plan.Property{
+		Name:        "untyped_array",
+		Description: "An array with no explicit item type (treated as any)",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemType:    []plan.PropertyType{},
+	}
+
+	ReferenceProperties["object_property"] = &plan.Property{
+		Name:        "object_property",
+		Description: "An object field with no defined structure",
+		Type:        []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -131,6 +187,38 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"profile": {
 					Property: *ReferenceProperties["profile"],
 					Required: true,
+				},
+				"device_type": {
+					Property: *ReferenceProperties["device_type"],
+					Required: false,
+				},
+				"tags": {
+					Property: *ReferenceProperties["tags"],
+					Required: false,
+				},
+				"contacts": {
+					Property: *ReferenceProperties["contacts"],
+					Required: false,
+				},
+				"property_of_any": {
+					Property: *ReferenceProperties["property_of_any"],
+					Required: false,
+				},
+				"untyped_field": {
+					Property: *ReferenceProperties["untyped_field"],
+					Required: false,
+				},
+				"array_of_any": {
+					Property: *ReferenceProperties["array_of_any"],
+					Required: false,
+				},
+				"untyped_array": {
+					Property: *ReferenceProperties["untyped_array"],
+					Required: false,
+				},
+				"object_property": {
+					Property: *ReferenceProperties["object_property"],
+					Required: false,
 				},
 			},
 			AdditionalProperties: false,
@@ -209,7 +297,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 4 // email, age, active, user_profile
-	ExpectedPropertyCount   = 6 // email, first_name, last_name, age, active, profile
-	ExpectedEventCount      = 5 // User Signed Up, Identify, Page, Screen, Group
+	ExpectedCustomTypeCount = 4  // email, age, active, user_profile
+	ExpectedPropertyCount   = 14 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property
+	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

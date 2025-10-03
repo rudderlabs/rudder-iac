@@ -4,6 +4,8 @@ import com.rudderstack.sdk.kotlin.core.Analytics
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
@@ -22,6 +24,12 @@ typealias PropertyActive = CustomTypeActive
 /** User's age */
 typealias PropertyAge = CustomTypeAge
 
+/** An array that can contain any type of items */
+typealias PropertyArrayOfAny = List<JsonElement>
+
+/** Array of user contacts */
+typealias PropertyContacts = List<CustomTypeEmail>
+
 /** User's email address */
 typealias PropertyEmail = CustomTypeEmail
 
@@ -31,8 +39,38 @@ typealias PropertyFirstName = String
 /** User's last name */
 typealias PropertyLastName = String
 
+/** An object field with no defined structure */
+typealias PropertyObjectProperty = JsonObject
+
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
+
+/** A field that can contain any type of value */
+typealias PropertyPropertyOfAny = JsonElement
+
+/** User tags as array of strings */
+typealias PropertyTags = List<String>
+
+/** An array with no explicit item type (treated as any) */
+typealias PropertyUntypedArray = List<JsonElement>
+
+/** A field with no explicit type (treated as any) */
+typealias PropertyUntypedField = JsonElement
+
+/** Type of device */
+@Serializable
+enum class PropertyDeviceType {
+    @SerialName("mobile")
+    MOBILE,
+    @SerialName("tablet")
+    TABLET,
+    @SerialName("desktop")
+    DESKTOP,
+    @SerialName("smartTV")
+    SMARTTV,
+    @SerialName("IoT-Device")
+    IOT_DEVICE
+}
 
 /** User profile information */
 @Serializable
@@ -97,9 +135,41 @@ data class TrackUserSignedUpProperties(
     @SerialName("age")
     val age: PropertyAge? = null,
 
+    /** An array that can contain any type of items */
+    @SerialName("array_of_any")
+    val arrayOfAny: PropertyArrayOfAny? = null,
+
+    /** Array of user contacts */
+    @SerialName("contacts")
+    val contacts: PropertyContacts? = null,
+
+    /** Type of device */
+    @SerialName("device_type")
+    val deviceType: PropertyDeviceType? = null,
+
+    /** An object field with no defined structure */
+    @SerialName("object_property")
+    val objectProperty: PropertyObjectProperty? = null,
+
     /** User profile data */
     @SerialName("profile")
-    val profile: PropertyProfile
+    val profile: PropertyProfile,
+
+    /** A field that can contain any type of value */
+    @SerialName("property_of_any")
+    val propertyOfAny: PropertyPropertyOfAny? = null,
+
+    /** User tags as array of strings */
+    @SerialName("tags")
+    val tags: PropertyTags? = null,
+
+    /** An array with no explicit item type (treated as any) */
+    @SerialName("untyped_array")
+    val untypedArray: PropertyUntypedArray? = null,
+
+    /** A field with no explicit type (treated as any) */
+    @SerialName("untyped_field")
+    val untypedField: PropertyUntypedField? = null
 )
 
 class RudderAnalytics(private val analytics: Analytics) {

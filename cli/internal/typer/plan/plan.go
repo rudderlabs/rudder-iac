@@ -58,6 +58,7 @@ const (
 	PrimitiveTypeBoolean PrimitiveType = "boolean"
 	PrimitiveTypeArray   PrimitiveType = "array"
 	PrimitiveTypeObject  PrimitiveType = "object"
+	PrimitiveTypeAny     PrimitiveType = "any"
 )
 
 // PropertyType represents either a primitive type or a custom type
@@ -74,6 +75,7 @@ type Property struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Type        []PropertyType  `json:"type"`
+	ItemType    []PropertyType  `json:"itemType,omitempty"` // Used if Type includes PrimitiveTypeArray
 	Config      *PropertyConfig `json:"config,omitempty"`
 }
 
@@ -106,6 +108,8 @@ func ParsePrimitiveType(s string) (PrimitiveType, error) {
 		return PrimitiveTypeArray, nil
 	case string(PrimitiveTypeObject):
 		return PrimitiveTypeObject, nil
+	case string(PrimitiveTypeAny):
+		return PrimitiveTypeAny, nil
 	default:
 		return "", fmt.Errorf("invalid primitive type: %s", s)
 	}
