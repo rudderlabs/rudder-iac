@@ -50,15 +50,18 @@ func TestComputeDiff(t *testing.T) {
 	g2.AddResource(resources.NewResource("r0", "some-type", resources.ResourceData{"key1": "value1", "key2": "value2"}, []string{}))
 	g2.AddResource(resources.NewResource("r1", "some-type", resources.ResourceData{"key1": "value1", "key2": "value3"}, []string{}))
 	g2.AddResource(resources.NewResource("r3", "some-type", resources.ResourceData{"key1": "value1", "key2": "value3"}, []string{}))
+	g2.AddResource(resources.NewResource("r4", "some-type", resources.ResourceData{"key1": "value1", "key2": "value4"}, []string{}, resources.WithResourceImportMetadata("remote-id-r4", "workspace-id")))
 
 	diff := differ.ComputeDiff(g1, g2, differ.DiffOptions{WorkspaceID: "workspace1"})
 
 	assert.Len(t, diff.NewResources, 1)
+	assert.Len(t, diff.ImportableResources, 1)
 	assert.Len(t, diff.UpdatedResources, 1)
 	assert.Len(t, diff.RemovedResources, 1)
 	assert.Len(t, diff.UnmodifiedResources, 1)
 
 	assert.Contains(t, diff.NewResources, "some-type:r3")
+	assert.Contains(t, diff.ImportableResources, "some-type:r4")
 	assert.Equal(t, diff.UpdatedResources["some-type:r1"], differ.ResourceDiff{URN: "some-type:r1", Diffs: map[string]differ.PropertyDiff{"key2": {Property: "key2", SourceValue: "value2", TargetValue: "value3"}}})
 	assert.Contains(t, diff.RemovedResources, "some-type:r2")
 	assert.Contains(t, diff.UnmodifiedResources, "some-type:r0")
