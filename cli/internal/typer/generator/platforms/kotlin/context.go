@@ -72,6 +72,7 @@ type KotlinContext struct {
 	DataClasses            []KotlinDataClass       // Data classes for object custom types
 	Enums                  []KotlinEnum            // Enum classes for properties with enum constraints
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
+	EventContext           map[string]string       // Fixed context to be included with every event
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices

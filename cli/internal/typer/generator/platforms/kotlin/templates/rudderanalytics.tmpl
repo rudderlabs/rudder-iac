@@ -3,6 +3,14 @@ class RudderAnalytics(private val analytics: Analytics) {
         prettyPrint = true
         encodeDefaults = false
     }
+
+    private val context = buildJsonObject {
+        put("ruddertyper", buildJsonObject {
+        {{- range $key, $value := .EventContext }}
+            put("{{ $key }}", {{ $value }})
+        {{- end }}
+        })
+    }
 {{ range .RudderAnalyticsMethods }}
     /**
      * {{ .Comment }}
@@ -10,9 +18,9 @@ class RudderAnalytics(private val analytics: Analytics) {
     fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
-            {{- if $i }},{{ end }}
-            {{ .Name }} = {{- if .ShouldSerialize }} json.encodeToJsonElement({{ .Value }}).jsonObject{{- else }} {{ .Value }}{{- end }}
+            {{ .Name }} = {{- if .ShouldSerialize }} json.encodeToJsonElement({{ .Value }}).jsonObject{{- else }} {{ .Value }}{{- end }},
         {{- end }}
+            options = RudderOptions(customContext = context)
         )
     }
 {{ end -}}
