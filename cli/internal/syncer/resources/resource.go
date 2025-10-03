@@ -36,6 +36,9 @@ func NewResource(id string, resourceType string, data ResourceData, dependencies
 		Dependencies: dependencies,
 	}
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
 		opt(r)
 	}
 	return &Resource{r: r}

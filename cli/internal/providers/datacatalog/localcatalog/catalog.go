@@ -3,8 +3,11 @@ package localcatalog
 import (
 	"fmt"
 
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/samber/lo"
 )
 
 var (
@@ -15,13 +18,19 @@ var (
 // as metadata->name in respective yaml file
 type EntityGroup string
 
+type WorkspaceRemoteIDMapping struct {
+	WorkspaceID string
+	RemoteID    string
+}
+
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties    map[EntityGroup][]Property    `json:"properties"`
-	Events        map[EntityGroup][]Event       `json:"events"`
-	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
-	CustomTypes   map[EntityGroup][]CustomType  `json:"customTypes"`   // Custom types grouped by entity group
-	Categories    map[EntityGroup][]Category    `json:"categories"`    // Categories grouped by entity group
+	Properties     map[EntityGroup][]Property           `json:"properties"`
+	Events         map[EntityGroup][]Event              `json:"events"`
+	TrackingPlans  map[EntityGroup]*TrackingPlan        `json:"trackingPlans"` // Only one tracking plan per entity group
+	CustomTypes    map[EntityGroup][]CustomType         `json:"customTypes"`   // Custom types grouped by entity group
+	Categories     map[EntityGroup][]Category           `json:"categories"`    // Categories grouped by entity group
+	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 }
 
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
@@ -104,11 +113,12 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 
 func New() *DataCatalog {
 	return &DataCatalog{
-		Properties:    map[EntityGroup][]Property{},
-		Events:        map[EntityGroup][]Event{},
-		TrackingPlans: map[EntityGroup]*TrackingPlan{},
-		CustomTypes:   map[EntityGroup][]CustomType{},
-		Categories:    map[EntityGroup][]Category{},
+		Properties:     map[EntityGroup][]Property{},
+		Events:         map[EntityGroup][]Event{},
+		TrackingPlans:  map[EntityGroup]*TrackingPlan{},
+		CustomTypes:    map[EntityGroup][]CustomType{},
+		Categories:     map[EntityGroup][]Category{},
+		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
 	}
 }
 
@@ -116,6 +126,32 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 	if err := extractEntities(s, dc); err != nil {
 		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
 	}
+
+	if err := addImportMetadata(s, dc); err != nil {
+		return fmt.Errorf("adding import metadata: %w", err)
+	}
+
+	return nil
+}
+
+func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
+	metadata := importremote.Metadata{}
+
+	err := mapstructure.Decode(s.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+
+	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
+		// For each resource within the workspace, load the import metadata
+		// which will be used during the creation of resourceGraph
+		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+			dc.ImportMetadata[resource.LocalID] = &WorkspaceRemoteIDMapping{
+				WorkspaceID: workspace.WorkspaceID,
+				RemoteID:    resource.RemoteID,
+			}
+		})
+	})
 
 	return nil
 }
