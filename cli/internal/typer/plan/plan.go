@@ -200,13 +200,11 @@ type TrackingPlan struct {
 	Name  string      `json:"name"`
 	Rules []EventRule `json:"rules"`
 
-	// EventContext represents additional fixed context to be included with every event
-	EventContext EventContext `json:"eventContext,omitempty"`
+	// Metadata represents additional fixed context to be included with every event
+	Metadata PlanMetadata `json:"eventContext,omitempty"`
 }
 
-type EventContext struct {
-	Platform            string `json:"platform,omitempty"`
-	RudderCLIVersion    string `json:"rudderCLIVersion,omitempty"`
+type PlanMetadata struct {
 	TrackingPlanID      string `json:"trackingPlanId,omitempty"`
 	TrackingPlanVersion int    `json:"trackingPlanVersion,omitempty"`
 }

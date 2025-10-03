@@ -39,6 +39,10 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 	tp := &plan.TrackingPlan{
 		Name:  apitp.Name,
 		Rules: rules,
+		Metadata: plan.PlanMetadata{
+			TrackingPlanID:      apitp.ID,
+			TrackingPlanVersion: apitp.Version,
+		},
 	}
 
 	// Pretty print the tracking plan for debugging

@@ -1,12 +1,12 @@
 package com.rudderstack.sdk.kotlin.core
 
-import com.rudderstack.sdk.kotlin.core.internals.models.RudderOptions
+import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 class Analytics() {
-    fun identify(userId: String, traits: JsonObject, options: RudderOptions) {
+    fun identify(userId: String, traits: JsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "identify")
             put("userId", userId)
@@ -16,7 +16,7 @@ class Analytics() {
         println(output)
     }
 
-    fun track(name: String, properties: JsonObject, options: RudderOptions) {
+    fun track(name: String, properties: JsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "track")
             put("name", name)
@@ -26,7 +26,7 @@ class Analytics() {
         println(output)
     }
 
-    fun group(groupId: String, traits: JsonObject, options: RudderOptions) {
+    fun group(groupId: String, traits: JsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "group")
             put("groupId", groupId)
@@ -36,7 +36,7 @@ class Analytics() {
         println(output)
     }
 
-    fun screen(screenName: String, category: String, properties: JsonObject, options: RudderOptions) {
+    fun screen(screenName: String, category: String, properties: JsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "screen")
             put("screenName", screenName)

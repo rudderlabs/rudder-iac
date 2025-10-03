@@ -9,9 +9,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
+const (
+	Platform = "kotlin"
+)
+
+func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
 	ctx := NewKotlinContext()
-	ctx.EventContext = formatEventContext(plan.EventContext)
+	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
@@ -34,10 +38,10 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	}, nil
 }
 
-func formatEventContext(ec plan.EventContext) map[string]string {
+func formatEventContext(ec plan.PlanMetadata, rudderCLIVersion string) map[string]string {
 	return map[string]string{
-		"platform":            fmt.Sprintf("%q", ec.Platform),
-		"rudderCLIVersion":    fmt.Sprintf("%q", ec.RudderCLIVersion),
+		"platform":            fmt.Sprintf("%q", Platform),
+		"rudderCLIVersion":    fmt.Sprintf("%q", rudderCLIVersion),
 		"trackingPlanId":      fmt.Sprintf("%q", ec.TrackingPlanID),
 		"trackingPlanVersion": fmt.Sprintf("%d", ec.TrackingPlanVersion),
 	}

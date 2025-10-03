@@ -20,7 +20,7 @@ class RudderAnalytics(private val analytics: Analytics) {
         {{- range $i, $arg := .SDKCall.Arguments }}
             {{ .Name }} = {{- if .ShouldSerialize }} json.encodeToJsonElement({{ .Value }}).jsonObject{{- else }} {{ .Value }}{{- end }},
         {{- end }}
-            options = RudderOptions(customContext = context)
+            options = RudderOption(customContext = context)
         )
     }
 {{ end -}}
