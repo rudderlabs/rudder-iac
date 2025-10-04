@@ -71,9 +71,13 @@ func AsPrimitiveType(t PropertyType) *PrimitiveType {
 	return nil
 }
 
-// IsCustomType checks if the PropertyType is a CustomType
+// IsCustomType checks if the PropertyType is a CustomType (value or pointer)
 func IsCustomType(t PropertyType) bool {
 	_, ok := t.(CustomType)
+	if ok {
+		return true
+	}
+	_, ok = t.(*CustomType)
 	return ok
 }
 
@@ -81,6 +85,9 @@ func IsCustomType(t PropertyType) bool {
 func AsCustomType(t PropertyType) *CustomType {
 	if customType, ok := t.(CustomType); ok {
 		return &customType
+	}
+	if customType, ok := t.(*CustomType); ok {
+		return customType
 	}
 	return nil
 }

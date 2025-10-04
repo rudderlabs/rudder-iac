@@ -164,6 +164,50 @@ func init() {
 		Description: "User profile data",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["user_profile"]},
 	}
+
+	// Custom type with enum
+	ReferenceCustomTypes["status"] = &plan.CustomType{
+		Name:        "status",
+		Description: "User status enum",
+		Type:        plan.PrimitiveTypeString,
+		Config: &plan.PropertyConfig{
+			Enum: []any{"pending", "active", "suspended", "deleted"},
+		},
+	}
+
+	ReferenceProperties["status"] = &plan.Property{
+		Name:        "status",
+		Description: "User account status",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["status"]},
+	}
+
+	// Custom array type with primitive items
+	ReferenceCustomTypes["email_list"] = &plan.CustomType{
+		Name:        "email_list",
+		Description: "List of email addresses",
+		Type:        plan.PrimitiveTypeArray,
+		ItemType:    ReferenceCustomTypes["email"],
+	}
+
+	ReferenceProperties["email_list"] = &plan.Property{
+		Name:        "email_list",
+		Description: "User's email addresses",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["email_list"]},
+	}
+
+	// Custom array type with object items
+	ReferenceCustomTypes["profile_list"] = &plan.CustomType{
+		Name:        "profile_list",
+		Description: "List of user profiles",
+		Type:        plan.PrimitiveTypeArray,
+		ItemType:    ReferenceCustomTypes["user_profile"],
+	}
+
+	ReferenceProperties["profile_list"] = &plan.Property{
+		Name:        "profile_list",
+		Description: "List of related user profiles",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["profile_list"]},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -218,6 +262,18 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				},
 				"object_property": {
 					Property: *ReferenceProperties["object_property"],
+					Required: false,
+				},
+				"status": {
+					Property: *ReferenceProperties["status"],
+					Required: false,
+				},
+				"email_list": {
+					Property: *ReferenceProperties["email_list"],
+					Required: false,
+				},
+				"profile_list": {
+					Property: *ReferenceProperties["profile_list"],
 					Required: false,
 				},
 			},
@@ -301,7 +357,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 4  // email, age, active, user_profile
-	ExpectedPropertyCount   = 14 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property
+	ExpectedCustomTypeCount = 7  // email, age, active, user_profile, status, email_list, profile_list
+	ExpectedPropertyCount   = 17 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )
