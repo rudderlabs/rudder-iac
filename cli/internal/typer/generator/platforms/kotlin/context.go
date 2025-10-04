@@ -23,7 +23,6 @@ type KotlinDataClass struct {
 	Comment       string            // Documentation comment for the class
 	Properties    []KotlinProperty  // Properties of the data class
 	NestedClasses []KotlinDataClass // Nested data classes within this class
-	Indent        int               // Indentation level for nested classes
 }
 
 // KotlinEnumValue represents a single value in a Kotlin enum
