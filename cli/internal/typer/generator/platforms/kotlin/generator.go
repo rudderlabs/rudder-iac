@@ -471,9 +471,9 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 	}, nil
 }
 
-// hasEnumConstraints checks if a property has enum constraints defined
-func hasEnumConstraints(property *plan.Property) bool {
-	return property.Config != nil && property.Config.Enum != nil && len(property.Config.Enum) > 0
+// hasEnumConfig checks if a PropertyConfig has enum constraints defined
+func hasEnumConfig(config *plan.PropertyConfig) bool {
+	return config != nil && config.Enum != nil && len(config.Enum) > 0
 }
 
 // createPropertyEnum creates a KotlinEnum from a property with enum constraints
@@ -495,6 +495,29 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 	return &KotlinEnum{
 		Name:    enumName,
 		Comment: property.Description,
+		Values:  enumValues,
+	}, nil
+}
+
+// createCustomTypeEnum creates a KotlinEnum from a custom type with enum constraints
+func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range customType.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       FormatEnumValue(value),
+			SerialName: FormatEnumSerialName(value),
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: customType.Description,
 		Values:  enumValues,
 	}, nil
 }
