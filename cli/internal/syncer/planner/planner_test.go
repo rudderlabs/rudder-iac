@@ -19,6 +19,7 @@ func TestPlanner_Plan(t *testing.T) {
 	targetWithDependency := newResource("res2", "target resource 2", &resources.PropertyRef{URN: sourceUnmodified.URN(), Property: "name"})
 	targetToBeUpdated := newResource("res3", "target resource 3", nil)
 	targetToBeCreated := newResource("res4", "target resource 4", nil)
+	targetToBeImported := newResource("res5", "target resource 5", nil, resources.WithResourceImportMetadata("remote-res5", "workspace-id"))
 
 	tests := []struct {
 		name     string
@@ -98,11 +99,39 @@ func TestPlanner_Plan(t *testing.T) {
 				{Type: planner.Delete, Resource: sourceToBeDeleted},
 			},
 		},
+		{
+			name:   "import single resource",
+			source: newGraph(),
+			target: newGraphWithResources(targetToBeImported),
+			expected: []*planner.Operation{
+				{Type: planner.Import, Resource: targetToBeImported},
+			},
+		},
+		{
+			name: "combined import, create, update and delete",
+			source: newGraphWithResources(
+				sourceToBeDeleted,
+				sourceUnmodified,
+				sourceToBeUpdated,
+			),
+			target: newGraphWithResources(
+				targetUnmodified,
+				targetToBeUpdated,
+				targetToBeCreated,
+				targetToBeImported,
+			),
+			expected: []*planner.Operation{
+				{Type: planner.Import, Resource: targetToBeImported},
+				{Type: planner.Create, Resource: targetToBeCreated},
+				{Type: planner.Update, Resource: targetToBeUpdated},
+				{Type: planner.Delete, Resource: sourceToBeDeleted},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := planner.New("test-workspace-id")
+			p := planner.New("workspace-id")
 			plan := p.Plan(tt.source, tt.target)
 			for i, op := range plan.Operations {
 				fmt.Printf("Operation %d: %d %s\n", i, op.Type, op.Resource.ID())
@@ -124,12 +153,12 @@ func newGraphWithResources(rs ...*resources.Resource) *resources.Graph {
 	return g
 }
 
-func newResource(id string, name string, dependency *resources.PropertyRef) *resources.Resource {
+func newResource(id string, name string, dependency *resources.PropertyRef, opts ...resources.ResourceOpts) *resources.Resource {
 	data := resources.ResourceData{
 		"name": name,
 	}
 	if dependency != nil {
 		data["dependency"] = *dependency
 	}
-	return resources.NewResource(id, "some-type", data, []string{})
+	return resources.NewResource(id, "some-type", data, []string{}, opts...)
 }

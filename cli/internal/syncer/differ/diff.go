@@ -13,8 +13,10 @@ var (
 
 // Diff represents the differences between two resource graphs
 type Diff struct {
-	// NewResources contains URNs of resources that exist in target but not in source
+	// NewResources contains URNs of resources that will be created (exist in target but not in source, and have no ImportMetadata)
 	NewResources []string
+	// ImportableResources contains URNs of resources that will be imported (exist in target but not in source, and have ImportMetadata)
+	ImportableResources []string
 	// UpdatedResources contains URNs of resources that exist in both graphs but have different data
 	UpdatedResources map[string]ResourceDiff
 	// RemovedResources contains URNs of resources that exist in source but not in target
@@ -34,14 +36,20 @@ type PropertyDiff struct {
 	TargetValue interface{}
 }
 
+type DiffOptions struct {
+	WorkspaceID string
+}
+
 // ComputeDiff computes the diff between two graphs
-// It returns a Diff struct containing the new, updated, removed and unmodified resources
-// - New resources are resources that exist in the target but not in the source
+// It returns a Diff struct containing the new, importable, updated, removed and unmodified resources
+// - New resources are resources that will be created (exist in target but not in source, without ImportMetadata)
+// - Importable resources are resources that will be imported (exist in target but not in source, with ImportMetadata)
 // - Updated resources are resources that exist in both but their data differ
 // - Removed resources are resources that exist in the source but not in the target
 // - Unmodified resources are resources that exist in both with identical data
-func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
+func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffOptions) *Diff {
 	newResources := []string{}
+	importableResources := []string{}
 	removedResources := []string{}
 	updatedResources := map[string]ResourceDiff{}
 	unmodifiedResources := []string{}
@@ -49,8 +57,14 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 	// Iterate over target resources to find new and updated resources
 	for urn, r := range target.Resources() {
 		if sourceResource, exists := source.GetResource(urn); !exists {
-			// Resource is new if it doesn't exist in the source
-			newResources = append(newResources, urn)
+			// Categorize based on ImportMetadata - mutually exclusive
+			if r.ImportMetadata() != nil && r.ImportMetadata().WorkspaceId == options.WorkspaceID {
+				// Resource will be imported (exists remotely)
+				importableResources = append(importableResources, urn)
+			} else {
+				// Resource will be created (doesn't exist anywhere)
+				newResources = append(newResources, urn)
+			}
 		} else {
 			// Check if resource is updated or unmodified
 			propertyDiffs := CompareData(sourceResource.Data(), r.Data())
@@ -72,6 +86,7 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph) *Diff {
 
 	return &Diff{
 		NewResources:        newResources,
+		ImportableResources: importableResources,
 		UpdatedResources:    updatedResources,
 		RemovedResources:    removedResources,
 		UnmodifiedResources: unmodifiedResources,
