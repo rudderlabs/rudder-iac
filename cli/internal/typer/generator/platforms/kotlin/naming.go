@@ -122,6 +122,12 @@ func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.N
 	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
 }
 
+// getOrRegisterCustomTypeEnumName returns the registered enum class name for a custom type with enum constraints
+func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
+	enumName := FormatClassName("CustomType", customType.Name)
+	return nameRegistry.RegisterName("customtype:"+customType.Name, EnumScope, enumName)
+}
+
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
 	valueStr := fmt.Sprintf("%v", value)
