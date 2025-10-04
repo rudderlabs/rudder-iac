@@ -255,8 +255,11 @@ func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.
 	}
 }
 
-// createKotlinPropertiesFromSchema processes properties from an ObjectSchema and returns KotlinProperty objects
-func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) ([]KotlinProperty, error) {
+func createDataClass(className string, comment string, schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	return createDataClassWithIndent(className, comment, schema, nameRegistry, 0)
+}
+
+func createDataClassWithIndent(className string, comment string, schema *plan.ObjectSchema, nameRegistry *core.NameRegistry, indentLevel int) (*KotlinDataClass, error) {
 	// Sort property names for deterministic output
 	var sortedPropNames []string
 	for propName := range schema.Properties {
@@ -265,29 +268,64 @@ func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *c
 	sort.Strings(sortedPropNames)
 
 	var properties []KotlinProperty
+	var nestedClasses []KotlinDataClass
+
 	for _, propName := range sortedPropNames {
 		propSchema := schema.Properties[propName]
-		kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
-		if err != nil {
-			return nil, err
-		}
 
-		property := KotlinProperty{
-			Name:       formatPropertyName(propName),
-			SerialName: propName,
-			Type:       kotlinType,
-			Comment:    propSchema.Property.Description,
-			Nullable:   !propSchema.Required,
-		}
+		// Check if this property has nested object schema
+		if propSchema.Schema != nil {
+			// Generate nested data class
+			nestedClass, err := createNestedDataClass(&propSchema, propName, className, nameRegistry, indentLevel+1)
+			if err != nil {
+				return nil, err
+			}
+			nestedClasses = append(nestedClasses, *nestedClass)
 
-		if !propSchema.Required {
-			property.Default = "null"
-		}
+			// Property type references the nested class
+			nestedClassName := fmt.Sprintf("%s.%s", className, nestedClass.Name)
+			property := KotlinProperty{
+				Name:       formatPropertyName(propName),
+				SerialName: propName,
+				Type:       nestedClassName,
+				Comment:    propSchema.Property.Description,
+				Nullable:   !propSchema.Required,
+			}
 
-		properties = append(properties, property)
+			if !propSchema.Required {
+				property.Default = "null"
+			}
+
+			properties = append(properties, property)
+		} else {
+			kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+
+			property := KotlinProperty{
+				Name:       formatPropertyName(propName),
+				SerialName: propName,
+				Type:       kotlinType,
+				Comment:    propSchema.Property.Description,
+				Nullable:   !propSchema.Required,
+			}
+
+			if !propSchema.Required {
+				property.Default = "null"
+			}
+
+			properties = append(properties, property)
+		}
 	}
 
-	return properties, nil
+	return &KotlinDataClass{
+		Name:          className,
+		Comment:       comment,
+		Properties:    properties,
+		NestedClasses: nestedClasses,
+		Indent:        indentLevel,
+	}, nil
 }
 
 // createCustomTypeDataClass creates a KotlinDataClass from an object custom type
@@ -297,16 +335,7 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 		return nil, err
 	}
 
-	properties, err := createKotlinPropertiesFromSchema(customType.Schema, nameRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	return &KotlinDataClass{
-		Name:       finalName,
-		Comment:    customType.Description,
-		Properties: properties,
-	}, nil
+	return createDataClass(finalName, customType.Description, customType.Schema, nameRegistry)
 }
 
 // getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases or enum classes
@@ -367,17 +396,7 @@ func createEventDataClass(rule *plan.EventRule, nameRegistry *core.NameRegistry)
 		return nil, err
 	}
 
-	// Use the shared helper to create properties from the rule's schema
-	properties, err := createKotlinPropertiesFromSchema(&rule.Schema, nameRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	return &KotlinDataClass{
-		Name:       className,
-		Comment:    rule.Event.Description,
-		Properties: properties,
-	}, nil
+	return createDataClass(className, rule.Event.Description, &rule.Schema, nameRegistry)
 }
 
 // hasEnumConfig checks if a PropertyConfig has enum constraints defined
@@ -449,4 +468,20 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 	default:
 		return "JsonElement" // Fallback for unknown types
 	}
+}
+
+// createNestedDataClass creates a nested KotlinDataClass from a property schema
+func createNestedDataClass(propSchema *plan.PropertySchema, propName string, parentClassName string, nameRegistry *core.NameRegistry, indentLevel int) (*KotlinDataClass, error) {
+	// Generate class name for the nested class
+	nestedClassName := FormatClassName("", propName)
+	mergedName := fmt.Sprintf("%s.%s", parentClassName, nestedClassName)
+
+	dataClass, err := createDataClassWithIndent(mergedName, propSchema.Property.Description, propSchema.Schema, nameRegistry, indentLevel)
+	if err != nil {
+		return nil, err
+	}
+
+	dataClass.Name = nestedClassName
+
+	return dataClass, nil
 }

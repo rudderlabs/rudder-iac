@@ -264,6 +264,25 @@ func init() {
 		Description: "List of related user profiles",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["profile_list"]},
 	}
+
+	// Add properties for testing nested objects
+	ReferenceProperties["ip_address"] = &plan.Property{
+		Name:        "ip_address",
+		Description: "IP address of the user",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["nested_context"] = &plan.Property{
+		Name:        "nested_context",
+		Description: "demonstrates multiple levels of nesting",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	ReferenceProperties["context"] = &plan.Property{
+		Name:        "context",
+		Description: "example of object property",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -331,6 +350,33 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"profile_list": {
 					Property: *ReferenceProperties["profile_list"],
 					Required: false,
+				},
+				// Add nested object properties for testing
+				"context": {
+					Property: *ReferenceProperties["context"],
+					Required: false,
+					Schema: &plan.ObjectSchema{
+						Properties: map[string]plan.PropertySchema{
+							"ip_address": {
+								Property: *ReferenceProperties["ip_address"],
+								Required: true,
+							},
+							"nested_context": {
+								Property: *ReferenceProperties["nested_context"],
+								Required: true,
+								Schema: &plan.ObjectSchema{
+									Properties: map[string]plan.PropertySchema{
+										"profile": {
+											Property: *ReferenceProperties["profile"],
+											Required: false,
+										},
+									},
+									AdditionalProperties: false,
+								},
+							},
+						},
+						AdditionalProperties: false,
+					},
 				},
 			},
 			AdditionalProperties: false,
@@ -414,6 +460,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 7  // email, age, active, user_profile, status, email_list, profile_list
-	ExpectedPropertyCount   = 17 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list
+	ExpectedPropertyCount   = 20 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

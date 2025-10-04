@@ -3,6 +3,7 @@ package kotlin
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 	"text/template"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -24,7 +25,13 @@ var rudderanalyticsTemplate string
 var enumTemplate string
 
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
-	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
+	funcMap := template.FuncMap{
+		"indent": func(level int) string {
+			return strings.Repeat("    ", level)
+		},
+	}
+
+	tmpl, err := template.New("kotlin").Funcs(funcMap).Parse(kotlinTemplate)
 	if err != nil {
 		return nil, err
 	}

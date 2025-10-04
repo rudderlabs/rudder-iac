@@ -39,6 +39,9 @@ typealias PropertyArrayOfAny = List<JsonElement>
 /** Array of user contacts */
 typealias PropertyContacts = List<CustomTypeEmail>
 
+/** example of object property */
+typealias PropertyContext = JsonObject
+
 /** User's email address */
 typealias PropertyEmail = CustomTypeEmail
 
@@ -48,8 +51,14 @@ typealias PropertyEmailList = CustomTypeEmailList
 /** User's first name */
 typealias PropertyFirstName = String
 
+/** IP address of the user */
+typealias PropertyIpAddress = String
+
 /** User's last name */
 typealias PropertyLastName = String
+
+/** demonstrates multiple levels of nesting */
+typealias PropertyNestedContext = JsonObject
 
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
@@ -174,6 +183,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("contacts")
     val contacts: PropertyContacts? = null,
 
+    /** example of object property */
+    @SerialName("context")
+    val context: TrackUserSignedUpProperties.Context? = null,
+
     /** Type of device */
     @SerialName("device_type")
     val deviceType: PropertyDeviceType? = null,
@@ -213,7 +226,27 @@ data class TrackUserSignedUpProperties(
     /** A field with no explicit type (treated as any) */
     @SerialName("untyped_field")
     val untypedField: PropertyUntypedField? = null
-)
+) {
+    /** example of object property */
+    @Serializable
+    data class Context(
+        /** IP address of the user */
+        @SerialName("ip_address")
+        val ipAddress: PropertyIpAddress,
+
+        /** demonstrates multiple levels of nesting */
+        @SerialName("nested_context")
+        val nestedContext: TrackUserSignedUpProperties.Context.NestedContext
+    ) {
+        /** demonstrates multiple levels of nesting */
+        @Serializable
+        data class NestedContext(
+            /** User profile data */
+            @SerialName("profile")
+            val profile: PropertyProfile? = null
+        )
+    }
+}
 
 class RudderAnalytics(private val analytics: Analytics) {
     private val json = Json {
