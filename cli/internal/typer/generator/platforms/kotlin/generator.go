@@ -333,8 +333,14 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 			}
 		}
 
-		if !propSchema.Required {
-			property.Default = "null"
+		// Property type references the nested class
+		nestedClassName := fmt.Sprintf("%s.%s", className, nestedClass.Name)
+		property := KotlinProperty{
+			Name:       formatPropertyName(propName),
+			SerialName: propName,
+			Type:       nestedClassName,
+			Comment:    propSchema.Property.Description,
+			Nullable:   !propSchema.Required,
 		}
 
 		properties = append(properties, *property)
