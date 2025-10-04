@@ -94,6 +94,7 @@ type CustomType struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Type        PrimitiveType   `json:"type"`
+	ItemType    PropertyType    `json:"itemType,omitempty"` // Used if Type is PrimitiveTypeArray
 	Config      *PropertyConfig `json:"config,omitempty"`
 	// Schema defines the structure of the custom type if it's an object
 	Schema *ObjectSchema `json:"schema,omitempty"`

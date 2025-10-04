@@ -185,6 +185,11 @@ func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.
 					ct.Type = *plan.AsPrimitiveType(td.Types[0])
 					ct.Schema = td.Schema
 					ct.Config = td.Config
+
+					// For array types, set ItemType
+					if ct.Type == plan.PrimitiveTypeArray && len(td.ItemTypes) > 0 {
+						ct.ItemType = td.ItemTypes[0]
+					}
 				} else {
 					return nil, fmt.Errorf("custom type definition for '%s' must be an object", typeName)
 				}
@@ -211,7 +216,8 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 			return nil, fmt.Errorf("resolving custom type reference '%v': %w", ref, err)
 		}
 
-		td.Types = []plan.PropertyType{*customType}
+		td.Types = []plan.PropertyType{customType}
+		return td, nil
 	}
 
 	// parse enums
@@ -239,15 +245,14 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 			if len(v) == 0 {
 				td.Types = []plan.PropertyType{plan.PrimitiveTypeAny}
 			} else {
-				// TODO: handle multiple types
-				// Use first type from array
-
-				if str, ok := v[0].(string); ok {
-					pt, err := parsePrimitiveType(str)
-					if err != nil {
-						return nil, fmt.Errorf("parsing primitive type '%s': %w", str, err)
+				for _, item := range v {
+					if str, ok := item.(string); ok {
+						pt, err := parsePrimitiveType(str)
+						if err != nil {
+							return nil, fmt.Errorf("parsing primitive type '%s': %w", str, err)
+						}
+						td.Types = append(td.Types, pt)
 					}
-					td.Types = []plan.PropertyType{pt}
 				}
 			}
 		}
@@ -295,26 +300,45 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 				}
 			}
 		}
+	}
 
-		// handle arrays
-		if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeArray {
-			if items, exists := def["items"]; exists {
-				if itemsMap, ok := items.(map[string]any); ok {
-					ref, refExists := itemsMap["$ref"]
-					if refExists {
-						customType, err := resolveCustomTypeReference(ref.(string), customTypes)
-						if err != nil {
-							return nil, fmt.Errorf("resolving array item custom type reference '%v': %w", ref, err)
-						}
-						td.ItemTypes = []plan.PropertyType{*customType}
-					} else {
-						td.ItemTypes = []plan.PropertyType{plan.PrimitiveTypeAny}
+	// handle arrays
+	if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeArray {
+		if items, exists := def["items"]; exists {
+			if itemsMap, ok := items.(map[string]any); ok {
+				ref, refExists := itemsMap["$ref"]
+				if refExists {
+					customType, err := resolveCustomTypeReference(ref.(string), customTypes)
+					if err != nil {
+						return nil, fmt.Errorf("resolving array item custom type reference '%v': %w", ref, err)
 					}
+					td.ItemTypes = []plan.PropertyType{customType}
 				} else {
-					td.ItemTypes = []plan.PropertyType{plan.PrimitiveTypeAny}
+					t, tExists := itemsMap["type"]
+					if tExists {
+						if tSlice, ok := t.([]any); ok {
+							for _, item := range tSlice {
+								if str, ok := item.(string); ok {
+									pt, err := parsePrimitiveType(str)
+									if err != nil {
+										return nil, fmt.Errorf("parsing array item primitive type '%s': %w", str, err)
+									}
+									td.ItemTypes = append(td.ItemTypes, pt)
+								}
+							}
+						} else if tStr, ok := t.(string); ok {
+							pt, err := parsePrimitiveType(tStr)
+							if err != nil {
+								return nil, fmt.Errorf("parsing array item primitive type '%s': %w", tStr, err)
+							}
+							td.ItemTypes = []plan.PropertyType{pt}
+						} else {
+							return nil, fmt.Errorf("array items type must be a string or array of strings")
+						}
+					} else {
+						return nil, fmt.Errorf("array items must have a 'type' field")
+					}
 				}
-			} else {
-				td.ItemTypes = []plan.PropertyType{plan.PrimitiveTypeAny}
 			}
 		}
 	}
