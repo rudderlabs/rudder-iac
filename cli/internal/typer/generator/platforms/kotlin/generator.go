@@ -77,15 +77,24 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases for primitive custom types and data classes for object custom types
+	// Generate type aliases for primitive custom types, enums for custom types with enum configs, and data classes for object custom types
 	for _, name := range sortedNames {
 		customType := customTypes[name]
 		if customType.IsPrimitive() {
-			alias, err := createCustomTypeTypeAlias(customType, nameRegistry)
-			if err != nil {
-				return err
+			// Check if this custom type has enum constraints
+			if hasEnumConfig(customType.Config) {
+				enum, err := createCustomTypeEnum(customType, nameRegistry)
+				if err != nil {
+					return err
+				}
+				ctx.Enums = append(ctx.Enums, *enum)
+			} else {
+				alias, err := createCustomTypeTypeAlias(customType, nameRegistry)
+				if err != nil {
+					return err
+				}
+				ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 			}
-			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 		} else {
 			dataClass, err := createCustomTypeDataClass(customType, nameRegistry)
 			if err != nil {
@@ -111,7 +120,7 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 		property := allProperties[name]
 
 		// Check if this property has enum constraints
-		if hasEnumConstraints(property) {
+		if hasEnumConfig(property.Config) {
 			enum, err := createPropertyEnum(property, nameRegistry)
 			if err != nil {
 				return err
@@ -135,8 +144,23 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 		return nil, err
 	}
 
-	// Map primitive type to Kotlin type
-	kotlinType := mapPrimitiveToKotlinType(customType.Type)
+	var kotlinType string
+	// Handle array custom types with ItemType
+	if customType.Type == plan.PrimitiveTypeArray {
+		if customType.ItemType != nil {
+			innerKotlinType, err := resolveTypeToKotlinType(customType.ItemType, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+			kotlinType = fmt.Sprintf("List<%s>", innerKotlinType)
+		} else {
+			// Array with no item type means array of any
+			kotlinType = "List<JsonElement>"
+		}
+	} else {
+		// Map primitive type to Kotlin type
+		kotlinType = mapPrimitiveToKotlinType(customType.Type)
+	}
 
 	return &KotlinTypeAlias{
 		Alias:   finalName,
@@ -171,13 +195,13 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 	// For now, we only handle single-type properties
 
 	var propertyType plan.PropertyType
-	if len(property.Type) == 0 {
+	if len(property.Types) == 0 {
 		return "JsonElement", nil
-	} else if len(property.Type) == 1 {
-		propertyType = property.Type[0]
+	} else if len(property.Types) == 1 {
+		propertyType = property.Types[0]
 	} else {
 		// TODO: Future enhancement for union types
-		return "", fmt.Errorf("union types not yet supported: %v", property.Type)
+		return "", fmt.Errorf("union types not yet supported: %v", property.Types)
 	}
 
 	if plan.IsPrimitiveType(propertyType) {
@@ -185,18 +209,18 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 
 		// Handle array types by using ItemType
 		if primitiveType == plan.PrimitiveTypeArray {
-			if len(property.ItemType) == 0 {
+			if len(property.ItemTypes) == 0 {
 				// No item type specified means array can contain any type
 				return "List<JsonElement>", nil
-			} else if len(property.ItemType) == 1 {
-				itemType := property.ItemType[0]
+			} else if len(property.ItemTypes) == 1 {
+				itemType := property.ItemTypes[0]
 				innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
 				if err != nil {
 					return "", err
 				}
 				return fmt.Sprintf("List<%s>", innerKotlinType), nil
 			} else {
-				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemType)
+				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemTypes)
 			}
 		}
 
@@ -204,7 +228,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 	} else if plan.IsCustomType(propertyType) {
 		return resolveTypeToKotlinType(propertyType, nameRegistry)
 	} else {
-		return "", fmt.Errorf("unsupported property type: %s", property.Type)
+		return "", fmt.Errorf("unsupported property type: %s", property.Types)
 	}
 }
 
@@ -215,6 +239,11 @@ func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.
 	} else if plan.IsCustomType(propertyType) {
 		customType := plan.AsCustomType(propertyType)
 		if customType.IsPrimitive() {
+			// Check if this custom type has enum constraints
+			if hasEnumConfig(customType.Config) {
+				// Reference the custom type enum
+				return getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+			}
 			// Reference the custom type alias
 			return getOrRegisterCustomTypeAliasName(customType, nameRegistry)
 		} else {
@@ -283,7 +312,7 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 // getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases or enum classes
 func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	// Check if this property has enum constraints
-	if hasEnumConstraints(&property) {
+	if hasEnumConfig(property.Config) {
 		return getOrRegisterPropertyEnumName(&property, nameRegistry)
 	}
 	return getOrRegisterPropertyAliasName(&property, nameRegistry)
@@ -351,9 +380,9 @@ func createEventDataClass(rule *plan.EventRule, nameRegistry *core.NameRegistry)
 	}, nil
 }
 
-// hasEnumConstraints checks if a property has enum constraints defined
-func hasEnumConstraints(property *plan.Property) bool {
-	return property.Config != nil && property.Config.Enum != nil && len(property.Config.Enum) > 0
+// hasEnumConfig checks if a PropertyConfig has enum constraints defined
+func hasEnumConfig(config *plan.PropertyConfig) bool {
+	return config != nil && config.Enum != nil && len(config.Enum) > 0
 }
 
 // createPropertyEnum creates a KotlinEnum from a property with enum constraints
@@ -368,13 +397,36 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 	for _, value := range property.Config.Enum {
 		enumValues = append(enumValues, KotlinEnumValue{
 			Name:       FormatEnumValue(value),
-			SerialName: value,
+			SerialName: FormatEnumSerialName(value),
 		})
 	}
 
 	return &KotlinEnum{
 		Name:    enumName,
 		Comment: property.Description,
+		Values:  enumValues,
+	}, nil
+}
+
+// createCustomTypeEnum creates a KotlinEnum from a custom type with enum constraints
+func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range customType.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       FormatEnumValue(value),
+			SerialName: FormatEnumSerialName(value),
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: customType.Description,
 		Values:  enumValues,
 	}, nil
 }

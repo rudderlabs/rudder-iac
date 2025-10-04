@@ -122,9 +122,16 @@ func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.N
 	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
 }
 
+// getOrRegisterCustomTypeEnumName returns the registered enum class name for a custom type with enum constraints
+func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
+	enumName := FormatClassName("CustomType", customType.Name)
+	return nameRegistry.RegisterName("customtype:"+customType.Name, EnumScope, enumName)
+}
+
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
-func FormatEnumValue(value string) string {
-	trimmedValue := strings.TrimSpace(value)
+func FormatEnumValue(value any) string {
+	valueStr := fmt.Sprintf("%v", value)
+	trimmedValue := strings.TrimSpace(valueStr)
 	if trimmedValue == "" {
 		return ""
 	}
@@ -156,6 +163,16 @@ func FormatEnumValue(value string) string {
 	}
 
 	return formatted
+}
+
+func FormatEnumSerialName(value any) string {
+	switch v := value.(type) {
+	case string:
+		// For strings, preserve the original value with quotes
+		return fmt.Sprintf("%q", v)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
 }
 
 func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.NameRegistry) (string, error) {
