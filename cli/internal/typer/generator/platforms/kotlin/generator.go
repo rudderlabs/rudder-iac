@@ -171,13 +171,13 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 	// For now, we only handle single-type properties
 
 	var propertyType plan.PropertyType
-	if len(property.Type) == 0 {
+	if len(property.Types) == 0 {
 		return "JsonElement", nil
-	} else if len(property.Type) == 1 {
-		propertyType = property.Type[0]
+	} else if len(property.Types) == 1 {
+		propertyType = property.Types[0]
 	} else {
 		// TODO: Future enhancement for union types
-		return "", fmt.Errorf("union types not yet supported: %v", property.Type)
+		return "", fmt.Errorf("union types not yet supported: %v", property.Types)
 	}
 
 	if plan.IsPrimitiveType(propertyType) {
@@ -185,18 +185,18 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 
 		// Handle array types by using ItemType
 		if primitiveType == plan.PrimitiveTypeArray {
-			if len(property.ItemType) == 0 {
+			if len(property.ItemTypes) == 0 {
 				// No item type specified means array can contain any type
 				return "List<JsonElement>", nil
-			} else if len(property.ItemType) == 1 {
-				itemType := property.ItemType[0]
+			} else if len(property.ItemTypes) == 1 {
+				itemType := property.ItemTypes[0]
 				innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
 				if err != nil {
 					return "", err
 				}
 				return fmt.Sprintf("List<%s>", innerKotlinType), nil
 			} else {
-				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemType)
+				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemTypes)
 			}
 		}
 
@@ -204,7 +204,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 	} else if plan.IsCustomType(propertyType) {
 		return resolveTypeToKotlinType(propertyType, nameRegistry)
 	} else {
-		return "", fmt.Errorf("unsupported property type: %s", property.Type)
+		return "", fmt.Errorf("unsupported property type: %s", property.Types)
 	}
 }
 
@@ -368,7 +368,7 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 	for _, value := range property.Config.Enum {
 		enumValues = append(enumValues, KotlinEnumValue{
 			Name:       FormatEnumValue(value),
-			SerialName: value,
+			SerialName: FormatEnumSerialName(value),
 		})
 	}
 

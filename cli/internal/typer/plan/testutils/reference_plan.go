@@ -53,87 +53,87 @@ func init() {
 	ReferenceProperties["email"] = &plan.Property{
 		Name:        "email",
 		Description: "User's email address",
-		Type:        []plan.PropertyType{*ReferenceCustomTypes["email"]},
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
 	ReferenceProperties["first_name"] = &plan.Property{
 		Name:        "first_name",
 		Description: "User's first name",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
 	ReferenceProperties["last_name"] = &plan.Property{
 		Name:        "last_name",
 		Description: "User's last name",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
 	ReferenceProperties["age"] = &plan.Property{
 		Name:        "age",
 		Description: "User's age",
-		Type:        []plan.PropertyType{*ReferenceCustomTypes["age"]},
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["age"]},
 	}
 
 	ReferenceProperties["active"] = &plan.Property{
 		Name:        "active",
 		Description: "User active status",
-		Type:        []plan.PropertyType{*ReferenceCustomTypes["active"]},
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["active"]},
 	}
 
 	ReferenceProperties["device_type"] = &plan.Property{
 		Name:        "device_type",
 		Description: "Type of device",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeString},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 		Config: &plan.PropertyConfig{
-			Enum: []string{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+			Enum: []any{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
 		},
 	}
 
 	ReferenceProperties["tags"] = &plan.Property{
 		Name:        "tags",
 		Description: "User tags as array of strings",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemType:    []plan.PropertyType{plan.PrimitiveTypeString},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
 	ReferenceProperties["contacts"] = &plan.Property{
 		Name:        "contacts",
 		Description: "Array of user contacts",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemType:    []plan.PropertyType{*ReferenceCustomTypes["email"]},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
 	// Add properties for testing "any" type support
 	ReferenceProperties["property_of_any"] = &plan.Property{
 		Name:        "property_of_any",
 		Description: "A field that can contain any type of value",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeAny},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
 	}
 
 	ReferenceProperties["untyped_field"] = &plan.Property{
 		Name:        "untyped_field",
 		Description: "A field with no explicit type (treated as any)",
-		Type:        []plan.PropertyType{},
+		Types:       []plan.PropertyType{},
 	}
 
 	ReferenceProperties["array_of_any"] = &plan.Property{
 		Name:        "array_of_any",
 		Description: "An array that can contain any type of items",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemType:    []plan.PropertyType{plan.PrimitiveTypeAny},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeAny},
 	}
 
 	ReferenceProperties["untyped_array"] = &plan.Property{
 		Name:        "untyped_array",
 		Description: "An array with no explicit item type (treated as any)",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemType:    []plan.PropertyType{},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{},
 	}
 
 	ReferenceProperties["object_property"] = &plan.Property{
 		Name:        "object_property",
 		Description: "An object field with no defined structure",
-		Type:        []plan.PropertyType{plan.PrimitiveTypeObject},
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
@@ -162,7 +162,7 @@ func init() {
 	ReferenceProperties["profile"] = &plan.Property{
 		Name:        "profile",
 		Description: "User profile data",
-		Type:        []plan.PropertyType{*ReferenceCustomTypes["user_profile"]},
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["user_profile"]},
 	}
 }
 
