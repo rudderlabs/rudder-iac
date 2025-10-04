@@ -256,10 +256,6 @@ func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.
 }
 
 func createDataClass(className string, comment string, schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
-	return createDataClassWithIndent(className, comment, schema, nameRegistry, 0)
-}
-
-func createDataClassWithIndent(className string, comment string, schema *plan.ObjectSchema, nameRegistry *core.NameRegistry, indentLevel int) (*KotlinDataClass, error) {
 	// Sort property names for deterministic output
 	var sortedPropNames []string
 	for propName := range schema.Properties {
@@ -276,7 +272,7 @@ func createDataClassWithIndent(className string, comment string, schema *plan.Ob
 		// Check if this property has nested object schema
 		if propSchema.Schema != nil {
 			// Generate nested data class
-			nestedClass, err := createNestedDataClass(&propSchema, propName, className, nameRegistry, indentLevel+1)
+			nestedClass, err := createNestedDataClass(&propSchema, propName, className, nameRegistry)
 			if err != nil {
 				return nil, err
 			}
@@ -324,7 +320,6 @@ func createDataClassWithIndent(className string, comment string, schema *plan.Ob
 		Comment:       comment,
 		Properties:    properties,
 		NestedClasses: nestedClasses,
-		Indent:        indentLevel,
 	}, nil
 }
 
@@ -471,12 +466,12 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
 }
 
 // createNestedDataClass creates a nested KotlinDataClass from a property schema
-func createNestedDataClass(propSchema *plan.PropertySchema, propName string, parentClassName string, nameRegistry *core.NameRegistry, indentLevel int) (*KotlinDataClass, error) {
+func createNestedDataClass(propSchema *plan.PropertySchema, propName string, parentClassName string, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
 	// Generate class name for the nested class
 	nestedClassName := FormatClassName("", propName)
 	mergedName := fmt.Sprintf("%s.%s", parentClassName, nestedClassName)
 
-	dataClass, err := createDataClassWithIndent(mergedName, propSchema.Property.Description, propSchema.Schema, nameRegistry, indentLevel)
+	dataClass, err := createDataClass(mergedName, propSchema.Property.Description, propSchema.Schema, nameRegistry)
 	if err != nil {
 		return nil, err
 	}

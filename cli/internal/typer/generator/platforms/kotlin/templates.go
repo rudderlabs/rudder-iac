@@ -43,6 +43,12 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 			err := tmpl.ExecuteTemplate(&buf, name, data)
 			return buf.String(), err
 		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"mkSlice": func(args ...any) []any {
+			return args
+		},
 	}
 
 	tmpl, err := template.New("kotlin").Funcs(funcMap).Parse(kotlinTemplate)
