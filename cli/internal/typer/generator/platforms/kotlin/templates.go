@@ -25,9 +25,23 @@ var rudderanalyticsTemplate string
 var enumTemplate string
 
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
+	var tmpl *template.Template
+
 	funcMap := template.FuncMap{
-		"indent": func(level int) string {
-			return strings.Repeat("    ", level)
+		"indent": func(level int, text string) string {
+			indentStr := "    "
+			lines := strings.Split(text, "\n")
+			for i, line := range lines {
+				if line != "" {
+					lines[i] = indentStr + line
+				}
+			}
+			return strings.Join(lines, "\n")
+		},
+		"include": func(name string, data interface{}) (string, error) {
+			var buf bytes.Buffer
+			err := tmpl.ExecuteTemplate(&buf, name, data)
+			return buf.String(), err
 		},
 	}
 

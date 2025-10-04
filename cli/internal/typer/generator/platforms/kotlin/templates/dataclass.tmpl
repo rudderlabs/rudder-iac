@@ -1,22 +1,19 @@
 {{- if .Comment }}
-{{ indent .Indent }}/** {{ .Comment }} */
+/** {{ .Comment }} */
 {{- end }}
-{{ indent .Indent }}@Serializable
-{{ indent .Indent }}data class {{ .Name }}(
+@Serializable
+data class {{ .Name }}(
 {{- range $index, $prop := .Properties }}{{- if $index }},
 {{ end }}
-{{- if and $index $prop.Comment }}
-
-{{- end }}
 {{- if $prop.Comment }}
-{{ indent $.Indent }}    /** {{ $prop.Comment }} */
+    /** {{ $prop.Comment }} */
 {{- end }}
-{{ indent $.Indent }}    @SerialName("{{ $prop.SerialName }}")
-{{ indent $.Indent }}    val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
+    @SerialName("{{ $prop.SerialName }}")
+    val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
 {{- end }}
-{{ indent .Indent }}){{- if gt (len .NestedClasses) 0 }} {
-{{- range .NestedClasses }}
-
-{{- template "dataclass.tmpl" . }}
+){{- if gt (len .NestedClasses) 0 }} {
+{{- range $nested :=.NestedClasses }}
+{{- include "dataclass.tmpl" $nested | indent $nested.Indent }}
 {{- end }}
-{{ indent .Indent }}}{{- end }}
+}
+{{- end }}
