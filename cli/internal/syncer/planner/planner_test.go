@@ -131,7 +131,7 @@ func TestPlanner_Plan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := planner.New("test-workspace-id")
+			p := planner.New("workspace-id")
 			plan := p.Plan(tt.source, tt.target)
 			for i, op := range plan.Operations {
 				fmt.Printf("Operation %d: %d %s\n", i, op.Type, op.Resource.ID())

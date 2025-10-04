@@ -52,7 +52,7 @@ func TestComputeDiff(t *testing.T) {
 	g2.AddResource(resources.NewResource("r3", "some-type", resources.ResourceData{"key1": "value1", "key2": "value3"}, []string{}))
 	g2.AddResource(resources.NewResource("r4", "some-type", resources.ResourceData{"key1": "value1", "key2": "value4"}, []string{}, resources.WithResourceImportMetadata("remote-id-r4", "workspace-id")))
 
-	diff := differ.ComputeDiff(g1, g2, differ.DiffOptions{WorkspaceID: "workspace1"})
+	diff := differ.ComputeDiff(g1, g2, differ.DiffOptions{WorkspaceID: "workspace-id"})
 
 	assert.Len(t, diff.NewResources, 1)
 	assert.Len(t, diff.ImportableResources, 1)
