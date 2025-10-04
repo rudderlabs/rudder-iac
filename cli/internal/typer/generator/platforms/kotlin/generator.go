@@ -488,7 +488,7 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 	for _, value := range property.Config.Enum {
 		enumValues = append(enumValues, KotlinEnumValue{
 			Name:       FormatEnumValue(value),
-			SerialName: value,
+			SerialName: FormatEnumSerialName(value),
 		})
 	}
 
