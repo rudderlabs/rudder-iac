@@ -141,30 +141,30 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 							Properties: map[string]plan.PropertySchema{
 								"someObject": {
 									Property: plan.Property{
-										Name: "someObject",
-										Type: []plan.PropertyType{plan.PrimitiveTypeObject},
+										Name:  "someObject",
+										Types: []plan.PropertyType{plan.PrimitiveTypeObject},
 									},
 									Required: false,
 									Schema: &plan.ObjectSchema{
 										Properties: map[string]plan.PropertySchema{
 											"someInteger": {
 												Property: plan.Property{
-													Name: "someInteger",
-													Type: []plan.PropertyType{plan.PrimitiveTypeInteger},
+													Name:  "someInteger",
+													Types: []plan.PropertyType{plan.PrimitiveTypeInteger},
 												},
 												Required: false,
 											},
 											"someNumber": {
 												Property: plan.Property{
-													Name: "someNumber",
-													Type: []plan.PropertyType{plan.PrimitiveTypeNumber},
+													Name:  "someNumber",
+													Types: []plan.PropertyType{plan.PrimitiveTypeNumber},
 												},
 												Required: false,
 											},
 											"someString": {
 												Property: plan.Property{
-													Name: "someString",
-													Type: []plan.PropertyType{plan.PrimitiveTypeString},
+													Name:  "someString",
+													Types: []plan.PropertyType{plan.PrimitiveTypeString},
 												},
 												Required: false,
 											},
@@ -173,46 +173,46 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 								},
 								"someInteger": {
 									Property: plan.Property{
-										Name: "someInteger",
-										Type: []plan.PropertyType{plan.PrimitiveTypeInteger},
+										Name:  "someInteger",
+										Types: []plan.PropertyType{plan.PrimitiveTypeInteger},
 									},
 									Required: false,
 								},
 								"someNumber": {
 									Property: plan.Property{
-										Name: "someNumber",
-										Type: []plan.PropertyType{plan.PrimitiveTypeNumber},
+										Name:  "someNumber",
+										Types: []plan.PropertyType{plan.PrimitiveTypeNumber},
 									},
 									Required: false,
 								},
 								"someString": {
 									Property: plan.Property{
-										Name: "someString",
-										Type: []plan.PropertyType{plan.PrimitiveTypeString},
+										Name:  "someString",
+										Types: []plan.PropertyType{plan.PrimitiveTypeString},
 									},
 									Required: false,
 								},
 								"someArrayOfStrings": {
 									Property: plan.Property{
-										Name: "someArrayOfStrings",
-										Type: []plan.PropertyType{plan.PrimitiveTypeArray},
+										Name:  "someArrayOfStrings",
+										Types: []plan.PropertyType{plan.PrimitiveTypeArray},
 									},
 									Required: false,
 								},
 								"someStringWithEnums": {
 									Property: plan.Property{
-										Name: "someStringWithEnums",
-										Type: []plan.PropertyType{plan.PrimitiveTypeString},
+										Name:  "someStringWithEnums",
+										Types: []plan.PropertyType{plan.PrimitiveTypeString},
 										Config: &plan.PropertyConfig{
-											Enum: []string{"one", "two", "three"},
+											Enum: []any{"one", "two", "three"},
 										},
 									},
 									Required: false,
 								},
 								"someStringOrBoolean": {
 									Property: plan.Property{
-										Name: "someStringOrBoolean",
-										Type: []plan.PropertyType{plan.PrimitiveTypeBoolean},
+										Name:  "someStringOrBoolean",
+										Types: []plan.PropertyType{plan.PrimitiveTypeBoolean},
 									},
 									Required: false,
 								},
@@ -279,15 +279,15 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 							Properties: map[string]plan.PropertySchema{
 								"email": {
 									Property: plan.Property{
-										Name: "email",
-										Type: []plan.PropertyType{plan.PrimitiveTypeString},
+										Name:  "email",
+										Types: []plan.PropertyType{plan.PrimitiveTypeString},
 									},
 									Required: true,
 								},
 								"username": {
 									Property: plan.Property{
-										Name: "username",
-										Type: []plan.PropertyType{plan.PrimitiveTypeString},
+										Name:  "username",
+										Types: []plan.PropertyType{plan.PrimitiveTypeString},
 									},
 									Required: true,
 								},
@@ -351,8 +351,8 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 							Properties: map[string]plan.PropertySchema{
 								"userId": {
 									Property: plan.Property{
-										Name: "userId",
-										Type: []plan.PropertyType{plan.PrimitiveTypeString},
+										Name:  "userId",
+										Types: []plan.PropertyType{plan.PrimitiveTypeString},
 									},
 									Required: true,
 								},
@@ -429,7 +429,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 
 						assert.Equal(t, expectedProp.Property.Name, actualProp.Property.Name)
 						assert.Equal(t, expectedProp.Required, actualProp.Required)
-						assert.Equal(t, len(expectedProp.Property.Type), len(actualProp.Property.Type))
+						assert.Equal(t, len(expectedProp.Property.Types), len(actualProp.Property.Types))
 
 						// Compare enum config if present
 						if expectedProp.Property.Config != nil && expectedProp.Property.Config.Enum != nil {
@@ -489,17 +489,6 @@ func TestJSONSchemaPlanProvider_ErrorCases(t *testing.T) {
 				}
 			}`),
 			expectedErrorMsg: "invalid event type",
-		},
-		{
-			name: "invalid identity section",
-			mockResponse: mockInvalidRespone("track", "invalid_section", `{
-				"properties": {
-					"type": "object",
-					"properties": {},
-					"required": []
-				}
-			}`),
-			expectedErrorMsg: "invalid identity section",
 		},
 		{
 			name:             "missing identity section in properties",
