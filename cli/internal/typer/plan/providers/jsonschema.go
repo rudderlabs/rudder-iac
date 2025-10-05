@@ -256,6 +256,7 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 				}
 			}
 		}
+	}
 
 	// handle nested objects
 	if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeObject {
@@ -303,8 +304,6 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 						}
 					}
 				}
-			} else {
-				td.ItemTypes = []plan.PropertyType{plan.PrimitiveTypeAny}
 			}
 		}
 	}
