@@ -1,0 +1,54 @@
+version: "rudder/v0.1"
+kind: "tp"
+metadata:
+  name: "typer-test"
+spec:
+  id: "typer-test-tracking-plan"
+  display_name: "Typer Test Tracking Plan"
+  description: "Tracking plan for a testing application."
+  rules:
+    - type: "event_rule"
+      id: "some_track_event_rule"
+      event:
+        $ref: "#/events/typer-test/some_track_event"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/typer-test/some-string"
+          required: true
+        - $ref: "#/properties/typer-test/some-integer"
+          required: true
+        - $ref: "#/properties/typer-test/some-number"
+          required: true
+        - $ref: "#/properties/typer-test/some-boolean"
+          required: true
+        - $ref: "#/properties/typer-test/some-object"
+          required: true
+        - $ref: "#/properties/typer-test/some-array-of-any"
+        - $ref: "#/properties/typer-test/some-array-of-strings"
+        - $ref: "#/properties/typer-test/some-array-of-integers"
+        - $ref: "#/properties/typer-test/some-array-of-numbers"
+        - $ref: "#/properties/typer-test/some-array-of-booleans"
+        # - $ref: "#/properties/typer-test/some-array-of-multiple-types"
+        - $ref: "#/properties/typer-test/some-string-with-enum"
+        - $ref: "#/properties/typer-test/some-integer-with-enum"
+        - $ref: "#/properties/typer-test/some-nested-object"
+          properties:
+            - $ref: "#/properties/typer-test/some-nested-level-1"
+              properties:
+                - $ref: "#/properties/typer-test/some-nested-level-2"
+                  properties:
+                    - $ref: "#/properties/typer-test/some-string"
+                    - $ref: "#/properties/typer-test/some-integer"
+                    - $ref: "#/properties/typer-test/some-number"
+                    - $ref: "#/properties/typer-test/some-boolean"
+                    - $ref: "#/properties/typer-test/some-object"
+    - type: "event_rule"
+      id: "some_empty_track_event_rule"
+      event:
+        $ref: "#/events/typer-test/some_empty_track_event"
+        allow_unplanned: false
+    - type: "event_rule"
+      id: "some_empty_track_event_with_additional_properties_rule"
+      event:
+        $ref: "#/events/typer-test/some_empty_track_event_with_additional_properties"
+        allow_unplanned: true

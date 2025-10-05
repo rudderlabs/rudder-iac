@@ -1,4 +1,3 @@
-{{- range .Enums }}
 {{- if .Comment }}
 /** {{ .Comment }} */
 {{- end }}
@@ -10,4 +9,3 @@ enum class {{ .Name }} {
     {{ $value.Name }}
 {{- end }}
 }
-{{ end }}
