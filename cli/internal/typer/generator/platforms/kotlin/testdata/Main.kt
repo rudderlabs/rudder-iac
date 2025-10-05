@@ -72,6 +72,18 @@ typealias PropertyNestedEmptyObject = JsonObject
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
 
+/** Page context information */
+typealias PropertyPageContext = CustomTypePageContext
+
+/** Additional page data */
+typealias PropertyPageData = JsonObject
+
+/** Type of page */
+typealias PropertyPageType = String
+
+/** Product identifier */
+typealias PropertyProductId = String
+
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
 
@@ -80,6 +92,9 @@ typealias PropertyProfileList = CustomTypeProfileList
 
 /** A field that can contain any type of value */
 typealias PropertyPropertyOfAny = JsonElement
+
+/** Search query */
+typealias PropertyQuery = String
 
 /** User account status */
 typealias PropertyStatus = CustomTypeStatus
@@ -119,6 +134,122 @@ enum class PropertyDeviceType {
     SMARTTV,
     @SerialName("IoT-Device")
     IOT_DEVICE
+}
+
+/** Page context with variants based on page type */
+@Serializable
+sealed class CustomTypePageContext {
+    /** Type of page */
+    @SerialName("page_type")
+    abstract val pageType: PropertyPageType
+
+    /** Search page variant */
+    @Serializable
+    data class CaseSearch(
+        /** Search query */
+        @SerialName("query")
+        val query: PropertyQuery
+    ) : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "search"
+    }
+
+    /** Product page variant */
+    @Serializable
+    data class CaseProduct(
+        /** Product identifier */
+        @SerialName("product_id")
+        val productId: PropertyProductId
+    ) : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "product"
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Additional page data */
+        @SerialName("page_data")
+        val pageData: PropertyPageData? = null,
+
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType
+    ) : CustomTypePageContext()
+}
+
+/** Example event to demonstrate variants */
+@Serializable
+sealed class TrackEventWithVariantsProperties {
+    /** Type of device */
+    @SerialName("device_type")
+    abstract val deviceType: PropertyDeviceType
+
+    /** Mobile device page view */
+    @Serializable
+    data class CaseMobile(
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile,
+
+        /** User tags as array of strings */
+        @SerialName("tags")
+        val tags: PropertyTags
+    ) : TrackEventWithVariantsProperties() {
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType = PropertyDeviceType.MOBILE
+    }
+
+    /** Desktop page view */
+    @Serializable
+    data class CaseDesktop(
+        /** User's first name */
+        @SerialName("first_name")
+        val firstName: PropertyFirstName,
+
+        /** User's last name */
+        @SerialName("last_name")
+        val lastName: PropertyLastName? = null,
+
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile
+    ) : TrackEventWithVariantsProperties() {
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType = PropertyDeviceType.DESKTOP
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType,
+
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile,
+
+        /** A field with no explicit type (treated as any) */
+        @SerialName("untyped_field")
+        val untypedField: PropertyUntypedField? = null
+    ) : TrackEventWithVariantsProperties()
 }
 
 /** User profile information */
@@ -309,6 +440,17 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.screen(
             screenName = screenName,
             category = category,
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Example event to demonstrate variants
+     */
+    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties) {
+        analytics.track(
+            name = "Event With Variants",
             properties = json.encodeToJsonElement(properties).jsonObject,
             options = RudderOption(customContext = context)
         )

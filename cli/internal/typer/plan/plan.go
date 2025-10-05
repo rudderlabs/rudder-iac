@@ -96,6 +96,22 @@ func AsCustomType(t PropertyType) *CustomType {
  * Custom Type related types
  */
 
+// Variant represents a discriminator-based variant definition
+type Variant struct {
+	Type          string        `json:"type"` // Always "discriminator" for now
+	Discriminator string        `json:"discriminator"`
+	Cases         []VariantCase `json:"cases"`
+	DefaultSchema *ObjectSchema `json:"defaultSchema,omitempty"`
+}
+
+// VariantCase represents a single case in a variant
+type VariantCase struct {
+	DisplayName string       `json:"displayName,omitempty"`
+	Match       []any        `json:"match"`
+	Description string       `json:"description,omitempty"`
+	Schema      ObjectSchema `json:"schema"`
+}
+
 // CustomType represents a custom type definition
 type CustomType struct {
 	Name        string          `json:"name"`
@@ -104,7 +120,8 @@ type CustomType struct {
 	ItemType    PropertyType    `json:"itemType,omitempty"` // Used if Type is PrimitiveTypeArray
 	Config      *PropertyConfig `json:"config,omitempty"`
 	// Schema defines the structure of the custom type if it's an object
-	Schema *ObjectSchema `json:"schema,omitempty"`
+	Schema   *ObjectSchema `json:"schema,omitempty"`
+	Variants []Variant     `json:"variants,omitempty"`
 }
 
 func (c *CustomType) IsPrimitive() bool {
@@ -125,9 +142,10 @@ const (
 
 // EventRule represents a rule for an event
 type EventRule struct {
-	Event   Event           `json:"event"`
-	Section IdentitySection `json:"section"`
-	Schema  ObjectSchema    `json:"schema"`
+	Event    Event           `json:"event"`
+	Section  IdentitySection `json:"section"`
+	Schema   ObjectSchema    `json:"schema"`
+	Variants []Variant       `json:"variants,omitempty"`
 }
 
 // ObjectSchema represents the schema for an object

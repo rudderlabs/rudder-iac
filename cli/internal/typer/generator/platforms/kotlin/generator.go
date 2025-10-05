@@ -80,7 +80,16 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	// Generate type aliases for primitive custom types, enums for custom types with enum configs, and data classes for object custom types
 	for _, name := range sortedNames {
 		customType := customTypes[name]
-		if customType.IsPrimitive() {
+
+		// Check if this custom type has variants
+		if len(customType.Variants) > 0 {
+			// Generate sealed class for variant custom type
+			sealedClass, err := createCustomTypeVariantSealedClass(customType, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else if customType.IsPrimitive() {
 			// Check if this custom type has enum constraints
 			if hasEnumConfig(customType.Config) {
 				enum, err := createCustomTypeEnum(customType, nameRegistry)
@@ -389,12 +398,22 @@ func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *c
 	for _, key := range sortedKeys {
 		rule := ruleMap[key]
 
-		// create data class and method for the event rule
-		dataClass, err := createEventDataClass(rule, nameRegistry)
-		if err != nil {
-			return err
+		// Check if this event rule has variants
+		if len(rule.Variants) > 0 {
+			// Generate sealed class for variant event
+			sealedClass, err := createEventRuleVariantSealedClass(rule, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else {
+			// create data class for the event rule
+			dataClass, err := createEventDataClass(rule, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 		}
-		ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 
 		// create RudderAnalyticsMethod for the event rule
 		method, err := createRudderAnalyticsMethod(rule, nameRegistry)
