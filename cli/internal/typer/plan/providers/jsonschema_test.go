@@ -356,6 +356,61 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		{
+			name: "empty object properties",
+			mockResponse: constructTrackingPlanWithSchemas("tp_empty", "Empty Properties Plan", []catalog.TrackingPlanEventSchema{
+				constructTrackingPlanEventSchema("EmptyEvent", "track", "properties", parseRulesJSON(`{
+					"properties": {
+						"type": "object",
+						"properties": {}
+					}
+				}`)),
+			}),
+			expectedPlan: &plan.TrackingPlan{
+				Name: "Empty Properties Plan",
+				Rules: []plan.EventRule{
+					{
+						Event: plan.Event{
+							Name:        "EmptyEvent",
+							Description: "",
+							EventType:   plan.EventTypeTrack,
+						},
+						Section: plan.IdentitySectionProperties,
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "object without properties field",
+			mockResponse: constructTrackingPlanWithSchemas("tp_no_props", "No Properties Plan", []catalog.TrackingPlanEventSchema{
+				constructTrackingPlanEventSchema("NoPropsEvent", "track", "properties", parseRulesJSON(`{
+					"properties": {
+						"type": "object"
+					}
+				}`)),
+			}),
+			expectedPlan: &plan.TrackingPlan{
+				Name: "No Properties Plan",
+				Rules: []plan.EventRule{
+					{
+						Event: plan.Event{
+							Name:        "NoPropsEvent",
+							Description: "",
+							EventType:   plan.EventTypeTrack,
+						},
+						Section: plan.IdentitySectionProperties,
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
