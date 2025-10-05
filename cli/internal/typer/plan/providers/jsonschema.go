@@ -264,6 +264,13 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 		}
 		td.Schema = objSchema
 
+		// Parse additionalProperties field
+		if additionalPropsVal, exists := def["additionalProperties"]; exists {
+			if additionalProps, ok := additionalPropsVal.(bool); ok {
+				objSchema.AdditionalProperties = additionalProps
+			}
+		}
+
 		if propertiesMap, exists := def["properties"]; exists {
 			if props, ok := propertiesMap.(map[string]any); ok {
 				for propName, propDef := range props {

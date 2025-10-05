@@ -24,6 +24,9 @@ typealias CustomTypeEmail = String
 /** List of email addresses */
 typealias CustomTypeEmailList = List<CustomTypeEmail>
 
+/** Empty object that allows additional properties */
+typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
+
 /** List of user profiles */
 typealias CustomTypeProfileList = List<CustomTypeUserProfile>
 
@@ -48,6 +51,9 @@ typealias PropertyEmail = CustomTypeEmail
 /** User's email addresses */
 typealias PropertyEmailList = CustomTypeEmailList
 
+/** Property with empty object allowing additional properties */
+typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
+
 /** User's first name */
 typealias PropertyFirstName = String
 
@@ -59,6 +65,9 @@ typealias PropertyLastName = String
 
 /** demonstrates multiple levels of nesting */
 typealias PropertyNestedContext = JsonObject
+
+/** Nested property with empty object allowing additional properties */
+typealias PropertyNestedEmptyObject = JsonObject
 
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
@@ -194,6 +203,14 @@ data class TrackUserSignedUpProperties(
     /** User's email addresses */
     @SerialName("email_list")
     val emailList: PropertyEmailList? = null,
+
+    /** Property with empty object allowing additional properties */
+    @SerialName("empty_object_with_additional_props")
+    val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
+
+    /** Nested property with empty object allowing additional properties */
+    @SerialName("nested_empty_object")
+    val nestedEmptyObject: PropertyNestedEmptyObject? = null,
 
     /** An object field with no defined structure */
     @SerialName("object_property")
