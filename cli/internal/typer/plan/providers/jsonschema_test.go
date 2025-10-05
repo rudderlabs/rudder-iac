@@ -28,7 +28,11 @@ func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, 
 }
 
 // helper function to parse JSON rules into map[string]interface{}
-func parseRulesJSON(rulesJSON string) map[string]interface{} {
+func parseRulesJSON(rulesJSON string) map[string]any {
+	if rulesJSON == "" {
+		return nil
+	}
+
 	var rules map[string]interface{}
 	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
 		panic("failed to parse rules JSON: " + err.Error())
@@ -36,7 +40,7 @@ func parseRulesJSON(rulesJSON string) map[string]interface{} {
 	return rules
 }
 
-func constructTrackingPlanEventSchema(name, eventType, identitySection string, rules map[string]interface{}) catalog.TrackingPlanEventSchema {
+func constructTrackingPlanEventSchema(name, eventType, identitySection string, rules map[string]interface{}, defs map[string]interface{}) catalog.TrackingPlanEventSchema {
 	return catalog.TrackingPlanEventSchema{
 		Name:            name,
 		EventType:       eventType,
@@ -45,10 +49,12 @@ func constructTrackingPlanEventSchema(name, eventType, identitySection string, r
 			Schema     string                 `json:"$schema"`
 			Type       string                 `json:"type"`
 			Properties map[string]interface{} `json:"properties"`
+			Defs       map[string]interface{} `json:"$defs,omitempty"`
 		}{
 			Schema:     "https://json-schema.org/draft/2019-09/schema",
 			Type:       "object",
 			Properties: rules,
+			Defs:       defs,
 		},
 	}
 }
@@ -164,39 +170,37 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						},
 						"required": [],
 						"unevaluatedProperties": false
+					}
+				}`), parseRulesJSON(`{
+					"CustomString": {
+						"type": "string",
+						"enum": ["one", "two", "three"]
 					},
-					"$defs": {
-						"CustomString": {
-							"type": "string",
-							"enum": ["one", "two", "three"]
-						},
-						"CustomObject": {
-							"type": ["object"],
-							"properties": {
-								"id": {
-								  "$ref": "#/$defs/CustomString"
-								},
-								"count": {
-									"type": ["integer"]
-								}
+					"CustomObject": {
+						"type": ["object"],
+						"properties": {
+							"id": {
+								"$ref": "#/$defs/CustomString"
 							},
-							"required": ["id"]
-						},
-						"CustomStringArray": {
-							"type": ["array"],
-							"items": {
-								"type": ["string"]
+							"count": {
+								"type": ["integer"]
 							}
 						},
-						"CustomObjectArray": {
-							"type": ["array"],
-							"items": {
-								"$ref": "#/$defs/CustomObject"
-							}
+						"required": ["id"]
+					},
+					"CustomStringArray": {
+						"type": ["array"],
+						"items": {
+							"type": ["string"]
+						}
+					},
+					"CustomObjectArray": {
+						"type": ["array"],
+						"items": {
+							"$ref": "#/$defs/CustomObject"
 						}
 					}
-				}`),
-				),
+				}`)),
 				constructTrackingPlanEventSchema("", "identify", "traits", parseRulesJSON(`{
 					"traits": {
 						"type": "object",
@@ -211,7 +215,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						"required": ["someString", "someInteger"],
 						"unevaluatedProperties": false
 					}
-				}`)),
+				}`), nil),
 				constructTrackingPlanEventSchema("", "screen", "traits", parseRulesJSON(`{
 					"traits": {
 						"type": "object",
@@ -222,7 +226,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						},
 						"unevaluatedProperties": false
 					}
-				}`)),
+				}`), nil),
 				constructTrackingPlanEventSchema("", "page", "traits", parseRulesJSON(`{
 					"traits": {
 						"type": "object",
@@ -233,7 +237,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						},
 						"unevaluatedProperties": false
 					}
-				}`)),
+				}`), nil),
 				constructTrackingPlanEventSchema("", "group", "traits", parseRulesJSON(`{
 					"traits": {
 						"type": "object",
@@ -244,7 +248,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						},
 						"unevaluatedProperties": false
 					}
-				}`)),
+				}`), nil),
 			}),
 			expectedPlan: &plan.TrackingPlan{
 				Name: "Test Tracking Plan",
@@ -364,7 +368,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 						"type": "object",
 						"properties": {}
 					}
-				}`)),
+				}`), nil),
 			}),
 			expectedPlan: &plan.TrackingPlan{
 				Name: "Empty Properties Plan",
@@ -391,7 +395,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 					"properties": {
 						"type": "object"
 					}
-				}`)),
+				}`), nil),
 			}),
 			expectedPlan: &plan.TrackingPlan{
 				Name: "No Properties Plan",
@@ -511,10 +515,12 @@ func TestJSONSchemaPlanProvider_ErrorCases(t *testing.T) {
 						Schema     string                 `json:"$schema"`
 						Type       string                 `json:"type"`
 						Properties map[string]interface{} `json:"properties"`
+						Defs       map[string]interface{} `json:"$defs,omitempty"`
 					}{
 						Schema:     "https://json-schema.org/draft/2019-09/schema",
 						Type:       "object",
 						Properties: parseRulesJSON(rulesJSON),
+						Defs:       nil,
 					},
 				},
 			},
@@ -556,6 +562,370 @@ func TestJSONSchemaPlanProvider_ErrorCases(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErrorMsg)
+		})
+	}
+}
+
+func TestJSONSchemaPlanProvider_Variants(t *testing.T) {
+	tests := []struct {
+		name         string
+		mockResponse *catalog.TrackingPlanWithSchemas
+		expectedPlan *plan.TrackingPlan
+	}{
+		{
+			name: "custom type with variants",
+			mockResponse: constructTrackingPlanWithSchemas("tp_variants", "Variants Test Plan", []catalog.TrackingPlanEventSchema{
+				constructTrackingPlanEventSchema("PageView", "track", "properties", parseRulesJSON(`{
+					"properties": {
+						"type": "object",
+						"properties": {
+							"pageContext": {
+								"$ref": "#/$defs/PageContext"
+							}
+						},
+						"required": []
+					}
+				}`), parseRulesJSON(`{
+					"PageContext": {
+						"type": "object",
+						"properties": {
+							"pageType": {
+								"type": "string"
+							}
+						},
+						"required": ["pageType"],
+						"allOf": [
+							{
+								"type": "object",
+								"allOf": [
+									{
+										"if": {
+											"properties": {
+												"pageType": {
+													"enum": ["search"]
+												}
+											},
+											"required": ["pageType"]
+										},
+										"then": {
+											"properties": {
+												"query": {
+													"type": "string"
+												}
+											},
+											"required": ["query"]
+										}
+									},
+									{
+										"if": {
+											"properties": {
+												"pageType": {
+													"enum": ["product"]
+												}
+											},
+											"required": ["pageType"]
+										},
+										"then": {
+											"properties": {
+												"productId": {
+													"type": "string"
+												}
+											},
+											"required": ["productId"]
+										}
+									},
+									{
+										"if": {
+											"properties": {
+												"pageType": {
+													"not": {
+														"enum": ["search", "product"]
+													}
+												}
+											},
+											"required": ["pageType"]
+										},
+										"then": {
+											"properties": {
+												"pageData": {
+													"type": "object"
+												}
+											},
+											"required": []
+										}
+									}
+								]
+							}
+						]
+					}
+				}`)),
+			}),
+			expectedPlan: &plan.TrackingPlan{
+				Name: "Variants Test Plan",
+				Rules: []plan.EventRule{
+					{
+						Event: plan.Event{
+							Name:        "PageView",
+							Description: "",
+							EventType:   plan.EventTypeTrack,
+						},
+						Section: plan.IdentitySectionProperties,
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"pageContext": constructPropertySchema("pageContext", []plan.PropertyType{
+									constructCustomType("PageContext", plan.PrimitiveTypeObject, nil, nil, &plan.ObjectSchema{
+										Properties: map[string]plan.PropertySchema{
+											"pageType": constructPropertySchema("pageType", []plan.PropertyType{plan.PrimitiveTypeString}, true, nil, nil, nil),
+										},
+									}),
+								}, false, nil, nil, nil),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "event rule with variants",
+			mockResponse: constructTrackingPlanWithSchemas("tp_event_variants", "Event Variants Plan", []catalog.TrackingPlanEventSchema{
+				constructTrackingPlanEventSchema("VariantEvent", "track", "properties", parseRulesJSON(`{
+					"properties": {
+						"type": "object",
+						"properties": {
+							"eventType": {
+								"type": "string"
+							},
+							"baseProperty": {
+								"type": "string"
+							}
+						},
+						"required": ["eventType"],
+						"allOf": [
+							{
+								"type": "object",
+								"allOf": [
+									{
+										"if": {
+											"properties": {
+												"eventType": {
+													"enum": ["click"]
+												}
+											},
+											"required": ["eventType"]
+										},
+										"then": {
+											"properties": {
+												"elementId": {
+													"type": "string"
+												}
+											},
+											"required": ["elementId"]
+										}
+									},
+									{
+										"if": {
+											"properties": {
+												"eventType": {
+													"enum": ["scroll"]
+												}
+											},
+											"required": ["eventType"]
+										},
+										"then": {
+											"properties": {
+												"scrollDepth": {
+													"type": "number"
+												}
+											},
+											"required": ["scrollDepth"]
+										}
+									}
+								]
+							}
+						]
+					}
+				}`), nil),
+			}),
+			expectedPlan: &plan.TrackingPlan{
+				Name: "Event Variants Plan",
+				Rules: []plan.EventRule{
+					{
+						Event: plan.Event{
+							Name:        "VariantEvent",
+							Description: "",
+							EventType:   plan.EventTypeTrack,
+						},
+						Section: plan.IdentitySectionProperties,
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"eventType":    constructPropertySchema("eventType", []plan.PropertyType{plan.PrimitiveTypeString}, true, nil, nil, nil),
+								"baseProperty": constructPropertySchema("baseProperty", []plan.PropertyType{plan.PrimitiveTypeString}, false, nil, nil, nil),
+							},
+						},
+						Variants: []plan.Variant{
+							{
+								Type:          "discriminator",
+								Discriminator: "eventType",
+								Cases: []plan.VariantCase{
+									{
+										Match: []any{"click"},
+										Schema: plan.ObjectSchema{
+											Properties: map[string]plan.PropertySchema{
+												"elementId": constructPropertySchema("elementId", []plan.PropertyType{plan.PrimitiveTypeString}, true, nil, nil, nil),
+											},
+										},
+									},
+									{
+										Match: []any{"scroll"},
+										Schema: plan.ObjectSchema{
+											Properties: map[string]plan.PropertySchema{
+												"scrollDepth": constructPropertySchema("scrollDepth", []plan.PropertyType{plan.PrimitiveTypeNumber}, true, nil, nil, nil),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "variant with multiple match values",
+			mockResponse: constructTrackingPlanWithSchemas("tp_multi_match", "Multi Match Plan", []catalog.TrackingPlanEventSchema{
+				constructTrackingPlanEventSchema("MultiMatch", "track", "properties", parseRulesJSON(`{
+					"properties": {
+						"type": "object",
+						"properties": {
+							"status": {
+								"type": "string"
+							}
+						},
+						"required": ["status"],
+						"allOf": [
+							{
+								"type": "object",
+								"allOf": [
+									{
+										"if": {
+											"properties": {
+												"status": {
+													"enum": ["active", "enabled", "running"]
+												}
+											},
+											"required": ["status"]
+										},
+										"then": {
+											"properties": {
+												"uptime": {
+													"type": "number"
+												}
+											},
+											"required": ["uptime"]
+										}
+									}
+								]
+							}
+						]
+					}
+				}`), nil),
+			}),
+			expectedPlan: &plan.TrackingPlan{
+				Name: "Multi Match Plan",
+				Rules: []plan.EventRule{
+					{
+						Event: plan.Event{
+							Name:        "MultiMatch",
+							Description: "",
+							EventType:   plan.EventTypeTrack,
+						},
+						Section: plan.IdentitySectionProperties,
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"status": constructPropertySchema("status", []plan.PropertyType{plan.PrimitiveTypeString}, true, nil, nil, nil),
+							},
+						},
+						Variants: []plan.Variant{
+							{
+								Type:          "discriminator",
+								Discriminator: "status",
+								Cases: []plan.VariantCase{
+									{
+										Match: []any{"active", "enabled", "running"},
+										Schema: plan.ObjectSchema{
+											Properties: map[string]plan.PropertySchema{
+												"uptime": constructPropertySchema("uptime", []plan.PropertyType{plan.PrimitiveTypeNumber}, true, nil, nil, nil),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &mockTrackingPlanStore{
+				trackingPlanWithSchemas: tt.mockResponse,
+				err:                     nil,
+			}
+
+			provider := providers.NewJSONSchemaPlanProvider("test-plan-id", mockClient)
+			result, err := provider.GetTrackingPlan(context.Background())
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			// Compare tracking plan name
+			assert.Equal(t, tt.expectedPlan.Name, result.Name)
+
+			// Compare number of rules
+			assert.Len(t, result.Rules, len(tt.expectedPlan.Rules))
+
+			// Compare each rule
+			for i, expectedRule := range tt.expectedPlan.Rules {
+				actualRule := result.Rules[i]
+
+				// Compare event details
+				assert.Equal(t, expectedRule.Event.Name, actualRule.Event.Name)
+				assert.Equal(t, expectedRule.Event.EventType, actualRule.Event.EventType)
+
+				// Compare section
+				assert.Equal(t, expectedRule.Section, actualRule.Section)
+
+				// Compare schema properties
+				assert.Len(t, actualRule.Schema.Properties, len(expectedRule.Schema.Properties))
+
+				// Compare variants if present
+				if len(expectedRule.Variants) > 0 {
+					assert.Len(t, actualRule.Variants, len(expectedRule.Variants), "Variants length should match")
+
+					for vi, expectedVariant := range expectedRule.Variants {
+						actualVariant := actualRule.Variants[vi]
+
+						assert.Equal(t, expectedVariant.Type, actualVariant.Type, "Variant type should match")
+						assert.Equal(t, expectedVariant.Discriminator, actualVariant.Discriminator, "Discriminator should match")
+						assert.Len(t, actualVariant.Cases, len(expectedVariant.Cases), "Cases length should match")
+
+						for ci, expectedCase := range expectedVariant.Cases {
+							actualCase := actualVariant.Cases[ci]
+
+							assert.ElementsMatch(t, expectedCase.Match, actualCase.Match, "Match values should match")
+							assert.Len(t, actualCase.Schema.Properties, len(expectedCase.Schema.Properties), "Case schema properties should match")
+						}
+
+						// Check default schema if present
+						if expectedVariant.DefaultSchema != nil {
+							require.NotNil(t, actualVariant.DefaultSchema, "Default schema should be present")
+							assert.Len(t, actualVariant.DefaultSchema.Properties, len(expectedVariant.DefaultSchema.Properties))
+						}
+					}
+				}
+			}
 		})
 	}
 }

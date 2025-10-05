@@ -17,6 +17,9 @@ import kotlinx.serialization.json.jsonObject
 {{- range .Enums }}
 {{ template "enum.tmpl" . -}}
 {{- end }}
+{{- range .SealedClasses }}
+{{ template "sealedclass.tmpl" . }}
+{{- end }}
 {{- range .DataClasses }}
 {{- $ctx := mkSlice 0 . }}
 {{ template "dataclasswithindent" $ctx }}

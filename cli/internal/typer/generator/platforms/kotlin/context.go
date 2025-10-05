@@ -15,6 +15,8 @@ type KotlinProperty struct {
 	Comment    string // Documentation comment for the property
 	Nullable   bool   // Whether the property is nullable
 	Default    string // The default value for the property, e.g., "null"
+	Abstract   bool   // Whether this is an abstract property
+	Override   bool   // Whether this property overrides an abstract property
 }
 
 // KotlinDataClass represents a Kotlin data class declaration
@@ -84,6 +86,7 @@ type RudderAnalyticsMethod struct {
 type KotlinContext struct {
 	TypeAliases            []KotlinTypeAlias       // Type aliases for primitive custom types
 	DataClasses            []KotlinDataClass       // Data classes for object custom types
+	SealedClasses          []KotlinSealedClass     // Sealed classes for variant types
 	Enums                  []KotlinEnum            // Enum classes for properties with enum constraints
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
 	EventContext           map[string]string       // Fixed context to be included with every event
@@ -94,6 +97,7 @@ func NewKotlinContext() *KotlinContext {
 	return &KotlinContext{
 		TypeAliases:            make([]KotlinTypeAlias, 0),
 		DataClasses:            make([]KotlinDataClass, 0),
+		SealedClasses:          make([]KotlinSealedClass, 0),
 		Enums:                  make([]KotlinEnum, 0),
 		RudderAnalyticsMethods: make([]RudderAnalyticsMethod, 0),
 	}
