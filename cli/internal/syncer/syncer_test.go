@@ -3,15 +3,15 @@ package syncer_test
 import (
 	"context"
 	"fmt"
-	"os"
+
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,10 +26,12 @@ func mockWorkspace() *client.Workspace {
 }
 
 func enableConcurrentSyncs(t *testing.T) {
-	os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "true")
-	config.InitConfig("")
+	viper.Set("experimental", true)
+	viper.Set("flags.concurrentSyncs", true)
+
 	t.Cleanup(func() {
-		os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "false")
+		viper.Set("experimental", false)
+		viper.Set("flags.concurrentSyncs", false)
 	})
 }
 
