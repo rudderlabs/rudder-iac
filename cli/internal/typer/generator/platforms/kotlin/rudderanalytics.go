@@ -8,11 +8,11 @@ import (
 )
 
 // sectionToParamName converts an EventRuleSection to the appropriate parameter name
-func sectionToParamName(section plan.EventRuleSection) (string, error) {
+func sectionToParamName(section plan.IdentitySection) (string, error) {
 	switch section {
-	case plan.EventRuleSectionProperties:
+	case plan.IdentitySectionProperties:
 		return "properties", nil
-	case plan.EventRuleSectionTraits:
+	case plan.IdentitySectionTraits:
 		return "traits", nil
 	default:
 		return "", fmt.Errorf("unknown event rule section: %s", section)
