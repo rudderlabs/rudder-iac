@@ -130,7 +130,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				errorMessage: "validations config is required",
+				errorMessage: "governance.validations.config is required",
 			},
 		}
 

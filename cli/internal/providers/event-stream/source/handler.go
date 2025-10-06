@@ -54,15 +54,15 @@ func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceR
 		return nil
 	}
 	if spec.Governance.TrackingPlan != nil && !config.GetConfig().ExperimentalFlags.StatelessCLI {
-		return fmt.Errorf("source validations is supported only in stateless CLI mode")
+		return fmt.Errorf("governance.validations is supported only in stateless CLI mode")
 	}
 
 	tp := spec.Governance.TrackingPlan
 	if tp.Ref == "" {
-		return fmt.Errorf("validations tracking plan is required")
+		return fmt.Errorf("governance.validations.tracking_plan is required")
 	}
 	if tp.Config == nil {
-		return fmt.Errorf("validations config is required")
+		return fmt.Errorf("governance.validations.config is required")
 	}
 
 	trackingPlanRef, err := parseTrackingPlanRef(tp.Ref)
