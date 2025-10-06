@@ -2,39 +2,40 @@ package formatter
 
 import (
 	"bytes"
+	"fmt"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	SPACE_INDENT = 2
 )
 
 // YAMLFormatter formats data into YAML with custom string quoting behavior.
 // String values are always double-quoted while keys remain unquoted.
 type YAMLFormatter struct{}
 
-func NewYAMLFormatter() *YAMLFormatter {
-	return &YAMLFormatter{}
-}
-
 // Format converts data to YAML format with 2-space indentation and quoted string values.
 func (f YAMLFormatter) Format(data any) ([]byte, error) {
 	var node yaml.Node
-	err := node.Encode(data)
-	if err != nil {
-		return nil, err
+
+	if err := node.Encode(data); err != nil {
+		return nil, fmt.Errorf("encoding data to YAML node: %w", err)
 	}
 	forceStringQuotes(&node)
 
 	var buf bytes.Buffer
 	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
+	encoder.SetIndent(SPACE_INDENT)
 
-	err = encoder.Encode(&node)
-	if err != nil {
-		return nil, err
+	if err := encoder.Encode(&node); err != nil {
+		return nil, fmt.Errorf("encoding YAML node to bytes: %w", err)
 	}
-	err = encoder.Close()
-	if err != nil {
-		return nil, err
+
+	if err := encoder.Close(); err != nil {
+		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
+
 	return buf.Bytes(), nil
 }
 
