@@ -27,6 +27,9 @@ var enumTemplate string
 //go:embed templates/sealedclass.tmpl
 var sealedclassTemplate string
 
+//go:embed templates/sealedclass_base.tmpl
+var sealedclassBaseTemplate string
+
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	var tmpl *template.Template
 
@@ -81,6 +84,11 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	}
 
 	_, err = tmpl.New("sealedclass.tmpl").Parse(sealedclassTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("sealedclass_base.tmpl").Parse(sealedclassBaseTemplate)
 	if err != nil {
 		return nil, err
 	}

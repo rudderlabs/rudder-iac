@@ -4,9 +4,16 @@ import com.rudderstack.sdk.kotlin.core.Analytics
 import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.encodeToJsonElement
@@ -136,12 +143,32 @@ enum class PropertyDeviceType {
     IOT_DEVICE
 }
 
+abstract class SealedClassWithJson {
+    abstract val _jsonObject: JsonObject
+}
+
+open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("SealedClass")
+
+    override fun serialize(encoder: Encoder, value: T) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("This serializer only works with JSON")
+        jsonEncoder.encodeJsonElement(value._jsonObject)
+    }
+
+    override fun deserialize(decoder: Decoder): T {
+        throw NotImplementedError("Deserialization is not supported")
+    }
+}
+
 /** Page context with variants based on page type */
-@Serializable
-sealed class CustomTypePageContext {
+@Serializable(with = RudderCustomTypePageContextSerializer::class)
+sealed class CustomTypePageContext : SealedClassWithJson() {
     /** Type of page */
     @SerialName("page_type")
     abstract val pageType: PropertyPageType
+
+    abstract override val _jsonObject: JsonObject
 
     /** Search page variant */
     @Serializable
@@ -153,6 +180,11 @@ sealed class CustomTypePageContext {
         /** Type of page */
         @SerialName("page_type")
         override val pageType: PropertyPageType = "search"
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("query", Json.encodeToJsonElement(query))
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
     }
 
     /** Product page variant */
@@ -165,6 +197,11 @@ sealed class CustomTypePageContext {
         /** Type of page */
         @SerialName("page_type")
         override val pageType: PropertyPageType = "product"
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("product_id", Json.encodeToJsonElement(productId))
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
     }
 
     /** Default case */
@@ -177,15 +214,25 @@ sealed class CustomTypePageContext {
         /** Type of page */
         @SerialName("page_type")
         override val pageType: PropertyPageType
-    ) : CustomTypePageContext()
+    ) : CustomTypePageContext() {
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            pageData?.let { put("page_data", Json.encodeToJsonElement(it)) }
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
 }
 
+private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer<CustomTypePageContext>()
+
 /** Example event to demonstrate variants */
-@Serializable
-sealed class TrackEventWithVariantsProperties {
+@Serializable(with = RudderTrackEventWithVariantsPropertiesSerializer::class)
+sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
     /** Type of device */
     @SerialName("device_type")
     abstract val deviceType: PropertyDeviceType
+
+    abstract override val _jsonObject: JsonObject
 
     /** Mobile device page view */
     @Serializable
@@ -205,6 +252,13 @@ sealed class TrackEventWithVariantsProperties {
         /** Type of device */
         @SerialName("device_type")
         override val deviceType: PropertyDeviceType = PropertyDeviceType.MOBILE
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            put("tags", Json.encodeToJsonElement(tags))
+            put("device_type", Json.encodeToJsonElement(deviceType))
+        }
     }
 
     /** Desktop page view */
@@ -229,6 +283,14 @@ sealed class TrackEventWithVariantsProperties {
         /** Type of device */
         @SerialName("device_type")
         override val deviceType: PropertyDeviceType = PropertyDeviceType.DESKTOP
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("first_name", Json.encodeToJsonElement(firstName))
+            lastName?.let { put("last_name", Json.encodeToJsonElement(it)) }
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            put("device_type", Json.encodeToJsonElement(deviceType))
+        }
     }
 
     /** Default case */
@@ -249,8 +311,18 @@ sealed class TrackEventWithVariantsProperties {
         /** A field with no explicit type (treated as any) */
         @SerialName("untyped_field")
         val untypedField: PropertyUntypedField? = null
-    ) : TrackEventWithVariantsProperties()
+    ) : TrackEventWithVariantsProperties() {
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("device_type", Json.encodeToJsonElement(deviceType))
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            untypedField?.let { put("untyped_field", Json.encodeToJsonElement(it)) }
+        }
+    }
 }
+
+private object RudderTrackEventWithVariantsPropertiesSerializer : SealedClassJsonSerializer<TrackEventWithVariantsProperties>()
 
 /** User profile information */
 @Serializable
