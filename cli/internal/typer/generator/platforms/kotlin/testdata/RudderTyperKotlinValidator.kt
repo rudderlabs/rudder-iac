@@ -173,5 +173,17 @@ fun main() {
         )
     )
 
+    println("\n12. Testing trackEventWithVariants() with different variants...")
+    typer.trackEventWithVariants(
+        properties = TrackEventWithVariantsProperties.CaseMobile(
+            profile = CustomTypeUserProfile(
+                email = "mobile.user@example.com",
+                firstName = "Hannah",
+                lastName = "Smith"
+            ),
+            tags = listOf("mobile", "app-user"),
+        )
+    )
+
     println("\n=== All Tests Completed ===")
 }

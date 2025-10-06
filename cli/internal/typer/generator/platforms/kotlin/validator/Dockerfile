@@ -20,7 +20,7 @@ COPY settings.gradle.kts .
 COPY gradle.properties .
 
 # Copy source code
-COPY src ./src
+RUN mkdir -p ./src/main/kotlin
 
 # Copy run script
 COPY run.sh .
