@@ -147,7 +147,7 @@ level1:
 func TestYAMLFormatter_Extension(t *testing.T) {
 	t.Parallel()
 	formatter := YAMLFormatter{}
-	assert.Equal(t, "yaml", formatter.Extension())
+	assert.Equal(t, []string{"yaml", "yml"}, formatter.Extension())
 }
 
 func TestYAMLFormatter_StringQuotingBehavior(t *testing.T) {
