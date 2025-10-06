@@ -142,10 +142,17 @@ func parseTrackingPlanEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.Ev
 		return nil, err
 	}
 
+	// Parse variants if present
+	variants, err := parseVariants(schemaPropertiesMap, customTypes)
+	if err != nil {
+		return nil, fmt.Errorf("parsing variants: %w", err)
+	}
+
 	rule := plan.EventRule{
-		Event:   event,
-		Section: section,
-		Schema:  *td.Schema,
+		Event:    event,
+		Section:  section,
+		Schema:   *td.Schema,
+		Variants: variants,
 	}
 
 	return &rule, nil
@@ -153,48 +160,58 @@ func parseTrackingPlanEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.Ev
 
 func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.CustomType, error) {
 	customTypes := make(map[string]*plan.CustomType)
-	if defs, exists := ev.Rules.Properties["$defs"]; exists {
-		if defsMap, ok := defs.(map[string]any); ok {
-			customTypes = make(map[string]*plan.CustomType)
+	fmt.Println("Parsing $defs for event:", ev.Name)
+	if ev.Rules.Defs != nil {
+		customTypes = make(map[string]*plan.CustomType)
 
-			// First pass: create custom types without resolving references
-			for typeName := range defsMap {
-				customTypes[typeName] = &plan.CustomType{
-					Name: typeName,
-				}
-			}
-
-			// Second pass: populate custom types with full definitions
-			for typeName, typeDef := range defsMap {
-				if typeDefMap, ok := typeDef.(map[string]any); ok {
-					td, err := parseTypeDefinition(typeDefMap, customTypes)
-					if err != nil {
-						return nil, fmt.Errorf("parsing custom type '%s': %w", typeName, err)
-					}
-
-					// custom types can only have a single primitive type
-					if len(td.Types) != 1 {
-						return nil, fmt.Errorf("custom type '%s' must have a single type, got %d types", typeName, len(td.Types))
-					}
-					customTypeType := td.Types[0]
-					if !plan.IsPrimitiveType(customTypeType) {
-						return nil, fmt.Errorf("custom type '%s' must be a primitive type, got '%s'", typeName, customTypeType)
-					}
-
-					ct := customTypes[typeName]
-					ct.Type = *plan.AsPrimitiveType(td.Types[0])
-					ct.Schema = td.Schema
-					ct.Config = td.Config
-
-					// For array types, set ItemType
-					if ct.Type == plan.PrimitiveTypeArray && len(td.ItemTypes) > 0 {
-						ct.ItemType = td.ItemTypes[0]
-					}
-				} else {
-					return nil, fmt.Errorf("custom type definition for '%s' must be an object", typeName)
-				}
+		// First pass: create custom types without resolving references
+		for typeName := range ev.Rules.Defs {
+			fmt.Println("Found custom type:", typeName)
+			customTypes[typeName] = &plan.CustomType{
+				Name: typeName,
 			}
 		}
+
+		// Second pass: populate custom types with full definitions
+		for typeName, typeDef := range ev.Rules.Defs {
+			if typeDefMap, ok := typeDef.(map[string]any); ok {
+				td, err := parseTypeDefinition(typeDefMap, customTypes)
+				if err != nil {
+					return nil, fmt.Errorf("parsing custom type '%s': %w", typeName, err)
+				}
+
+				// custom types can only have a single primitive type
+				if len(td.Types) != 1 {
+					return nil, fmt.Errorf("custom type '%s' must have a single type, got %d types", typeName, len(td.Types))
+				}
+				customTypeType := td.Types[0]
+				if !plan.IsPrimitiveType(customTypeType) {
+					return nil, fmt.Errorf("custom type '%s' must be a primitive type, got '%s'", typeName, customTypeType)
+				}
+
+				ct := customTypes[typeName]
+				ct.Type = *plan.AsPrimitiveType(td.Types[0])
+				ct.Schema = td.Schema
+				ct.Config = td.Config
+
+				// For array types, set ItemType
+				if ct.Type == plan.PrimitiveTypeArray && len(td.ItemTypes) > 0 {
+					ct.ItemType = td.ItemTypes[0]
+				}
+
+				// Parse variants for custom types
+				variants, err := parseVariants(typeDefMap, customTypes)
+				if err != nil {
+					return nil, fmt.Errorf("parsing variants for custom type '%s': %w", typeName, err)
+				}
+				ct.Variants = variants
+			} else {
+				return nil, fmt.Errorf("custom type definition for '%s' must be an object", typeName)
+			}
+		}
+
+	} else {
+		fmt.Println("No $defs found for event:", ev.Name)
 	}
 
 	return customTypes, nil
@@ -367,4 +384,210 @@ func resolveCustomTypeReference(ref string, customTypes map[string]*plan.CustomT
 	}
 
 	return customType, nil
+}
+
+// parseVariants parses variant definitions from a JSON Schema allOf structure
+func parseVariants(def map[string]any, customTypes map[string]*plan.CustomType) ([]plan.Variant, error) {
+	allOfVal, exists := def["allOf"]
+	if !exists {
+		return nil, nil
+	}
+
+	allOfList, ok := allOfVal.([]any)
+	if !ok {
+		return nil, fmt.Errorf("allOf must be an array")
+	}
+
+	// We expect a single variant definition in allOf
+	if len(allOfList) != 1 {
+		return nil, fmt.Errorf("expected exactly one variant definition in allOf")
+	}
+
+	variantDef, ok := allOfList[0].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("variant definition must be an object")
+	}
+
+	variantAllOf, exists := variantDef["allOf"]
+	if !exists {
+		return nil, fmt.Errorf("variant definition must have allOf")
+	}
+
+	variantAllOfList, ok := variantAllOf.([]any)
+	if !ok {
+		return nil, fmt.Errorf("variant allOf must be an array")
+	}
+
+	cases, discriminator, defaultSchema, err := parseVariantCases(variantAllOfList, customTypes)
+	if err != nil {
+		return nil, err
+	}
+
+	variant := plan.Variant{
+		Type:          "discriminator",
+		Discriminator: discriminator,
+		Cases:         cases,
+		DefaultSchema: defaultSchema,
+	}
+
+	return []plan.Variant{variant}, nil
+}
+
+// parseVariantCases parses individual variant cases from the allOf structure
+func parseVariantCases(
+	allOfList []any,
+	customTypes map[string]*plan.CustomType,
+) ([]plan.VariantCase, string, *plan.ObjectSchema, error) {
+	var cases []plan.VariantCase
+	var discriminator string
+	var defaultSchema *plan.ObjectSchema
+
+	for _, item := range allOfList {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Extract if condition
+		ifCondition, exists := itemMap["if"]
+		if !exists {
+			continue
+		}
+
+		// Extract then schema
+		thenDef, exists := itemMap["then"]
+		if !exists {
+			continue
+		}
+
+		// Parse if condition to get discriminator and match values
+		ifMap, ok := ifCondition.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		props, exists := ifMap["properties"]
+		if !exists {
+			continue
+		}
+
+		propsMap, ok := props.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Get discriminator property name (first property in if condition)
+		for propName, propDef := range propsMap {
+			if discriminator == "" {
+				discriminator = propName
+			}
+
+			propDefMap, ok := propDef.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			// Check if this is a default case (has "not")
+			if _, hasNot := propDefMap["not"]; hasNot {
+				// This is the default case
+				thenMap, ok := thenDef.(map[string]any)
+				if !ok {
+					return nil, "", nil, fmt.Errorf("default case 'then' must be an object")
+				}
+
+				schema, err := parseObjectSchemaFromDef(thenMap, customTypes)
+				if err != nil {
+					return nil, "", nil, fmt.Errorf("parsing default schema: %w", err)
+				}
+				defaultSchema = schema
+			} else if enumDef, hasEnum := propDefMap["enum"]; hasEnum {
+				// This is a regular case
+				enumList, ok := enumDef.([]any)
+				if !ok {
+					return nil, "", nil, fmt.Errorf("enum must be an array")
+				}
+
+				// Parse the then schema
+				thenMap, ok := thenDef.(map[string]any)
+				if !ok {
+					return nil, "", nil, fmt.Errorf("case 'then' must be an object")
+				}
+
+				schema, err := parseObjectSchemaFromDef(thenMap, customTypes)
+				if err != nil {
+					return nil, "", nil, fmt.Errorf("parsing case schema: %w", err)
+				}
+
+				// Create a case for this
+				variantCase := plan.VariantCase{
+					Match:  enumList,
+					Schema: *schema,
+					// DisplayName and Description could be extracted from metadata if available
+				}
+				cases = append(cases, variantCase)
+			}
+		}
+	}
+
+	return cases, discriminator, defaultSchema, nil
+}
+
+// parseObjectSchemaFromDef parses an ObjectSchema from a JSON Schema definition
+func parseObjectSchemaFromDef(
+	def map[string]any,
+	customTypes map[string]*plan.CustomType,
+) (*plan.ObjectSchema, error) {
+	schema := &plan.ObjectSchema{
+		Properties: make(map[string]plan.PropertySchema),
+	}
+
+	// Parse additionalProperties field
+	if additionalPropsVal, exists := def["additionalProperties"]; exists {
+		if additionalProps, ok := additionalPropsVal.(bool); ok {
+			schema.AdditionalProperties = additionalProps
+		}
+	}
+
+	// Parse properties
+	if propertiesMap, exists := def["properties"]; exists {
+		if props, ok := propertiesMap.(map[string]any); ok {
+			for propName, propDef := range props {
+				propDefMap, ok := propDef.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("property '%s' definition must be an object", propName)
+				}
+
+				ptd, err := parseTypeDefinition(propDefMap, customTypes)
+				if err != nil {
+					return nil, fmt.Errorf("parsing property '%s': %w", propName, err)
+				}
+
+				schema.Properties[propName] = plan.PropertySchema{
+					Property: plan.Property{
+						Name:      propName,
+						Types:     ptd.Types,
+						ItemTypes: ptd.ItemTypes,
+						Config:    ptd.Config,
+					},
+					Schema: ptd.Schema,
+				}
+			}
+
+			// Handle required properties
+			if requiredList, exists := def["required"]; exists {
+				if reqs, ok := requiredList.([]any); ok {
+					for _, r := range reqs {
+						if rStr, ok := r.(string); ok {
+							if propSchema, exists := schema.Properties[rStr]; exists {
+								propSchema.Required = true
+								schema.Properties[rStr] = propSchema
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return schema, nil
 }

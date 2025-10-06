@@ -1,0 +1,73 @@
+version: "rudder/v0.1"
+kind: "custom-types"
+metadata:
+  name: "typer-test"
+spec:
+  types:
+    # primitive types
+    - id: "some-string-type"
+      name: "SomeStringType"
+      type: "string"
+      description: "some string custom type"
+    - id: "some-integer-type"
+      name: "SomeIntegerType"
+      type: "integer"
+      description: "some integer custom type"
+    - id: "some-number-type"
+      name: "SomeNumberType"
+      type: "number"
+      description: "some number custom type"
+    - id: "some-boolean-type"
+      name: "SomeBooleanType"
+      type: "boolean"
+      description: "some boolean custom type"
+    - id: "some-array-type"
+      name: "SomeArrayType"
+      type: "array"
+      description: "some array custom type"
+    - id: "some-null-type"
+      name: "SomeNullType"
+      type: "null"
+      description: "some null custom type"
+    # object custom types
+    - id: "some-object-type"
+      name: "SomeObjectType"
+      type: "object"
+      description: "some object custom type"
+      properties:
+        - $ref: "#/properties/typer-test/some-custom-string"
+          required: true
+        - $ref: "#/properties/typer-test/some-integer"
+          required: false
+    # variant custom types
+    - id: "some-variant-type"
+      name: "SomeVariantType"
+      type: "object"
+      description: "some variant custom type"
+      properties:
+        - $ref: "#/properties/typer-test/some-string"
+          required: true
+        - $ref: "#/properties/typer-test/some-integer"
+          required: false
+      variants:
+        - type: "discriminator"
+          discriminator: "#/properties/typer-test/some-string"
+          cases:
+            - display_name: "Case 1"
+              match:
+                - "case_1"
+              description: "applies when someString is case_1"
+              properties:
+                - $ref: "#/properties/typer-test/some-integer"
+                  required: true
+            - display_name: "Case 2"
+              match:
+                - "case_2_a"
+                - "case_2_b"
+              description: "applies when someString is case_2_a or case_2_b"
+              properties:
+                - $ref: "#/properties/typer-test/some-number"
+                  required: true
+          default:
+            - $ref: "#/properties/typer-test/some-boolean"
+              required: false

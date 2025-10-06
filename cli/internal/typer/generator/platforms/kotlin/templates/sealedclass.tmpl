@@ -1,0 +1,58 @@
+{{- if .Comment }}
+/** {{ .Comment }} */
+{{- end }}
+@Serializable(with = Rudder{{ .Name }}Serializer::class)
+sealed class {{ .Name }} : SealedClassWithJson() {
+{{- range $prop := .Properties }}
+{{- if $prop.Abstract }}
+    {{- if $prop.Comment }}
+    /** {{ $prop.Comment }} */
+    {{- end }}
+    @SerialName("{{ $prop.SerialName }}")
+    abstract val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}
+{{- end }}
+{{- end }}
+
+    abstract override val _jsonObject: JsonObject
+{{- range $index, $subclass := .Subclasses }}
+{{- if or $index (len $.Properties) }}
+{{ end }}
+    {{- if $subclass.Comment }}
+    /** {{ $subclass.Comment }} */
+    {{- end }}
+    @Serializable
+    data class {{ $subclass.Name }}(
+    {{- range $propIndex, $prop := $subclass.Properties }}{{- if $propIndex }},
+{{ end }}
+        {{- if $prop.Comment }}
+        /** {{ $prop.Comment }} */
+        {{- end }}
+        @SerialName("{{ $prop.SerialName }}")
+        {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
+    {{- end }}
+    ) : {{ $.Name }}() {
+    {{- range $prop := $subclass.BodyProperties }}
+        {{- if $prop.Comment }}
+        /** {{ $prop.Comment }} */
+        {{- end }}
+        @SerialName("{{ $prop.SerialName }}")
+        {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
+    {{- end }}
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+        {{- range $subclass.Properties }}
+            {{- if .Nullable }}
+            {{ .Name }}?.let { put("{{ .SerialName }}", Json.encodeToJsonElement(it)) }
+            {{- else }}
+            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+            {{- end }}
+        {{- end }}
+        {{- range $subclass.BodyProperties }}
+            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+        {{- end }}
+        }
+    }
+{{- end }}
+}
+
+private object Rudder{{ .Name }}Serializer : SealedClassJsonSerializer<{{ .Name }}>()
