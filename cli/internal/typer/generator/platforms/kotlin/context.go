@@ -40,17 +40,20 @@ type KotlinEnum struct {
 	Values  []KotlinEnumValue // The enum values with their serial names
 }
 
-// KotlinEnumValue represents a single value in a Kotlin enum
-type KotlinEnumValue struct {
-	Name       string // The Kotlin constant name (e.g., "GET")
-	SerialName string // The serialized name (e.g., "GET" for @SerialName("GET"))
+// KotlinSealedSubclass represents a data class subclass of a sealed class
+type KotlinSealedSubclass struct {
+	Name           string           // Subclass name (e.g., "CaseSearch", "Default")
+	Comment        string           // Documentation comment
+	Properties     []KotlinProperty // Constructor properties
+	BodyProperties []KotlinProperty // Body properties
 }
 
-// KotlinEnum represents a Kotlin enum class declaration
-type KotlinEnum struct {
-	Name    string            // The enum name in PascalCase (e.g., "PropertyMyEnum")
-	Comment string            // Documentation comment for the enum
-	Values  []KotlinEnumValue // The enum values with their serial names
+// KotlinSealedClass represents a Kotlin sealed class with subclasses
+type KotlinSealedClass struct {
+	Name       string                 // Sealed class name (e.g., "CustomTypePageType")
+	Comment    string                 // Documentation comment
+	Properties []KotlinProperty       // Direct properties of the sealed class
+	Subclasses []KotlinSealedSubclass // List of subclasses
 }
 
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature
