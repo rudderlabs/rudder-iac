@@ -8,6 +8,10 @@ import (
 )
 
 func PrintDiff(diff *Diff) {
+	if len(diff.ImportableResources) > 0 {
+		listResources("Importable resources", diff.ImportableResources, nil)
+	}
+
 	if len(diff.NewResources) > 0 {
 		listResources("New resources", diff.NewResources, nil)
 	}
