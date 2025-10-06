@@ -1,8 +1,8 @@
 {{- if .Comment }}
 /** {{ .Comment }} */
 {{- end }}
-@Serializable
-sealed class {{ .Name }} {
+@Serializable(with = Rudder{{ .Name }}Serializer::class)
+sealed class {{ .Name }} : SealedClassWithJson() {
 {{- range $prop := .Properties }}
 {{- if $prop.Abstract }}
     {{- if $prop.Comment }}
@@ -12,6 +12,8 @@ sealed class {{ .Name }} {
     abstract val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}
 {{- end }}
 {{- end }}
+
+    abstract override val _jsonObject: JsonObject
 {{- range $index, $subclass := .Subclasses }}
 {{- if or $index (len $.Properties) }}
 {{ end }}
@@ -28,7 +30,7 @@ sealed class {{ .Name }} {
         @SerialName("{{ $prop.SerialName }}")
         {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
     {{- end }}
-    ) : {{ $.Name }}(){{ if $subclass.BodyProperties }} {
+    ) : {{ $.Name }}() {
     {{- range $prop := $subclass.BodyProperties }}
         {{- if $prop.Comment }}
         /** {{ $prop.Comment }} */
@@ -36,6 +38,21 @@ sealed class {{ .Name }} {
         @SerialName("{{ $prop.SerialName }}")
         {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
     {{- end }}
-    }{{ end }}
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+        {{- range $subclass.Properties }}
+            {{- if .Nullable }}
+            {{ .Name }}?.let { put("{{ .SerialName }}", Json.encodeToJsonElement(it)) }
+            {{- else }}
+            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+            {{- end }}
+        {{- end }}
+        {{- range $subclass.BodyProperties }}
+            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+        {{- end }}
+        }
+    }
 {{- end }}
 }
+
+private object Rudder{{ .Name }}Serializer : SealedClassJsonSerializer<{{ .Name }}>()
