@@ -3,10 +3,11 @@ package formatter
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
-	YAML = YAMLFormatter{}
+	DefaultYAML = YAMLFormatter{}
 )
 
 var (
@@ -31,7 +32,7 @@ func Setup(inputs ...Formatter) Formatters {
 			continue
 		}
 		for _, ext := range formatter.Extension() {
-			formatters[ext] = formatter
+			formatters[normalizeExtension(ext)] = formatter
 		}
 	}
 
@@ -45,9 +46,15 @@ func (f *Formatters) Format(data any, extension string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: extension cannot be empty", ErrEmptyExtension)
 	}
 
-	formatter, ok := f.formatters[extension]
+	formatter, ok := f.formatters[normalizeExtension(extension)]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedExtension, extension)
 	}
 	return formatter.Format(data)
+}
+
+func normalizeExtension(extension string) string {
+	return strings.TrimLeftFunc(strings.ToLower(extension), func(r rune) bool {
+		return r == '.'
+	})
 }

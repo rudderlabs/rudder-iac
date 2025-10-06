@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	SPACE_INDENT = 2
+	defaultIndent = 2
 )
 
 // YAMLFormatter formats data into YAML with custom string quoting behavior.
@@ -26,7 +26,7 @@ func (f YAMLFormatter) Format(data any) ([]byte, error) {
 
 	var buf bytes.Buffer
 	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(SPACE_INDENT)
+	encoder.SetIndent(defaultIndent)
 
 	if err := encoder.Encode(&node); err != nil {
 		return nil, fmt.Errorf("encoding YAML node to bytes: %w", err)
