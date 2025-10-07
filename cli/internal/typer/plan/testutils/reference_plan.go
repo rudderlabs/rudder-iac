@@ -234,6 +234,27 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
+	// Add multi-type properties for testing
+	ReferenceProperties["multi_type_field"] = &plan.Property{
+		Name:        "multi_type_field",
+		Description: "A field that can be string, integer, or boolean",
+		Types: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeInteger,
+			plan.PrimitiveTypeBoolean,
+		},
+	}
+
+	ReferenceProperties["multi_type_array"] = &plan.Property{
+		Name:        "multi_type_array",
+		Description: "An array with items that can be string or integer",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeInteger,
+		},
+	}
+
 	// Add empty custom type with additionalProperties: true for testing
 	ReferenceCustomTypes["empty_object_with_additional_props"] = &plan.CustomType{
 		Name:        "empty_object_with_additional_props",
@@ -441,6 +462,14 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 						AdditionalProperties: true,
 					},
 				},
+				"multi_type_field": {
+					Property: *ReferenceProperties["multi_type_field"],
+					Required: false,
+				},
+				"multi_type_array": {
+					Property: *ReferenceProperties["multi_type_array"],
+					Required: false,
+				},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
@@ -621,6 +650,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 9  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context
-	ExpectedPropertyCount   = 27 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context
+	ExpectedPropertyCount   = 29 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

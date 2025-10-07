@@ -22,6 +22,6 @@ func main() {
 	}
 
 	if len(files) > 0 {
-		fmt.Println(files[0].Content)
+		fmt.Print(files[0].Content)
 	}
 }
