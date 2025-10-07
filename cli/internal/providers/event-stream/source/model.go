@@ -17,10 +17,10 @@ const (
 	TrackingPlanConfigKey = "tracking_plan_config"
 	TrackingPlanIDKey     = "tracking_plan_id"
 
-	PropagateViolationsKey = "propagate_violations"
+	PropagateViolationsKey     = "propagate_violations"
 	DropUnplannedPropertiesKey = "drop_unplanned_properties"
-	DropOtherViolationsKey = "drop_other_violations"
-	DropUnplannedEventsKey = "drop_unplanned_events"
+	DropOtherViolationsKey     = "drop_other_violations"
+	DropUnplannedEventsKey     = "drop_unplanned_events"
 
 	ResourceType = "event-stream-source"
 )
@@ -48,7 +48,7 @@ type sourceSpec struct {
 	LocalId          string                `mapstructure:"id"`
 	Name             string                `mapstructure:"name"`
 	SourceDefinition string                `mapstructure:"type"`
-	Enabled          bool                  `mapstructure:"enabled"`
+	Enabled          *bool                 `mapstructure:"enabled"`
 	Governance       *sourceGovernanceSpec `mapstructure:"governance"`
 }
 
@@ -76,7 +76,7 @@ type eventConfigSpec struct {
 }
 
 type trackConfigSpec struct {
-	eventConfigSpec `mapstructure:",squash"`
+	eventConfigSpec     `mapstructure:",squash"`
 	DropUnplannedEvents *bool `json:"drop_unplanned_events" mapstructure:"drop_unplanned_events"`
 }
 

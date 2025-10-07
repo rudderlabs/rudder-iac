@@ -43,7 +43,7 @@ func TestCreateSource(t *testing.T) {
 	created, err := eventStreamClient.Create(context.Background(), source)
 	require.NoError(t, err)
 
-	assert.Equal(t, &esSource.EventStreamSource{
+	assert.Equal(t, &esSource.CreateUpdateSourceResponse{
 		ID:         "src-123",
 		ExternalID: "ext-123",
 		Name:       "Test Source",
@@ -56,7 +56,7 @@ func TestCreateSource(t *testing.T) {
 func TestUpdateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Updated Source"}`
+			expected := `{"name":"Updated Source","enabled":true}`
 			return testutils.ValidateRequest(t, req, "PUT", "/v2/event-stream-sources/src-123", expected)
 		},
 		ResponseStatus: 200,
@@ -76,12 +76,13 @@ func TestUpdateSource(t *testing.T) {
 
 	source := &esSource.UpdateSourceRequest{
 		Name: "Updated Source",
+		Enabled: true,
 	}
 
 	updated, err := eventStreamClient.Update(context.Background(), "src-123", source)
 	require.NoError(t, err)
 
-	assert.Equal(t, &esSource.EventStreamSource{
+	assert.Equal(t, &esSource.CreateUpdateSourceResponse{
 		ID:         "src-123",
 		ExternalID: "ext-123",
 		Name:       "Updated Source",
@@ -112,8 +113,8 @@ func TestDeleteSource(t *testing.T) {
 
 func TestGetSources(t *testing.T) {
 	tests := []struct {
-		name           string
-		calls          []testutils.Call
+		name            string
+		calls           []testutils.Call
 		expectedSources []esSource.EventStreamSource
 	}{
 		{

@@ -14,20 +14,28 @@ type CreateSourceRequest struct {
 
 type UpdateSourceRequest struct {
 	Name    string `json:"name,omitempty"`
-	Enabled bool   `json:"enabled,omitempty"`
+	Enabled bool   `json:"enabled"`
+}
+
+type CreateUpdateSourceResponse struct {
+	ID         string `json:"id"`
+	ExternalID string `json:"externalId"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Enabled    bool   `json:"enabled"`
 }
 
 type EventStreamSource struct {
-	ID          string `json:"id"`
-	ExternalID  string `json:"externalId"`
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Enabled     bool   `json:"enabled"`
+	ID           string        `json:"id"`
+	ExternalID   string        `json:"externalId"`
+	Name         string        `json:"name"`
+	Type         string        `json:"type"`
+	Enabled      bool          `json:"enabled"`
 	TrackingPlan *TrackingPlan `json:"trackingPlan"`
 }
 
 type TrackingPlan struct {
-	ID string `json:"id"`
+	ID     string                               `json:"id"`
 	Config *trackingplanClient.ConnectionConfig `json:"config"`
 }
 

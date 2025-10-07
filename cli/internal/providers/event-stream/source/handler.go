@@ -13,9 +13,9 @@ import (
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 )
 
 type Handler struct {
@@ -35,11 +35,16 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if _, exists := h.resources[spec.LocalId]; exists {
 		return fmt.Errorf("event stream source with id %s already exists", spec.LocalId)
 	}
+	// Default enabled to true when not specified in the spec
+	enabled := true
+	if spec.Enabled != nil {
+		enabled = *spec.Enabled
+	}
 	sourceResource := &sourceResource{
 		LocalId:          spec.LocalId,
 		Name:             spec.Name,
 		SourceDefinition: spec.SourceDefinition,
-		Enabled:          spec.Enabled,
+		Enabled:          enabled,
 		Governance:       &governanceResource{},
 	}
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {

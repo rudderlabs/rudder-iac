@@ -287,7 +287,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					"id":      "test-source-1",
 					"name":    "Test Source 1",
 					"type":    "javascript",
-					"enabled": true,
 				},
 			},
 			{
