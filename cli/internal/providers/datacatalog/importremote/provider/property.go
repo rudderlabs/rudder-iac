@@ -18,7 +18,6 @@ import (
 
 const (
 	PropertiesRelativePath = "properties/properties.yaml"
-	PropertiesMetadataName = "properties"
 )
 
 var (
@@ -138,7 +137,7 @@ func (p *PropertyImportProvider) FormatForExport(
 
 	spec, err := toImportSpec(
 		localcatalog.KindProperties,
-		PropertiesMetadataName,
+		MetadataNameProperties,
 		workspaceMetadata,
 		map[string]any{
 			"properties": formattedProps,
