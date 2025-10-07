@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
-	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -21,11 +20,6 @@ import (
 // Helper function to convert boolean to pointer
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-// Helper function to convert Action to pointer
-func actionPtr(a trackingplanClient.Action) *trackingplanClient.Action {
-	return &a
 }
 
 func TestEventStreamSourceHandler(t *testing.T) {
@@ -709,29 +703,29 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Enabled:    true,
 					TrackingPlan: &sourceClient.TrackingPlan{
 						ID: "remote-tp-123",
-						Config: &trackingplanClient.ConnectionConfig{
-							Track: &trackingplanClient.TrackConfig{
-								AllowUnplannedEvents: boolPtr(false),
+						Config: &sourceClient.TrackingPlanConfig{
+							Track: &sourceClient.TrackConfig{
+								DropUnplannedEvents: boolPtr(true),
 							},
-							Identify: &trackingplanClient.EventTypeConfig{
-								PropagateValidationErrors: boolPtr(false),
-								UnplannedProperties:       actionPtr(trackingplanClient.Drop),
-								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
+							Identify: &sourceClient.EventTypeConfig{
+								PropagateViolations: boolPtr(false),
+								DropUnplannedProperties:       boolPtr(true),
+								DropOtherViolations:         boolPtr(false),
 							},
-							Group: &trackingplanClient.EventTypeConfig{
-								PropagateValidationErrors: boolPtr(true),
-								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
+							Group: &sourceClient.EventTypeConfig{
+								PropagateViolations: boolPtr(true),
+								DropUnplannedProperties:       boolPtr(false),
+								DropOtherViolations:         boolPtr(false),
 							},
-							Page: &trackingplanClient.EventTypeConfig{
-								PropagateValidationErrors: boolPtr(false),
-								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolation:         actionPtr(trackingplanClient.Drop),
+							Page: &sourceClient.EventTypeConfig{
+								PropagateViolations: boolPtr(false),
+								DropUnplannedProperties:       boolPtr(false),
+								DropOtherViolations:         boolPtr(true),
 							},
-							Screen: &trackingplanClient.EventTypeConfig{
-								PropagateValidationErrors: boolPtr(true),
-								UnplannedProperties:       actionPtr(trackingplanClient.Forward),
-								AnyOtherViolation:         actionPtr(trackingplanClient.Forward),
+							Screen: &sourceClient.EventTypeConfig{
+								PropagateViolations: boolPtr(true),
+								DropUnplannedProperties:  boolPtr(false),
+								DropOtherViolations:         boolPtr(false),
 							},
 						},
 					},
@@ -925,9 +919,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Enabled:    true,
 					TrackingPlan: &sourceClient.TrackingPlan{
 						ID: "remote-tp-789",
-						Config: &trackingplanClient.ConnectionConfig{
-							Track: &trackingplanClient.TrackConfig{
-								AllowUnplannedEvents: boolPtr(false),
+						Config: &sourceClient.TrackingPlanConfig{
+							Track: &sourceClient.TrackConfig{
+								DropUnplannedEvents: boolPtr(true),
 							},
 						},
 					},

@@ -2,7 +2,6 @@ package source
 
 import (
 	"github.com/rudderlabs/rudder-iac/api/client"
-	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 )
 
 type CreateSourceRequest struct {
@@ -34,9 +33,31 @@ type EventStreamSource struct {
 	TrackingPlan *TrackingPlan `json:"trackingPlan"`
 }
 
+// The response shape is different for the GET API compared
+// to the APIs present in the tracking-plan-connection package
+type TrackingPlanConfig struct {
+	Track    *TrackConfig     `json:"track,omitempty"`
+	Identify *EventTypeConfig `json:"identify,omitempty"`
+	Group    *EventTypeConfig `json:"group,omitempty"`
+	Page     *EventTypeConfig `json:"page,omitempty"`
+	Screen   *EventTypeConfig `json:"screen,omitempty"`
+}
+
+type TrackConfig struct {
+	*EventTypeConfig
+	DropUnplannedEvents *bool `json:"dropUnplannedEvents,omitempty"`
+}
+
+type EventTypeConfig struct {
+	PropagateViolations *bool   `json:"propagateViolations,omitempty"`
+	DropUnplannedProperties       *bool `json:"dropUnplannedProperties,omitempty"`
+	DropOtherViolations         *bool `json:"dropOtherViolations,omitempty"`
+}
+
+
 type TrackingPlan struct {
 	ID     string                               `json:"id"`
-	Config *trackingplanClient.ConnectionConfig `json:"config"`
+	Config *TrackingPlanConfig `json:"config"`
 }
 
 type eventStreamSourcesPage struct {
