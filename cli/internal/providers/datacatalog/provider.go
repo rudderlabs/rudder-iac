@@ -15,6 +15,8 @@ import (
 
 var log = logger.New("datacatalogprovider")
 
+const importDir = "data-catalog"
+
 type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
@@ -26,7 +28,7 @@ func New(client catalog.DataCatalog) *Provider {
 		client: client,
 		dc:     localcatalog.New(),
 		providerStore: map[string]resourceProvider{
-			pstate.PropertyResourceType:     NewPropertyProvider(client),
+			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client),
 			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
 			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),

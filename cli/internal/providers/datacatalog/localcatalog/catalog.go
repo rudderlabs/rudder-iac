@@ -14,6 +14,14 @@ var (
 	log = logger.New("localcatalog")
 )
 
+const (
+	KindProperties    = "properties"
+	KindEvents        = "events"
+	KindCategories    = "categories"
+	KindTrackingPlans = "tp"
+	KindCustomTypes   = "custom-types"
+)
+
 // entity group is logical grouping of entities defined
 // as metadata->name in respective yaml file
 type EntityGroup string
@@ -165,28 +173,28 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		name = ""
 	}
 	switch s.Kind {
-	case "properties":
+	case KindProperties:
 		properties, err := ExtractProperties(s)
 		if err != nil {
 			return fmt.Errorf("extracting properties: %w", err)
 		}
 		dc.Properties[EntityGroup(name)] = append(dc.Properties[EntityGroup(name)], properties...)
 
-	case "events":
+	case KindEvents:
 		events, err := ExtractEvents(s)
 		if err != nil {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
 		dc.Events[EntityGroup(name)] = append(dc.Events[EntityGroup(name)], events...)
 
-	case "categories":
+	case KindCategories:
 		categories, err := ExtractCategories(s)
 		if err != nil {
 			return fmt.Errorf("extracting categories: %w", err)
 		}
 		dc.Categories[EntityGroup(name)] = append(dc.Categories[EntityGroup(name)], categories...)
 
-	case "tp":
+	case KindTrackingPlans:
 		tp, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return fmt.Errorf("extracting tracking plan: %w", err)
@@ -197,7 +205,7 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		}
 		dc.TrackingPlans[EntityGroup(name)] = &tp
 
-	case "custom-types":
+	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)
 		if err != nil {
 			return fmt.Errorf("extracting custom types: %w", err)

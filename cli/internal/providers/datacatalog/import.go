@@ -10,7 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.providerStore {
@@ -18,7 +18,7 @@ func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceColle
 			continue
 		}
 
-		resources, err := provider.(resourceImportProvider).LoadImportable(ctx)
+		resources, err := provider.(resourceImportProvider).LoadImportable(ctx, idNamer)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %w", err)
 		}
@@ -29,26 +29,6 @@ func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceColle
 		}
 	}
 	return collection, nil
-}
-
-func (p *Provider) IDResources(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
-	idNamer namer.Namer) error {
-	for _, provider := range p.providerStore {
-		if _, ok := provider.(resourceImportProvider); !ok {
-			continue
-		}
-
-		if err := provider.(resourceImportProvider).IDResources(
-			ctx,
-			collection,
-			idNamer,
-		); err != nil {
-			return fmt.Errorf("assigning identifier to resources to provider %w", err)
-		}
-	}
-	return nil
 }
 
 func (p *Provider) FormatForExport(

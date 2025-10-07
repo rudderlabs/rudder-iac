@@ -439,12 +439,8 @@ func (h *Handler) Import(_ context.Context, _ string, data resources.ResourceDat
 	return nil, fmt.Errorf("importing event stream source is not supported")
 }
 
-func (h *Handler) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	return nil, fmt.Errorf("loading importable event stream sources is not supported")
-}
-
-func (h *Handler) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
-	return fmt.Errorf("assigning identifiers to event stream sources is not supported")
 }
 
 func (h *Handler) FormatForExport(

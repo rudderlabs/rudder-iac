@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 )
@@ -17,14 +17,6 @@ const (
 	MetadataNameEvents      = "events"
 	MetadataNameCategories  = "categories"
 	MetadataNameCustomTypes = "custom-types"
-)
-
-const (
-	KindProperties    = "properties"
-	KindEvents        = "events"
-	KindCategories    = "categories"
-	KindTrackingPlans = "tp"
-	KindCustomTypes   = "custom-types"
 )
 
 func toImportSpec(

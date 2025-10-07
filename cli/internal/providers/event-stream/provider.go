@@ -26,8 +26,7 @@ type handler interface {
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
-	LoadImportable(ctx context.Context) (*resources.ResourceCollection, error)
-	IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
 	FormatForExport(
 		ctx context.Context,
 		collection *resources.ResourceCollection,
@@ -193,11 +192,7 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return handler.Import(ctx, ID, data, remoteId)
 }
 
-func (p *Provider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
-	return nil
-}
-
-func (p *Provider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	return nil, nil
 }
 

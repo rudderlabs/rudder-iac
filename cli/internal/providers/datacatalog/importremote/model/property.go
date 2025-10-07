@@ -1,10 +1,10 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -28,15 +28,9 @@ func (p *ImportableProperty) ForExport(
 		return nil, fmt.Errorf("loading property from upstream: %w", err)
 	}
 
-	// FIXME: should we not cherry-pick the fields we need ?
-	byt, err := json.Marshal(p.Property)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling property: %w", err)
-	}
-
 	toReturn := make(map[string]any)
-	if err := json.Unmarshal(byt, &toReturn); err != nil {
-		return nil, fmt.Errorf("unmarshalling property: %w", err)
+	if err := mapstructure.Decode(p.Property, &toReturn); err != nil {
+		return nil, fmt.Errorf("decoding property: %w", err)
 	}
 
 	return toReturn, nil

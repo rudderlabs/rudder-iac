@@ -3,20 +3,21 @@ package provider
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 const (
-	PropertiesKind         = "properties"
-	PropertiesRelativePath = "./imported/data-catalog/properties/properties.yaml"
+	PropertiesRelativePath = "properties/properties.yaml"
 	PropertiesMetadataName = "properties"
 )
 
@@ -25,18 +26,20 @@ var (
 )
 
 type PropertyImportProvider struct {
-	client catalog.DataCatalog
-	log    logger.Logger
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
-func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger) *PropertyImportProvider {
+func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *PropertyImportProvider {
 	return &PropertyImportProvider{
-		log:    log,
-		client: client,
+		log:      log,
+		filepath: filepath.Join(importDir, PropertiesRelativePath),
+		client:   client,
 	}
 }
 
-func (p *PropertyImportProvider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewResourceCollection()
 
@@ -47,18 +50,28 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context) (*resources
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
+		if property.ExternalId != "" {
+			continue
+		}
 		resourceMap[property.ID] = &resources.RemoteResource{
 			ID:   property.ID,
 			Data: property,
 		}
 	}
-	collection.Set(state.PropertyResourceType, resourceMap)
+
+	collection.Set(
+		state.PropertyResourceType,
+		resourceMap,
+	)
+
+	if err := p.idResources(collection, idNamer); err != nil {
+		return nil, fmt.Errorf("assigning identifiers to properties: %w", err)
+	}
 
 	return collection, nil
 }
 
-func (p *PropertyImportProvider) IDResources(
-	ctx context.Context,
+func (p *PropertyImportProvider) idResources(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 ) error {
@@ -124,7 +137,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	}
 
 	spec, err := toImportSpec(
-		PropertiesKind,
+		localcatalog.KindProperties,
 		PropertiesMetadataName,
 		workspaceMetadata,
 		map[string]any{
@@ -137,7 +150,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	return []importremote.FormattableEntity{
 		{
 			Content:      spec,
-			RelativePath: PropertiesRelativePath,
+			RelativePath: p.filepath,
 		},
 	}, nil
 }

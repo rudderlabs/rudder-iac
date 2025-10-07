@@ -27,8 +27,7 @@ type entityProvider interface {
 }
 
 type resourceImportProvider interface {
-	LoadImportable(ctx context.Context) (*resources.ResourceCollection, error)
-	IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
 	FormatForExport(
 		ctx context.Context,
 		collection *resources.ResourceCollection,

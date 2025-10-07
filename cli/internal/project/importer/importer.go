@@ -10,24 +10,23 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-func WorkspaceImport(ctx context.Context, location string, project project.Project, p project.Provider) error {
-	importable, err := p.LoadImportable(ctx)
+func WorkspaceImport(
+	ctx context.Context,
+	location string,
+	project project.Project,
+	p project.Provider) error {
+	idNamer, err := initNamer(project)
+	if err != nil {
+		return fmt.Errorf("initializing namer: %w", err)
+	}
+
+	importable, err := p.LoadImportable(ctx, idNamer)
 	if err != nil {
 		return fmt.Errorf("loading importable resources: %w", err)
 	}
 
 	if importable.Len() == 0 {
 		return nil
-	}
-
-	idNamer, err := initNamer(project)
-	if err != nil {
-		return fmt.Errorf("initializing namer: %w", err)
-	}
-
-	err = p.IDResources(ctx, importable, idNamer)
-	if err != nil {
-		return fmt.Errorf("assigning external IDs: %w", err)
 	}
 
 	resolver, err := initResolver(ctx, p, importable)
@@ -52,12 +51,12 @@ func initNamer(p project.Project) (namer.Namer, error) {
 	}
 
 	resourcesMap := graph.Resources()
-	projectIDs := make([]string, 0, len(resourcesMap))
+	externalIDs := make([]string, 0, len(resourcesMap))
 	for _, r := range resourcesMap {
-		projectIDs = append(projectIDs, r.ID())
+		externalIDs = append(externalIDs, r.ID())
 	}
 
-	if err := idNamer.Load(projectIDs); err != nil {
+	if err := idNamer.Load(externalIDs); err != nil {
 		return nil, fmt.Errorf("preloading namer with project IDs: %w", err)
 	}
 

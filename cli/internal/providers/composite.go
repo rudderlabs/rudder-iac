@@ -163,11 +163,11 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportable(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.Providers {
-		resources, err := provider.LoadImportable(ctx)
+		resources, err := provider.LoadImportable(ctx, idNamer)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %s: %w", provider.GetName(), err)
 		}
@@ -178,24 +178,6 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context) (*resources.Reso
 	}
 
 	return collection, nil
-}
-
-// AssignExternalIDs offers a point of synchronization between providers
-// where the outcome assumes that all the resources in collection will have allocated externalIds
-func (p *CompositeProvider) IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error {
-	for _, provider := range p.Providers {
-
-		err := provider.IDResources(
-			ctx,
-			collection,
-			idNamer,
-		)
-		if err != nil {
-			return fmt.Errorf("assigning externalIds to provider %s: %w", provider.GetName(), err)
-		}
-	}
-
-	return nil
 }
 
 func (p *CompositeProvider) FormatForExport(

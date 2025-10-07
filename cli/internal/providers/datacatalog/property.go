@@ -22,7 +22,7 @@ type PropertyProvider struct {
 	log    logger.Logger
 }
 
-func NewPropertyProvider(dc catalog.DataCatalog) *PropertyEntityProvider {
+func NewPropertyProvider(dc catalog.DataCatalog, importDir string) *PropertyEntityProvider {
 
 	pp := &PropertyProvider{
 		client: dc,
@@ -31,9 +31,13 @@ func NewPropertyProvider(dc catalog.DataCatalog) *PropertyEntityProvider {
 		},
 	}
 
-	imp := impProvider.NewPropertyImportProvider(dc, logger.Logger{
-		Logger: logger.New("importremote.provider").With("type", "property"),
-	})
+	imp := impProvider.NewPropertyImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "property"),
+		},
+		importDir,
+	)
 
 	return &PropertyEntityProvider{
 		PropertyProvider:       pp,
