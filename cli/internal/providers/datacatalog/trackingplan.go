@@ -217,6 +217,10 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 	return nil
 }
 
+func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	return nil, fmt.Errorf("import is not supported for tracking plan resources")
+}
+
 // LoadResourcesFromRemote loads all tracking plans from the remote catalog
 func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading tracking plans from remote catalog ")

@@ -44,6 +44,10 @@ func (m *EmptyCatalog) GetProperty(ctx context.Context, id string) (*catalog.Pro
 	return nil, nil
 }
 
+func (m *EmptyCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
 func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }

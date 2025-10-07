@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -48,7 +49,7 @@ func NewCmdTPDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog)
+			s, err := syncer.New(deps.Providers().DataCatalog, &client.Workspace{})
 			if err != nil {
 				return err
 			}

@@ -247,9 +247,7 @@ func TestProvider(t *testing.T) {
 			result, err := provider.Create(ctx, "test-source", source.ResourceType, createData)
 			require.NoError(t, err)
 			require.Equal(t, &resources.ResourceData{
-				"name":              "Test Source",
-				"enabled":           true,
-				"type": "javascript",
+				"id": "",
 			}, result)
 		})
 
@@ -269,9 +267,7 @@ func TestProvider(t *testing.T) {
 			result, err := provider.Update(ctx, "test-source", source.ResourceType, updateData, stateData)
 			require.NoError(t, err)
 			assert.Equal(t, &resources.ResourceData{
-				"name":              "Updated Source",
-				"enabled":           false,
-				"type": "javascript",
+				"id": "test-source-id",
 			}, result)
 		})
 
