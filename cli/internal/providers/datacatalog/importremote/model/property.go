@@ -73,5 +73,5 @@ func isCustomType(typ string) bool {
 		types = append(types, strings.TrimSpace(t))
 	}
 
-	return lo.Some(validate.ValidTypes, types)
+	return !lo.Some(validate.ValidTypes, types)
 }
