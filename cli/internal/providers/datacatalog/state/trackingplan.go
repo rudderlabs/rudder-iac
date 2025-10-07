@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	PropertiesIdentity    = "properties"
-	TraitsIdentity        = "traits"
-	ContextTraitsIdentity = "context.traits"
+	PropertiesIdentity       = "properties"
+	TraitsIdentity           = "traits"
+	ContextTraitsIdentity    = "context.traits"
 	TrackingPlanResourceType = "tracking-plan"
 )
 
@@ -139,8 +139,65 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
-func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
-	return fmt.Errorf("not implemented")
+func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.ResourceCollection) error {
+	t.ID = trackingPlan.ID
+	t.Name = trackingPlan.Name
+	t.WorkspaceID = trackingPlan.WorkspaceID
+	t.Version = trackingPlan.Version
+	t.CreationType = trackingPlan.CreationType
+	t.CreatedAt = trackingPlan.CreatedAt.String()
+	t.UpdatedAt = trackingPlan.UpdatedAt.String()
+	if trackingPlan.Description != nil {
+		t.Description = *trackingPlan.Description
+	}
+
+	events := make([]*TrackingPlanEventState, 0, len(trackingPlan.Events))
+	for _, event := range trackingPlan.Events {
+		events = append(events, &TrackingPlanEventState{
+			// we dont set the tracking plan event ID in the stateless approach
+			ID:      "",
+			EventID: event.ID,
+			LocalID: event.ExternalID,
+		})
+	}
+	t.Events = events
+
+	tpArgs := TrackingPlanArgs{}
+	tpArgs.Name = trackingPlan.Name
+	tpArgs.LocalID = trackingPlan.ExternalID
+	if trackingPlan.Description != nil {
+		tpArgs.Description = *trackingPlan.Description
+	}
+
+	for _, remoteTPEvent := range trackingPlan.Events {
+		eventArgs := &TrackingPlanEventArgs{
+			ID:              remoteTPEvent.ID,
+			LocalID:         remoteTPEvent.ExternalID,
+			AllowUnplanned:  remoteTPEvent.AdditionalProperties,
+			IdentitySection: remoteTPEvent.IdentitySection,
+		}
+
+		properties := make([]*TrackingPlanPropertyArgs, 0, len(remoteTPEvent.Properties))
+		for _, remoteProp := range remoteTPEvent.Properties {
+			propArgs := &TrackingPlanPropertyArgs{}
+			propArgs.FromRemoteTrackingPlanProperty(remoteProp, collection, false)
+			properties = append(properties, propArgs)
+		}
+		eventArgs.Properties = properties
+
+		variants := make([]Variant, len(remoteTPEvent.Variants))
+		for idx, variant := range remoteTPEvent.Variants {
+			v := Variant{}
+			v.FromRemoteVariant(variant, collection.GetURNByID, false)
+			variants[idx] = v
+		}
+		eventArgs.Variants = variants
+
+		tpArgs.Events = append(tpArgs.Events, eventArgs)
+	}
+	t.TrackingPlanArgs = tpArgs
+
+	return nil
 }
 
 // Encapsulates the catalog argument which is added as a resource
@@ -316,6 +373,50 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	return nil
 }
 
+// FromRemoteTrackingPlanProperty converts a remote tracking plan property into an TrackingPlanPropertyArgs struct
+// usePropertyRefsForDependencies is used to determine if the property ID should be converted to a propertyRef or not
+// for TrackingPlanArgs(which becomes the state's input field later) we need to convert propertyIDs into propertyRefs
+// for TrackingPlanState(which becomes the state's output field later), we use the propertyID as is
+func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp *catalog.TrackingPlanEventProperty, collection *resources.ResourceCollection, usePropertyRefsForDependencies bool) error {
+	if usePropertyRefsForDependencies {
+		urn, err := collection.GetURNByID(PropertyResourceType, remoteProp.ID)
+		if err != nil {
+			return fmt.Errorf("getting URN for property %s: %w", remoteProp.ID, err)
+		}
+
+		args.ID = resources.PropertyRef{
+			URN:      urn,
+			Property: "id",
+		}
+	} else {
+		args.ID = remoteProp.ID
+	}
+
+	prop, ok := collection.GetByID(PropertyResourceType, remoteProp.ID)
+	if !ok {
+		return fmt.Errorf("getting property %s from resourceCollection: %w", remoteProp.ID, resources.ErrRemoteResourceNotFound)
+	}
+	args.LocalID = prop.ExternalID
+	args.Required = remoteProp.Required
+
+	// Handle nested properties recursively
+	if len(remoteProp.Properties) > 0 {
+		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(remoteProp.Properties))
+		for _, nestedProp := range remoteProp.Properties {
+			nestedArgs := &TrackingPlanPropertyArgs{}
+			if err := nestedArgs.FromRemoteTrackingPlanProperty(nestedProp, collection, usePropertyRefsForDependencies); err != nil {
+				return fmt.Errorf("processing nested property %s: %w", nestedProp.ID, err)
+			}
+			nestedProperties = append(nestedProperties, nestedArgs)
+		}
+		args.Properties = nestedProperties
+		// set additionalProperties to true if there are nested properties
+		args.AdditionalProperties = true
+	}
+
+	return nil
+}
+
 // ToResourceData converts TrackingPlanPropertyArgs to resource data map
 func (args *TrackingPlanPropertyArgs) ToResourceData() map[string]interface{} {
 	propMap := map[string]interface{}{
@@ -408,11 +509,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 
 	args.Events = events
 	return nil
-}
-
-// FromRemoteTrackingPlan converts from remote API TrackingPlan to TrackingPlanArgs
-func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlan, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
-	return fmt.Errorf("not implemented")
 }
 
 func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
@@ -510,4 +606,49 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 		"localId":     args.LocalID,
 		"events":      events,
 	}
+}
+
+func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.ResourceCollection) error {
+	args.Name = trackingPlan.Name
+	args.LocalID = trackingPlan.ExternalID
+	if trackingPlan.Description != nil {
+		args.Description = *trackingPlan.Description
+	}
+
+	events := make([]*TrackingPlanEventArgs, 0, len(trackingPlan.Events))
+	for _, event := range trackingPlan.Events {
+		eventURN, err := collection.GetURNByID(EventResourceType, event.ID)
+		if err != nil {
+			return fmt.Errorf("getting URN for event %s: %w", event.ID, err)
+		}
+		eventArgs := &TrackingPlanEventArgs{
+			ID: resources.PropertyRef{
+				URN:      eventURN,
+				Property: "id",
+			},
+			LocalID:         event.ExternalID,
+			AllowUnplanned:  event.AdditionalProperties,
+			IdentitySection: event.IdentitySection,
+		}
+
+		properties := make([]*TrackingPlanPropertyArgs, 0, len(event.Properties))
+		for _, prop := range event.Properties {
+			tpProperty := &TrackingPlanPropertyArgs{}
+			tpProperty.FromRemoteTrackingPlanProperty(prop, collection, true)
+			properties = append(properties, tpProperty)
+		}
+		eventArgs.Properties = properties
+
+		variants := make([]Variant, 0, len(event.Variants))
+		for _, remoteVariant := range event.Variants {
+			variant := Variant{}
+			variant.FromRemoteVariant(remoteVariant, collection.GetURNByID, true)
+			variants = append(variants, variant)
+		}
+		eventArgs.Variants = variants
+		events = append(events, eventArgs)
+	}
+	args.Events = events
+
+	return nil
 }

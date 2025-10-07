@@ -334,10 +334,12 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	trackingPlans := createTrackingPlans(events, properties)
 
 	initialState := createInitialStateWithResources(events, properties, trackingPlans)
+	reconstructedState := createInitialStateWithResources(events, properties, trackingPlans)
 
 	// Create provider with initial state
 	provider := &testutils.DataCatalogProvider{
 		InitialState: initialState,
+		ReconstructedState: reconstructedState,
 	}
 
 	// Create empty target graph (all resources should be deleted)
@@ -475,6 +477,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 		provider := &testutils.DataCatalogProvider{
 			InitialState: createInitialStateWithResources(events, properties, trackingPlans),
+			ReconstructedState: createInitialStateWithResources(events, properties, trackingPlans),
 		}
 
 		// Create a custom provider that fails for event2 and property2
