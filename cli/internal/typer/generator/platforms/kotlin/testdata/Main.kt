@@ -13,6 +13,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -69,6 +71,9 @@ typealias PropertyIpAddress = String
 
 /** User's last name */
 typealias PropertyLastName = String
+
+/** An array with items that can be string or integer */
+typealias PropertyMultiTypeArray = List<ArrayItemMultiTypeArray>
 
 /** demonstrates multiple levels of nesting */
 typealias PropertyNestedContext = JsonObject
@@ -144,7 +149,7 @@ enum class PropertyDeviceType {
 }
 
 abstract class SealedClassWithJson {
-    abstract val _jsonObject: JsonObject
+    abstract val _jsonElement: JsonElement
 }
 
 open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
@@ -153,7 +158,7 @@ open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
     override fun serialize(encoder: Encoder, value: T) {
         val jsonEncoder = encoder as? JsonEncoder
             ?: throw SerializationException("This serializer only works with JSON")
-        jsonEncoder.encodeJsonElement(value._jsonObject)
+        jsonEncoder.encodeJsonElement(value._jsonElement)
     }
 
     override fun deserialize(decoder: Decoder): T {
@@ -167,8 +172,7 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
     /** Type of page */
     @SerialName("page_type")
     abstract val pageType: PropertyPageType
-
-    abstract override val _jsonObject: JsonObject
+    abstract override val _jsonElement: JsonElement
 
     /** Search page variant */
     @Serializable
@@ -180,8 +184,7 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         /** Type of page */
         @SerialName("page_type")
         override val pageType: PropertyPageType = "search"
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("query", Json.encodeToJsonElement(query))
             put("page_type", Json.encodeToJsonElement(pageType))
         }
@@ -197,8 +200,7 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         /** Type of page */
         @SerialName("page_type")
         override val pageType: PropertyPageType = "product"
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("product_id", Json.encodeToJsonElement(productId))
             put("page_type", Json.encodeToJsonElement(pageType))
         }
@@ -215,8 +217,7 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         @SerialName("page_type")
         override val pageType: PropertyPageType
     ) : CustomTypePageContext() {
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             pageData?.let { put("page_data", Json.encodeToJsonElement(it)) }
             put("page_type", Json.encodeToJsonElement(pageType))
         }
@@ -225,14 +226,77 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
 
 private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer<CustomTypePageContext>()
 
+/** Item type for multi_type_array array */
+@Serializable(with = RudderArrayItemMultiTypeArraySerializer::class)
+sealed class ArrayItemMultiTypeArray : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : ArrayItemMultiTypeArray() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'integer' value */
+    @Serializable
+    data class IntegerValue(
+        @SerialName("value")
+        val value: Long
+    ) : ArrayItemMultiTypeArray() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+}
+
+private object RudderArrayItemMultiTypeArraySerializer : SealedClassJsonSerializer<ArrayItemMultiTypeArray>()
+
+/** A field that can be string, integer, or boolean */
+@Serializable(with = RudderPropertyMultiTypeFieldSerializer::class)
+sealed class PropertyMultiTypeField : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : PropertyMultiTypeField() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'integer' value */
+    @Serializable
+    data class IntegerValue(
+        @SerialName("value")
+        val value: Long
+    ) : PropertyMultiTypeField() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'boolean' value */
+    @Serializable
+    data class BooleanValue(
+        @SerialName("value")
+        val value: Boolean
+    ) : PropertyMultiTypeField() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+}
+
+private object RudderPropertyMultiTypeFieldSerializer : SealedClassJsonSerializer<PropertyMultiTypeField>()
+
 /** Example event to demonstrate variants */
 @Serializable(with = RudderTrackEventWithVariantsPropertiesSerializer::class)
 sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
     /** Type of device */
     @SerialName("device_type")
     abstract val deviceType: PropertyDeviceType
-
-    abstract override val _jsonObject: JsonObject
+    abstract override val _jsonElement: JsonElement
 
     /** Mobile device page view */
     @Serializable
@@ -252,8 +316,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         /** Type of device */
         @SerialName("device_type")
         override val deviceType: PropertyDeviceType = PropertyDeviceType.MOBILE
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
             put("profile", Json.encodeToJsonElement(profile))
             put("tags", Json.encodeToJsonElement(tags))
@@ -283,8 +346,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         /** Type of device */
         @SerialName("device_type")
         override val deviceType: PropertyDeviceType = PropertyDeviceType.DESKTOP
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("first_name", Json.encodeToJsonElement(firstName))
             lastName?.let { put("last_name", Json.encodeToJsonElement(it)) }
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
@@ -312,8 +374,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         @SerialName("untyped_field")
         val untypedField: PropertyUntypedField? = null
     ) : TrackEventWithVariantsProperties() {
-
-        override val _jsonObject: JsonObject = buildJsonObject {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("device_type", Json.encodeToJsonElement(deviceType))
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
             put("profile", Json.encodeToJsonElement(profile))
@@ -410,6 +471,14 @@ data class TrackUserSignedUpProperties(
     /** Property with empty object allowing additional properties */
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
+
+    /** An array with items that can be string or integer */
+    @SerialName("multi_type_array")
+    val multiTypeArray: PropertyMultiTypeArray? = null,
+
+    /** A field that can be string, integer, or boolean */
+    @SerialName("multi_type_field")
+    val multiTypeField: PropertyMultiTypeField? = null,
 
     /** Nested property with empty object allowing additional properties */
     @SerialName("nested_empty_object")

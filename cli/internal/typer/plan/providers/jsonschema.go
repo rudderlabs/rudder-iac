@@ -321,8 +321,6 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 						}
 					}
 				}
-			} else {
-				td.ItemTypes = []plan.PropertyType{plan.PrimitiveTypeAny}
 			}
 		}
 	}

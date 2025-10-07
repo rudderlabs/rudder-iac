@@ -238,3 +238,15 @@ func KotlinCollisionHandler(name string, existingNames []string) string {
 func CreateKotlinNameRegistry() *core.NameRegistry {
 	return core.NewNameRegistry(KotlinCollisionHandler)
 }
+
+// getOrRegisterPropertyMultiTypeClassName returns the registered sealed class name for a property with multiple types
+func getOrRegisterPropertyMultiTypeClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	className := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, DataclassScope, className)
+}
+
+// getOrRegisterPropertyMultiTypeArrayItemClassName returns the registered sealed class name for array items with multiple types
+func getOrRegisterPropertyMultiTypeArrayItemClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	className := FormatClassName("ArrayItem", property.Name)
+	return nameRegistry.RegisterName("property:item:"+property.Name, DataclassScope, className)
+}

@@ -142,62 +142,6 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
-	ReferenceProperties["device_type"] = &plan.Property{
-		Name:        "device_type",
-		Description: "Type of device",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
-		Config: &plan.PropertyConfig{
-			Enum: []any{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
-		},
-	}
-
-	ReferenceProperties["tags"] = &plan.Property{
-		Name:        "tags",
-		Description: "User tags as array of strings",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeString},
-	}
-
-	ReferenceProperties["contacts"] = &plan.Property{
-		Name:        "contacts",
-		Description: "Array of user contacts",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["email"]},
-	}
-
-	// Add properties for testing "any" type support
-	ReferenceProperties["property_of_any"] = &plan.Property{
-		Name:        "property_of_any",
-		Description: "A field that can contain any type of value",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
-	}
-
-	ReferenceProperties["untyped_field"] = &plan.Property{
-		Name:        "untyped_field",
-		Description: "A field with no explicit type (treated as any)",
-		Types:       []plan.PropertyType{},
-	}
-
-	ReferenceProperties["array_of_any"] = &plan.Property{
-		Name:        "array_of_any",
-		Description: "An array that can contain any type of items",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeAny},
-	}
-
-	ReferenceProperties["untyped_array"] = &plan.Property{
-		Name:        "untyped_array",
-		Description: "An array with no explicit item type (treated as any)",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{},
-	}
-
-	ReferenceProperties["object_property"] = &plan.Property{
-		Name:        "object_property",
-		Description: "An object field with no defined structure",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
-	}
-
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -288,6 +232,27 @@ func init() {
 		Name:        "context",
 		Description: "example of object property",
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	// Add multi-type properties for testing
+	ReferenceProperties["multi_type_field"] = &plan.Property{
+		Name:        "multi_type_field",
+		Description: "A field that can be string, integer, or boolean",
+		Types: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeInteger,
+			plan.PrimitiveTypeBoolean,
+		},
+	}
+
+	ReferenceProperties["multi_type_array"] = &plan.Property{
+		Name:        "multi_type_array",
+		Description: "An array with items that can be string or integer",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeInteger,
+		},
 	}
 
 	// Add empty custom type with additionalProperties: true for testing
@@ -497,6 +462,14 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 						AdditionalProperties: true,
 					},
 				},
+				"multi_type_field": {
+					Property: *ReferenceProperties["multi_type_field"],
+					Required: false,
+				},
+				"multi_type_array": {
+					Property: *ReferenceProperties["multi_type_array"],
+					Required: false,
+				},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
@@ -677,6 +650,6 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 // Constants for test assertions based on the reference plan
 const (
 	ExpectedCustomTypeCount = 9  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context
-	ExpectedPropertyCount   = 27 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context
+	ExpectedPropertyCount   = 29 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )
