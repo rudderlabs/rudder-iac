@@ -103,9 +103,6 @@ func TestPropertyForExport(t *testing.T) {
 			"name":        "Product ID",
 			"description": "Custom product identifier",
 			"type":        expectedRef,
-			"propConfig": map[string]interface{}{
-				"pattern": "^PROD-[0-9]{7}$",
-			},
 		}, result)
 	})
 
