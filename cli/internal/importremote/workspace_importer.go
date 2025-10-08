@@ -11,7 +11,6 @@ import (
 // WorkspaceImporter defines methods for importing workspace resources using a namer for unique IDs.
 type WorkspaceImporter interface {
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
-	// IDResources(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer) error
 	FormatForExport(
 		ctx context.Context,
 		collection *resources.ResourceCollection,

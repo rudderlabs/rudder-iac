@@ -19,8 +19,8 @@ const ExternalIdNamerScope = "externalIds"
 
 // Namer interface provides methods to generate unique names based on strategy and load existing names.
 type Namer interface {
-	Name(input string) (string, error)
-	Load([]string) error
+	Name(input ScopeName) (string, error)
+	Load([]ScopeName) error
 }
 
 // NamingStrategy interface defines how to transform input into a base name.
@@ -32,7 +32,6 @@ type NamingStrategy interface {
 type ExternalIdNamer struct {
 	*core.NameRegistry
 	strategy NamingStrategy
-	scope    string
 	mu       sync.Mutex
 }
 
@@ -42,20 +41,19 @@ func NewExternalIdNamer(strategy NamingStrategy) Namer {
 	return &ExternalIdNamer{
 		NameRegistry: registry,
 		strategy:     strategy,
-		scope:        ExternalIdNamerScope,
 	}
 }
 
 // Name generates a unique name using the strategy and handles collisions.
-func (p *ExternalIdNamer) Name(input string) (string, error) {
+func (p *ExternalIdNamer) Name(input ScopeName) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	baseName := p.strategy.Name(input)
+	baseName := p.strategy.Name(input.Name)
 
 	// The reason we are generating id uniquely everytime we register name is
 	// as we just need to make sure that the name is unique within the scope.
-	registered, err := p.RegisterName(uuid.New().String(), p.scope, baseName)
+	registered, err := p.RegisterName(uuid.New().String(), input.Scope, baseName)
 	if err != nil {
 		return "", fmt.Errorf("registering name: %s errored with: %w", baseName, err)
 	}
@@ -63,18 +61,23 @@ func (p *ExternalIdNamer) Name(input string) (string, error) {
 	return registered, nil
 }
 
+type ScopeName struct {
+	Scope string
+	Name  string
+}
+
 // Load adds existing names to the registry, returning error on duplicates.
-func (p *ExternalIdNamer) Load(names []string) error {
+func (p *ExternalIdNamer) Load(names []ScopeName) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	for _, name := range names {
-		registered, err := p.RegisterName(uuid.New().String(), p.scope, name)
+		registered, err := p.RegisterName(uuid.New().String(), name.Scope, name.Name)
 		if err != nil {
 			return err
 		}
-		if registered != name {
-			return fmt.Errorf("loading name: %s errored with: %w", name, ErrDuplicateNameException)
+		if registered != name.Name {
+			return fmt.Errorf("loading name: %s errored with: %w", name.Name, ErrDuplicateNameException)
 		}
 	}
 	return nil

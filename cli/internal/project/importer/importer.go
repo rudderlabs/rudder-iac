@@ -3,11 +3,17 @@ package importer
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+)
+
+const (
+	importedDir = "imported"
 )
 
 func WorkspaceImport(
@@ -34,9 +40,15 @@ func WorkspaceImport(
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
-	_, err = p.FormatForExport(ctx, importable, idNamer, resolver)
+	entities, err := p.FormatForExport(ctx, importable, idNamer, resolver)
 	if err != nil {
 		return fmt.Errorf("normalizing for import: %w", err)
+	}
+
+	formatters := formatter.Setup(formatter.DefaultYAML)
+
+	if err := Write(ctx, filepath.Join(location, importedDir), formatters, entities); err != nil {
+		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
 	return nil
@@ -51,9 +63,12 @@ func initNamer(p project.Project) (namer.Namer, error) {
 	}
 
 	resourcesMap := graph.Resources()
-	externalIDs := make([]string, 0, len(resourcesMap))
+	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
 	for _, r := range resourcesMap {
-		externalIDs = append(externalIDs, r.ID())
+		externalIDs = append(externalIDs, namer.ScopeName{
+			Name:  r.ID(),
+			Scope: r.Type(),
+		})
 	}
 
 	if err := idNamer.Load(externalIDs); err != nil {

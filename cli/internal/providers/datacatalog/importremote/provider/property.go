@@ -18,6 +18,7 @@ import (
 
 const (
 	PropertiesRelativePath = "properties/properties.yaml"
+	PropertyScope          = "property"
 )
 
 var (
@@ -83,7 +84,9 @@ func (p *PropertyImportProvider) idResources(
 			return fmt.Errorf("unable to cast remote resource to catalog property")
 		}
 
-		externalID, err := idNamer.Name(data.Name)
+		externalID, err := idNamer.Name(namer.ScopeName{
+			Name:  data.Name,
+			Scope: state.PropertyResourceType})
 		if err != nil {
 			return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
 		}

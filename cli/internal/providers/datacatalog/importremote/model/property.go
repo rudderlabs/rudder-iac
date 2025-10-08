@@ -48,7 +48,7 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 	if isCustomType(p.Property.Type) {
 		customTypeRef, err := resolver.ResolveToReference(
 			state.CustomTypeResourceType,
-			p.Property.Type)
+			upstream.DefinitionId)
 		if err != nil {
 			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.Property.LocalID, err)
 		}
@@ -58,6 +58,9 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 		}
 
 		p.Property.Type = customTypeRef
+		// Hardcode the config to nil when property references a custom type
+		// other we receive $ref data in it
+		p.Property.Config = nil
 	}
 
 	return nil

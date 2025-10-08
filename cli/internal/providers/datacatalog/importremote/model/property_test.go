@@ -83,6 +83,7 @@ func TestPropertyForExport(t *testing.T) {
 			Config: map[string]interface{}{
 				"pattern": "^PROD-[0-9]{7}$",
 			},
+			DefinitionId: customTypeID,
 		}
 
 		mockRes := &mockResolver{
