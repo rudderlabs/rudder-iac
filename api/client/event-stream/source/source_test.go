@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func TestCreateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -181,7 +185,16 @@ func TestGetSources(t *testing.T) {
 								"externalId": "ext-123",
 								"name": "Source 1",
 								"type": "webhook",
-								"enabled": true
+								"enabled": true,
+								"trackingPlan": {
+									"id": "tp-123",
+									"config": {
+										"track": {
+											"propagateViolations": true,
+											"dropUnplannedEvents": true
+										}
+									}
+								}
 							}
 						],
 						"paging": {
@@ -240,6 +253,17 @@ func TestGetSources(t *testing.T) {
 					Name:       "Source 1",
 					Type:       "webhook",
 					Enabled:    true,
+					TrackingPlan: &esSource.TrackingPlan{
+						ID: "tp-123",
+						Config: &esSource.TrackingPlanConfig{
+							Track: &esSource.TrackConfig{
+								EventTypeConfig: &esSource.EventTypeConfig{
+									PropagateViolations: boolPtr(true),
+								},
+								DropUnplannedEvents: boolPtr(true),
+							},
+						},
+					},
 				},
 				{
 					ID:         "src-456",

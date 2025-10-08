@@ -589,13 +589,13 @@ func mapStateEventTypeConfigToRemote(config map[string]interface{}, key string) 
 	return eventTypeConfig
 }
 
-func mapRemoteTPConfigToState(config *trackingplanClient.ConnectionConfig) map[string]interface{} {
+func mapRemoteTPConfigToState(config *sourceClient.TrackingPlanConfig) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	if config.Track != nil {
 		trackMap := buildStateEventConfigMap(config.Track.EventTypeConfig)
-		if config.Track.AllowUnplannedEvents != nil {
-			trackMap[DropUnplannedEventsKey] = !(*config.Track.AllowUnplannedEvents)
+		if config.Track.DropUnplannedEvents != nil {
+			trackMap[DropUnplannedEventsKey] = *config.Track.DropUnplannedEvents
 		}
 		result[TrackKey] = trackMap
 	}
@@ -619,7 +619,7 @@ func mapRemoteTPConfigToState(config *trackingplanClient.ConnectionConfig) map[s
 	return result
 }
 
-func buildStateEventConfigMap(config *trackingplanClient.EventTypeConfig) map[string]interface{} {
+func buildStateEventConfigMap(config *sourceClient.EventTypeConfig) map[string]interface{} {
 	if config == nil {
 		return map[string]interface{}{}
 	}
@@ -627,26 +627,19 @@ func buildStateEventConfigMap(config *trackingplanClient.EventTypeConfig) map[st
 	result := map[string]interface{}{}
 
 	// Only include fields that are explicitly set
-	if config.PropagateValidationErrors != nil {
-		result[PropagateViolationsKey] = *config.PropagateValidationErrors
+	if config.PropagateViolations != nil {
+		result[PropagateViolationsKey] = *config.PropagateViolations
 	}
 
-	if config.UnplannedProperties != nil {
-		result[DropUnplannedPropertiesKey] = shouldDrop(config.UnplannedProperties)
+	if config.DropUnplannedProperties != nil {
+		result[DropUnplannedPropertiesKey] = *config.DropUnplannedProperties
 	}
 
-	if config.AnyOtherViolation != nil {
-		result[DropOtherViolationsKey] = shouldDrop(config.AnyOtherViolation)
+	if config.DropOtherViolations != nil {
+		result[DropOtherViolationsKey] = *config.DropOtherViolations
 	}
 
 	return result
-}
-
-func shouldDrop(action *trackingplanClient.Action) bool {
-	if action == nil {
-		return false
-	}
-	return *action == trackingplanClient.Drop
 }
 
 func dropToAction(drop bool) trackingplanClient.Action {
