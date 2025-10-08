@@ -1,6 +1,6 @@
 {{- define "sealedclass_base" }}
 abstract class SealedClassWithJson {
-    abstract val _jsonObject: JsonObject
+    abstract val _jsonElement: JsonElement
 }
 
 open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
@@ -9,7 +9,7 @@ open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
     override fun serialize(encoder: Encoder, value: T) {
         val jsonEncoder = encoder as? JsonEncoder
             ?: throw SerializationException("This serializer only works with JSON")
-        jsonEncoder.encodeJsonElement(value._jsonObject)
+        jsonEncoder.encodeJsonElement(value._jsonElement)
     }
 
     override fun deserialize(decoder: Decoder): T {

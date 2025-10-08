@@ -25,13 +25,13 @@ spec:
           required: true
         # - $ref: "#/properties/typer-test/some-null"
         #   required: true
-        # - $ref: "#/properties/typer-test/some-multi-type"
+        - $ref: "#/properties/typer-test/some-multi-type"
         - $ref: "#/properties/typer-test/some-array-of-any"
         - $ref: "#/properties/typer-test/some-array-of-strings"
         - $ref: "#/properties/typer-test/some-array-of-integers"
         - $ref: "#/properties/typer-test/some-array-of-numbers"
         - $ref: "#/properties/typer-test/some-array-of-booleans"
-        # - $ref: "#/properties/typer-test/some-array-of-multiple-types"
+        - $ref: "#/properties/typer-test/some-array-of-multiple-types"
         - $ref: "#/properties/typer-test/some-string-with-enum"
         - $ref: "#/properties/typer-test/some-integer-with-enum"
         - $ref: "#/properties/typer-test/some-nested-object"
