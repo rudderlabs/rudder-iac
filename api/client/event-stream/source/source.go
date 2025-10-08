@@ -101,6 +101,9 @@ func (r *rudderSourceStore) list(ctx context.Context, paging client.Paging) (*ev
 	if paging.Next == "" {
 		return nil, nil
 	}
+
+	fmt.Printf("subpath: %s\n", paging.Next)
+
 	res, err := r.client.Do(ctx, "GET", paging.Next, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
