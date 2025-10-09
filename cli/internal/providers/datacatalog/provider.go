@@ -31,7 +31,7 @@ func New(client catalog.DataCatalog) *Provider {
 			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client),
 			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
-			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
+			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
 			pstate.CategoryResourceType:     NewCategoryProvider(client),
 		},
 	}
@@ -88,6 +88,8 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
+	fmt.Printf("called to create resource graph\n")
+
 	graph := resources.NewGraph()
 
 	// First, pre-calculate all URNs to use for references
@@ -214,6 +216,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 	// Add custom types to the graph with dependencies on properties or other custom types
 	for group, customTypes := range catalog.CustomTypes {
+		fmt.Printf("customTypes: %v\n", customTypes)
+
 		for _, customType := range customTypes {
 			log.Debug("adding custom type to graph", "id", customType.LocalID, "group", group)
 
