@@ -15,6 +15,8 @@ import (
 
 var log = logger.New("datacatalogprovider")
 
+const importDir = "data-catalog"
+
 type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
@@ -26,7 +28,7 @@ func New(client catalog.DataCatalog) *Provider {
 		client: client,
 		dc:     localcatalog.New(),
 		providerStore: map[string]resourceProvider{
-			pstate.PropertyResourceType:     NewPropertyProvider(client),
+			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client),
 			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
 			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
@@ -35,12 +37,22 @@ func New(client catalog.DataCatalog) *Provider {
 	}
 }
 
+func (p *Provider) GetName() string {
+	return "datacatalog"
+}
+
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.dc.LoadSpec(path, s)
 }
 
 func (p *Provider) GetSupportedKinds() []string {
-	return []string{"properties", "events", "tp", "custom-types", "categories"}
+	return []string{
+		localcatalog.KindProperties,
+		localcatalog.KindEvents,
+		localcatalog.KindTrackingPlans,
+		localcatalog.KindCustomTypes,
+		localcatalog.KindCategories,
+	}
 }
 
 func (p *Provider) GetSupportedTypes() []string {
@@ -129,14 +141,18 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		)
 
 		switch entityType {
-		case "properties":
+		case localcatalog.KindProperties:
 			return propIDToURN[id]
-		case "custom-types":
+
+		case localcatalog.KindCustomTypes:
 			return customTypeIDToURN[id]
-		case "categories":
+
+		case localcatalog.KindCategories:
 			return categoryIDToURN[id]
-		case "events":
+
+		case localcatalog.KindEvents:
 			return eventIDToURN[id]
+
 		default:
 			return ""
 		}
@@ -158,8 +174,12 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				args.ToResourceData(),
 				make([]string, 0),
 				getResourceImportMetadata(prop.LocalID),
+				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+					localcatalog.KindProperties,
+					group,
+					prop.LocalID,
+				)),
 			)
-
 			graph.AddResource(resource)
 
 			propIDToURN[prop.LocalID] = resource.URN()
@@ -178,7 +198,14 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				pstate.EventResourceType,
 				args.ToResourceData(),
 				make([]string, 0),
-				getResourceImportMetadata(event.LocalID))
+				getResourceImportMetadata(event.LocalID),
+				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+					localcatalog.KindEvents,
+					group,
+					event.LocalID,
+				)),
+			)
+			graph.AddResource(resource)
 
 			graph.AddResource(resource)
 			eventIDToURN[event.LocalID] = resource.URN()
@@ -199,6 +226,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				args.ToResourceData(),
 				make([]string, 0),
 				getResourceImportMetadata(customType.LocalID),
+				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+					localcatalog.KindCustomTypes,
+					group,
+					customType.LocalID,
+				)),
 			)
 			graph.AddResource(resource)
 		}
@@ -217,6 +249,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				args.ToResourceData(),
 				make([]string, 0),
 				getResourceImportMetadata(category.LocalID),
+				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+					localcatalog.KindCategories,
+					group,
+					category.LocalID,
+				)),
 			)
 			graph.AddResource(resource)
 		}
@@ -237,6 +274,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(tp.LocalID),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+				localcatalog.KindTrackingPlans,
+				group,
+				tp.LocalID,
+			)),
 		)
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))

@@ -5,7 +5,10 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -16,6 +19,21 @@ var resourceTypeCollection = map[string]catalog.ResourceCollection{
 	dcstate.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
 	dcstate.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
 	dcstate.CategoryResourceType:     catalog.ResourceCollectionCategories,
+}
+
+type entityProvider interface {
+	resourceProvider
+	resourceImportProvider
+}
+
+type resourceImportProvider interface {
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	FormatForExport(
+		ctx context.Context,
+		collection *resources.ResourceCollection,
+		idNamer namer.Namer,
+		inputResolver resolver.ReferenceResolver,
+	) ([]importremote.FormattableEntity, error)
 }
 
 type resourceProvider interface {

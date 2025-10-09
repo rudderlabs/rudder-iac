@@ -3,48 +3,51 @@ package testutils
 import (
 	"context"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // MockProvider is a mock implementation of the project.Provider interface for testing.
 type MockProvider struct {
-	SupportedKinds         []string
-	SupportedTypes         []string
-	ValidateErr            error
-	LoadSpecErr            error
-	GetResourceGraphVal    *resources.Graph
-	GetResourceGraphErr    error
-	LoadStateVal           *state.State
-	LoadStateErr           error
+	SupportedKinds             []string
+	SupportedTypes             []string
+	ValidateErr                error
+	LoadSpecErr                error
+	GetResourceGraphVal        *resources.Graph
+	GetResourceGraphErr        error
+	LoadStateVal               *state.State
+	LoadStateErr               error
 	LoadResourcesFromRemoteVal *resources.ResourceCollection
 	LoadResourcesFromRemoteErr error
-	LoadStateFromResourcesVal *state.State
-	LoadStateFromResourcesErr error
-	PutResourceStateErr    error
-	DeleteResourceStateErr error
-	CreateVal              *resources.ResourceData
-	CreateErr              error
-	UpdateVal              *resources.ResourceData
-	UpdateErr              error
-	DeleteErr              error
-	ImportVal              *resources.ResourceData
-	ImportErr              error
+	LoadStateFromResourcesVal  *state.State
+	LoadStateFromResourcesErr  error
+	PutResourceStateErr        error
+	DeleteResourceStateErr     error
+	CreateVal                  *resources.ResourceData
+	CreateErr                  error
+	UpdateVal                  *resources.ResourceData
+	UpdateErr                  error
+	DeleteErr                  error
+	ImportVal                  *resources.ResourceData
+	ImportErr                  error
 
 	// Tracking calls
-	ValidateCalledCount              int
-	LoadSpecCalledWithArgs           []LoadSpecArgs
-	GetResourceGraphCalledCount      int
-	LoadStateCalledCount             int
+	ValidateCalledCount                int
+	LoadSpecCalledWithArgs             []LoadSpecArgs
+	GetResourceGraphCalledCount        int
+	LoadStateCalledCount               int
 	LoadResourcesFromRemoteCalledCount int
-	LoadStateFromResourcesCalledCount int
-	PutResourceStateCalledWithArg    PutResourceStateArgs
-	DeleteResourceStateCalledWithArg *state.ResourceState
-	CreateCalledWithArg              CreateArgs
-	UpdateCalledWithArg              UpdateArgs
-	DeleteCalledWithArg              DeleteArgs
-	ImportCalledWithArg              ImportArgs
+	LoadStateFromResourcesCalledCount  int
+	PutResourceStateCalledWithArg      PutResourceStateArgs
+	DeleteResourceStateCalledWithArg   *state.ResourceState
+	CreateCalledWithArg                CreateArgs
+	UpdateCalledWithArg                UpdateArgs
+	DeleteCalledWithArg                DeleteArgs
+	ImportCalledWithArg                ImportArgs
 }
 
 // LoadSpecArgs stores arguments for LoadSpec calls
@@ -95,6 +98,10 @@ func NewMockProvider() *MockProvider {
 	return &MockProvider{
 		LoadSpecCalledWithArgs: make([]LoadSpecArgs, 0),
 	}
+}
+
+func (m *MockProvider) GetName() string {
+	return "mock"
 }
 
 func (m *MockProvider) GetSupportedKinds() []string {
@@ -163,6 +170,14 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
 	return m.ImportVal, m.ImportErr
+}
+
+func (m *MockProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	return nil, nil
+}
+
+func (m *MockProvider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	return nil, nil
 }
 
 // ResetCallCounters resets all call counters and argument trackers.

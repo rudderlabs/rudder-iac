@@ -6,22 +6,42 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
+
+type PropertyEntityProvider struct {
+	*PropertyProvider
+	*impProvider.PropertyImportProvider
+}
 
 type PropertyProvider struct {
 	client catalog.DataCatalog
 	log    logger.Logger
 }
 
-func NewPropertyProvider(dc catalog.DataCatalog) *PropertyProvider {
-	return &PropertyProvider{
+func NewPropertyProvider(dc catalog.DataCatalog, importDir string) *PropertyEntityProvider {
+
+	pp := &PropertyProvider{
 		client: dc,
 		log: logger.Logger{
 			Logger: logger.New("provider").With("type", "property"),
 		},
+	}
+
+	imp := impProvider.NewPropertyImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "property"),
+		},
+		importDir,
+	)
+
+	return &PropertyEntityProvider{
+		PropertyProvider:       pp,
+		PropertyImportProvider: imp,
 	}
 }
 
@@ -179,7 +199,6 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 		}
 	}
 	collection.Set(state.PropertyResourceType, resourceMap)
-
 	return collection, nil
 }
 
