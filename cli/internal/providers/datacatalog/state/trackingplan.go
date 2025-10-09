@@ -110,7 +110,14 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	t.ID = MustString(from, "id")
 	t.Name = MustString(from, "name")
 	t.Description = MustString(from, "description")
-	t.Version = int(MustFloat64(from, "version"))
+	// version can be either an int or a float64
+	// in our old stateful approach, we used to get the version as a float64 as we used json.Unmarshall to decode the state api's response into a map[string]interface{}
+	// in the stateless approach, we derive the state from the remote TrackingPlan which is a strongly typed struct where the version field is of type int
+	t.Version = Int(from, "version", 0)
+	if t.Version == 0 {
+		t.Version = int(Float64(from, "version", 0))
+	}
+
 	t.CreationType = MustString(from, "creationType")
 	t.WorkspaceID = MustString(from, "workspaceId")
 	t.CreatedAt = MustString(from, "createdAt")
