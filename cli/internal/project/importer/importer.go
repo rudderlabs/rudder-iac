@@ -32,6 +32,7 @@ func WorkspaceImport(
 	}
 
 	if importable.Len() == 0 {
+		fmt.Println("No resources to import")
 		return nil
 	}
 

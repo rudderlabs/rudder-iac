@@ -6,6 +6,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	SpecVersion = "rudder/v0.1"
+)
+
 type Spec struct {
 	Version  string                 `yaml:"version"`
 	Kind     string                 `yaml:"kind"`

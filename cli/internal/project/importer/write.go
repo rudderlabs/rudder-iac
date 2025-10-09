@@ -21,11 +21,6 @@ func Write(ctx context.Context, baseDir string, formatters formatter.Formatters,
 			return fmt.Errorf("creating directory %s: %w", filepath.Dir(path), err)
 		}
 
-		if f, err := os.Stat(path); err == nil {
-			if f != nil {
-			}
-		}
-
 		content, err := formatters.Format(
 			datum.Content,
 			filepath.Ext(path))

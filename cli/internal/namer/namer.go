@@ -15,8 +15,6 @@ import (
 
 var ErrDuplicateNameException = errors.New("duplicate name exception")
 
-const ExternalIdNamerScope = "externalIds"
-
 // Namer interface provides methods to generate unique names based on strategy and load existing names.
 type Namer interface {
 	Name(input ScopeName) (string, error)

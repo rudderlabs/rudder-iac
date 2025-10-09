@@ -12,7 +12,6 @@ type Resource struct {
 }
 
 type ResourceFileMetadata struct {
-	FilePath    string
 	MetadataRef string
 }
 

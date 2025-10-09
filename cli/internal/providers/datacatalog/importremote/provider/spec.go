@@ -9,10 +9,6 @@ import (
 )
 
 const (
-	SpecVersion = "rudder/v0.1"
-)
-
-const (
 	MetadataNameProperties  = "properties"
 	MetadataNameEvents      = "events"
 	MetadataNameCategories  = "categories"
@@ -39,7 +35,7 @@ func toImportSpec(
 	}
 
 	return &specs.Spec{
-		Version:  SpecVersion,
+		Version:  specs.SpecVersion,
 		Kind:     kind,
 		Metadata: metadataMap,
 		Spec:     data,
