@@ -8,8 +8,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -35,6 +37,10 @@ func New(client retlClient.RETLStore) *Provider {
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
 
 	return p
+}
+
+func (p *Provider) GetName() string {
+	return "retl"
 }
 
 func (p *Provider) GetSupportedKinds() []string {
@@ -231,4 +237,12 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 	}
 
 	return handler.Preview(ctx, ID, data, limit)
+}
+
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	return resources.NewResourceCollection(), nil
+}
+
+func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	return nil, nil
 }

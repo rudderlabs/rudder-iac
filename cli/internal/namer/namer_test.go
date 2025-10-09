@@ -52,7 +52,7 @@ func TestExternalIdNamer_Name(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for i, input := range tt.inputs {
-				result, err := n.Name(input)
+				result, err := n.Name(ScopeName{Name: input, Scope: "testscope"})
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected[i], result)
 			}
@@ -66,14 +66,14 @@ func TestExternalIdNamer_Load(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		names   []string
+		names   []ScopeName
 		wantErr bool
 		errMsg  string
 	}{
-		{"empty", []string{}, false, ""},
-		{"no duplicates", []string{"three", "four"}, false, ""},
-		{"with duplicates", []string{"one", "one"}, true, "loading name: one errored with: duplicate name exception"},
-		{"extra duplicates", []string{"test", "test", "test"}, true, "loading name: test errored with: duplicate name exception"},
+		{"empty", []ScopeName{}, false, ""},
+		{"no duplicates", []ScopeName{{Name: "three", Scope: "testscope"}, {Name: "four", Scope: "testscope"}}, false, ""},
+		{"with duplicates", []ScopeName{{Name: "one", Scope: "testscope"}, {Name: "one", Scope: "testscope"}}, true, "loading name: one errored with: duplicate name exception"},
+		{"extra duplicates", []ScopeName{{Name: "test", Scope: "testscope"}, {Name: "test", Scope: "testscope"}, {Name: "test", Scope: "testscope"}}, true, "loading name: test errored with: duplicate name exception"},
 	}
 
 	for _, tt := range tests {

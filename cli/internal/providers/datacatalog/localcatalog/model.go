@@ -8,11 +8,11 @@ import (
 )
 
 type Property struct {
-	LocalID     string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"propConfig"`
+	LocalID     string                 `mapstructure:"id" json:"id"`
+	Name        string                 `mapstructure:"name" json:"name"`
+	Description string                 `mapstructure:"description,omitempty" json:"description"`
+	Type        string                 `mapstructure:"type" json:"type"`
+	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig"`
 }
 
 type PropertySpec struct {

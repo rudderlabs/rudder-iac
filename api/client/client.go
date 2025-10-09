@@ -23,6 +23,7 @@ type Client struct {
 	Destinations *destinations
 	Connections  *connections
 	Accounts     *accounts
+	Workspaces   *workspaces
 }
 
 const BASE_URL = "https://api.rudderstack.com"
@@ -45,6 +46,7 @@ func New(accessToken string, options ...Option) (*Client, error) {
 	client.Destinations = &destinations{service: client.service("/v2/destinations")}
 	client.Connections = &connections{service: client.service("/v2/connections")}
 	client.Accounts = &accounts{service: client.service("/v2/accounts")}
+	client.Workspaces = &workspaces{client: client}
 
 	for _, o := range options {
 		if err := o(client); err != nil {
@@ -95,6 +97,11 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 			if err != nil {
 				return nil, fmt.Errorf("could not parse error response from API: %w", err)
 			}
+		}
+
+		if apiError.HTTPStatusCode == 403 && strings.Contains(apiError.Message, "Flag is not enabled for your account") {
+			// return an empty byte array without error if the corresponding resource's flag is not enabled for the user's account
+			return []byte{}, nil
 		}
 
 		return nil, apiError

@@ -18,9 +18,9 @@ type MockSourceClient struct {
 	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
 
-func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.EventStreamSource, error) {
+func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
 	m.createCalled = true
-	return &sourceClient.EventStreamSource{
+	return &sourceClient.CreateUpdateSourceResponse{
 		ExternalID: req.ExternalID,
 		Name:       req.Name,
 		Type:       req.Type,
@@ -28,9 +28,9 @@ func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateS
 	}, nil
 }
 
-func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sourceClient.UpdateSourceRequest) (*sourceClient.EventStreamSource, error) {
+func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sourceClient.UpdateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
 	m.updateCalled = true
-	return &sourceClient.EventStreamSource{
+	return &sourceClient.CreateUpdateSourceResponse{
 		ID:         sourceID,
 		ExternalID: "external-123",
 		Name:       req.Name,

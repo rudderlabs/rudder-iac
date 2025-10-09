@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -17,6 +18,7 @@ type Loader interface {
 }
 
 type ProjectProvider interface {
+	GetName() string
 	GetSupportedKinds() []string
 	GetSupportedTypes() []string
 	Validate() error
@@ -27,6 +29,7 @@ type ProjectProvider interface {
 type Provider interface {
 	ProjectProvider
 	syncer.SyncProvider
+	importremote.WorkspaceImporter
 }
 
 type Project interface {

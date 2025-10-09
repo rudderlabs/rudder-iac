@@ -283,32 +283,44 @@ func diffPropertyReferences(left []PropertyReference, right []PropertyReference)
 	return false
 }
 
-func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRemoteId func(string, string) (string, error)) error {
+// FromRemoteVariant converts a remote variant into an Variant struct
+// usePropertyRefsForDependencies is used to determine if the property ID should be converted to a propertyRef or not
+// for CustomTypeArgs/TrackingPlanArgs(which becomes the state's input field later) we need to convert propertyIDs into propertyRefs
+// for CustomTypeState/TrackingPlanState(which becomes the state's output field later), we use the propertyID as is
+func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRemoteId func(string, string) (string, error), usePropertyRefsForDependencies bool) error {
+	getPropRefOrID := func(remoteID string) (any, error) {
+		if usePropertyRefsForDependencies {
+			urn, err := getURNFromRemoteId(PropertyResourceType, remoteID)
+			if err != nil {
+				return remoteID, nil
+			}
+			return resources.PropertyRef{
+				URN:      urn,
+				Property: "id",
+			}, nil
+		}
+		return remoteID, nil
+	}
+
 	v.Type = remoteVariant.Type
 
-	// set discriminator as a propertyRef
-	discriminatorURN, err := getURNFromRemoteId(PropertyResourceType, remoteVariant.Discriminator)
+	// set discriminator as a propertyRef or ID
+	discriminator, err := getPropRefOrID(remoteVariant.Discriminator)
 	if err != nil {
 		return err
 	}
-	v.Discriminator = resources.PropertyRef{
-		URN:      discriminatorURN,
-		Property: "id",
-	}
+	v.Discriminator = discriminator
 
 	v.Cases = make([]VariantCase, 0, len(remoteVariant.Cases))
 	for _, remoteCase := range remoteVariant.Cases {
 		properties := make([]PropertyReference, len(remoteCase.Properties))
 		for i, prop := range remoteCase.Properties {
-			urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+			propRefOrID, err := getPropRefOrID(prop.ID)
 			if err != nil {
 				return err
 			}
 			properties[i] = PropertyReference{
-				ID: resources.PropertyRef{
-					URN:      urn,
-					Property: "id",
-				},
+				ID: propRefOrID,
 				Required: prop.Required,
 			}
 		}
@@ -322,15 +334,12 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 
 	v.Default = make([]PropertyReference, len(remoteVariant.Default))
 	for i, prop := range remoteVariant.Default {
-		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+		propRefOrID, err := getPropRefOrID(prop.ID)
 		if err != nil {
 			return err
 		}
 		v.Default[i] = PropertyReference{
-			ID: resources.PropertyRef{
-				URN:      urn,
-				Property: "id",
-			},
+			ID: propRefOrID,
 			Required: prop.Required,
 		}
 	}

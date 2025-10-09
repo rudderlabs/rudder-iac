@@ -197,7 +197,7 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	for _, variant := range customType.Variants {
 		toAdd := Variant{}
 
-		if err := toAdd.FromRemoteVariant(variant, getURNFromRemoteId); err != nil {
+		if err := toAdd.FromRemoteVariant(variant, getURNFromRemoteId, true); err != nil {
 			return fmt.Errorf("processing %s variant %s: %w", variant.Type, variant.Discriminator, err)
 		}
 		variants = append(variants, toAdd)
