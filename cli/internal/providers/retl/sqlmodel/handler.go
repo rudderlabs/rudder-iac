@@ -156,7 +156,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
-		IsEnabled:            data[EnabledKey].(bool),
+		Enabled:              data[EnabledKey].(bool),
 	}
 
 	// Call API to create RETL source

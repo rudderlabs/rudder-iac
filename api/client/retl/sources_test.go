@@ -49,7 +49,7 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceType:           retl.ModelSourceType,
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
-		IsEnabled:            true,
+		Enabled:              true,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)
