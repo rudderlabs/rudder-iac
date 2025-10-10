@@ -14,6 +14,50 @@ import (
 // It provides the foundational data structure for conditional validation with PropertyRef support.
 type Variants []Variant
 
+// FromCatalogVariants converts catalog.Variants (from upstream API) to state.Variants for comparison
+// This is used in DiffUpstream to compare upstream variants with local variants
+func (v *Variants) FromCatalogVariants(catalogVariants catalog.Variants) {
+	*v = make(Variants, len(catalogVariants))
+	for idx, variant := range catalogVariants {
+		stateVariant := Variant{
+			Type:          variant.Type,
+			Discriminator: variant.Discriminator,
+			Cases:         make([]VariantCase, len(variant.Cases)),
+			Default:       make([]PropertyReference, len(variant.Default)),
+		}
+
+		// Convert cases
+		for caseIdx, variantCase := range variant.Cases {
+			stateCase := VariantCase{
+				DisplayName: variantCase.DisplayName,
+				Match:       variantCase.Match,
+				Description: variantCase.Description,
+				Properties:  make([]PropertyReference, len(variantCase.Properties)),
+			}
+
+			// Convert case properties
+			for propIdx, property := range variantCase.Properties {
+				stateCase.Properties[propIdx] = PropertyReference{
+					ID:       property.ID,
+					Required: property.Required,
+				}
+			}
+
+			stateVariant.Cases[caseIdx] = stateCase
+		}
+
+		// Convert default properties
+		for propIdx, property := range variant.Default {
+			stateVariant.Default[propIdx] = PropertyReference{
+				ID:       property.ID,
+				Required: property.Required,
+			}
+		}
+
+		(*v)[idx] = stateVariant
+	}
+}
+
 func (v Variants) ToCatalogVariants() catalog.Variants {
 	variants := make(catalog.Variants, 0)
 
@@ -133,8 +177,8 @@ func (v *Variants) FromResourceData(from []map[string]any) {
 type Variant struct {
 	Type          string              `json:"type"`
 	Discriminator any                 `json:"discriminator"`
-	Cases         []VariantCase       `json:"cases"`
-	Default       []PropertyReference `json:"default"`
+	Cases         []VariantCase       `json:"cases,omitempty"`
+	Default       []PropertyReference `json:"default,omitempty"`
 }
 
 func (v *Variant) FromLocalCatalogVariant(
@@ -180,9 +224,9 @@ func (v *Variant) FromLocalCatalogVariant(
 
 type VariantCase struct {
 	DisplayName string              `json:"display_name"`
-	Match       []any               `json:"match"`
-	Description string              `json:"description"`
-	Properties  []PropertyReference `json:"properties"`
+	Match       []any               `json:"match,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Properties  []PropertyReference `json:"properties,omitempty"`
 }
 
 type PropertyReference struct {
@@ -320,7 +364,7 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 				return err
 			}
 			properties[i] = PropertyReference{
-				ID: propRefOrID,
+				ID:       propRefOrID,
 				Required: prop.Required,
 			}
 		}
@@ -339,7 +383,7 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 			return err
 		}
 		v.Default[i] = PropertyReference{
-			ID: propRefOrID,
+			ID:       propRefOrID,
 			Required: prop.Required,
 		}
 	}

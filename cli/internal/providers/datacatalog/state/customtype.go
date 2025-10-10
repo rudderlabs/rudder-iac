@@ -146,8 +146,6 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 
 		for idx, item := range itemTypes.([]any) {
 
-			fmt.Printf("item: %v\n", item)
-
 			if !localcatalog.CustomTypeRegex.Match([]byte(item.(string))) {
 				continue
 			}
@@ -279,8 +277,11 @@ func (args *CustomTypeArgs) DiffUpstream(upstream *catalog.CustomType) bool {
 		}
 	}
 
-	// Skip variants comparison as per requirement (not handling in this PR)
-	return false
+	// Compare variants using the FromCatalogVariants helper and Diff method
+	var upstreamVariants Variants
+	upstreamVariants.FromCatalogVariants(upstream.Variants)
+
+	return args.Variants.Diff(upstreamVariants)
 }
 
 // Diff compares two CustomTypeArgs instances and returns true if they differ
