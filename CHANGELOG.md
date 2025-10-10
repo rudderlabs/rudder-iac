@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.11.0](https://github.com/rudderlabs/rudder-iac/compare/v0.10.0...v0.11.0) (2025-10-10)
+
+
+### Features
+
+* add APIs for event stream tracking plan connections ([#182](https://github.com/rudderlabs/rudder-iac/issues/182)) ([12003ac](https://github.com/rudderlabs/rudder-iac/commit/12003acb1cac03819fc68c00da91e04ac3f385f6))
+* add conconcurrency flag to apply and destroy commands ([#186](https://github.com/rudderlabs/rudder-iac/issues/186)) ([5c2258a](https://github.com/rudderlabs/rudder-iac/commit/5c2258aed9db54da3c068b0a7f6d193a19ad4768))
+* add CRUD APIs for event stream sources ([#172](https://github.com/rudderlabs/rudder-iac/issues/172)) ([220267f](https://github.com/rudderlabs/rudder-iac/commit/220267fe697ea855f1042edaee38aa6ac1ef57b3))
+* add Enabled field to create RETL source requests ([#175](https://github.com/rudderlabs/rudder-iac/issues/175)) ([4232437](https://github.com/rudderlabs/rudder-iac/commit/423243702dce72541c199bf83c0bd3680825f1d4))
+* add support for event stream source governance validations ([#190](https://github.com/rudderlabs/rudder-iac/issues/190)) ([71ecef8](https://github.com/rudderlabs/rudder-iac/commit/71ecef8c66537f97de44373494e5dd5833af5b15))
+* add support for running operations concurrently ([#167](https://github.com/rudderlabs/rudder-iac/issues/167)) ([cae599c](https://github.com/rudderlabs/rudder-iac/commit/cae599c52a751d2a6035e0a4cb96711dc1376f8a))
+* added formatter with ability to format data of specific extension ([#206](https://github.com/rudderlabs/rudder-iac/issues/206)) ([b6ae6ca](https://github.com/rudderlabs/rudder-iac/commit/b6ae6ca815e66b0fbd80e6f73a16af8dbffb752d))
+* implement event-stream-source provider ([#181](https://github.com/rudderlabs/rudder-iac/issues/181)) ([58a9da9](https://github.com/rudderlabs/rudder-iac/commit/58a9da99034f63d5e426394295e160083698f27f))
+* ruddertyper orchestrating component ([#183](https://github.com/rudderlabs/rudder-iac/issues/183)) ([3000ff7](https://github.com/rudderlabs/rudder-iac/commit/3000ff744133831817b023e403423b9883d625aa))
+* separate out the importable resources in the print diff ([#201](https://github.com/rudderlabs/rudder-iac/issues/201)) ([2670ca1](https://github.com/rudderlabs/rudder-iac/commit/2670ca15dba01e04aedb6210081bcec8cad0ce5c))
+* use new event stream sources APIs ([#188](https://github.com/rudderlabs/rudder-iac/issues/188)) ([86e7c65](https://github.com/rudderlabs/rudder-iac/commit/86e7c65c17c143c564778dc2623a4b116063fd68))
+
+
+### Bug Fixes
+
+* enabled field of EventStreamSource is defaulting to false ([#207](https://github.com/rudderlabs/rudder-iac/issues/207)) ([1f84442](https://github.com/rudderlabs/rudder-iac/commit/1f84442fcf7e2ea5130b7bf4d20da28e53990b41))
+* incorrect field type used when configuring tracking plan connection ([#212](https://github.com/rudderlabs/rudder-iac/issues/212)) ([74cd314](https://github.com/rudderlabs/rudder-iac/commit/74cd314ba4e0c2b0ef75721a15253b37564fbbc9))
+* incorrect response schema used in get event stream sources API ([#209](https://github.com/rudderlabs/rudder-iac/issues/209)) ([dfe7aca](https://github.com/rudderlabs/rudder-iac/commit/dfe7aca4d03b908c07629a498c0f861df649575e))
+* move the e2e tests to generic apply and destroy ([#211](https://github.com/rudderlabs/rudder-iac/issues/211)) ([6415b95](https://github.com/rudderlabs/rudder-iac/commit/6415b95d49035ccfaa05de6c9fa017cdc60e3d2a))
+* panic when casting tracking plan version to float64 ([#210](https://github.com/rudderlabs/rudder-iac/issues/210)) ([7ed1701](https://github.com/rudderlabs/rudder-iac/commit/7ed1701f43101273e7e65ac819d5ffe8bb1deef7))
+* tests failing in main branch ([#187](https://github.com/rudderlabs/rudder-iac/issues/187)) ([a3dca92](https://github.com/rudderlabs/rudder-iac/commit/a3dca923ed9835f6604a2c491d6e06c419b390eb))
+
+
+### Miscellaneous
+
+* add support to reconstruct state for custom types and properties ([#185](https://github.com/rudderlabs/rudder-iac/issues/185)) ([a6c191c](https://github.com/rudderlabs/rudder-iac/commit/a6c191c0df0bb9e374675f39bd67c5a0073c7d69))
+* apiClient - add projectId for events, categories, properties and custom types ([#156](https://github.com/rudderlabs/rudder-iac/issues/156)) ([c407b52](https://github.com/rudderlabs/rudder-iac/commit/c407b52050dd51a37474b3bfe10270ffc1a3986a))
+* import apply changes introducing capturing of workspace information and using it in planning operations ([#195](https://github.com/rudderlabs/rudder-iac/issues/195)) ([a7e8e93](https://github.com/rudderlabs/rudder-iac/commit/a7e8e934c4792e43da34592cee9eadc2480f4fb2))
+* new workspace importer interface ([#192](https://github.com/rudderlabs/rudder-iac/issues/192)) ([6263dcc](https://github.com/rudderlabs/rudder-iac/commit/6263dcc24b8cc1c51a60fcf3078fcc362cdd578d))
+* reconstruct state for tracking plans ([#194](https://github.com/rudderlabs/rudder-iac/issues/194)) ([f8c64e5](https://github.com/rudderlabs/rudder-iac/commit/f8c64e535b95474dea5733363b33e984917af051))
+
 ## [0.10.0](https://github.com/rudderlabs/rudder-iac/compare/v0.9.0...v0.10.0) (2025-09-18)
 
 
