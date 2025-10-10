@@ -93,19 +93,19 @@ func ExtractCategories(s *specs.Spec) ([]Category, error) {
 
 // CustomType represents a user-defined custom type
 type CustomType struct {
-	LocalID     string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
-	Variants    Variants               `json:"variants,omitempty"`
+	LocalID     string               `mapstructure:"id" json:"id"`
+	Name        string               `mapstructure:"name" json:"name"`
+	Description string               `mapstructure:"description,omitempty" json:"description,omitempty"`
+	Type        string               `mapstructure:"type" json:"type"`
+	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
+	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty"`
+	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type
 type CustomTypeProperty struct {
-	Ref      string `json:"$ref"`
-	Required bool   `json:"required"`
+	Ref      string `mapstructure:"$ref" json:"$ref"`
+	Required bool   `mapstructure:"required" json:"required"`
 }
 
 // CustomTypeSpec represents the spec section of a custom-types resource

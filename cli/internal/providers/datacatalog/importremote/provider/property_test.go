@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/samber/lo"
@@ -118,11 +118,11 @@ func TestFormatForExport(t *testing.T) {
 			},
 		}
 
-		provider := &PropertyImportProvider{
-			client:   mockClient,
-			log:      *logger.New("test"),
-			filepath: "data-catalog",
-		}
+		provider := NewPropertyImportProvider(
+			mockClient,
+			*logger.New("test"),
+			"data-catalog",
+		)
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
@@ -138,7 +138,10 @@ func TestFormatForExport(t *testing.T) {
 		require.Equal(t, 1, len(result))
 
 		entity := result[0]
-		assert.True(t, strings.HasSuffix(entity.RelativePath, "data-catalog"))
+		assert.Equal(t, entity.RelativePath, filepath.Join(
+			"data-catalog",
+			"properties/properties.yaml",
+		))
 
 		spec, ok := entity.Content.(*specs.Spec)
 		require.True(t, ok)

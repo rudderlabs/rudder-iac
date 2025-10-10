@@ -176,8 +176,8 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	for key, value := range customType.Config {
 		args.Config[key] = value
 	}
-	
-	properties := make([]*CustomTypeProperty,0, len(customType.Properties))
+
+	properties := make([]*CustomTypeProperty, 0, len(customType.Properties))
 	for _, prop := range customType.Properties {
 		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
 		if err != nil {
@@ -192,8 +192,8 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 		})
 	}
 	args.Properties = properties
-	
-	variants := make([]Variant,0, len(customType.Variants))
+
+	variants := make([]Variant, 0, len(customType.Variants))
 	for _, variant := range customType.Variants {
 		toAdd := Variant{}
 
@@ -204,7 +204,6 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	}
 	args.Variants = variants
 
-	
 	if len(customType.ItemDefinitions) != 0 {
 		for _, item := range customType.ItemDefinitions {
 			id := MustString(item.(map[string]interface{}), "id")
@@ -234,6 +233,55 @@ func (args *CustomTypeArgs) PropertyByID(id string) *CustomTypeProperty {
 		}
 	}
 	return nil
+}
+
+// DiffUpstream compares CustomTypeArgs with an upstream CustomType and returns true if they are different
+func (args *CustomTypeArgs) DiffUpstream(upstream *catalog.CustomType) bool {
+	if args.Name != upstream.Name {
+		return true
+	}
+
+	if args.Description != upstream.Description {
+		return true
+	}
+
+	if args.Type != upstream.Type {
+		return true
+	}
+
+	// Compare config maps using deep equality
+	if !reflect.DeepEqual(args.Config, upstream.Config) {
+		return true
+	}
+
+	// Compare properties arrays
+	if len(args.Properties) != len(upstream.Properties) {
+		return true
+	}
+
+	// Create a map of upstream properties for easier lookup
+	upstreamProps := make(map[string]catalog.CustomTypeProperty)
+	for _, prop := range upstream.Properties {
+		upstreamProps[prop.ID] = prop
+	}
+
+	// Check if all local properties exist in upstream with same values
+	for _, localProp := range args.Properties {
+		upstreamProp, ok := upstreamProps[localProp.ID]
+		if !ok {
+			return true
+		}
+
+		if localProp.Required != upstreamProp.Required {
+			return true
+		}
+	}
+
+	// Compare variants using the FromCatalogVariants helper and Diff method
+	var upstreamVariants Variants
+	upstreamVariants.FromCatalogVariants(upstream.Variants)
+
+	return args.Variants.Diff(upstreamVariants)
 }
 
 // Diff compares two CustomTypeArgs instances and returns true if they differ
@@ -335,7 +383,7 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	s.WorkspaceID = MustString(from, "workspaceId")
 	s.CreatedAt = MustString(from, "createdAt")
 	s.UpdatedAt = MustString(from, "updatedAt")
-	
+
 	// version can be either an int or a float64
 	// in our old stateful approach, we used to get the version as a float64 as we used json.Unmarshall to decode the state api's response into a map[string]interface{}
 	// in the stateless approach, we derive the state from the remote CustomType which is a strongly typed struct where the version field is of type int
@@ -344,8 +392,8 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 	if s.Version == 0 {
 		s.Version = int(Float64(from, "version", 0))
 	}
-	
-	if itemDef, ok :=from["itemDefinitions"].([]any); ok {
+
+	if itemDef, ok := from["itemDefinitions"].([]any); ok {
 		s.ItemDefinitions = itemDef
 	}
 	s.CustomTypeArgs.FromResourceData(
@@ -373,18 +421,18 @@ func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, g
 					s.ItemDefinitions = append(s.ItemDefinitions, itemMap["name"])
 					break
 				}
-				
+
 			}
 		}
 	}
-	
+
 	// create custom type args
 	s.CustomTypeArgs.LocalID = customType.ExternalId
 	s.CustomTypeArgs.Name = customType.Name
 	s.CustomTypeArgs.Description = customType.Description
 	s.CustomTypeArgs.Type = customType.Type
 	s.CustomTypeArgs.Config = customType.Config
-	
+
 	// create properties and add them to custom type args
 	s.CustomTypeArgs.Properties = make([]*CustomTypeProperty, len(customType.Properties))
 	for idx, prop := range customType.Properties {
@@ -394,7 +442,7 @@ func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, g
 			RefToID:  prop.ID,
 		}
 	}
-	
+
 	// create variants and add them to custom type args
 	variants := make([]Variant, len(customType.Variants))
 	for idx, variant := range customType.Variants {
@@ -406,7 +454,7 @@ func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, g
 			properties := make([]PropertyReference, len(remoteCase.Properties))
 			for i, prop := range remoteCase.Properties {
 				properties[i] = PropertyReference{
-					ID: prop.ID,
+					ID:       prop.ID,
 					Required: prop.Required,
 				}
 			}
@@ -418,16 +466,16 @@ func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, g
 			})
 		}
 		v.Cases = cases
-		
+
 		defaultProps := make([]PropertyReference, len(variant.Default))
 		for i, prop := range variant.Default {
 			defaultProps[i] = PropertyReference{
-				ID: prop.ID,
+				ID:       prop.ID,
 				Required: prop.Required,
 			}
 		}
 		v.Default = defaultProps
-		
+
 		variants[idx] = *v
 	}
 	s.CustomTypeArgs.Variants = variants

@@ -104,6 +104,10 @@ func (m *EmptyCatalog) DeleteCustomType(ctx context.Context, customTypeID string
 	return nil
 }
 
+func (m *EmptyCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
 func (m *EmptyCatalog) ReadState(ctx context.Context) (*catalog.State, error) {
 	return nil, nil
 }
