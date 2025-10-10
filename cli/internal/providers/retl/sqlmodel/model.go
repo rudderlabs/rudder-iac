@@ -67,7 +67,7 @@ type SQLModelSpec struct {
 	AccountID        string           `mapstructure:"account_id"`
 	PrimaryKey       string           `mapstructure:"primary_key"`
 	SourceDefinition SourceDefinition `mapstructure:"source_definition"`
-	Enabled          bool             `mapstructure:"enabled"`
+	Enabled          *bool            `mapstructure:"enabled"`
 }
 
 // SQLModelResource represents a processed SQL Model resource ready for API operations

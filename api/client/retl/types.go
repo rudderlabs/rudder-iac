@@ -57,6 +57,7 @@ type RETLSourceCreateRequest struct {
 	SourceType           SourceType         `json:"sourceType"`
 	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
+	Enabled              bool               `json:"enabled"`
 }
 
 type RETLSourceUpdateRequest struct {

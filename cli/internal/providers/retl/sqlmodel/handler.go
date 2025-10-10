@@ -67,6 +67,12 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		sqlStr = string(sqlContent)
 	}
 
+	// Default Enabled to true if not specified
+	enabled := true
+	if spec.Enabled != nil {
+		enabled = *spec.Enabled
+	}
+
 	// Create resource with SQL directly from spec
 	h.resources[spec.ID] = &SQLModelResource{
 		ID:               spec.ID,
@@ -75,7 +81,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		AccountID:        spec.AccountID,
 		PrimaryKey:       spec.PrimaryKey,
 		SourceDefinition: string(spec.SourceDefinition),
-		Enabled:          spec.Enabled,
+		Enabled:          enabled,
 		SQL:              sqlStr,
 	}
 
@@ -150,16 +156,13 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
-	if enabled, ok := data[EnabledKey].(bool); ok && !enabled {
-		return nil, fmt.Errorf("cannot create disabled sql model")
-	}
-
 	source := &retlClient.RETLSourceCreateRequest{
 		Name:                 data[DisplayNameKey].(string),
 		Config:               toRETLSQLModelConfig(data),
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
+		Enabled:              data[EnabledKey].(bool),
 	}
 
 	// Call API to create RETL source
