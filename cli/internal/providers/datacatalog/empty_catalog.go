@@ -151,3 +151,7 @@ func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomTyp
 func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
 	return nil, nil
 }
+
+func (m *EmptyCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
