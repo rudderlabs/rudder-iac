@@ -32,7 +32,7 @@ func New(client catalog.DataCatalog) *Provider {
 			pstate.EventResourceType:        NewEventProvider(client),
 			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
 			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
-			pstate.CategoryResourceType:     NewCategoryProvider(client),
+			pstate.CategoryResourceType:     NewCategoryProvider(client, importDir),
 		},
 	}
 }
