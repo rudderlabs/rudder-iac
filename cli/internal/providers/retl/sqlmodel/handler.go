@@ -68,6 +68,12 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	}
 
 	// Create resource with SQL directly from spec
+	// Default Enabled to true if not specified
+	enabled := true
+	if spec.Enabled != nil {
+		enabled = *spec.Enabled
+	}
+
 	h.resources[spec.ID] = &SQLModelResource{
 		ID:               spec.ID,
 		DisplayName:      spec.DisplayName,
@@ -75,7 +81,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		AccountID:        spec.AccountID,
 		PrimaryKey:       spec.PrimaryKey,
 		SourceDefinition: string(spec.SourceDefinition),
-		Enabled:          spec.Enabled,
+		Enabled:          enabled,
 		SQL:              sqlStr,
 	}
 
