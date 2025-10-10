@@ -63,7 +63,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetCategory(mockCategory)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "User Actions",
@@ -93,7 +93,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("creation failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "User Actions",
@@ -123,7 +123,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetCategory(updatedCategory)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "Updated User Actions",
@@ -164,7 +164,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("update failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "Updated User Actions",
@@ -196,7 +196,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			// No error set, should succeed
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
@@ -219,7 +219,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetError(notFoundErr)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
@@ -238,7 +238,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("deletion failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
