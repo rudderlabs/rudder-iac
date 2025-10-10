@@ -67,13 +67,13 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		sqlStr = string(sqlContent)
 	}
 
-	// Create resource with SQL directly from spec
 	// Default Enabled to true if not specified
 	enabled := true
 	if spec.Enabled != nil {
 		enabled = *spec.Enabled
 	}
 
+	// Create resource with SQL directly from spec
 	h.resources[spec.ID] = &SQLModelResource{
 		ID:               spec.ID,
 		DisplayName:      spec.DisplayName,
