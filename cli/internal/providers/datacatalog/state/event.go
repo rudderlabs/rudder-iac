@@ -45,6 +45,37 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 	}
 }
 
+func (args *EventArgs) DiffUpstream(upstream *catalog.Event) bool {
+	if args.Name != upstream.Name {
+		return true
+	}
+
+	if args.Description != upstream.Description {
+		return true
+	}
+
+	if args.EventType != upstream.EventType {
+		return true
+	}
+
+	if args.CategoryId != nil && upstream.CategoryId == nil {
+		return true
+	}
+
+	if args.CategoryId == nil && upstream.CategoryId != nil {
+		return true
+	}
+
+	if args.CategoryId != nil && upstream.CategoryId != nil {
+		if strId, ok := args.CategoryId.(string); ok {
+			if *upstream.CategoryId != strId {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // FromRemoteEvent converts from remote API Event to EventArgs
 func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
 	args.Name = event.Name
