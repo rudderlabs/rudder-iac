@@ -19,7 +19,6 @@ const (
 func WorkspaceImport(
 	ctx context.Context,
 	location string,
-	project project.Project,
 	p project.Provider) error {
 
 	resourceGraph, err := p.GetResourceGraph()
@@ -27,7 +26,7 @@ func WorkspaceImport(
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
 
-	idNamer, err := initNamer(p, resourceGraph)
+	idNamer, err := initNamer(resourceGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -61,7 +60,7 @@ func WorkspaceImport(
 	return nil
 }
 
-func initNamer(p project.Provider, graph *resources.Graph) (namer.Namer, error) {
+func initNamer(graph *resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 
 	resourcesMap := graph.Resources()
