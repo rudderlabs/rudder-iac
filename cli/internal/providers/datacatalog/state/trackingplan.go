@@ -253,6 +253,98 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 	return diffed
 }
 
+func (args *TrackingPlanArgs) DiffUpstream(upstream *catalog.TrackingPlanWithIdentifiers) bool {
+	if args.Name != upstream.Name {
+		return true
+	}
+
+	if upstream.Description != nil {
+		if args.Description != *upstream.Description {
+			return true
+		}
+	} else if args.Description != "" {
+		return true
+	}
+
+	if len(args.Events) != len(upstream.Events) {
+		return true
+	}
+
+	upstreamEvents := make(map[string]*catalog.TrackingPlanEventPropertyIdentifiers)
+	for _, event := range upstream.Events {
+		upstreamEvents[event.ID] = &event
+	}
+
+	for _, localEvent := range args.Events {
+		upstreamEvent, exists := upstreamEvents[localEvent.ID.(string)]
+		if !exists {
+			return true
+		}
+
+		if localEvent.AllowUnplanned != upstreamEvent.AdditionalProperties {
+			return true
+		}
+
+		if localEvent.IdentitySection != upstreamEvent.IdentitySection {
+			return true
+		}
+
+		if len(localEvent.Properties) != len(upstreamEvent.Properties) {
+			return true
+		}
+
+		upstreamProps := make(map[string]*catalog.TrackingPlanEventProperty)
+		for _, prop := range upstreamEvent.Properties {
+			upstreamProps[prop.ID] = prop
+		}
+
+		for _, localProp := range localEvent.Properties {
+			upstreamProp, exists := upstreamProps[localProp.LocalID]
+			if !exists {
+				return true
+			}
+
+			if localProp.Required != upstreamProp.Required {
+				return true
+			}
+
+			if !diffProperties(localProp.Properties, upstreamProp.Properties) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func diffProperties(localProps []*TrackingPlanPropertyArgs, upstreamProps []*catalog.TrackingPlanEventProperty) bool {
+	if len(localProps) != len(upstreamProps) {
+		return false
+	}
+
+	upstreamPropMap := make(map[string]*catalog.TrackingPlanEventProperty)
+	for _, prop := range upstreamProps {
+		upstreamPropMap[prop.ID] = prop
+	}
+
+	for _, localProp := range localProps {
+		upstreamProp, exists := upstreamPropMap[localProp.ID.(string)]
+		if !exists {
+			return false
+		}
+
+		if localProp.Required != upstreamProp.Required {
+			return false
+		}
+
+		if !diffProperties(localProp.Properties, upstreamProp.Properties) {
+			return false
+		}
+	}
+
+	return true
+}
+
 type TrackingPlanEventArgs struct {
 	ID              any
 	LocalID         string

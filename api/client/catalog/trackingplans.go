@@ -189,6 +189,7 @@ type TrackingPlanStore interface {
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
 	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
+	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
 
 // TODO: Make this create idempotent so that we can call it multiple times without error
@@ -418,4 +419,22 @@ func (c *RudderDataCatalog) UpdateTrackingPlanEvent(ctx context.Context, id stri
 	}
 
 	return &trackingPlan, nil
+}
+
+func (c *RudderDataCatalog) SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/tracking-plans/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

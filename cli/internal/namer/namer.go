@@ -13,11 +13,16 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core" // Import for NameRegistry
 )
 
+var (
+	StrategyKebabCase = NewKebabCase()
+	StrategySnakeCase = NewSnakeCase()
+)
+
 var ErrDuplicateNameException = errors.New("duplicate name exception")
 
 // Namer interface provides methods to generate unique names based on strategy and load existing names.
 type Namer interface {
-	Name(input ScopeName) (string, error)
+	Name(input ScopeName, options ...NamingOptions) (string, error)
 	Load([]ScopeName) error
 }
 
@@ -42,13 +47,27 @@ func NewExternalIdNamer(strategy NamingStrategy) Namer {
 	}
 }
 
+type NamingOptions struct {
+	Strategy NamingStrategy
+}
+
+func WithStrategy(strategy NamingStrategy) NamingOptions {
+	return NamingOptions{
+		Strategy: strategy,
+	}
+}
+
 // Name generates a unique name using the strategy and handles collisions.
-func (p *ExternalIdNamer) Name(input ScopeName) (string, error) {
+func (p *ExternalIdNamer) Name(input ScopeName, options ...NamingOptions) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	baseName := p.strategy.Name(input.Name)
+	strategy := p.strategy
+	for _, option := range options {
+		strategy = option.Strategy
+	}
 
+	baseName := strategy.Name(input.Name)
 	// The reason we are generating id uniquely everytime we register name is
 	// as we just need to make sure that the name is unique within the scope.
 	registered, err := p.RegisterName(uuid.New().String(), input.Scope, baseName)
@@ -120,4 +139,26 @@ func (s *KebabCase) Name(input string) string {
 	}
 
 	return strings.Trim(result.String(), "-")
+}
+
+func NewSnakeCase() NamingStrategy {
+	return &SnakeCase{}
+}
+
+type SnakeCase struct{}
+
+func (s *SnakeCase) Name(input string) string {
+	var result strings.Builder
+	input = strings.ToLower(input)
+
+	for i, r := range input {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+			continue
+		}
+		if i > 0 && result.Len() > 0 && result.String()[result.Len()-1] != '_' {
+			result.WriteRune('_')
+		}
+	}
+	return strings.Trim(result.String(), "_")
 }
