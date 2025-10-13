@@ -37,6 +37,8 @@ type handler interface {
 
 var _ project.Provider = &Provider{}
 
+const importDir = "event-stream"
+
 type Provider struct {
 	kindToType map[string]string
 	handlers   map[string]handler
@@ -49,7 +51,7 @@ func New(client esClient.EventStreamStore) *Provider {
 		},
 		handlers: make(map[string]handler),
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client)
+	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	return p
 }
 
@@ -193,7 +195,18 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 }
 
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	return nil, nil
+	collection := resources.NewResourceCollection()
+	for _, handler := range p.handlers {
+		resources, err := handler.LoadImportable(ctx, idNamer)
+		if err != nil {
+			return nil, fmt.Errorf("loading importable resources from handler %w", err)
+		}
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collection for handler %w", err)
+		}
+	}
+	return collection, nil
 }
 
 func (p *Provider) FormatForExport(
@@ -202,7 +215,20 @@ func (p *Provider) FormatForExport(
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]importremote.FormattableEntity, error) {
-	return nil, nil
+	result := make([]importremote.FormattableEntity, 0)
+	for _, handler := range p.handlers {
+		entities, err := handler.FormatForExport(
+			ctx,
+			collection,
+			idNamer,
+			inputResolver,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("formatting for export for handler %w", err)
+		}
+		result = append(result, entities...)
+	}
+	return result, nil
 }
 
 func (p *Provider) GetName() string {
