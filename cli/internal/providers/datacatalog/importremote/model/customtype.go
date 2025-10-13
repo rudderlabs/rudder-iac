@@ -83,37 +83,33 @@ func (ct *ImportableCustomType) fromUpstream(
 		})
 	}
 
-	// Resolve custom type references in Config["itemTypes"]
-	// ItemDefinitions contain the actual custom type data with IDs
-	if len(upstream.ItemDefinitions) > 0 {
-		// We only support one item definition currently
-		for _, item := range upstream.ItemDefinitions {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-
-			itemID, ok := itemMap["id"].(string)
-			if !ok || itemID == "" {
-				continue
-			}
-
-			customTypeRef, err := resolver.ResolveToReference(
-				state.CustomTypeResourceType,
-				itemID,
-			)
-			if err != nil {
-				return fmt.Errorf("custom type reference resolution for itemTypes in custom type: %s, item: %s: %w",
-					ct.CustomType.LocalID, itemID, err)
-			}
-
-			if customTypeRef == "" {
-				return fmt.Errorf("resolved custom type reference is empty for itemTypes: %s", itemID)
-			}
-
-			ct.CustomType.Config["itemTypes"] = []any{customTypeRef}
-			break
+	// We only support one item definition currently
+	for _, item := range upstream.ItemDefinitions {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			continue
 		}
+
+		itemID, ok := itemMap["id"].(string)
+		if !ok || itemID == "" {
+			continue
+		}
+
+		customTypeRef, err := resolver.ResolveToReference(
+			state.CustomTypeResourceType,
+			itemID,
+		)
+		if err != nil {
+			return fmt.Errorf("custom type reference resolution for itemTypes in custom type: %s, item: %s: %w",
+				ct.CustomType.LocalID, itemID, err)
+		}
+
+		if customTypeRef == "" {
+			return fmt.Errorf("resolved custom type reference is empty for itemTypes: %s", itemID)
+		}
+
+		ct.CustomType.Config["itemTypes"] = []any{customTypeRef}
+		break
 	}
 
 	// Process variants and resolve property references within them
