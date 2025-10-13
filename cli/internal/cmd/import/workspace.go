@@ -44,7 +44,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			defer func() {
 				telemetry.TrackCommand("import workspace", err)
 			}()
-			err = importer.WorkspaceImport(cmd.Context(), location, p, deps.CompositeProvider())
+			err = importer.WorkspaceImport(cmd.Context(), location, deps.CompositeProvider())
 			return err
 		},
 	}

@@ -19,9 +19,14 @@ const (
 func WorkspaceImport(
 	ctx context.Context,
 	location string,
-	project project.Project,
 	p project.Provider) error {
-	idNamer, err := initNamer(project)
+
+	resourceGraph, err := p.GetResourceGraph()
+	if err != nil {
+		return fmt.Errorf("getting resource graph: %w", err)
+	}
+
+	idNamer, err := initNamer(resourceGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -36,7 +41,7 @@ func WorkspaceImport(
 		return nil
 	}
 
-	resolver, err := initResolver(ctx, p, importable)
+	resolver, err := initResolver(ctx, p, importable, resourceGraph)
 	if err != nil {
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
@@ -55,13 +60,8 @@ func WorkspaceImport(
 	return nil
 }
 
-func initNamer(p project.Project) (namer.Namer, error) {
+func initNamer(graph *resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-
-	graph, err := p.GetResourceGraph()
-	if err != nil {
-		return nil, fmt.Errorf("getting resource graph: %w", err)
-	}
 
 	resourcesMap := graph.Resources()
 	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
@@ -83,15 +83,11 @@ func initResolver(
 	ctx context.Context,
 	p project.Provider,
 	importable *resources.ResourceCollection,
+	graph *resources.Graph,
 ) (*resolver.ImportRefResolver, error) {
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
-	}
-
-	graph, err := p.GetResourceGraph()
-	if err != nil {
-		return nil, fmt.Errorf("getting resource graph: %w", err)
 	}
 
 	return &resolver.ImportRefResolver{

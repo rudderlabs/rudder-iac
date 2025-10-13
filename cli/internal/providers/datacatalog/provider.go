@@ -31,7 +31,7 @@ func New(client catalog.DataCatalog) *Provider {
 			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client),
 			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client),
-			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client),
+			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
 			pstate.CategoryResourceType:     NewCategoryProvider(client),
 		},
 	}
