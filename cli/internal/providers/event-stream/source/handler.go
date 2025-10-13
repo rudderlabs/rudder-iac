@@ -558,7 +558,12 @@ func mapStateTrackConfigToRemote(config map[string]interface{}, key string) *tra
 
 	if val, exists := configMap[DropUnplannedEventsKey]; exists {
 		if dropUnplannedEvents, ok := val.(bool); ok {
-			allowUnplannedEvents := !dropUnplannedEvents
+			var allowUnplannedEvents trackingplanClient.StringBool
+			if dropUnplannedEvents {
+				allowUnplannedEvents = trackingplanClient.False
+			} else {
+				allowUnplannedEvents = trackingplanClient.True
+			}
 			trackConfig.AllowUnplannedEvents = &allowUnplannedEvents
 		}
 	}
@@ -582,7 +587,13 @@ func mapStateEventTypeConfigToRemote(config map[string]interface{}, key string) 
 	// Only set PropagateValidationErrors if explicitly provided
 	if val, exists := configMap[PropagateViolationsKey]; exists {
 		if propagateViolations, ok := val.(bool); ok {
-			eventTypeConfig.PropagateValidationErrors = &propagateViolations
+			var propagateViolationsStr trackingplanClient.StringBool
+			if propagateViolations {
+				propagateViolationsStr = trackingplanClient.True
+			} else {
+				propagateViolationsStr = trackingplanClient.False
+			}
+			eventTypeConfig.PropagateValidationErrors = &propagateViolationsStr
 		}
 	}
 

@@ -10,9 +10,16 @@ type TrackingPlanConnectionStore interface {
 
 type Action string
 
+type StringBool string
+
 const (
 	Forward Action = "forward"
 	Drop    Action = "drop"
+)
+
+const (
+	True  StringBool = "true"
+	False StringBool = "false"
 )
 
 type ConnectionConfig struct {
@@ -24,14 +31,14 @@ type ConnectionConfig struct {
 }
 
 type EventTypeConfig struct {
-	PropagateValidationErrors *bool   `json:"propagateValidationErrors,omitempty"`
+	PropagateValidationErrors *StringBool   `json:"propagateValidationErrors,omitempty"`
 	UnplannedProperties       *Action `json:"unplannedProperties,omitempty"`
 	AnyOtherViolation         *Action `json:"anyOtherViolation,omitempty"`
 }
 
 type TrackConfig struct {
 	*EventTypeConfig
-	AllowUnplannedEvents *bool `json:"allowUnplannedEvents,omitempty"`
+	AllowUnplannedEvents *StringBool `json:"allowUnplannedEvents,omitempty"`
 }
 
 type requestBody struct {
