@@ -6,7 +6,7 @@
        "events": [
             {
                 "allowUnplanned": true,
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "api_tracking",
                 "id": {
                    "$__rudderRef": "event:api_tracking",
@@ -111,7 +111,7 @@
             },
             {
                 "allowUnplanned": true,
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "api_error",
                 "id": {
                     "$__rudderRef": "event:api_error",
@@ -159,7 +159,7 @@
             },
             {
                 "allowUnplanned": false,
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "login",
                 "id": {
                     "$__rudderRef": "event:login",
@@ -288,7 +288,7 @@
             "events": [
                 {
                     "allowUnplanned": true,
-                    "identitySection": "",
+                    "identitySection": "properties",
                     "localId": "api_tracking",
                     "id": "ev_2yzT9moeasqOjAnECGEjlTKfagA",
                     "properties": [
@@ -363,7 +363,7 @@
                 },
                 {
                     "allowUnplanned": true,
-                    "identitySection": "",
+                    "identitySection": "properties",
                     "localId": "api_error",
                     "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                     "properties": [
@@ -396,7 +396,7 @@
                 },
                 {
                     "allowUnplanned": false,
-                    "identitySection": "",
+                    "identitySection": "properties",
                     "localId": "login",
                     "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                     "properties": [

@@ -501,6 +501,12 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			variants = append(variants, *variant)
 		}
 
+		// set the identity section to its default value 'properties' if it is not set
+		identitySection := event.IdentitySection
+		if identitySection == "" {
+			identitySection = PropertiesIdentity
+		}
+
 		events = append(events, &TrackingPlanEventArgs{
 			ID: resources.PropertyRef{
 				URN:      urnFromRef(event.Ref),
@@ -508,7 +514,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			},
 			LocalID:         event.LocalID,
 			AllowUnplanned:  event.AllowUnplanned,
-			IdentitySection: event.IdentitySection,
+			IdentitySection: identitySection,
 			Properties:      properties,
 			Variants:        variants,
 		})

@@ -274,10 +274,6 @@ func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, colle
 }
 
 func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {
-	var identitySection = PropertiesIdentity
-	if from.IdentitySection != "" {
-		identitySection = from.IdentitySection
-	}
 	return catalog.EventIdentifierDetail{
 		ID: from.ID.(string),
 		Properties: lo.Map(
@@ -286,7 +282,7 @@ func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventId
 				return GetUpsertPropertyIdentifier(prop)
 			}),
 		AdditionalProperties: from.AllowUnplanned,
-		IdentitySection:      identitySection,
+		IdentitySection:      from.IdentitySection,
 		Variants:             from.Variants.ToCatalogVariants(),
 	}
 }
