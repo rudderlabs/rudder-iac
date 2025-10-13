@@ -32,6 +32,7 @@ type CategoryStore interface {
 	DeleteCategory(ctx context.Context, id string) error
 	GetCategory(ctx context.Context, id string) (*Category, error)
 	GetCategories(ctx context.Context) ([]*Category, error)
+	SetCategoryExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) CreateCategory(ctx context.Context, input CategoryCreate) (*Category, error) {
@@ -97,4 +98,22 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 
 func (c *RudderDataCatalog) GetCategories(ctx context.Context) ([]*Category, error) {
 	return getAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
+}
+
+func (c *RudderDataCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/categories/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

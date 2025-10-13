@@ -36,11 +36,11 @@ func ExtractProperties(s *specs.Spec) ([]Property, error) {
 }
 
 type Event struct {
-	LocalID     string  `json:"id"`
-	Name        string  `json:"name"`
-	Type        string  `json:"event_type"`
-	Description string  `json:"description"`
-	CategoryRef *string `json:"category"` // This stores the ref to the category
+	LocalID     string  `json:"id" mapstructure:"id"`
+	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type"`
+	Description string  `json:"description" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
 type EventSpec struct {
@@ -66,8 +66,8 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 
 // Category represents a user-defined category
 type Category struct {
-	LocalID string `json:"id"`
-	Name    string `json:"name"`
+	LocalID string `mapstructure:"id" json:"id"`
+	Name    string `mapstructure:"name" json:"name"`
 }
 
 // CategorySpec represents the spec section of a categories resource
