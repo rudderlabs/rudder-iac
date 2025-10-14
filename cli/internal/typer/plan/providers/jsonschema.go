@@ -139,19 +139,29 @@ func parsePropertySchema(name string, propDef any, required bool) (*plan.Propert
 
 	// Parse type
 	typeVal, exists := propMap["type"]
-	if !exists {
-		typeVal = "object"
-	}
+	var typeStr string
 
-	typeStr, ok := typeVal.(string)
-	if !ok {
-		typeArr, ok := typeVal.([]any)
-		if !ok || len(typeArr) == 0 {
-			return nil, fmt.Errorf("property 'type' must be a string or non-empty array of strings, got %T", typeVal)
-		}
-		typeStr, ok = typeArr[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("property 'type' array must contain strings, got %T", typeArr[0])
+	if !exists {
+		// When type is missing, treat as "any"
+		typeStr = "any"
+	} else {
+		switch v := typeVal.(type) {
+		case string:
+			typeStr = v
+		case []any:
+			if len(v) == 0 {
+				// Empty type array means "any"
+				typeStr = "any"
+			} else {
+				// Use first type from array
+				if str, ok := v[0].(string); ok {
+					typeStr = str
+				} else {
+					return nil, fmt.Errorf("property 'type' array must contain strings, got %T", v[0])
+				}
+			}
+		default:
+			return nil, fmt.Errorf("property 'type' must be a string or array of strings, got %T", typeVal)
 		}
 	}
 
@@ -164,6 +174,51 @@ func parsePropertySchema(name string, propDef any, required bool) (*plan.Propert
 	property := plan.Property{
 		Name: name,
 		Type: []plan.PropertyType{propType},
+	}
+
+	// Handle array item types
+	if propType == plan.PrimitiveTypeArray {
+		itemsVal, exists := propMap["items"]
+		if exists {
+			if itemsMap, ok := itemsVal.(map[string]any); ok {
+				itemTypeVal, itemTypeExists := itemsMap["type"]
+				var itemTypeStr string
+
+				if !itemTypeExists {
+					// No item type specified means "any"
+					itemTypeStr = "any"
+				} else {
+					switch v := itemTypeVal.(type) {
+					case string:
+						itemTypeStr = v
+					case []any:
+						if len(v) == 0 {
+							// Empty item type array means "any"
+							itemTypeStr = "any"
+						} else {
+							// Use first type from array
+							if str, ok := v[0].(string); ok {
+								itemTypeStr = str
+							} else {
+								return nil, fmt.Errorf("array items 'type' array must contain strings, got %T", v[0])
+							}
+						}
+					default:
+						return nil, fmt.Errorf("array items 'type' must be a string or array of strings, got %T", itemTypeVal)
+					}
+				}
+
+				itemType, err := plan.ParsePrimitiveType(itemTypeStr)
+				if err != nil {
+					return nil, fmt.Errorf("parsing array item type '%s': %w", itemTypeStr, err)
+				}
+
+				property.ItemType = []plan.PropertyType{itemType}
+			}
+		} else {
+			// No items specification means array can contain any type
+			property.ItemType = []plan.PropertyType{plan.PrimitiveTypeAny}
+		}
 	}
 
 	// Parse description if present
