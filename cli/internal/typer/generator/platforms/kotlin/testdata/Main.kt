@@ -4,9 +4,16 @@ import com.rudderstack.sdk.kotlin.core.Analytics
 import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.encodeToJsonElement
@@ -72,6 +79,18 @@ typealias PropertyNestedEmptyObject = JsonObject
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
 
+/** Page context information */
+typealias PropertyPageContext = CustomTypePageContext
+
+/** Additional page data */
+typealias PropertyPageData = JsonObject
+
+/** Type of page */
+typealias PropertyPageType = String
+
+/** Product identifier */
+typealias PropertyProductId = String
+
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
 
@@ -80,6 +99,9 @@ typealias PropertyProfileList = CustomTypeProfileList
 
 /** A field that can contain any type of value */
 typealias PropertyPropertyOfAny = JsonElement
+
+/** Search query */
+typealias PropertyQuery = String
 
 /** User account status */
 typealias PropertyStatus = CustomTypeStatus
@@ -120,6 +142,187 @@ enum class PropertyDeviceType {
     @SerialName("IoT-Device")
     IOT_DEVICE
 }
+
+abstract class SealedClassWithJson {
+    abstract val _jsonObject: JsonObject
+}
+
+open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("SealedClass")
+
+    override fun serialize(encoder: Encoder, value: T) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("This serializer only works with JSON")
+        jsonEncoder.encodeJsonElement(value._jsonObject)
+    }
+
+    override fun deserialize(decoder: Decoder): T {
+        throw NotImplementedError("Deserialization is not supported")
+    }
+}
+
+/** Page context with variants based on page type */
+@Serializable(with = RudderCustomTypePageContextSerializer::class)
+sealed class CustomTypePageContext : SealedClassWithJson() {
+    /** Type of page */
+    @SerialName("page_type")
+    abstract val pageType: PropertyPageType
+
+    abstract override val _jsonObject: JsonObject
+
+    /** Search page variant */
+    @Serializable
+    data class CaseSearch(
+        /** Search query */
+        @SerialName("query")
+        val query: PropertyQuery
+    ) : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "search"
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("query", Json.encodeToJsonElement(query))
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+
+    /** Product page variant */
+    @Serializable
+    data class CaseProduct(
+        /** Product identifier */
+        @SerialName("product_id")
+        val productId: PropertyProductId
+    ) : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "product"
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("product_id", Json.encodeToJsonElement(productId))
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Additional page data */
+        @SerialName("page_data")
+        val pageData: PropertyPageData? = null,
+
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType
+    ) : CustomTypePageContext() {
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            pageData?.let { put("page_data", Json.encodeToJsonElement(it)) }
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+}
+
+private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer<CustomTypePageContext>()
+
+/** Example event to demonstrate variants */
+@Serializable(with = RudderTrackEventWithVariantsPropertiesSerializer::class)
+sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
+    /** Type of device */
+    @SerialName("device_type")
+    abstract val deviceType: PropertyDeviceType
+
+    abstract override val _jsonObject: JsonObject
+
+    /** Mobile device page view */
+    @Serializable
+    data class CaseMobile(
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile,
+
+        /** User tags as array of strings */
+        @SerialName("tags")
+        val tags: PropertyTags
+    ) : TrackEventWithVariantsProperties() {
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType = PropertyDeviceType.MOBILE
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            put("tags", Json.encodeToJsonElement(tags))
+            put("device_type", Json.encodeToJsonElement(deviceType))
+        }
+    }
+
+    /** Desktop page view */
+    @Serializable
+    data class CaseDesktop(
+        /** User's first name */
+        @SerialName("first_name")
+        val firstName: PropertyFirstName,
+
+        /** User's last name */
+        @SerialName("last_name")
+        val lastName: PropertyLastName? = null,
+
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile
+    ) : TrackEventWithVariantsProperties() {
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType = PropertyDeviceType.DESKTOP
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("first_name", Json.encodeToJsonElement(firstName))
+            lastName?.let { put("last_name", Json.encodeToJsonElement(it)) }
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            put("device_type", Json.encodeToJsonElement(deviceType))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Type of device */
+        @SerialName("device_type")
+        override val deviceType: PropertyDeviceType,
+
+        /** Page context information */
+        @SerialName("page_context")
+        val pageContext: PropertyPageContext? = null,
+
+        /** User profile data */
+        @SerialName("profile")
+        val profile: PropertyProfile,
+
+        /** A field with no explicit type (treated as any) */
+        @SerialName("untyped_field")
+        val untypedField: PropertyUntypedField? = null
+    ) : TrackEventWithVariantsProperties() {
+
+        override val _jsonObject: JsonObject = buildJsonObject {
+            put("device_type", Json.encodeToJsonElement(deviceType))
+            pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
+            put("profile", Json.encodeToJsonElement(profile))
+            untypedField?.let { put("untyped_field", Json.encodeToJsonElement(it)) }
+        }
+    }
+}
+
+private object RudderTrackEventWithVariantsPropertiesSerializer : SealedClassJsonSerializer<TrackEventWithVariantsProperties>()
 
 /** User profile information */
 @Serializable
@@ -309,6 +512,17 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.screen(
             screenName = screenName,
             category = category,
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Example event to demonstrate variants
+     */
+    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties) {
+        analytics.track(
+            name = "Event With Variants",
             properties = json.encodeToJsonElement(properties).jsonObject,
             options = RudderOption(customContext = context)
         )

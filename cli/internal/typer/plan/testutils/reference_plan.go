@@ -13,6 +13,12 @@ func init() {
 		Description: "Triggered when a user signs up",
 	}
 
+	ReferenceEvents["Event With Variants"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Event With Variants",
+		Description: "Example event to demonstrate variants",
+	}
+
 	ReferenceEvents["Identify"] = &plan.Event{
 		EventType:   plan.EventTypeIdentify,
 		Description: "User identification event",
@@ -78,62 +84,6 @@ func init() {
 		Name:        "active",
 		Description: "User active status",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["active"]},
-	}
-
-	ReferenceProperties["device_type"] = &plan.Property{
-		Name:        "device_type",
-		Description: "Type of device",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
-		Config: &plan.PropertyConfig{
-			Enum: []any{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
-		},
-	}
-
-	ReferenceProperties["tags"] = &plan.Property{
-		Name:        "tags",
-		Description: "User tags as array of strings",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeString},
-	}
-
-	ReferenceProperties["contacts"] = &plan.Property{
-		Name:        "contacts",
-		Description: "Array of user contacts",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["email"]},
-	}
-
-	// Add properties for testing "any" type support
-	ReferenceProperties["property_of_any"] = &plan.Property{
-		Name:        "property_of_any",
-		Description: "A field that can contain any type of value",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
-	}
-
-	ReferenceProperties["untyped_field"] = &plan.Property{
-		Name:        "untyped_field",
-		Description: "A field with no explicit type (treated as any)",
-		Types:       []plan.PropertyType{},
-	}
-
-	ReferenceProperties["array_of_any"] = &plan.Property{
-		Name:        "array_of_any",
-		Description: "An array that can contain any type of items",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeAny},
-	}
-
-	ReferenceProperties["untyped_array"] = &plan.Property{
-		Name:        "untyped_array",
-		Description: "An array with no explicit item type (treated as any)",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{},
-	}
-
-	ReferenceProperties["object_property"] = &plan.Property{
-		Name:        "object_property",
-		Description: "An object field with no defined structure",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
 	ReferenceProperties["device_type"] = &plan.Property{
@@ -306,6 +256,111 @@ func init() {
 		Description: "Nested property with empty object allowing additional properties",
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
+
+	// Properties for variant testing
+	ReferenceProperties["page_type"] = &plan.Property{
+		Name:        "page_type",
+		Description: "Type of page",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["query"] = &plan.Property{
+		Name:        "query",
+		Description: "Search query",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["product_id"] = &plan.Property{
+		Name:        "product_id",
+		Description: "Product identifier",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["page_data"] = &plan.Property{
+		Name:        "page_data",
+		Description: "Additional page data",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	// Custom type with variants (properties defined inline, but also added to ReferenceProperties for extraction)
+	ReferenceCustomTypes["page_context"] = &plan.CustomType{
+		Name:        "page_context",
+		Description: "Page context with variants based on page type",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"page_type": {
+					Property: plan.Property{
+						Name:        "page_type",
+						Description: "Type of page",
+						Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+					},
+					Required: true,
+				},
+			},
+			AdditionalProperties: false,
+		},
+		Variants: []plan.Variant{
+			{
+				Type:          "discriminator",
+				Discriminator: "page_type",
+				Cases: []plan.VariantCase{
+					{
+						DisplayName: "Search",
+						Match:       []any{"search"},
+						Description: "Search page variant",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"query": {
+									Property: plan.Property{
+										Name:        "query",
+										Description: "Search query",
+										Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+									},
+									Required: true,
+								},
+							},
+						},
+					},
+					{
+						DisplayName: "Product",
+						Match:       []any{"product"},
+						Description: "Product page variant",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"product_id": {
+									Property: plan.Property{
+										Name:        "product_id",
+										Description: "Product identifier",
+										Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+									},
+									Required: true,
+								},
+							},
+						},
+					},
+				},
+				DefaultSchema: &plan.ObjectSchema{
+					Properties: map[string]plan.PropertySchema{
+						"page_data": {
+							Property: plan.Property{
+								Name:        "page_data",
+								Description: "Additional page data",
+								Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+							},
+							Required: false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ReferenceProperties["page_context"] = &plan.Property{
+		Name:        "page_context",
+		Description: "Page context information",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["page_context"]},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -418,6 +473,77 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	})
 
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Event With Variants"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"profile": {
+					Property: *ReferenceProperties["profile"],
+					Required: true,
+				},
+				"page_context": {
+					Property: *ReferenceProperties["page_context"],
+					Required: false,
+				},
+				"device_type": {
+					Property: *ReferenceProperties["device_type"],
+					Required: true,
+				},
+			},
+			AdditionalProperties: false,
+		},
+		Variants: []plan.Variant{
+			{
+				Type:          "discriminator",
+				Discriminator: "device_type",
+				Cases: []plan.VariantCase{
+					{
+						DisplayName: "Mobile",
+						Match:       []any{"mobile"},
+						Description: "Mobile device page view",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"tags": {
+									Property: *ReferenceProperties["tags"],
+									Required: true,
+								},
+							},
+							AdditionalProperties: false,
+						},
+					},
+					{
+						DisplayName: "Desktop",
+						Match:       []any{"desktop"},
+						Description: "Desktop page view",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"first_name": {
+									Property: *ReferenceProperties["first_name"],
+									Required: true,
+								},
+								"last_name": {
+									Property: *ReferenceProperties["last_name"],
+									Required: false,
+								},
+							},
+							AdditionalProperties: false,
+						},
+					},
+				},
+				DefaultSchema: &plan.ObjectSchema{
+					Properties: map[string]plan.PropertySchema{
+						"untyped_field": {
+							Property: *ReferenceProperties["untyped_field"],
+							Required: false,
+						},
+					},
+					AdditionalProperties: false,
+				},
+			},
+		},
+	})
+
 	// Identify event - traits
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Identify"],
@@ -494,7 +620,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 8  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props
-	ExpectedPropertyCount   = 22 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object
+	ExpectedCustomTypeCount = 9  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context
+	ExpectedPropertyCount   = 27 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

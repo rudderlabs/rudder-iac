@@ -175,6 +175,13 @@ func FormatEnumSerialName(value any) string {
 	}
 }
 
+// formatSealedSubclassName formats a match value into a valid Kotlin class name prefixed with "Case"
+func formatSealedSubclassName(matchValue any) string {
+	valueStr := fmt.Sprintf("%v", matchValue)
+	className := FormatClassName("Case", valueStr)
+	return className
+}
+
 func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.NameRegistry) (string, error) {
 	// Generate class name based on event type, name, and section
 	var prefix string

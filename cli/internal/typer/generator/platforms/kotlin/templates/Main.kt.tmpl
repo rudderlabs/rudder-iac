@@ -4,9 +4,16 @@ import com.rudderstack.sdk.kotlin.core.Analytics
 import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.encodeToJsonElement
@@ -16,6 +23,12 @@ import kotlinx.serialization.json.jsonObject
 {{- end }}
 {{- range .Enums }}
 {{ template "enum.tmpl" . -}}
+{{- end }}
+{{- if .SealedClasses }}
+{{ template "sealedclass_base" }}
+{{- end }}
+{{- range .SealedClasses }}
+{{ template "sealedclass.tmpl" . }}
 {{- end }}
 {{- range .DataClasses }}
 {{- $ctx := mkSlice 0 . }}

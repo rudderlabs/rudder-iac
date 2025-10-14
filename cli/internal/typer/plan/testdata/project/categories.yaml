@@ -1,7 +1,7 @@
 version: rudder/0.1
 kind: categories
 metadata:
-  name: typer-test-categories
+  name: typer-test
 spec:
   categories:
     - id: test-category

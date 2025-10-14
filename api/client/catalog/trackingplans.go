@@ -144,9 +144,10 @@ type TrackingPlanEventSchema struct {
 	UpdatedAt       time.Time `json:"updatedAt"`
 	IdentitySection string    `json:"identitySection"`
 	Rules           struct {
-		Schema     string                 `json:"$schema"`
-		Type       string                 `json:"type"`
-		Properties map[string]interface{} `json:"properties"`
+		Schema     string         `json:"$schema"`
+		Type       string         `json:"type"`
+		Properties map[string]any `json:"properties"`
+		Defs       map[string]any `json:"$defs,omitempty"`
 	} `json:"rules"`
 }
 

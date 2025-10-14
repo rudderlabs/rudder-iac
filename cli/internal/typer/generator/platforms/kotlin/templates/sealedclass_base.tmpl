@@ -1,0 +1,19 @@
+{{- define "sealedclass_base" }}
+abstract class SealedClassWithJson {
+    abstract val _jsonObject: JsonObject
+}
+
+open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("SealedClass")
+
+    override fun serialize(encoder: Encoder, value: T) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("This serializer only works with JSON")
+        jsonEncoder.encodeJsonElement(value._jsonObject)
+    }
+
+    override fun deserialize(decoder: Decoder): T {
+        throw NotImplementedError("Deserialization is not supported")
+    }
+}
+{{- end }}
