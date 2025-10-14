@@ -21,7 +21,7 @@ func TestCreateRetlSource(t *testing.T) {
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123"}`
+			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123", "enabled":true}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", expected)
 		},
 		ResponseStatus: 200,
@@ -49,6 +49,7 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceType:           retl.ModelSourceType,
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
+		Enabled:              true,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)

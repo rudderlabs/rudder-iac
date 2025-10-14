@@ -261,6 +261,41 @@ func TestSQLModelHandler(t *testing.T) {
 				expectedError: true,
 				errorMessage:  "reading SQL file",
 			},
+			{
+				name: "Enabled is false",
+				spec: &specs.Spec{
+					Version: "rudder/v0.1",
+					Kind:    "retl-source-sql-model",
+					Spec: map[string]interface{}{
+						"id":                "test-model",
+						"display_name":      "Test Model",
+						"description":       "Test description",
+						"sql":               "SELECT * FROM users",
+						"account_id":        "acc123",
+						"primary_key":       "id",
+						"source_definition": "postgres",
+						"enabled":           false,
+					},
+				},
+				expectedError: false,
+			},
+			{
+				name: "Enabled is missing",
+				spec: &specs.Spec{
+					Version: "rudder/v0.1",
+					Kind:    "retl-source-sql-model",
+					Spec: map[string]interface{}{
+						"id":                "test-model",
+						"display_name":      "Test Model",
+						"description":       "Test description",
+						"sql":               "SELECT * FROM users",
+						"account_id":        "acc123",
+						"primary_key":       "id",
+						"source_definition": "postgres",
+					},
+				},
+				expectedError: false,
+			},
 		}
 
 		for _, tc := range testCases {
@@ -573,15 +608,31 @@ func TestSQLModelHandler(t *testing.T) {
 				"enabled":           true,
 			},
 		})
+		handler.LoadSpec("test-2.yaml", &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":                "test-model-2",
+				"display_name":      "Test Model 2",
+				"description":       "Test description 2",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		})
 
 		// Execute
 		resources, err := handler.GetResources()
 
 		// Verify
 		assert.NoError(t, err)
-		assert.Len(t, resources, 1)
-		assert.Equal(t, "test-model", resources[0].ID())
+		assert.Len(t, resources, 2)
 		assert.Equal(t, sqlmodel.ResourceType, resources[0].Type())
+		assert.Equal(t, sqlmodel.ResourceType, resources[1].Type())
+		assert.Equal(t, true, resources[0].Data()[sqlmodel.EnabledKey])
+		// Enabled should be true by default
+		assert.Equal(t, true, resources[1].Data()[sqlmodel.EnabledKey])
 	})
 
 	t.Run("Create", func(t *testing.T) {

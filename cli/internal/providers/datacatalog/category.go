@@ -6,22 +6,42 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
+
+type CategoryEntityProvider struct {
+	*CategoryProvider
+	*impProvider.CategoryImportProvider
+}
 
 type CategoryProvider struct {
 	client catalog.DataCatalog
 	log    logger.Logger
 }
 
-func NewCategoryProvider(dc catalog.DataCatalog) *CategoryProvider {
-	return &CategoryProvider{
+func NewCategoryProvider(dc catalog.DataCatalog, importDir string) *CategoryEntityProvider {
+
+	cp := &CategoryProvider{
 		client: dc,
 		log: logger.Logger{
 			Logger: logger.New("provider").With("type", "category"),
 		},
+	}
+
+	imp := impProvider.NewCategoryImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "category"),
+		},
+		importDir,
+	)
+
+	return &CategoryEntityProvider{
+		CategoryProvider:       cp,
+		CategoryImportProvider: imp,
 	}
 }
 
@@ -93,6 +113,51 @@ func (p *CategoryProvider) Delete(ctx context.Context, ID string, data resources
 	}
 
 	return nil
+}
+
+func (p *CategoryProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	p.log.Debug("importing category resource", "id", ID, "remoteId", remoteId)
+
+	// Get the category from upstream based on the remoteId
+	category, err := p.client.GetCategory(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting category from upstream: %w", err)
+	}
+
+	// Convert input data to CategoryArgs
+	toArgs := state.CategoryArgs{}
+	toArgs.FromResourceData(data)
+
+	// Check if there are any differences and update if needed
+	if toArgs.Name != category.Name {
+		p.log.Debug("category has differences, updating", "id", ID, "remoteId", remoteId)
+		// Call the updateCategory if there are any differences
+		category, err = p.client.UpdateCategory(ctx, remoteId, catalog.CategoryUpdate{
+			Name: toArgs.Name,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("updating category during import: %w", err)
+		}
+	}
+
+	// Set the external ID on the category
+	err = p.client.SetCategoryExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting category external id: %w", err)
+	}
+
+	// Build and return the category state
+	categoryState := state.CategoryState{
+		CategoryArgs: toArgs,
+		ID:           category.ID,
+		Name:         category.Name,
+		WorkspaceID:  category.WorkspaceID,
+		CreatedAt:    category.CreatedAt.String(),
+		UpdatedAt:    category.UpdatedAt.String(),
+	}
+
+	resourceData := categoryState.ToResourceData()
+	return &resourceData, nil
 }
 
 // LoadResourcesFromRemote loads all categories from the remote catalog

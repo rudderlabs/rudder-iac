@@ -18,6 +18,14 @@ func URN(ID string, resourceType string) string {
 
 type ResourceOpts func(*internal.Resource)
 
+func WithResourceFileMetadata(metadataRef string) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.FileMetadata = &internal.ResourceFileMetadata{
+			MetadataRef: metadataRef,
+		}
+	}
+}
+
 func WithResourceImportMetadata(remoteId, workspaceId string) ResourceOpts {
 	return func(r *internal.Resource) {
 		r.ImportMetadata = &internal.ResourceImportMetadata{
@@ -36,6 +44,9 @@ func NewResource(id string, resourceType string, data ResourceData, dependencies
 		Dependencies: dependencies,
 	}
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
 		opt(r)
 	}
 	return &Resource{r: r}
@@ -63,4 +74,8 @@ func (r *Resource) Dependencies() []string {
 
 func (r *Resource) ImportMetadata() *internal.ResourceImportMetadata {
 	return r.r.ImportMetadata
+}
+
+func (r *Resource) FileMetadata() *internal.ResourceFileMetadata {
+	return r.r.FileMetadata
 }

@@ -8,11 +8,11 @@ import (
 )
 
 type Property struct {
-	LocalID     string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"propConfig"`
+	LocalID     string                 `mapstructure:"id" json:"id"`
+	Name        string                 `mapstructure:"name" json:"name"`
+	Description string                 `mapstructure:"description,omitempty" json:"description"`
+	Type        string                 `mapstructure:"type" json:"type"`
+	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig"`
 }
 
 type PropertySpec struct {
@@ -36,11 +36,11 @@ func ExtractProperties(s *specs.Spec) ([]Property, error) {
 }
 
 type Event struct {
-	LocalID     string  `json:"id"`
-	Name        string  `json:"name"`
-	Type        string  `json:"event_type"`
-	Description string  `json:"description"`
-	CategoryRef *string `json:"category"` // This stores the ref to the category
+	LocalID     string  `json:"id" mapstructure:"id"`
+	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type"`
+	Description string  `json:"description" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
 type EventSpec struct {
@@ -66,8 +66,8 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 
 // Category represents a user-defined category
 type Category struct {
-	LocalID string `json:"id"`
-	Name    string `json:"name"`
+	LocalID string `mapstructure:"id" json:"id"`
+	Name    string `mapstructure:"name" json:"name"`
 }
 
 // CategorySpec represents the spec section of a categories resource
@@ -93,19 +93,19 @@ func ExtractCategories(s *specs.Spec) ([]Category, error) {
 
 // CustomType represents a user-defined custom type
 type CustomType struct {
-	LocalID     string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
-	Variants    Variants               `json:"variants,omitempty"`
+	LocalID     string               `mapstructure:"id" json:"id"`
+	Name        string               `mapstructure:"name" json:"name"`
+	Description string               `mapstructure:"description,omitempty" json:"description,omitempty"`
+	Type        string               `mapstructure:"type" json:"type"`
+	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
+	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty"`
+	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type
 type CustomTypeProperty struct {
-	Ref      string `json:"$ref"`
-	Required bool   `json:"required"`
+	Ref      string `mapstructure:"$ref" json:"$ref"`
+	Required bool   `mapstructure:"required" json:"required"`
 }
 
 // CustomTypeSpec represents the spec section of a custom-types resource

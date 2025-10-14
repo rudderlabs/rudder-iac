@@ -11,6 +11,7 @@ import (
 type RemoteResource struct {
 	ID         string
 	ExternalID string
+	Reference  string
 	Data       interface{}
 }
 
@@ -20,14 +21,20 @@ type ResourceCollection struct {
 	resources map[string]map[string]*RemoteResource
 }
 
-var ErrDuplicateResource = errors.New("duplicate resource detected")
-var ErrRemoteResourceNotFound = errors.New("remote resource not found")
+var (
+	ErrDuplicateResource      = errors.New("duplicate resource detected")
+	ErrRemoteResourceNotFound = errors.New("remote resource not found")
+)
 
 // NewResourceCollection creates a new empty ResourceCollection
 func NewResourceCollection() *ResourceCollection {
 	return &ResourceCollection{
 		resources: make(map[string]map[string]*RemoteResource),
 	}
+}
+
+func (rc *ResourceCollection) Len() int {
+	return len(rc.resources)
 }
 
 // Set stores a resource map for the given resource type
@@ -56,7 +63,7 @@ func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteRe
 	return resource, exists
 }
 
-func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string,error) {
+func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string, error) {
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound

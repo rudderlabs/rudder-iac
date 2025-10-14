@@ -44,6 +44,10 @@ func (m *EmptyCatalog) GetProperty(ctx context.Context, id string) (*catalog.Pro
 	return nil, nil
 }
 
+func (m *EmptyCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
 func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
@@ -73,6 +77,10 @@ func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog
 }
 
 func (m *EmptyCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+  return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
@@ -97,6 +105,10 @@ func (m *EmptyCatalog) GetCustomType(ctx context.Context, id string) (*catalog.C
 }
 
 func (m *EmptyCatalog) DeleteCustomType(ctx context.Context, customTypeID string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
 	return nil
 }
 
@@ -142,4 +154,12 @@ func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomTyp
 
 func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
 	return nil, nil
+}
+
+func (m *EmptyCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
 }
