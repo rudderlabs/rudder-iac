@@ -128,7 +128,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	return nil
 }
 
-// processPropertiesIntoContext processes individual properties and creates type aliases or enums for all properties
+// processPropertiesIntoContext processes individual properties and creates type aliases, enums, or sealed classes for all properties
 func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	// Sort property names for deterministic output
 	var sortedNames []string
@@ -137,7 +137,7 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases or enums for all properties
+	// Generate type aliases, enums, or sealed classes for all properties
 	for _, name := range sortedNames {
 		property := allProperties[name]
 
@@ -148,6 +148,26 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 				return err
 			}
 			ctx.Enums = append(ctx.Enums, *enum)
+		} else if len(property.Types) > 1 {
+			// Multi-type property - generate sealed class
+			sealedClass, err := createPropertyMultiTypeSealedClass(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else if len(property.Types) == 1 && plan.IsPrimitiveType(property.Types[0]) && *plan.AsPrimitiveType(property.Types[0]) == plan.PrimitiveTypeArray && len(property.ItemTypes) > 1 {
+			// Array with multiple item types - generate sealed class for array items
+			sealedClass, err := createPropertyMultiTypeArrayItemSealedClass(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+			// Also create type alias for the array itself
+			alias, err := createPropertyTypeAlias(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 		} else {
 			alias, err := createPropertyTypeAlias(property, nameRegistry)
 			if err != nil {
@@ -181,7 +201,10 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 		}
 	} else {
 		// Map primitive type to Kotlin type
-		kotlinType = mapPrimitiveToKotlinType(customType.Type)
+		kotlinType, err = mapPrimitiveToKotlinType(customType.Type)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &KotlinTypeAlias{
@@ -211,53 +234,61 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 	}, nil
 }
 
-// resolvePropertyKotlinType resolves the Kotlin type for a property, handling arrays properly
+// resolvePropertyKotlinType resolves the Kotlin type for a property, handling arrays and multi-type properties
 func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	// TODO: handle multiple types (union types) if needed
-	// For now, we only handle single-type properties
-
-	var propertyType plan.PropertyType
+	// no types means any type, which maps to JsonElement for a flexible representation
 	if len(property.Types) == 0 {
 		return "JsonElement", nil
 	} else if len(property.Types) == 1 {
-		propertyType = property.Types[0]
-	} else {
-		// TODO: Future enhancement for union types
-		return "", fmt.Errorf("union types not yet supported: %v", property.Types)
-	}
+		// Single type property
+		propertyType := property.Types[0]
 
-	if plan.IsPrimitiveType(propertyType) {
-		primitiveType := *plan.AsPrimitiveType(propertyType)
+		if plan.IsPrimitiveType(propertyType) {
+			primitiveType := *plan.AsPrimitiveType(propertyType)
 
-		// Handle array types by using ItemType
-		if primitiveType == plan.PrimitiveTypeArray {
-			if len(property.ItemTypes) == 0 {
-				// No item type specified means array can contain any type
-				return "List<JsonElement>", nil
-			} else if len(property.ItemTypes) == 1 {
-				itemType := property.ItemTypes[0]
-				innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
-				if err != nil {
-					return "", err
+			// Handle array types by using ItemType
+			if primitiveType == plan.PrimitiveTypeArray {
+				if len(property.ItemTypes) == 0 {
+					// No item type specified means array can contain any type
+					return "List<JsonElement>", nil
+				} else if len(property.ItemTypes) == 1 {
+					itemType := property.ItemTypes[0]
+					innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("List<%s>", innerKotlinType), nil
+				} else {
+					// Multi-type array items - reference the sealed class for array items
+					itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("List<%s>", itemClassName), nil
 				}
-				return fmt.Sprintf("List<%s>", innerKotlinType), nil
-			} else {
-				return "", fmt.Errorf("array properties must have exactly one item type: %v", property.ItemTypes)
 			}
+
+			return mapPrimitiveToKotlinType(primitiveType)
+		} else if plan.IsCustomType(propertyType) {
+			return resolveTypeToKotlinType(propertyType, nameRegistry)
+		} else {
+			return "", fmt.Errorf("unsupported property type: %s", property.Types)
+		}
+	} else {
+		// Multi-type property - reference the sealed class
+		itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+		if err != nil {
+			return "", err
 		}
 
-		return mapPrimitiveToKotlinType(primitiveType), nil
-	} else if plan.IsCustomType(propertyType) {
-		return resolveTypeToKotlinType(propertyType, nameRegistry)
-	} else {
-		return "", fmt.Errorf("unsupported property type: %s", property.Types)
+		return fmt.Sprintf("List<%s>", itemClassName), nil
 	}
 }
 
 // resolveTypeToKotlinType resolves a PropertyType to its Kotlin type representation
 func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.NameRegistry) (string, error) {
 	if plan.IsPrimitiveType(propertyType) {
-		return mapPrimitiveToKotlinType(*plan.AsPrimitiveType(propertyType)), nil
+		return mapPrimitiveToKotlinType(*plan.AsPrimitiveType(propertyType))
 	} else if plan.IsCustomType(propertyType) {
 		customType := plan.AsCustomType(propertyType)
 		if customType.IsPrimitive() {
@@ -491,22 +522,22 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 }
 
 // mapPrimitiveToKotlinType maps plan primitive types to Kotlin types
-func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
+func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) (string, error) {
 	switch primitiveType {
 	case plan.PrimitiveTypeString:
-		return "String"
+		return "String", nil
 	case plan.PrimitiveTypeInteger:
-		return "Long"
+		return "Long", nil
 	case plan.PrimitiveTypeNumber:
-		return "Double"
+		return "Double", nil
 	case plan.PrimitiveTypeBoolean:
-		return "Boolean"
+		return "Boolean", nil
 	case plan.PrimitiveTypeAny:
-		return "JsonElement"
+		return "JsonElement", nil
 	case plan.PrimitiveTypeObject:
-		return "JsonObject"
+		return "JsonObject", nil
 	default:
-		return "JsonElement" // Fallback for unknown types
+		return "", fmt.Errorf("unsupported primitive type: %s", primitiveType)
 	}
 }
 
