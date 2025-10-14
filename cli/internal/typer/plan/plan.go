@@ -177,16 +177,6 @@ type EventRule struct {
 	Schema  ObjectSchema    `json:"schema"`
 }
 
-/*
- * Plan related types
- */
-
-// Plan represents a tracking plan with its rules
-type TrackingPlan struct {
-	Name  string      `json:"name"`
-	Rules []EventRule `json:"rules"`
-}
-
 // ObjectSchema represents the schema for an object
 type ObjectSchema struct {
 	Properties           map[string]PropertySchema `json:"properties"`
@@ -199,4 +189,22 @@ type PropertySchema struct {
 	Required bool     `json:"required"`
 	// Schema represents a nested object schema for the property, if applicable
 	Schema *ObjectSchema `json:"schema,omitempty"`
+}
+
+/*
+ * Plan related types
+ */
+
+// Plan represents a tracking plan with its rules
+type TrackingPlan struct {
+	Name  string      `json:"name"`
+	Rules []EventRule `json:"rules"`
+
+	// Metadata represents additional fixed context to be included with every event
+	Metadata PlanMetadata `json:"eventContext,omitempty"`
+}
+
+type PlanMetadata struct {
+	TrackingPlanID      string `json:"trackingPlanId,omitempty"`
+	TrackingPlanVersion int    `json:"trackingPlanVersion,omitempty"`
 }
