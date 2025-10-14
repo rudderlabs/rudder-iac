@@ -29,7 +29,7 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 
 	rules := make([]plan.EventRule, 0, len(apitp.Events))
 	for _, ev := range apitp.Events {
-		rule, err := parseEventSchema(&ev)
+		rule, err := parseTrackingPlanEventSchema(&ev)
 		if err != nil {
 			return nil, err
 		}
@@ -55,8 +55,55 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 	return tp, nil
 }
 
-func parseEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.EventRule, error) {
-	evType, err := plan.ParseEventType(ev.EventType)
+func parseEventType(s string) (plan.EventType, error) {
+	switch s {
+	case "track":
+		return plan.EventTypeTrack, nil
+	case "identify":
+		return plan.EventTypeIdentify, nil
+	case "page":
+		return plan.EventTypePage, nil
+	case "screen":
+		return plan.EventTypeScreen, nil
+	case "group":
+		return plan.EventTypeGroup, nil
+	default:
+		return "", fmt.Errorf("invalid event type: %s", s)
+	}
+}
+
+func parseIdentitySection(s string) (plan.IdentitySection, error) {
+	switch s {
+	case "properties":
+		return plan.IdentitySectionProperties, nil
+	case "traits":
+		return plan.IdentitySectionTraits, nil
+	default:
+		return "", fmt.Errorf("invalid identity section: %s", s)
+	}
+}
+
+func parsePrimitiveType(s string) (plan.PrimitiveType, error) {
+	switch s {
+	case "string":
+		return plan.PrimitiveTypeString, nil
+	case "integer":
+		return plan.PrimitiveTypeInteger, nil
+	case "number":
+		return plan.PrimitiveTypeNumber, nil
+	case "boolean":
+		return plan.PrimitiveTypeBoolean, nil
+	case "array":
+		return plan.PrimitiveTypeArray, nil
+	case "object":
+		return plan.PrimitiveTypeObject, nil
+	default:
+		return "", fmt.Errorf("invalid primitive type: %s", s)
+	}
+}
+
+func parseTrackingPlanEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.EventRule, error) {
+	evType, err := parseEventType(ev.EventType)
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +114,9 @@ func parseEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.EventRule, err
 		EventType:   evType,
 	}
 
-	section, err := plan.ParseIdentitySection(ev.IdentitySection)
+	customTypes, err := parseEventRulesDefs(ev)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing event rules definitions: %w", err)
 	}
 
 	schemaProperties, ok := ev.Rules.Properties[ev.IdentitySection]
@@ -82,7 +129,15 @@ func parseEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.EventRule, err
 		return nil, fmt.Errorf("properties for identity section '%s' must be an object", ev.IdentitySection)
 	}
 
-	schema, err := parseJSONSchemaObject(schemaPropertiesMap)
+	td, err := parseTypeDefinition(schemaPropertiesMap, customTypes)
+	if err != nil {
+		return nil, err
+	}
+	if (len(td.Types) != 1) || (td.Types[0] != plan.PrimitiveTypeObject) {
+		return nil, fmt.Errorf("identity section '%s' must be of type 'object'", ev.IdentitySection)
+	}
+
+	section, err := parseIdentitySection(ev.IdentitySection)
 	if err != nil {
 		return nil, err
 	}
@@ -90,179 +145,220 @@ func parseEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.EventRule, err
 	rule := plan.EventRule{
 		Event:   event,
 		Section: section,
-		Schema:  *schema,
+		Schema:  *td.Schema,
 	}
 
 	return &rule, nil
 }
 
-func parseJSONSchemaObject(object map[string]any) (*plan.ObjectSchema, error) {
-	objSchema := &plan.ObjectSchema{
-		Properties: make(map[string]plan.PropertySchema),
-	}
+func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.CustomType, error) {
+	customTypes := make(map[string]*plan.CustomType)
+	if defs, exists := ev.Rules.Properties["$defs"]; exists {
+		if defsMap, ok := defs.(map[string]any); ok {
+			customTypes = make(map[string]*plan.CustomType)
 
-	requiredSet := make(map[string]bool)
-	required, ok := object["required"]
-	if ok {
-		slice, ok := required.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("'required' field must be an array of strings, it is instead %T", required)
-		}
-		// Create a set of required property names for quick lookup
-		for _, req := range slice {
-			if reqStr, ok := req.(string); ok {
-				requiredSet[reqStr] = true
+			// First pass: create custom types without resolving references
+			for typeName := range defsMap {
+				customTypes[typeName] = &plan.CustomType{
+					Name: typeName,
+				}
+			}
+
+			// Second pass: populate custom types with full definitions
+			for typeName, typeDef := range defsMap {
+				if typeDefMap, ok := typeDef.(map[string]any); ok {
+					td, err := parseTypeDefinition(typeDefMap, customTypes)
+					if err != nil {
+						return nil, fmt.Errorf("parsing custom type '%s': %w", typeName, err)
+					}
+
+					// custom types can only have a single primitive type
+					if len(td.Types) != 1 {
+						return nil, fmt.Errorf("custom type '%s' must have a single type, got %d types", typeName, len(td.Types))
+					}
+					customTypeType := td.Types[0]
+					if !plan.IsPrimitiveType(customTypeType) {
+						return nil, fmt.Errorf("custom type '%s' must be a primitive type, got '%s'", typeName, customTypeType)
+					}
+
+					ct := customTypes[typeName]
+					ct.Type = *plan.AsPrimitiveType(td.Types[0])
+					ct.Schema = td.Schema
+					ct.Config = td.Config
+
+					// For array types, set ItemType
+					if ct.Type == plan.PrimitiveTypeArray && len(td.ItemTypes) > 0 {
+						ct.ItemType = td.ItemTypes[0]
+					}
+				} else {
+					return nil, fmt.Errorf("custom type definition for '%s' must be an object", typeName)
+				}
 			}
 		}
 	}
 
-	properties, ok := object["properties"].(map[string]any)
-	if !ok {
-		return nil, nil
-	}
-
-	for propName, propDef := range properties {
-		propSchema, err := parsePropertySchema(propName, propDef, requiredSet[propName])
-		if err != nil {
-			return nil, fmt.Errorf("parsing property '%s': %w", propName, err)
-		}
-
-		if propSchema != nil {
-			objSchema.Properties[propName] = *propSchema
-		}
-	}
-
-	return objSchema, nil
+	return customTypes, nil
 }
 
-func parsePropertySchema(name string, propDef any, required bool) (*plan.PropertySchema, error) {
-	propMap, ok := propDef.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("property definition must be an object, got %T", propDef)
+type typeDefinition struct {
+	Types     []plan.PropertyType
+	ItemTypes []plan.PropertyType
+	Config    *plan.PropertyConfig
+	Schema    *plan.ObjectSchema
+}
+
+func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.CustomType) (*typeDefinition, error) {
+	td := &typeDefinition{}
+	// check for $ref first
+	if ref, exists := def["$ref"]; exists {
+		customType, err := resolveCustomTypeReference(ref.(string), customTypes)
+		if err != nil {
+			return nil, fmt.Errorf("resolving custom type reference '%v': %w", ref, err)
+		}
+
+		td.Types = []plan.PropertyType{customType}
+		return td, nil
 	}
 
-	// Parse type
-	typeVal, exists := propMap["type"]
-	var typeStr string
+	// parse enums
+	if enumVal, exists := def["enum"]; exists {
+		if enumSlice, ok := enumVal.([]any); ok {
+			td.Config = &plan.PropertyConfig{
+				Enum: enumSlice,
+			}
+		}
+	}
 
+	// parse type
+	typeVal, exists := def["type"]
 	if !exists {
-		// When type is missing, treat as "any"
-		typeStr = "any"
+		td.Types = []plan.PropertyType{plan.PrimitiveTypeAny}
 	} else {
 		switch v := typeVal.(type) {
 		case string:
-			typeStr = v
+			pt, err := parsePrimitiveType(v)
+			if err != nil {
+				return nil, fmt.Errorf("parsing primitive type '%s': %w", v, err)
+			}
+			td.Types = []plan.PropertyType{pt}
 		case []any:
 			if len(v) == 0 {
-				// Empty type array means "any"
-				typeStr = "any"
+				td.Types = []plan.PropertyType{plan.PrimitiveTypeAny}
 			} else {
-				// Use first type from array
-				if str, ok := v[0].(string); ok {
-					typeStr = str
-				} else {
-					return nil, fmt.Errorf("property 'type' array must contain strings, got %T", v[0])
-				}
-			}
-		default:
-			return nil, fmt.Errorf("property 'type' must be a string or array of strings, got %T", typeVal)
-		}
-	}
-
-	propType, err := plan.ParsePrimitiveType(typeStr)
-	if err != nil {
-		return nil, fmt.Errorf("parsing property type '%s': %w", typeStr, err)
-	}
-
-	// Create property
-	property := plan.Property{
-		Name: name,
-		Type: []plan.PropertyType{propType},
-	}
-
-	// Handle array item types
-	if propType == plan.PrimitiveTypeArray {
-		itemsVal, exists := propMap["items"]
-		if exists {
-			if itemsMap, ok := itemsVal.(map[string]any); ok {
-				itemTypeVal, itemTypeExists := itemsMap["type"]
-				var itemTypeStr string
-
-				if !itemTypeExists {
-					// No item type specified means "any"
-					itemTypeStr = "any"
-				} else {
-					switch v := itemTypeVal.(type) {
-					case string:
-						itemTypeStr = v
-					case []any:
-						if len(v) == 0 {
-							// Empty item type array means "any"
-							itemTypeStr = "any"
-						} else {
-							// Use first type from array
-							if str, ok := v[0].(string); ok {
-								itemTypeStr = str
-							} else {
-								return nil, fmt.Errorf("array items 'type' array must contain strings, got %T", v[0])
-							}
+				for _, item := range v {
+					if str, ok := item.(string); ok {
+						pt, err := parsePrimitiveType(str)
+						if err != nil {
+							return nil, fmt.Errorf("parsing primitive type '%s': %w", str, err)
 						}
-					default:
-						return nil, fmt.Errorf("array items 'type' must be a string or array of strings, got %T", itemTypeVal)
+						td.Types = append(td.Types, pt)
 					}
 				}
-
-				itemType, err := plan.ParsePrimitiveType(itemTypeStr)
-				if err != nil {
-					return nil, fmt.Errorf("parsing array item type '%s': %w", itemTypeStr, err)
-				}
-
-				property.ItemType = []plan.PropertyType{itemType}
-			}
-		} else {
-			// No items specification means array can contain any type
-			property.ItemType = []plan.PropertyType{plan.PrimitiveTypeAny}
-		}
-	}
-
-	// Parse description if present
-	if desc, exists := propMap["description"]; exists {
-		if descStr, ok := desc.(string); ok {
-			property.Description = descStr
-		}
-	}
-
-	// Parse enum config if present
-	if enumVal, exists := propMap["enum"]; exists {
-		if enumSlice, ok := enumVal.([]any); ok {
-			var enumStrings []string
-			for _, e := range enumSlice {
-				if eStr, ok := e.(string); ok {
-					enumStrings = append(enumStrings, eStr)
-				}
-			}
-			if len(enumStrings) > 0 {
-				property.Config = &plan.PropertyConfig{
-					Enum: enumStrings,
-				}
 			}
 		}
 	}
 
-	// Create property schema
-	propSchema := &plan.PropertySchema{
-		Property: property,
-		Required: required,
-	}
+	// handle nested objects
+	if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeObject {
+		if propertiesMap, exists := def["properties"]; exists {
+			objSchema := &plan.ObjectSchema{
+				Properties: make(map[string]plan.PropertySchema),
+			}
 
-	// Handle nested objects
-	if typeStr == "object" {
-		nestedObj, err := parseJSONSchemaObject(propMap)
-		if err != nil {
-			return nil, fmt.Errorf("parsing nested object for property '%s': %w", name, err)
+			if props, ok := propertiesMap.(map[string]any); ok {
+				for propName, propDef := range props {
+					ptd, err := parseTypeDefinition(propDef.(map[string]any), customTypes)
+					if err != nil {
+						return nil, fmt.Errorf("parsing property '%s': %w", propName, err)
+					}
+
+					objSchema.Properties[propName] = plan.PropertySchema{
+						Property: plan.Property{
+							Name:      propName,
+							Types:     ptd.Types,
+							ItemTypes: ptd.ItemTypes,
+							Config:    ptd.Config,
+						},
+						Schema: ptd.Schema,
+					}
+
+					td.Schema = objSchema
+				}
+
+				// handle required properties
+				if requiredList, exists := def["required"]; exists {
+					if reqs, ok := requiredList.([]any); ok {
+						for _, r := range reqs {
+							if rStr, ok := r.(string); ok {
+								if propSchema, exists := objSchema.Properties[rStr]; exists {
+									propSchema.Required = true
+									objSchema.Properties[rStr] = propSchema
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-		propSchema.Schema = nestedObj
 	}
 
-	return propSchema, nil
+	// handle arrays
+	if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeArray {
+		if items, exists := def["items"]; exists {
+			if itemsMap, ok := items.(map[string]any); ok {
+				ref, refExists := itemsMap["$ref"]
+				if refExists {
+					customType, err := resolveCustomTypeReference(ref.(string), customTypes)
+					if err != nil {
+						return nil, fmt.Errorf("resolving array item custom type reference '%v': %w", ref, err)
+					}
+					td.ItemTypes = []plan.PropertyType{customType}
+				} else {
+					t, tExists := itemsMap["type"]
+					if tExists {
+						if tSlice, ok := t.([]any); ok {
+							for _, item := range tSlice {
+								if str, ok := item.(string); ok {
+									pt, err := parsePrimitiveType(str)
+									if err != nil {
+										return nil, fmt.Errorf("parsing array item primitive type '%s': %w", str, err)
+									}
+									td.ItemTypes = append(td.ItemTypes, pt)
+								}
+							}
+						} else if tStr, ok := t.(string); ok {
+							pt, err := parsePrimitiveType(tStr)
+							if err != nil {
+								return nil, fmt.Errorf("parsing array item primitive type '%s': %w", tStr, err)
+							}
+							td.ItemTypes = []plan.PropertyType{pt}
+						} else {
+							return nil, fmt.Errorf("array items type must be a string or array of strings")
+						}
+					} else {
+						return nil, fmt.Errorf("array items must have a 'type' field")
+					}
+				}
+			}
+		}
+	}
+
+	return td, nil
+}
+
+// resolveCustomTypeReference resolves a $ref reference to a custom type
+func resolveCustomTypeReference(ref string, customTypes map[string]*plan.CustomType) (*plan.CustomType, error) {
+	// Parse reference format: #/$defs/TypeName
+	const prefix = "#/$defs/"
+	if len(ref) <= len(prefix) || ref[:len(prefix)] != prefix {
+		return nil, fmt.Errorf("invalid $ref format: '%s', expected format: '#/$defs/TypeName'", ref)
+	}
+
+	typeName := ref[len(prefix):]
+	customType, exists := customTypes[typeName]
+	if !exists {
+		return nil, fmt.Errorf("custom type '%s' not found in definitions", typeName)
+	}
+
+	return customType, nil
 }

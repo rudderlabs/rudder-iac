@@ -21,6 +21,12 @@ typealias CustomTypeAge = Double
 /** Custom type for email validation */
 typealias CustomTypeEmail = String
 
+/** List of email addresses */
+typealias CustomTypeEmailList = List<CustomTypeEmail>
+
+/** List of user profiles */
+typealias CustomTypeProfileList = List<CustomTypeUserProfile>
+
 /** User active status */
 typealias PropertyActive = CustomTypeActive
 
@@ -36,6 +42,9 @@ typealias PropertyContacts = List<CustomTypeEmail>
 /** User's email address */
 typealias PropertyEmail = CustomTypeEmail
 
+/** User's email addresses */
+typealias PropertyEmailList = CustomTypeEmailList
+
 /** User's first name */
 typealias PropertyFirstName = String
 
@@ -48,8 +57,14 @@ typealias PropertyObjectProperty = JsonObject
 /** User profile data */
 typealias PropertyProfile = CustomTypeUserProfile
 
+/** List of related user profiles */
+typealias PropertyProfileList = CustomTypeProfileList
+
 /** A field that can contain any type of value */
 typealias PropertyPropertyOfAny = JsonElement
+
+/** User account status */
+typealias PropertyStatus = CustomTypeStatus
 
 /** User tags as array of strings */
 typealias PropertyTags = List<String>
@@ -59,6 +74,19 @@ typealias PropertyUntypedArray = List<JsonElement>
 
 /** A field with no explicit type (treated as any) */
 typealias PropertyUntypedField = JsonElement
+
+/** User status enum */
+@Serializable
+enum class CustomTypeStatus {
+    @SerialName("pending")
+    PENDING,
+    @SerialName("active")
+    ACTIVE,
+    @SerialName("suspended")
+    SUSPENDED,
+    @SerialName("deleted")
+    DELETED
+}
 
 /** Type of device */
 @Serializable
@@ -150,6 +178,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("device_type")
     val deviceType: PropertyDeviceType? = null,
 
+    /** User's email addresses */
+    @SerialName("email_list")
+    val emailList: PropertyEmailList? = null,
+
     /** An object field with no defined structure */
     @SerialName("object_property")
     val objectProperty: PropertyObjectProperty? = null,
@@ -158,9 +190,17 @@ data class TrackUserSignedUpProperties(
     @SerialName("profile")
     val profile: PropertyProfile,
 
+    /** List of related user profiles */
+    @SerialName("profile_list")
+    val profileList: PropertyProfileList? = null,
+
     /** A field that can contain any type of value */
     @SerialName("property_of_any")
     val propertyOfAny: PropertyPropertyOfAny? = null,
+
+    /** User account status */
+    @SerialName("status")
+    val status: PropertyStatus? = null,
 
     /** User tags as array of strings */
     @SerialName("tags")

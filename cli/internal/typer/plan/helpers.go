@@ -47,7 +47,7 @@ func (tp *TrackingPlan) ExtractAllProperties() map[string]*Property {
 // The customTypes map is modified in place to accumulate results
 func extractCustomTypesFromSchema(schema *ObjectSchema, customTypes map[string]*CustomType) {
 	for _, propSchema := range schema.Properties {
-		for _, t := range propSchema.Property.Type {
+		for _, t := range propSchema.Property.Types {
 			if IsCustomType(t) {
 				customType := AsCustomType(t)
 				if customType != nil {

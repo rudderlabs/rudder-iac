@@ -1,9 +1,5 @@
 package plan
 
-import (
-	"fmt"
-)
-
 /*
  * Event related types
  */
@@ -24,24 +20,6 @@ type Event struct {
 	EventType   EventType `json:"eventType"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
-}
-
-// ParseEventType converts a string to an EventType, returning an error for unknown types
-func ParseEventType(s string) (EventType, error) {
-	switch s {
-	case string(EventTypeTrack):
-		return EventTypeTrack, nil
-	case string(EventTypeIdentify):
-		return EventTypeIdentify, nil
-	case string(EventTypePage):
-		return EventTypePage, nil
-	case string(EventTypeScreen):
-		return EventTypeScreen, nil
-	case string(EventTypeGroup):
-		return EventTypeGroup, nil
-	default:
-		return "", fmt.Errorf("invalid event type: %s", s)
-	}
 }
 
 /*
@@ -67,15 +45,15 @@ type PropertyType any
 
 // PropertyConfig represents additional configuration for a property
 type PropertyConfig struct {
-	Enum []string `json:"enum,omitempty"`
+	Enum []any `json:"enum,omitempty"`
 }
 
 // Property represents a property definition
 type Property struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
-	Type        []PropertyType  `json:"type"`
-	ItemType    []PropertyType  `json:"itemType,omitempty"` // Used if Type includes PrimitiveTypeArray
+	Types       []PropertyType  `json:"type"`
+	ItemTypes   []PropertyType  `json:"itemType,omitempty"` // Used if Type includes PrimitiveTypeArray
 	Config      *PropertyConfig `json:"config,omitempty"`
 }
 
@@ -93,31 +71,13 @@ func AsPrimitiveType(t PropertyType) *PrimitiveType {
 	return nil
 }
 
-// ParsePrimitiveType converts a string to a PrimitiveType, returning an error for unknown types
-func ParsePrimitiveType(s string) (PrimitiveType, error) {
-	switch s {
-	case string(PrimitiveTypeString):
-		return PrimitiveTypeString, nil
-	case string(PrimitiveTypeInteger):
-		return PrimitiveTypeInteger, nil
-	case string(PrimitiveTypeNumber):
-		return PrimitiveTypeNumber, nil
-	case string(PrimitiveTypeBoolean):
-		return PrimitiveTypeBoolean, nil
-	case string(PrimitiveTypeArray):
-		return PrimitiveTypeArray, nil
-	case string(PrimitiveTypeObject):
-		return PrimitiveTypeObject, nil
-	case string(PrimitiveTypeAny):
-		return PrimitiveTypeAny, nil
-	default:
-		return "", fmt.Errorf("invalid primitive type: %s", s)
-	}
-}
-
-// IsCustomType checks if the PropertyType is a CustomType
+// IsCustomType checks if the PropertyType is a CustomType (value or pointer)
 func IsCustomType(t PropertyType) bool {
 	_, ok := t.(CustomType)
+	if ok {
+		return true
+	}
+	_, ok = t.(*CustomType)
 	return ok
 }
 
@@ -125,6 +85,9 @@ func IsCustomType(t PropertyType) bool {
 func AsCustomType(t PropertyType) *CustomType {
 	if customType, ok := t.(CustomType); ok {
 		return &customType
+	}
+	if customType, ok := t.(*CustomType); ok {
+		return customType
 	}
 	return nil
 }
@@ -135,9 +98,11 @@ func AsCustomType(t PropertyType) *CustomType {
 
 // CustomType represents a custom type definition
 type CustomType struct {
-	Name        string        `json:"name"`
-	Description string        `json:"description,omitempty"`
-	Type        PrimitiveType `json:"type"`
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Type        PrimitiveType   `json:"type"`
+	ItemType    PropertyType    `json:"itemType,omitempty"` // Used if Type is PrimitiveTypeArray
+	Config      *PropertyConfig `json:"config,omitempty"`
 	// Schema defines the structure of the custom type if it's an object
 	Schema *ObjectSchema `json:"schema,omitempty"`
 }
@@ -157,18 +122,6 @@ const (
 	IdentitySectionProperties IdentitySection = "properties"
 	IdentitySectionTraits     IdentitySection = "traits"
 )
-
-// ParseIdentitySection converts a string to an IdentitySection, returning an error for unknown sections
-func ParseIdentitySection(s string) (IdentitySection, error) {
-	switch s {
-	case string(IdentitySectionProperties):
-		return IdentitySectionProperties, nil
-	case string(IdentitySectionTraits):
-		return IdentitySectionTraits, nil
-	default:
-		return "", fmt.Errorf("invalid identity section: %s", s)
-	}
-}
 
 // EventRule represents a rule for an event
 type EventRule struct {
