@@ -1,5 +1,9 @@
 package plan
 
+import (
+	"fmt"
+)
+
 /*
  * Event related types
  */
@@ -22,6 +26,24 @@ type Event struct {
 	Description string    `json:"description,omitempty"`
 }
 
+// ParseEventType converts a string to an EventType, returning an error for unknown types
+func ParseEventType(s string) (EventType, error) {
+	switch s {
+	case string(EventTypeTrack):
+		return EventTypeTrack, nil
+	case string(EventTypeIdentify):
+		return EventTypeIdentify, nil
+	case string(EventTypePage):
+		return EventTypePage, nil
+	case string(EventTypeScreen):
+		return EventTypeScreen, nil
+	case string(EventTypeGroup):
+		return EventTypeGroup, nil
+	default:
+		return "", fmt.Errorf("invalid event type: %s", s)
+	}
+}
+
 /*
  * Property related types
  */
@@ -31,11 +53,11 @@ type PrimitiveType string
 
 const (
 	PrimitiveTypeString  PrimitiveType = "string"
+	PrimitiveTypeInteger PrimitiveType = "integer"
 	PrimitiveTypeNumber  PrimitiveType = "number"
 	PrimitiveTypeBoolean PrimitiveType = "boolean"
 	PrimitiveTypeArray   PrimitiveType = "array"
 	PrimitiveTypeObject  PrimitiveType = "object"
-	PrimitiveTypeDate    PrimitiveType = "date"
 )
 
 // PropertyType represents either a primitive type or a custom type
@@ -51,32 +73,56 @@ type PropertyConfig struct {
 type Property struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
-	Type        PropertyType    `json:"type"`
+	Type        []PropertyType  `json:"type"`
 	Config      *PropertyConfig `json:"config,omitempty"`
 }
 
-func (p *Property) IsPrimitive() bool {
-	_, ok := p.Type.(PrimitiveType)
+// IsPrimitiveType checks if the PropertyType is a PrimitiveType
+func IsPrimitiveType(t PropertyType) bool {
+	_, ok := t.(PrimitiveType)
 	return ok
 }
 
-func (p Property) IsCustomType() bool {
-	_, ok := p.Type.(CustomType)
-	return ok
-}
-
-func (p *Property) CustomType() *CustomType {
-	if customType, ok := p.Type.(CustomType); ok {
-		return &customType
+// AsPrimitiveType converts a PropertyType to a PrimitiveType pointer if possible, else returns nil
+func AsPrimitiveType(t PropertyType) *PrimitiveType {
+	if primitiveType, ok := t.(PrimitiveType); ok {
+		return &primitiveType
 	}
 	return nil
 }
 
-func (p *Property) PrimitiveType() PrimitiveType {
-	if primitiveType, ok := p.Type.(PrimitiveType); ok {
-		return primitiveType
+// ParsePrimitiveType converts a string to a PrimitiveType, returning an error for unknown types
+func ParsePrimitiveType(s string) (PrimitiveType, error) {
+	switch s {
+	case string(PrimitiveTypeString):
+		return PrimitiveTypeString, nil
+	case string(PrimitiveTypeInteger):
+		return PrimitiveTypeInteger, nil
+	case string(PrimitiveTypeNumber):
+		return PrimitiveTypeNumber, nil
+	case string(PrimitiveTypeBoolean):
+		return PrimitiveTypeBoolean, nil
+	case string(PrimitiveTypeArray):
+		return PrimitiveTypeArray, nil
+	case string(PrimitiveTypeObject):
+		return PrimitiveTypeObject, nil
+	default:
+		return "", fmt.Errorf("invalid primitive type: %s", s)
 	}
-	return ""
+}
+
+// IsCustomType checks if the PropertyType is a CustomType
+func IsCustomType(t PropertyType) bool {
+	_, ok := t.(CustomType)
+	return ok
+}
+
+// AsCustomType converts a PropertyType to a CustomType pointer if possible, else returns nil
+func AsCustomType(t PropertyType) *CustomType {
+	if customType, ok := t.(CustomType); ok {
+		return &customType
+	}
+	return nil
 }
 
 /*
@@ -100,19 +146,31 @@ func (c *CustomType) IsPrimitive() bool {
  * Event Rule related types
  */
 
-// EventRuleSection represents the section of an event rule
-type EventRuleSection string
+// IdentitySection represents the section of an event rule
+type IdentitySection string
 
 const (
-	EventRuleSectionProperties EventRuleSection = "properties"
-	EventRuleSectionTraits     EventRuleSection = "traits"
+	IdentitySectionProperties IdentitySection = "properties"
+	IdentitySectionTraits     IdentitySection = "traits"
 )
+
+// ParseIdentitySection converts a string to an IdentitySection, returning an error for unknown sections
+func ParseIdentitySection(s string) (IdentitySection, error) {
+	switch s {
+	case string(IdentitySectionProperties):
+		return IdentitySectionProperties, nil
+	case string(IdentitySectionTraits):
+		return IdentitySectionTraits, nil
+	default:
+		return "", fmt.Errorf("invalid identity section: %s", s)
+	}
+}
 
 // EventRule represents a rule for an event
 type EventRule struct {
-	Event   Event            `json:"event"`
-	Section EventRuleSection `json:"section"`
-	Schema  ObjectSchema     `json:"schema"`
+	Event   Event           `json:"event"`
+	Section IdentitySection `json:"section"`
+	Schema  ObjectSchema    `json:"schema"`
 }
 
 /*
