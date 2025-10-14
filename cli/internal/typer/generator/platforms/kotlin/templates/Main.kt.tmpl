@@ -11,7 +11,15 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+{{- range .TypeAliases }}
 {{ template "typealias.tmpl" . -}}
+{{- end }}
+{{- range .Enums }}
 {{ template "enum.tmpl" . -}}
-{{ template "dataclass.tmpl" . }}
+{{- end }}
+{{- range .DataClasses }}
+{{- $ctx := mkSlice 0 . }}
+{{ template "dataclasswithindent" $ctx }}
+{{- end }}
+
 {{ template "rudderanalytics.tmpl" . }}

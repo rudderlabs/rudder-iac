@@ -1,0 +1,109 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: "typer-test"
+spec:
+  properties:
+    # primitive types
+    - id: "some-string"
+      name: "someString"
+      type: "string"
+      description: "some string property"
+    - id: "some-integer"
+      name: "someInteger"
+      type: "integer"
+      description: "some integer property"
+    - id: "some-number"
+      name: "someNumber"
+      type: "number"
+      description: "some number property"
+    - id: "some-boolean"
+      name: "someBoolean"
+      type: "boolean"
+      description: "some boolean property"
+    - id: "some-object"
+      name: "someObject"
+      type: "object"
+      description: "some object property"
+    # nested objects
+    - id: "some-nested-object"
+      name: "someNestedObject"
+      type: "object"
+      description: "some nested object property to test nested objects"
+    - id: "some-nested-level-1"
+      name: "someNestedLevel1"
+      type: "object"
+      description: "some nested level 1 property"
+    - id: "some-nested-level-2"
+      name: "someNestedLevel2"
+      type: "object"
+      description: "some nested level 2 property"
+    # array types (primitives)
+    - id: "some-array-of-any"
+      name: "someArray"
+      type: "array"
+      description: "some array of any property"
+    - id: "some-array-of-strings"
+      name: "someArrayOfStrings"
+      type: "array"
+      description: "some array of strings property"
+      propConfig:
+        itemTypes:
+          - "string"
+    - id: "some-array-of-integers"
+      name: "someArrayOfIntegers"
+      type: "array"
+      description: "some array of integers property"
+      propConfig:
+        itemTypes:
+          - "integer"
+    - id: "some-array-of-numbers"
+      name: "someArrayOfNumbers"
+      type: "array"
+      description: "some array of numbers property"
+      propConfig:
+        itemTypes:
+          - "number"
+    - id: "some-array-of-booleans"
+      name: "someArrayOfBooleans"
+      type: "array"
+      description: "some array of booleans property"
+      propConfig:
+        itemTypes:
+          - "boolean"
+    - id: "some-array-of-multiple-types"
+      name: "someArrayOfMultipleTypes"
+      type: "array"
+      description: "some array of multiple types property"
+      propConfig:
+        itemTypes:
+          - "string"
+          - "integer"
+          - "number"
+          - "boolean"
+    # primitive types with enums
+    - id: "some-string-with-enum"
+      name: "someStringWithEnum"
+      type: "string"
+      description: "some string property with enum"
+      propConfig:
+        enum:
+          - "GET"
+          - "PUT"
+          - "POST"
+          - "DELETE"
+          - "PATCH"
+    - id: "some-integer-with-enum"
+      name: "someIntegerWithEnum"
+      type: "integer"
+      description: "some integer property with enum"
+      propConfig:
+        enum:
+          - 200
+          - 201
+          - 204
+          - 400
+          - 401
+          - 403
+          - 404
+          - 500

@@ -19,9 +19,10 @@ type KotlinProperty struct {
 
 // KotlinDataClass represents a Kotlin data class declaration
 type KotlinDataClass struct {
-	Name       string           // The class name in PascalCase (e.g., "UserProfile")
-	Comment    string           // Documentation comment for the class
-	Properties []KotlinProperty // Properties of the data class
+	Name          string            // The class name in PascalCase (e.g., "UserProfile")
+	Comment       string            // Documentation comment for the class
+	Properties    []KotlinProperty  // Properties of the data class
+	NestedClasses []KotlinDataClass // Nested data classes within this class
 }
 
 // KotlinEnumValue represents a single value in a Kotlin enum

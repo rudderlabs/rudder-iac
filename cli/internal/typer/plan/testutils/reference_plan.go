@@ -136,6 +136,62 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
+	ReferenceProperties["device_type"] = &plan.Property{
+		Name:        "device_type",
+		Description: "Type of device",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
+	ReferenceProperties["tags"] = &plan.Property{
+		Name:        "tags",
+		Description: "User tags as array of strings",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["contacts"] = &plan.Property{
+		Name:        "contacts",
+		Description: "Array of user contacts",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["email"]},
+	}
+
+	// Add properties for testing "any" type support
+	ReferenceProperties["property_of_any"] = &plan.Property{
+		Name:        "property_of_any",
+		Description: "A field that can contain any type of value",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_field"] = &plan.Property{
+		Name:        "untyped_field",
+		Description: "A field with no explicit type (treated as any)",
+		Types:       []plan.PropertyType{},
+	}
+
+	ReferenceProperties["array_of_any"] = &plan.Property{
+		Name:        "array_of_any",
+		Description: "An array that can contain any type of items",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeAny},
+	}
+
+	ReferenceProperties["untyped_array"] = &plan.Property{
+		Name:        "untyped_array",
+		Description: "An array with no explicit item type (treated as any)",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{},
+	}
+
+	ReferenceProperties["object_property"] = &plan.Property{
+		Name:        "object_property",
+		Description: "An object field with no defined structure",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
 	ReferenceCustomTypes["user_profile"] = &plan.CustomType{
 		Name:        "user_profile",
 		Description: "User profile information",
@@ -208,6 +264,48 @@ func init() {
 		Description: "List of related user profiles",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["profile_list"]},
 	}
+
+	// Add properties for testing nested objects
+	ReferenceProperties["ip_address"] = &plan.Property{
+		Name:        "ip_address",
+		Description: "IP address of the user",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["nested_context"] = &plan.Property{
+		Name:        "nested_context",
+		Description: "demonstrates multiple levels of nesting",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	ReferenceProperties["context"] = &plan.Property{
+		Name:        "context",
+		Description: "example of object property",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	// Add empty custom type with additionalProperties: true for testing
+	ReferenceCustomTypes["empty_object_with_additional_props"] = &plan.CustomType{
+		Name:        "empty_object_with_additional_props",
+		Description: "Empty object that allows additional properties",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: true,
+		},
+	}
+
+	ReferenceProperties["empty_object_with_additional_props"] = &plan.Property{
+		Name:        "empty_object_with_additional_props",
+		Description: "Property with empty object allowing additional properties",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["empty_object_with_additional_props"]},
+	}
+
+	ReferenceProperties["nested_empty_object"] = &plan.Property{
+		Name:        "nested_empty_object",
+		Description: "Nested property with empty object allowing additional properties",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -275,6 +373,45 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"profile_list": {
 					Property: *ReferenceProperties["profile_list"],
 					Required: false,
+				},
+				"empty_object_with_additional_props": {
+					Property: *ReferenceProperties["empty_object_with_additional_props"],
+					Required: false,
+				},
+				"nested_empty_object": {
+					Property: *ReferenceProperties["nested_empty_object"],
+					Required: false,
+					Schema: &plan.ObjectSchema{
+						Properties:           map[string]plan.PropertySchema{},
+						AdditionalProperties: true,
+					},
+				},
+				// Add nested object properties for testing
+				"context": {
+					Property: *ReferenceProperties["context"],
+					Required: false,
+					Schema: &plan.ObjectSchema{
+						Properties: map[string]plan.PropertySchema{
+							"ip_address": {
+								Property: *ReferenceProperties["ip_address"],
+								Required: true,
+							},
+							"nested_context": {
+								Property: *ReferenceProperties["nested_context"],
+								Required: true,
+								Schema: &plan.ObjectSchema{
+									Properties: map[string]plan.PropertySchema{
+										"profile": {
+											Property: *ReferenceProperties["profile"],
+											Required: false,
+										},
+									},
+									AdditionalProperties: false,
+								},
+							},
+						},
+						AdditionalProperties: false,
+					},
 				},
 			},
 			AdditionalProperties: false,
@@ -357,7 +494,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 7  // email, age, active, user_profile, status, email_list, profile_list
-	ExpectedPropertyCount   = 17 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list
+	ExpectedCustomTypeCount = 8  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props
+	ExpectedPropertyCount   = 22 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

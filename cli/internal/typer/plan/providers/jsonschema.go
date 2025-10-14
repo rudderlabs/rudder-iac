@@ -260,11 +260,19 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 
 	// handle nested objects
 	if len(td.Types) > 0 && td.Types[0] == plan.PrimitiveTypeObject {
-		if propertiesMap, exists := def["properties"]; exists {
-			objSchema := &plan.ObjectSchema{
-				Properties: make(map[string]plan.PropertySchema),
-			}
+		objSchema := &plan.ObjectSchema{
+			Properties: make(map[string]plan.PropertySchema),
+		}
+		td.Schema = objSchema
 
+		// Parse additionalProperties field
+		if additionalPropsVal, exists := def["additionalProperties"]; exists {
+			if additionalProps, ok := additionalPropsVal.(bool); ok {
+				objSchema.AdditionalProperties = additionalProps
+			}
+		}
+
+		if propertiesMap, exists := def["properties"]; exists {
 			if props, ok := propertiesMap.(map[string]any); ok {
 				for propName, propDef := range props {
 					ptd, err := parseTypeDefinition(propDef.(map[string]any), customTypes)
@@ -281,8 +289,6 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 						},
 						Schema: ptd.Schema,
 					}
-
-					td.Schema = objSchema
 				}
 
 				// handle required properties
