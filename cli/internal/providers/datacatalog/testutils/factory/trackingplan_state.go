@@ -51,8 +51,6 @@ func (f *TrackingPlanArgsFactory) Build() state.TrackingPlanArgs {
 	return f.trackingplanArgs
 }
 
-// ----------------------------------------------------------
-
 type TrackingPlanStateFactory struct {
 	trackingplanState state.TrackingPlanState
 }

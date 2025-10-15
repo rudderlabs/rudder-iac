@@ -20,25 +20,21 @@ var (
 
 var ErrDuplicateNameException = errors.New("duplicate name exception")
 
-// Namer interface provides methods to generate unique names based on strategy and load existing names.
 type Namer interface {
-	Name(input ScopeName, options ...NamingOptions) (string, error)
+	Name(input ScopeName) (string, error)
 	Load([]ScopeName) error
 }
 
-// NamingStrategy interface defines how to transform input into a base name.
 type NamingStrategy interface {
 	Name(input string) string
 }
 
-// ExternalIdNamer implements Namer by composing NameRegistry.
 type ExternalIdNamer struct {
 	*core.NameRegistry
 	strategy NamingStrategy
 	mu       sync.Mutex
 }
 
-// NewNamer creates a new Namer instance using the provided strategy.
 func NewExternalIdNamer(strategy NamingStrategy) Namer {
 	registry := core.NewNameRegistry(collisionHandler)
 	return &ExternalIdNamer{
@@ -57,17 +53,11 @@ func WithStrategy(strategy NamingStrategy) NamingOptions {
 	}
 }
 
-// Name generates a unique name using the strategy and handles collisions.
-func (p *ExternalIdNamer) Name(input ScopeName, options ...NamingOptions) (string, error) {
+func (p *ExternalIdNamer) Name(input ScopeName) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	strategy := p.strategy
-	for _, option := range options {
-		strategy = option.Strategy
-	}
-
-	baseName := strategy.Name(input.Name)
+	baseName := p.strategy.Name(input.Name)
 	// The reason we are generating id uniquely everytime we register name is
 	// as we just need to make sure that the name is unique within the scope.
 	registered, err := p.RegisterName(uuid.New().String(), input.Scope, baseName)
@@ -83,7 +73,6 @@ type ScopeName struct {
 	Name  string
 }
 
-// Load adds existing names to the registry, returning error on duplicates.
 func (p *ExternalIdNamer) Load(names []ScopeName) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -112,10 +101,8 @@ func collisionHandler(name string, existingNames []string) string {
 	}
 }
 
-// KebabCase implements NamingStrategy for kebab-case naming.
 type KebabCase struct{}
 
-// NewKebabCase returns a new KebabCase strategy.
 func NewKebabCase() NamingStrategy {
 	return &KebabCase{}
 }

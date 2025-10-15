@@ -130,20 +130,17 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	p.log.Debug("importing property resource", "id", ID, "remoteId", remoteId)
 
-	// Get the property from upstream based on the remoteId
 	property, err := p.client.GetProperty(ctx, remoteId)
 	if err != nil {
 		return nil, fmt.Errorf("getting property from upstream: %w", err)
 	}
 
-	// Convert input data to PropertyArgs
 	toArgs := state.PropertyArgs{}
 	toArgs.FromResourceData(data)
 
-	// Compare the diff between the args and the property
 	if toArgs.DiffUpstream(property) {
 		p.log.Debug("property has differences, updating", "id", ID, "remoteId", remoteId)
-		// Call the updateProperty if there are any differences
+
 		property, err = p.client.UpdateProperty(ctx, remoteId, &catalog.PropertyUpdate{
 			Name:        toArgs.Name,
 			Description: toArgs.Description,

@@ -254,24 +254,45 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 	toArgs := state.TrackingPlanArgs{}
 	toArgs.FromResourceData(data)
 
-	if toArgs.DiffUpstream(trackingPlan) {
+	changed, diffed := toArgs.DiffUpstream(trackingPlan)
+	if changed {
 		p.log.Debug("tracking plan has differences, updating", "id", ID, "remoteId", remoteId)
 
 		_, err = p.client.UpdateTrackingPlan(ctx, remoteId, toArgs.Name, toArgs.Description)
 		if err != nil {
 			return nil, fmt.Errorf("updating tracking plan during import: %w", err)
 		}
-		// Re-fetch the tracking plan to get the updated details
-		trackingPlan, err = p.client.GetTrackingPlan(ctx, remoteId)
-		if err != nil {
-			return nil, fmt.Errorf("re-fetching tracking plan after update: %w", err)
+
+		for _, deleted := range diffed.Deleted {
+			err = p.client.DeleteTrackingPlanEvent(ctx, remoteId, deleted.ID.(string))
+			if err != nil {
+				return nil, fmt.Errorf("deleting tracking plan event during import: %w", err)
+			}
+		}
+
+		for _, added := range diffed.Added {
+			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(added))
+			if err != nil {
+				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
+			}
+		}
+
+		for _, updated := range diffed.Updated {
+			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(updated))
+			if err != nil {
+				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
+			}
 		}
 	}
 
-	// Set the external ID on the remote tracking plan
 	err = p.client.SetTrackingPlanExternalId(ctx, remoteId, ID)
 	if err != nil {
 		return nil, fmt.Errorf("setting tracking plan external id: %w", err)
+	}
+
+	trackingPlan, err = p.client.GetTrackingPlan(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("re-fetching tracking plan after update: %w", err)
 	}
 
 	trackingPlanState := state.TrackingPlanState{

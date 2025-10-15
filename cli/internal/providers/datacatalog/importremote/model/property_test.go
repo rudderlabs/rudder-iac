@@ -148,7 +148,6 @@ func TestPropertyForExport(t *testing.T) {
 }
 
 func TestIsCustomType(t *testing.T) {
-	assert.True(t, isCustomType("someuuid"))
-	assert.False(t, isCustomType("string, number, boolean"))
-	assert.False(t, isCustomType("string"))
+	assert.True(t, isCustomType(&catalog.Property{DefinitionId: "someuuid"}))
+	assert.False(t, isCustomType(&catalog.Property{DefinitionId: ""}))
 }

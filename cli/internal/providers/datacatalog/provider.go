@@ -119,8 +119,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		}
 	}
 
-	getResourceImportMetadata := func(id string) resources.ResourceOpts {
-		metadata, ok := catalog.ImportMetadata[id]
+	getResourceImportMetadata := func(kind, id string) resources.ResourceOpts {
+		metadata, ok := catalog.ImportMetadata[resources.URN(kind, id)]
 		if !ok {
 			return nil
 		}
@@ -173,7 +173,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				pstate.PropertyResourceType,
 				args.ToResourceData(),
 				make([]string, 0),
-				getResourceImportMetadata(prop.LocalID),
+				getResourceImportMetadata(localcatalog.KindProperties, prop.LocalID),
 				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
 					localcatalog.KindProperties,
 					group,
@@ -198,7 +198,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				pstate.EventResourceType,
 				args.ToResourceData(),
 				make([]string, 0),
-				getResourceImportMetadata(event.LocalID),
+				getResourceImportMetadata(localcatalog.KindEvents, event.LocalID),
 				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
 					localcatalog.KindEvents,
 					group,
@@ -225,7 +225,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				pstate.CustomTypeResourceType,
 				args.ToResourceData(),
 				make([]string, 0),
-				getResourceImportMetadata(customType.LocalID),
+				getResourceImportMetadata(localcatalog.KindCustomTypes, customType.LocalID),
 				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
 					localcatalog.KindCustomTypes,
 					group,
@@ -248,7 +248,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				pstate.CategoryResourceType,
 				args.ToResourceData(),
 				make([]string, 0),
-				getResourceImportMetadata(category.LocalID),
+				getResourceImportMetadata(localcatalog.KindCategories, category.LocalID),
 				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
 					localcatalog.KindCategories,
 					group,
@@ -273,7 +273,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			pstate.TrackingPlanResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
-			getResourceImportMetadata(tp.LocalID),
+			getResourceImportMetadata(localcatalog.KindTrackingPlans, tp.LocalID),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
 				localcatalog.KindTrackingPlans,
 				group,

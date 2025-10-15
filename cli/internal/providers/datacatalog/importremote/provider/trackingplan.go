@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -153,7 +154,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		tpPath, err := idNamer.Name(namer.ScopeName{
 			Name:  trackingPlan.ExternalID,
 			Scope: TrackingPlanScope,
-		}, namer.WithStrategy(namer.StrategySnakeCase))
+		})
 		if err != nil {
 			return nil, fmt.Errorf("generating tracking plan path: %w", err)
 		}
@@ -163,7 +164,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			RelativePath: filepath.Join(
 				p.baseImportDir,
 				TrackingPlansRelativePath,
-				fmt.Sprintf("%s.yaml", tpPath),
+				fmt.Sprintf("%s%s", tpPath, loader.ExtensionYAML),
 			),
 		})
 

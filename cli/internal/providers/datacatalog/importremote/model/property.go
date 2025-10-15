@@ -2,15 +2,12 @@ package model
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/samber/lo"
 )
 
 type ImportableProperty struct {
@@ -45,7 +42,7 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 
 	// If the type not matches the valid types, it means it's a customType ID
 	// reference which needs to be resolved to a custom type reference
-	if isCustomType(p.Property.Type) {
+	if isCustomType(upstream) {
 		customTypeRef, err := resolver.ResolveToReference(
 			state.CustomTypeResourceType,
 			upstream.DefinitionId)
@@ -66,15 +63,6 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 	return nil
 }
 
-// isCustomType checks if the type is a custom type id reference
-// by making sure to return true if the type doesn't contain any pre-defined static types
-func isCustomType(typ string) bool {
-	rawtypes := strings.Split(typ, ",") // typ = "number,integer,string"
-
-	types := make([]string, 0, len(rawtypes))
-	for _, t := range rawtypes {
-		types = append(types, strings.TrimSpace(t))
-	}
-
-	return !lo.Some(validate.ValidTypes, types)
+func isCustomType(property *catalog.Property) bool {
+	return property.DefinitionId != ""
 }

@@ -83,7 +83,7 @@ func (p *CategoryProvider) Update(ctx context.Context, ID string, input resource
 	oldState.FromResourceData(olds)
 
 	updated, err := p.client.UpdateCategory(ctx, oldState.ID, catalog.CategoryUpdate{
-		Name:       toArgs.Name,
+		Name: toArgs.Name,
 	})
 
 	if err != nil {
