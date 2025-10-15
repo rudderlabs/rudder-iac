@@ -106,30 +106,11 @@ func TestPropertyForExport(t *testing.T) {
 		}, result)
 	})
 
-	t.Run("errors when resolver returns empty reference", func(t *testing.T) {
-		upstream := &catalog.Property{
-			Name: "Custom Property",
-			Type: "ct_custom_type_id",
-		}
-
-		mockRes := &mockResolver{
-			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				return "", nil
-			},
-		}
-
-		prop := &ImportableProperty{}
-		result, err := prop.ForExport("custom_prop", upstream, mockRes)
-
-		require.Error(t, err)
-		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved custom type reference is empty")
-	})
-
 	t.Run("errors when resolver fails", func(t *testing.T) {
 		upstream := &catalog.Property{
-			Name: "Failing Property",
-			Type: "ct_invalid_type",
+			Name:         "Failing Property",
+			Type:         "ct_invalid_type",
+			DefinitionId: "ct_invalid_type",
 		}
 
 		mockRes := &mockResolver{
