@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
@@ -16,17 +19,30 @@ const (
 	importedDir = "imported"
 )
 
+var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
+
 func WorkspaceImport(
 	ctx context.Context,
 	location string,
 	p project.Provider) error {
 
-	resourceGraph, err := p.GetResourceGraph()
+	pState, err := p.LoadState(ctx)
+	if err != nil {
+		return fmt.Errorf("loading state: %w", err)
+	}
+
+	sourceGraph := syncer.StateToGraph(pState)
+	targetGraph, err := p.GetResourceGraph()
 	if err != nil {
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
 
-	idNamer, err := initNamer(resourceGraph)
+	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
+	if diff.IsDiffed() {
+		return fmt.Errorf("%w", ErrProjectNotSynced)
+	}
+
+	idNamer, err := initNamer(targetGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -41,7 +57,7 @@ func WorkspaceImport(
 		return nil
 	}
 
-	resolver, err := initResolver(ctx, p, importable, resourceGraph)
+	resolver, err := initResolver(ctx, p, importable, targetGraph)
 	if err != nil {
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}

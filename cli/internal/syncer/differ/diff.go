@@ -25,6 +25,13 @@ type Diff struct {
 	UnmodifiedResources []string
 }
 
+func (d *Diff) IsDiffed() bool {
+	return len(d.NewResources) > 0 ||
+		len(d.ImportableResources) > 0 ||
+		len(d.UpdatedResources) > 0 ||
+		len(d.RemovedResources) > 0
+}
+
 type ResourceDiff struct {
 	URN   string
 	Diffs map[string]PropertyDiff
