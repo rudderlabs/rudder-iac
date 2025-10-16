@@ -28,11 +28,27 @@ func Write(ctx context.Context, baseDir string, formatters formatter.Formatters,
 			return fmt.Errorf("formatting %s: %w", path, err)
 		}
 
-		err = os.WriteFile(path, content, 0644)
+		err = writeFile(path, content)
 		if err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
 		}
 	}
 
+	return nil
+}
+
+// writeFile writes content to a file, but fails if the file already exists.
+// This prevents accidental overwriting of existing files.
+func writeFile(path string, content []byte) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("opening file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	_, err = file.Write(content)
+	if err != nil {
+		return fmt.Errorf("writing to file %s: %w", path, err)
+	}
 	return nil
 }
