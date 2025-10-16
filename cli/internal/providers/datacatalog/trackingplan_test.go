@@ -50,6 +50,10 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string
 	return m.tpWithIdentifiers, m.err
 }
 
+func (m *MockTrackingPlanCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+	return m.tpWithSchema, m.err
+}
+
 func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventSchema, error) {
 	return m.tpes, m.err
 }

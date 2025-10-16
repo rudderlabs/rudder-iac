@@ -1,0 +1,11 @@
+{{- if .Comment }}
+/** {{ .Comment }} */
+{{- end }}
+@Serializable
+enum class {{ .Name }} {
+{{- range $index, $value := .Values }}{{- if $index }},
+{{- end }}
+    @SerialName({{ $value.SerialName }})
+    {{ $value.Name }}
+{{- end }}
+}

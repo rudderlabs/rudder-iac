@@ -171,6 +171,16 @@ These helper methods provide convenient access to nested data without violating 
 
 ## Testing Strategy
 
+### Running Tests
+
+Tests are executed using the Makefile at the project root:
+
+```bash
+make test
+```
+
+This runs all tests across the project, including the typer generator tests that validate the plan model functionality.
+
 ### Reference Tracking Plan
 
 The testing approach leverages a comprehensive reference tracking plan that provides consistent test data across all components:
@@ -187,6 +197,44 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 - **Reliability**: Known structure enables precise validation of extraction and generation logic
 - **Maintainability**: Centralized test data reduces duplication and simplifies updates
 - **Documentation**: Reference plan serves as living documentation of supported features
+
+### Testing Approach
+
+The plan model is tested indirectly through platform generator tests rather than direct unit tests. This approach:
+
+- **Validates the complete pipeline**: Tests the entire flow from plan model through code generation
+- **Reduces test maintenance**: Changes to the plan model are automatically tested through generator tests
+- **Provides comprehensive coverage**: The reference plan includes diverse scenarios that exercise all plan model features
+
+Platform generators (like the Kotlin generator) use the reference tracking plan to validate their output against expected generated code, ensuring both plan model correctness and generation logic accuracy for all plan scenarios.
+
+### Docker-based Validation
+
+The Kotlin generator includes an additional layer of validation through a Docker-based runtime verification system:
+
+- **Location**: `cli/internal/typer/generator/platforms/kotlin/validator/`
+- **Purpose**: Validates that generated Kotlin code not only matches expected output but also compiles and executes correctly in a real Kotlin runtime environment
+- **Implementation**: Complete Docker-containerized Kotlin project with Gradle build system and RudderStack SDK integration
+- **Test Coverage**: Comprehensive validation scenarios covering all supported RudderTyper features including:
+  - All RudderStack event types (Track, Identify, Page, Screen, Group)
+  - Custom types and properties with various data types
+  - Enum handling and array support
+  - Edge cases with minimal and comprehensive data sets
+
+**Key Benefits**:
+
+- **Runtime Verification**: Ensures generated code compiles and executes without errors
+- **SDK Integration Testing**: Validates compatibility with actual RudderStack Kotlin SDK
+- **Environment Consistency**: Docker containerization provides consistent testing environment across different development machines
+- **End-to-End Validation**: Tests the complete pipeline from plan model to executable Kotlin code
+
+**Usage**:
+
+```bash
+make typer-validate-kotlin
+```
+
+The validator uses the same test data as the unit tests (`testdata/Main.kt`), ensuring consistency between static code generation tests and runtime validation tests.
 
 ## Implementation Guidelines
 

@@ -12,6 +12,7 @@ import (
 var (
 	TypeAliasScope = "typealias"
 	DataclassScope = "dataclass"
+	EnumScope      = "enum"
 )
 
 // formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
@@ -115,6 +116,72 @@ func getOrRegisterPropertyAliasName(property *plan.Property, nameRegistry *core.
 	return nameRegistry.RegisterName("property:"+property.Name, TypeAliasScope, aliasName)
 }
 
+// getOrRegisterPropertyEnumName returns the registered enum class name for a property with enum constraints
+func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	enumName := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
+}
+
+// getOrRegisterCustomTypeEnumName returns the registered enum class name for a custom type with enum constraints
+func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
+	enumName := FormatClassName("CustomType", customType.Name)
+	return nameRegistry.RegisterName("customtype:"+customType.Name, EnumScope, enumName)
+}
+
+// FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
+func FormatEnumValue(value any) string {
+	valueStr := fmt.Sprintf("%v", value)
+	trimmedValue := strings.TrimSpace(valueStr)
+	if trimmedValue == "" {
+		return ""
+	}
+
+	// Convert to upper case and replace invalid characters with underscores
+	formatted := strings.ToUpper(trimmedValue)
+
+	// Replace non-alphanumeric characters with underscores
+	var result strings.Builder
+	for _, r := range formatted {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+		} else {
+			result.WriteRune('_')
+		}
+	}
+
+	formatted = result.String()
+
+	// If it starts with a number, prefix with underscore
+	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
+		formatted = "_" + formatted
+	}
+
+	// Handle reserved keywords by prefixing with underscore
+	originalLower := strings.ToLower(trimmedValue)
+	if KotlinReservedKeywords[originalLower] {
+		formatted = "_" + formatted
+	}
+
+	return formatted
+}
+
+func FormatEnumSerialName(value any) string {
+	switch v := value.(type) {
+	case string:
+		// For strings, preserve the original value with quotes
+		return fmt.Sprintf("%q", v)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
+// formatSealedSubclassName formats a match value into a valid Kotlin class name prefixed with "Case"
+func formatSealedSubclassName(matchValue any) string {
+	valueStr := fmt.Sprintf("%v", matchValue)
+	className := FormatClassName("Case", valueStr)
+	return className
+}
+
 func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.NameRegistry) (string, error) {
 	// Generate class name based on event type, name, and section
 	var prefix string
@@ -143,9 +210,9 @@ func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.Na
 
 	var suffix string
 	switch rule.Section {
-	case plan.EventRuleSectionProperties:
+	case plan.IdentitySectionProperties:
 		suffix = "Properties"
-	case plan.EventRuleSectionTraits:
+	case plan.IdentitySectionTraits:
 		suffix = "Traits"
 	default:
 		return "", fmt.Errorf("unsupported event rule section: %s", rule.Section)
@@ -170,4 +237,16 @@ func KotlinCollisionHandler(name string, existingNames []string) string {
 // CreateKotlinNameRegistry creates a new NameRegistry with Kotlin-specific collision handling
 func CreateKotlinNameRegistry() *core.NameRegistry {
 	return core.NewNameRegistry(KotlinCollisionHandler)
+}
+
+// getOrRegisterPropertyMultiTypeClassName returns the registered sealed class name for a property with multiple types
+func getOrRegisterPropertyMultiTypeClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	className := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, DataclassScope, className)
+}
+
+// getOrRegisterPropertyMultiTypeArrayItemClassName returns the registered sealed class name for array items with multiple types
+func getOrRegisterPropertyMultiTypeArrayItemClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	className := FormatClassName("ArrayItem", property.Name)
+	return nameRegistry.RegisterName("property:item:"+property.Name, DataclassScope, className)
 }

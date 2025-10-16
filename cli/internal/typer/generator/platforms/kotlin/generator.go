@@ -9,8 +9,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
+const (
+	Platform = "kotlin"
+)
+
+func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
 	ctx := NewKotlinContext()
+	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
@@ -31,6 +36,15 @@ func Generate(plan *plan.TrackingPlan) ([]*core.File, error) {
 	return []*core.File{
 		mainFile,
 	}, nil
+}
+
+func formatEventContext(ec plan.PlanMetadata, rudderCLIVersion string) map[string]string {
+	return map[string]string{
+		"platform":            fmt.Sprintf("%q", Platform),
+		"rudderCLIVersion":    fmt.Sprintf("%q", rudderCLIVersion),
+		"trackingPlanId":      fmt.Sprintf("%q", ec.TrackingPlanID),
+		"trackingPlanVersion": fmt.Sprintf("%d", ec.TrackingPlanVersion),
+	}
 }
 
 // processPropertiesAndCustomTypes extracts custom types and properties from the tracking plan and generates corresponding Kotlin types
@@ -63,13 +77,44 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases for primitive custom types and data classes for object custom types
+	// Generate type aliases for primitive custom types, enums for custom types with enum configs, and data classes for object custom types
 	for _, name := range sortedNames {
 		customType := customTypes[name]
-		if customType.IsPrimitive() {
-			alias, err := createCustomTypeTypeAlias(customType, nameRegistry)
+
+		// Check if this custom type has variants
+		if len(customType.Variants) > 0 {
+			// Generate sealed class for variant custom type
+			sealedClass, err := createCustomTypeVariantSealedClass(customType, nameRegistry)
 			if err != nil {
 				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else if customType.IsPrimitive() {
+			// Check if this custom type has enum constraints
+			if hasEnumConfig(customType.Config) {
+				enum, err := createCustomTypeEnum(customType, nameRegistry)
+				if err != nil {
+					return err
+				}
+				ctx.Enums = append(ctx.Enums, *enum)
+			} else {
+				alias, err := createCustomTypeTypeAlias(customType, nameRegistry)
+				if err != nil {
+					return err
+				}
+				ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+			}
+		} else if customType.Schema != nil && len(customType.Schema.Properties) == 0 && customType.Schema.AdditionalProperties {
+			// If this is an empty object with additionalProperties: true
+			// create a type alias to JsonObject instead of an empty data class
+			finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+			if err != nil {
+				return err
+			}
+			alias := &KotlinTypeAlias{
+				Alias:   finalName,
+				Comment: customType.Description,
+				Type:    "JsonObject",
 			}
 			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 		} else {
@@ -83,7 +128,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 	return nil
 }
 
-// processPropertiesIntoContext processes individual properties and creates type aliases for all properties
+// processPropertiesIntoContext processes individual properties and creates type aliases, enums, or sealed classes for all properties
 func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *KotlinContext, nameRegistry *core.NameRegistry) error {
 	// Sort property names for deterministic output
 	var sortedNames []string
@@ -92,14 +137,44 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 	}
 	sort.Strings(sortedNames)
 
-	// Generate type aliases for all properties
+	// Generate type aliases, enums, or sealed classes for all properties
 	for _, name := range sortedNames {
 		property := allProperties[name]
-		alias, err := createPropertyTypeAlias(property, nameRegistry)
-		if err != nil {
-			return err
+
+		// Check if this property has enum constraints
+		if hasEnumConfig(property.Config) {
+			enum, err := createPropertyEnum(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.Enums = append(ctx.Enums, *enum)
+		} else if len(property.Types) > 1 {
+			// Multi-type property - generate sealed class
+			sealedClass, err := createPropertyMultiTypeSealedClass(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else if len(property.Types) == 1 && plan.IsPrimitiveType(property.Types[0]) && *plan.AsPrimitiveType(property.Types[0]) == plan.PrimitiveTypeArray && len(property.ItemTypes) > 1 {
+			// Array with multiple item types - generate sealed class for array items
+			sealedClass, err := createPropertyMultiTypeArrayItemSealedClass(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+			// Also create type alias for the array itself
+			alias, err := createPropertyTypeAlias(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+		} else {
+			alias, err := createPropertyTypeAlias(property, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 		}
-		ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 	}
 	return nil
 }
@@ -111,8 +186,26 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 		return nil, err
 	}
 
-	// Map primitive type to Kotlin type
-	kotlinType := mapPrimitiveToKotlinType(customType.Type)
+	var kotlinType string
+	// Handle array custom types with ItemType
+	if customType.Type == plan.PrimitiveTypeArray {
+		if customType.ItemType != nil {
+			innerKotlinType, err := resolveTypeToKotlinType(customType.ItemType, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+			kotlinType = fmt.Sprintf("List<%s>", innerKotlinType)
+		} else {
+			// Array with no item type means array of any
+			kotlinType = "List<JsonElement>"
+		}
+	} else {
+		// Map primitive type to Kotlin type
+		kotlinType, err = mapPrimitiveToKotlinType(customType.Type)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &KotlinTypeAlias{
 		Alias:   finalName,
@@ -129,26 +222,9 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 	}
 
 	// Get the appropriate Kotlin type for this property
-	var kotlinType string
-	if property.IsPrimitive() {
-		kotlinType = mapPrimitiveToKotlinType(property.PrimitiveType())
-	} else if property.IsCustomType() {
-		customType := property.CustomType()
-		if customType.IsPrimitive() {
-			// Reference the custom type alias
-			kotlinType, err = getOrRegisterCustomTypeAliasName(customType, nameRegistry)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			// Reference the custom type data class
-			kotlinType, err = getOrRegisterCustomTypeClassName(customType, nameRegistry)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		return nil, fmt.Errorf("unsupported property type: %s", property.Type)
+	kotlinType, err := resolvePropertyKotlinType(property, nameRegistry)
+	if err != nil {
+		return nil, err
 	}
 
 	return &KotlinTypeAlias{
@@ -158,8 +234,81 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 	}, nil
 }
 
-// createKotlinPropertiesFromSchema processes properties from an ObjectSchema and returns KotlinProperty objects
-func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) ([]KotlinProperty, error) {
+// resolvePropertyKotlinType resolves the Kotlin type for a property, handling arrays and multi-type properties
+func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	// no types means any type, which maps to JsonElement for a flexible representation
+	if len(property.Types) == 0 {
+		return "JsonElement", nil
+	} else if len(property.Types) == 1 {
+		// Single type property
+		propertyType := property.Types[0]
+
+		if plan.IsPrimitiveType(propertyType) {
+			primitiveType := *plan.AsPrimitiveType(propertyType)
+
+			// Handle array types by using ItemType
+			if primitiveType == plan.PrimitiveTypeArray {
+				if len(property.ItemTypes) == 0 {
+					// No item type specified means array can contain any type
+					return "List<JsonElement>", nil
+				} else if len(property.ItemTypes) == 1 {
+					itemType := property.ItemTypes[0]
+					innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("List<%s>", innerKotlinType), nil
+				} else {
+					// Multi-type array items - reference the sealed class for array items
+					itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("List<%s>", itemClassName), nil
+				}
+			}
+
+			return mapPrimitiveToKotlinType(primitiveType)
+		} else if plan.IsCustomType(propertyType) {
+			return resolveTypeToKotlinType(propertyType, nameRegistry)
+		} else {
+			return "", fmt.Errorf("unsupported property type: %s", property.Types)
+		}
+	} else {
+		// Multi-type property - reference the sealed class
+		itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("List<%s>", itemClassName), nil
+	}
+}
+
+// resolveTypeToKotlinType resolves a PropertyType to its Kotlin type representation
+func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.NameRegistry) (string, error) {
+	if plan.IsPrimitiveType(propertyType) {
+		return mapPrimitiveToKotlinType(*plan.AsPrimitiveType(propertyType))
+	} else if plan.IsCustomType(propertyType) {
+		customType := plan.AsCustomType(propertyType)
+		if customType.IsPrimitive() {
+			// Check if this custom type has enum constraints
+			if hasEnumConfig(customType.Config) {
+				// Reference the custom type enum
+				return getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+			}
+			// Reference the custom type alias
+			return getOrRegisterCustomTypeAliasName(customType, nameRegistry)
+		} else {
+			// Reference the custom type data class
+			return getOrRegisterCustomTypeClassName(customType, nameRegistry)
+		}
+	} else {
+		return "", fmt.Errorf("unsupported property type: %T", propertyType)
+	}
+}
+
+func createDataClass(className string, comment string, schema *plan.ObjectSchema, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
 	// Sort property names for deterministic output
 	var sortedPropNames []string
 	for propName := range schema.Properties {
@@ -168,29 +317,76 @@ func createKotlinPropertiesFromSchema(schema *plan.ObjectSchema, nameRegistry *c
 	sort.Strings(sortedPropNames)
 
 	var properties []KotlinProperty
-	for _, propName := range sortedPropNames {
-		propSchema := schema.Properties[propName]
-		kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
-		if err != nil {
-			return nil, err
-		}
+	var nestedClasses []KotlinDataClass
 
-		property := KotlinProperty{
-			Name:       formatPropertyName(propName),
-			SerialName: propName,
-			Type:       kotlinType,
-			Comment:    propSchema.Property.Description,
-			Nullable:   !propSchema.Required,
+	for _, propName := range sortedPropNames {
+		var property *KotlinProperty
+		propSchema := schema.Properties[propName]
+
+		// Check if this property has nested object schema
+		if propSchema.Schema != nil {
+			// Check if this is an empty object with additionalProperties: true
+			if len(propSchema.Schema.Properties) == 0 && propSchema.Schema.AdditionalProperties {
+				// Use the property's type alias instead of creating an empty data class
+				kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+				if err != nil {
+					return nil, err
+				}
+				property = &KotlinProperty{
+					Name:       formatPropertyName(propName),
+					SerialName: propName,
+					Type:       kotlinType,
+					Comment:    propSchema.Property.Description,
+					Nullable:   !propSchema.Required,
+				}
+			} else {
+				// Generate nested data class
+				nestedClass, err := createNestedDataClass(&propSchema, propName, className, nameRegistry)
+				if err != nil {
+					return nil, err
+				}
+				nestedClasses = append(nestedClasses, *nestedClass)
+
+				// Property type references the nested class
+				nestedClassName := fmt.Sprintf("%s.%s", className, nestedClass.Name)
+				property = &KotlinProperty{
+					Name:       formatPropertyName(propName),
+					SerialName: propName,
+					Type:       nestedClassName,
+					Comment:    propSchema.Property.Description,
+					Nullable:   !propSchema.Required,
+				}
+
+			}
+		} else {
+			kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+			if err != nil {
+				return nil, err
+			}
+
+			property = &KotlinProperty{
+				Name:       formatPropertyName(propName),
+				SerialName: propName,
+				Type:       kotlinType,
+				Comment:    propSchema.Property.Description,
+				Nullable:   !propSchema.Required,
+			}
 		}
 
 		if !propSchema.Required {
 			property.Default = "null"
 		}
 
-		properties = append(properties, property)
+		properties = append(properties, *property)
+
 	}
 
-	return properties, nil
+	return &KotlinDataClass{
+		Name:          className,
+		Comment:       comment,
+		Properties:    properties,
+		NestedClasses: nestedClasses,
+	}, nil
 }
 
 // createCustomTypeDataClass creates a KotlinDataClass from an object custom type
@@ -200,20 +396,15 @@ func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.N
 		return nil, err
 	}
 
-	properties, err := createKotlinPropertiesFromSchema(customType.Schema, nameRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	return &KotlinDataClass{
-		Name:       finalName,
-		Comment:    customType.Description,
-		Properties: properties,
-	}, nil
+	return createDataClass(finalName, customType.Description, customType.Schema, nameRegistry)
 }
 
-// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases
+// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases or enum classes
 func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	// Check if this property has enum constraints
+	if hasEnumConfig(property.Config) {
+		return getOrRegisterPropertyEnumName(&property, nameRegistry)
+	}
 	return getOrRegisterPropertyAliasName(&property, nameRegistry)
 }
 
@@ -238,12 +429,22 @@ func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *c
 	for _, key := range sortedKeys {
 		rule := ruleMap[key]
 
-		// create data class and method for the event rule
-		dataClass, err := createEventDataClass(rule, nameRegistry)
-		if err != nil {
-			return err
+		// Check if this event rule has variants
+		if len(rule.Variants) > 0 {
+			// Generate sealed class for variant event
+			sealedClass, err := createEventRuleVariantSealedClass(rule, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
+		} else {
+			// create data class for the event rule
+			dataClass, err := createEventDataClass(rule, nameRegistry)
+			if err != nil {
+				return err
+			}
+			ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 		}
-		ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 
 		// create RudderAnalyticsMethod for the event rule
 		method, err := createRudderAnalyticsMethod(rule, nameRegistry)
@@ -266,33 +467,92 @@ func createEventDataClass(rule *plan.EventRule, nameRegistry *core.NameRegistry)
 		return nil, err
 	}
 
-	// Use the shared helper to create properties from the rule's schema
-	properties, err := createKotlinPropertiesFromSchema(&rule.Schema, nameRegistry)
+	return createDataClass(className, rule.Event.Description, &rule.Schema, nameRegistry)
+}
+
+// hasEnumConfig checks if a PropertyConfig has enum constraints defined
+func hasEnumConfig(config *plan.PropertyConfig) bool {
+	return config != nil && config.Enum != nil && len(config.Enum) > 0
+}
+
+// createPropertyEnum creates a KotlinEnum from a property with enum constraints
+func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterPropertyEnumName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
 
-	return &KotlinDataClass{
-		Name:       className,
-		Comment:    rule.Event.Description,
-		Properties: properties,
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range property.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       FormatEnumValue(value),
+			SerialName: FormatEnumSerialName(value),
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: property.Description,
+		Values:  enumValues,
+	}, nil
+}
+
+// createCustomTypeEnum creates a KotlinEnum from a custom type with enum constraints
+func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
+	enumName, err := getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert enum values to KotlinEnumValue structs
+	var enumValues []KotlinEnumValue
+	for _, value := range customType.Config.Enum {
+		enumValues = append(enumValues, KotlinEnumValue{
+			Name:       FormatEnumValue(value),
+			SerialName: FormatEnumSerialName(value),
+		})
+	}
+
+	return &KotlinEnum{
+		Name:    enumName,
+		Comment: customType.Description,
+		Values:  enumValues,
 	}, nil
 }
 
 // mapPrimitiveToKotlinType maps plan primitive types to Kotlin types
-func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) string {
+func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) (string, error) {
 	switch primitiveType {
 	case plan.PrimitiveTypeString:
-		return "String"
+		return "String", nil
+	case plan.PrimitiveTypeInteger:
+		return "Long", nil
 	case plan.PrimitiveTypeNumber:
-		return "Double"
+		return "Double", nil
 	case plan.PrimitiveTypeBoolean:
-		return "Boolean"
-	case plan.PrimitiveTypeDate:
-		return "String" // For now, represent dates as strings
-	case plan.PrimitiveTypeArray:
-		return "List<Any>" // Generic array type for now
+		return "Boolean", nil
+	case plan.PrimitiveTypeAny:
+		return "JsonElement", nil
+	case plan.PrimitiveTypeObject:
+		return "JsonObject", nil
 	default:
-		return "Any" // Fallback for unknown types
+		return "", fmt.Errorf("unsupported primitive type: %s", primitiveType)
 	}
+}
+
+// createNestedDataClass creates a nested KotlinDataClass from a property schema
+func createNestedDataClass(propSchema *plan.PropertySchema, propName string, parentClassName string, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
+	// Generate class name for the nested class
+	nestedClassName := FormatClassName("", propName)
+	mergedName := fmt.Sprintf("%s.%s", parentClassName, nestedClassName)
+
+	dataClass, err := createDataClass(mergedName, propSchema.Property.Description, propSchema.Schema, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	dataClass.Name = nestedClassName
+
+	return dataClass, nil
 }

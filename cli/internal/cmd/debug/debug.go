@@ -49,6 +49,7 @@ func NewCmdDebug() *cobra.Command {
 
 	debugCmd.AddCommand(configCmd)
 	debugCmd.AddCommand(configFileCmd)
+	debugCmd.AddCommand(newCmdStacktrace())
 
 	return debugCmd
 }

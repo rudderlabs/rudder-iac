@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,9 @@ func TestGenerate(t *testing.T) {
 	// Create a tracking plan with primitive custom types
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
-	files, err := kotlin.Generate(trackingPlan)
+	files, err := kotlin.Generate(trackingPlan, core.GenerationOptions{
+		RudderCLIVersion: "1.0.0",
+	})
 
 	assert.NoError(t, err)
 	assert.Len(t, files, 1)

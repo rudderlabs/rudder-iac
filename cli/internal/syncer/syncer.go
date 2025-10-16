@@ -106,7 +106,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 		return []error{err}
 	}
 
-	source := stateToGraph(state)
+	source := StateToGraph(state)
 
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
@@ -136,7 +136,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 	return s.executePlan(ctx, state, plan, target, continueOnFail, options)
 }
 
-func stateToGraph(state *state.State) *resources.Graph {
+func StateToGraph(state *state.State) *resources.Graph {
 	graph := resources.NewGraph()
 
 	for _, stateResource := range state.Resources {
@@ -207,7 +207,7 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 
 func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
 	tasks := make([]Task, 0, len(plan.Operations))
-	sourceGraph := stateToGraph(state)
+	sourceGraph := StateToGraph(state)
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
 	}

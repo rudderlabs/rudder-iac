@@ -1,7 +1,10 @@
 package importcmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -37,14 +40,23 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 
-			return nil
+			_, err := os.Stat(filepath.Join(location, importer.ImportedDir))
+			if err == nil {
+				return fmt.Errorf("directory for import: %s already exists", filepath.Join(location, importer.ImportedDir))
+			}
+
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			defer func() {
 				telemetry.TrackCommand("import workspace", err)
 			}()
-			err = importer.WorkspaceImport(cmd.Context(), location, p, deps.CompositeProvider())
+			err = importer.WorkspaceImport(cmd.Context(), location, deps.CompositeProvider())
 			return err
 		},
 	}

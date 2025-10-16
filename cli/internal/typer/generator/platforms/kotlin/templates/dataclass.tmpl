@@ -1,4 +1,7 @@
-{{- range .DataClasses }}
+{{- define "dataclasswithindent" -}}
+{{- $indentLevel := (index . 0) -}}
+{{- $dataClass := (index . 1) -}}
+{{- with $dataClass -}}
 {{- if .Comment }}
 /** {{ .Comment }} */
 {{- end }}
@@ -12,5 +15,13 @@ data class {{ .Name }}(
     @SerialName("{{ $prop.SerialName }}")
     val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
 {{- end }}
-)
-{{ end }}
+){{- if gt (len .NestedClasses) 0 }} {
+{{- range $nested :=.NestedClasses }}
+{{- $nestedIndentLevel := (add $indentLevel 1) }}
+{{- $ctx := mkSlice $nestedIndentLevel $nested }}
+{{- include "dataclasswithindent" $ctx | indent $nestedIndentLevel }}
+{{- end }}
+}
+{{- end }}
+{{- end }}
+{{- end }}
