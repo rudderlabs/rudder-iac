@@ -53,6 +53,10 @@ type TrackingPlanEventState struct {
 	EventID string
 }
 
+func (t *TrackingPlanEventState) GetLocalID() string {
+	return t.LocalID
+}
+
 func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
 	for _, event := range t.Events {
 		if event.LocalID == localID {
