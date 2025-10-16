@@ -25,7 +25,7 @@ type Diff struct {
 	UnmodifiedResources []string
 }
 
-func (d *Diff) IsDiffed() bool {
+func (d *Diff) HasDiff() bool {
 	return len(d.NewResources) > 0 ||
 		len(d.ImportableResources) > 0 ||
 		len(d.UpdatedResources) > 0 ||

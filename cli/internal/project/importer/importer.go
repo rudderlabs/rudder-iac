@@ -38,7 +38,7 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	if diff.IsDiffed() {
+	if diff.HasDiff() {
 		return fmt.Errorf("%w", ErrProjectNotSynced)
 	}
 
