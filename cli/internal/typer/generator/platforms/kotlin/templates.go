@@ -3,6 +3,7 @@ package kotlin
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 	"text/template"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -20,8 +21,43 @@ var dataclassTemplate string
 //go:embed templates/rudderanalytics.tmpl
 var rudderanalyticsTemplate string
 
+//go:embed templates/enum.tmpl
+var enumTemplate string
+
+//go:embed templates/sealedclass.tmpl
+var sealedclassTemplate string
+
+//go:embed templates/sealedclass_base.tmpl
+var sealedclassBaseTemplate string
+
 func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
-	tmpl, err := template.New("kotlin").Parse(kotlinTemplate)
+	var tmpl *template.Template
+
+	funcMap := template.FuncMap{
+		"indent": func(level int, text string) string {
+			indentStr := "    "
+			lines := strings.Split(text, "\n")
+			for i, line := range lines {
+				if line != "" {
+					lines[i] = indentStr + line
+				}
+			}
+			return strings.Join(lines, "\n")
+		},
+		"include": func(name string, data interface{}) (string, error) {
+			var buf bytes.Buffer
+			err := tmpl.ExecuteTemplate(&buf, name, data)
+			return buf.String(), err
+		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"mkSlice": func(args ...any) []any {
+			return args
+		},
+	}
+
+	tmpl, err := template.New("kotlin").Funcs(funcMap).Parse(kotlinTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +74,21 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	}
 
 	_, err = tmpl.New("rudderanalytics.tmpl").Parse(rudderanalyticsTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("enum.tmpl").Parse(enumTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("sealedclass.tmpl").Parse(sealedclassTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("sealedclass_base.tmpl").Parse(sealedclassBaseTemplate)
 	if err != nil {
 		return nil, err
 	}

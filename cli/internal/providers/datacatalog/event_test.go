@@ -48,12 +48,16 @@ func (m *MockEventCatalog) GetEvent(ctx context.Context, id string) (*catalog.Ev
 	return m.mockEvent, m.err
 }
 
+func (m *MockEventCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	return m.err
+}
+
 func TestEventProviderOperations(t *testing.T) {
 
 	var (
 		ctx           = context.Background()
 		mockCatalog   = &MockEventCatalog{}
-		eventProvider = datacatalog.NewEventProvider(mockCatalog)
+		eventProvider = datacatalog.NewEventProvider(mockCatalog, "test-import-dir")
 		created, _    = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updated, _    = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)
@@ -257,7 +261,7 @@ func TestEventProviderDuplicateError(t *testing.T) {
 
 			mockCatalog := &MockEventCatalog{}
 			mockCatalog.SetError(c.err)
-			eventProvider := datacatalog.NewEventProvider(mockCatalog)
+			eventProvider := datacatalog.NewEventProvider(mockCatalog, "test-import-dir")
 
 			_, err := eventProvider.Create(ctx, "event-id", c.args.ToResourceData())
 			require.Error(t, err)

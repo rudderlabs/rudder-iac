@@ -58,6 +58,7 @@ type CustomTypeStore interface {
 	DeleteCustomType(ctx context.Context, id string) error
 	GetCustomType(ctx context.Context, id string) (*CustomType, error)
 	GetCustomTypes(ctx context.Context) ([]*CustomType, error)
+	SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
@@ -122,4 +123,22 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 
 func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context) ([]*CustomType, error) {
 	return getAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
+}
+
+func (c *RudderDataCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/custom-types/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

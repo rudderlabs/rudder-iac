@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -9,19 +10,39 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 const (
-	importedDir = "imported"
+	ImportedDir = "imported"
 )
+
+var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 
 func WorkspaceImport(
 	ctx context.Context,
 	location string,
-	project project.Project,
 	p project.Provider) error {
-	idNamer, err := initNamer(project)
+
+	pState, err := p.LoadState(ctx)
+	if err != nil {
+		return fmt.Errorf("loading state: %w", err)
+	}
+
+	sourceGraph := syncer.StateToGraph(pState)
+	targetGraph, err := p.GetResourceGraph()
+	if err != nil {
+		return fmt.Errorf("getting resource graph: %w", err)
+	}
+
+	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
+	if diff.HasDiff() {
+		return fmt.Errorf("%w", ErrProjectNotSynced)
+	}
+
+	idNamer, err := initNamer(targetGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -36,7 +57,7 @@ func WorkspaceImport(
 		return nil
 	}
 
-	resolver, err := initResolver(ctx, p, importable)
+	resolver, err := initResolver(ctx, p, importable, targetGraph)
 	if err != nil {
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
@@ -48,20 +69,15 @@ func WorkspaceImport(
 
 	formatters := formatter.Setup(formatter.DefaultYAML)
 
-	if err := Write(ctx, filepath.Join(location, importedDir), formatters, entities); err != nil {
+	if err := Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
 	return nil
 }
 
-func initNamer(p project.Project) (namer.Namer, error) {
+func initNamer(graph *resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-
-	graph, err := p.GetResourceGraph()
-	if err != nil {
-		return nil, fmt.Errorf("getting resource graph: %w", err)
-	}
 
 	resourcesMap := graph.Resources()
 	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
@@ -83,15 +99,11 @@ func initResolver(
 	ctx context.Context,
 	p project.Provider,
 	importable *resources.ResourceCollection,
+	graph *resources.Graph,
 ) (*resolver.ImportRefResolver, error) {
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
-	}
-
-	graph, err := p.GetResourceGraph()
-	if err != nil {
-		return nil, fmt.Errorf("getting resource graph: %w", err)
 	}
 
 	return &resolver.ImportRefResolver{
