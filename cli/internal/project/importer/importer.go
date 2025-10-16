@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	importedDir = "imported"
+	ImportedDir = "imported"
 )
 
 var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
@@ -69,7 +69,7 @@ func WorkspaceImport(
 
 	formatters := formatter.Setup(formatter.DefaultYAML)
 
-	if err := Write(ctx, filepath.Join(location, importedDir), formatters, entities); err != nil {
+	if err := Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
