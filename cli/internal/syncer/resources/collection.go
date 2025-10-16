@@ -34,7 +34,11 @@ func NewResourceCollection() *ResourceCollection {
 }
 
 func (rc *ResourceCollection) Len() int {
-	return len(rc.resources)
+	count := 0
+	for _, resources := range rc.resources {
+		count += len(resources)
+	}
+	return count
 }
 
 // Set stores a resource map for the given resource type
