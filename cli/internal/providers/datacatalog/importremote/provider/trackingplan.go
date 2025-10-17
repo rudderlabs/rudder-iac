@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	TrackingPlanScope         = "trackingplan"
-	TrackingPlansRelativePath = "trackingplans"
+	trackingPlanFileNameScope = "file-name-trackingplan"
+	trackingPlansRelativePath = "trackingplans"
 )
 
 var (
@@ -94,7 +94,7 @@ func (p *TrackingPlanImportProvider) idResources(
 
 		tp.ExternalID = externalID
 		tp.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindTrackingPlans,
+			localcatalog.KindTrackingPlanForReference,
 			externalID,
 			externalID,
 		)
@@ -116,10 +116,6 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
-	}
-
 	formattables := make([]importremote.FormattableEntity, 0)
 	for _, trackingPlan := range trackingPlans {
 		p.log.Debug("formatting tracking plan", "remoteID", trackingPlan.ID, "externalID", trackingPlan.ExternalID)
@@ -129,11 +125,15 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource to catalog tracking plan")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the tracking plans
-		workspaceMetadata.Resources = append(workspaceMetadata.Resources, importremote.ImportIds{
-			LocalID:  trackingPlan.ExternalID,
-			RemoteID: trackingPlan.ID,
-		})
+		workspaceMetadata := importremote.WorkspaceImportMetadata{
+			WorkspaceID: data.WorkspaceID,
+			Resources: []importremote.ImportIds{
+				{
+					LocalID:  trackingPlan.ExternalID,
+					RemoteID: trackingPlan.ID,
+				},
+			},
+		}
 
 		importableTrackingPlan := &model.ImportableTrackingPlan{}
 		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
@@ -151,9 +151,9 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("creating spec: %w", err)
 		}
 
-		tpPath, err := idNamer.Name(namer.ScopeName{
+		fName, err := idNamer.Name(namer.ScopeName{
 			Name:  trackingPlan.ExternalID,
-			Scope: TrackingPlanScope,
+			Scope: trackingPlanFileNameScope,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generating tracking plan path: %w", err)
@@ -163,8 +163,8 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			Content: spec,
 			RelativePath: filepath.Join(
 				p.baseImportDir,
-				TrackingPlansRelativePath,
-				fmt.Sprintf("%s%s", tpPath, loader.ExtensionYAML),
+				trackingPlansRelativePath,
+				fmt.Sprintf("%s%s", fName, loader.ExtensionYAML),
 			),
 		})
 
