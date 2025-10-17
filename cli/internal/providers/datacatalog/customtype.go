@@ -192,11 +192,9 @@ func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resourc
 		return nil, fmt.Errorf("getting custom type from upstream: %w", err)
 	}
 
-	// Convert input data to CustomTypeArgs
 	toArgs := state.CustomTypeArgs{}
 	toArgs.FromResourceData(data)
 
-	// Compare the diff between the args and the custom type
 	if toArgs.DiffUpstream(customType) {
 		p.log.Debug("custom type has differences, updating", "id", ID, "remoteId", remoteId)
 

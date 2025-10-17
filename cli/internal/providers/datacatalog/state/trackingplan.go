@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
+	"github.com/samber/lo"
 )
 
 const (
@@ -79,6 +80,10 @@ type TrackingPlanArgsDiff struct {
 	Added   []*TrackingPlanEventArgs
 	Updated []*TrackingPlanEventArgs
 	Deleted []*TrackingPlanEventArgs
+}
+
+func (t *TrackingPlanArgsDiff) isDiffed() bool {
+	return len(t.Added) > 0 || len(t.Updated) > 0 || len(t.Deleted) > 0
 }
 
 func (t *TrackingPlanState) ToResourceData() resources.ResourceData {
@@ -244,10 +249,72 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 			continue
 		}
 
-		if event.Diff(otherEvent) {
+		if event.diff(otherEvent) {
 			diffed.Updated = append(diffed.Updated, otherEvent)
 		}
 
+	}
+
+	return diffed
+}
+
+// DiffUpstream compares the TrackingPlanArgs with an upstream TrackingPlanWithIdentifiers and returns true if they are different
+func (args *TrackingPlanArgs) DiffUpstream(upstream *catalog.TrackingPlanWithIdentifiers) (changed bool, diffed *TrackingPlanArgsDiff) {
+	if args.Name != upstream.Name {
+		changed = true
+	}
+
+	if upstream.Description != nil {
+		if args.Description != *upstream.Description {
+			changed = true
+		}
+	} else if args.Description != "" {
+		changed = true
+	}
+
+	diffed = diffEventArgs(args.Events, upstream.Events)
+	if diffed.isDiffed() {
+		changed = true
+	}
+
+	return changed, diffed
+}
+
+func diffEventArgs(local []*TrackingPlanEventArgs, upstream []*catalog.TrackingPlanEventPropertyIdentifiers) *TrackingPlanArgsDiff {
+	diffed := &TrackingPlanArgsDiff{
+		Added:   make([]*TrackingPlanEventArgs, 0),
+		Updated: make([]*TrackingPlanEventArgs, 0),
+		Deleted: make([]*TrackingPlanEventArgs, 0),
+	}
+
+	for _, upstreamEvent := range upstream {
+		ev, found := lo.Find(local, func(event *TrackingPlanEventArgs) bool {
+			return event.ID.(string) == upstreamEvent.ID
+		})
+
+		if !found {
+			diffed.Deleted = append(diffed.Deleted, &TrackingPlanEventArgs{
+				ID: upstreamEvent.ID,
+			})
+			continue
+		}
+
+		if ev.diffUpstream(upstreamEvent) {
+			diffed.Updated = append(diffed.Updated, ev)
+			continue
+		}
+	}
+
+	for _, localEvent := range local {
+		_, found := lo.Find(upstream, func(event *catalog.TrackingPlanEventPropertyIdentifiers) bool {
+			return event.ID == localEvent.ID.(string)
+		})
+
+		// localevent not found in upstream,
+		// so it's added manually by the user
+		if !found {
+			diffed.Added = append(diffed.Added, localEvent)
+		}
 	}
 
 	return diffed
@@ -266,7 +333,58 @@ func (args *TrackingPlanEventArgs) GetLocalID() string {
 	return args.LocalID
 }
 
-func (args *TrackingPlanEventArgs) Diff(other *TrackingPlanEventArgs) bool {
+func (args *TrackingPlanEventArgs) diffUpstream(upstream *catalog.TrackingPlanEventPropertyIdentifiers) bool {
+	if args.AllowUnplanned != upstream.AdditionalProperties {
+		return true
+	}
+
+	if args.IdentitySection != upstream.IdentitySection {
+		return true
+	}
+
+	if diffPropertyArgs(args.Properties, upstream.Properties) {
+		return true
+	}
+
+	var upstreamVariants Variants
+	upstreamVariants.FromCatalogVariants(upstream.Variants)
+
+	if args.Variants.Diff(upstreamVariants) {
+		return true
+	}
+
+	return false
+}
+
+func diffPropertyArgs(localProps []*TrackingPlanPropertyArgs, upstreamProps []*catalog.TrackingPlanEventProperty) bool {
+	if len(localProps) != len(upstreamProps) {
+		return true
+	}
+
+	upstreamPropMap := make(map[string]*catalog.TrackingPlanEventProperty)
+	for _, prop := range upstreamProps {
+		upstreamPropMap[prop.ID] = prop
+	}
+
+	for _, localProp := range localProps {
+		upstreamProp, exists := upstreamPropMap[localProp.ID.(string)]
+		if !exists {
+			return true
+		}
+
+		if localProp.Required != upstreamProp.Required {
+			return true
+		}
+
+		if diffPropertyArgs(localProp.Properties, upstreamProp.Properties) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (args *TrackingPlanEventArgs) diff(other *TrackingPlanEventArgs) bool {
 	if args.LocalID != other.LocalID {
 		return true
 	}

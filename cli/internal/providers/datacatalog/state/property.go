@@ -33,7 +33,11 @@ func (args *PropertyArgs) DiffUpstream(upstream *catalog.Property) bool {
 		return true
 	}
 
-	return !reflect.DeepEqual(args.Config, upstream.Config)
+	upstreamConf := upstream.Config
+	if upstream.DefinitionId != "" {
+		upstreamConf = make(map[string]any)
+	}
+	return !reflect.DeepEqual(args.Config, upstreamConf)
 }
 
 const PropertyResourceType = "property"

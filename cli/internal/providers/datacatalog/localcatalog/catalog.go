@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/samber/lo"
 )
 
@@ -154,7 +155,7 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 		// For each resource within the workspace, load the import metadata
 		// which will be used during the creation of resourceGraph
 		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
-			dc.ImportMetadata[resource.LocalID] = &WorkspaceRemoteIDMapping{
+			dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
 				WorkspaceID: workspace.WorkspaceID,
 				RemoteID:    resource.RemoteID,
 			}

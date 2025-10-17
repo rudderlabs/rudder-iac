@@ -66,16 +66,16 @@ type TrackingPlanEvent struct {
 }
 
 type TrackingPlanWithIdentifiers struct {
-	ID           string                                 `json:"id"`
-	ExternalID   string                                 `json:"externalId"`
-	Name         string                                 `json:"name"`
-	Description  *string                                `json:"description,omitempty"`
-	CreationType string                                 `json:"creationType"`
-	Version      int                                    `json:"version"`
-	WorkspaceID  string                                 `json:"workspaceId"`
-	CreatedAt    time.Time                              `json:"createdAt"`
-	UpdatedAt    time.Time                              `json:"updatedAt"`
-	Events       []TrackingPlanEventPropertyIdentifiers `json:"events"`
+	ID           string                                  `json:"id"`
+	ExternalID   string                                  `json:"externalId"`
+	Name         string                                  `json:"name"`
+	Description  *string                                 `json:"description,omitempty"`
+	CreationType string                                  `json:"creationType"`
+	Version      int                                     `json:"version"`
+	WorkspaceID  string                                  `json:"workspaceId"`
+	CreatedAt    time.Time                               `json:"createdAt"`
+	UpdatedAt    time.Time                               `json:"updatedAt"`
+	Events       []*TrackingPlanEventPropertyIdentifiers `json:"events"`
 }
 
 type TrackingPlanWithoutEvents struct {
@@ -189,6 +189,7 @@ type TrackingPlanStore interface {
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
 	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
+	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
 
 // TODO: Make this create idempotent so that we can call it multiple times without error
@@ -298,13 +299,13 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		return nil, fmt.Errorf("decoding events response: %w, response: %s", err, string(eventsResp))
 	}
 
-	trackingPlan.Events = make([]TrackingPlanEventPropertyIdentifiers, len(events.Data))
+	trackingPlan.Events = make([]*TrackingPlanEventPropertyIdentifiers, len(events.Data))
 	for i, event := range events.Data {
 		schema, err := c.GetTrackingPlanEventWithIdentifiers(ctx, id, event.ID)
 		if err != nil {
 			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
 		}
-		trackingPlan.Events[i] = *schema
+		trackingPlan.Events[i] = schema
 	}
 
 	return &trackingPlan, nil
@@ -418,4 +419,22 @@ func (c *RudderDataCatalog) UpdateTrackingPlanEvent(ctx context.Context, id stri
 	}
 
 	return &trackingPlan, nil
+}
+
+func (c *RudderDataCatalog) SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/tracking-plans/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }
