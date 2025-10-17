@@ -24,6 +24,7 @@ func NewCmdTyper() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdGenerate())
+	cmd.AddCommand(newCmdList())
 
 	return cmd
 }
