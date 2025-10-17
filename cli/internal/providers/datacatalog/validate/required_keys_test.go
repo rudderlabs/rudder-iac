@@ -369,6 +369,18 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		errorContains  string
 	}{
 		{
+			name: "property with empty type",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID: "prop-without-type",
+						Name:    "Property Without Type",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
 			name: "valid property name without whitespace",
 			properties: map[catalog.EntityGroup][]catalog.Property{
 				"test-group": {

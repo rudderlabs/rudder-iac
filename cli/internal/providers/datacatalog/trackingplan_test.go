@@ -80,7 +80,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -138,7 +138,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -232,7 +232,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -434,7 +434,7 @@ func TestTrackingPlanProvider_Delete(t *testing.T) {
 
 	var (
 		ctx      = context.Background()
-		provider = datacatalog.NewTrackingPlanProvider(&MockTrackingPlanCatalog{})
+		provider = datacatalog.NewTrackingPlanProvider(&MockTrackingPlanCatalog{}, "data-catalog")
 	)
 
 	err := provider.Delete(ctx, "tracking-plan-id", resources.ResourceData{"id": "upstream-tracking-plan-id"})

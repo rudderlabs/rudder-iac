@@ -20,7 +20,7 @@ type PropertyUpdate struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"propConfig,omitempty"`
+	Config      map[string]interface{} `json:"propConfig"`
 }
 
 type Property struct {

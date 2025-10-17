@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -127,6 +128,10 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 			Required: prop.Required,
 		})
 	}
+	// sort properties by RefToID.URN
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].RefToID.(resources.PropertyRef).URN < properties[j].RefToID.(resources.PropertyRef).URN
+	})
 
 	// VARIANT HANDLING
 	variants := make([]Variant, 0, len(from.Variants))
@@ -191,6 +196,10 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 			},
 		})
 	}
+	// sort properties by RefToID.URN
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].RefToID.(resources.PropertyRef).URN < properties[j].RefToID.(resources.PropertyRef).URN
+	})
 	args.Properties = properties
 
 	variants := make([]Variant, 0, len(customType.Variants))
@@ -249,23 +258,23 @@ func (args *CustomTypeArgs) DiffUpstream(upstream *catalog.CustomType) bool {
 		return true
 	}
 
-	// Compare config maps using deep equality
-	if !reflect.DeepEqual(args.Config, upstream.Config) {
-		return true
+	// DeepEqual will fail if one is empty vs other nil
+	// so we check only if atleast one of them is set, otherwise treating them as equal.
+	if len(args.Config) != 0 || len(upstream.Config) != 0 {
+		if !reflect.DeepEqual(args.Config, upstream.Config) {
+			return true
+		}
 	}
 
-	// Compare properties arrays
 	if len(args.Properties) != len(upstream.Properties) {
 		return true
 	}
 
-	// Create a map of upstream properties for easier lookup
 	upstreamProps := make(map[string]catalog.CustomTypeProperty)
 	for _, prop := range upstream.Properties {
 		upstreamProps[prop.ID] = prop
 	}
 
-	// Check if all local properties exist in upstream with same values
 	for _, localProp := range args.Properties {
 		upstreamProp, ok := upstreamProps[localProp.ID]
 		if !ok {
@@ -277,16 +286,18 @@ func (args *CustomTypeArgs) DiffUpstream(upstream *catalog.CustomType) bool {
 		}
 	}
 
-	// Compare variants using the FromCatalogVariants helper and Diff method
 	var upstreamVariants Variants
 	upstreamVariants.FromCatalogVariants(upstream.Variants)
 
-	return args.Variants.Diff(upstreamVariants)
+	if args.Variants.Diff(upstreamVariants) {
+		return true
+	}
+
+	return false
 }
 
 // Diff compares two CustomTypeArgs instances and returns true if they differ
 func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
-	// Compare basic fields
 	if args.LocalID != other.LocalID {
 		return true
 	}
@@ -303,12 +314,10 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 		return true
 	}
 
-	// Compare config maps using deep equality
 	if !reflect.DeepEqual(args.Config, other.Config) {
 		return true
 	}
 
-	// Compare properties arrays
 	if len(args.Properties) != len(other.Properties) {
 		return true
 	}
@@ -324,7 +333,6 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 		}
 	}
 
-	// Compare variants using existing Variants.Diff method
 	if args.Variants.Diff(other.Variants) {
 		return true
 	}

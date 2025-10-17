@@ -13,27 +13,28 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core" // Import for NameRegistry
 )
 
+var (
+	StrategyKebabCase = NewKebabCase()
+	StrategySnakeCase = NewSnakeCase()
+)
+
 var ErrDuplicateNameException = errors.New("duplicate name exception")
 
-// Namer interface provides methods to generate unique names based on strategy and load existing names.
 type Namer interface {
 	Name(input ScopeName) (string, error)
 	Load([]ScopeName) error
 }
 
-// NamingStrategy interface defines how to transform input into a base name.
 type NamingStrategy interface {
 	Name(input string) string
 }
 
-// ExternalIdNamer implements Namer by composing NameRegistry.
 type ExternalIdNamer struct {
 	*core.NameRegistry
 	strategy NamingStrategy
 	mu       sync.Mutex
 }
 
-// NewNamer creates a new Namer instance using the provided strategy.
 func NewExternalIdNamer(strategy NamingStrategy) Namer {
 	registry := core.NewNameRegistry(collisionHandler)
 	return &ExternalIdNamer{
@@ -42,13 +43,21 @@ func NewExternalIdNamer(strategy NamingStrategy) Namer {
 	}
 }
 
-// Name generates a unique name using the strategy and handles collisions.
+type NamingOptions struct {
+	Strategy NamingStrategy
+}
+
+func WithStrategy(strategy NamingStrategy) NamingOptions {
+	return NamingOptions{
+		Strategy: strategy,
+	}
+}
+
 func (p *ExternalIdNamer) Name(input ScopeName) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	baseName := p.strategy.Name(input.Name)
-
 	// The reason we are generating id uniquely everytime we register name is
 	// as we just need to make sure that the name is unique within the scope.
 	registered, err := p.RegisterName(uuid.New().String(), input.Scope, baseName)
@@ -64,7 +73,6 @@ type ScopeName struct {
 	Name  string
 }
 
-// Load adds existing names to the registry, returning error on duplicates.
 func (p *ExternalIdNamer) Load(names []ScopeName) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -93,10 +101,8 @@ func collisionHandler(name string, existingNames []string) string {
 	}
 }
 
-// KebabCase implements NamingStrategy for kebab-case naming.
 type KebabCase struct{}
 
-// NewKebabCase returns a new KebabCase strategy.
 func NewKebabCase() NamingStrategy {
 	return &KebabCase{}
 }
@@ -120,4 +126,26 @@ func (s *KebabCase) Name(input string) string {
 	}
 
 	return strings.Trim(result.String(), "-")
+}
+
+func NewSnakeCase() NamingStrategy {
+	return &SnakeCase{}
+}
+
+type SnakeCase struct{}
+
+func (s *SnakeCase) Name(input string) string {
+	var result strings.Builder
+	input = strings.ToLower(input)
+
+	for i, r := range input {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+			continue
+		}
+		if i > 0 && result.Len() > 0 && result.String()[result.Len()-1] != '_' {
+			result.WriteRune('_')
+		}
+	}
+	return strings.Trim(result.String(), "_")
 }

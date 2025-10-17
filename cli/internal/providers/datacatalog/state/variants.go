@@ -17,6 +17,10 @@ type Variants []Variant
 // FromCatalogVariants converts catalog.Variants (from upstream API) to state.Variants for comparison
 // This is used in DiffUpstream to compare upstream variants with local variants
 func (v *Variants) FromCatalogVariants(catalogVariants catalog.Variants) {
+	if len(catalogVariants) == 0 {
+		return
+	}
+
 	*v = make(Variants, len(catalogVariants))
 	for idx, variant := range catalogVariants {
 		stateVariant := Variant{

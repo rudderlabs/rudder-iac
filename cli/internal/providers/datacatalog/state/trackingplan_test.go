@@ -388,14 +388,14 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				AdditionalProperties: true,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
-						ID:       resources.PropertyRef{URN: "property:profile-name-id", Property: "id"},
-						LocalID:  "profile-name-id",
-						Required: true,
-					},
-					{
 						ID:       resources.PropertyRef{URN: "property:profile-email-id", Property: "id"},
 						LocalID:  "profile-email-id",
 						Required: false,
+					},
+					{
+						ID:       resources.PropertyRef{URN: "property:profile-name-id", Property: "id"},
+						LocalID:  "profile-name-id",
+						Required: true,
 					},
 				},
 			},
@@ -482,11 +482,6 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 						AdditionalProperties: true,
 						Properties: []*state.TrackingPlanPropertyArgs{
 							{
-								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
-								LocalID:  "theme-preference-id",
-								Required: false,
-							},
-							{
 								ID:                   resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
 								LocalID:              "notifications-id",
 								Required:             true,
@@ -498,6 +493,11 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 										Required: true,
 									},
 								},
+							},
+							{
+								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
+								LocalID:  "theme-preference-id",
+								Required: false,
 							},
 						},
 					},
@@ -624,11 +624,6 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 						Required: false,
 						Properties: []*state.TrackingPlanPropertyArgs{
 							{
-								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
-								LocalID:  "theme-preference-id",
-								Required: false,
-							},
-							{
 								ID:       resources.PropertyRef{URN: "property:notifications-id", Property: "id"},
 								LocalID:  "notifications-id",
 								Required: true,
@@ -644,6 +639,11 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 										Required: false,
 									},
 								},
+							},
+							{
+								ID:       resources.PropertyRef{URN: "property:theme-preference-id", Property: "id"},
+								LocalID:  "theme-preference-id",
+								Required: false,
 							},
 						},
 					},
