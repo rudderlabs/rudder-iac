@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -87,6 +88,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 			dcstate.CustomTypeResourceType,
 			dcstate.TrackingPlanResourceType,
 			esSource.ResourceType,
+			sqlmodel.ResourceType,
 		})
 		// load resources
 		resources, err := s.provider.LoadResourcesFromRemote(ctx)

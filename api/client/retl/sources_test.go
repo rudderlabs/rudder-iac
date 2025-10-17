@@ -18,10 +18,11 @@ func TestCreateRetlSource(t *testing.T) {
 		Sql:         "SELECT * FROM users",
 		Description: "Test source",
 	}
+	externalID := "ext-123"
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123", "enabled":true}`
+			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123", "enabled":true, "externalId":"ext-123"}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", expected)
 		},
 		ResponseStatus: 200,
@@ -34,7 +35,8 @@ func TestCreateRetlSource(t *testing.T) {
 			"sourceDefinitionName": "postgres",
 			"accountId": "acc123",
 			"createdAt": "2023-07-01T12:00:00Z",
-			"updatedAt": "2023-07-01T12:00:00Z"
+			"updatedAt": "2023-07-01T12:00:00Z",
+			"externalId": "ext-123"
 		}`,
 	})
 
@@ -50,6 +52,7 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
 		Enabled:              true,
+		ExternalID:           &externalID,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)
@@ -210,7 +213,7 @@ func TestListRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background())
+	sources, err := retlClient.ListRetlSources(context.Background(), nil)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 2)
@@ -256,7 +259,7 @@ func TestNextRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background())
+	sources, err := retlClient.ListRetlSources(context.Background(), nil)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 1)
@@ -378,7 +381,7 @@ func TestListRetlSourcesAPIError(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background())
+	_, err = retlClient.ListRetlSources(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listing RETL sources")
 
@@ -426,7 +429,7 @@ func TestListRetlSourcesMalformedResponse(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background())
+	_, err = retlClient.ListRetlSources(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshalling response")
 
