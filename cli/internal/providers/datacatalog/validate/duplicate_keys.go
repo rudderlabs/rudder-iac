@@ -27,7 +27,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 				// If name and type on the property are same, then it's a duplicate
 				if lookup.Type == prop.Type {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("duplicate name key %s", prop.Name),
+						error:     fmt.Errorf("duplicate name key: %s and type: %s", prop.Name, prop.Type),
 						Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
 					})
 				}
