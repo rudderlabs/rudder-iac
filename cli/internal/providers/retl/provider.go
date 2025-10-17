@@ -76,7 +76,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 // Validate validates all loaded specs
-func (p *Provider) Validate() error {
+func (p *Provider) Validate(_ *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(); err != nil {
 			return fmt.Errorf("validating %s: %w", resourceType, err)

@@ -90,12 +90,12 @@ type sourceResource struct {
 }
 
 type governanceResource struct {
-	TrackingPlan *trackingPlanResource
+	Validations *validationsResource
 }
 
-type trackingPlanResource struct {
-	Ref    *resources.PropertyRef
-	Config *trackingPlanConfigResource
+type validationsResource struct {
+	TrackingPlanRef *resources.PropertyRef
+	Config          *trackingPlanConfigResource
 }
 
 type trackingPlanConfigResource struct {

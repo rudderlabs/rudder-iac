@@ -43,10 +43,10 @@ func TestProvider(t *testing.T) {
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "event-stream-source",
 				Spec: map[string]interface{}{
-					"id":                "test-source",
-					"name":              "Test Source",
-					"type": "javascript",
-					"enabled":           true,
+					"id":      "test-source",
+					"name":    "Test Source",
+					"type":    "javascript",
+					"enabled": true,
 				},
 			})
 			assert.NoError(t, err)
@@ -68,10 +68,11 @@ func TestProvider(t *testing.T) {
 
 	t.Run("Validate", func(t *testing.T) {
 		testCases := []struct {
-			name          string
-			specs         []*specs.Spec
-			expectedError bool
-			errorMessage  string
+			externalGraphResources []*resources.Resource
+			name                   string
+			specs                  []*specs.Spec
+			expectedError          bool
+			errorMessage           string
 		}{
 			{
 				name: "Valid sources",
@@ -80,10 +81,10 @@ func TestProvider(t *testing.T) {
 						Version: "rudder/v0.1",
 						Kind:    "event-stream-source",
 						Spec: map[string]interface{}{
-							"id":                "test-source-1",
-							"name":              "Test Source 1",
-							"type": "javascript",
-							"enabled":           true,
+							"id":      "test-source-1",
+							"name":    "Test Source 1",
+							"type":    "javascript",
+							"enabled": true,
 						},
 					},
 				},
@@ -116,8 +117,8 @@ func TestProvider(t *testing.T) {
 					require.NoError(t, err, "LoadSpec should not fail")
 				}
 
-				// Validate all specs
-				err := provider.Validate()
+				err := provider.Validate(resources.NewGraph())
+
 				if tc.expectedError {
 					assert.Error(t, err)
 					if tc.errorMessage != "" {
@@ -136,10 +137,10 @@ func TestProvider(t *testing.T) {
 		err := provider.LoadSpec("test1.yaml", &specs.Spec{
 			Kind: "event-stream-source",
 			Spec: map[string]interface{}{
-				"id":                "test-source-1",
-				"name":              "Test Source 1",
-				"type": "javascript",
-				"enabled":           true,
+				"id":      "test-source-1",
+				"name":    "Test Source 1",
+				"type":    "javascript",
+				"enabled": true,
 			},
 		})
 		require.NoError(t, err)
@@ -147,10 +148,10 @@ func TestProvider(t *testing.T) {
 		err = provider.LoadSpec("test2.yaml", &specs.Spec{
 			Kind: "event-stream-source",
 			Spec: map[string]interface{}{
-				"id":                "test-source-2",
-				"name":              "Test Source 2",
-				"type": "python",
-				"enabled":           false,
+				"id":      "test-source-2",
+				"name":    "Test Source 2",
+				"type":    "python",
+				"enabled": false,
 			},
 		})
 		require.NoError(t, err)
@@ -209,9 +210,9 @@ func TestProvider(t *testing.T) {
 			ID:   "external-123",
 			Type: source.ResourceType,
 			Input: resources.ResourceData{
-				"name":              "Test Source 1",
-				"enabled":           true,
-				"type": "javascript",
+				"name":    "Test Source 1",
+				"enabled": true,
+				"type":    "javascript",
 			},
 			Output: resources.ResourceData{
 				"id": "remote123",
@@ -223,9 +224,9 @@ func TestProvider(t *testing.T) {
 			ID:   "external-456",
 			Type: source.ResourceType,
 			Input: resources.ResourceData{
-				"name":              "Test Source 2",
-				"enabled":           false,
-				"type": "python",
+				"name":    "Test Source 2",
+				"enabled": false,
+				"type":    "python",
 			},
 			Output: resources.ResourceData{
 				"id": "remote456",
@@ -239,9 +240,9 @@ func TestProvider(t *testing.T) {
 			ctx := context.Background()
 
 			createData := resources.ResourceData{
-				"name":              "Test Source",
-				"enabled":           true,
-				"type": "javascript",
+				"name":    "Test Source",
+				"enabled": true,
+				"type":    "javascript",
 			}
 
 			result, err := provider.Create(ctx, "test-source", source.ResourceType, createData)
@@ -391,9 +392,9 @@ func TestProvider(t *testing.T) {
 				ID:   "external-123",
 				Type: "event-stream-source",
 				Input: resources.ResourceData{
-					"name":              "Test Source 1",
-					"enabled":           true,
-					"type": "javascript",
+					"name":    "Test Source 1",
+					"enabled": true,
+					"type":    "javascript",
 				},
 				Output: resources.ResourceData{
 					"id": "remote123",
@@ -403,9 +404,9 @@ func TestProvider(t *testing.T) {
 				ID:   "external-456",
 				Type: "event-stream-source",
 				Input: resources.ResourceData{
-					"name":              "Test Source 2",
-					"enabled":           false,
-					"type": "python",
+					"name":    "Test Source 2",
+					"enabled": false,
+					"type":    "python",
 				},
 				Output: resources.ResourceData{
 					"id": "remote456",
