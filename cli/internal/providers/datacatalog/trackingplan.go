@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/samber/lo"
 )
 
@@ -72,6 +73,9 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		})
 		version = lastupserted.Version
 	}
+
+	// sort eventStates based on localId
+	utils.SortByLocalID(eventStates)
 
 	tpState := state.TrackingPlanState{
 		TrackingPlanArgs: args,
@@ -171,6 +175,9 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	updatedEventStates = lo.Filter(updatedEventStates, func(event *state.TrackingPlanEventState, idx int) bool {
 		return !lo.Contains(deletedEvents, event.ID)
 	})
+
+	// sort updatedEventStates based on localId
+	utils.SortByLocalID(updatedEventStates)
 
 	var tpState state.TrackingPlanState
 
@@ -274,10 +281,6 @@ func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, colle
 }
 
 func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {
-	var identitySection = PropertiesIdentity
-	if from.IdentitySection != "" {
-		identitySection = from.IdentitySection
-	}
 	return catalog.EventIdentifierDetail{
 		ID: from.ID.(string),
 		Properties: lo.Map(
@@ -286,7 +289,7 @@ func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventId
 				return GetUpsertPropertyIdentifier(prop)
 			}),
 		AdditionalProperties: from.AllowUnplanned,
-		IdentitySection:      identitySection,
+		IdentitySection:      from.IdentitySection,
 		Variants:             from.Variants.ToCatalogVariants(),
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 const (
@@ -50,6 +51,10 @@ type TrackingPlanEventState struct {
 	ID      string
 	LocalID string
 	EventID string
+}
+
+func (t *TrackingPlanEventState) GetLocalID() string {
+	return t.LocalID
 }
 
 func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
@@ -257,6 +262,10 @@ type TrackingPlanEventArgs struct {
 	Variants        Variants
 }
 
+func (args *TrackingPlanEventArgs) GetLocalID() string {
+	return args.LocalID
+}
+
 func (args *TrackingPlanEventArgs) Diff(other *TrackingPlanEventArgs) bool {
 	if args.LocalID != other.LocalID {
 		return true
@@ -308,6 +317,10 @@ type TrackingPlanPropertyArgs struct {
 	Required             bool
 	Properties           []*TrackingPlanPropertyArgs `json:"properties,omitempty"`
 	AdditionalProperties bool                        `json:"additionalProperties"`
+}
+
+func (args *TrackingPlanPropertyArgs) GetLocalID() string {
+	return args.LocalID
 }
 
 func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool {
@@ -372,6 +385,8 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 			}
 			nestedProperties = append(nestedProperties, nestedArgs)
 		}
+		// sort the nested properties array by the localID
+		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
 		// set additionalProperties to true if there are nested properties
 		args.AdditionalProperties = true
@@ -416,6 +431,8 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 			}
 			nestedProperties = append(nestedProperties, nestedArgs)
 		}
+		// sort the nested properties array by the localID
+		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
 		// set additionalProperties to true if there are nested properties
 		args.AdditionalProperties = true
@@ -487,6 +504,8 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 
 			properties = append(properties, tpProperty)
 		}
+		// sort the properties array by the localID
+		utils.SortByLocalID(properties)
 
 		var variants Variants
 		for _, localVariant := range event.Variants {
@@ -501,6 +520,12 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			variants = append(variants, *variant)
 		}
 
+		// set the identity section to its default value 'properties' if it is not set
+		identitySection := event.IdentitySection
+		if identitySection == "" {
+			identitySection = PropertiesIdentity
+		}
+
 		events = append(events, &TrackingPlanEventArgs{
 			ID: resources.PropertyRef{
 				URN:      urnFromRef(event.Ref),
@@ -508,12 +533,14 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 			},
 			LocalID:         event.LocalID,
 			AllowUnplanned:  event.AllowUnplanned,
-			IdentitySection: event.IdentitySection,
+			IdentitySection: identitySection,
 			Properties:      properties,
 			Variants:        variants,
 		})
 	}
 
+	// sort the events array by the localID
+	utils.SortByLocalID(events)
 	args.Events = events
 	return nil
 }
@@ -644,6 +671,8 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.Track
 			tpProperty.FromRemoteTrackingPlanProperty(prop, collection, true)
 			properties = append(properties, tpProperty)
 		}
+		// sort the properties array by the localID
+		utils.SortByLocalID(properties)
 		eventArgs.Properties = properties
 
 		variants := make([]Variant, 0, len(event.Variants))
@@ -655,6 +684,8 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.Track
 		eventArgs.Variants = variants
 		events = append(events, eventArgs)
 	}
+	// sort the events array by the localID
+	utils.SortByLocalID(events)
 	args.Events = events
 
 	return nil

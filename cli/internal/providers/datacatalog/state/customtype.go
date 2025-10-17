@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -127,6 +128,10 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 			Required: prop.Required,
 		})
 	}
+	// sort properties by RefToID.URN
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].RefToID.(resources.PropertyRef).URN < properties[j].RefToID.(resources.PropertyRef).URN
+	})
 
 	// VARIANT HANDLING
 	variants := make([]Variant, 0, len(from.Variants))
@@ -191,6 +196,10 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 			},
 		})
 	}
+	// sort properties by RefToID.URN
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].RefToID.(resources.PropertyRef).URN < properties[j].RefToID.(resources.PropertyRef).URN
+	})
 	args.Properties = properties
 
 	variants := make([]Variant, 0, len(customType.Variants))

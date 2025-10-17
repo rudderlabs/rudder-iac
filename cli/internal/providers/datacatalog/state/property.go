@@ -3,11 +3,13 @@ package state
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type PropertyArgs struct {
@@ -60,7 +62,11 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 			return nil
 		}
 
-		for _, item := range itemTypes.([]any) {
+		// sort itemTypes array lexicographically
+		itemTypesArray := itemTypes.([]any)
+		utils.SortLexicographically(itemTypesArray)
+
+		for _, item := range itemTypesArray {
 			val := item.(string)
 
 			if !strings.HasPrefix(val, "#/custom-types/") {
@@ -81,6 +87,12 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 		}
 	}
 
+	// sort the order of types for a multi type property
+	if multiTypeProp := strings.Split(prop.Type, ","); len(multiTypeProp) > 1 {
+		sort.Strings(multiTypeProp)
+		args.Type = strings.Join(multiTypeProp, ",")
+	}
+
 	return nil
 }
 
@@ -92,6 +104,10 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 	// Deep copy the config map
 	args.Config = make(map[string]interface{})
 	for k, v := range property.Config {
+		// sort itemTypes array lexicographically
+		if k == "itemTypes" {
+			utils.SortLexicographically(v.([]any))
+		}
 		args.Config[k] = v
 	}
 
@@ -122,6 +138,12 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 				Property: "name",
 			},
 		}
+	}
+
+	// sort the order of types for a multi type property
+	if multiTypeProp := strings.Split(property.Type, ","); len(multiTypeProp) > 1 {
+		sort.Strings(multiTypeProp)
+		args.Type = strings.Join(multiTypeProp, ",")
 	}
 	return nil
 }
