@@ -234,10 +234,10 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 // LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
 func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
-	for resourceType, handler := range p.handlers {
+	for sqlmodelResourceType, handler := range p.handlers {
 		providerState, err := handler.LoadStateFromResources(ctx, collection)
 		if err != nil {
-			return nil, fmt.Errorf("loading state from provider handler %s: %w", resourceType, err)
+			return nil, fmt.Errorf("loading state from provider handler %s: %w", sqlmodelResourceType, err)
 		}
 		s, err = s.Merge(providerState)
 		if err != nil {
