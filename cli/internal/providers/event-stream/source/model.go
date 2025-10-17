@@ -22,7 +22,25 @@ const (
 	DropOtherViolationsKey     = "drop_other_violations"
 	DropUnplannedEventsKey     = "drop_unplanned_events"
 
+	// YAML keys for import spec
+	TrackingPlanRefYAMLKey         = "tracking_plan"
+	TrackingPlanConfigYAMLKey     = "config"
+	GovernanceYAMLKey              = "governance"
+	ValidationsYAMLKey             = "validations"
+	TrackYAMLKey                   = "track"
+	IdentifyYAMLKey                = "identify"
+	GroupYAMLKey                   = "group"
+	PageYAMLKey                    = "page"
+	ScreenYAMLKey                  = "screen"
+	PropagateViolationsYAMLKey     = "propagate_violations"
+	DropUnplannedPropertiesYAMLKey = "drop_unplanned_properties"
+	DropOtherViolationsYAMLKey     = "drop_other_violations"
+	DropUnplannedEventsYAMLKey     = "drop_unplanned_events"
+
 	ResourceType = "event-stream-source"
+	ResourceKind = "event-stream-source"
+	MetadataName = "event-stream-source"
+	ImportPath   = "sources"
 )
 
 var sourceDefinitions = []string{
