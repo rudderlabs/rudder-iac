@@ -551,7 +551,7 @@ func TestProvider(t *testing.T) {
 				}
 
 				// Validate all specs
-				err := provider.Validate()
+				err := provider.Validate(nil)
 				if tc.expectedError {
 					assert.Error(t, err)
 					if tc.errorMessage != "" {

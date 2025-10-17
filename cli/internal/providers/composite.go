@@ -62,9 +62,9 @@ func (p *CompositeProvider) GetSupportedTypes() []string {
 	return maps.Keys(p.registeredTypes)
 }
 
-func (p *CompositeProvider) Validate() error {
+func (p *CompositeProvider) Validate(graph *resources.Graph) error {
 	for _, provider := range p.Providers {
-		if err := provider.Validate(); err != nil {
+		if err := provider.Validate(graph); err != nil {
 			return err
 		}
 	}

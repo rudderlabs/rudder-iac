@@ -15,6 +15,7 @@ import (
 type MockProvider struct {
 	SupportedKinds             []string
 	SupportedTypes             []string
+	ValidateArg                *resources.Graph
 	ValidateErr                error
 	LoadSpecErr                error
 	GetResourceGraphVal        *resources.Graph
@@ -112,7 +113,8 @@ func (m *MockProvider) GetSupportedTypes() []string {
 	return m.SupportedTypes
 }
 
-func (m *MockProvider) Validate() error {
+func (m *MockProvider) Validate(graph *resources.Graph) error {
+	m.ValidateArg = graph
 	m.ValidateCalledCount++
 	return m.ValidateErr
 }

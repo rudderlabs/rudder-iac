@@ -69,7 +69,12 @@ func (p *Provider) GetLocalCatalog() *localcatalog.DataCatalog {
 	return p.dc
 }
 
-func (p *Provider) Validate() error {
+// Validate validates the data catalog loaded in the provider
+// Note that, with the new interface, we pass the resource graph to validate against
+// but the old implementation validations resources internally from the catalog, as they were loaded during LoadSpec.
+// Technically this is the same, because the graph is built from the catalog, but in future we might want to change
+// the validation logic to use the graph instead.
+func (p *Provider) Validate(_ *resources.Graph) error {
 	err := validate.ValidateCatalog(p.dc)
 	if err == nil {
 		log.Info("successfully validated the catalog")
