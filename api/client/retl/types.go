@@ -49,6 +49,7 @@ type RETLSource struct {
 	CreatedAt            *time.Time         `json:"createdAt"`
 	UpdatedAt            *time.Time         `json:"updatedAt"`
 	WorkspaceID          string             `json:"workspaceId"`
+	ExternalID           *string            `json:"externalId"`
 }
 
 type RETLSourceCreateRequest struct {
@@ -58,6 +59,7 @@ type RETLSourceCreateRequest struct {
 	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
 	Enabled              bool               `json:"enabled"`
+	ExternalID           *string            `json:"externalId"`
 }
 
 type RETLSourceUpdateRequest struct {

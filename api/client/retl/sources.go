@@ -88,8 +88,12 @@ func (r *RudderRETLStore) GetRetlSource(ctx context.Context, id string) (*RETLSo
 }
 
 // ListRetlSources lists all RETL sources
-func (r *RudderRETLStore) ListRetlSources(ctx context.Context) (*RETLSources, error) {
-	resp, err := r.client.Do(ctx, "GET", "/v2/retl-sources", nil)
+func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*RETLSources, error) {
+	path := "/v2/retl-sources"
+	if hasExternalID != nil {
+		path += fmt.Sprintf("?hasExternalID=%t", *hasExternalID)
+	}
+	resp, err := r.client.Do(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}

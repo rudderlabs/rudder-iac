@@ -98,7 +98,7 @@ func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) 
 	return nil
 }
 
-func (m *mockRETLClient) ListRetlSources(ctx context.Context) (*retlClient.RETLSources, error) {
+func (m *mockRETLClient) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
 		return m.listRetlSourcesFunc(ctx)
 	}

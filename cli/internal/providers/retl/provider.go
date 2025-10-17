@@ -217,16 +217,34 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 
 // LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
 func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	// TODO: Implement when ready - will use p.client.ListRetlSources()
-	// For now, return empty collection to keep provider functional
-	return resources.NewResourceCollection(), nil
+	collection := resources.NewResourceCollection()
+	for resourceType, handler := range p.handlers {
+		c, err := handler.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
+		}
+		collection, err = collection.Merge(c)
+		if err != nil {
+			return nil, fmt.Errorf("merging collection for %s: %w", resourceType, err)
+		}
+	}
+	return collection, nil
 }
 
 // LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
 func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
-	// TODO: Implement when ready
-	// For now, fall back to existing LoadState behavior
-	return state.EmptyState(), nil
+	s := state.EmptyState()
+	for resourceType, handler := range p.handlers {
+		providerState, err := handler.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, fmt.Errorf("loading state from provider handler %s: %w", resourceType, err)
+		}
+		s, err = s.Merge(providerState)
+		if err != nil {
+			return nil, fmt.Errorf("merging provider states: %w", err)
+		}
+	}
+	return s, nil
 }
 
 // Preview returns the preview results for a resource

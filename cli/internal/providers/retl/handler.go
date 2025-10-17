@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // resourceHandler defines the interface for type-specific resource handlers.
@@ -64,4 +65,12 @@ type resourceHandler interface {
 	// - map[string]any: contains result data with keys: "errorMessage", "rows", "rowCount", and "columns" (array of column info)
 	// - error: any error that occurred
 	Preview(ctx context.Context, ID string, data resources.ResourceData, limit int) ([]map[string]any, error)
+
+	// LoadResourcesFromRemote loads all RETL resources from remote
+	// Returns a collection of resources or an error if loading fails.
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+
+	// LoadStateFromResources reconstructs RETL state from loaded resources
+	// Returns a state or an error if loading fails.
+	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 }

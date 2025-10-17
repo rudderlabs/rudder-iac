@@ -29,7 +29,7 @@ type mockRETLStore struct {
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc  func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -86,9 +86,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx)
+		return m.listRetlSourcesFunc(ctx, hasExternalID)
 	}
 	return &retlClient.RETLSources{}, nil
 }
@@ -618,7 +618,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return &retlClient.RETLSources{
 					Data: []retlClient.RETLSource{
 						{
@@ -658,7 +658,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock error from client that the handler will encounter
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return nil, fmt.Errorf("API error")
 			}
 
