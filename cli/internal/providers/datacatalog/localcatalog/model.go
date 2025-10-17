@@ -11,7 +11,7 @@ type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id"`
 	Name        string                 `mapstructure:"name" json:"name"`
 	Description string                 `mapstructure:"description,omitempty" json:"description"`
-	Type        string                 `mapstructure:"type" json:"type"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig"`
 }
 

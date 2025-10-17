@@ -45,7 +45,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		for _, prop := range props {
 			reference := fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID)
 
-			if prop.Name == "" || prop.Type == "" || prop.LocalID == "" {
+			if prop.Name == "" || prop.LocalID == "" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("id, name and type fields on property are mandatory"),
 					Reference: reference,
