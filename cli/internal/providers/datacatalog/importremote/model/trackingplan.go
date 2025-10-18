@@ -26,7 +26,7 @@ func (tp *ImportableTrackingPlan) ForExport(
 	idNamer namer.Namer,
 ) (map[string]any, error) {
 	if err := tp.fromUpstream(externalID, upstream, resolver, idNamer); err != nil {
-		return nil, fmt.Errorf("loading tracking plan from upstream: %w", err)
+		return nil, fmt.Errorf("loading tracking plan: %w", err)
 	}
 
 	toReturn := make(map[string]any)
@@ -62,16 +62,16 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			event.ID,
 		)
 		if err != nil {
-			return fmt.Errorf("event reference resolution for tracking plan %s: %w", tp.TrackingPlan.LocalID, err)
+			return fmt.Errorf("resolving reference for event %s: %w", event.ID, err)
 		}
 
 		if eventRef == "" {
-			return fmt.Errorf("resolved event reference is empty for tracking plan %s", tp.TrackingPlan.LocalID)
+			return fmt.Errorf("resolved reference is empty for event %s", event.ID)
 		}
 
 		ruleProperties, err := buildRuleProperties(event.Properties, resolver)
 		if err != nil {
-			return fmt.Errorf("building properties for event %s in tracking plan %s: %w", event.ID, tp.TrackingPlan.LocalID, err)
+			return fmt.Errorf("building properties for event %s: %w", event.ID, err)
 		}
 
 		// Since rules are not first class citizens in catalog,
@@ -88,7 +88,12 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			Scope: TypeEventRule,
 		})
 		if err != nil {
-			return fmt.Errorf("generating localID for event rule %s: %w", event.Name, err)
+			return fmt.Errorf("generating externalID for rule %s on event %s: %w", ruleName, event.ID, err)
+		}
+
+		var importableVariants ImportableVariants
+		if err := importableVariants.fromUpstream(event.Variants, resolver); err != nil {
+			return fmt.Errorf("processing variants on event %s: %w", event.ID, err)
 		}
 
 		rule := &localcatalog.TPRule{
@@ -100,6 +105,7 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 				IdentitySection: event.IdentitySection,
 			},
 			Properties: ruleProperties,
+			Variants:   importableVariants.Variants,
 		}
 
 		rules = append(rules, rule)
