@@ -20,14 +20,14 @@ const importDir = "data-catalog"
 type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
-	providerStore map[string]resourceProvider
+	providerStore map[string]entityProvider
 }
 
 func New(client catalog.DataCatalog) *Provider {
 	return &Provider{
 		client: client,
 		dc:     localcatalog.New(),
-		providerStore: map[string]resourceProvider{
+		providerStore: map[string]entityProvider{
 			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client, importDir),
 			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),

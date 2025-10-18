@@ -294,7 +294,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved property reference is empty")
+		assert.Contains(t, err.Error(), "resolved reference is empty for property")
 	})
 
 	t.Run("errors when custom type resolver for itemTypes fails", func(t *testing.T) {
@@ -344,7 +344,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved custom type reference is empty for itemTypes")
+		assert.Contains(t, err.Error(), "resolved reference is empty for itemTypes")
 	})
 
 	t.Run("errors when variant discriminator resolver fails", func(t *testing.T) {
@@ -398,7 +398,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved discriminator property reference is empty")
+		assert.Contains(t, err.Error(), "resolved reference is empty for discriminator")
 	})
 
 	t.Run("errors when variant case property resolver fails", func(t *testing.T) {

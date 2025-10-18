@@ -122,7 +122,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 
 		data, ok := trackingPlan.Data.(*catalog.TrackingPlanWithIdentifiers)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog tracking plan")
+			return nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
 		}
 
 		workspaceMetadata := importremote.WorkspaceImportMetadata{
@@ -138,7 +138,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		importableTrackingPlan := &model.ImportableTrackingPlan{}
 		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
 		if err != nil {
-			return nil, fmt.Errorf("formatting tracking plan: %w", err)
+			return nil, fmt.Errorf("formatting tracking plan %s for export: %w", trackingPlan.ID, err)
 		}
 
 		spec, err := toImportSpec(
@@ -148,7 +148,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			formatted,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec: %w", err)
+			return nil, fmt.Errorf("creating spec for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
 		fName, err := idNamer.Name(namer.ScopeName{
@@ -156,7 +156,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			Scope: trackingPlanFileNameScope,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("generating tracking plan path: %w", err)
+			return nil, fmt.Errorf("generating file path for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
 		formattables = append(formattables, importremote.FormattableEntity{

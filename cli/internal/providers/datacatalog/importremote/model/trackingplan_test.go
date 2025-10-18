@@ -368,7 +368,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved event reference is empty")
+		assert.Contains(t, err.Error(), "resolved reference is empty for event")
 	})
 
 	t.Run("errors when property reference resolution fails", func(t *testing.T) {
