@@ -9,7 +9,7 @@ import (
 
 // createPropertyMultiTypeSealedClass creates a sealed class for a property with multiple types
 func createPropertyMultiTypeSealedClass(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinSealedClass, error) {
-	className, err := getOrRegisterPropertyMultiTypeClassName(property, nameRegistry)
+	className, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func createPropertyMultiTypeSealedClass(property *plan.Property, nameRegistry *c
 
 // createPropertyMultiTypeArrayItemSealedClass creates a sealed class for array items with multiple types
 func createPropertyMultiTypeArrayItemSealedClass(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinSealedClass, error) {
-	className, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+	className, err := getOrRegisterPropertyArrayItemTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}

@@ -9,11 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-var (
-	TypeAliasScope = "typealias"
-	DataclassScope = "dataclass"
-	EnumScope      = "enum"
-)
+const globalTypeScope = "types"
 
 // formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
@@ -98,34 +94,16 @@ func FormatMethodName(prefix, name string) string {
 	return formatted
 }
 
-// getOrRegisterCustomTypeClassName returns the registered class name for a custom type
-func getOrRegisterCustomTypeClassName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, DataclassScope, className)
+// getOrRegisterCustomTypeName returns the registered type name for a custom type.
+func getOrRegisterCustomTypeName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("CustomType", customType.Name)
+	return nameRegistry.RegisterName("customtype:"+customType.Name, globalTypeScope, typeName)
 }
 
-// getOrRegisterCustomTypeAliasName returns the registered alias name for a primitive custom type
-func getOrRegisterCustomTypeAliasName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	aliasName := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, TypeAliasScope, aliasName)
-}
-
-// getOrRegisterPropertyAliasName returns the registered alias name for a property-specific type
-func getOrRegisterPropertyAliasName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	aliasName := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, TypeAliasScope, aliasName)
-}
-
-// getOrRegisterPropertyEnumName returns the registered enum class name for a property with enum constraints
-func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	enumName := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
-}
-
-// getOrRegisterCustomTypeEnumName returns the registered enum class name for a custom type with enum constraints
-func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	enumName := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, EnumScope, enumName)
+// getOrRegisterPropertyTypeTypeName returns the registered type name for a property-specific type.
+func getOrRegisterPropertyTypeTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
 }
 
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
@@ -224,9 +202,15 @@ func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.Na
 	registrationKey := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name
 	return nameRegistry.RegisterName(
 		registrationKey,
-		DataclassScope,
+		globalTypeScope,
 		className,
 	)
+}
+
+// getOrRegisterPropertyArrayItemTypeName returns the registered type name for array items with multiple types
+func getOrRegisterPropertyArrayItemTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("ArrayItem", property.Name)
+	return nameRegistry.RegisterName("property:item:"+property.Name, globalTypeScope, typeName)
 }
 
 // KotlinCollisionHandler provides a Kotlin-specific collision handler for the NameRegistry
@@ -237,16 +221,4 @@ func KotlinCollisionHandler(name string, existingNames []string) string {
 // CreateKotlinNameRegistry creates a new NameRegistry with Kotlin-specific collision handling
 func CreateKotlinNameRegistry() *core.NameRegistry {
 	return core.NewNameRegistry(KotlinCollisionHandler)
-}
-
-// getOrRegisterPropertyMultiTypeClassName returns the registered sealed class name for a property with multiple types
-func getOrRegisterPropertyMultiTypeClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, DataclassScope, className)
-}
-
-// getOrRegisterPropertyMultiTypeArrayItemClassName returns the registered sealed class name for array items with multiple types
-func getOrRegisterPropertyMultiTypeArrayItemClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("ArrayItem", property.Name)
-	return nameRegistry.RegisterName("property:item:"+property.Name, DataclassScope, className)
 }
