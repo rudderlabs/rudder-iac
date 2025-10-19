@@ -160,21 +160,29 @@ func createVariantSealedClass(
 		}
 	}
 
-	// Create default subclass if default schema exists
-	if variant.DefaultSchema != nil {
-		defaultSubclass, err := createSealedSubclass(
-			nil,
-			variant.Discriminator,
-			baseSchema,
-			variant.DefaultSchema,
-			"Default case",
-			nameRegistry,
-		)
-		if err != nil {
-			return nil, err
+	// Always create a default subclass
+	// If DefaultSchema is explicitly provided, use it; otherwise use an empty schema
+	defaultSchema := variant.DefaultSchema
+	if defaultSchema == nil {
+		// Create an empty schema with no additional properties
+		defaultSchema = &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
 		}
-		subclasses = append(subclasses, *defaultSubclass)
 	}
+
+	defaultSubclass, err := createSealedSubclass(
+		nil,
+		variant.Discriminator,
+		baseSchema,
+		defaultSchema,
+		"Default case",
+		nameRegistry,
+	)
+	if err != nil {
+		return nil, err
+	}
+	subclasses = append(subclasses, *defaultSubclass)
 
 	return &KotlinSealedClass{
 		Name:       name,

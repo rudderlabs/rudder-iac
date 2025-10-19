@@ -183,15 +183,15 @@ sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
     /** Feature enabled (boolean true) */
     @Serializable
     data class Case_True(
-        /** User's email address */
-        @SerialName("email")
-        val email: PropertyEmail
+        /** User's age */
+        @SerialName("age")
+        val age: PropertyAge? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
         @SerialName("feature_flag")
         override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(true)
         override val _jsonElement: JsonElement = buildJsonObject {
-            put("email", Json.encodeToJsonElement(email))
+            age?.let { put("age", Json.encodeToJsonElement(it)) }
             put("feature_flag", Json.encodeToJsonElement(featureFlag))
         }
     }
@@ -199,15 +199,15 @@ sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
     /** Feature disabled (boolean false) */
     @Serializable
     data class Case_False(
-        /** User account status */
-        @SerialName("status")
-        val status: PropertyStatus
+        /** User's first name */
+        @SerialName("first_name")
+        val firstName: PropertyFirstName? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
         @SerialName("feature_flag")
         override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(false)
         override val _jsonElement: JsonElement = buildJsonObject {
-            put("status", Json.encodeToJsonElement(status))
+            firstName?.let { put("first_name", Json.encodeToJsonElement(it)) }
             put("feature_flag", Json.encodeToJsonElement(featureFlag))
         }
     }
@@ -217,13 +217,25 @@ sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
     data class CaseBeta(
         /** User tags as array of strings */
         @SerialName("tags")
-        val tags: PropertyTags
+        val tags: PropertyTags? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
         @SerialName("feature_flag")
         override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.StringValue("beta")
         override val _jsonElement: JsonElement = buildJsonObject {
-            put("tags", Json.encodeToJsonElement(tags))
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag
+    ) : CustomTypeFeatureConfig() {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("feature_flag", Json.encodeToJsonElement(featureFlag))
         }
     }
@@ -327,6 +339,18 @@ sealed class CustomTypeUserAccess : SealedClassWithJson() {
         override val active: PropertyActive = false
         override val _jsonElement: JsonElement = buildJsonObject {
             put("status", Json.encodeToJsonElement(status))
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive
+    ) : CustomTypeUserAccess() {
+        override val _jsonElement: JsonElement = buildJsonObject {
             put("active", Json.encodeToJsonElement(active))
         }
     }
@@ -446,7 +470,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
 
         /** User tags as array of strings */
         @SerialName("tags")
-        val tags: PropertyTags
+        val tags: PropertyTags? = null
     ) : TrackEventWithVariantsProperties() {
         /** Type of device */
         @SerialName("device_type")
@@ -454,7 +478,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         override val _jsonElement: JsonElement = buildJsonObject {
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
             put("profile", Json.encodeToJsonElement(profile))
-            put("tags", Json.encodeToJsonElement(tags))
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
             put("device_type", Json.encodeToJsonElement(deviceType))
         }
     }
