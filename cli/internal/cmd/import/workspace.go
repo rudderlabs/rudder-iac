@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +57,17 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			defer func() {
 				telemetry.TrackCommand("import workspace", err)
 			}()
+
+			spinner := ui.NewSpinner("Importing, please wait!")
+			spinner.Start()
+
 			err = importer.WorkspaceImport(cmd.Context(), location, deps.CompositeProvider())
+
+			spinner.Stop()
+			if err == nil {
+				fmt.Printf("%s Done\n", ui.Color("✔", ui.Green))
+			}
+
 			return err
 		},
 	}

@@ -75,10 +75,16 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 		}
 
 		// Since rules are not first class citizens in catalog,
-		// we need to generate the localID for the rule based on the event
-		// Product Viewed -> Product Viewed Rule -> product_viewed_rule
+		// we need to generate the localID for the rule based on the event name and type
+		// Product Viewed -> Product Viewed Rule ->product-viewed-rule
+		// Identify -> Identify Rule ->identify-rule
+		// Alias -> Alias Rule ->alias-rule
+		name := event.Name
+		if name == "" {
+			name = event.EventType
+		}
 		ruleLocalID, err := idNamer.Name(namer.ScopeName{
-			Name:  fmt.Sprintf("%s %s", event.Name, "Rule"),
+			Name:  fmt.Sprintf("%s %s", name, "Rule"),
 			Scope: TypeEventRule,
 		})
 		if err != nil {
