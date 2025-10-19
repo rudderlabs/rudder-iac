@@ -452,6 +452,43 @@ func init() {
 		Description: "Feature configuration information",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["feature_config"]},
 	}
+
+	// Add properties with Unicode characters for testing
+	ReferenceProperties["用户名"] = &plan.Property{
+		Name:        "用户名",
+		Description: "Username in Chinese characters",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["emoji_field"] = &plan.Property{
+		Name:        "emoji_field",
+		Description: "Field with emoji enum values",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"🎯", "✅", "❌", "🚀"},
+		},
+	}
+
+	ReferenceProperties["mixed_unicode"] = &plan.Property{
+		Name:        "mixed_unicode",
+		Description: "Property with mixed unicode: café, naïve, 日本語",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceCustomTypes["типы_данных"] = &plan.CustomType{
+		Name:        "типы_данных",
+		Description: "Custom type with Cyrillic name",
+		Type:        plan.PrimitiveTypeString,
+		Config: &plan.PropertyConfig{
+			Enum: []any{"активный", "неактивный", "pending"},
+		},
+	}
+
+	ReferenceProperties["unicode_custom_type"] = &plan.Property{
+		Name:        "unicode_custom_type",
+		Description: "Property using custom type with Unicode",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["типы_данных"]},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -490,6 +527,11 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"multi_type_array": {Property: *ReferenceProperties["multi_type_array"]},
 				"user_access":      {Property: *ReferenceProperties["user_access"]},
 				"feature_config":   {Property: *ReferenceProperties["feature_config"]},
+				// Add Unicode properties for testing
+				"用户名":                 {Property: *ReferenceProperties["用户名"]},
+				"emoji_field":         {Property: *ReferenceProperties["emoji_field"]},
+				"mixed_unicode":       {Property: *ReferenceProperties["mixed_unicode"]},
+				"unicode_custom_type": {Property: *ReferenceProperties["unicode_custom_type"]},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
@@ -615,7 +657,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 
 // Constants for test assertions based on the reference plan
 const (
-	ExpectedCustomTypeCount = 11 // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context, user_access, feature_config
-	ExpectedPropertyCount   = 32 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array, user_access, feature_flag, feature_config
+	ExpectedCustomTypeCount = 14 // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context, user_access, feature_config
+	ExpectedPropertyCount   = 33 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array, user_access, feature_flag, feature_config
 	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
 )

@@ -75,6 +75,9 @@ typealias PropertyIpAddress = String
 /** User's last name */
 typealias PropertyLastName = String
 
+/** Property with mixed unicode: café, naïve, 日本語 */
+typealias PropertyMixedUnicode = String
+
 /** An array with items that can be string or integer */
 typealias PropertyMultiTypeArray = List<ArrayItemMultiTypeArray>
 
@@ -117,6 +120,9 @@ typealias PropertyStatus = CustomTypeStatus
 /** User tags as array of strings */
 typealias PropertyTags = List<String>
 
+/** Property using custom type with Unicode */
+typealias PropertyUnicodeCustomType = CustomTypeТипыДанных
+
 /** An array with no explicit item type (treated as any) */
 typealias PropertyUntypedArray = List<JsonElement>
 
@@ -125,6 +131,9 @@ typealias PropertyUntypedField = JsonElement
 
 /** User access information */
 typealias PropertyUserAccess = CustomTypeUserAccess
+
+/** Username in Chinese characters */
+typealias Property用户名 = String
 
 /** User status enum */
 @Serializable
@@ -137,6 +146,17 @@ enum class CustomTypeStatus {
     SUSPENDED,
     @SerialName("deleted")
     DELETED
+}
+
+/** Custom type with Cyrillic name */
+@Serializable
+enum class CustomTypeТипыДанных {
+    @SerialName("активный")
+    ,
+    @SerialName("неактивный")
+    ,
+    @SerialName("pending")
+    PENDING
 }
 
 /** Type of device */
@@ -152,6 +172,19 @@ enum class PropertyDeviceType {
     SMART_TV,
     @SerialName("IoT-Device")
     IO_T_DEVICE
+}
+
+/** Field with emoji enum values */
+@Serializable
+enum class PropertyEmojiField {
+    @SerialName("🎯")
+    ,
+    @SerialName("✅")
+    ,
+    @SerialName("❌")
+    ,
+    @SerialName("🚀")
+    
 }
 
 abstract class SealedClassWithJson {
@@ -627,6 +660,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("email_list")
     val emailList: PropertyEmailList? = null,
 
+    /** Field with emoji enum values */
+    @SerialName("emoji_field")
+    val emojiField: PropertyEmojiField? = null,
+
     /** Property with empty object allowing additional properties */
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
@@ -634,6 +671,10 @@ data class TrackUserSignedUpProperties(
     /** Feature configuration information */
     @SerialName("feature_config")
     val featureConfig: PropertyFeatureConfig? = null,
+
+    /** Property with mixed unicode: café, naïve, 日本語 */
+    @SerialName("mixed_unicode")
+    val mixedUnicode: PropertyMixedUnicode? = null,
 
     /** An array with items that can be string or integer */
     @SerialName("multi_type_array")
@@ -671,6 +712,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("tags")
     val tags: PropertyTags? = null,
 
+    /** Property using custom type with Unicode */
+    @SerialName("unicode_custom_type")
+    val unicodeCustomType: PropertyUnicodeCustomType? = null,
+
     /** An array with no explicit item type (treated as any) */
     @SerialName("untyped_array")
     val untypedArray: PropertyUntypedArray? = null,
@@ -681,7 +726,11 @@ data class TrackUserSignedUpProperties(
 
     /** User access information */
     @SerialName("user_access")
-    val userAccess: PropertyUserAccess? = null
+    val userAccess: PropertyUserAccess? = null,
+
+    /** Username in Chinese characters */
+    @SerialName("用户名")
+    val 用户名: Property用户名? = null
 ) {
     /** example of object property */
     @Serializable
