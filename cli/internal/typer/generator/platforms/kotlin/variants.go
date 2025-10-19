@@ -287,7 +287,14 @@ func mergeVariantSchemaProperties(
 				// Check if the property type is an enum
 				if hasEnumConfig(propSchema.Property.Config) {
 					// For enums, use the enum constant name (e.g., PropertyDeviceType.MOBILE)
-					enumValueName := FormatEnumValue(discriminatorValue)
+					enumValueName, err := getOrRegisterEnumValue(
+						kotlinType,
+						discriminatorValue,
+						nameRegistry,
+					)
+					if err != nil {
+						return nil, nil, err
+					}
 					defaultValue = fmt.Sprintf("%s.%s", kotlinType, enumValueName)
 				} else {
 					// For non-enum types, format based on the discriminator value's type

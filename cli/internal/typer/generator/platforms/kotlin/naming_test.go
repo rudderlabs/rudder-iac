@@ -149,10 +149,13 @@ func TestFormatEnumValue(t *testing.T) {
 		{"greek_characters", "ενεργός", "ΕΝΕΡΓΌΣ"},
 		{"arabic_characters", "نشط", "نشط"},
 		{"mixed_unicode_ascii", "café-status", "CAFÉ_STATUS"},
-		// Note: Emoji are not valid Kotlin enum identifiers without backticks
-		// These will convert to underscores
+		// Emoji and special characters convert to underscores with "1" suffix (reserved pattern)
 		{"emoji_single", "🎯", "_"},
 		{"emoji_multiple", "✅❌", "__"},
+		{"only_symbols", "!@#", "___"},
+		{"only_underscores", "___", "___"},
+		// Mixed content with letters gets converted
+		{"special_chars_with_letters", "hello-world!", "HELLO_WORLD_"},
 	}
 
 	for _, tt := range tests {

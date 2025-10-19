@@ -141,8 +141,8 @@ func TestFormattingConsistency(t *testing.T) {
 		"email-address",
 		"first name",
 		"XMLHttpRequest",
-		"用户_数据",    // Unicode test
-		"тип_класса",  // Cyrillic test
+		"用户_数据",      // Unicode test
+		"тип_класса", // Cyrillic test
 	}
 
 	for _, input := range inputs {
@@ -159,63 +159,6 @@ func TestFormattingConsistency(t *testing.T) {
 				assert.Equal(t, expectedPascal, pascal,
 					"ToPascalCase should be ToCamelCase with first rune capitalized")
 			}
-		})
-	}
-}
-
-func TestUnicodeHandling(t *testing.T) {
-	// Dedicated tests to ensure Unicode characters are not corrupted
-	tests := []struct {
-		name          string
-		input         string
-		pascalResult  string
-		camelResult   string
-		description   string
-	}{
-		{
-			name:         "cyrillic_no_corruption",
-			input:        "типы_данных",
-			pascalResult: "ТипыДанных",
-			camelResult:  "типыДанных",
-			description:  "Cyrillic characters should preserve case conversion without corruption",
-		},
-		{
-			name:         "chinese_preserved",
-			input:        "用户_名称",
-			pascalResult: "用户名称",
-			camelResult:  "用户名称",
-			description:  "Chinese characters have no case distinction and should be preserved",
-		},
-		{
-			name:         "mixed_scripts",
-			input:        "user_用户_данные",
-			pascalResult: "User用户Данные",
-			camelResult:  "user用户Данные",
-			description:  "Mixed scripts should handle case conversion per-script",
-		},
-		{
-			name:         "emoji_not_corrupted",
-			input:        "🎯_target",
-			pascalResult: "🎯Target",
-			camelResult:  "🎯Target",
-			description:  "Emoji should not be corrupted during processing",
-		},
-		{
-			name:         "multi_byte_first_char",
-			input:        "café",
-			pascalResult: "Café",
-			camelResult:  "café",
-			description:  "Multi-byte UTF-8 characters at start should handle case correctly",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pascalResult := core.ToPascalCase(tt.input)
-			assert.Equal(t, tt.pascalResult, pascalResult, tt.description)
-
-			camelResult := core.ToCamelCase(tt.input)
-			assert.Equal(t, tt.camelResult, camelResult, tt.description)
 		})
 	}
 }

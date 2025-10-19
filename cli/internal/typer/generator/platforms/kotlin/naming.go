@@ -73,6 +73,34 @@ func getOrRegisterPropertyTypeTypeName(property *plan.Property, nameRegistry *co
 	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
 }
 
+// getOrRegisterEnumValue returns the registered enum value name for an enum value
+// Uses the enum's scope to ensure values within the same enum are deduplicated
+// typeName should be the name of the Kotlin type that contains the enum
+func getOrRegisterEnumValue(typeName string, value any, nameRegistry *core.NameRegistry) (string, error) {
+	enumScope := fmt.Sprintf("enum:%s", typeName)
+	formatted := FormatEnumValue(value)
+	valueKey := fmt.Sprintf("%v", value)
+
+	// Check if the result is only underscores (_, __, ___, etc.)
+	// These are reserved in Kotlin, so we need to append a number
+	// by registering a dummy enum id to trigger the collision handler
+	isOnlyUnderscores := true
+	for _, r := range formatted {
+		if r != '_' {
+			isOnlyUnderscores = false
+			break
+		}
+	}
+	if isOnlyUnderscores && len(formatted) > 0 {
+		_, err := nameRegistry.RegisterName(fmt.Sprintf("enum:placeholder:%s", formatted), enumScope, formatted)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return nameRegistry.RegisterName(valueKey, enumScope, formatted)
+}
+
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
 	formatted := fmt.Sprintf("%v", value)

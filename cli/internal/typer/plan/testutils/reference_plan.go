@@ -460,12 +460,20 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 	}
 
-	ReferenceProperties["emoji_field"] = &plan.Property{
-		Name:        "emoji_field",
-		Description: "Field with emoji enum values",
+	ReferenceProperties["unicode_enum_field"] = &plan.Property{
+		Name:        "unicode_enum_field",
+		Description: "Field demonstrating various Unicode characters in enum values",
 		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 		Config: &plan.PropertyConfig{
-			Enum: []any{"🎯", "✅", "❌", "🚀"},
+			Enum: []any{
+				"🎯",        // Emoji
+				"✅",        // Emoji
+				"активный", // Cyrillic
+				"已完成",      // Chinese
+				"ενεργός",  // Greek
+				"café",     // Latin with diacritics
+				"!!!",      // Symbols only (backtick escape)
+			},
 		},
 	}
 
@@ -529,7 +537,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"feature_config":   {Property: *ReferenceProperties["feature_config"]},
 				// Add Unicode properties for testing
 				"用户名":                 {Property: *ReferenceProperties["用户名"]},
-				"emoji_field":         {Property: *ReferenceProperties["emoji_field"]},
+				"unicode_enum_field":  {Property: *ReferenceProperties["unicode_enum_field"]},
 				"mixed_unicode":       {Property: *ReferenceProperties["mixed_unicode"]},
 				"unicode_custom_type": {Property: *ReferenceProperties["unicode_custom_type"]},
 				// Add nested object properties for testing

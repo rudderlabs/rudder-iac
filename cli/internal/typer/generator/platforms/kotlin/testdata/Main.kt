@@ -174,17 +174,29 @@ enum class PropertyDeviceType {
     IO_T_DEVICE
 }
 
-/** Field with emoji enum values */
+/** Field demonstrating various Unicode characters in enum values */
 @Serializable
-enum class PropertyEmojiField {
+enum class PropertyUnicodeEnumField {
     @SerialName("🎯")
     ,
     @SerialName("✅")
     ,
     @SerialName("❌")
     ,
-    @SerialName("🚀")
-    
+    @SerialName("🚀"),    
+    _1,
+    @SerialName("✅")
+    _2,
+    @SerialName("активный")
+    АКТИВНЫЙ,
+    @SerialName("已完成")
+    已完成,
+    @SerialName("ενεργός")
+    ΕΝΕΡΓΌΣ,
+    @SerialName("café")
+    CAFÉ,
+    @SerialName("!!!")
+    ___1
 }
 
 abstract class SealedClassWithJson {
@@ -660,10 +672,6 @@ data class TrackUserSignedUpProperties(
     @SerialName("email_list")
     val emailList: PropertyEmailList? = null,
 
-    /** Field with emoji enum values */
-    @SerialName("emoji_field")
-    val emojiField: PropertyEmojiField? = null,
-
     /** Property with empty object allowing additional properties */
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
@@ -715,6 +723,10 @@ data class TrackUserSignedUpProperties(
     /** Property using custom type with Unicode */
     @SerialName("unicode_custom_type")
     val unicodeCustomType: PropertyUnicodeCustomType? = null,
+
+    /** Field demonstrating various Unicode characters in enum values */
+    @SerialName("unicode_enum_field")
+    val unicodeEnumField: PropertyUnicodeEnumField? = null,
 
     /** An array with no explicit item type (treated as any) */
     @SerialName("untyped_array")
