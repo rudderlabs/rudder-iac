@@ -1122,11 +1122,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"remote-tp-456": {
 				ID:         "remote-tp-456",
 				ExternalID: "test-tp-456",
+				Reference:  "#/tracking-plans/tracking-plan/test-tp-456",
 			},
 		}
 		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{})
+		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
+			resolveFunc: func(entityType string, remoteID string) (string, error) {
+				return "#/tracking-plans/tracking-plan/test-tp-456", nil
+			},
+		})
 		require.NoError(t, err)
 		require.Len(t, entities, 2)
 
@@ -1234,9 +1239,13 @@ func (m *mockNamer) Load(names []namer.ScopeName) error {
 	return nil
 }
 
-// mockResolver is a simple mock implementation of resolver.ReferenceResolver for testing
-type mockResolver struct{}
+type mockResolver struct {
+	resolveFunc func(entityType string, remoteID string) (string, error)
+}
 
 func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
-	return remoteID, nil
+	if m.resolveFunc != nil {
+		return m.resolveFunc(entityType, remoteID)
+	}
+	return "", fmt.Errorf("resolver not configured")
 }

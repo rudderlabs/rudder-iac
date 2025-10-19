@@ -501,7 +501,13 @@ func (h *Handler) FormatForExport(
 				RemoteID: source.ID,
 			},
 		}
-		spec, err := h.toImportSpec(data, source.ExternalID, workspaceMetadata, collection)
+		spec, err := h.toImportSpec(
+			data,
+			source.ExternalID,
+			workspaceMetadata,
+			collection,
+			inputResolver,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("creating spec: %w", err)
 		}
@@ -513,7 +519,13 @@ func (h *Handler) FormatForExport(
 	return result, nil
 }
 
-func (p *Handler) toImportSpec(source *sourceClient.EventStreamSource, externalID string, workspaceMetadata importremote.WorkspaceImportMetadata, collection *resources.ResourceCollection) (*specs.Spec, error) {
+func (p *Handler) toImportSpec(
+	source *sourceClient.EventStreamSource,
+	externalID string,
+	workspaceMetadata importremote.WorkspaceImportMetadata,
+	collection *resources.ResourceCollection,
+	resolver resolver.ReferenceResolver,
+) (*specs.Spec, error) {
 	metadata := importremote.Metadata{
 		Name: MetadataName,
 		Import: importremote.WorkspacesImportMetadata{
@@ -539,8 +551,16 @@ func (p *Handler) toImportSpec(source *sourceClient.EventStreamSource, externalI
 			return nil, fmt.Errorf("tracking plan with ID %s not found in collection", source.TrackingPlan.ID)
 		}
 
+		tpRef, err := resolver.ResolveToReference(
+			dcstate.TrackingPlanResourceType,
+			trackingPlanResource.ID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("resolving tracking plan reference: %w", err)
+		}
+
 		validations := map[string]any{
-			TrackingPlanRefYAMLKey:     fmt.Sprintf("#/tracking-plans/%s/%s", dcstate.TrackingPlanResourceType, trackingPlanResource.ExternalID),
+			TrackingPlanRefYAMLKey:    tpRef,
 			TrackingPlanConfigYAMLKey: toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
 		}
 
