@@ -185,5 +185,53 @@ fun main() {
         )
     )
 
+    // Test 13: Multi-type discriminator with boolean true (enabled)
+    println("\n13. Testing trackUserSignedUp() with feature_config enabled (boolean true)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.enabled@example.com",
+                firstName = "Premium",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.Case_True(
+                email = "premium@example.com"
+            )
+        )
+    )
+
+    // Test 14: Multi-type discriminator with boolean false (disabled)
+    println("\n14. Testing trackUserSignedUp() with feature_config disabled (boolean false)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.disabled@example.com",
+                firstName = "Free",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.Case_False(
+                status = PropertyStatus.ACTIVE
+            )
+        )
+    )
+
+    // Test 15: Multi-type discriminator with string "beta"
+    println("\n15. Testing trackUserSignedUp() with feature_config beta (string)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.beta@example.com",
+                firstName = "Beta",
+                lastName = "Tester"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseBeta(
+                tags = listOf("beta-user", "early-access", "experimental")
+            )
+        )
+    )
+
     println("\n=== All Tests Completed ===")
 }
