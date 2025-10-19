@@ -89,3 +89,10 @@ func SplitIntoWords(input string) []string {
 
 	return result
 }
+
+func ReplaceSpecialCharacters(input, replacement string) string {
+	// Define a regex pattern to match special characters
+	re := regexp.MustCompile(`[^\w\s]`)
+	// Replace special characters with the specified replacement string
+	return re.ReplaceAllString(input, replacement)
+}

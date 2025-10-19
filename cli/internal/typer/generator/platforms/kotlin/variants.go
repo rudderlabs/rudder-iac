@@ -71,7 +71,7 @@ func createVariantSealedClass(
 		}
 
 		abstractProperties = append(abstractProperties, KotlinProperty{
-			Name:       formatPropertyName(variant.Discriminator),
+			Name:       FormatPropertyName(variant.Discriminator),
 			SerialName: variant.Discriminator,
 			Type:       kotlinType,
 			Comment:    discriminatorProp.Property.Description,
@@ -229,7 +229,7 @@ func mergeVariantSchemaProperties(
 
 			// Discriminator goes in the body as an override property (or constructor for Default case)
 			discProp := KotlinProperty{
-				Name:       formatPropertyName(name),
+				Name:       FormatPropertyName(name),
 				SerialName: name,
 				Type:       kotlinType,
 				Comment:    propSchema.Property.Description,
@@ -253,7 +253,7 @@ func mergeVariantSchemaProperties(
 			}
 
 			prop := KotlinProperty{
-				Name:       formatPropertyName(name),
+				Name:       FormatPropertyName(name),
 				SerialName: name,
 				Type:       kotlinType,
 				Comment:    propSchema.Property.Description,

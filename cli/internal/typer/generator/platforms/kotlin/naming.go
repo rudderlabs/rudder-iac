@@ -15,86 +15,53 @@ var (
 	EnumScope      = "enum"
 )
 
+func handleReservedKeyword(name string) string {
+	if KotlinHardKeywords[name] {
+		return "_" + name
+	}
+	return name
+}
+
+func handleStartingCharacter(name string) string {
+	if len(name) > 0 && unicode.IsDigit(rune(name[0])) {
+		return "_" + name
+	}
+	return name
+}
+
 // formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToPascalCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
-	// Add prefix if provided
+	formatted := strings.TrimSpace(name)
 	if prefix != "" {
-		formatted = prefix + formatted
+		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
 	}
-
+	formatted = core.ToPascalCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
-// formatPropertyName converts a name to camelCase suitable for Kotlin property names
+// FormatPropertyName converts a name to camelCase suitable for Kotlin property names
 // Returns empty string if input is empty.
-func formatPropertyName(name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToCamelCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
+func FormatPropertyName(name string) string {
+	formatted := strings.TrimSpace(name)
+	formatted = core.ToCamelCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
 // FormatMethodName converts a name to camelCase suitable for Kotlin method names
 // If prefix is provided, it's prepended to the formatted name with proper casing
 func FormatMethodName(prefix, name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToCamelCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
-	// Add prefix if provided
+	formatted := strings.TrimSpace(name)
 	if prefix != "" {
-		// Convert prefix to camelCase and append the PascalCase name
-		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(name)
+		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
 	}
-
+	formatted = core.ToCamelCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
@@ -130,38 +97,18 @@ func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *
 
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
-	valueStr := fmt.Sprintf("%v", value)
-	trimmedValue := strings.TrimSpace(valueStr)
-	if trimmedValue == "" {
+	formatted := fmt.Sprintf("%v", value)
+	formatted = strings.TrimSpace(formatted)
+	formatted = core.ReplaceSpecialCharacters(formatted, "_")
+	words := core.SplitIntoWords(formatted)
+	if len(words) == 0 {
 		return ""
 	}
 
-	// Convert to upper case and replace invalid characters with underscores
-	formatted := strings.ToUpper(trimmedValue)
-
-	// Replace non-alphanumeric characters with underscores
-	var result strings.Builder
-	for _, r := range formatted {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			result.WriteRune(r)
-		} else {
-			result.WriteRune('_')
-		}
-	}
-
-	formatted = result.String()
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords by prefixing with underscore
-	originalLower := strings.ToLower(trimmedValue)
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
+	formatted = strings.Join(words, "_")
+	formatted = strings.ToUpper(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
