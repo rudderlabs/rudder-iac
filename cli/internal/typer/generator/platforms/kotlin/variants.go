@@ -60,6 +60,10 @@ func createVariantSealedClass(
 	}
 
 	// We currently support only one variant per type
+	if len(variants) > 1 {
+		return nil, fmt.Errorf("multiple variants per type are not supported; found %d variants", len(variants))
+	}
+
 	variant := variants[0]
 
 	// Create abstract discriminator property
