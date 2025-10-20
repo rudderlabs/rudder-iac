@@ -287,6 +287,8 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 			if additionalProps, ok := additionalPropsVal.(bool); ok {
 				objSchema.AdditionalProperties = additionalProps
 			}
+		} else {
+			objSchema.AdditionalProperties = true // default to true if not specified
 		}
 
 		if propertiesMap, exists := def["properties"]; exists {
