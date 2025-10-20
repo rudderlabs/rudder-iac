@@ -20,6 +20,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
+// stringPtr is a helper function to create a pointer to a string
+func stringPtr(s string) *string {
+	return &s
+}
+
 // mockRETLClient is a mock implementation of the RETL client
 type mockRETLClient struct {
 	createCalled               bool
@@ -1048,7 +1053,7 @@ func TestSQLModelHandler(t *testing.T) {
 			handler := sqlmodel.NewHandler(mockClient)
 
 			// Execute
-			results, err := handler.List(context.Background())
+			results, err := handler.List(context.Background(), nil)
 
 			// Verify
 			assert.NoError(t, err)
@@ -1081,6 +1086,51 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Equal(t, "account-2", source2[sqlmodel.AccountIDKey])
 		})
 
+		t.Run("Sources with external id", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				sourceID: "src123",
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{
+							{
+								ID:                   "source-1",
+								Name:                 "Test Source 1",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "postgres",
+								AccountID:            "account-1",
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "desc",
+									PrimaryKey:  "id",
+									Sql:         "SELECT 1\nFROM dual",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+			hasExternalID := true
+			results, err := handler.List(context.Background(), &hasExternalID)
+			assert.NoError(t, err)
+			assert.Len(t, results, 1)
+			// Basic field checks
+			assert.Equal(t, "source-1", results[0][sqlmodel.IDKey])
+			assert.Equal(t, "Test Source 1", results[0]["name"]) // Handler uses "name" not DisplayNameKey
+			assert.Equal(t, "postgres", results[0][sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, "account-1", results[0][sqlmodel.AccountIDKey])
+			// Config nested checks and SQL newline normalization
+			cfg, ok := results[0]["config"].(map[string]any)
+			require.True(t, ok, "config should be a map")
+			assert.Equal(t, "id", cfg[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "desc", cfg[sqlmodel.DescriptionKey])
+			// newlines should be collapsed to a single space
+			assert.Equal(t, "SELECT 1 FROM dual", cfg[sqlmodel.SQLKey])
+		})
+
 		t.Run("EmptyList", func(t *testing.T) {
 			t.Parallel()
 
@@ -1096,7 +1146,7 @@ func TestSQLModelHandler(t *testing.T) {
 			handler := sqlmodel.NewHandler(mockClient)
 
 			// Execute
-			results, err := handler.List(context.Background())
+			results, err := handler.List(context.Background(), nil)
 
 			// Verify
 			assert.NoError(t, err)
@@ -1116,7 +1166,7 @@ func TestSQLModelHandler(t *testing.T) {
 			handler := sqlmodel.NewHandler(mockClient)
 
 			// Execute
-			results, err := handler.List(context.Background())
+			results, err := handler.List(context.Background(), nil)
 
 			// Verify
 			assert.Error(t, err)
@@ -1354,6 +1404,379 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "remote id is required")
+		})
+	})
+
+	t.Run("LoadResourcesFromRemote", func(t *testing.T) {
+		t.Run("Success with multiple sources", func(t *testing.T) {
+			t.Parallel()
+
+			createdAt := time.Now().Add(-24 * time.Hour)
+			updatedAt := time.Now()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{
+							{
+								ID:                   "source-1",
+								Name:                 "Test Source 1",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "postgres",
+								AccountID:            "account-1",
+								CreatedAt:            &createdAt,
+								UpdatedAt:            &updatedAt,
+								ExternalID:           stringPtr("ext-1"),
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "Test description 1",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM table1",
+								},
+							},
+							{
+								ID:                   "source-2",
+								Name:                 "Test Source 2",
+								IsEnabled:            false,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "mysql",
+								AccountID:            "account-2",
+								ExternalID:           stringPtr("ext-2"),
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "Test description 2",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM table2",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.NoError(t, err)
+			assert.NotNil(t, collection)
+
+			// Get all SQL model resources
+			resources := collection.GetAll(sqlmodel.ResourceType)
+			assert.Len(t, resources, 2)
+
+			// Verify first resource
+			resource1, exists := resources["source-1"]
+			assert.True(t, exists)
+			assert.Equal(t, "source-1", resource1.ID)
+			assert.Equal(t, "ext-1", resource1.ExternalID)
+			assert.NotNil(t, resource1.Data)
+
+			// Verify second resource
+			resource2, exists := resources["source-2"]
+			assert.True(t, exists)
+			assert.Equal(t, "source-2", resource2.ID)
+			assert.Equal(t, "ext-2", resource2.ExternalID)
+			assert.NotNil(t, resource2.Data)
+		})
+
+		t.Run("Success with single source", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{
+							{
+								ID:                   "single-source",
+								Name:                 "Single Source",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "postgres",
+								AccountID:            "account-1",
+								ExternalID:           stringPtr("ext-single"),
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "Single source description",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM single_table",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.NoError(t, err)
+			assert.NotNil(t, collection)
+
+			resources := collection.GetAll(sqlmodel.ResourceType)
+			assert.Len(t, resources, 1)
+
+			resource, exists := resources["single-source"]
+			assert.True(t, exists)
+			assert.Equal(t, "single-source", resource.ID)
+			assert.Equal(t, "ext-single", resource.ExternalID)
+		})
+
+		t.Run("Success with empty list", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.NoError(t, err)
+			assert.NotNil(t, collection)
+
+			resources := collection.GetAll(sqlmodel.ResourceType)
+			assert.Len(t, resources, 0)
+		})
+
+		t.Run("Success with sources without external IDs", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{
+							{
+								ID:                   "source-no-ext",
+								Name:                 "Source Without External ID",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "postgres",
+								AccountID:            "account-1",
+								ExternalID:           nil, // No external ID
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "No external ID",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM no_ext_table",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.NoError(t, err)
+			assert.NotNil(t, collection)
+
+			resources := collection.GetAll(sqlmodel.ResourceType)
+			assert.Len(t, resources, 0) // Should be filtered out
+		})
+
+		t.Run("Success with mixed sources", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return &retlClient.RETLSources{
+						Data: []retlClient.RETLSource{
+							{
+								ID:                   "source-with-ext",
+								Name:                 "Source With External ID",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "postgres",
+								AccountID:            "account-1",
+								ExternalID:           stringPtr("ext-with"),
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "With external ID",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM with_ext_table",
+								},
+							},
+							{
+								ID:                   "source-no-ext",
+								Name:                 "Source Without External ID",
+								IsEnabled:            true,
+								SourceType:           retlClient.ModelSourceType,
+								SourceDefinitionName: "mysql",
+								AccountID:            "account-2",
+								ExternalID:           nil, // No external ID
+								Config: retlClient.RETLSQLModelConfig{
+									Description: "Without external ID",
+									PrimaryKey:  "id",
+									Sql:         "SELECT * FROM no_ext_table",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.NoError(t, err)
+			assert.NotNil(t, collection)
+
+			resources := collection.GetAll(sqlmodel.ResourceType)
+			assert.Len(t, resources, 1) // Only the one with external ID
+
+			resource, exists := resources["source-with-ext"]
+			assert.True(t, exists)
+			assert.Equal(t, "source-with-ext", resource.ID)
+			assert.Equal(t, "ext-with", resource.ExternalID)
+		})
+
+		t.Run("API error", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{
+				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+					return nil, fmt.Errorf("API error listing sources")
+				},
+			}
+
+			handler := sqlmodel.NewHandler(mockClient)
+
+			// Execute
+			collection, err := handler.LoadResourcesFromRemote(context.Background())
+
+			// Verify
+			assert.Error(t, err)
+			assert.Nil(t, collection)
+			assert.Contains(t, err.Error(), "listing RETL sources")
+		})
+	})
+
+	t.Run("LoadStateFromResources", func(t *testing.T) {
+		t.Run("Success with multiple resources", func(t *testing.T) {
+			t.Parallel()
+
+			h := sqlmodel.NewHandler(&mockRETLClient{})
+
+			createdAt := time.Now().Add(-48 * time.Hour)
+			updatedAt := time.Now()
+
+			// Build a collection with two RETL sources having ExternalID set
+			collection := resources.NewResourceCollection()
+			resourceMap := map[string]*resources.RemoteResource{
+				"remote-1": {
+					ID:         "remote-1",
+					ExternalID: "local-1",
+					Data: retlClient.RETLSource{
+						ID:                   "remote-1",
+						Name:                 "Model One",
+						AccountID:            "acc-1",
+						SourceType:           retlClient.ModelSourceType,
+						SourceDefinitionName: "postgres",
+						IsEnabled:            true,
+						WorkspaceID:          "ws-1",
+						ExternalID:           stringPtr("local-1"),
+						CreatedAt:            &createdAt,
+						UpdatedAt:            &updatedAt,
+						Config: retlClient.RETLSQLModelConfig{
+							Description: "desc 1",
+							PrimaryKey:  "id",
+							Sql:         "SELECT * FROM one",
+						},
+					},
+				},
+				"remote-2": {
+					ID:         "remote-2",
+					ExternalID: "local-2",
+					Data: retlClient.RETLSource{
+						ID:                   "remote-2",
+						Name:                 "Model Two",
+						AccountID:            "acc-2",
+						SourceType:           retlClient.ModelSourceType,
+						SourceDefinitionName: "mysql",
+						IsEnabled:            false,
+						WorkspaceID:          "ws-2",
+						ExternalID:           stringPtr("local-2"),
+						Config: retlClient.RETLSQLModelConfig{
+							Description: "desc 2",
+							PrimaryKey:  "pk",
+							Sql:         "SELECT * FROM two",
+						},
+					},
+				},
+			}
+			collection.Set(sqlmodel.ResourceType, resourceMap)
+
+			// Execute
+			st, err := h.LoadStateFromResources(context.Background(), collection)
+
+			// Verify
+			require.NoError(t, err)
+			require.NotNil(t, st)
+			// Expect two resources keyed by URN(localID, type)
+			urn1 := resources.URN("local-1", sqlmodel.ResourceType)
+			urn2 := resources.URN("local-2", sqlmodel.ResourceType)
+			r1 := st.GetResource(urn1)
+			require.NotNil(t, r1)
+			assert.Equal(t, "local-1", r1.ID)
+			assert.Equal(t, sqlmodel.ResourceType, r1.Type)
+			// Input fields
+			assert.Equal(t, "Model One", r1.Input[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc 1", r1.Input[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc-1", r1.Input[sqlmodel.AccountIDKey])
+			assert.Equal(t, "id", r1.Input[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM one", r1.Input[sqlmodel.SQLKey])
+			assert.Equal(t, true, r1.Input[sqlmodel.EnabledKey])
+			assert.Equal(t, "postgres", r1.Input[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, "local-1", r1.Input[sqlmodel.LocalIDKey])
+			// Output timestamps should be present
+			assert.Equal(t, &createdAt, r1.Output[sqlmodel.CreatedAtKey])
+			assert.Equal(t, &updatedAt, r1.Output[sqlmodel.UpdatedAtKey])
+
+			r2 := st.GetResource(urn2)
+			require.NotNil(t, r2)
+			assert.Equal(t, "Model Two", r2.Input[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc 2", r2.Input[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc-2", r2.Input[sqlmodel.AccountIDKey])
+			assert.Equal(t, "pk", r2.Input[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM two", r2.Input[sqlmodel.SQLKey])
+			assert.Equal(t, false, r2.Input[sqlmodel.EnabledKey])
+			assert.Equal(t, "mysql", r2.Input[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, "local-2", r2.Input[sqlmodel.LocalIDKey])
+		})
+
+		t.Run("Error on invalid data type", func(t *testing.T) {
+			t.Parallel()
+
+			h := sqlmodel.NewHandler(&mockRETLClient{})
+			collection := resources.NewResourceCollection()
+			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+				"bad": {
+					ID:         "bad",
+					ExternalID: "local-bad",
+					Data:       "not-a-retl-source",
+				},
+			})
+
+			st, err := h.LoadStateFromResources(context.Background(), collection)
+			assert.Error(t, err)
+			assert.Nil(t, st)
+			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
 		})
 	})
 }

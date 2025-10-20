@@ -43,9 +43,10 @@ type resourceHandler interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 
 	// List lists all resources managed by this handler.
+	// The hasExternalId parameter is used to filter the resources by external ID.
 	// The returned resources will be added to the resource graph for
 	// dependency resolution and state management.
-	List(ctx context.Context) ([]resources.ResourceData, error)
+	List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error)
 
 	// FetchImportData retrieves data for multiple resources to be imported.
 	// This method fetches remote resources based on the provided import arguments

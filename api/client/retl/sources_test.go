@@ -234,10 +234,13 @@ func TestListRetlSources(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestNextRetlSources(t *testing.T) {
+func TestListRetlSourcesWithExternalID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources", "")
+			if !assert.Equal(t, "https://api.rudderstack.com/v2/retl-sources?hasExternalID=true", req.URL.String()) {
+				return false
+			}
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-source?hasExternalID=false", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -248,7 +251,8 @@ func TestNextRetlSources(t *testing.T) {
 					"enabled": true,
 					"sourceType": "model",
 					"sourceDefinitionName": "postgres",
-					"accountId": "acc123"
+					"accountId": "acc123",
+					"externalId": "ext-123"
 				}
 			]
 		}`,
@@ -259,7 +263,8 @@ func TestNextRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background(), nil)
+	hasExternalID := true
+	sources, err := retlClient.ListRetlSources(context.Background(), &hasExternalID)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 1)

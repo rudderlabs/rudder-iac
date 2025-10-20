@@ -242,8 +242,8 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 	return nil
 }
 
-func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
-	sources, err := h.client.ListRetlSources(ctx, nil)
+func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error) {
+	sources, err := h.client.ListRetlSources(ctx, hasExternalId)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}

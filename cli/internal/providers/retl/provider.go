@@ -3,6 +3,7 @@ package retl
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
@@ -188,7 +189,16 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
-	return handler.List(ctx)
+
+	var hasExtranlId *bool
+	if hasEsternalIdStr, ok := filters["hasExternalId"]; ok {
+		hasExternalId, err := strconv.ParseBool(hasEsternalIdStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hasExternalId filter: %w", err)
+		}
+		hasExtranlId = &hasExternalId
+	}
+	return handler.List(ctx, hasExtranlId)
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
