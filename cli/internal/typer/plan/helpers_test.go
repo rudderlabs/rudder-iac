@@ -30,7 +30,6 @@ func TestExtractAllProperties(t *testing.T) {
 	properties := trackingPlan.ExtractAllProperties()
 
 	assert.Len(t, properties, len(testutils.ReferenceProperties))
-
 	for name := range testutils.ReferenceProperties {
 		assert.Contains(t, properties, name, "Property %s should be present", name)
 	}
