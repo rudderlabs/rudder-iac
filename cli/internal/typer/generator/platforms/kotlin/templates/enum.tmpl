@@ -1,5 +1,5 @@
 {{- if .Comment }}
-/** {{ .Comment }} */
+/** {{ escapeComment .Comment }} */
 {{- end }}
 @Serializable(with = Rudder{{ .Name }}Serializer::class)
 enum class {{ .Name }} {

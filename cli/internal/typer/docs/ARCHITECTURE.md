@@ -134,7 +134,8 @@ These helper methods provide convenient access to nested data without violating 
 **Template Design Principles**:
 
 - **Platform-specific contexts**: Each platform defines context types for all supported code constructs (e.g., Kotlin supports both type aliases for primitive types and data classes for object types)
-- **Pre-processed values**: All values are escaped, formatted, and ready for template rendering with no additional processing required
+- **Semantic vs. syntax separation**: Context values contain semantic content (what to generate), while templates handle syntax-level formatting (escaping, quoting) via template functions
+- **Pre-processed semantics**: All semantic decisions (names, types, structure) are made in generators and stored in context
 - **Minimal conditional logic**: Templates focus on formatting rather than business logic
 - **Construct-specific modeling**: Different context types for different code constructs ensure templates remain simple and focused
 
@@ -144,10 +145,10 @@ These helper methods provide convenient access to nested data without violating 
 
 ### Separation of Concerns
 
-- TrackingPlan: Pure domain representation
-- TemplateContext: Pure code construct representation
-- Generators: Business logic transformation layer
-- Templates: Minimal formatting logic
+- TrackingPlan: Pure domain representation (platform-agnostic)
+- TemplateContext: Platform-specific code construct representation with semantic content
+- Generators: Business logic transformation layer (semantic decisions)
+- Templates: Syntax-level formatting (escaping, indentation, quoting) via template functions
 
 ### Extensibility
 
@@ -259,7 +260,7 @@ The validator uses the same test data as the unit tests (`testdata/Main.kt`), en
 
 ### Template Development
 
-- Keep logic minimal
-- Pre-process all values in generators
+- Keep business logic minimal (no semantic decisions)
+- Handle syntax-level formatting via template functions (escaping, quoting)
 - Use specific context types for different constructs
-- Avoid raw tracking plan access
+- Avoid raw tracking plan access in templates
