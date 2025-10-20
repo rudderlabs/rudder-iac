@@ -192,6 +192,59 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 - **Event Types**: Covers Track events (with custom names), Identify, Page, Screen, and Group events with both Properties and Traits sections
 - **Constants**: Defines expected counts for validation (`ExpectedCustomTypeCount`, `ExpectedPropertyCount`, `ExpectedEventCount`)
 
+#### Modifying the Reference Plan
+
+When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
+
+1. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go`
+2. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
+3. **Update the constants** at the bottom of `reference_plan.go`:
+   - `ExpectedCustomTypeCount` - increment for each new custom type
+   - `ExpectedPropertyCount` - increment for each new property
+   - `ExpectedEventCount` - increment for each new event
+4. **Update the test expectations** in `cli/internal/typer/plan/helpers_test.go`:
+   - Add new property names to the `expectedNames` slice in `TestExtractAllProperties`
+   - Add new custom type names to the `expectedNames` slice in `TestExtractAllCustomTypes` (if applicable)
+5. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+
+**Common Mistakes to Avoid**:
+- ❌ Adding properties to ReferenceProperties but forgetting to add them to the expectedNames list in helpers_test.go
+- ❌ Adding properties to event rules but not incrementing ExpectedPropertyCount
+- ❌ Forgetting to regenerate testdata after reference plan changes
+- ❌ Updating constants but not the corresponding test assertions
+
+**Workflow Example**:
+```go
+// 1. Add property to reference plan
+ReferenceProperties["new_field"] = &plan.Property{
+    Name: "new_field",
+    Description: "New test field",
+    Types: []plan.PropertyType{plan.PrimitiveTypeString},
+}
+
+// 2. Use it in an event rule
+rules = append(rules, plan.EventRule{
+    Event: *ReferenceEvents["Some Event"],
+    Schema: plan.ObjectSchema{
+        Properties: map[string]plan.PropertySchema{
+            "new_field": {
+                Property: *ReferenceProperties["new_field"],
+                Required: true,
+            },
+        },
+    },
+})
+
+// 3. Update constants
+ExpectedPropertyCount = 32  // was 31, now 32
+
+// 4. Update helpers_test.go
+expectedNames := []string{"...", "new_field", "..."}  // Add to list
+
+// 5. Regenerate testdata
+// Run: make typer-kotlin-update-testdata
+```
+
 ### Benefits
 
 - **Consistency**: All tests use the same reference data, ensuring consistent behavior across components

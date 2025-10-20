@@ -39,6 +39,13 @@ func init() {
 		Description: "Group association event",
 	}
 
+	// Event with quotes in name to test escaping
+	ReferenceEvents["Product \"Premium\" Clicked"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Product \"Premium\" Clicked",
+		Description: "Triggered when user clicks on a \"premium\" product /* important */",
+	}
+
 	ReferenceCustomTypes["email"] = &plan.CustomType{
 		Name:        "email",
 		Description: "Custom type for email validation",
@@ -92,6 +99,23 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 		Config: &plan.PropertyConfig{
 			Enum: []any{"mobile", "tablet", "desktop", "smartTV", "IoT-Device"},
+		},
+	}
+
+	// Property with special characters in description to test comment escaping
+	ReferenceProperties["special_field"] = &plan.Property{
+		Name:        "special_field",
+		Description: "Field with special chars: \"quotes\", backslash\\path, and /* comment */",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	// Property with enum containing special characters
+	ReferenceProperties["status_code"] = &plan.Property{
+		Name:        "status_code",
+		Description: "HTTP status with special characters",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"200: OK", "404: Not Found", "500: Internal \"Server\" Error"},
 		},
 	}
 
@@ -694,6 +718,25 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 			Properties: map[string]plan.PropertySchema{
 				"active": {Property: *ReferenceProperties["active"], Required: true},
 			},
+		},
+	})
+
+	// Track event with special characters - properties
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Product \"Premium\" Clicked"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"special_field": {
+					Property: *ReferenceProperties["special_field"],
+					Required: true,
+				},
+				"status_code": {
+					Property: *ReferenceProperties["status_code"],
+					Required: false,
+				},
+			},
+			AdditionalProperties: false,
 		},
 	})
 

@@ -30,7 +30,7 @@ func TestExtractAllProperties(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
 	properties := trackingPlan.ExtractAllProperties()
-	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile", "device_type", "tags", "contacts", "property_of_any", "untyped_field", "array_of_any", "untyped_array", "object_property", "status", "email_list", "profile_list", "ip_address", "nested_context", "context", "empty_object_with_additional_props", "nested_empty_object", "page_context", "page_type", "query", "product_id", "page_data", "multi_type_field", "multi_type_array", "user_access", "feature_flag", "feature_config", "用户名", "unicode_enum_field", "mixed_unicode", "unicode_custom_type", "priority", "enabled", "rating", "mixed_value"}
+	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile", "device_type", "special_field", "status_code", "tags", "contacts", "property_of_any", "untyped_field", "array_of_any", "untyped_array", "object_property", "status", "email_list", "profile_list", "ip_address", "nested_context", "context", "empty_object_with_additional_props", "nested_empty_object", "page_context", "page_type", "query", "product_id", "page_data", "multi_type_field", "multi_type_array"}
 
 	assert.Len(t, properties, len(testutils.ReferenceProperties))
 	assert.Len(t, expectedNames, len(testutils.ReferenceProperties)) // consistency check

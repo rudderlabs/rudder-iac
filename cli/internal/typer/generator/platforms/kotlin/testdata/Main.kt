@@ -114,6 +114,9 @@ typealias PropertyPropertyOfAny = JsonElement
 /** Search query */
 typealias PropertyQuery = String
 
+/** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+typealias PropertySpecialField = String
+
 /** User account status */
 typealias PropertyStatus = CustomTypeStatus
 
@@ -317,6 +320,31 @@ private object RudderPropertyRatingSerializer : KSerializer<PropertyRating> {
 
     override fun deserialize(decoder: Decoder): PropertyRating {
         throw SerializationException("Deserialization not supported for PropertyRating")
+    }
+}
+
+/** HTTP status with special characters */
+@Serializable(with = RudderPropertyStatusCodeSerializer::class)
+enum class PropertyStatusCode {
+    _200_OK,
+    _404_NOT_FOUND,
+    _500_INTERNAL_SERVER_ERROR
+}
+
+private object RudderPropertyStatusCodeSerializer : KSerializer<PropertyStatusCode> {
+    override val descriptor = buildClassSerialDescriptor("PropertyStatusCode")
+
+    override fun serialize(encoder: Encoder, value: PropertyStatusCode) {
+        val jsonValue = when (value) {
+            PropertyStatusCode._200_OK -> JsonPrimitive("200: OK")
+            PropertyStatusCode._404_NOT_FOUND -> JsonPrimitive("404: Not Found")
+            PropertyStatusCode._500_INTERNAL_SERVER_ERROR -> JsonPrimitive("500: Internal \"Server\" Error")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyStatusCode {
+        throw SerializationException("Deserialization not supported for PropertyStatusCode")
     }
 }
 
@@ -795,6 +823,18 @@ data class ScreenProperties(
     val profile: PropertyProfile? = null
 )
 
+/** Triggered when user clicks on a "premium" product /\* important *\/ */
+@Serializable
+data class TrackProductPremiumClickedProperties(
+    /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+    @SerialName("special_field")
+    val specialField: PropertySpecialField,
+
+    /** HTTP status with special characters */
+    @SerialName("status_code")
+    val statusCode: PropertyStatusCode? = null
+)
+
 /** Triggered when a user signs up */
 @Serializable
 data class TrackUserSignedUpProperties(
@@ -990,6 +1030,17 @@ class RudderAnalytics(private val analytics: Analytics) {
     fun trackEventWithVariants(properties: TrackEventWithVariantsProperties) {
         analytics.track(
             name = "Event With Variants",
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Triggered when user clicks on a "premium" product /\* important *\/
+     */
+    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties) {
+        analytics.track(
+            name = "Product \"Premium\" Clicked",
             properties = json.encodeToJsonElement(properties).jsonObject,
             options = RudderOption(customContext = context)
         )
