@@ -88,7 +88,7 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			Scope: TypeEventRule,
 		})
 		if err != nil {
-			return fmt.Errorf("generating externalID for rule %s on event %s: %w", ruleName, event.ID, err)
+			return fmt.Errorf("generating externalID for rule on event %s: %w", event.ID, err)
 		}
 
 		var importableVariants ImportableVariants
