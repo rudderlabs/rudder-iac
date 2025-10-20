@@ -14,11 +14,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.providerStore {
-		if _, ok := provider.(resourceImportProvider); !ok {
-			continue
-		}
-
-		resources, err := provider.(resourceImportProvider).LoadImportable(ctx, idNamer)
+		resources, err := provider.LoadImportable(ctx, idNamer)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %w", err)
 		}
