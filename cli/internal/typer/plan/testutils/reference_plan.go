@@ -46,6 +46,18 @@ func init() {
 		Description: "Triggered when user clicks on a \"premium\" product /* important */",
 	}
 
+	ReferenceEvents["Empty Event With Additional Props"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Empty Event With Additional Props",
+		Description: "Empty event schema with additionalProperties true",
+	}
+
+	ReferenceEvents["Empty Event No Additional Props"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Empty Event No Additional Props",
+		Description: "Empty event schema with additionalProperties false",
+	}
+
 	ReferenceCustomTypes["email"] = &plan.CustomType{
 		Name:        "email",
 		Description: "Custom type for email validation",
@@ -289,6 +301,29 @@ func init() {
 	ReferenceProperties["nested_empty_object"] = &plan.Property{
 		Name:        "nested_empty_object",
 		Description: "Nested property with empty object allowing additional properties",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
+	// Add empty custom type with additionalProperties: false for testing
+	ReferenceCustomTypes["empty_object_no_additional_props"] = &plan.CustomType{
+		Name:        "empty_object_no_additional_props",
+		Description: "Empty object that does not allow additional properties",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
+		},
+	}
+
+	ReferenceProperties["empty_object_no_additional_props"] = &plan.Property{
+		Name:        "empty_object_no_additional_props",
+		Description: "Property with empty object not allowing additional properties",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["empty_object_no_additional_props"]},
+	}
+
+	ReferenceProperties["nested_empty_object_no_additional_props"] = &plan.Property{
+		Name:        "nested_empty_object_no_additional_props",
+		Description: "Nested property with empty object not allowing additional properties",
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
@@ -600,14 +635,20 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"user_access":      {Property: *ReferenceProperties["user_access"]},
 				"feature_config":   {Property: *ReferenceProperties["feature_config"]},
 				// Add Unicode properties for testing
-				"用户名":                 {Property: *ReferenceProperties["用户名"]},
-				"unicode_enum_field":  {Property: *ReferenceProperties["unicode_enum_field"]},
-				"mixed_unicode":       {Property: *ReferenceProperties["mixed_unicode"]},
-				"unicode_custom_type": {Property: *ReferenceProperties["unicode_custom_type"]},
-				"priority":            {Property: *ReferenceProperties["priority"]},
-				"enabled":             {Property: *ReferenceProperties["enabled"]},
-				"rating":              {Property: *ReferenceProperties["rating"]},
-				"mixed_value":         {Property: *ReferenceProperties["mixed_value"]},
+				"用户名":                              {Property: *ReferenceProperties["用户名"]},
+				"unicode_enum_field":               {Property: *ReferenceProperties["unicode_enum_field"]},
+				"mixed_unicode":                    {Property: *ReferenceProperties["mixed_unicode"]},
+				"unicode_custom_type":              {Property: *ReferenceProperties["unicode_custom_type"]},
+				"priority":                         {Property: *ReferenceProperties["priority"]},
+				"enabled":                          {Property: *ReferenceProperties["enabled"]},
+				"rating":                           {Property: *ReferenceProperties["rating"]},
+				"mixed_value":                      {Property: *ReferenceProperties["mixed_value"]},
+				"empty_object_no_additional_props": {Property: *ReferenceProperties["empty_object_no_additional_props"]},
+				"nested_empty_object_no_additional_props": {
+					Property: *ReferenceProperties["nested_empty_object_no_additional_props"],
+					Required: false,
+					Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
+				},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
@@ -736,7 +777,25 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 					Required: false,
 				},
 			},
-			AdditionalProperties: false,
+		},
+	})
+
+	// Empty event with additionalProperties: true
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Empty Event With Additional Props"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: true,
+		},
+	})
+
+	// Empty event with additionalProperties: false
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Empty Event No Additional Props"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{},
 		},
 	})
 

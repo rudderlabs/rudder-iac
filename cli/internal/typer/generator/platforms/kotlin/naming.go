@@ -100,8 +100,8 @@ func getOrRegisterCustomTypeName(customType *plan.CustomType, nameRegistry *core
 	return nameRegistry.RegisterName("customtype:"+customType.Name, globalTypeScope, typeName)
 }
 
-// getOrRegisterPropertyTypeTypeName returns the registered type name for a property-specific type.
-func getOrRegisterPropertyTypeTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+// getOrRegisterPropertyTypeName returns the registered type name for a property-specific type.
+func getOrRegisterPropertyTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	typeName := FormatClassName("Property", property.Name)
 	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
 }

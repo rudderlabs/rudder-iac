@@ -5,8 +5,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+val emptyJsonObject = JsonObject(emptyMap())
+
 class Analytics() {
-    fun identify(userId: String, traits: JsonObject, options: RudderOption) {
+    fun identify(userId: String, traits: JsonObject = emptyJsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "identify")
             put("userId", userId)
@@ -16,7 +18,7 @@ class Analytics() {
         println(output)
     }
 
-    fun track(name: String, properties: JsonObject, options: RudderOption) {
+    fun track(name: String, properties: JsonObject = emptyJsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "track")
             put("name", name)
@@ -26,7 +28,7 @@ class Analytics() {
         println(output)
     }
 
-    fun group(groupId: String, traits: JsonObject, options: RudderOption) {
+    fun group(groupId: String, traits: JsonObject = emptyJsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "group")
             put("groupId", groupId)
@@ -36,7 +38,7 @@ class Analytics() {
         println(output)
     }
 
-    fun screen(screenName: String, category: String, properties: JsonObject, options: RudderOption) {
+    fun screen(screenName: String, category: String, properties: JsonObject = emptyJsonObject, options: RudderOption) {
         val output = buildJsonObject {
             put("type", "screen")
             put("screenName", screenName)
