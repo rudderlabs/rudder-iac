@@ -46,6 +46,7 @@ type KotlinSealedSubclass struct {
 	Comment        string           // Documentation comment
 	Properties     []KotlinProperty // Constructor properties
 	BodyProperties []KotlinProperty // Body properties
+	IsDataClass    bool             // If false, generate as regular class instead of data class
 }
 
 // KotlinSealedClass represents a Kotlin sealed class with subclasses

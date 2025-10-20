@@ -221,11 +221,16 @@ func createSealedSubclass(
 		return nil, err
 	}
 
+	// Determine if this should be a data class or regular class
+	// Data classes require at least one constructor parameter
+	isDataClass := len(constructorProps) > 0
+
 	return &KotlinSealedSubclass{
 		Name:           subclassName,
 		Comment:        comment,
 		Properties:     constructorProps,
 		BodyProperties: bodyProps,
+		IsDataClass:    isDataClass,
 	}, nil
 }
 

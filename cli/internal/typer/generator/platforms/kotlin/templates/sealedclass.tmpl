@@ -22,7 +22,7 @@ sealed class {{ .Name }} : SealedClassWithJson() {
     /** {{ $subclass.Comment }} */
     {{- end }}
     @Serializable
-    data class {{ $subclass.Name }}(
+    {{ if $subclass.IsDataClass }}data {{ end }}class {{ $subclass.Name }}{{- if $subclass.Properties }}(
     {{- range $propIndex, $prop := $subclass.Properties }}{{- if $propIndex }},
 {{ end }}
         {{- if $prop.Comment }}
@@ -31,7 +31,7 @@ sealed class {{ .Name }} : SealedClassWithJson() {
         @SerialName("{{ $prop.SerialName }}")
         {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
     {{- end }}
-    ) : {{ $.Name }}() {
+    ){{- else }}(){{ end }} : {{ $.Name }}() {
     {{- range $prop := $subclass.BodyProperties }}
         {{- if ne $prop.Name "_jsonElement" }}
         {{- if $prop.Comment }}
