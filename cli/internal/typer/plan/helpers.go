@@ -14,7 +14,7 @@ func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {
 
 	// Extract properties from within custom type schemas and variants
 	for _, customType := range customTypes {
-		if !customType.IsPrimitive() && customType.Schema != nil {
+		if !customType.IsPrimitive() {
 			extractCustomTypesFromSchema(customType.Schema, customTypes)
 		}
 		// Extract from custom type variants

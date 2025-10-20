@@ -192,18 +192,26 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 		if customType.ItemType != nil {
 			innerKotlinType, err := resolveTypeToKotlinType(customType.ItemType, nameRegistry)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to resolve item type for custom type %q: %w", customType.Name, err)
 			}
 			kotlinType = fmt.Sprintf("List<%s>", innerKotlinType)
 		} else {
 			// Array with no item type means array of any
 			kotlinType = "List<JsonElement>"
 		}
+	} else if customType.Type == plan.PrimitiveTypeObject && isEmptySchema(customType.Schema) {
+		if customType.Schema.AdditionalProperties {
+			// Empty object schema with additionalProperties means JsonObject
+			kotlinType = "JsonObject"
+		} else {
+			// Empty object schema without additionalProperties means Unit (no data)
+			kotlinType = "Unit"
+		}
 	} else {
 		// Map primitive type to Kotlin type
 		kotlinType, err = mapPrimitiveToKotlinType(customType.Type)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to map custom type %q to Kotlin type: %w", customType.Name, err)
 		}
 	}
 
@@ -216,7 +224,7 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 
 // createPropertyTypeAlias creates a KotlinTypeAlias from any property
 func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
-	finalName, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
+	finalName, err := getOrRegisterPropertyTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +232,7 @@ func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameReg
 	// Get the appropriate Kotlin type for this property
 	kotlinType, err := resolvePropertyKotlinType(property, nameRegistry)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve Kotlin type for property %q: %w", property.Name, err)
 	}
 
 	return &KotlinTypeAlias{
@@ -255,7 +263,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 					itemType := property.ItemTypes[0]
 					innerKotlinType, err := resolveTypeToKotlinType(itemType, nameRegistry)
 					if err != nil {
-						return "", err
+						return "", fmt.Errorf("failed to resolve item type for property %q: %w", property.Name, err)
 					}
 					return fmt.Sprintf("List<%s>", innerKotlinType), nil
 				} else {
@@ -314,13 +322,20 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 
 		// Check if this property has nested object schema
 		if propSchema.Schema != nil {
-			// Check if this is an empty object with additionalProperties: true
-			if len(propSchema.Schema.Properties) == 0 && propSchema.Schema.AdditionalProperties {
-				// Use the property's type alias instead of creating an empty data class
-				kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
-				if err != nil {
-					return nil, err
+			// Check if this is an empty object
+			if len(propSchema.Schema.Properties) == 0 {
+				var kotlinType string
+				if propSchema.Schema.AdditionalProperties {
+					// Use the property's type alias instead of creating an empty data class
+					kt, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
+					kotlinType = kt
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					kotlinType = "Unit"
 				}
+
 				property = &KotlinProperty{
 					Name:       FormatPropertyName(propName),
 					SerialName: propName,
@@ -345,10 +360,9 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 					Comment:    propSchema.Property.Description,
 					Nullable:   !propSchema.Required,
 				}
-
 			}
 		} else {
-			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, err
 			}
@@ -418,12 +432,24 @@ func processEventRules(p *plan.TrackingPlan, ctx *KotlinContext, nameRegistry *c
 			}
 			ctx.SealedClasses = append(ctx.SealedClasses, *sealedClass)
 		} else {
-			// create data class for the event rule
-			dataClass, err := createEventDataClass(rule, nameRegistry)
-			if err != nil {
-				return err
+			// Check if schema is empty
+			if isEmptySchema(&rule.Schema) {
+				// Empty with additionalProperties - create type alias to JsonObject, otherwise skip
+				if rule.Schema.AdditionalProperties {
+					typeAlias, err := createEventSchemaTypeAlias(rule, nameRegistry)
+					if err != nil {
+						return err
+					}
+					ctx.TypeAliases = append(ctx.TypeAliases, *typeAlias)
+				}
+			} else {
+				// create data class for the event rule
+				dataClass, err := createEventDataClass(rule, nameRegistry)
+				if err != nil {
+					return err
+				}
+				ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 			}
-			ctx.DataClasses = append(ctx.DataClasses, *dataClass)
 		}
 
 		// create RudderAnalyticsMethod for the event rule
@@ -478,7 +504,7 @@ func formatEnumValueForKotlin(value any) string {
 
 // createPropertyEnum creates a KotlinEnum from a property with enum constraints
 func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
-	enumName, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
+	enumName, err := getOrRegisterPropertyTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -547,6 +573,8 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) (string, error) 
 		return "JsonElement", nil
 	case plan.PrimitiveTypeObject:
 		return "JsonObject", nil
+	case plan.PrimitiveTypeArray:
+		return "List<JsonElement>", nil
 	default:
 		return "", fmt.Errorf("unsupported primitive type: %s", primitiveType)
 	}
@@ -566,4 +594,23 @@ func createNestedDataClass(propSchema *plan.PropertySchema, propName string, par
 	dataClass.Name = nestedClassName
 
 	return dataClass, nil
+}
+
+// isEmptySchema checks if an ObjectSchema has no definedproperties
+func isEmptySchema(schema *plan.ObjectSchema) bool {
+	return schema != nil && len(schema.Properties) == 0
+}
+
+// createEventSchemaTypeAlias creates a type alias to JsonObject for an empty event schema
+func createEventSchemaTypeAlias(rule *plan.EventRule, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
+	aliasName, err := getOrRegisterEventDataClassName(rule, nameRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KotlinTypeAlias{
+		Alias:   aliasName,
+		Comment: rule.Event.Description,
+		Type:    "JsonObject",
+	}, nil
 }

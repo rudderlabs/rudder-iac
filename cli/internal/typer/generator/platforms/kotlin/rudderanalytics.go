@@ -19,6 +19,13 @@ func sectionToParamName(section plan.IdentitySection) (string, error) {
 	}
 }
 
+// shouldIncludePropertiesParameter checks if a properties/traits parameter should be included
+// Returns false only for empty schemas without additionalProperties
+func shouldIncludePropertiesParameter(rule *plan.EventRule) bool {
+	isEmpty := len(rule.Schema.Properties) == 0
+	return !isEmpty || rule.Schema.AdditionalProperties
+}
+
 // createRudderAnalyticsMethod creates a single RudderAnalyticsMethod from a plan.Event
 func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRegistry) (*RudderAnalyticsMethod, error) {
 	method := &RudderAnalyticsMethod{
@@ -59,17 +66,24 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 		return err
 	}
 
-	method.MethodArguments = []KotlinMethodArgument{
-		{Name: paramName, Type: className, Nullable: false},
-	}
+	method.MethodArguments = []KotlinMethodArgument{}
+
 	method.SDKCall = SDKCall{
 		MethodName: "track",
 		Arguments: []SDKCallArgument{
 			// TODO: Handle proper escaping of event name
 			{Name: "name", Value: fmt.Sprintf("\"%s\"", rule.Event.Name)},
-			{Name: paramName, Value: paramName, ShouldSerialize: true},
 		},
 	}
+
+	if shouldIncludePropertiesParameter(rule) {
+		method.MethodArguments = append(method.MethodArguments,
+			KotlinMethodArgument{Name: paramName, Type: className, Nullable: false})
+
+		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+	}
+
 	return nil
 }
 
@@ -88,15 +102,22 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 
 	method.MethodArguments = []KotlinMethodArgument{
 		{Name: "userId", Type: "String", Default: "\"\""},
-		{Name: paramName, Type: className},
 	}
 	method.SDKCall = SDKCall{
 		MethodName: "identify",
 		Arguments: []SDKCallArgument{
 			{Name: "userId", Value: "userId"},
-			{Name: paramName, Value: paramName, ShouldSerialize: true},
 		},
 	}
+
+	if shouldIncludePropertiesParameter(rule) {
+		method.MethodArguments = append(method.MethodArguments,
+			KotlinMethodArgument{Name: paramName, Type: className})
+
+		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+	}
+
 	return nil
 }
 
@@ -115,14 +136,20 @@ func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 
 	method.MethodArguments = []KotlinMethodArgument{
 		{Name: "groupId", Type: "String"},
-		{Name: paramName, Type: className},
 	}
 	method.SDKCall = SDKCall{
 		MethodName: "group",
 		Arguments: []SDKCallArgument{
 			{Name: "groupId", Value: "groupId"},
-			{Name: paramName, Value: paramName, ShouldSerialize: true},
 		},
+	}
+
+	if shouldIncludePropertiesParameter(rule) {
+		method.MethodArguments = append(method.MethodArguments,
+			KotlinMethodArgument{Name: paramName, Type: className})
+
+		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
 	}
 	return nil
 }
@@ -143,15 +170,21 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 	method.MethodArguments = []KotlinMethodArgument{
 		{Name: "screenName", Type: "String", Nullable: false},
 		{Name: "category", Type: "String", Default: "\"\""},
-		{Name: paramName, Type: className, Nullable: false},
 	}
 	method.SDKCall = SDKCall{
 		MethodName: "screen",
 		Arguments: []SDKCallArgument{
 			{Name: "screenName", Value: "screenName"},
 			{Name: "category", Value: "category"},
-			{Name: paramName, Value: paramName, ShouldSerialize: true},
 		},
+	}
+
+	if shouldIncludePropertiesParameter(rule) {
+		method.MethodArguments = append(method.MethodArguments,
+			KotlinMethodArgument{Name: paramName, Type: className})
+
+		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
 	}
 	return nil
 }

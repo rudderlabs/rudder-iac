@@ -290,6 +290,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 											}, nil)}, true, nil, nil, nil),
 											"count": constructPropertySchema("count", []plan.PropertyType{plan.PrimitiveTypeInteger}, false, nil, nil, nil),
 										},
+										AdditionalProperties: true,
 									}),
 								}, false, nil, nil, nil),
 								"someCustomStringArray": constructPropertySchema("someCustomStringArray", []plan.PropertyType{
@@ -303,6 +304,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 											}, nil)}, true, nil, nil, nil),
 											"count": constructPropertySchema("count", []plan.PropertyType{plan.PrimitiveTypeInteger}, false, nil, nil, nil),
 										},
+										AdditionalProperties: true,
 									}), nil, nil),
 								}, false, nil, nil, nil),
 								"arrayWithMultipleTypes": constructPropertySchema("arrayWithMultipleTypes", []plan.PropertyType{plan.PrimitiveTypeArray}, false, nil, nil, []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger}),

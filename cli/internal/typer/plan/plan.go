@@ -125,7 +125,7 @@ type CustomType struct {
 }
 
 func (c *CustomType) IsPrimitive() bool {
-	return c.Type != PrimitiveTypeObject
+	return c.Type != PrimitiveTypeObject || c.Schema == nil || len(c.Schema.Properties) == 0
 }
 
 /*

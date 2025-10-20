@@ -125,7 +125,7 @@ func createVariantSealedClass(
 	// Create abstract discriminator property
 	var abstractProperties []KotlinProperty
 	if discriminatorProp, exists := baseSchema.Properties[variant.Discriminator]; exists {
-		kotlinType, err := getOrRegisterPropertyTypeTypeName(&discriminatorProp.Property, nameRegistry)
+		kotlinType, err := getOrRegisterPropertyTypeName(&discriminatorProp.Property, nameRegistry)
 		if err != nil {
 			return nil, err
 		}
@@ -277,7 +277,7 @@ func mergeVariantSchemaProperties(
 
 		// Special handling for discriminator property
 		if name == discriminatorProp {
-			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -323,7 +323,7 @@ func mergeVariantSchemaProperties(
 			}
 		} else {
 			// Regular property handling - always goes in constructor
-			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, nil, err
 			}
