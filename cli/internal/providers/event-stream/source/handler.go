@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -24,10 +25,11 @@ import (
 type Handler struct {
 	resources map[string]*sourceResource
 	client    esClient.EventStreamStore
+	importDir string
 }
 
-func NewHandler(client esClient.EventStreamStore) *Handler {
-	return &Handler{resources: make(map[string]*sourceResource), client: client}
+func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
+	return &Handler{resources: make(map[string]*sourceResource), client: client, importDir: filepath.Join(importDir, ImportPath)}
 }
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
@@ -440,7 +442,37 @@ func (h *Handler) Import(_ context.Context, _ string, data resources.ResourceDat
 }
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	return nil, fmt.Errorf("loading importable event stream sources is not supported")
+	collection := resources.NewResourceCollection()
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, source := range sources {
+		if source.ExternalID != "" {
+			continue
+		}
+		externalID, err := idNamer.Name(namer.ScopeName{
+			Name:  source.Name,
+			Scope: ResourceType,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
+		}
+		remoteResource := &resources.RemoteResource{
+			ID:         source.ID,
+			ExternalID: externalID,
+			Reference: fmt.Sprintf("#/%s/%s/%s",
+				ResourceKind,
+				MetadataName,
+				externalID,
+			),
+			Data: &source,
+		}
+		resourceMap[source.ID] = remoteResource
+	}
+	collection.Set(ResourceType, resourceMap)
+	return collection, nil
 }
 
 func (h *Handler) FormatForExport(
@@ -449,7 +481,148 @@ func (h *Handler) FormatForExport(
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]importremote.FormattableEntity, error) {
-	return nil, fmt.Errorf("formatting event stream sources for export is not supported")
+	sources := collection.GetAll(ResourceType)
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	workspaceMetadata := importremote.WorkspaceImportMetadata{
+		Resources: make([]importremote.ImportIds, 0),
+	}
+	var result []importremote.FormattableEntity
+	for _, source := range sources {
+		data, ok := source.Data.(*sourceClient.EventStreamSource)
+		if !ok {
+			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
+		}
+		workspaceMetadata.WorkspaceID = data.WorkspaceID
+		workspaceMetadata.Resources = []importremote.ImportIds{
+			{
+				LocalID:  source.ExternalID,
+				RemoteID: source.ID,
+			},
+		}
+		spec, err := h.toImportSpec(
+			data,
+			source.ExternalID,
+			workspaceMetadata,
+			collection,
+			inputResolver,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating spec: %w", err)
+		}
+		result = append(result, importremote.FormattableEntity{
+			Content:      spec,
+			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
+		})
+	}
+	return result, nil
+}
+
+func (p *Handler) toImportSpec(
+	source *sourceClient.EventStreamSource,
+	externalID string,
+	workspaceMetadata importremote.WorkspaceImportMetadata,
+	collection *resources.ResourceCollection,
+	resolver resolver.ReferenceResolver,
+) (*specs.Spec, error) {
+	metadata := importremote.Metadata{
+		Name: MetadataName,
+		Import: importremote.WorkspacesImportMetadata{
+			Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+		},
+	}
+	metadataMap := make(map[string]any)
+	err := mapstructure.Decode(metadata, &metadataMap)
+	if err != nil {
+		return nil, fmt.Errorf("decoding metadata: %w", err)
+	}
+
+	specMap := map[string]any{
+		IDKey:               externalID,
+		NameKey:             source.Name,
+		SourceDefinitionKey: source.Type,
+		EnabledKey:          source.Enabled,
+	}
+
+	if source.TrackingPlan != nil {
+		trackingPlanResource, exists := collection.GetByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
+		if !exists {
+			return nil, fmt.Errorf("tracking plan with ID %s not found in collection", source.TrackingPlan.ID)
+		}
+
+		tpRef, err := resolver.ResolveToReference(
+			dcstate.TrackingPlanResourceType,
+			trackingPlanResource.ID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("resolving tracking plan reference: %w", err)
+		}
+
+		validations := map[string]any{
+			TrackingPlanRefYAMLKey:    tpRef,
+			TrackingPlanConfigYAMLKey: toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
+		}
+
+		specMap[GovernanceYAMLKey] = map[string]any{
+			ValidationsYAMLKey: validations,
+		}
+	}
+
+	return &specs.Spec{
+		Version:  specs.SpecVersion,
+		Kind:     ResourceKind,
+		Metadata: metadataMap,
+		Spec:     specMap,
+	}, nil
+}
+
+func toTrackingPlanConfigImportSpec(config *sourceClient.TrackingPlanConfig) map[string]any {
+	result := make(map[string]any)
+
+	if config.Track != nil {
+		trackSpec := toEventConfigImportSpec(config.Track.EventTypeConfig)
+		if config.Track.DropUnplannedEvents != nil {
+			trackSpec[DropUnplannedEventsYAMLKey] = *config.Track.DropUnplannedEvents
+		}
+		result[TrackYAMLKey] = trackSpec
+	}
+
+	if config.Identify != nil {
+		identifySpec := toEventConfigImportSpec(config.Identify)
+		result[IdentifyYAMLKey] = identifySpec
+	}
+
+	if config.Group != nil {
+		groupSpec := toEventConfigImportSpec(config.Group)
+		result[GroupYAMLKey] = groupSpec
+	}
+
+	if config.Page != nil {
+		pageSpec := toEventConfigImportSpec(config.Page)
+		result[PageYAMLKey] = pageSpec
+	}
+
+	if config.Screen != nil {
+		screenSpec := toEventConfigImportSpec(config.Screen)
+		result[ScreenYAMLKey] = screenSpec
+	}
+
+	return result
+}
+
+func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]any {
+	result := make(map[string]any)
+	if config.PropagateViolations != nil {
+		result[PropagateViolationsYAMLKey] = *config.PropagateViolations
+	}
+	if config.DropUnplannedProperties != nil {
+		result[DropUnplannedPropertiesYAMLKey] = *config.DropUnplannedProperties
+	}
+	if config.DropOtherViolations != nil {
+		result[DropOtherViolationsYAMLKey] = *config.DropOtherViolations
+	}
+	return result
 }
 
 func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN string) (*state.ResourceState, bool) {

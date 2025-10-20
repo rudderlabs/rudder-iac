@@ -2,6 +2,9 @@ package source_test
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -10,17 +13,21 @@ import (
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 )
 
 // Helper function to convert boolean to pointer
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+const importDir = ""
 
 func TestEventStreamSourceHandler(t *testing.T) {
 	t.Run("LoadSpec", func(t *testing.T) {
@@ -132,7 +139,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
-				handler := source.NewHandler(mockClient)
+				handler := source.NewHandler(mockClient, importDir)
 				if tc.loadTwice {
 					err := handler.LoadSpec("", tc.spec)
 					require.NoError(t, err)
@@ -247,7 +254,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
-				handler := source.NewHandler(mockClient)
+				handler := source.NewHandler(mockClient, importDir)
 
 				for _, spec := range tc.specs {
 					err := handler.LoadSpec("", spec)
@@ -271,16 +278,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	t.Run("GetResources", func(t *testing.T) {
 		enableStatelessCLI(t)
 		mockClient := source.NewMockSourceClient()
-		handler := source.NewHandler(mockClient)
+		handler := source.NewHandler(mockClient, importDir)
 
 		specs := []*specs.Spec{
 			{
 				Version: "rudder/v0.1",
 				Kind:    "event-stream-source",
 				Spec: map[string]interface{}{
-					"id":      "test-source-1",
-					"name":    "Test Source 1",
-					"type":    "javascript",
+					"id":   "test-source-1",
+					"name": "Test Source 1",
+					"type": "javascript",
 				},
 			},
 			{
@@ -411,7 +418,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
-				handler := source.NewHandler(mockClient)
+				handler := source.NewHandler(mockClient, importDir)
 
 				result, err := handler.Create(context.Background(), "test-source", tc.data)
 
@@ -635,7 +642,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
-				handler := source.NewHandler(mockClient)
+				handler := source.NewHandler(mockClient, importDir)
 
 				result, err := handler.Update(context.Background(), "test-source", tc.data, tc.state)
 
@@ -680,7 +687,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
-				handler := source.NewHandler(mockClient)
+				handler := source.NewHandler(mockClient, importDir)
 
 				err := handler.Delete(context.Background(), "test-source", tc.state)
 
@@ -708,24 +715,24 @@ func TestEventStreamSourceHandler(t *testing.T) {
 								DropUnplannedEvents: boolPtr(true),
 							},
 							Identify: &sourceClient.EventTypeConfig{
-								PropagateViolations: boolPtr(false),
-								DropUnplannedProperties:       boolPtr(true),
-								DropOtherViolations:         boolPtr(false),
+								PropagateViolations:     boolPtr(false),
+								DropUnplannedProperties: boolPtr(true),
+								DropOtherViolations:     boolPtr(false),
 							},
 							Group: &sourceClient.EventTypeConfig{
-								PropagateViolations: boolPtr(true),
-								DropUnplannedProperties:       boolPtr(false),
-								DropOtherViolations:         boolPtr(false),
+								PropagateViolations:     boolPtr(true),
+								DropUnplannedProperties: boolPtr(false),
+								DropOtherViolations:     boolPtr(false),
 							},
 							Page: &sourceClient.EventTypeConfig{
-								PropagateViolations: boolPtr(false),
-								DropUnplannedProperties:       boolPtr(false),
-								DropOtherViolations:         boolPtr(true),
+								PropagateViolations:     boolPtr(false),
+								DropUnplannedProperties: boolPtr(false),
+								DropOtherViolations:     boolPtr(true),
 							},
 							Screen: &sourceClient.EventTypeConfig{
-								PropagateViolations: boolPtr(true),
-								DropUnplannedProperties:  boolPtr(false),
-								DropOtherViolations:         boolPtr(false),
+								PropagateViolations:     boolPtr(true),
+								DropUnplannedProperties: boolPtr(false),
+								DropOtherViolations:     boolPtr(false),
 							},
 						},
 					},
@@ -746,7 +753,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, nil
 		})
-		handler := source.NewHandler(mockClient)
+		handler := source.NewHandler(mockClient, importDir)
 
 		st, err := handler.LoadState(context.Background())
 
@@ -839,7 +846,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, nil
 		})
-		handler := source.NewHandler(mockClient)
+		handler := source.NewHandler(mockClient, importDir)
 
 		collection, err := handler.LoadResourcesFromRemote(context.Background())
 
@@ -881,7 +888,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadStateFromResources", func(t *testing.T) {
-		handler := source.NewHandler(nil)
+		handler := source.NewHandler(nil, importDir)
 
 		// Create a resource collection with event stream sources
 		collection := resources.NewResourceCollection()
@@ -988,6 +995,227 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 		}, resource789)
 	})
+
+	t.Run("LoadImportable", func(t *testing.T) {
+		mockClient := source.NewMockSourceClient()
+		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+			return []sourceClient.EventStreamSource{
+				{
+					ID:         "remote123",
+					ExternalID: "external-123", // Has ExternalID - should be filtered out
+					Name:       "Test Source 1",
+					Type:       "javascript",
+					Enabled:    true,
+				},
+				{
+					ID:         "remote456",
+					ExternalID: "", // No ExternalID - should be included
+					Name:       "Test Source 2",
+					Type:       "python",
+					Enabled:    false,
+				},
+				{
+					ID:         "remote789",
+					ExternalID: "", // No ExternalID - should be included
+					Name:       "Test Source 3",
+					Type:       "javascript",
+					Enabled:    true,
+				},
+			}, nil
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
+
+		assert.NoError(t, err)
+		assert.True(t, mockClient.GetSourcesCalled())
+
+		esResources := collection.GetAll(source.ResourceType)
+		require.Len(t, esResources, 2, "Should only include sources without ExternalID")
+
+		// Verify the returned resources
+		resource456, exists := esResources["remote456"]
+		require.True(t, exists)
+		assert.Equal(t, &resources.RemoteResource{
+			ID:         "remote456",
+			ExternalID: "test-source-2",
+			Reference:  "#/event-stream-source/event-stream-source/test-source-2",
+			Data: &sourceClient.EventStreamSource{
+				ID:         "remote456",
+				ExternalID: "",
+				Name:       "Test Source 2",
+				Type:       "python",
+				Enabled:    false,
+			},
+		}, resource456)
+
+		resource789, exists := esResources["remote789"]
+		require.True(t, exists)
+		assert.Equal(t, &resources.RemoteResource{
+			ID:         "remote789",
+			ExternalID: "test-source-3",
+			Reference:  "#/event-stream-source/event-stream-source/test-source-3",
+			Data: &sourceClient.EventStreamSource{
+				ID:         "remote789",
+				ExternalID: "",
+				Name:       "Test Source 3",
+				Type:       "javascript",
+				Enabled:    true,
+			},
+		}, resource789)
+	})
+
+	t.Run("FormatForExport", func(t *testing.T) {
+		mockClient := source.NewMockSourceClient()
+		handler := source.NewHandler(mockClient, importDir)
+		ctx := context.Background()
+
+		// Create a ResourceCollection with test data
+		collection := resources.NewResourceCollection()
+		resourceMap := map[string]*resources.RemoteResource{
+			"remote123": {
+				ID:         "remote123",
+				ExternalID: "test-source-1",
+				Data: &sourceClient.EventStreamSource{
+					ID:          "remote123",
+					ExternalID:  "test-source-1",
+					Name:        "Test Source 1",
+					Type:        "javascript",
+					Enabled:     true,
+					WorkspaceID: "workspace-123",
+				},
+			},
+			"remote456": {
+				ID:         "remote456",
+				ExternalID: "test-source-2",
+				Data: &sourceClient.EventStreamSource{
+					ID:          "remote456",
+					ExternalID:  "test-source-2",
+					Name:        "Test Source 2",
+					Type:        "python",
+					Enabled:     false,
+					WorkspaceID: "workspace-123",
+					TrackingPlan: &sourceClient.TrackingPlan{
+						ID: "remote-tp-456",
+						Config: &sourceClient.TrackingPlanConfig{
+							Track: &sourceClient.TrackConfig{
+								DropUnplannedEvents: boolPtr(true),
+								EventTypeConfig: &sourceClient.EventTypeConfig{
+									PropagateViolations: boolPtr(false),
+									DropOtherViolations: boolPtr(true),
+								},
+							},
+							Identify: &sourceClient.EventTypeConfig{
+								PropagateViolations:     boolPtr(true),
+								DropUnplannedProperties: boolPtr(true),
+								DropOtherViolations:     boolPtr(false),
+							},
+						},
+					},
+				},
+			},
+		}
+		collection.Set(source.ResourceType, resourceMap)
+
+		// Add tracking plan resources to the collection so they can be resolved
+		trackingPlanResourceMap := map[string]*resources.RemoteResource{
+			"remote-tp-456": {
+				ID:         "remote-tp-456",
+				ExternalID: "test-tp-456",
+				Reference:  "#/tracking-plans/tracking-plan/test-tp-456",
+			},
+		}
+		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+
+		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
+			resolveFunc: func(entityType string, remoteID string) (string, error) {
+				return "#/tracking-plans/tracking-plan/test-tp-456", nil
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, entities, 2)
+
+		// Verify entities (order is not guaranteed in map iteration)
+		entityMap := make(map[string]*specs.Spec)
+		for _, entity := range entities {
+			spec, ok := entity.Content.(*specs.Spec)
+			require.True(t, ok)
+			assert.Equal(t, "event-stream-source", spec.Kind)
+			assert.Equal(t, "rudder/v0.1", spec.Version)
+			externalID := spec.Spec["id"].(string)
+			assert.Equal(t, filepath.Join("sources", fmt.Sprintf("%s.yaml", externalID)), entity.RelativePath)
+			entityMap[externalID] = spec
+		}
+
+		// Verify first source
+		spec1, exists := entityMap["test-source-1"]
+		require.True(t, exists)
+		assert.Equal(t, map[string]interface{}{
+			"id":      "test-source-1",
+			"name":    "Test Source 1",
+			"enabled": true,
+			"type":    "javascript",
+		}, spec1.Spec)
+		assert.Equal(t, map[string]interface{}{
+			"name": "event-stream-source",
+			"import": map[string]interface{}{
+				"workspaces": []importremote.WorkspaceImportMetadata{
+					{
+						WorkspaceID: "workspace-123",
+						Resources: []importremote.ImportIds{
+							{
+								LocalID:  "test-source-1",
+								RemoteID: "remote123",
+							},
+						},
+					},
+				},
+			},
+		}, spec1.Metadata)
+
+		// Verify second source with tracking plan
+		spec2, exists := entityMap["test-source-2"]
+		require.True(t, exists)
+		assert.Equal(t, map[string]interface{}{
+			"id":      "test-source-2",
+			"name":    "Test Source 2",
+			"enabled": false,
+			"type":    "python",
+			"governance": map[string]interface{}{
+				"validations": map[string]interface{}{
+					"tracking_plan": "#/tracking-plans/tracking-plan/test-tp-456",
+					"config": map[string]interface{}{
+						"track": map[string]interface{}{
+							"drop_unplanned_events": true,
+							"propagate_violations":  false,
+							"drop_other_violations": true,
+						},
+						"identify": map[string]interface{}{
+							"propagate_violations":      true,
+							"drop_unplanned_properties": true,
+							"drop_other_violations":     false,
+						},
+					},
+				},
+			},
+		}, spec2.Spec)
+		assert.Equal(t, map[string]interface{}{
+			"name": "event-stream-source",
+			"import": map[string]interface{}{
+				"workspaces": []importremote.WorkspaceImportMetadata{
+					{
+						WorkspaceID: "workspace-123",
+						Resources: []importremote.ImportIds{
+							{
+								LocalID:  "test-source-2",
+								RemoteID: "remote456",
+							},
+						},
+					},
+				},
+			},
+		}, spec2.Metadata)
+	})
 }
 
 func enableStatelessCLI(t *testing.T) {
@@ -998,4 +1226,26 @@ func enableStatelessCLI(t *testing.T) {
 		viper.Set("experimental", false)
 		viper.Set("flags.statelessCLI", false)
 	})
+}
+
+// mockNamer is a simple mock implementation of namer.Namer for testing
+type mockNamer struct{}
+
+func (m *mockNamer) Name(input namer.ScopeName) (string, error) {
+	return strings.ToLower(strings.ReplaceAll(input.Name, " ", "-")), nil
+}
+
+func (m *mockNamer) Load(names []namer.ScopeName) error {
+	return nil
+}
+
+type mockResolver struct {
+	resolveFunc func(entityType string, remoteID string) (string, error)
+}
+
+func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
+	if m.resolveFunc != nil {
+		return m.resolveFunc(entityType, remoteID)
+	}
+	return "", fmt.Errorf("resolver not configured")
 }

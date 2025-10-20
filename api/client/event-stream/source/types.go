@@ -30,6 +30,7 @@ type EventStreamSource struct {
 	Name         string        `json:"name"`
 	Type         string        `json:"type"`
 	Enabled      bool          `json:"enabled"`
+	WorkspaceID  string        `json:"workspaceId"`
 	TrackingPlan *TrackingPlan `json:"trackingPlan"`
 }
 
