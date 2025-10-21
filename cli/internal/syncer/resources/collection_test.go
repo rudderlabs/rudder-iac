@@ -399,3 +399,53 @@ func TestResourceCollection_Merge(t *testing.T) {
 		assert.Same(t, collection, result) // Should return same collection object when merging with nil
 	})
 }
+
+func TestResourceCollection_GetURNByID(t *testing.T) {
+	t.Parallel()
+
+	const (
+		resourceType = "event"
+		resourceID   = "resource-1"
+		externalID   = "ext-resource-1"
+	)
+
+	t.Run("resource does not exist", func(t *testing.T) {
+		collection := NewResourceCollection()
+
+		urn, err := collection.GetURNByID(resourceType, "non-existent-id")
+		assert.Empty(t, urn)
+		assert.ErrorIs(t, err, ErrRemoteResourceNotFound)
+	})
+
+	t.Run("resource exists but externalID missing", func(t *testing.T) {
+		collection := NewResourceCollection()
+		resourceMap := map[string]*RemoteResource{
+			resourceID: {
+				ID:         resourceID,
+				ExternalID: "",
+				Data:       struct{}{},
+			},
+		}
+		collection.Set(resourceType, resourceMap)
+
+		urn, err := collection.GetURNByID(resourceType, resourceID)
+		assert.Empty(t, urn)
+		assert.ErrorIs(t, err, ErrRemoteResourceExternalIdNotFound)
+	})
+
+	t.Run("resource exists and has externalID", func(t *testing.T) {
+		collection := NewResourceCollection()
+		resourceMap := map[string]*RemoteResource{
+			resourceID: {
+				ID:         resourceID,
+				ExternalID: externalID,
+				Data:       struct{}{},
+			},
+		}
+		collection.Set(resourceType, resourceMap)
+
+		urn, err := collection.GetURNByID(resourceType, resourceID)
+		require.NoError(t, err)
+		assert.Equal(t, URN(externalID, resourceType), urn)
+	})
+}
