@@ -143,9 +143,9 @@ enum class PropertyDeviceType {
     @SerialName("desktop")
     DESKTOP,
     @SerialName("smartTV")
-    SMARTTV,
+    SMART_TV,
     @SerialName("IoT-Device")
-    IOT_DEVICE
+    IO_T_DEVICE
 }
 
 abstract class SealedClassWithJson {

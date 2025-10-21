@@ -322,7 +322,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 					return nil, err
 				}
 				property = &KotlinProperty{
-					Name:       formatPropertyName(propName),
+					Name:       FormatPropertyName(propName),
 					SerialName: propName,
 					Type:       kotlinType,
 					Comment:    propSchema.Property.Description,
@@ -339,7 +339,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 				// Property type references the nested class
 				nestedClassName := fmt.Sprintf("%s.%s", className, nestedClass.Name)
 				property = &KotlinProperty{
-					Name:       formatPropertyName(propName),
+					Name:       FormatPropertyName(propName),
 					SerialName: propName,
 					Type:       nestedClassName,
 					Comment:    propSchema.Property.Description,
@@ -354,7 +354,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 			}
 
 			property = &KotlinProperty{
-				Name:       formatPropertyName(propName),
+				Name:       FormatPropertyName(propName),
 				SerialName: propName,
 				Type:       kotlinType,
 				Comment:    propSchema.Property.Description,
