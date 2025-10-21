@@ -78,9 +78,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	}
 
 	var (
-		tpName   = make(map[string]any)
-		tpID     = make(map[string]any)
-		tpRuleID = make(map[string]any)
+		tpName = make(map[string]any)
+		tpID   = make(map[string]any)
 	)
 
 	// Checking duplicate id and name keys of trackingplans
@@ -102,16 +101,6 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		tpName[tp.Name] = nil
 		tpID[tp.LocalID] = nil
 
-		for _, rule := range tp.Rules {
-			if _, ok := tpRuleID[rule.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
-				})
-			}
-
-			tpRuleID[rule.LocalID] = nil
-		}
 	}
 
 	var (
