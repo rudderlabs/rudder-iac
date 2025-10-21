@@ -351,10 +351,7 @@ func init() {
 		Type:        plan.PrimitiveTypeObject,
 		Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"active": {
-					Property: *ReferenceProperties["active"],
-					Required: true,
-				},
+				"active": {Property: *ReferenceProperties["active"], Required: true},
 			},
 		},
 		Variants: []plan.Variant{
@@ -368,10 +365,7 @@ func init() {
 						Description: "Active user access",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"email": {
-									Property: *ReferenceProperties["email"],
-									Required: true,
-								},
+								"email": {Property: *ReferenceProperties["email"], Required: true},
 							},
 						},
 					},
@@ -381,10 +375,7 @@ func init() {
 						Description: "Inactive user access",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"status": {
-									Property: *ReferenceProperties["status"],
-									Required: true,
-								},
+								"status": {Property: *ReferenceProperties["status"], Required: true},
 							},
 						},
 					},

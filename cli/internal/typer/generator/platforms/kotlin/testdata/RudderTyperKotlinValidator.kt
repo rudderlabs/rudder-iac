@@ -150,7 +150,7 @@ fun main() {
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.SMARTTV,
+            deviceType = PropertyDeviceType.SMART_TV,
             age = 45.0,
             profile = CustomTypeUserProfile(
                 email = "tv.user@example.com",
@@ -165,7 +165,7 @@ fun main() {
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.IOT_DEVICE,
+            deviceType = PropertyDeviceType.IO_T_DEVICE,
             profile = CustomTypeUserProfile(
                 email = "iot@example.com",
                 firstName = "George"
@@ -195,8 +195,8 @@ fun main() {
                 firstName = "Premium",
                 lastName = "User"
             ),
-            featureConfig = CustomTypeFeatureConfig.Case_True(
-                email = "premium@example.com"
+            featureConfig = CustomTypeFeatureConfig.CaseTrue(
+                age = 30.0
             )
         )
     )
@@ -211,8 +211,8 @@ fun main() {
                 firstName = "Free",
                 lastName = "User"
             ),
-            featureConfig = CustomTypeFeatureConfig.Case_False(
-                status = PropertyStatus.ACTIVE
+            featureConfig = CustomTypeFeatureConfig.CaseFalse(
+                firstName = "some-name"
             )
         )
     )

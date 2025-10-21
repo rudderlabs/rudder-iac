@@ -182,7 +182,7 @@ sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
 
     /** Feature enabled (boolean true) */
     @Serializable
-    data class Case_True(
+    data class CaseTrue(
         /** User's age */
         @SerialName("age")
         val age: PropertyAge? = null
@@ -198,7 +198,7 @@ sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
 
     /** Feature disabled (boolean false) */
     @Serializable
-    data class Case_False(
+    data class CaseFalse(
         /** User's first name */
         @SerialName("first_name")
         val firstName: PropertyFirstName? = null
@@ -313,7 +313,7 @@ sealed class CustomTypeUserAccess : SealedClassWithJson() {
 
     /** Active user access */
     @Serializable
-    data class Case_True(
+    data class CaseTrue(
         /** User's email address */
         @SerialName("email")
         val email: PropertyEmail
@@ -329,7 +329,7 @@ sealed class CustomTypeUserAccess : SealedClassWithJson() {
 
     /** Inactive user access */
     @Serializable
-    data class Case_False(
+    data class CaseFalse(
         /** User account status */
         @SerialName("status")
         val status: PropertyStatus
