@@ -339,13 +339,17 @@ func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRem
 	getPropRefOrID := func(remoteID string) (any, error) {
 		if usePropertyRefsForDependencies {
 			urn, err := getURNFromRemoteId(PropertyResourceType, remoteID)
-			if err != nil {
+			switch {
+			case err == nil:
+				return resources.PropertyRef{
+					URN:      urn,
+					Property: "id",
+				}, nil
+			case err == resources.ErrRemoteResourceExternalIdNotFound:
+				return nil, nil
+			default:
 				return remoteID, nil
 			}
-			return resources.PropertyRef{
-				URN:      urn,
-				Property: "id",
-			}, nil
 		}
 		return remoteID, nil
 	}
