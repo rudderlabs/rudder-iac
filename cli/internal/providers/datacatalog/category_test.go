@@ -2,10 +2,12 @@ package datacatalog_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -14,39 +16,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ catalog.DataCatalog = &MockCategoryCatalog{}
+
 type MockCategoryCatalog struct {
 	datacatalog.EmptyCatalog
-	category            *catalog.Category
+	mockCategory        *catalog.Category
 	err                 error
 	updateCalled        bool
 	setExternalIdCalled bool
 }
 
-func (m *MockCategoryCatalog) CreateCategory(ctx context.Context, categoryCreate catalog.CategoryCreate) (*catalog.Category, error) {
-	return m.category, m.err
-}
-
-func (m *MockCategoryCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
-	m.updateCalled = true
-	m.category.Name = categoryUpdate.Name
-	return m.category, m.err
-}
-
-func (m *MockCategoryCatalog) DeleteCategory(ctx context.Context, categoryID string) error {
-	return m.err
-}
-
-func (m *MockCategoryCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
-	return m.category, m.err
-}
-
-func (m *MockCategoryCatalog) SetCategoryExternalId(ctx context.Context, categoryID, externalID string) error {
-	m.setExternalIdCalled = true
-	return m.err
-}
-
 func (m *MockCategoryCatalog) SetCategory(category *catalog.Category) {
-	m.category = category
+	m.mockCategory = category
 }
 
 func (m *MockCategoryCatalog) SetError(err error) {
@@ -58,91 +39,245 @@ func (m *MockCategoryCatalog) ResetSpies() {
 	m.setExternalIdCalled = false
 }
 
-func TestCategoryProviderOperations(t *testing.T) {
-	var (
-		ctx              = context.Background()
-		mockCatalog      = &MockCategoryCatalog{}
-		categoryProvider = datacatalog.NewCategoryProvider(mockCatalog, "data-catalog")
-		createdAt, _     = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
-		updatedAt, _     = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
-	)
+func (m *MockCategoryCatalog) CreateCategory(ctx context.Context, categoryCreate catalog.CategoryCreate) (*catalog.Category, error) {
+	return m.mockCategory, m.err
+}
 
+func (m *MockCategoryCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
+	m.updateCalled = true
+	if m.mockCategory != nil {
+		m.mockCategory.Name = categoryUpdate.Name
+	}
+	return m.mockCategory, m.err
+}
+
+func (m *MockCategoryCatalog) DeleteCategory(ctx context.Context, categoryID string) error {
+	return m.err
+}
+
+func (m *MockCategoryCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
+	return m.mockCategory, m.err
+}
+
+func (m *MockCategoryCatalog) SetCategoryExternalId(ctx context.Context, categoryID, externalID string) error {
+	m.setExternalIdCalled = true
+	return m.err
+}
+
+func TestCategoryProviderOperations(t *testing.T) {
 	t.Run("Create", func(t *testing.T) {
-		mockCatalog.SetCategory(&catalog.Category{
-			ID:          "upstream-catalog-id",
-			Name:        "category",
-			WorkspaceID: "workspace-id",
-			CreatedAt:   createdAt,
-			UpdatedAt:   updatedAt,
+		t.Run("successful creation", func(t *testing.T) {
+			t.Parallel()
+
+			mockCatalog := &MockCategoryCatalog{}
+			now := time.Now()
+			mockCategory := &catalog.Category{
+				ID:          "cat-123",
+				Name:        "User Actions",
+				WorkspaceID: "ws-456",
+				ExternalId:  "test-id",
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			mockCatalog.SetCategory(mockCategory)
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			inputData := resources.ResourceData{
+				"name": "User Actions",
+			}
+
+			result, err := provider.Create(context.Background(), "test-id", inputData)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			resultData := *result
+			assert.Equal(t, "cat-123", resultData["id"])
+			assert.Equal(t, "User Actions", resultData["name"])
+			assert.Equal(t, "ws-456", resultData["workspaceId"])
+			assert.NotEmpty(t, resultData["createdAt"])
+			assert.NotEmpty(t, resultData["updatedAt"])
+
+			// Verify args are properly embedded
+			categoryArgs, ok := resultData["categoryArgs"].(map[string]interface{})
+			require.True(t, ok)
+			assert.Equal(t, "User Actions", categoryArgs["name"])
 		})
 
-		toArgs := state.CategoryArgs{
-			Name: "category",
-		}
+		t.Run("creation error", func(t *testing.T) {
+			t.Parallel()
 
-		resourceData, err := categoryProvider.Create(ctx, "category-id", toArgs.ToResourceData())
-		require.NoError(t, err)
-		assert.Equal(t, resources.ResourceData{
-			"id":          "upstream-catalog-id",
-			"name":        "category",
-			"workspaceId": "workspace-id",
-			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
-			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
-			"categoryArgs": map[string]interface{}{
-				"name": "category",
-			},
-		}, *resourceData)
+			mockCatalog := &MockCategoryCatalog{}
+			mockCatalog.SetError(errors.New("creation failed"))
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			inputData := resources.ResourceData{
+				"name": "User Actions",
+			}
+
+			result, err := provider.Create(context.Background(), "test-id", inputData)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "creating category resource in upstream catalog")
+		})
 	})
 
 	t.Run("Update", func(t *testing.T) {
-		prevState := state.CategoryState{
-			CategoryArgs: state.CategoryArgs{
-				Name: "old-category",
-			},
-			ID:          "upstream-catalog-id",
-			Name:        "old-category",
-			WorkspaceID: "workspace-id",
-			CreatedAt:   "2021-09-01 00:00:00 +0000 UTC",
-			UpdatedAt:   "2021-09-02 00:00:00 +0000 UTC",
-		}
+		t.Run("successful update", func(t *testing.T) {
+			t.Parallel()
 
-		toArgs := state.CategoryArgs{
-			Name: "new-category",
-		}
+			mockCatalog := &MockCategoryCatalog{}
+			now := time.Now()
+			updatedCategory := &catalog.Category{
+				ID:          "cat-123",
+				Name:        "Updated User Actions",
+				WorkspaceID: "ws-456",
+				ExternalId:  "test-project-id",
+				CreatedAt:   now.Add(-time.Hour),
+				UpdatedAt:   now,
+			}
+			mockCatalog.SetCategory(updatedCategory)
 
-		mockCatalog.SetCategory(&catalog.Category{
-			ID:          "upstream-catalog-id",
-			Name:        "new-category",
-			WorkspaceID: "workspace-id",
-			CreatedAt:   createdAt,
-			UpdatedAt:   updatedAt,
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			inputData := resources.ResourceData{
+				"name": "Updated User Actions",
+			}
+
+			oldStateData := resources.ResourceData{
+				"id":          "cat-123",
+				"name":        "User Actions",
+				"workspaceId": "ws-456",
+				"createdAt":   now.Add(-time.Hour).String(),
+				"updatedAt":   now.Add(-time.Minute).String(),
+				"categoryArgs": map[string]interface{}{
+					"name": "User Actions",
+				},
+			}
+
+			result, err := provider.Update(context.Background(), "test-id", inputData, oldStateData)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			resultData := *result
+			assert.Equal(t, "cat-123", resultData["id"])
+			assert.Equal(t, "Updated User Actions", resultData["name"])
+			assert.Equal(t, "ws-456", resultData["workspaceId"])
+			assert.NotEmpty(t, resultData["createdAt"])
+			assert.NotEmpty(t, resultData["updatedAt"])
+
+			// Verify args are properly embedded
+			categoryArgs, ok := resultData["categoryArgs"].(map[string]interface{})
+			require.True(t, ok)
+			assert.Equal(t, "Updated User Actions", categoryArgs["name"])
 		})
 
-		updatedResource, err := categoryProvider.Update(ctx, "category-id", toArgs.ToResourceData(), prevState.ToResourceData())
-		require.NoError(t, err)
-		assert.Equal(t, resources.ResourceData{
-			"id":          "upstream-catalog-id",
-			"name":        "new-category",
-			"workspaceId": "workspace-id",
-			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
-			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
-			"categoryArgs": map[string]interface{}{
-				"name": "new-category",
-			},
-		}, *updatedResource)
+		t.Run("update error", func(t *testing.T) {
+			t.Parallel()
+
+			mockCatalog := &MockCategoryCatalog{}
+			mockCatalog.SetError(errors.New("update failed"))
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			inputData := resources.ResourceData{
+				"name": "Updated User Actions",
+			}
+
+			oldStateData := resources.ResourceData{
+				"id":          "cat-123",
+				"name":        "User Actions",
+				"workspaceId": "ws-456",
+				"createdAt":   time.Now().Add(-time.Hour).String(),
+				"updatedAt":   time.Now().Add(-time.Minute).String(),
+				"categoryArgs": map[string]interface{}{
+					"name": "User Actions",
+				},
+			}
+
+			result, err := provider.Update(context.Background(), "test-id", inputData, oldStateData)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "updating category resource in upstream catalog")
+		})
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		prevState := state.CategoryState{
-			ID: "upstream-catalog-id",
-		}
-		mockCatalog.SetError(nil)
+		t.Run("successful deletion", func(t *testing.T) {
+			t.Parallel()
 
-		err := categoryProvider.Delete(ctx, "category-id", prevState.ToResourceData())
-		require.NoError(t, err)
+			mockCatalog := &MockCategoryCatalog{}
+			// No error set, should succeed
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			stateData := resources.ResourceData{
+				"id":          "cat-123",
+				"name":        "User Actions",
+				"workspaceId": "ws-456",
+			}
+
+			err := provider.Delete(context.Background(), "test-id", stateData)
+
+			assert.NoError(t, err)
+		})
+
+		t.Run("not found error (should not fail)", func(t *testing.T) {
+			t.Parallel()
+
+			mockCatalog := &MockCategoryCatalog{}
+			notFoundErr := &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "Category not found",
+			}
+			mockCatalog.SetError(notFoundErr)
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			stateData := resources.ResourceData{
+				"id":          "cat-123",
+				"name":        "User Actions",
+				"workspaceId": "ws-456",
+			}
+
+			err := provider.Delete(context.Background(), "test-id", stateData)
+
+			assert.NoError(t, err) // Should not fail for not found errors
+		})
+
+		t.Run("other deletion error", func(t *testing.T) {
+			t.Parallel()
+
+			mockCatalog := &MockCategoryCatalog{}
+			mockCatalog.SetError(errors.New("deletion failed"))
+
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
+
+			stateData := resources.ResourceData{
+				"id":          "cat-123",
+				"name":        "User Actions",
+				"workspaceId": "ws-456",
+			}
+
+			err := provider.Delete(context.Background(), "test-id", stateData)
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "deleting category resource in upstream catalog")
+		})
 	})
 
 	t.Run("Import", func(t *testing.T) {
+		createdAt, _ := time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
+		updatedAt, _ := time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
+		mockCatalog := &MockCategoryCatalog{}
+		categoryProvider := datacatalog.NewCategoryProvider(mockCatalog, "data-catalog")
+		ctx := context.Background()
+
 		tests := []struct {
 			name           string
 			localArgs      state.CategoryArgs
