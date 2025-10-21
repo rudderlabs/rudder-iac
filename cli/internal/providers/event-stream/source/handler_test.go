@@ -661,6 +661,169 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("Import", func(t *testing.T) {
+		testCases := []struct {
+			name                     string
+			id                       string
+			remoteId                 string
+			data                     resources.ResourceData
+			existingSources          []sourceClient.EventStreamSource
+			expectedUpdateCalled     bool
+			expectedSetExternalIDCalled bool
+			expectedError            bool
+			errorMessage             string
+			expectedResult           *resources.ResourceData
+		}{
+			{
+				name:     "source not found",
+				id:       "test-source",
+				remoteId: "remote-not-found",
+				data: resources.ResourceData{
+					"name":    "Test Source",
+					"enabled": true,
+					"type":    "javascript",
+				},
+				existingSources: []sourceClient.EventStreamSource{
+					{
+						ID:         "remote123",
+						ExternalID: "",
+						Name:       "Existing Source",
+						Type:       "javascript",
+						Enabled:    true,
+					},
+				},
+				expectedUpdateCalled:     false,
+				expectedSetExternalIDCalled: false,
+				expectedError:            true,
+				errorMessage:             "event stream source with ID remote-not-found not found",
+			},
+			{
+				name:     "import source without tracking plan",
+				id:       "test-source",
+				remoteId: "remote123",
+				data: resources.ResourceData{
+					"name":    "Updated Source",
+					"enabled": false,
+					"type":    "javascript",
+				},
+				existingSources: []sourceClient.EventStreamSource{
+					{
+						ID:         "remote123",
+						ExternalID: "",
+						Name:       "Existing Source",
+						Type:       "javascript",
+						Enabled:    true,
+					},
+				},
+				expectedUpdateCalled:     true,
+				expectedSetExternalIDCalled: true,
+				expectedError:            false,
+				expectedResult: &resources.ResourceData{
+					"id": "remote123",
+				},
+			},
+			{
+				name:     "import source with tracking plan",
+				id:       "test-source",
+				remoteId: "remote456",
+				data: resources.ResourceData{
+					"name":          "Test Source",
+					"enabled":       true,
+					"type":          "python",
+					"tracking_plan": "tp-456",
+					"tracking_plan_config": map[string]interface{}{
+						"track": map[string]interface{}{
+							"propagate_violations":  true,
+							"drop_unplanned_events": false,
+						},
+					},
+				},
+				existingSources: []sourceClient.EventStreamSource{
+					{
+						ID:         "remote456",
+						ExternalID: "",
+						Name:       "Existing Source",
+						Type:       "python",
+						Enabled:    false,
+						TrackingPlan: &sourceClient.TrackingPlan{
+							ID: "tp-123",
+							Config: &sourceClient.TrackingPlanConfig{
+								Track: &sourceClient.TrackConfig{
+									DropUnplannedEvents: boolPtr(true),
+									EventTypeConfig: &sourceClient.EventTypeConfig{
+										PropagateViolations: boolPtr(false),
+									},
+								},
+							},
+						},
+					},
+				},
+				expectedUpdateCalled:     true,
+				expectedSetExternalIDCalled: true,
+				expectedError:            false,
+				expectedResult: &resources.ResourceData{
+					"id":               "remote456",
+					"tracking_plan_id": "tp-456",
+				},
+			},
+			{
+				name:     "import source and add tracking plan",
+				id:       "test-source",
+				remoteId: "remote789",
+				data: resources.ResourceData{
+					"name":          "Test Source",
+					"enabled":       true,
+					"type":          "javascript",
+					"tracking_plan": "tp-999",
+					"tracking_plan_config": map[string]interface{}{
+						"track": map[string]interface{}{
+							"propagate_violations": true,
+						},
+					},
+				},
+				existingSources: []sourceClient.EventStreamSource{
+					{
+						ID:         "remote789",
+						ExternalID: "",
+						Name:       "Existing Source",
+						Type:       "javascript",
+						Enabled:    true,
+					},
+				},
+				expectedUpdateCalled:     true,
+				expectedSetExternalIDCalled: true,
+				expectedError:            false,
+				expectedResult: &resources.ResourceData{
+					"id":               "remote789",
+					"tracking_plan_id": "tp-999",
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				mockClient := source.NewMockSourceClient()
+				mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+					return tc.existingSources, nil
+				})
+				handler := source.NewHandler(mockClient, importDir)
+
+				result, err := handler.Import(context.Background(), tc.id, tc.data, tc.remoteId)
+
+				if tc.expectedError {
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errorMessage)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, tc.expectedResult, result)
+				}
+				assert.True(t, mockClient.GetSourcesCalled())
+				assert.Equal(t, tc.expectedUpdateCalled, mockClient.UpdateCalled())
+				assert.Equal(t, tc.expectedSetExternalIDCalled, mockClient.SetExternalIDCalled())
+			})
+		}
+	})
+
 	t.Run("Delete", func(t *testing.T) {
 		testCases := []struct {
 			name                   string

@@ -15,6 +15,7 @@ type MockSourceClient struct {
 	unlinkTPCalled   bool
 	updateTPConnectionCalled bool
 	getSourcesCalled bool
+	setExternalIDCalled bool
 	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
 
@@ -67,6 +68,11 @@ func (m *MockSourceClient) UpdateTPConnection(ctx context.Context, trackingPlanI
 	return nil
 }
 
+func (m *MockSourceClient) SetExternalID(ctx context.Context, sourceID string, externalID string) error {
+	m.setExternalIDCalled = true
+	return nil
+}
+
 func NewMockSourceClient() *MockSourceClient {
 	return &MockSourceClient{}
 }
@@ -101,4 +107,8 @@ func (m *MockSourceClient) UnlinkTPCalled() bool {
 
 func (m *MockSourceClient) UpdateTPConnectionCalled() bool {
 	return m.updateTPConnectionCalled
+}
+
+func (m *MockSourceClient) SetExternalIDCalled() bool {
+	return m.setExternalIDCalled
 }

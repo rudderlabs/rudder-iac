@@ -16,6 +16,10 @@ type UpdateSourceRequest struct {
 	Enabled bool   `json:"enabled"`
 }
 
+type SetExternalIDRequest struct {
+	ExternalID string `json:"externalId"`
+}
+
 type CreateUpdateSourceResponse struct {
 	ID         string `json:"id"`
 	ExternalID string `json:"externalId"`
