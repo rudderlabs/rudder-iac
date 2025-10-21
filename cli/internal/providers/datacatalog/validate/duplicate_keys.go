@@ -98,6 +98,17 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 			})
 		}
 
+		eventRuleIDs := make(map[string]any)
+		for _, rule := range tp.Rules {
+			if _, ok := eventRuleIDs[rule.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
+					Reference: fmt.Sprintf("#/tp/%s/%s/rules/%s", group, tp.LocalID, rule.LocalID),
+				})
+			}
+			eventRuleIDs[rule.LocalID] = nil
+		}
+
 		tpName[tp.Name] = nil
 		tpID[tp.LocalID] = nil
 
