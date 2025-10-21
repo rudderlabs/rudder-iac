@@ -49,14 +49,12 @@ func (ct *ImportableCustomType) fromUpstream(
 	ct.CustomType.Description = upstream.Description
 	ct.CustomType.Type = upstream.Type
 
-	// Deep copy the config map
 	ct.CustomType.Config = make(map[string]any)
 	maps.Copy(
 		ct.CustomType.Config,
 		upstream.Config,
 	)
 
-	// Resolve property references in the Properties field
 	ct.CustomType.Properties = make(
 		[]localcatalog.CustomTypeProperty,
 		0,
@@ -69,12 +67,11 @@ func (ct *ImportableCustomType) fromUpstream(
 			prop.ID,
 		)
 		if err != nil {
-			return fmt.Errorf("property reference resolution for custom type: %s, property: %s: %w",
-				ct.CustomType.LocalID, prop.ID, err)
+			return fmt.Errorf("resolving reference for property %s: %w", prop.ID, err)
 		}
 
 		if propertyRef == "" {
-			return fmt.Errorf("resolved property reference is empty for property: %s", prop.ID)
+			return fmt.Errorf("resolved reference is empty for property %s", prop.ID)
 		}
 
 		ct.CustomType.Properties = append(ct.CustomType.Properties, localcatalog.CustomTypeProperty{
@@ -83,7 +80,6 @@ func (ct *ImportableCustomType) fromUpstream(
 		})
 	}
 
-	// We only support one item definition currently
 	for _, item := range upstream.ItemDefinitions {
 		itemMap, ok := item.(map[string]any)
 		if !ok {
@@ -100,12 +96,11 @@ func (ct *ImportableCustomType) fromUpstream(
 			itemID,
 		)
 		if err != nil {
-			return fmt.Errorf("custom type reference resolution for itemTypes in custom type: %s, item: %s: %w",
-				ct.CustomType.LocalID, itemID, err)
+			return fmt.Errorf("resolving reference for itemTypes: %s: %w", itemID, err)
 		}
 
 		if customTypeRef == "" {
-			return fmt.Errorf("resolved custom type reference is empty for itemTypes: %s", itemID)
+			return fmt.Errorf("resolved reference is empty for itemTypes: %s", itemID)
 		}
 
 		ct.CustomType.Config["itemTypes"] = []any{customTypeRef}
@@ -113,84 +108,11 @@ func (ct *ImportableCustomType) fromUpstream(
 	}
 
 	// Process variants and resolve property references within them
-	ct.CustomType.Variants = make([]localcatalog.Variant, 0, len(upstream.Variants))
-	for _, remoteVariant := range upstream.Variants {
-		// Create a local catalog variant
-		localVariant := localcatalog.Variant{
-			Type:          remoteVariant.Type,
-			Discriminator: remoteVariant.Discriminator,
-			Cases:         make([]localcatalog.VariantCase, 0, len(remoteVariant.Cases)),
-			Default:       make([]localcatalog.PropertyReference, 0, len(remoteVariant.Default)),
-		}
-
-		// Resolve discriminator property reference
-		discriminatorRef, err := resolver.ResolveToReference(
-			state.PropertyResourceType,
-			remoteVariant.Discriminator,
-		)
-		if err != nil {
-			return fmt.Errorf("discriminator property reference resolution for variant in custom type: %s, property: %s: %w",
-				ct.CustomType.LocalID, remoteVariant.Discriminator, err)
-		}
-		if discriminatorRef == "" {
-			return fmt.Errorf("resolved discriminator property reference is empty for property: %s", remoteVariant.Discriminator)
-		}
-		localVariant.Discriminator = discriminatorRef
-
-		// Process each case in the variant
-		for _, remoteCase := range remoteVariant.Cases {
-			localCase := localcatalog.VariantCase{
-				DisplayName: remoteCase.DisplayName,
-				Match:       remoteCase.Match,
-				Description: remoteCase.Description,
-				Properties:  make([]localcatalog.PropertyReference, 0, len(remoteCase.Properties)),
-			}
-
-			// Resolve property references in the case
-			for _, remoteProp := range remoteCase.Properties {
-				propRef, err := resolver.ResolveToReference(
-					state.PropertyResourceType,
-					remoteProp.ID,
-				)
-				if err != nil {
-					return fmt.Errorf("property reference resolution for variant case in custom type: %s, property: %s: %w",
-						ct.CustomType.LocalID, remoteProp.ID, err)
-				}
-				if propRef == "" {
-					return fmt.Errorf("resolved property reference is empty in variant case for property: %s", remoteProp.ID)
-				}
-
-				localCase.Properties = append(localCase.Properties, localcatalog.PropertyReference{
-					Ref:      propRef,
-					Required: remoteProp.Required,
-				})
-			}
-
-			localVariant.Cases = append(localVariant.Cases, localCase)
-		}
-
-		// Process default properties in the variant
-		for _, remoteProp := range remoteVariant.Default {
-			propRef, err := resolver.ResolveToReference(
-				state.PropertyResourceType,
-				remoteProp.ID,
-			)
-			if err != nil {
-				return fmt.Errorf("property reference resolution for variant default in custom type: %s, property: %s: %w",
-					ct.CustomType.LocalID, remoteProp.ID, err)
-			}
-			if propRef == "" {
-				return fmt.Errorf("resolved property reference is empty in variant default for property: %s", remoteProp.ID)
-			}
-
-			localVariant.Default = append(localVariant.Default, localcatalog.PropertyReference{
-				Ref:      propRef,
-				Required: remoteProp.Required,
-			})
-		}
-
-		ct.CustomType.Variants = append(ct.CustomType.Variants, localVariant)
+	var importableVariants ImportableVariants
+	if err := importableVariants.fromUpstream(upstream.Variants, resolver); err != nil {
+		return fmt.Errorf("processing variants: %w", err)
 	}
+	ct.CustomType.Variants = importableVariants.Variants
 
 	return nil
 }
