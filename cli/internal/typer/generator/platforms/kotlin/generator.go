@@ -107,7 +107,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 		} else if customType.Schema != nil && len(customType.Schema.Properties) == 0 && customType.Schema.AdditionalProperties {
 			// If this is an empty object with additionalProperties: true
 			// create a type alias to JsonObject instead of an empty data class
-			finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+			finalName, err := getOrRegisterCustomTypeName(customType, nameRegistry)
 			if err != nil {
 				return err
 			}
@@ -181,7 +181,7 @@ func processPropertiesIntoContext(allProperties map[string]*plan.Property, ctx *
 
 // createCustomTypeTypeAlias creates a KotlinTypeAlias from a primitive custom type
 func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
-	finalName, err := getOrRegisterCustomTypeAliasName(customType, nameRegistry)
+	finalName, err := getOrRegisterCustomTypeName(customType, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func createCustomTypeTypeAlias(customType *plan.CustomType, nameRegistry *core.N
 
 // createPropertyTypeAlias creates a KotlinTypeAlias from any property
 func createPropertyTypeAlias(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinTypeAlias, error) {
-	finalName, err := getOrRegisterPropertyAliasName(property, nameRegistry)
+	finalName, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 					return fmt.Sprintf("List<%s>", innerKotlinType), nil
 				} else {
 					// Multi-type array items - reference the sealed class for array items
-					itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+					itemClassName, err := getOrRegisterPropertyArrayItemTypeName(property, nameRegistry)
 					if err != nil {
 						return "", err
 					}
@@ -276,7 +276,7 @@ func resolvePropertyKotlinType(property *plan.Property, nameRegistry *core.NameR
 		}
 	} else {
 		// Multi-type property - reference the sealed class
-		itemClassName, err := getOrRegisterPropertyMultiTypeArrayItemClassName(property, nameRegistry)
+		itemClassName, err := getOrRegisterPropertyArrayItemTypeName(property, nameRegistry)
 		if err != nil {
 			return "", err
 		}
@@ -291,18 +291,7 @@ func resolveTypeToKotlinType(propertyType plan.PropertyType, nameRegistry *core.
 		return mapPrimitiveToKotlinType(*plan.AsPrimitiveType(propertyType))
 	} else if plan.IsCustomType(propertyType) {
 		customType := plan.AsCustomType(propertyType)
-		if customType.IsPrimitive() {
-			// Check if this custom type has enum constraints
-			if hasEnumConfig(customType.Config) {
-				// Reference the custom type enum
-				return getOrRegisterCustomTypeEnumName(customType, nameRegistry)
-			}
-			// Reference the custom type alias
-			return getOrRegisterCustomTypeAliasName(customType, nameRegistry)
-		} else {
-			// Reference the custom type data class
-			return getOrRegisterCustomTypeClassName(customType, nameRegistry)
-		}
+		return getOrRegisterCustomTypeName(customType, nameRegistry)
 	} else {
 		return "", fmt.Errorf("unsupported property type: %T", propertyType)
 	}
@@ -328,7 +317,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 			// Check if this is an empty object with additionalProperties: true
 			if len(propSchema.Schema.Properties) == 0 && propSchema.Schema.AdditionalProperties {
 				// Use the property's type alias instead of creating an empty data class
-				kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+				kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
 				if err != nil {
 					return nil, err
 				}
@@ -359,7 +348,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 
 			}
 		} else {
-			kotlinType, err := getPropertyKotlinType(propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, err
 			}
@@ -391,21 +380,12 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 
 // createCustomTypeDataClass creates a KotlinDataClass from an object custom type
 func createCustomTypeDataClass(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinDataClass, error) {
-	finalName, err := getOrRegisterCustomTypeClassName(customType, nameRegistry)
+	finalName, err := getOrRegisterCustomTypeName(customType, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
 
 	return createDataClass(finalName, customType.Description, customType.Schema, nameRegistry)
-}
-
-// getPropertyKotlinType returns the Kotlin type name for a property, using appropriate type aliases or enum classes
-func getPropertyKotlinType(property plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	// Check if this property has enum constraints
-	if hasEnumConfig(property.Config) {
-		return getOrRegisterPropertyEnumName(&property, nameRegistry)
-	}
-	return getOrRegisterPropertyAliasName(&property, nameRegistry)
 }
 
 // processEventRules processes event rules and generates data classes for event properties/traits
@@ -477,7 +457,7 @@ func hasEnumConfig(config *plan.PropertyConfig) bool {
 
 // createPropertyEnum creates a KotlinEnum from a property with enum constraints
 func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
-	enumName, err := getOrRegisterPropertyEnumName(property, nameRegistry)
+	enumName, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +480,7 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 
 // createCustomTypeEnum creates a KotlinEnum from a custom type with enum constraints
 func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
-	enumName, err := getOrRegisterCustomTypeEnumName(customType, nameRegistry)
+	enumName, err := getOrRegisterCustomTypeName(customType, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
