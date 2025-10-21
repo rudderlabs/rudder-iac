@@ -284,6 +284,21 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			{
 				Version: "rudder/v0.1",
 				Kind:    "event-stream-source",
+				Metadata: map[string]interface{}{
+					"import": map[string]interface{}{
+						"workspaces": []map[string]interface{}{
+							{
+								"workspace_id": "workspace-123",
+								"resources": []map[string]interface{}{
+									{
+										"local_id": "test-source-1",
+										"remote_id": "test-source-1-123",
+									},
+								},
+							},
+						},
+					},
+				},
 				Spec: map[string]interface{}{
 					"id":   "test-source-1",
 					"name": "Test Source 1",
@@ -345,6 +360,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"enabled": true,
 			"type":    "javascript",
 		}, source1.Data())
+		assert.Equal(t, "workspace-123", source1.ImportMetadata().WorkspaceId)
+		assert.Equal(t, "test-source-1-123", source1.ImportMetadata().RemoteId)
 
 		// Assert test-source-2
 		source2, exists := resourceMap["test-source-2"]
@@ -373,6 +390,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, source2.Data())
+		assert.Nil(t, source2.ImportMetadata())
 	})
 
 	t.Run("Create", func(t *testing.T) {

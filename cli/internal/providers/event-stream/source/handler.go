@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type Handler struct {
@@ -51,10 +52,12 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		SourceDefinition: spec.SourceDefinition,
 		Enabled:          enabled,
 		Governance:       &governanceResource{},
+		ImportMetadata:   make(map[string]*WorkspaceRemoteIDMapping),
 	}
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
+	sourceResource.addImportMetadata(s)
 	h.resources[spec.LocalId] = sourceResource
 	return nil
 }
@@ -159,7 +162,21 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.TrackingPlan.Ref
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.TrackingPlan.Config)
 		}
-		r := resources.NewResource(s.LocalId, ResourceType, data, []string{}, resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)))
+		opts := []resources.ResourceOpts{
+			resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)),
+		}
+		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			}
+		}
+		r := resources.NewResource(
+			s.LocalId,
+			ResourceType,
+			data,
+			[]string{},
+			opts...,
+		)
 		result = append(result, r)
 	}
 	return result, nil
@@ -505,8 +522,8 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
-			Reference: getFileMetadata(externalID),
-			Data: &source,
+			Reference:  getFileMetadata(externalID),
+			Data:       &source,
 		}
 		resourceMap[source.ID] = remoteResource
 	}
@@ -614,6 +631,23 @@ func (p *Handler) toImportSpec(
 		Metadata: metadataMap,
 		Spec:     specMap,
 	}, nil
+}
+
+func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
+	metadata := importremote.Metadata{}
+	err := mapstructure.Decode(s.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
+		})
+	})
+	return nil
 }
 
 func toTrackingPlanConfigImportSpec(config *sourceClient.TrackingPlanConfig) map[string]any {
