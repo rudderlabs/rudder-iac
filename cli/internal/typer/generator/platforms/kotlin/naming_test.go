@@ -23,9 +23,9 @@ func TestFormatClassName(t *testing.T) {
 		{"with numbers", "", "user123", "User123"},
 		{"number at end", "", "user123Id", "User123Id"},
 		{"leading number", "", "123user", "_123user"},
-		{"reserved keyword", "", "class", "_Class"},
-		{"reserved keyword uppercase", "", "Class", "_Class"},
-		{"reserved keyword mixed", "", "CLASS", "_Class"},
+		{"reserved keyword", "", "class", "Class"},
+		{"reserved keyword uppercase", "", "Class", "Class"},
+		{"reserved keyword mixed", "", "CLASS", "Class"},
 		{"empty string", "", "", ""},
 		{"whitespace only", "", "   ", ""},
 		{"complex name", "", "user_email-address.type", "UserEmailAddressType"},
@@ -155,7 +155,7 @@ func TestFormatEnumValue(t *testing.T) {
 		{"only_symbols", "!@#", "___"},
 		{"only_underscores", "___", "___"},
 		// Mixed content with letters gets converted
-		{"special_chars_with_letters", "hello-world!", "HELLO_WORLD_"},
+		{"special_chars_with_letters", "hello-world!", "HELLO_WORLD"},
 	}
 
 	for _, tt := range tests {

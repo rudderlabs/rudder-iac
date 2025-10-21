@@ -61,6 +61,8 @@ func ToCamelCase(input string) string {
 }
 
 // SplitIntoWords splits a string into words based on various delimiters and case changes
+// Note: If the input contains only underscores, this will return an empty slice
+// since underscores are treated as delimiters
 func SplitIntoWords(input string) []string {
 	if input == "" {
 		return []string{}
@@ -97,8 +99,10 @@ func SplitIntoWords(input string) []string {
 }
 
 func ReplaceSpecialCharacters(input, replacement string) string {
-	// Define a regex pattern to match special characters
-	re := regexp.MustCompile(`[^\w\s]`)
+	// Match Unicode letters (L), numbers (N), underscores, and whitespace
+	// Replace everything else (punctuation, symbols, etc.) with the replacement
+	// This preserves Cyrillic, Greek, Chinese, etc. while replacing special chars
+	re := regexp.MustCompile(`[^\pL\pN_\s]`)
 	// Replace special characters with the specified replacement string
 	return re.ReplaceAllString(input, replacement)
 }
