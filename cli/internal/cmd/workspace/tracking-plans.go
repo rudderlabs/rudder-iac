@@ -5,7 +5,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/spf13/cobra"
 )
 
@@ -47,36 +49,14 @@ func newCmdListTrackingPlans() *cobra.Command {
 				return fmt.Errorf("failed to cast DataCatalog provider")
 			}
 
-			// Get tracking plans
-			trackingPlans, err := dcProvider.List(cmd.Context(), "tracking-plan", nil)
-			if err != nil {
-				return err
-			}
-
+			format := lister.TableFormat
 			if jsonOutput {
-				// Output as JSON
-				for _, tp := range trackingPlans {
-					fmt.Printf("{\"name\":\"%v\",\"id\":\"%v\",\"version\":%v}\n",
-						tp["name"], tp["id"], tp["version"])
-				}
-			} else {
-				// Output as simple table
-				fmt.Printf("%-30s %-34s %s\n", "NAME", "ID", "VERSION")
-				fmt.Printf("%s %s %s\n",
-					"------------------------------",
-					"----------------------------------",
-					"-------")
-
-				for _, tp := range trackingPlans {
-					name := fmt.Sprintf("%v", tp["name"])
-					if name == "" {
-						name = "- not set -"
-					}
-					fmt.Printf("%-30s %-34s %v\n", name, tp["id"], tp["version"])
-				}
+				format = lister.JSONFormat
 			}
+			l := lister.New(dcProvider, format)
 
-			return nil
+			err = l.List(cmd.Context(), state.TrackingPlanResourceType, nil)
+			return err
 		},
 	}
 

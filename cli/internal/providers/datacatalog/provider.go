@@ -106,11 +106,19 @@ func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceD
 
 	var result []resources.ResourceData
 	for _, tp := range trackingPlans {
-		// Only include essential fields for simple table display
+		// Handle nil description
+		description := ""
+		if tp.Description != nil {
+			description = *tp.Description
+		}
+
+		// Include all relevant fields for Lister display
+		// "id" and "name" are shown in columns, other fields in details panel
 		resourceData := resources.ResourceData{
-			"name":    tp.Name,
-			"id":      tp.ID,
-			"version": tp.Version,
+			"name":        tp.Name,
+			"id":          tp.ID,
+			"version":     tp.Version,
+			"description": description,
 		}
 		result = append(result, resourceData)
 	}
