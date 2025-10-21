@@ -119,6 +119,8 @@ func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceD
 			"id":          tp.ID,
 			"version":     tp.Version,
 			"description": description,
+			"createdAt":   tp.CreatedAt.String(),
+			"updatedAt":   tp.UpdatedAt.String(),
 		}
 		result = append(result, resourceData)
 	}
