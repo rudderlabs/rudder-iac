@@ -1,10 +1,12 @@
 package datacatalog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -85,6 +87,38 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	}
 
 	return createResourceGraph(p.dc)
+}
+
+func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
+	switch resourceType {
+	case pstate.TrackingPlanResourceType:
+		return p.listTrackingPlans(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
+}
+
+func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceData, error) {
+	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tracking plans: %w", err)
+	}
+
+	var result []resources.ResourceData
+	for _, tp := range trackingPlans {
+		resourceData := resources.ResourceData{
+			"id":          tp.ID,
+			"name":        tp.Name,
+			"version":     tp.Version,
+			"description": tp.Description,
+			"workspaceId": tp.WorkspaceID,
+			"createdAt":   tp.CreatedAt.String(),
+			"updatedAt":   tp.UpdatedAt.String(),
+		}
+		result = append(result, resourceData)
+	}
+
+	return result, nil
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
