@@ -393,7 +393,7 @@ func (h *Handler) LoadState(ctx context.Context) (*state.State, error) {
 	}
 	st := state.EmptyState()
 	for _, source := range sources {
-		resourceState, skip := mapRemoteToState(&source, "")
+		resourceState, skip := mapRemoteToState(&source, nil)
 		if skip {
 			continue
 		}
@@ -428,12 +428,17 @@ func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream source")
 		}
-		var trackingPlanURN string
-		var err error
+		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
-			trackingPlanURN, err = collection.GetURNByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
-			if err != nil {
+			tpURN, err := collection.GetURNByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
+			if err == resources.ErrRemoteResourceNotFound {
+				// ErrRemoteResourceNotFound would happen if the source was created via CLI
+				// but the tracking plan was created and linked via the UI/API
+				trackingPlanURN = nil
+			} else if err != nil {
 				return nil, fmt.Errorf("get urn by id: %w", err)
+			} else {
+				trackingPlanURN = &tpURN
 			}
 		}
 		resourceState, skip := mapRemoteToState(&source, trackingPlanURN)
@@ -713,7 +718,7 @@ func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]an
 	return result
 }
 
-func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN string) (*state.ResourceState, bool) {
+func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*state.ResourceState, bool) {
 	if source.ExternalID == "" {
 		return nil, true
 	}
@@ -722,15 +727,13 @@ func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN st
 		EnabledKey:          source.Enabled,
 		SourceDefinitionKey: source.Type,
 	}
-	if source.TrackingPlan != nil {
+	var output *resources.ResourceData
+	if trackingPlanURN != nil {
 		input[TrackingPlanKey] = &resources.PropertyRef{
-			URN:      trackingPlanURN,
+			URN:      *trackingPlanURN,
 			Property: "id",
 		}
 		input[TrackingPlanConfigKey] = mapRemoteTPConfigToState(source.TrackingPlan.Config)
-	}
-	var output *resources.ResourceData
-	if source.TrackingPlan != nil {
 		output = toResourceData(source.ID, source.TrackingPlan.ID)
 	} else {
 		output = toResourceData(source.ID, "")
