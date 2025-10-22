@@ -9,6 +9,9 @@ type SourceDefinition string
 // ResourceType is the type identifier for SQL Model resources
 const (
 	ResourceType = "retl-source-sql-model"
+	ResourceKind = "retl-source-sql-model"
+	MetadataName = "retl-source-sql-model"
+	ImportPath   = "sql-models"
 
 	LocalIDKey          = "local_id"
 	DisplayNameKey      = "display_name"

@@ -10,7 +10,9 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -19,13 +21,15 @@ import (
 type Handler struct {
 	client    retlClient.RETLStore
 	resources map[string]*SQLModelResource
+	importDir string
 }
 
 // NewHandler creates a new SQL Model resource handler
-func NewHandler(client retlClient.RETLStore) *Handler {
+func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 	return &Handler{
 		client:    client,
 		resources: make(map[string]*SQLModelResource),
+		importDir: filepath.Join(importDir, ImportPath),
 	}
 }
 
@@ -383,6 +387,93 @@ func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 		})
 	}
 	return s, nil
+}
+
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	hasExternalID := false
+	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
+	if err != nil {
+		return nil, fmt.Errorf("listing RETL sources: %w", err)
+	}
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, source := range sources.Data {
+		externalID, err := idNamer.Name(namer.ScopeName{
+			Name:  source.Name,
+			Scope: ResourceType,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
+		}
+		resourceMap[source.ID] = &resources.RemoteResource{
+			ID:         source.ID,
+			ExternalID: externalID,
+			Data:       &source,
+			Reference: fmt.Sprintf("#/%s/%s/%s",
+				ResourceKind,
+				MetadataName,
+				externalID,
+			),
+		}
+	}
+	collection.Set(ResourceType, resourceMap)
+	return collection, nil
+}
+
+func (h *Handler) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	sources := collection.GetAll(ResourceType)
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	workspaceMetadata := importremote.WorkspaceImportMetadata{
+		Resources: make([]importremote.ImportIds, 0),
+	}
+	var result []importremote.FormattableEntity
+	for _, source := range sources {
+		sourceData, ok := source.Data.(*retlClient.RETLSource)
+		if !ok {
+			return nil, fmt.Errorf("unable to cast resource to retl source")
+		}
+		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
+		workspaceMetadata.Resources = []importremote.ImportIds{
+			{
+				LocalID:  source.ExternalID,
+				RemoteID: source.ID,
+			},
+		}
+
+		metadata := importremote.Metadata{
+			Name: source.ExternalID,
+			Import: importremote.WorkspacesImportMetadata{
+				Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+			},
+		}
+		metadataMap := make(map[string]any)
+		err := mapstructure.Decode(metadata, &metadataMap)
+		if err != nil {
+			return nil, fmt.Errorf("decoding metadata: %w", err)
+		}
+		spec := &specs.Spec{
+			Version:  specs.SpecVersion,
+			Kind:     ResourceKind,
+			Metadata: metadataMap,
+			Spec: map[string]interface{}{
+				DisplayNameKey:      sourceData.Name,
+				DescriptionKey:      sourceData.Config.Description,
+				AccountIDKey:        sourceData.AccountID,
+				PrimaryKeyKey:       sourceData.Config.PrimaryKey,
+				SQLKey:              sourceData.Config.Sql,
+				SourceDefinitionKey: sourceData.SourceDefinitionName,
+				EnabledKey:          sourceData.IsEnabled,
+				IDKey:               source.ExternalID,
+			},
+		}
+		result = append(result, importremote.FormattableEntity{
+			Content:      spec,
+			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
+		})
+	}
+	return result, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
