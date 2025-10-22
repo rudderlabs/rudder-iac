@@ -6,9 +6,8 @@ fun main() {
     val typer = RudderAnalytics(analytics)
 
     println("=== Testing RudderAnalytics Functions ===\n")
-
-    // Test 1: Identify with comprehensive traits
-    println("1. Testing identify()...")
+    
+    println("Testing identify()...")
     typer.identify(
         userId = "user-123-abc",
         traits = IdentifyTraits(
@@ -16,9 +15,8 @@ fun main() {
             email = "john.doe@example.com"
         )
     )
-
-    // Test 2: Identify with minimal data (no userId, minimal traits)
-    println("\n2. Testing identify() with optional userId...")
+    
+    println("\nTesting identify() with optional userId...")
     typer.identify(
         traits = IdentifyTraits(
             active = false,
@@ -26,17 +24,15 @@ fun main() {
         )
     )
 
-    // Test 3: Group with traits
-    println("\n3. Testing group()...")
+    println("\nTesting group()...")
     typer.group(
         groupId = "company-xyz-789",
         traits = GroupTraits(
             active = true
         )
     )
-
-    // Test 4: Screen with full properties
-    println("\n4. Testing screen() with properties...")
+    
+    println("\nTesting screen() with properties...")
     typer.screen(
         screenName = "Dashboard",
         category = "Main Navigation",
@@ -49,17 +45,15 @@ fun main() {
         )
     )
 
-    // Test 5: Screen without category
-    println("\n5. Testing screen() without category...")
+    println("\nTesting screen() without category...")
     typer.screen(
         screenName = "Settings",
         properties = ScreenProperties(
             profile = null
         )
     )
-
-    // Test 6: Track User Signed Up with all properties
-    println("\n6. Testing trackUserSignedUp() with comprehensive data...")
+    
+    println("\nTesting trackUserSignedUp() with comprehensive data...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
@@ -108,8 +102,7 @@ fun main() {
         )
     )
 
-    // Test 7: Track User Signed Up with minimal required properties
-    println("\n7. Testing trackUserSignedUp() with minimal data...")
+    println("\nTesting trackUserSignedUp() with minimal data...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = false,
@@ -119,9 +112,8 @@ fun main() {
             )
         )
     )
-
-    // Test 8: Track with different device types
-    println("\n8. Testing trackUserSignedUp() with TABLET device...")
+    
+    println("\nTesting trackUserSignedUp() with TABLET device...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
@@ -134,7 +126,7 @@ fun main() {
         )
     )
 
-    println("\n9. Testing trackUserSignedUp() with DESKTOP device...")
+    println("\nTesting trackUserSignedUp() with DESKTOP device...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
@@ -146,11 +138,11 @@ fun main() {
         )
     )
 
-    println("\n10. Testing trackUserSignedUp() with SMARTTV device...")
+    println("\nTesting trackUserSignedUp() with SMARTTV device...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.SMARTTV,
+            deviceType = PropertyDeviceType.SMART_TV,
             age = 45.0,
             profile = CustomTypeUserProfile(
                 email = "tv.user@example.com",
@@ -161,11 +153,11 @@ fun main() {
         )
     )
 
-    println("\n11. Testing trackUserSignedUp() with IOT_DEVICE...")
+    println("\nTesting trackUserSignedUp() with IOT_DEVICE...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.IOT_DEVICE,
+            deviceType = PropertyDeviceType.IO_T_DEVICE,
             profile = CustomTypeUserProfile(
                 email = "iot@example.com",
                 firstName = "George"
@@ -173,7 +165,7 @@ fun main() {
         )
     )
 
-    println("\n12. Testing trackEventWithVariants() with different variants...")
+    println("\nTesting trackEventWithVariants() with different variants...")
     typer.trackEventWithVariants(
         properties = TrackEventWithVariantsProperties.CaseMobile(
             profile = CustomTypeUserProfile(
@@ -182,6 +174,154 @@ fun main() {
                 lastName = "Smith"
             ),
             tags = listOf("mobile", "app-user"),
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with feature_config enabled (boolean true)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.enabled@example.com",
+                firstName = "Premium",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseTrue(
+                age = 30.0
+            ),
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with integer enum (priority)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            priority = PropertyPriority._1,
+            profile = CustomTypeUserProfile(
+                email = "priority.user@example.com",
+                firstName = "Ivan"
+            )
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with feature_config disabled (boolean false)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.disabled@example.com",
+                firstName = "Free",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseFalse(
+                firstName = "some-name"
+            ),
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with boolean enum (enabled)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            enabled = PropertyEnabled.TRUE,
+            profile = CustomTypeUserProfile(
+                email = "enabled.user@example.com",
+                firstName = "Julia"
+            )
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with feature_config beta (string)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.beta@example.com",
+                firstName = "Beta",
+                lastName = "Tester"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseBeta(
+                tags = listOf("beta-user", "early-access", "experimental")
+            ),
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with float enum (rating)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            rating = PropertyRating._4_5,
+            profile = CustomTypeUserProfile(
+                email = "rating.user@example.com",
+                firstName = "Kevin"
+            )
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with user_access default case...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "default.user@example.com",
+                firstName = "Default",
+                lastName = "Case"
+            ),
+            userAccess = CustomTypeUserAccess.Default(
+                active = true  // Can be any value - demonstrates default case
+            ),
+        )
+    )
+
+    
+    println("\nTesting trackUserSignedUp() with mixed-type enum...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            mixedValue = PropertyMixedValue._2_5,
+            profile = CustomTypeUserProfile(
+                email = "mixed.user@example.com",
+                firstName = "Laura"
+            )
+        )
+    )
+
+    println("\nTesting trackUserSignedUp() with feature_config default case (string 'alpha')...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.alpha@example.com",
+                firstName = "Alpha",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.Default(
+                featureFlag = PropertyFeatureFlag.StringValue("alpha")  // Not 'beta', true, or false
+            ),
+        )
+    )
+
+    println("\nTesting trackUserSignedUp() with all enum types...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            deviceType = PropertyDeviceType.MOBILE,
+            priority = PropertyPriority._3,
+            enabled = PropertyEnabled.FALSE,
+            rating = PropertyRating._5,
+            mixedValue = PropertyMixedValue.ACTIVE,
+            status = CustomTypeStatus.ACTIVE,
+            profile = CustomTypeUserProfile(
+                email = "all.enums@example.com",
+                firstName = "Michael"
+            )
         )
     )
 

@@ -465,9 +465,14 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 	// Convert enum values to KotlinEnumValue structs
 	var enumValues []KotlinEnumValue
 	for _, value := range property.Config.Enum {
+		registeredName, err := getOrRegisterEnumValue(enumName, value, nameRegistry)
+		if err != nil {
+			return nil, err
+		}
+
 		enumValues = append(enumValues, KotlinEnumValue{
-			Name:       FormatEnumValue(value),
-			SerialName: FormatEnumSerialName(value),
+			Name:  registeredName,
+			Value: value,
 		})
 	}
 
@@ -488,9 +493,14 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 	// Convert enum values to KotlinEnumValue structs
 	var enumValues []KotlinEnumValue
 	for _, value := range customType.Config.Enum {
+		registeredName, err := getOrRegisterEnumValue(enumName, value, nameRegistry)
+		if err != nil {
+			return nil, err
+		}
+
 		enumValues = append(enumValues, KotlinEnumValue{
-			Name:       FormatEnumValue(value),
-			SerialName: FormatEnumSerialName(value),
+			Name:  registeredName,
+			Value: value,
 		})
 	}
 

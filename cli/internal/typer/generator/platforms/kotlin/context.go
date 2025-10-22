@@ -29,8 +29,8 @@ type KotlinDataClass struct {
 
 // KotlinEnumValue represents a single value in a Kotlin enum
 type KotlinEnumValue struct {
-	Name       string // The Kotlin constant name (e.g., "GET")
-	SerialName string // The serialized name (e.g., "GET" for @SerialName("GET"))
+	Name  string // The Kotlin constant name (e.g., "GET")
+	Value any    // The (unformatted) value associated with the enum constant (e.g., "GET")
 }
 
 // KotlinEnum represents a Kotlin enum class declaration
@@ -58,17 +58,19 @@ type KotlinSealedClass struct {
 
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature
 type KotlinMethodArgument struct {
-	Name     string // e.g., "groupId", "properties"
-	Type     string // e.g., "String", "TrackProductClickedProperties"
-	Nullable bool   // e.g., true for "userId: String?"
-	Default  string // The default value for the argument, e.g., ""
+	Name             string // e.g., "groupId", "properties"
+	Type             string // e.g., "String", "TrackProductClickedProperties"
+	Nullable         bool   // e.g., true for "userId: String?"
+	Default          any    // The default value: nil (no default), string (for literals), or variable name
+	IsLiteralDefault bool   // If true, Default should be formatted as a Kotlin literal
 }
 
 // SDKCallArgument represents an argument passed to an internal RudderStack SDK method
 type SDKCallArgument struct {
 	Name            string // The parameter name for the named argument, e.g., "name", "properties"
-	Value           string // The value to pass, e.g., "Product Clicked" or "properties". Generator will handle quoting.
+	Value           any    // The value: string (literal or variable), int, bool, etc.
 	ShouldSerialize bool   // Whether this argument should be serialized to JsonObject
+	IsLiteral       bool   // If true, Value should be formatted as a Kotlin literal
 }
 
 // SDKCall represents a call to an internal RudderStack SDK method

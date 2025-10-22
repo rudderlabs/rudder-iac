@@ -1,14 +1,14 @@
 {{- if .Comment }}
-/** {{ .Comment }} */
+/** {{ escapeComment .Comment }} */
 {{- end }}
 @Serializable(with = Rudder{{ .Name }}Serializer::class)
 sealed class {{ .Name }} : SealedClassWithJson() {
 {{- range $prop := .Properties }}
 {{- if $prop.Abstract }}
     {{- if $prop.Comment }}
-    /** {{ $prop.Comment }} */
+    /** {{ escapeComment $prop.Comment }} */
     {{- end }}
-    @SerialName("{{ $prop.SerialName }}")
+    @SerialName("{{ escapeString $prop.SerialName }}")
     abstract val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}
 
 {{- end }}
@@ -19,25 +19,25 @@ sealed class {{ .Name }} : SealedClassWithJson() {
 {{- if or $index (len $.Properties) }}
 {{ end }}
     {{- if $subclass.Comment }}
-    /** {{ $subclass.Comment }} */
+    /** {{ escapeComment $subclass.Comment }} */
     {{- end }}
     @Serializable
     data class {{ $subclass.Name }}(
     {{- range $propIndex, $prop := $subclass.Properties }}{{- if $propIndex }},
 {{ end }}
         {{- if $prop.Comment }}
-        /** {{ $prop.Comment }} */
+        /** {{ escapeComment $prop.Comment }} */
         {{- end }}
-        @SerialName("{{ $prop.SerialName }}")
+        @SerialName("{{ escapeString $prop.SerialName }}")
         {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
     {{- end }}
     ) : {{ $.Name }}() {
     {{- range $prop := $subclass.BodyProperties }}
         {{- if ne $prop.Name "_jsonElement" }}
         {{- if $prop.Comment }}
-        /** {{ $prop.Comment }} */
+        /** {{ escapeComment $prop.Comment }} */
         {{- end }}
-        @SerialName("{{ $prop.SerialName }}")
+        @SerialName("{{ escapeString $prop.SerialName }}")
         {{ if $prop.Override }}override {{ end }}val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
         {{- end }}
     {{- end }}
@@ -58,14 +58,14 @@ sealed class {{ .Name }} : SealedClassWithJson() {
         override val _jsonElement: JsonElement = buildJsonObject {
         {{- range $subclass.Properties }}
             {{- if .Nullable }}
-            {{ .Name }}?.let { put("{{ .SerialName }}", Json.encodeToJsonElement(it)) }
+            {{ .Name }}?.let { put("{{ escapeString .SerialName }}", Json.encodeToJsonElement(it)) }
             {{- else }}
-            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+            put("{{ escapeString .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
             {{- end }}
         {{- end }}
         {{- range $subclass.BodyProperties }}
             {{- if ne .Name "_jsonElement" }}
-            put("{{ .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
+            put("{{ escapeString .SerialName }}", Json.encodeToJsonElement({{ .Name }}))
             {{- end }}
         {{- end }}
         }

@@ -9,6 +9,41 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
+// formatDiscriminatorValue formats a discriminator value based on its runtime type
+// For multi-type properties, wraps the value in the appropriate sealed class constructor
+func formatDiscriminatorValue(value any, property *plan.Property, kotlinType string) string {
+	// Check if this is a multi-type property
+	if len(property.Types) > 1 {
+		return formatMultiTypeDiscriminatorValue(kotlinType, value)
+	}
+
+	return FormatKotlinLiteral(value)
+}
+
+// formatMultiTypeDiscriminatorValue wraps a discriminator value in the appropriate
+// sealed class constructor for multi-type properties
+func formatMultiTypeDiscriminatorValue(kotlinType string, value any) string {
+	var subclassName string
+
+	switch value.(type) {
+	case bool:
+		subclassName = "BooleanValue"
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		subclassName = "IntegerValue"
+	case float32, float64:
+		subclassName = "NumberValue"
+	case string:
+		subclassName = "StringValue"
+	default:
+		// Fallback to StringValue
+		subclassName = "StringValue"
+	}
+
+	formattedValue := FormatKotlinLiteral(value)
+
+	return fmt.Sprintf("%s.%s(%s)", kotlinType, subclassName, formattedValue)
+}
+
 // createCustomTypeVariantSealedClass creates a sealed class for a custom type with variants
 func createCustomTypeVariantSealedClass(
 	customType *plan.CustomType,
@@ -104,21 +139,29 @@ func createVariantSealedClass(
 		}
 	}
 
-	// Create default subclass if default schema exists
-	if variant.DefaultSchema != nil {
-		defaultSubclass, err := createSealedSubclass(
-			nil,
-			variant.Discriminator,
-			baseSchema,
-			variant.DefaultSchema,
-			"Default case",
-			nameRegistry,
-		)
-		if err != nil {
-			return nil, err
+	// Always create a default subclass
+	// If DefaultSchema is explicitly provided, use it; otherwise use an empty schema
+	defaultSchema := variant.DefaultSchema
+	if defaultSchema == nil {
+		// Create an empty schema with no additional properties
+		defaultSchema = &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
 		}
-		subclasses = append(subclasses, *defaultSubclass)
 	}
+
+	defaultSubclass, err := createSealedSubclass(
+		nil,
+		variant.Discriminator,
+		baseSchema,
+		defaultSchema,
+		"Default case",
+		nameRegistry,
+	)
+	if err != nil {
+		return nil, err
+	}
+	subclasses = append(subclasses, *defaultSubclass)
 
 	return &KotlinSealedClass{
 		Name:       name,
@@ -223,11 +266,19 @@ func mergeVariantSchemaProperties(
 				// Check if the property type is an enum
 				if hasEnumConfig(propSchema.Property.Config) {
 					// For enums, use the enum constant name (e.g., PropertyDeviceType.MOBILE)
-					enumValueName := FormatEnumValue(discriminatorValue)
+					enumValueName, err := getOrRegisterEnumValue(
+						kotlinType,
+						discriminatorValue,
+						nameRegistry,
+					)
+					if err != nil {
+						return nil, nil, err
+					}
 					defaultValue = fmt.Sprintf("%s.%s", kotlinType, enumValueName)
 				} else {
-					// For non-enum types, use the quoted string value
-					defaultValue = fmt.Sprintf("%q", discriminatorValue)
+					// For non-enum types, format based on the discriminator value's type
+					// (handles both single-type and multi-type properties)
+					defaultValue = formatDiscriminatorValue(discriminatorValue, &propSchema.Property, kotlinType)
 				}
 			}
 
