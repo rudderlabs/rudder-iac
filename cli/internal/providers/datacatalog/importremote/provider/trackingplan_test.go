@@ -271,8 +271,22 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, 2, len(result))
 
-		ecommerceSpec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
+		var (
+			ecommerceSpec     *specs.Spec
+			userAnalyticsSpec *specs.Spec
+		)
+
+		for _, entity := range result {
+			spec, ok := entity.Content.(*specs.Spec)
+			require.True(t, ok)
+
+			if spec.Metadata["name"] == "e-commerce-tracking" {
+				ecommerceSpec = spec
+			}
+			if spec.Metadata["name"] == "user-analytics" {
+				userAnalyticsSpec = spec
+			}
+		}
 
 		assert.Equal(t, &specs.Spec{
 			Version: specs.SpecVersion,
@@ -315,9 +329,6 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				},
 			},
 		}, ecommerceSpec)
-
-		userAnalyticsSpec, ok := result[1].Content.(*specs.Spec)
-		require.True(t, ok)
 
 		assert.Equal(t, &specs.Spec{
 			Version: specs.SpecVersion,
