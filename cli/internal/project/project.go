@@ -21,7 +21,10 @@ type ProjectProvider interface {
 	GetName() string
 	GetSupportedKinds() []string
 	GetSupportedTypes() []string
-	Validate() error
+	// Validate makes provider specific validations on the resource graph.
+	// Providers are expected to validate their own resources only, but can leverage
+	// the full graph for cross-resource validations.
+	Validate(graph *resources.Graph) error
 	LoadSpec(path string, s *specs.Spec) error
 	GetResourceGraph() (*resources.Graph, error)
 }
@@ -95,7 +98,12 @@ func (p *project) Load() error {
 		}
 	}
 
-	return p.Provider.Validate()
+	graph, err := p.Provider.GetResourceGraph()
+	if err != nil {
+		return fmt.Errorf("getting resource graph: %w", err)
+	}
+
+	return p.Provider.Validate(graph)
 }
 
 func (p *project) GetResourceGraph() (*resources.Graph, error) {

@@ -205,11 +205,14 @@ func TestCompositeProvider_Validate(t *testing.T) {
 			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
-			err := cp.Validate()
+
+			graph := resources.NewGraph() // Empty graph for validation
+			err := cp.Validate(graph)
 
 			assert.ErrorIs(t, err, tt.expectedErr)
 
 			for i, p := range tt.providers {
+				assert.Equal(t, graph, p.ValidateArg, "Provider %d Validate() called with unexpected argument")
 				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.ValidateErr) {
 					assert.Equal(t, 1, p.ValidateCalledCount, "Provider %d Validate() not called once when it should have errored", i)
 					for j := i + 1; j < len(tt.providers); j++ {

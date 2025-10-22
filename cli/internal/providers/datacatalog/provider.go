@@ -71,7 +71,10 @@ func (p *Provider) GetLocalCatalog() *localcatalog.DataCatalog {
 	return p.dc
 }
 
-func (p *Provider) Validate() error {
+// Validate validates the provider's data catalog.
+// The method accepts a *resources.Graph but currently ignores it and validates directly from the catalog 
+// (same behavior as earlier); future implementations may validate against the graph.
+func (p *Provider) Validate(_ *resources.Graph) error {
 	err := validate.ValidateCatalog(p.dc)
 	if err == nil {
 		log.Info("successfully validated the catalog")
