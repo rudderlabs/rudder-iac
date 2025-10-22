@@ -9,6 +9,62 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
+// formatDiscriminatorValue formats a discriminator value based on its runtime type
+// For multi-type properties, wraps the value in the appropriate sealed class constructor
+func formatDiscriminatorValue(value any, property *plan.Property, kotlinType string) string {
+	// Check if this is a multi-type property
+	if len(property.Types) > 1 {
+		return formatMultiTypeDiscriminatorValue(kotlinType, value)
+	}
+
+	// Single-type property - format based on value's runtime type
+	switch v := value.(type) {
+	case bool:
+		// Format as boolean literal
+		return fmt.Sprintf("%v", v)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		// Format as integer literal
+		return fmt.Sprintf("%v", v)
+	case float32, float64:
+		// Format as float literal
+		return fmt.Sprintf("%v", v)
+	case string:
+		// Format as quoted string
+		return fmt.Sprintf("%q", v)
+	default:
+		// For any other type, default to string formatting
+		return fmt.Sprintf("%q", v)
+	}
+}
+
+// formatMultiTypeDiscriminatorValue wraps a discriminator value in the appropriate
+// sealed class constructor for multi-type properties
+func formatMultiTypeDiscriminatorValue(kotlinType string, value any) string {
+	var subclassName string
+	var formattedValue string
+
+	switch v := value.(type) {
+	case bool:
+		subclassName = "BooleanValue"
+		formattedValue = fmt.Sprintf("%v", v)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		subclassName = "IntegerValue"
+		formattedValue = fmt.Sprintf("%v", v)
+	case float32, float64:
+		subclassName = "NumberValue"
+		formattedValue = fmt.Sprintf("%v", v)
+	case string:
+		subclassName = "StringValue"
+		formattedValue = fmt.Sprintf("%q", v)
+	default:
+		// Fallback to StringValue
+		subclassName = "StringValue"
+		formattedValue = fmt.Sprintf("%q", v)
+	}
+
+	return fmt.Sprintf("%s.%s(%s)", kotlinType, subclassName, formattedValue)
+}
+
 // createCustomTypeVariantSealedClass creates a sealed class for a custom type with variants
 func createCustomTypeVariantSealedClass(
 	customType *plan.CustomType,
@@ -104,21 +160,29 @@ func createVariantSealedClass(
 		}
 	}
 
-	// Create default subclass if default schema exists
-	if variant.DefaultSchema != nil {
-		defaultSubclass, err := createSealedSubclass(
-			nil,
-			variant.Discriminator,
-			baseSchema,
-			variant.DefaultSchema,
-			"Default case",
-			nameRegistry,
-		)
-		if err != nil {
-			return nil, err
+	// Always create a default subclass
+	// If DefaultSchema is explicitly provided, use it; otherwise use an empty schema
+	defaultSchema := variant.DefaultSchema
+	if defaultSchema == nil {
+		// Create an empty schema with no additional properties
+		defaultSchema = &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
 		}
-		subclasses = append(subclasses, *defaultSubclass)
 	}
+
+	defaultSubclass, err := createSealedSubclass(
+		nil,
+		variant.Discriminator,
+		baseSchema,
+		defaultSchema,
+		"Default case",
+		nameRegistry,
+	)
+	if err != nil {
+		return nil, err
+	}
+	subclasses = append(subclasses, *defaultSubclass)
 
 	return &KotlinSealedClass{
 		Name:       name,
@@ -226,8 +290,9 @@ func mergeVariantSchemaProperties(
 					enumValueName := FormatEnumValue(discriminatorValue)
 					defaultValue = fmt.Sprintf("%s.%s", kotlinType, enumValueName)
 				} else {
-					// For non-enum types, use the quoted string value
-					defaultValue = fmt.Sprintf("%q", discriminatorValue)
+					// For non-enum types, format based on the discriminator value's type
+					// (handles both single-type and multi-type properties)
+					defaultValue = formatDiscriminatorValue(discriminatorValue, &propSchema.Property, kotlinType)
 				}
 			}
 

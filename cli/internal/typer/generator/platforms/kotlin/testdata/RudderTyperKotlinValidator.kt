@@ -150,7 +150,7 @@ fun main() {
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.SMARTTV,
+            deviceType = PropertyDeviceType.SMART_TV,
             age = 45.0,
             profile = CustomTypeUserProfile(
                 email = "tv.user@example.com",
@@ -165,7 +165,7 @@ fun main() {
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
             active = true,
-            deviceType = PropertyDeviceType.IOT_DEVICE,
+            deviceType = PropertyDeviceType.IO_T_DEVICE,
             profile = CustomTypeUserProfile(
                 email = "iot@example.com",
                 firstName = "George"
@@ -182,6 +182,86 @@ fun main() {
                 lastName = "Smith"
             ),
             tags = listOf("mobile", "app-user"),
+        )
+    )
+
+    // Test 13: Multi-type discriminator with boolean true (enabled)
+    println("\n13. Testing trackUserSignedUp() with feature_config enabled (boolean true)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.enabled@example.com",
+                firstName = "Premium",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseTrue(
+                age = 30.0
+            )
+        )
+    )
+
+    // Test 14: Multi-type discriminator with boolean false (disabled)
+    println("\n14. Testing trackUserSignedUp() with feature_config disabled (boolean false)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.disabled@example.com",
+                firstName = "Free",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseFalse(
+                firstName = "some-name"
+            )
+        )
+    )
+
+    // Test 15: Multi-type discriminator with string "beta"
+    println("\n15. Testing trackUserSignedUp() with feature_config beta (string)...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.beta@example.com",
+                firstName = "Beta",
+                lastName = "Tester"
+            ),
+            featureConfig = CustomTypeFeatureConfig.CaseBeta(
+                tags = listOf("beta-user", "early-access", "experimental")
+            )
+        )
+    )
+
+    // Test 16: Default case with boolean discriminator accepting any other boolean value
+    println("\n16. Testing trackUserSignedUp() with user_access default case...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "default.user@example.com",
+                firstName = "Default",
+                lastName = "Case"
+            ),
+            userAccess = CustomTypeUserAccess.Default(
+                active = true  // Can be any value - demonstrates default case
+            )
+        )
+    )
+
+    // Test 17: Default case with multi-type discriminator accepting any other value
+    println("\n17. Testing trackUserSignedUp() with feature_config default case (string 'alpha')...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "feature.alpha@example.com",
+                firstName = "Alpha",
+                lastName = "User"
+            ),
+            featureConfig = CustomTypeFeatureConfig.Default(
+                featureFlag = PropertyFeatureFlag.StringValue("alpha")  // Not 'beta', true, or false
+            )
         )
     )
 

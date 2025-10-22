@@ -63,6 +63,9 @@ typealias PropertyEmailList = CustomTypeEmailList
 /** Property with empty object allowing additional properties */
 typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
 
+/** Feature configuration information */
+typealias PropertyFeatureConfig = CustomTypeFeatureConfig
+
 /** User's first name */
 typealias PropertyFirstName = String
 
@@ -120,6 +123,9 @@ typealias PropertyUntypedArray = List<JsonElement>
 /** A field with no explicit type (treated as any) */
 typealias PropertyUntypedField = JsonElement
 
+/** User access information */
+typealias PropertyUserAccess = CustomTypeUserAccess
+
 /** User status enum */
 @Serializable
 enum class CustomTypeStatus {
@@ -165,6 +171,77 @@ open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
         throw NotImplementedError("Deserialization is not supported")
     }
 }
+
+/** Feature configuration with variants based on multi-type flag */
+@Serializable(with = RudderCustomTypeFeatureConfigSerializer::class)
+sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
+    /** Feature flag that can be boolean or string */
+    @SerialName("feature_flag")
+    abstract val featureFlag: PropertyFeatureFlag
+    abstract override val _jsonElement: JsonElement
+
+    /** Feature enabled (boolean true) */
+    @Serializable
+    data class CaseTrue(
+        /** User's age */
+        @SerialName("age")
+        val age: PropertyAge? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(true)
+        override val _jsonElement: JsonElement = buildJsonObject {
+            age?.let { put("age", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Feature disabled (boolean false) */
+    @Serializable
+    data class CaseFalse(
+        /** User's first name */
+        @SerialName("first_name")
+        val firstName: PropertyFirstName? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(false)
+        override val _jsonElement: JsonElement = buildJsonObject {
+            firstName?.let { put("first_name", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Feature in beta (string 'beta') */
+    @Serializable
+    data class CaseBeta(
+        /** User tags as array of strings */
+        @SerialName("tags")
+        val tags: PropertyTags? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.StringValue("beta")
+        override val _jsonElement: JsonElement = buildJsonObject {
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag
+    ) : CustomTypeFeatureConfig() {
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+}
+
+private object RudderCustomTypeFeatureConfigSerializer : SealedClassJsonSerializer<CustomTypeFeatureConfig>()
 
 /** Page context with variants based on page type */
 @Serializable(with = RudderCustomTypePageContextSerializer::class)
@@ -225,6 +302,88 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
 }
 
 private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer<CustomTypePageContext>()
+
+/** User access with variants based on active status */
+@Serializable(with = RudderCustomTypeUserAccessSerializer::class)
+sealed class CustomTypeUserAccess : SealedClassWithJson() {
+    /** User active status */
+    @SerialName("active")
+    abstract val active: PropertyActive
+    abstract override val _jsonElement: JsonElement
+
+    /** Active user access */
+    @Serializable
+    data class CaseTrue(
+        /** User's email address */
+        @SerialName("email")
+        val email: PropertyEmail
+    ) : CustomTypeUserAccess() {
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive = true
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("email", Json.encodeToJsonElement(email))
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+
+    /** Inactive user access */
+    @Serializable
+    data class CaseFalse(
+        /** User account status */
+        @SerialName("status")
+        val status: PropertyStatus
+    ) : CustomTypeUserAccess() {
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive = false
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("status", Json.encodeToJsonElement(status))
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive
+    ) : CustomTypeUserAccess() {
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+}
+
+private object RudderCustomTypeUserAccessSerializer : SealedClassJsonSerializer<CustomTypeUserAccess>()
+
+/** Feature flag that can be boolean or string */
+@Serializable(with = RudderPropertyFeatureFlagSerializer::class)
+sealed class PropertyFeatureFlag : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'boolean' value */
+    @Serializable
+    data class BooleanValue(
+        @SerialName("value")
+        val value: Boolean
+    ) : PropertyFeatureFlag() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : PropertyFeatureFlag() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+}
+
+private object RudderPropertyFeatureFlagSerializer : SealedClassJsonSerializer<PropertyFeatureFlag>()
 
 /** Item type for multi_type_array array */
 @Serializable(with = RudderArrayItemMultiTypeArraySerializer::class)
@@ -311,7 +470,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
 
         /** User tags as array of strings */
         @SerialName("tags")
-        val tags: PropertyTags
+        val tags: PropertyTags? = null
     ) : TrackEventWithVariantsProperties() {
         /** Type of device */
         @SerialName("device_type")
@@ -319,7 +478,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         override val _jsonElement: JsonElement = buildJsonObject {
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
             put("profile", Json.encodeToJsonElement(profile))
-            put("tags", Json.encodeToJsonElement(tags))
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
             put("device_type", Json.encodeToJsonElement(deviceType))
         }
     }
@@ -472,6 +631,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
 
+    /** Feature configuration information */
+    @SerialName("feature_config")
+    val featureConfig: PropertyFeatureConfig? = null,
+
     /** An array with items that can be string or integer */
     @SerialName("multi_type_array")
     val multiTypeArray: PropertyMultiTypeArray? = null,
@@ -514,7 +677,11 @@ data class TrackUserSignedUpProperties(
 
     /** A field with no explicit type (treated as any) */
     @SerialName("untyped_field")
-    val untypedField: PropertyUntypedField? = null
+    val untypedField: PropertyUntypedField? = null,
+
+    /** User access information */
+    @SerialName("user_access")
+    val userAccess: PropertyUserAccess? = null
 ) {
     /** example of object property */
     @Serializable
