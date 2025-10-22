@@ -26,12 +26,17 @@ func WorkspaceImport(
 	location string,
 	p project.Provider) error {
 
-	pState, err := p.LoadState(ctx)
+	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
-		return fmt.Errorf("loading state: %w", err)
+		return fmt.Errorf("loading remote resources: %w", err)
 	}
 
-	sourceGraph := syncer.StateToGraph(pState)
+	pstate, err := p.LoadStateFromResources(ctx, remoteCollection)
+	if err != nil {
+		return fmt.Errorf("loading state from resources: %w", err)
+	}
+
+	sourceGraph := syncer.StateToGraph(pstate)
 	targetGraph, err := p.GetResourceGraph()
 	if err != nil {
 		return fmt.Errorf("getting resource graph: %w", err)
