@@ -33,6 +33,14 @@ func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 	return &Handler{resources: make(map[string]*sourceResource), client: client, importDir: filepath.Join(importDir, ImportPath)}
 }
 
+func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	id, ok := s.Spec["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("id not found in event stream source spec")
+	}
+	return &specs.ParsedSpec{IDs: []string{id}}, nil
+}
+
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	spec := &sourceSpec{}
 	if err := mapstructure.Decode(s.Spec, spec); err != nil {

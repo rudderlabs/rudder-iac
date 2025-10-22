@@ -43,6 +43,10 @@ func (p *Provider) GetName() string {
 	return "datacatalog"
 }
 
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	return p.dc.ParseSpec(path, s)
+}
+
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.dc.LoadSpec(path, s)
 }

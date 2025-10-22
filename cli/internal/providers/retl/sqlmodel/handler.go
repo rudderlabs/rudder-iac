@@ -28,6 +28,10 @@ func NewHandler(client retlClient.RETLStore) *Handler {
 	}
 }
 
+func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	return nil, nil
+}
+
 // LoadSpec loads and validates a SQL Model spec
 func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	spec := &SQLModelSpec{}

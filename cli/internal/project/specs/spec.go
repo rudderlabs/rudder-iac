@@ -2,7 +2,9 @@ package specs
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/samber/lo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -10,11 +12,23 @@ const (
 	SpecVersion = "rudder/v0.1"
 )
 
+type Errors struct {
+	Errors []error
+}
+
+func (e *Errors) Error() string {
+	return strings.Join(lo.Map(e.Errors, func(err error, _ int) string { return err.Error() }), "\n")
+}
+
 type Spec struct {
 	Version  string                 `yaml:"version"`
 	Kind     string                 `yaml:"kind"`
 	Metadata map[string]interface{} `yaml:"metadata"`
 	Spec     map[string]interface{} `yaml:"spec"`
+}
+
+type ParsedSpec struct {
+	IDs []string
 }
 
 // New creates and validates a Spec from YAML data

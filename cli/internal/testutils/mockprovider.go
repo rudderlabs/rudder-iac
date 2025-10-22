@@ -35,10 +35,13 @@ type MockProvider struct {
 	DeleteErr                  error
 	ImportVal                  *resources.ResourceData
 	ImportErr                  error
+	ParseSpecVal               *specs.ParsedSpec
+	ParseSpecErr               error
 
 	// Tracking calls
 	ValidateCalledCount                int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
+	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
 	LoadStateCalledCount               int
 	LoadResourcesFromRemoteCalledCount int
@@ -53,6 +56,12 @@ type MockProvider struct {
 
 // LoadSpecArgs stores arguments for LoadSpec calls
 type LoadSpecArgs struct {
+	Path string
+	Spec *specs.Spec
+}
+
+// ParseSpecArgs stores arguments for ParseSpec calls
+type ParseSpecArgs struct {
 	Path string
 	Spec *specs.Spec
 }
@@ -97,7 +106,9 @@ type ImportArgs struct {
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
 func NewMockProvider() *MockProvider {
 	return &MockProvider{
-		LoadSpecCalledWithArgs: make([]LoadSpecArgs, 0),
+		ParseSpecVal:            &specs.ParsedSpec{IDs: []string{}},
+		LoadSpecCalledWithArgs:  make([]LoadSpecArgs, 0),
+		ParseSpecCalledWithArgs: make([]ParseSpecArgs, 0),
 	}
 }
 
@@ -117,6 +128,11 @@ func (m *MockProvider) Validate(graph *resources.Graph) error {
 	m.ValidateArg = graph
 	m.ValidateCalledCount++
 	return m.ValidateErr
+}
+
+func (m *MockProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	m.ParseSpecCalledWithArgs = append(m.ParseSpecCalledWithArgs, ParseSpecArgs{Path: path, Spec: s})
+	return m.ParseSpecVal, m.ParseSpecErr
 }
 
 func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
@@ -186,6 +202,7 @@ func (m *MockProvider) FormatForExport(ctx context.Context, collection *resource
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
+	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0
 	m.LoadStateCalledCount = 0
 	m.PutResourceStateCalledWithArg = PutResourceStateArgs{}
