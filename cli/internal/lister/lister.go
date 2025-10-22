@@ -25,8 +25,23 @@ const (
 type Filters map[string]string
 
 type Lister struct {
-	Provider ListProvider
-	Format   OutputFormat
+	Provider     ListProvider
+	Format       OutputFormat
+	ColumnWidths map[string]int
+}
+
+type ListOption func(*Lister)
+
+func WithFormat(format OutputFormat) ListOption {
+	return func(l *Lister) {
+		l.Format = format
+	}
+}
+
+func WithColumnWidths(widths map[string]int) ListOption {
+	return func(l *Lister) {
+		l.ColumnWidths = widths
+	}
 }
 
 type ListProvider interface {
@@ -54,7 +69,7 @@ func (l *Lister) List(ctx context.Context, resourceType string, filters Filters)
 	case JSONFormat:
 		return printResourcesAsJSON(rs)
 	case TableFormat:
-		return printTableWithDetails(rs)
+		return printTableWithDetails(rs, l.ColumnWidths)
 	default:
 		return fmt.Errorf("unknown output format: %s", l.Format)
 	}
@@ -71,9 +86,14 @@ func printResourcesAsJSON(resources []resources.ResourceData) error {
 	return nil
 }
 
-func New(p ListProvider, format OutputFormat) *Lister {
-	return &Lister{
-		Provider: p,
-		Format:   format,
+func New(p ListProvider, opts ...ListOption) *Lister {
+	l := &Lister{
+		Provider:     p,
+		Format:       TableFormat,
+		ColumnWidths: map[string]int{},
 	}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l
 }

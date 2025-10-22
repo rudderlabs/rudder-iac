@@ -3,16 +3,16 @@
 {{- $dataClass := (index . 1) -}}
 {{- with $dataClass -}}
 {{- if .Comment }}
-/** {{ .Comment }} */
+/** {{ escapeComment .Comment }} */
 {{- end }}
 @Serializable
 data class {{ .Name }}(
 {{- range $index, $prop := .Properties }}{{- if $index }},
 {{ end }}
 {{- if $prop.Comment }}
-    /** {{ $prop.Comment }} */
+    /** {{ escapeComment $prop.Comment }} */
 {{- end }}
-    @SerialName("{{ $prop.SerialName }}")
+    @SerialName("{{ escapeString $prop.SerialName }}")
     val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
 {{- end }}
 ){{- if gt (len .NestedClasses) 0 }} {

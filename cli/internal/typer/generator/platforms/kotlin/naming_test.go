@@ -35,6 +35,13 @@ func TestFormatClassName(t *testing.T) {
 		{"with prefix set", "set", "email-address", "SetEmailAddress"},
 		{"prefix with empty name", "track", "", "Track"},
 		{"empty prefix", "", "testMethod", "TestMethod"},
+		// Unicode test cases - Kotlin supports Unicode identifiers
+		{"chinese_characters", "", "用户名", "用户名"},
+		{"cyrillic_characters", "", "типы_данных", "ТипыДанных"},
+		{"latin_with_diacritics", "", "café", "Café"},
+		{"emoji", "", "🎯", ""},
+		{"japanese_characters", "", "日本語", "日本語"},
+		{"mixed_unicode", "", "naïve", "Naïve"},
 	}
 
 	for _, tt := range tests {
@@ -89,6 +96,14 @@ func TestFormatMethodName(t *testing.T) {
 		{"with prefix set", "set", "email-address", "setEmailAddress"},
 		{"prefix with empty name", "track", "", "track"},
 		{"empty prefix", "", "testMethod", "testMethod"},
+		// Unicode test cases - Kotlin supports Unicode identifiers
+		{"chinese_method", "", "获取用户", "获取用户"},
+		{"cyrillic_method", "", "получить_данные", "получитьДанные"},
+		{"method_with_diacritics", "", "café_créme", "caféCréme"},
+		{"unicode_with_ascii_prefix", "track", "用户注册", "track用户注册"},
+		{"cyrillic_with_ascii_prefix", "get", "данные", "getДанные"},
+		{"unicode_prefix_ascii_name", "追踪", "user_event", "追踪UserEvent"},
+		{"unicode_prefix_unicode_name", "получить", "данные_пользователя", "получитьДанныеПользователя"},
 	}
 
 	for _, tt := range tests {
@@ -127,6 +142,20 @@ func TestFormatEnumValue(t *testing.T) {
 		{"integer value", 42, "_42"},
 		{"boolean value", true, "TRUE"},
 		{"complex mixed", "User-Status_123.Active!", "USER_STATUS_123_ACTIVE"},
+		// Unicode test cases
+		{"cyrillic_enum", "активный", "АКТИВНЫЙ"},
+		{"chinese_enum", "已完成", "已完成"},
+		{"mixed_cyrillic_underscore", "статус_активен", "СТАТУС_АКТИВЕН"},
+		{"greek_characters", "ενεργός", "ΕΝΕΡΓΌΣ"},
+		{"arabic_characters", "نشط", "نشط"},
+		{"mixed_unicode_ascii", "café-status", "CAFÉ_STATUS"},
+		// Emoji and special characters convert to underscores with "1" suffix (reserved pattern)
+		{"emoji_single", "🎯", "_"},
+		{"emoji_multiple", "✅❌", "__"},
+		{"only_symbols", "!@#", "___"},
+		{"only_underscores", "___", "___"},
+		// Mixed content with letters gets converted
+		{"special_chars_with_letters", "hello-world!", "HELLO_WORLD"},
 	}
 
 	for _, tt := range tests {

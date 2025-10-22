@@ -83,12 +83,12 @@ func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceR
 		return fmt.Errorf("parsing tracking plan reference: %w", err)
 	}
 
-	sourceResource.Governance.TrackingPlan = &trackingPlanResource{
-		Ref:    trackingPlanRef,
-		Config: &trackingPlanConfigResource{},
+	sourceResource.Governance.Validations = &validationsResource{
+		TrackingPlanRef: trackingPlanRef,
+		Config:          &trackingPlanConfigResource{},
 	}
 
-	config := sourceResource.Governance.TrackingPlan.Config
+	config := sourceResource.Governance.Validations.Config
 	tpConfigSpec := tp.Config
 
 	if tpConfigSpec.Track != nil {
@@ -125,7 +125,7 @@ func buildEventConfigFromSpec(specConfig *eventConfigSpec) *EventConfigResource 
 	}
 }
 
-func validateSource(source *sourceResource) error {
+func validateSource(source *sourceResource, graph *resources.Graph) error {
 	if source.LocalId == "" {
 		return fmt.Errorf("id is required")
 	}
@@ -138,12 +138,27 @@ func validateSource(source *sourceResource) error {
 	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
 		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
 	}
+	if source.Governance != nil && source.Governance.Validations != nil {
+		ref := source.Governance.Validations.TrackingPlanRef
+		if ref == nil {
+			return fmt.Errorf("governance.validations.tracking_plan is required")
+		}
+
+		tp, ok := graph.GetResource(ref.URN)
+		if !ok {
+			return fmt.Errorf("tracking plan with URN '%s' not found in the project", ref.URN)
+		}
+
+		if tp.Type() != dcstate.TrackingPlanResourceType {
+			return fmt.Errorf("referenced URN '%s' is not a tracking plan", ref.URN)
+		}
+	}
 	return nil
 }
 
-func (h *Handler) Validate() error {
+func (h *Handler) Validate(graph *resources.Graph) error {
 	for _, source := range h.resources {
-		if err := validateSource(source); err != nil {
+		if err := validateSource(source, graph); err != nil {
 			return fmt.Errorf("validating event stream source spec: %w", err)
 		}
 	}
@@ -158,9 +173,9 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			EnabledKey:          s.Enabled,
 			SourceDefinitionKey: s.SourceDefinition,
 		}
-		if s.Governance.TrackingPlan != nil {
-			data[TrackingPlanKey] = s.Governance.TrackingPlan.Ref
-			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.TrackingPlan.Config)
+		if s.Governance.Validations != nil {
+			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
+			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
 		}
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)),

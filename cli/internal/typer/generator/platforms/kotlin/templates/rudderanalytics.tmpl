@@ -13,12 +13,12 @@ class RudderAnalytics(private val analytics: Analytics) {
     }
 {{ range .RudderAnalyticsMethods }}
     /**
-     * {{ .Comment }}
+     * {{ escapeComment .Comment }}
      */
-    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
+    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
-            {{ .Name }} = {{- if .ShouldSerialize }} json.encodeToJsonElement({{ .Value }}).jsonObject{{- else }} {{ .Value }}{{- end }},
+            {{ .Name }} ={{- if .ShouldSerialize }} json.encodeToJsonElement({{- if .IsLiteral }}{{ formatLiteral .Value }}{{- else }}{{ .Value }}{{- end }}).jsonObject{{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
         {{- end }}
             options = RudderOption(customContext = context)
         )

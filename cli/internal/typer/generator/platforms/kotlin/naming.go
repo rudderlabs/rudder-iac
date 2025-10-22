@@ -29,6 +29,7 @@ func handleStartingCharacter(name string) string {
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
 	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
 	if prefix != "" {
 		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
 	}
@@ -48,14 +49,46 @@ func FormatPropertyName(name string) string {
 	return formatted
 }
 
+// sanitizeForIdentifier removes or replaces characters that are invalid in Kotlin identifiers
+// Invalid characters are replaced with spaces so they become word boundaries in PascalCase conversion
+func sanitizeForIdentifier(s string) string {
+	var result strings.Builder
+	result.Grow(len(s))
+
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
+			// Keep valid characters and common word separators
+			result.WriteRune(ch)
+		} else {
+			// Replace invalid characters with space to create word boundary
+			result.WriteRune(' ')
+		}
+	}
+
+	return result.String()
+}
+
+// formatPropertyName converts a name to camelCase suitable for Kotlin property names
+// Returns empty string if input is empty.
+func formatPropertyName(name string) string {
+	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
+	formatted = core.ToCamelCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
+	return formatted
+}
+
 // FormatMethodName converts a name to camelCase suitable for Kotlin method names
 // If prefix is provided, it's prepended to the formatted name with proper casing
 func FormatMethodName(prefix, name string) string {
 	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
 	if prefix != "" {
-		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
+		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(formatted)
+	} else {
+		formatted = core.ToCamelCase(formatted)
 	}
-	formatted = core.ToCamelCase(formatted)
 	formatted = handleStartingCharacter(formatted)
 	formatted = handleReservedKeyword(formatted)
 	return formatted
@@ -67,37 +100,76 @@ func getOrRegisterCustomTypeName(customType *plan.CustomType, nameRegistry *core
 	return nameRegistry.RegisterName("customtype:"+customType.Name, globalTypeScope, typeName)
 }
 
-// getOrRegisterPropertyTypeTypeName returns the registered type name for a property-specific type.
-func getOrRegisterPropertyTypeTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+// getOrRegisterPropertyTypeName returns the registered type name for a property-specific type.
+func getOrRegisterPropertyTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	typeName := FormatClassName("Property", property.Name)
 	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
+}
+
+// getOrRegisterEnumValue returns the registered enum value name for an enum value
+// Uses the enum's scope to ensure values within the same enum are deduplicated
+// typeName should be the name of the Kotlin type that contains the enum
+func getOrRegisterEnumValue(typeName string, value any, nameRegistry *core.NameRegistry) (string, error) {
+	enumScope := fmt.Sprintf("enum:%s", typeName)
+	formatted := FormatEnumValue(value)
+	valueKey := fmt.Sprintf("%v", value)
+
+	// If FormatEnumValue returns empty string (e.g., for emojis or symbols only),
+	// use underscore as a placeholder which will be numbered by the collision handler
+	if formatted == "" {
+		formatted = "_"
+	}
+
+	// Check if the result is only underscores (_, __, ___, etc.)
+	// These are reserved in Kotlin, so we need to append a number
+	// by registering a dummy enum id to trigger the collision handler
+	isOnlyUnderscores := true
+	for _, r := range formatted {
+		if r != '_' {
+			isOnlyUnderscores = false
+			break
+		}
+	}
+	if isOnlyUnderscores {
+		_, err := nameRegistry.RegisterName(fmt.Sprintf("enum:placeholder:%s", formatted), enumScope, formatted)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	n, err := nameRegistry.RegisterName(valueKey, enumScope, formatted)
+	if err != nil {
+		return "", fmt.Errorf("failed to register name for enum %q", typeName)
+	}
+
+	return n, nil
 }
 
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
 	formatted := fmt.Sprintf("%v", value)
 	formatted = strings.TrimSpace(formatted)
-	formatted = core.ReplaceSpecialCharacters(formatted, "_")
-	words := core.SplitIntoWords(formatted)
+	afterReplacement := core.ReplaceSpecialCharacters(formatted, "_")
+
+	words := core.SplitIntoWords(afterReplacement)
 	if len(words) == 0 {
-		return ""
+		// If no words were found, check if we have underscores from special char replacement
+		// This handles cases like "!!!" -> "___" where the underscores should be preserved
+		if len(afterReplacement) > 0 && strings.Trim(afterReplacement, "_") == "" {
+			// The string contains only underscores, preserve them
+			formatted = afterReplacement
+		} else {
+			// Empty or whitespace only
+			return ""
+		}
+	} else {
+		formatted = strings.Join(words, "_")
 	}
 
-	formatted = strings.Join(words, "_")
 	formatted = strings.ToUpper(formatted)
 	formatted = handleStartingCharacter(formatted)
 	formatted = handleReservedKeyword(formatted)
 	return formatted
-}
-
-func FormatEnumSerialName(value any) string {
-	switch v := value.(type) {
-	case string:
-		// For strings, preserve the original value with quotes
-		return fmt.Sprintf("%q", v)
-	default:
-		return fmt.Sprintf("%v", value)
-	}
 }
 
 // formatSealedSubclassName formats a match value into a valid Kotlin class name prefixed with "Case"

@@ -55,6 +55,9 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 		"mkSlice": func(args ...any) []any {
 			return args
 		},
+		"escapeString":  EscapeKotlinStringLiteral,
+		"escapeComment": EscapeKotlinComment,
+		"formatLiteral": FormatKotlinLiteral,
 	}
 
 	tmpl, err := template.New("kotlin").Funcs(funcMap).Parse(kotlinTemplate)

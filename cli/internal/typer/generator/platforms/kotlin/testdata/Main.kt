@@ -33,6 +33,9 @@ typealias CustomTypeEmail = String
 /** List of email addresses */
 typealias CustomTypeEmailList = List<CustomTypeEmail>
 
+/** Empty object that does not allow additional properties */
+typealias CustomTypeEmptyObjectNoAdditionalProps = Unit
+
 /** Empty object that allows additional properties */
 typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
 
@@ -60,8 +63,14 @@ typealias PropertyEmail = CustomTypeEmail
 /** User's email addresses */
 typealias PropertyEmailList = CustomTypeEmailList
 
+/** Property with empty object not allowing additional properties */
+typealias PropertyEmptyObjectNoAdditionalProps = CustomTypeEmptyObjectNoAdditionalProps
+
 /** Property with empty object allowing additional properties */
 typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
+
+/** Feature configuration information */
+typealias PropertyFeatureConfig = CustomTypeFeatureConfig
 
 /** User's first name */
 typealias PropertyFirstName = String
@@ -72,6 +81,9 @@ typealias PropertyIpAddress = String
 /** User's last name */
 typealias PropertyLastName = String
 
+/** Property with mixed unicode: café, naïve, 日本語 */
+typealias PropertyMixedUnicode = String
+
 /** An array with items that can be string or integer */
 typealias PropertyMultiTypeArray = List<ArrayItemMultiTypeArray>
 
@@ -80,6 +92,9 @@ typealias PropertyNestedContext = JsonObject
 
 /** Nested property with empty object allowing additional properties */
 typealias PropertyNestedEmptyObject = JsonObject
+
+/** Nested property with empty object not allowing additional properties */
+typealias PropertyNestedEmptyObjectNoAdditionalProps = JsonObject
 
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
@@ -108,11 +123,17 @@ typealias PropertyPropertyOfAny = JsonElement
 /** Search query */
 typealias PropertyQuery = String
 
+/** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+typealias PropertySpecialField = String
+
 /** User account status */
 typealias PropertyStatus = CustomTypeStatus
 
 /** User tags as array of strings */
 typealias PropertyTags = List<String>
+
+/** Property using custom type with Unicode */
+typealias PropertyUnicodeCustomType = CustomTypeТипыДанных
 
 /** An array with no explicit item type (treated as any) */
 typealias PropertyUntypedArray = List<JsonElement>
@@ -120,32 +141,256 @@ typealias PropertyUntypedArray = List<JsonElement>
 /** A field with no explicit type (treated as any) */
 typealias PropertyUntypedField = JsonElement
 
+/** User access information */
+typealias PropertyUserAccess = CustomTypeUserAccess
+
+/** Username in Chinese characters */
+typealias Property用户名 = String
+
+/** Empty event schema with additionalProperties true */
+typealias TrackEmptyEventWithAdditionalPropsProperties = JsonObject
+
 /** User status enum */
-@Serializable
+@Serializable(with = RudderCustomTypeStatusSerializer::class)
 enum class CustomTypeStatus {
-    @SerialName("pending")
     PENDING,
-    @SerialName("active")
     ACTIVE,
-    @SerialName("suspended")
     SUSPENDED,
-    @SerialName("deleted")
     DELETED
 }
 
+private object RudderCustomTypeStatusSerializer : KSerializer<CustomTypeStatus> {
+    override val descriptor = buildClassSerialDescriptor("CustomTypeStatus")
+
+    override fun serialize(encoder: Encoder, value: CustomTypeStatus) {
+        val jsonValue = when (value) {
+            CustomTypeStatus.PENDING -> JsonPrimitive("pending")
+            CustomTypeStatus.ACTIVE -> JsonPrimitive("active")
+            CustomTypeStatus.SUSPENDED -> JsonPrimitive("suspended")
+            CustomTypeStatus.DELETED -> JsonPrimitive("deleted")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): CustomTypeStatus {
+        throw SerializationException("Deserialization not supported for CustomTypeStatus")
+    }
+}
+
+/** Custom type with Cyrillic name */
+@Serializable(with = RudderCustomTypeТипыДанныхSerializer::class)
+enum class CustomTypeТипыДанных {
+    АКТИВНЫЙ,
+    НЕАКТИВНЫЙ,
+    PENDING
+}
+
+private object RudderCustomTypeТипыДанныхSerializer : KSerializer<CustomTypeТипыДанных> {
+    override val descriptor = buildClassSerialDescriptor("CustomTypeТипыДанных")
+
+    override fun serialize(encoder: Encoder, value: CustomTypeТипыДанных) {
+        val jsonValue = when (value) {
+            CustomTypeТипыДанных.АКТИВНЫЙ -> JsonPrimitive("активный")
+            CustomTypeТипыДанных.НЕАКТИВНЫЙ -> JsonPrimitive("неактивный")
+            CustomTypeТипыДанных.PENDING -> JsonPrimitive("pending")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): CustomTypeТипыДанных {
+        throw SerializationException("Deserialization not supported for CustomTypeТипыДанных")
+    }
+}
+
 /** Type of device */
-@Serializable
+@Serializable(with = RudderPropertyDeviceTypeSerializer::class)
 enum class PropertyDeviceType {
-    @SerialName("mobile")
     MOBILE,
-    @SerialName("tablet")
     TABLET,
-    @SerialName("desktop")
     DESKTOP,
-    @SerialName("smartTV")
     SMART_TV,
-    @SerialName("IoT-Device")
     IO_T_DEVICE
+}
+
+private object RudderPropertyDeviceTypeSerializer : KSerializer<PropertyDeviceType> {
+    override val descriptor = buildClassSerialDescriptor("PropertyDeviceType")
+
+    override fun serialize(encoder: Encoder, value: PropertyDeviceType) {
+        val jsonValue = when (value) {
+            PropertyDeviceType.MOBILE -> JsonPrimitive("mobile")
+            PropertyDeviceType.TABLET -> JsonPrimitive("tablet")
+            PropertyDeviceType.DESKTOP -> JsonPrimitive("desktop")
+            PropertyDeviceType.SMART_TV -> JsonPrimitive("smartTV")
+            PropertyDeviceType.IO_T_DEVICE -> JsonPrimitive("IoT-Device")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyDeviceType {
+        throw SerializationException("Deserialization not supported for PropertyDeviceType")
+    }
+}
+
+/** Feature enabled flag */
+@Serializable(with = RudderPropertyEnabledSerializer::class)
+enum class PropertyEnabled {
+    TRUE,
+    FALSE
+}
+
+private object RudderPropertyEnabledSerializer : KSerializer<PropertyEnabled> {
+    override val descriptor = buildClassSerialDescriptor("PropertyEnabled")
+
+    override fun serialize(encoder: Encoder, value: PropertyEnabled) {
+        val jsonValue = when (value) {
+            PropertyEnabled.TRUE -> JsonPrimitive(true)
+            PropertyEnabled.FALSE -> JsonPrimitive(false)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyEnabled {
+        throw SerializationException("Deserialization not supported for PropertyEnabled")
+    }
+}
+
+/** Mixed type enum */
+@Serializable(with = RudderPropertyMixedValueSerializer::class)
+enum class PropertyMixedValue {
+    ACTIVE,
+    _1,
+    TRUE,
+    _2_5
+}
+
+private object RudderPropertyMixedValueSerializer : KSerializer<PropertyMixedValue> {
+    override val descriptor = buildClassSerialDescriptor("PropertyMixedValue")
+
+    override fun serialize(encoder: Encoder, value: PropertyMixedValue) {
+        val jsonValue = when (value) {
+            PropertyMixedValue.ACTIVE -> JsonPrimitive("active")
+            PropertyMixedValue._1 -> JsonPrimitive(1)
+            PropertyMixedValue.TRUE -> JsonPrimitive(true)
+            PropertyMixedValue._2_5 -> JsonPrimitive(2.5)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyMixedValue {
+        throw SerializationException("Deserialization not supported for PropertyMixedValue")
+    }
+}
+
+/** Priority level */
+@Serializable(with = RudderPropertyPrioritySerializer::class)
+enum class PropertyPriority {
+    _1,
+    _2,
+    _3
+}
+
+private object RudderPropertyPrioritySerializer : KSerializer<PropertyPriority> {
+    override val descriptor = buildClassSerialDescriptor("PropertyPriority")
+
+    override fun serialize(encoder: Encoder, value: PropertyPriority) {
+        val jsonValue = when (value) {
+            PropertyPriority._1 -> JsonPrimitive(1)
+            PropertyPriority._2 -> JsonPrimitive(2)
+            PropertyPriority._3 -> JsonPrimitive(3)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyPriority {
+        throw SerializationException("Deserialization not supported for PropertyPriority")
+    }
+}
+
+/** Rating value */
+@Serializable(with = RudderPropertyRatingSerializer::class)
+enum class PropertyRating {
+    _1_5,
+    _2_5,
+    _3_5,
+    _4_5,
+    _5
+}
+
+private object RudderPropertyRatingSerializer : KSerializer<PropertyRating> {
+    override val descriptor = buildClassSerialDescriptor("PropertyRating")
+
+    override fun serialize(encoder: Encoder, value: PropertyRating) {
+        val jsonValue = when (value) {
+            PropertyRating._1_5 -> JsonPrimitive(1.5)
+            PropertyRating._2_5 -> JsonPrimitive(2.5)
+            PropertyRating._3_5 -> JsonPrimitive(3.5)
+            PropertyRating._4_5 -> JsonPrimitive(4.5)
+            PropertyRating._5 -> JsonPrimitive(5)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyRating {
+        throw SerializationException("Deserialization not supported for PropertyRating")
+    }
+}
+
+/** HTTP status with special characters */
+@Serializable(with = RudderPropertyStatusCodeSerializer::class)
+enum class PropertyStatusCode {
+    _200_OK,
+    _404_NOT_FOUND,
+    _500_INTERNAL_SERVER_ERROR
+}
+
+private object RudderPropertyStatusCodeSerializer : KSerializer<PropertyStatusCode> {
+    override val descriptor = buildClassSerialDescriptor("PropertyStatusCode")
+
+    override fun serialize(encoder: Encoder, value: PropertyStatusCode) {
+        val jsonValue = when (value) {
+            PropertyStatusCode._200_OK -> JsonPrimitive("200: OK")
+            PropertyStatusCode._404_NOT_FOUND -> JsonPrimitive("404: Not Found")
+            PropertyStatusCode._500_INTERNAL_SERVER_ERROR -> JsonPrimitive("500: Internal \"Server\" Error")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyStatusCode {
+        throw SerializationException("Deserialization not supported for PropertyStatusCode")
+    }
+}
+
+/** Field demonstrating various Unicode characters in enum values */
+@Serializable(with = RudderPropertyUnicodeEnumFieldSerializer::class)
+enum class PropertyUnicodeEnumField {
+    _1,
+    _2,
+    АКТИВНЫЙ,
+    已完成,
+    ΕΝΕΡΓΌΣ,
+    CAFÉ,
+    ___1
+}
+
+private object RudderPropertyUnicodeEnumFieldSerializer : KSerializer<PropertyUnicodeEnumField> {
+    override val descriptor = buildClassSerialDescriptor("PropertyUnicodeEnumField")
+
+    override fun serialize(encoder: Encoder, value: PropertyUnicodeEnumField) {
+        val jsonValue = when (value) {
+            PropertyUnicodeEnumField._1 -> JsonPrimitive("🎯")
+            PropertyUnicodeEnumField._2 -> JsonPrimitive("✅")
+            PropertyUnicodeEnumField.АКТИВНЫЙ -> JsonPrimitive("активный")
+            PropertyUnicodeEnumField.已完成 -> JsonPrimitive("已完成")
+            PropertyUnicodeEnumField.ΕΝΕΡΓΌΣ -> JsonPrimitive("ενεργός")
+            PropertyUnicodeEnumField.CAFÉ -> JsonPrimitive("café")
+            PropertyUnicodeEnumField.___1 -> JsonPrimitive("!!!")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyUnicodeEnumField {
+        throw SerializationException("Deserialization not supported for PropertyUnicodeEnumField")
+    }
 }
 
 abstract class SealedClassWithJson {
@@ -165,6 +410,77 @@ open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
         throw NotImplementedError("Deserialization is not supported")
     }
 }
+
+/** Feature configuration with variants based on multi-type flag */
+@Serializable(with = RudderCustomTypeFeatureConfigSerializer::class)
+sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
+    /** Feature flag that can be boolean or string */
+    @SerialName("feature_flag")
+    abstract val featureFlag: PropertyFeatureFlag
+    abstract override val _jsonElement: JsonElement
+
+    /** Feature enabled (boolean true) */
+    @Serializable
+    data class CaseTrue(
+        /** User's age */
+        @SerialName("age")
+        val age: PropertyAge? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(true)
+        override val _jsonElement: JsonElement = buildJsonObject {
+            age?.let { put("age", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Feature disabled (boolean false) */
+    @Serializable
+    data class CaseFalse(
+        /** User's first name */
+        @SerialName("first_name")
+        val firstName: PropertyFirstName? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(false)
+        override val _jsonElement: JsonElement = buildJsonObject {
+            firstName?.let { put("first_name", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Feature in beta (string 'beta') */
+    @Serializable
+    data class CaseBeta(
+        /** User tags as array of strings */
+        @SerialName("tags")
+        val tags: PropertyTags? = null
+    ) : CustomTypeFeatureConfig() {
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.StringValue("beta")
+        override val _jsonElement: JsonElement = buildJsonObject {
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** Feature flag that can be boolean or string */
+        @SerialName("feature_flag")
+        override val featureFlag: PropertyFeatureFlag
+    ) : CustomTypeFeatureConfig() {
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("feature_flag", Json.encodeToJsonElement(featureFlag))
+        }
+    }
+}
+
+private object RudderCustomTypeFeatureConfigSerializer : SealedClassJsonSerializer<CustomTypeFeatureConfig>()
 
 /** Page context with variants based on page type */
 @Serializable(with = RudderCustomTypePageContextSerializer::class)
@@ -206,6 +522,17 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         }
     }
 
+    /** Home page variant with no additional properties */
+    @Serializable
+    class CaseHome() : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "home"
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+
     /** Default case */
     @Serializable
     data class Default(
@@ -225,6 +552,88 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
 }
 
 private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer<CustomTypePageContext>()
+
+/** User access with variants based on active status */
+@Serializable(with = RudderCustomTypeUserAccessSerializer::class)
+sealed class CustomTypeUserAccess : SealedClassWithJson() {
+    /** User active status */
+    @SerialName("active")
+    abstract val active: PropertyActive
+    abstract override val _jsonElement: JsonElement
+
+    /** Active user access */
+    @Serializable
+    data class CaseTrue(
+        /** User's email address */
+        @SerialName("email")
+        val email: PropertyEmail
+    ) : CustomTypeUserAccess() {
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive = true
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("email", Json.encodeToJsonElement(email))
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+
+    /** Inactive user access */
+    @Serializable
+    data class CaseFalse(
+        /** User account status */
+        @SerialName("status")
+        val status: PropertyStatus
+    ) : CustomTypeUserAccess() {
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive = false
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("status", Json.encodeToJsonElement(status))
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+
+    /** Default case */
+    @Serializable
+    data class Default(
+        /** User active status */
+        @SerialName("active")
+        override val active: PropertyActive
+    ) : CustomTypeUserAccess() {
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("active", Json.encodeToJsonElement(active))
+        }
+    }
+}
+
+private object RudderCustomTypeUserAccessSerializer : SealedClassJsonSerializer<CustomTypeUserAccess>()
+
+/** Feature flag that can be boolean or string */
+@Serializable(with = RudderPropertyFeatureFlagSerializer::class)
+sealed class PropertyFeatureFlag : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'boolean' value */
+    @Serializable
+    data class BooleanValue(
+        @SerialName("value")
+        val value: Boolean
+    ) : PropertyFeatureFlag() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : PropertyFeatureFlag() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+}
+
+private object RudderPropertyFeatureFlagSerializer : SealedClassJsonSerializer<PropertyFeatureFlag>()
 
 /** Item type for multi_type_array array */
 @Serializable(with = RudderArrayItemMultiTypeArraySerializer::class)
@@ -311,7 +720,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
 
         /** User tags as array of strings */
         @SerialName("tags")
-        val tags: PropertyTags
+        val tags: PropertyTags? = null
     ) : TrackEventWithVariantsProperties() {
         /** Type of device */
         @SerialName("device_type")
@@ -319,7 +728,7 @@ sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
         override val _jsonElement: JsonElement = buildJsonObject {
             pageContext?.let { put("page_context", Json.encodeToJsonElement(it)) }
             put("profile", Json.encodeToJsonElement(profile))
-            put("tags", Json.encodeToJsonElement(tags))
+            tags?.let { put("tags", Json.encodeToJsonElement(it)) }
             put("device_type", Json.encodeToJsonElement(deviceType))
         }
     }
@@ -437,6 +846,18 @@ data class ScreenProperties(
     val profile: PropertyProfile? = null
 )
 
+/** Triggered when user clicks on a "premium" product /\* important *\/ */
+@Serializable
+data class TrackProductPremiumClickedProperties(
+    /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+    @SerialName("special_field")
+    val specialField: PropertySpecialField,
+
+    /** HTTP status with special characters */
+    @SerialName("status_code")
+    val statusCode: PropertyStatusCode? = null
+)
+
 /** Triggered when a user signs up */
 @Serializable
 data class TrackUserSignedUpProperties(
@@ -468,9 +889,29 @@ data class TrackUserSignedUpProperties(
     @SerialName("email_list")
     val emailList: PropertyEmailList? = null,
 
+    /** Property with empty object not allowing additional properties */
+    @SerialName("empty_object_no_additional_props")
+    val emptyObjectNoAdditionalProps: PropertyEmptyObjectNoAdditionalProps? = null,
+
     /** Property with empty object allowing additional properties */
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
+
+    /** Feature enabled flag */
+    @SerialName("enabled")
+    val enabled: PropertyEnabled? = null,
+
+    /** Feature configuration information */
+    @SerialName("feature_config")
+    val featureConfig: PropertyFeatureConfig? = null,
+
+    /** Property with mixed unicode: café, naïve, 日本語 */
+    @SerialName("mixed_unicode")
+    val mixedUnicode: PropertyMixedUnicode? = null,
+
+    /** Mixed type enum */
+    @SerialName("mixed_value")
+    val mixedValue: PropertyMixedValue? = null,
 
     /** An array with items that can be string or integer */
     @SerialName("multi_type_array")
@@ -484,9 +925,17 @@ data class TrackUserSignedUpProperties(
     @SerialName("nested_empty_object")
     val nestedEmptyObject: PropertyNestedEmptyObject? = null,
 
+    /** Nested property with empty object not allowing additional properties */
+    @SerialName("nested_empty_object_no_additional_props")
+    val nestedEmptyObjectNoAdditionalProps: Unit? = null,
+
     /** An object field with no defined structure */
     @SerialName("object_property")
     val objectProperty: PropertyObjectProperty? = null,
+
+    /** Priority level */
+    @SerialName("priority")
+    val priority: PropertyPriority? = null,
 
     /** User profile data */
     @SerialName("profile")
@@ -500,6 +949,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("property_of_any")
     val propertyOfAny: PropertyPropertyOfAny? = null,
 
+    /** Rating value */
+    @SerialName("rating")
+    val rating: PropertyRating? = null,
+
     /** User account status */
     @SerialName("status")
     val status: PropertyStatus? = null,
@@ -508,13 +961,29 @@ data class TrackUserSignedUpProperties(
     @SerialName("tags")
     val tags: PropertyTags? = null,
 
+    /** Property using custom type with Unicode */
+    @SerialName("unicode_custom_type")
+    val unicodeCustomType: PropertyUnicodeCustomType? = null,
+
+    /** Field demonstrating various Unicode characters in enum values */
+    @SerialName("unicode_enum_field")
+    val unicodeEnumField: PropertyUnicodeEnumField? = null,
+
     /** An array with no explicit item type (treated as any) */
     @SerialName("untyped_array")
     val untypedArray: PropertyUntypedArray? = null,
 
     /** A field with no explicit type (treated as any) */
     @SerialName("untyped_field")
-    val untypedField: PropertyUntypedField? = null
+    val untypedField: PropertyUntypedField? = null,
+
+    /** User access information */
+    @SerialName("user_access")
+    val userAccess: PropertyUserAccess? = null,
+
+    /** Username in Chinese characters */
+    @SerialName("用户名")
+    val 用户名: Property用户名? = null
 ) {
     /** example of object property */
     @Serializable
@@ -587,11 +1056,43 @@ class RudderAnalytics(private val analytics: Analytics) {
     }
 
     /**
+     * Empty event schema with additionalProperties false
+     */
+    fun trackEmptyEventNoAdditionalProps() {
+        analytics.track(
+            name = "Empty Event No Additional Props",
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Empty event schema with additionalProperties true
+     */
+    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties) {
+        analytics.track(
+            name = "Empty Event With Additional Props",
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
      * Example event to demonstrate variants
      */
     fun trackEventWithVariants(properties: TrackEventWithVariantsProperties) {
         analytics.track(
             name = "Event With Variants",
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Triggered when user clicks on a "premium" product /\* important *\/
+     */
+    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties) {
+        analytics.track(
+            name = "Product \"Premium\" Clicked",
             properties = json.encodeToJsonElement(properties).jsonObject,
             options = RudderOption(customContext = context)
         )

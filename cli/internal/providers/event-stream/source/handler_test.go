@@ -153,10 +153,11 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 	t.Run("Validate", func(t *testing.T) {
 		testCases := []struct {
-			name          string
-			specs         []*specs.Spec
-			expectedError bool
-			errorMessage  string
+			name                   string
+			externalGraphResources []*resources.Resource
+			specs                  []*specs.Spec
+			expectedError          bool
+			errorMessage           string
 		}{
 			{
 				name: "Valid sources",
@@ -249,10 +250,57 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				expectedError: true,
 				errorMessage:  "type 'InvalidSDK' is invalid",
 			},
+			{
+				name: "Validates existence of tracking plan resource reference",
+				externalGraphResources: []*resources.Resource{
+					resources.NewResource("tp-123", dcstate.TrackingPlanResourceType, resources.ResourceData{}, nil),
+				},
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":   "test-source-2",
+							"name": "Test Source 2",
+							"type": "ios",
+							"governance": map[string]interface{}{
+								"validations": map[string]interface{}{
+									"tracking_plan": "#/tracking-plans/some-name/tp-123",
+									"config":        map[string]interface{}{},
+								},
+							},
+						},
+					},
+				},
+				expectedError: false,
+			},
+			{
+				name: "Invalid tracking plan reference",
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":   "test-source-3",
+							"name": "Test Source 3",
+							"type": "ios",
+							"governance": map[string]interface{}{
+								"validations": map[string]interface{}{
+									"tracking_plan": "#/tracking-plans/some-name/non-existent-tp",
+									"config":        map[string]interface{}{},
+								},
+							},
+						},
+					},
+				},
+				expectedError: true,
+				errorMessage:  "validating event stream source spec: tracking plan with URN 'tracking-plan:non-existent-tp' not found in the project",
+			},
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
@@ -261,7 +309,12 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				err := handler.Validate()
+				// Add external resources to the graph
+				graph := resources.NewGraph()
+				for _, res := range tc.externalGraphResources {
+					graph.AddResource(res)
+				}
+				err := handler.Validate(graph)
 
 				if tc.expectedError {
 					assert.Error(t, err)

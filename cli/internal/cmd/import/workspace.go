@@ -58,7 +58,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				telemetry.TrackCommand("import workspace", err)
 			}()
 
-			spinner := ui.NewSpinner("Importing, please wait!")
+			spinner := ui.NewSpinner("Importing ...")
 			spinner.Start()
 
 			err = importer.WorkspaceImport(cmd.Context(), location, deps.CompositeProvider())
