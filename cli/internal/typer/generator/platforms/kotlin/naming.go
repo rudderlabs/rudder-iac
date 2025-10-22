@@ -73,17 +73,66 @@ func getOrRegisterPropertyTypeTypeName(property *plan.Property, nameRegistry *co
 	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
 }
 
+// getOrRegisterEnumValue returns the registered enum value name for an enum value
+// Uses the enum's scope to ensure values within the same enum are deduplicated
+// typeName should be the name of the Kotlin type that contains the enum
+func getOrRegisterEnumValue(typeName string, value any, nameRegistry *core.NameRegistry) (string, error) {
+	enumScope := fmt.Sprintf("enum:%s", typeName)
+	formatted := FormatEnumValue(value)
+	valueKey := fmt.Sprintf("%v", value)
+
+	// If FormatEnumValue returns empty string (e.g., for emojis or symbols only),
+	// use underscore as a placeholder which will be numbered by the collision handler
+	if formatted == "" {
+		formatted = "_"
+	}
+
+	// Check if the result is only underscores (_, __, ___, etc.)
+	// These are reserved in Kotlin, so we need to append a number
+	// by registering a dummy enum id to trigger the collision handler
+	isOnlyUnderscores := true
+	for _, r := range formatted {
+		if r != '_' {
+			isOnlyUnderscores = false
+			break
+		}
+	}
+	if isOnlyUnderscores {
+		_, err := nameRegistry.RegisterName(fmt.Sprintf("enum:placeholder:%s", formatted), enumScope, formatted)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	n, err := nameRegistry.RegisterName(valueKey, enumScope, formatted)
+	if err != nil {
+		return "", fmt.Errorf("failed to register name for enum %q", typeName)
+	}
+
+	return n, nil
+}
+
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
 	formatted := fmt.Sprintf("%v", value)
 	formatted = strings.TrimSpace(formatted)
-	formatted = core.ReplaceSpecialCharacters(formatted, "_")
-	words := core.SplitIntoWords(formatted)
+	afterReplacement := core.ReplaceSpecialCharacters(formatted, "_")
+
+	words := core.SplitIntoWords(afterReplacement)
 	if len(words) == 0 {
-		return ""
+		// If no words were found, check if we have underscores from special char replacement
+		// This handles cases like "!!!" -> "___" where the underscores should be preserved
+		if len(afterReplacement) > 0 && strings.Trim(afterReplacement, "_") == "" {
+			// The string contains only underscores, preserve them
+			formatted = afterReplacement
+		} else {
+			// Empty or whitespace only
+			return ""
+		}
+	} else {
+		formatted = strings.Join(words, "_")
 	}
 
-	formatted = strings.Join(words, "_")
 	formatted = strings.ToUpper(formatted)
 	formatted = handleStartingCharacter(formatted)
 	formatted = handleReservedKeyword(formatted)
