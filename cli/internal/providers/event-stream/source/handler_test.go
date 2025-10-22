@@ -1201,7 +1201,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}, resource789)
 		})
 
-		t.Run("tracking plan not found - ErrRemoteResourceNotFound", func(t *testing.T) {
+		t.Run("tracking plan not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream source that has a tracking plan
@@ -1229,7 +1229,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}
 			collection.Set(source.ResourceType, resourceMap)
-			// Note: Not adding tracking plan to collection, so GetURNByID will return ErrRemoteResourceNotFound
+			// Note: adding tracking plan without externalID to collection, so GetURNByID will return ErrRemoteResourceExternalIdNotFound
+			trackingPlanResourceMap := map[string]*resources.RemoteResource{
+				"remote-tp-123": {
+					ID:         "remote-tp-123",
+				},
+			}
+			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
 			st, err := handler.LoadStateFromResources(context.Background(), collection)
 

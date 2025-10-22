@@ -431,8 +431,8 @@ func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
 			tpURN, err := collection.GetURNByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
-			if err == resources.ErrRemoteResourceNotFound {
-				// ErrRemoteResourceNotFound would happen if the source was created via CLI
+			if err == resources.ErrRemoteResourceExternalIdNotFound {
+				// ErrRemoteResourceExternalIdNotFound would happen if the source was created via CLI
 				// but the tracking plan was created and linked via the UI/API
 				trackingPlanURN = nil
 			} else if err != nil {
