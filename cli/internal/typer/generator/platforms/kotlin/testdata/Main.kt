@@ -152,9 +152,9 @@ enum class CustomTypeStatus {
 @Serializable
 enum class CustomTypeТипыДанных {
     @SerialName("активный")
-    ,
+    АКТИВНЫЙ,
     @SerialName("неактивный")
-    ,
+    НЕАКТИВНЫЙ,
     @SerialName("pending")
     PENDING
 }
@@ -178,12 +178,6 @@ enum class PropertyDeviceType {
 @Serializable
 enum class PropertyUnicodeEnumField {
     @SerialName("🎯")
-    ,
-    @SerialName("✅")
-    ,
-    @SerialName("❌")
-    ,
-    @SerialName("🚀"),    
     _1,
     @SerialName("✅")
     _2,

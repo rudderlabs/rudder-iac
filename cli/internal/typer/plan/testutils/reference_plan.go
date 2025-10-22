@@ -662,10 +662,3 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	}
 }
-
-// Constants for test assertions based on the reference plan
-const (
-	ExpectedCustomTypeCount = 14 // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context, user_access, feature_config
-	ExpectedPropertyCount   = 33 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array, user_access, feature_flag, feature_config
-	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
-)
