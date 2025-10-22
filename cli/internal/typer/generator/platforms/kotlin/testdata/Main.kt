@@ -33,6 +33,9 @@ typealias CustomTypeEmail = String
 /** List of email addresses */
 typealias CustomTypeEmailList = List<CustomTypeEmail>
 
+/** Empty object that does not allow additional properties */
+typealias CustomTypeEmptyObjectNoAdditionalProps = Unit
+
 /** Empty object that allows additional properties */
 typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
 
@@ -60,6 +63,9 @@ typealias PropertyEmail = CustomTypeEmail
 /** User's email addresses */
 typealias PropertyEmailList = CustomTypeEmailList
 
+/** Property with empty object not allowing additional properties */
+typealias PropertyEmptyObjectNoAdditionalProps = CustomTypeEmptyObjectNoAdditionalProps
+
 /** Property with empty object allowing additional properties */
 typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
 
@@ -86,6 +92,9 @@ typealias PropertyNestedContext = JsonObject
 
 /** Nested property with empty object allowing additional properties */
 typealias PropertyNestedEmptyObject = JsonObject
+
+/** Nested property with empty object not allowing additional properties */
+typealias PropertyNestedEmptyObjectNoAdditionalProps = JsonObject
 
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
@@ -137,6 +146,9 @@ typealias PropertyUserAccess = CustomTypeUserAccess
 
 /** Username in Chinese characters */
 typealias Property用户名 = String
+
+/** Empty event schema with additionalProperties true */
+typealias TrackEmptyEventWithAdditionalPropsProperties = JsonObject
 
 /** User status enum */
 @Serializable(with = RudderCustomTypeStatusSerializer::class)
@@ -510,6 +522,17 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         }
     }
 
+    /** Home page variant with no additional properties */
+    @Serializable
+    class CaseHome() : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "home"
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+
     /** Default case */
     @Serializable
     data class Default(
@@ -866,6 +889,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("email_list")
     val emailList: PropertyEmailList? = null,
 
+    /** Property with empty object not allowing additional properties */
+    @SerialName("empty_object_no_additional_props")
+    val emptyObjectNoAdditionalProps: PropertyEmptyObjectNoAdditionalProps? = null,
+
     /** Property with empty object allowing additional properties */
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
@@ -897,6 +924,10 @@ data class TrackUserSignedUpProperties(
     /** Nested property with empty object allowing additional properties */
     @SerialName("nested_empty_object")
     val nestedEmptyObject: PropertyNestedEmptyObject? = null,
+
+    /** Nested property with empty object not allowing additional properties */
+    @SerialName("nested_empty_object_no_additional_props")
+    val nestedEmptyObjectNoAdditionalProps: Unit? = null,
 
     /** An object field with no defined structure */
     @SerialName("object_property")
@@ -1019,6 +1050,27 @@ class RudderAnalytics(private val analytics: Analytics) {
         analytics.screen(
             screenName = screenName,
             category = category,
+            properties = json.encodeToJsonElement(properties).jsonObject,
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Empty event schema with additionalProperties false
+     */
+    fun trackEmptyEventNoAdditionalProps() {
+        analytics.track(
+            name = "Empty Event No Additional Props",
+            options = RudderOption(customContext = context)
+        )
+    }
+
+    /**
+     * Empty event schema with additionalProperties true
+     */
+    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties) {
+        analytics.track(
+            name = "Empty Event With Additional Props",
             properties = json.encodeToJsonElement(properties).jsonObject,
             options = RudderOption(customContext = context)
         )

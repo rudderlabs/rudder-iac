@@ -104,7 +104,7 @@ func createVariantSealedClass(
 	// Create abstract discriminator property
 	var abstractProperties []KotlinProperty
 	if discriminatorProp, exists := baseSchema.Properties[variant.Discriminator]; exists {
-		kotlinType, err := getOrRegisterPropertyTypeTypeName(&discriminatorProp.Property, nameRegistry)
+		kotlinType, err := getOrRegisterPropertyTypeName(&discriminatorProp.Property, nameRegistry)
 		if err != nil {
 			return nil, err
 		}
@@ -200,11 +200,16 @@ func createSealedSubclass(
 		return nil, err
 	}
 
+	// Determine if this should be a data class or regular class
+	// Data classes require at least one constructor parameter
+	isDataClass := len(constructorProps) > 0
+
 	return &KotlinSealedSubclass{
 		Name:           subclassName,
 		Comment:        comment,
 		Properties:     constructorProps,
 		BodyProperties: bodyProps,
+		IsDataClass:    isDataClass,
 	}, nil
 }
 
@@ -256,7 +261,7 @@ func mergeVariantSchemaProperties(
 
 		// Special handling for discriminator property
 		if name == discriminatorProp {
-			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -302,7 +307,7 @@ func mergeVariantSchemaProperties(
 			}
 		} else {
 			// Regular property handling - always goes in constructor
-			kotlinType, err := getOrRegisterPropertyTypeTypeName(&propSchema.Property, nameRegistry)
+			kotlinType, err := getOrRegisterPropertyTypeName(&propSchema.Property, nameRegistry)
 			if err != nil {
 				return nil, nil, err
 			}

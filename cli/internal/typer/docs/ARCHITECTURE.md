@@ -73,12 +73,10 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
   - Context-driven rendering
 - **Example**: `typealias.tmpl` for Kotlin type aliases
 
-### Components Not Yet Implemented
+### JSON Schema Plan Provider
 
-- **PlanProvider**: Abstraction for tracking plan retrieval (planned)
-- **FileManager**: File system operations handler (planned)
-- **RudderTyper Orchestrator**: Main coordination component (planned)
-- **TyperCommand**: CLI integration (planned)
+- **Purpose**: Parses JSON Schema definitions into TrackingPlan domain models
+- **Current Implementation**: Located in `cli/internal/typer/plan/providers/jsonschema.go`
 
 ## Core Models
 

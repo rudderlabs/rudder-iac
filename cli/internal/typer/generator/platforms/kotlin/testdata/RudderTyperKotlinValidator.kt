@@ -177,7 +177,6 @@ fun main() {
         )
     )
 
-    
     println("\nTesting trackUserSignedUp() with feature_config enabled (boolean true)...")
     typer.trackUserSignedUp(
         properties = TrackUserSignedUpProperties(
@@ -322,6 +321,20 @@ fun main() {
                 email = "all.enums@example.com",
                 firstName = "Michael"
             )
+        )
+    )
+
+    println("\nTesting trackUserSignedUp() with Unit serialization...")
+    typer.trackUserSignedUp(
+        properties = TrackUserSignedUpProperties(
+            active = true,
+            profile = CustomTypeUserProfile(
+                email = "unit.test@example.com",
+                firstName = "Unit",
+                lastName = "Test"
+            ),
+            nestedEmptyObjectNoAdditionalProps = Unit,
+            tags = listOf("unit", "test")
         )
     )
 

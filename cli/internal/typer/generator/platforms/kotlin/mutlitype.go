@@ -9,7 +9,7 @@ import (
 
 // createPropertyMultiTypeSealedClass creates a sealed class for a property with multiple types
 func createPropertyMultiTypeSealedClass(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinSealedClass, error) {
-	className, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
+	className, err := getOrRegisterPropertyTypeName(property, nameRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func createMultiTypeSealedClass(className string, comment string, types []plan.P
 			primitiveType := *plan.AsPrimitiveType(propertyType)
 			subclass, err := createMultiTypeSubclass(primitiveType, nameRegistry)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to create subclass for %q primitive type %s: %w", className, primitiveType, err)
 			}
 			subclasses = append(subclasses, *subclass)
 		} else {
@@ -114,5 +114,6 @@ func createMultiTypeSubclass(primitiveType plan.PrimitiveType, nameRegistry *cor
 				Override:   true,
 			},
 		},
+		IsDataClass: true,
 	}, nil
 }
