@@ -285,11 +285,35 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("Import", func(t *testing.T) {
-		provider := eventstream.New(source.NewMockSourceClient())
+		mockClient := source.NewMockSourceClient()
+		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+			return []sourceClient.EventStreamSource{
+				{
+					ID:         "remote-123",
+					ExternalID: "",
+					Name:       "Existing Source",
+					Type:       "javascript",
+					Enabled:    true,
+				},
+			}, nil
+		})
+		provider := eventstream.New(mockClient)
 		ctx := context.Background()
-		_, err := provider.Import(ctx, "test-source", source.ResourceType, nil, "workspace-123", "remote-123")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "importing event stream source is not supported")
+
+		data := resources.ResourceData{
+			"name":    "Updated Source",
+			"enabled": false,
+			"type":    "javascript",
+		}
+
+		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "workspace-123", "remote-123")
+		require.NoError(t, err)
+		assert.Equal(t, &resources.ResourceData{
+			"id": "remote-123",
+		}, result)
+		assert.True(t, mockClient.GetSourcesCalled())
+		assert.True(t, mockClient.UpdateCalled())
+		assert.True(t, mockClient.SetExternalIDCalled())
 	})
 
 	t.Run("LoadResourcesFromRemote", func(t *testing.T) {

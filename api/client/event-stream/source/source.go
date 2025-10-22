@@ -15,6 +15,7 @@ type SourceStore interface {
 	Create(ctx context.Context, source *CreateSourceRequest) (*CreateUpdateSourceResponse, error)
 	Update(ctx context.Context, sourceId string, source *UpdateSourceRequest) (*CreateUpdateSourceResponse, error)
 	Delete(ctx context.Context, sourceId string) error
+	SetExternalID(ctx context.Context, sourceId string, externalID string) error
 	GetSources(ctx context.Context) ([]EventStreamSource, error)
 }
 
@@ -70,6 +71,19 @@ func (r *rudderSourceStore) Delete(ctx context.Context, sourceId string) error {
 		return fmt.Errorf("deleting event stream source: %w", err)
 	}
 	return nil
+}
+
+func (r *rudderSourceStore) SetExternalID(ctx context.Context, sourceId string, externalID string) error {
+	path := fmt.Sprintf("%s/%s/external-id", prefix, sourceId)
+	data, err := json.Marshal(SetExternalIDRequest{ExternalID: externalID})
+	if err != nil {
+		return fmt.Errorf("marshalling set external ID request: %w", err)
+	}
+	_, err = r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("setting external ID for event stream source: %w", err)
+	}
+	return err
 }
 
 func (r *rudderSourceStore) GetSources(ctx context.Context) ([]EventStreamSource, error) {
