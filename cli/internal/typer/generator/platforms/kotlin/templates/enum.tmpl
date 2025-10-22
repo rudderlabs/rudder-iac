@@ -15,7 +15,7 @@ private object Rudder{{ .Name }}Serializer : KSerializer<{{ .Name }}> {
     override fun serialize(encoder: Encoder, value: {{ .Name }}) {
         val jsonValue = when (value) {
             {{- range .Values }}
-            {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ .Value }})
+            {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ formatLiteral .Value }})
             {{- end }}
         }
         encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)

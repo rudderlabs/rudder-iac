@@ -30,7 +30,7 @@ type KotlinDataClass struct {
 // KotlinEnumValue represents a single value in a Kotlin enum
 type KotlinEnumValue struct {
 	Name  string // The Kotlin constant name (e.g., "GET")
-	Value string // The formatted Kotlin literal ready for JsonPrimitive (e.g., "\"GET\"" for strings, "200" for numbers)
+	Value any    // The (unformatted) value associated with the enum constant (e.g., "GET")
 }
 
 // KotlinEnum represents a Kotlin enum class declaration

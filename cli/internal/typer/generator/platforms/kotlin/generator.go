@@ -455,27 +455,6 @@ func hasEnumConfig(config *plan.PropertyConfig) bool {
 	return config != nil && config.Enum != nil && len(config.Enum) > 0
 }
 
-// formatEnumValueForKotlin converts a Go value to a Kotlin literal ready for JsonPrimitive
-func formatEnumValueForKotlin(value any) string {
-	switch v := value.(type) {
-	case string:
-		// For strings, use %q to get a quoted, escaped string
-		return fmt.Sprintf("%q", v)
-	case int, int32, int64:
-		// For integers, format as-is
-		return fmt.Sprintf("%v", v)
-	case float32, float64:
-		// For floats, format as-is (Go will handle precision)
-		return fmt.Sprintf("%v", v)
-	case bool:
-		// For booleans, format as lowercase true/false
-		return fmt.Sprintf("%v", v)
-	default:
-		// For any other type, attempt string formatting
-		return fmt.Sprintf("%v", v)
-	}
-}
-
 // createPropertyEnum creates a KotlinEnum from a property with enum constraints
 func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry) (*KotlinEnum, error) {
 	enumName, err := getOrRegisterPropertyTypeTypeName(property, nameRegistry)
@@ -493,7 +472,7 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 
 		enumValues = append(enumValues, KotlinEnumValue{
 			Name:  registeredName,
-			Value: formatEnumValueForKotlin(value),
+			Value: value,
 		})
 	}
 
@@ -521,7 +500,7 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 
 		enumValues = append(enumValues, KotlinEnumValue{
 			Name:  registeredName,
-			Value: formatEnumValueForKotlin(value),
+			Value: value,
 		})
 	}
 
