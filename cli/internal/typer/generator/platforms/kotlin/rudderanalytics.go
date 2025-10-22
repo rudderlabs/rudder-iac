@@ -65,8 +65,7 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 	method.SDKCall = SDKCall{
 		MethodName: "track",
 		Arguments: []SDKCallArgument{
-			// TODO: Handle proper escaping of event name
-			{Name: "name", Value: fmt.Sprintf("\"%s\"", rule.Event.Name)},
+			{Name: "name", Value: rule.Event.Name, IsLiteral: true},
 			{Name: paramName, Value: paramName, ShouldSerialize: true},
 		},
 	}
@@ -87,7 +86,7 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 	}
 
 	method.MethodArguments = []KotlinMethodArgument{
-		{Name: "userId", Type: "String", Default: "\"\""},
+		{Name: "userId", Type: "String", Default: "", IsLiteralDefault: true},
 		{Name: paramName, Type: className},
 	}
 	method.SDKCall = SDKCall{
@@ -142,7 +141,7 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 
 	method.MethodArguments = []KotlinMethodArgument{
 		{Name: "screenName", Type: "String", Nullable: false},
-		{Name: "category", Type: "String", Default: "\"\""},
+		{Name: "category", Type: "String", Default: "", IsLiteralDefault: true},
 		{Name: paramName, Type: className, Nullable: false},
 	}
 	method.SDKCall = SDKCall{

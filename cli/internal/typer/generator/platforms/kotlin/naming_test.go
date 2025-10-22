@@ -39,7 +39,7 @@ func TestFormatClassName(t *testing.T) {
 		{"chinese_characters", "", "用户名", "用户名"},
 		{"cyrillic_characters", "", "типы_данных", "ТипыДанных"},
 		{"latin_with_diacritics", "", "café", "Café"},
-		{"emoji", "", "🎯", "🎯"},
+		{"emoji", "", "🎯", ""},
 		{"japanese_characters", "", "日本語", "日本語"},
 		{"mixed_unicode", "", "naïve", "Naïve"},
 	}

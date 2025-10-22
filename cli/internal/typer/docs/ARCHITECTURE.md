@@ -134,7 +134,8 @@ These helper methods provide convenient access to nested data without violating 
 **Template Design Principles**:
 
 - **Platform-specific contexts**: Each platform defines context types for all supported code constructs (e.g., Kotlin supports both type aliases for primitive types and data classes for object types)
-- **Pre-processed values**: All values are escaped, formatted, and ready for template rendering with no additional processing required
+- **Semantic vs. syntax separation**: Context values contain semantic content (what to generate), while templates handle syntax-level formatting (escaping, quoting) via template functions
+- **Pre-processed semantics**: All semantic decisions (names, types, structure) are made in generators and stored in context
 - **Minimal conditional logic**: Templates focus on formatting rather than business logic
 - **Construct-specific modeling**: Different context types for different code constructs ensure templates remain simple and focused
 
@@ -144,10 +145,10 @@ These helper methods provide convenient access to nested data without violating 
 
 ### Separation of Concerns
 
-- TrackingPlan: Pure domain representation
-- TemplateContext: Pure code construct representation
-- Generators: Business logic transformation layer
-- Templates: Minimal formatting logic
+- TrackingPlan: Pure domain representation (platform-agnostic)
+- TemplateContext: Platform-specific code construct representation with semantic content
+- Generators: Business logic transformation layer (semantic decisions)
+- Templates: Syntax-level formatting (escaping, indentation, quoting) via template functions
 
 ### Extensibility
 
@@ -190,6 +191,59 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 - **Coverage**: Includes primitive custom types (email, age, active), object custom types (user_profile), nested properties, and comprehensive event rules for all RudderStack event types
 - **Event Types**: Covers Track events (with custom names), Identify, Page, Screen, and Group events with both Properties and Traits sections
 - **Constants**: Defines expected counts for validation (`ExpectedCustomTypeCount`, `ExpectedPropertyCount`, `ExpectedEventCount`)
+
+#### Modifying the Reference Plan
+
+When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
+
+1. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go`
+2. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
+3. **Update the constants** at the bottom of `reference_plan.go`:
+   - `ExpectedCustomTypeCount` - increment for each new custom type
+   - `ExpectedPropertyCount` - increment for each new property
+   - `ExpectedEventCount` - increment for each new event
+4. **Update the test expectations** in `cli/internal/typer/plan/helpers_test.go`:
+   - Add new property names to the `expectedNames` slice in `TestExtractAllProperties`
+   - Add new custom type names to the `expectedNames` slice in `TestExtractAllCustomTypes` (if applicable)
+5. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+
+**Common Mistakes to Avoid**:
+- ❌ Adding properties to ReferenceProperties but forgetting to add them to the expectedNames list in helpers_test.go
+- ❌ Adding properties to event rules but not incrementing ExpectedPropertyCount
+- ❌ Forgetting to regenerate testdata after reference plan changes
+- ❌ Updating constants but not the corresponding test assertions
+
+**Workflow Example**:
+```go
+// 1. Add property to reference plan
+ReferenceProperties["new_field"] = &plan.Property{
+    Name: "new_field",
+    Description: "New test field",
+    Types: []plan.PropertyType{plan.PrimitiveTypeString},
+}
+
+// 2. Use it in an event rule
+rules = append(rules, plan.EventRule{
+    Event: *ReferenceEvents["Some Event"],
+    Schema: plan.ObjectSchema{
+        Properties: map[string]plan.PropertySchema{
+            "new_field": {
+                Property: *ReferenceProperties["new_field"],
+                Required: true,
+            },
+        },
+    },
+})
+
+// 3. Update constants
+ExpectedPropertyCount = 32  // was 31, now 32
+
+// 4. Update helpers_test.go
+expectedNames := []string{"...", "new_field", "..."}  // Add to list
+
+// 5. Regenerate testdata
+// Run: make typer-kotlin-update-testdata
+```
 
 ### Benefits
 
@@ -259,7 +313,7 @@ The validator uses the same test data as the unit tests (`testdata/Main.kt`), en
 
 ### Template Development
 
-- Keep logic minimal
-- Pre-process all values in generators
+- Keep business logic minimal (no semantic decisions)
+- Handle syntax-level formatting via template functions (escaping, quoting)
 - Use specific context types for different constructs
-- Avoid raw tracking plan access
+- Avoid raw tracking plan access in templates
