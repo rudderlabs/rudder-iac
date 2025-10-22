@@ -30,12 +30,22 @@ type Lister struct {
 	ColumnWidths map[string]int
 }
 
-type ListProvider interface {
-	List(ctx context.Context, resourceType string, filters Filters) ([]resources.ResourceData, error)
+type ListOption func(*Lister)
+
+func WithFormat(format OutputFormat) ListOption {
+	return func(l *Lister) {
+		l.Format = format
+	}
 }
 
-func (l *Lister) SetColumnWidths(widths map[string]int) {
-	l.ColumnWidths = widths
+func WithColumnWidths(widths map[string]int) ListOption {
+	return func(l *Lister) {
+		l.ColumnWidths = widths
+	}
+}
+
+type ListProvider interface {
+	List(ctx context.Context, resourceType string, filters Filters) ([]resources.ResourceData, error)
 }
 
 func (l *Lister) List(ctx context.Context, resourceType string, filters Filters) error {
@@ -76,10 +86,14 @@ func printResourcesAsJSON(resources []resources.ResourceData) error {
 	return nil
 }
 
-func New(p ListProvider, format OutputFormat) *Lister {
-	return &Lister{
+func New(p ListProvider, opts ...ListOption) *Lister {
+	l := &Lister{
 		Provider:     p,
-		Format:       format,
+		Format:       TableFormat,
 		ColumnWidths: map[string]int{},
 	}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l
 }
