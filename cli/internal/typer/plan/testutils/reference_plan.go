@@ -497,6 +497,46 @@ func init() {
 		Description: "Property using custom type with Unicode",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["типы_данных"]},
 	}
+
+	// Integer enum for testing non-string enum serialization
+	ReferenceProperties["priority"] = &plan.Property{
+		Name:        "priority",
+		Description: "Priority level",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeInteger},
+		Config: &plan.PropertyConfig{
+			Enum: []any{1, 2, 3},
+		},
+	}
+
+	// Boolean enum for testing non-string enum serialization
+	ReferenceProperties["enabled"] = &plan.Property{
+		Name:        "enabled",
+		Description: "Feature enabled flag",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeBoolean},
+		Config: &plan.PropertyConfig{
+			Enum: []any{true, false},
+		},
+	}
+
+	// Float enum for testing non-string enum serialization
+	ReferenceProperties["rating"] = &plan.Property{
+		Name:        "rating",
+		Description: "Rating value",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeNumber},
+		Config: &plan.PropertyConfig{
+			Enum: []any{1.5, 2.5, 3.5, 4.5, 5.0},
+		},
+	}
+
+	// Mixed-type enum for testing non-string enum serialization
+	ReferenceProperties["mixed_value"] = &plan.Property{
+		Name:        "mixed_value",
+		Description: "Mixed type enum",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"active", 1, true, 2.5},
+		},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -540,6 +580,10 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"unicode_enum_field":  {Property: *ReferenceProperties["unicode_enum_field"]},
 				"mixed_unicode":       {Property: *ReferenceProperties["mixed_unicode"]},
 				"unicode_custom_type": {Property: *ReferenceProperties["unicode_custom_type"]},
+				"priority":            {Property: *ReferenceProperties["priority"]},
+				"enabled":             {Property: *ReferenceProperties["enabled"]},
+				"rating":              {Property: *ReferenceProperties["rating"]},
+				"mixed_value":         {Property: *ReferenceProperties["mixed_value"]},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],

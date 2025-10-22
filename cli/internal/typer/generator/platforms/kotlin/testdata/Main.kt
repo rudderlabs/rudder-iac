@@ -136,61 +136,221 @@ typealias PropertyUserAccess = CustomTypeUserAccess
 typealias Property用户名 = String
 
 /** User status enum */
-@Serializable
+@Serializable(with = RudderCustomTypeStatusSerializer::class)
 enum class CustomTypeStatus {
-    @SerialName("pending")
     PENDING,
-    @SerialName("active")
     ACTIVE,
-    @SerialName("suspended")
     SUSPENDED,
-    @SerialName("deleted")
     DELETED
 }
 
+private object RudderCustomTypeStatusSerializer : KSerializer<CustomTypeStatus> {
+    override val descriptor = buildClassSerialDescriptor("CustomTypeStatus")
+
+    override fun serialize(encoder: Encoder, value: CustomTypeStatus) {
+        val jsonValue = when (value) {
+            CustomTypeStatus.PENDING -> JsonPrimitive("pending")
+            CustomTypeStatus.ACTIVE -> JsonPrimitive("active")
+            CustomTypeStatus.SUSPENDED -> JsonPrimitive("suspended")
+            CustomTypeStatus.DELETED -> JsonPrimitive("deleted")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): CustomTypeStatus {
+        throw SerializationException("Deserialization not supported for CustomTypeStatus")
+    }
+}
+
 /** Custom type with Cyrillic name */
-@Serializable
+@Serializable(with = RudderCustomTypeТипыДанныхSerializer::class)
 enum class CustomTypeТипыДанных {
-    @SerialName("активный")
     АКТИВНЫЙ,
-    @SerialName("неактивный")
     НЕАКТИВНЫЙ,
-    @SerialName("pending")
     PENDING
 }
 
+private object RudderCustomTypeТипыДанныхSerializer : KSerializer<CustomTypeТипыДанных> {
+    override val descriptor = buildClassSerialDescriptor("CustomTypeТипыДанных")
+
+    override fun serialize(encoder: Encoder, value: CustomTypeТипыДанных) {
+        val jsonValue = when (value) {
+            CustomTypeТипыДанных.АКТИВНЫЙ -> JsonPrimitive("активный")
+            CustomTypeТипыДанных.НЕАКТИВНЫЙ -> JsonPrimitive("неактивный")
+            CustomTypeТипыДанных.PENDING -> JsonPrimitive("pending")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): CustomTypeТипыДанных {
+        throw SerializationException("Deserialization not supported for CustomTypeТипыДанных")
+    }
+}
+
 /** Type of device */
-@Serializable
+@Serializable(with = RudderPropertyDeviceTypeSerializer::class)
 enum class PropertyDeviceType {
-    @SerialName("mobile")
     MOBILE,
-    @SerialName("tablet")
     TABLET,
-    @SerialName("desktop")
     DESKTOP,
-    @SerialName("smartTV")
     SMART_TV,
-    @SerialName("IoT-Device")
     IO_T_DEVICE
 }
 
-/** Field demonstrating various Unicode characters in enum values */
-@Serializable
-enum class PropertyUnicodeEnumField {
-    @SerialName("🎯")
+private object RudderPropertyDeviceTypeSerializer : KSerializer<PropertyDeviceType> {
+    override val descriptor = buildClassSerialDescriptor("PropertyDeviceType")
+
+    override fun serialize(encoder: Encoder, value: PropertyDeviceType) {
+        val jsonValue = when (value) {
+            PropertyDeviceType.MOBILE -> JsonPrimitive("mobile")
+            PropertyDeviceType.TABLET -> JsonPrimitive("tablet")
+            PropertyDeviceType.DESKTOP -> JsonPrimitive("desktop")
+            PropertyDeviceType.SMART_TV -> JsonPrimitive("smartTV")
+            PropertyDeviceType.IO_T_DEVICE -> JsonPrimitive("IoT-Device")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyDeviceType {
+        throw SerializationException("Deserialization not supported for PropertyDeviceType")
+    }
+}
+
+/** Feature enabled flag */
+@Serializable(with = RudderPropertyEnabledSerializer::class)
+enum class PropertyEnabled {
+    TRUE,
+    FALSE
+}
+
+private object RudderPropertyEnabledSerializer : KSerializer<PropertyEnabled> {
+    override val descriptor = buildClassSerialDescriptor("PropertyEnabled")
+
+    override fun serialize(encoder: Encoder, value: PropertyEnabled) {
+        val jsonValue = when (value) {
+            PropertyEnabled.TRUE -> JsonPrimitive(true)
+            PropertyEnabled.FALSE -> JsonPrimitive(false)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyEnabled {
+        throw SerializationException("Deserialization not supported for PropertyEnabled")
+    }
+}
+
+/** Mixed type enum */
+@Serializable(with = RudderPropertyMixedValueSerializer::class)
+enum class PropertyMixedValue {
+    ACTIVE,
     _1,
-    @SerialName("✅")
+    TRUE,
+    _2_5
+}
+
+private object RudderPropertyMixedValueSerializer : KSerializer<PropertyMixedValue> {
+    override val descriptor = buildClassSerialDescriptor("PropertyMixedValue")
+
+    override fun serialize(encoder: Encoder, value: PropertyMixedValue) {
+        val jsonValue = when (value) {
+            PropertyMixedValue.ACTIVE -> JsonPrimitive("active")
+            PropertyMixedValue._1 -> JsonPrimitive(1)
+            PropertyMixedValue.TRUE -> JsonPrimitive(true)
+            PropertyMixedValue._2_5 -> JsonPrimitive(2.5)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyMixedValue {
+        throw SerializationException("Deserialization not supported for PropertyMixedValue")
+    }
+}
+
+/** Priority level */
+@Serializable(with = RudderPropertyPrioritySerializer::class)
+enum class PropertyPriority {
+    _1,
     _2,
-    @SerialName("активный")
+    _3
+}
+
+private object RudderPropertyPrioritySerializer : KSerializer<PropertyPriority> {
+    override val descriptor = buildClassSerialDescriptor("PropertyPriority")
+
+    override fun serialize(encoder: Encoder, value: PropertyPriority) {
+        val jsonValue = when (value) {
+            PropertyPriority._1 -> JsonPrimitive(1)
+            PropertyPriority._2 -> JsonPrimitive(2)
+            PropertyPriority._3 -> JsonPrimitive(3)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyPriority {
+        throw SerializationException("Deserialization not supported for PropertyPriority")
+    }
+}
+
+/** Rating value */
+@Serializable(with = RudderPropertyRatingSerializer::class)
+enum class PropertyRating {
+    _1_5,
+    _2_5,
+    _3_5,
+    _4_5,
+    _5
+}
+
+private object RudderPropertyRatingSerializer : KSerializer<PropertyRating> {
+    override val descriptor = buildClassSerialDescriptor("PropertyRating")
+
+    override fun serialize(encoder: Encoder, value: PropertyRating) {
+        val jsonValue = when (value) {
+            PropertyRating._1_5 -> JsonPrimitive(1.5)
+            PropertyRating._2_5 -> JsonPrimitive(2.5)
+            PropertyRating._3_5 -> JsonPrimitive(3.5)
+            PropertyRating._4_5 -> JsonPrimitive(4.5)
+            PropertyRating._5 -> JsonPrimitive(5)
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyRating {
+        throw SerializationException("Deserialization not supported for PropertyRating")
+    }
+}
+
+/** Field demonstrating various Unicode characters in enum values */
+@Serializable(with = RudderPropertyUnicodeEnumFieldSerializer::class)
+enum class PropertyUnicodeEnumField {
+    _1,
+    _2,
     АКТИВНЫЙ,
-    @SerialName("已完成")
     已完成,
-    @SerialName("ενεργός")
     ΕΝΕΡΓΌΣ,
-    @SerialName("café")
     CAFÉ,
-    @SerialName("!!!")
     ___1
+}
+
+private object RudderPropertyUnicodeEnumFieldSerializer : KSerializer<PropertyUnicodeEnumField> {
+    override val descriptor = buildClassSerialDescriptor("PropertyUnicodeEnumField")
+
+    override fun serialize(encoder: Encoder, value: PropertyUnicodeEnumField) {
+        val jsonValue = when (value) {
+            PropertyUnicodeEnumField._1 -> JsonPrimitive("🎯")
+            PropertyUnicodeEnumField._2 -> JsonPrimitive("✅")
+            PropertyUnicodeEnumField.АКТИВНЫЙ -> JsonPrimitive("активный")
+            PropertyUnicodeEnumField.已完成 -> JsonPrimitive("已完成")
+            PropertyUnicodeEnumField.ΕΝΕΡΓΌΣ -> JsonPrimitive("ενεργός")
+            PropertyUnicodeEnumField.CAFÉ -> JsonPrimitive("café")
+            PropertyUnicodeEnumField.___1 -> JsonPrimitive("!!!")
+        }
+        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
+    }
+
+    override fun deserialize(decoder: Decoder): PropertyUnicodeEnumField {
+        throw SerializationException("Deserialization not supported for PropertyUnicodeEnumField")
+    }
 }
 
 abstract class SealedClassWithJson {
@@ -670,6 +830,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("empty_object_with_additional_props")
     val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
 
+    /** Feature enabled flag */
+    @SerialName("enabled")
+    val enabled: PropertyEnabled? = null,
+
     /** Feature configuration information */
     @SerialName("feature_config")
     val featureConfig: PropertyFeatureConfig? = null,
@@ -677,6 +841,10 @@ data class TrackUserSignedUpProperties(
     /** Property with mixed unicode: café, naïve, 日本語 */
     @SerialName("mixed_unicode")
     val mixedUnicode: PropertyMixedUnicode? = null,
+
+    /** Mixed type enum */
+    @SerialName("mixed_value")
+    val mixedValue: PropertyMixedValue? = null,
 
     /** An array with items that can be string or integer */
     @SerialName("multi_type_array")
@@ -694,6 +862,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("object_property")
     val objectProperty: PropertyObjectProperty? = null,
 
+    /** Priority level */
+    @SerialName("priority")
+    val priority: PropertyPriority? = null,
+
     /** User profile data */
     @SerialName("profile")
     val profile: PropertyProfile,
@@ -705,6 +877,10 @@ data class TrackUserSignedUpProperties(
     /** A field that can contain any type of value */
     @SerialName("property_of_any")
     val propertyOfAny: PropertyPropertyOfAny? = null,
+
+    /** Rating value */
+    @SerialName("rating")
+    val rating: PropertyRating? = null,
 
     /** User account status */
     @SerialName("status")

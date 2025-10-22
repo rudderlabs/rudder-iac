@@ -139,16 +139,6 @@ func FormatEnumValue(value any) string {
 	return formatted
 }
 
-func FormatEnumSerialName(value any) string {
-	switch v := value.(type) {
-	case string:
-		// For strings, preserve the original value with quotes
-		return fmt.Sprintf("%q", v)
-	default:
-		return fmt.Sprintf("%v", value)
-	}
-}
-
 // formatSealedSubclassName formats a match value into a valid Kotlin class name prefixed with "Case"
 func formatSealedSubclassName(matchValue any) string {
 	valueStr := fmt.Sprintf("%v", matchValue)
