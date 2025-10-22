@@ -114,5 +114,6 @@ func createMultiTypeSubclass(primitiveType plan.PrimitiveType, nameRegistry *cor
 				Override:   true,
 			},
 		},
+		IsDataClass: true,
 	}, nil
 }

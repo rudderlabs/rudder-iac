@@ -387,6 +387,14 @@ func init() {
 							},
 						},
 					},
+					{
+						DisplayName: "Home",
+						Match:       []any{"home"},
+						Description: "Home page variant with no additional properties",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{},
+						},
+					},
 				},
 				DefaultSchema: &plan.ObjectSchema{
 					Properties: map[string]plan.PropertySchema{

@@ -522,6 +522,17 @@ sealed class CustomTypePageContext : SealedClassWithJson() {
         }
     }
 
+    /** Home page variant with no additional properties */
+    @Serializable
+    class CaseHome() : CustomTypePageContext() {
+        /** Type of page */
+        @SerialName("page_type")
+        override val pageType: PropertyPageType = "home"
+        override val _jsonElement: JsonElement = buildJsonObject {
+            put("page_type", Json.encodeToJsonElement(pageType))
+        }
+    }
+
     /** Default case */
     @Serializable
     data class Default(
