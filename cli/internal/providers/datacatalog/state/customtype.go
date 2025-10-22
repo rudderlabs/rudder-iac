@@ -185,16 +185,23 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	properties := make([]*CustomTypeProperty, 0, len(customType.Properties))
 	for _, prop := range customType.Properties {
 		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
-		if err != nil {
+		switch {
+		case err == nil:
+			properties = append(properties, &CustomTypeProperty{
+				Required: prop.Required,
+				RefToID: resources.PropertyRef{
+					URN:      urn,
+					Property: "id",
+				},
+			})
+		case err == resources.ErrRemoteResourceExternalIdNotFound:
+			properties = append(properties, &CustomTypeProperty{
+				Required: prop.Required,
+				RefToID: nil,
+			})
+		default:
 			return err
 		}
-		properties = append(properties, &CustomTypeProperty{
-			Required: prop.Required,
-			RefToID: resources.PropertyRef{
-				URN:      urn,
-				Property: "id",
-			},
-		})
 	}
 	// sort properties by RefToID.URN
 	sort.Slice(properties, func(i, j int) bool {
@@ -217,14 +224,18 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 		for _, item := range customType.ItemDefinitions {
 			id := MustString(item.(map[string]interface{}), "id")
 			urn, err := getURNFromRemoteId(CustomTypeResourceType, id)
-			if err != nil {
+			switch {
+			case err == nil:
+				args.Config["itemTypes"] = []any{
+					resources.PropertyRef{
+						URN:      urn,
+						Property: "name",
+					},
+				}
+			case err == resources.ErrRemoteResourceExternalIdNotFound:
+				args.Config["itemTypes"] = []any{nil}
+			default:
 				return err
-			}
-			args.Config["itemTypes"] = []any{
-				resources.PropertyRef{
-					URN:      urn,
-					Property: "name",
-				},
 			}
 			// we only support one itemdefinition, so we dont need to loop over the whole array
 			break

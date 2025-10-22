@@ -118,12 +118,16 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 	// Check if the property is referring to a customType using property.DefinitionId
 	if property.DefinitionId != "" {
 		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.DefinitionId)
-		if err != nil {
+		switch {
+		case err == nil:
+			args.Type = resources.PropertyRef{
+				URN:      urn,
+				Property: "name",
+			}
+		case err == resources.ErrRemoteResourceExternalIdNotFound:
+			args.Type = nil
+		default:
 			return err
-		}
-		args.Type = resources.PropertyRef{
-			URN:      urn,
-			Property: "name",
 		}
 		args.Config = map[string]interface{}{}
 	}
@@ -131,17 +135,21 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 	// Handle array types with custom type references in itemTypes
 	if property.Type == "array" && property.Config != nil && property.ItemDefinitionId != "" {
 		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.ItemDefinitionId)
-		if err != nil {
+		switch {
+		case err == nil:
+			// Update itemTypes in config to reference the same custom type
+			args.Config["itemTypes"] = []interface{}{
+				resources.PropertyRef{
+					URN:      urn,
+					Property: "name",
+				},
+			}
+		case err == resources.ErrRemoteResourceExternalIdNotFound:
+			args.Config["itemTypes"] = []interface{}{nil}
+		default:
 			return err
 		}
 
-		// Update itemTypes in config to reference the same custom type
-		args.Config["itemTypes"] = []interface{}{
-			resources.PropertyRef{
-				URN:      urn,
-				Property: "name",
-			},
-		}
 	}
 
 	// sort the order of types for a multi type property

@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type Handler struct {
@@ -51,10 +52,12 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		SourceDefinition: spec.SourceDefinition,
 		Enabled:          enabled,
 		Governance:       &governanceResource{},
+		ImportMetadata:   make(map[string]*WorkspaceRemoteIDMapping),
 	}
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
+	sourceResource.addImportMetadata(s)
 	h.resources[spec.LocalId] = sourceResource
 	return nil
 }
@@ -159,7 +162,21 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.TrackingPlan.Ref
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.TrackingPlan.Config)
 		}
-		r := resources.NewResource(s.LocalId, ResourceType, data, []string{})
+		opts := []resources.ResourceOpts{
+			resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)),
+		}
+		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			}
+		}
+		r := resources.NewResource(
+			s.LocalId,
+			ResourceType,
+			data,
+			[]string{},
+			opts...,
+		)
 		result = append(result, r)
 	}
 	return result, nil
@@ -437,8 +454,51 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	return nil
 }
 
-func (h *Handler) Import(_ context.Context, _ string, data resources.ResourceData, _ string) (*resources.ResourceData, error) {
-	return nil, fmt.Errorf("importing event stream source is not supported")
+func (h *Handler) Import(ctx context.Context, id string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	// FIXME: Instead of fetching all sources, fetch the source with the matching remoteId
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+
+	// Find the source with matching remoteId
+	var existingSource *sourceClient.EventStreamSource
+	for _, source := range sources {
+		if source.ID == remoteId {
+			existingSource = &source
+			break
+		}
+	}
+
+	if existingSource == nil {
+		return nil, fmt.Errorf("event stream source with ID %s not found", remoteId)
+	}
+
+	// Build state from existing source to compare with desired data
+	existingState := resources.ResourceData{
+		IDKey:               remoteId,
+		NameKey:             existingSource.Name,
+		EnabledKey:          existingSource.Enabled,
+		SourceDefinitionKey: existingSource.Type,
+	}
+
+	// If there's a tracking plan on the existing source, include it in state
+	if existingSource.TrackingPlan != nil {
+		existingState[TrackingPlanIDKey] = existingSource.TrackingPlan.ID
+		existingState[TrackingPlanConfigKey] = mapRemoteTPConfigToState(existingSource.TrackingPlan.Config)
+	}
+
+	// Update the source if there are differences
+	result, err := h.Update(ctx, id, data, existingState)
+	if err != nil {
+		return nil, fmt.Errorf("updating event stream source during import: %w", err)
+	}
+
+	err = h.client.SetExternalID(ctx, remoteId, id)
+	if err != nil {
+		return nil, fmt.Errorf("setting external ID for event stream source during import: %w", err)
+	}
+	return result, nil
 }
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
@@ -462,12 +522,8 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
-			Reference: fmt.Sprintf("#/%s/%s/%s",
-				ResourceKind,
-				MetadataName,
-				externalID,
-			),
-			Data: &source,
+			Reference:  getFileMetadata(externalID),
+			Data:       &source,
 		}
 		resourceMap[source.ID] = remoteResource
 	}
@@ -575,6 +631,23 @@ func (p *Handler) toImportSpec(
 		Metadata: metadataMap,
 		Spec:     specMap,
 	}, nil
+}
+
+func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
+	metadata := importremote.Metadata{}
+	err := mapstructure.Decode(s.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
+		})
+	})
+	return nil
 }
 
 func toTrackingPlanConfigImportSpec(config *sourceClient.TrackingPlanConfig) map[string]any {
@@ -847,4 +920,12 @@ func dropToAction(drop bool) trackingplanClient.Action {
 		return trackingplanClient.Drop
 	}
 	return trackingplanClient.Forward
+}
+
+func getFileMetadata(externalID string) string {
+	return fmt.Sprintf("#/%s/%s/%s",
+		ResourceKind,
+		MetadataName,
+		externalID,
+	)
 }

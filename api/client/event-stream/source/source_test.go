@@ -79,7 +79,7 @@ func TestUpdateSource(t *testing.T) {
 	eventStreamClient := esSource.NewRudderSourceStore(c)
 
 	source := &esSource.UpdateSourceRequest{
-		Name: "Updated Source",
+		Name:    "Updated Source",
 		Enabled: true,
 	}
 
@@ -317,4 +317,24 @@ func TestGetSources(t *testing.T) {
 			httpClient.AssertNumberOfCalls()
 		})
 	}
+}
+
+func TestSetExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"externalId":"ext-123"}`
+			return testutils.ValidateRequest(t, req, "PUT", "/v2/event-stream-sources/src-123/external-id", expected)
+		},
+		ResponseStatus: 200,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	eventStreamClient := esSource.NewRudderSourceStore(c)
+
+	err = eventStreamClient.SetExternalID(context.Background(), "src-123", "ext-123")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
 }
