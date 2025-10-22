@@ -53,12 +53,12 @@ func newCmdListTrackingPlans() *cobra.Command {
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
-			l := lister.New(dcProvider, format)
-
-			// Set custom column widths for tracking plan IDs (longer than standard KSUID)
-			l.SetColumnWidths(map[string]int{
-				"id": 34,
-			})
+			l := lister.New(dcProvider,
+				lister.WithFormat(format),
+				lister.WithColumnWidths(map[string]int{
+					"id": 30,
+				}),
+			)
 
 			err = l.List(cmd.Context(), state.TrackingPlanResourceType, nil)
 			return err
