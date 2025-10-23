@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 )
 
 // CreateRetlSource creates a new RETL source
@@ -88,12 +89,15 @@ func (r *RudderRETLStore) GetRetlSource(ctx context.Context, id string) (*RETLSo
 }
 
 // ListRetlSources lists all RETL sources
-func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*RETLSources, error) {
+func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalId *bool) (*RETLSources, error) {
 	path := "/v2/retl-sources"
-	if hasExternalID != nil {
-		path += fmt.Sprintf("?hasExternalID=%t", *hasExternalID)
+	query := url.Values{}
+	query.Add("sourceType", string(ModelSourceType))
+	if hasExternalId != nil {
+		query.Add("hasExternalId", fmt.Sprintf("%t", *hasExternalId))
 	}
-	resp, err := r.client.Do(ctx, "GET", path, nil)
+	url := fmt.Sprintf("%s?%s", path, query.Encode())
+	resp, err := r.client.Do(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}

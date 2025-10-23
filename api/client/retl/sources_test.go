@@ -52,7 +52,7 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
 		Enabled:              true,
-		ExternalID:           &externalID,
+		ExternalID:           externalID,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)

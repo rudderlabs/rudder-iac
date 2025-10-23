@@ -190,15 +190,15 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 
-	var hasExtranlId *bool
+	var hasExternalId *bool
 	if hasEsternalIdStr, ok := filters["hasExternalId"]; ok {
-		hasExternalId, err := strconv.ParseBool(hasEsternalIdStr)
+		id, err := strconv.ParseBool(hasEsternalIdStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid hasExternalId filter: %w", err)
 		}
-		hasExtranlId = &hasExternalId
+		hasExternalId = &id
 	}
-	return handler.List(ctx, hasExtranlId)
+	return handler.List(ctx, hasExternalId)
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
