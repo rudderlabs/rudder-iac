@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -39,6 +40,9 @@ typealias CustomTypeEmptyObjectNoAdditionalProps = Unit
 /** Empty object that allows additional properties */
 typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
 
+/** Custom type representing a null value */
+typealias CustomTypeNullType = JsonNull
+
 /** List of user profiles */
 typealias CustomTypeProfileList = List<CustomTypeUserProfile>
 
@@ -51,11 +55,17 @@ typealias PropertyAge = CustomTypeAge
 /** An array that can contain any type of items */
 typealias PropertyArrayOfAny = List<JsonElement>
 
+/** Array with items that can be string or null */
+typealias PropertyArrayWithNullItems = List<ArrayItemArrayWithNullItems>
+
 /** Array of user contacts */
 typealias PropertyContacts = List<CustomTypeEmail>
 
 /** example of object property */
 typealias PropertyContext = JsonObject
+
+/** Property using custom null type */
+typealias PropertyCustomNullField = CustomTypeNullType
 
 /** User's email address */
 typealias PropertyEmail = CustomTypeEmail
@@ -95,6 +105,9 @@ typealias PropertyNestedEmptyObject = JsonObject
 
 /** Nested property with empty object not allowing additional properties */
 typealias PropertyNestedEmptyObjectNoAdditionalProps = JsonObject
+
+/** Property that is always null */
+typealias PropertyNullField = JsonNull
 
 /** An object field with no defined structure */
 typealias PropertyObjectProperty = JsonObject
@@ -608,6 +621,33 @@ sealed class CustomTypeUserAccess : SealedClassWithJson() {
 
 private object RudderCustomTypeUserAccessSerializer : SealedClassJsonSerializer<CustomTypeUserAccess>()
 
+/** Item type for array_with_null_items array */
+@Serializable(with = RudderArrayItemArrayWithNullItemsSerializer::class)
+sealed class ArrayItemArrayWithNullItems : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : ArrayItemArrayWithNullItems() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'null' value */
+    @Serializable
+    data class NullValue(
+        @SerialName("value")
+        val value: JsonNull
+    ) : ArrayItemArrayWithNullItems() {
+
+        override val _jsonElement: JsonElement = value
+    }
+}
+
+private object RudderArrayItemArrayWithNullItemsSerializer : SealedClassJsonSerializer<ArrayItemArrayWithNullItems>()
+
 /** Feature flag that can be boolean or string */
 @Serializable(with = RudderPropertyFeatureFlagSerializer::class)
 sealed class PropertyFeatureFlag : SealedClassWithJson() {
@@ -698,6 +738,97 @@ sealed class PropertyMultiTypeField : SealedClassWithJson() {
 }
 
 private object RudderPropertyMultiTypeFieldSerializer : SealedClassJsonSerializer<PropertyMultiTypeField>()
+
+/** Property that can be string, integer, or null */
+@Serializable(with = RudderPropertyMultiTypeWithNullSerializer::class)
+sealed class PropertyMultiTypeWithNull : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : PropertyMultiTypeWithNull() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'integer' value */
+    @Serializable
+    data class IntegerValue(
+        @SerialName("value")
+        val value: Long
+    ) : PropertyMultiTypeWithNull() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'null' value */
+    @Serializable
+    data class NullValue(
+        @SerialName("value")
+        val value: JsonNull
+    ) : PropertyMultiTypeWithNull() {
+
+        override val _jsonElement: JsonElement = value
+    }
+}
+
+private object RudderPropertyMultiTypeWithNullSerializer : SealedClassJsonSerializer<PropertyMultiTypeWithNull>()
+
+/** Property that can be number or null */
+@Serializable(with = RudderPropertyNumberOrNullSerializer::class)
+sealed class PropertyNumberOrNull : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'number' value */
+    @Serializable
+    data class NumberValue(
+        @SerialName("value")
+        val value: Double
+    ) : PropertyNumberOrNull() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'null' value */
+    @Serializable
+    data class NullValue(
+        @SerialName("value")
+        val value: JsonNull
+    ) : PropertyNumberOrNull() {
+
+        override val _jsonElement: JsonElement = value
+    }
+}
+
+private object RudderPropertyNumberOrNullSerializer : SealedClassJsonSerializer<PropertyNumberOrNull>()
+
+/** Property that can be string or null */
+@Serializable(with = RudderPropertyStringOrNullSerializer::class)
+sealed class PropertyStringOrNull : SealedClassWithJson() {
+    abstract override val _jsonElement: JsonElement
+    /** Represents a 'string' value */
+    @Serializable
+    data class StringValue(
+        @SerialName("value")
+        val value: String
+    ) : PropertyStringOrNull() {
+
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    /** Represents a 'null' value */
+    @Serializable
+    data class NullValue(
+        @SerialName("value")
+        val value: JsonNull
+    ) : PropertyStringOrNull() {
+
+        override val _jsonElement: JsonElement = value
+    }
+}
+
+private object RudderPropertyStringOrNullSerializer : SealedClassJsonSerializer<PropertyStringOrNull>()
 
 /** Example event to demonstrate variants */
 @Serializable(with = RudderTrackEventWithVariantsPropertiesSerializer::class)
@@ -873,6 +1004,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("array_of_any")
     val arrayOfAny: PropertyArrayOfAny? = null,
 
+    /** Array with items that can be string or null */
+    @SerialName("array_with_null_items")
+    val arrayWithNullItems: PropertyArrayWithNullItems? = null,
+
     /** Array of user contacts */
     @SerialName("contacts")
     val contacts: PropertyContacts? = null,
@@ -880,6 +1015,10 @@ data class TrackUserSignedUpProperties(
     /** example of object property */
     @SerialName("context")
     val context: TrackUserSignedUpProperties.Context? = null,
+
+    /** Property using custom null type */
+    @SerialName("custom_null_field")
+    val customNullField: PropertyCustomNullField? = null,
 
     /** Type of device */
     @SerialName("device_type")
@@ -921,6 +1060,10 @@ data class TrackUserSignedUpProperties(
     @SerialName("multi_type_field")
     val multiTypeField: PropertyMultiTypeField? = null,
 
+    /** Property that can be string, integer, or null */
+    @SerialName("multi_type_with_null")
+    val multiTypeWithNull: PropertyMultiTypeWithNull? = null,
+
     /** Nested property with empty object allowing additional properties */
     @SerialName("nested_empty_object")
     val nestedEmptyObject: PropertyNestedEmptyObject? = null,
@@ -928,6 +1071,14 @@ data class TrackUserSignedUpProperties(
     /** Nested property with empty object not allowing additional properties */
     @SerialName("nested_empty_object_no_additional_props")
     val nestedEmptyObjectNoAdditionalProps: Unit? = null,
+
+    /** Property that is always null */
+    @SerialName("null_field")
+    val nullField: PropertyNullField? = null,
+
+    /** Property that can be number or null */
+    @SerialName("number_or_null")
+    val numberOrNull: PropertyNumberOrNull? = null,
 
     /** An object field with no defined structure */
     @SerialName("object_property")
@@ -956,6 +1107,10 @@ data class TrackUserSignedUpProperties(
     /** User account status */
     @SerialName("status")
     val status: PropertyStatus? = null,
+
+    /** Property that can be string or null */
+    @SerialName("string_or_null")
+    val stringOrNull: PropertyStringOrNull? = null,
 
     /** User tags as array of strings */
     @SerialName("tags")
