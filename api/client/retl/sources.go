@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // CreateRetlSource creates a new RETL source
@@ -94,7 +95,7 @@ func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalId *bo
 	query := url.Values{}
 	query.Add("sourceType", string(ModelSourceType))
 	if hasExternalId != nil {
-		query.Add("hasExternalId", fmt.Sprintf("%t", *hasExternalId))
+		query.Add("hasExternalId", strconv.FormatBool(*hasExternalId))
 	}
 	url := fmt.Sprintf("%s?%s", path, query.Encode())
 	resp, err := r.client.Do(ctx, "GET", url, nil)
