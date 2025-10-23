@@ -1,10 +1,12 @@
 package datacatalog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -20,14 +22,14 @@ const importDir = "data-catalog"
 type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
-	providerStore map[string]resourceProvider
+	providerStore map[string]entityProvider
 }
 
 func New(client catalog.DataCatalog) *Provider {
 	return &Provider{
 		client: client,
 		dc:     localcatalog.New(),
-		providerStore: map[string]resourceProvider{
+		providerStore: map[string]entityProvider{
 			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client, importDir),
 			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
@@ -69,7 +71,10 @@ func (p *Provider) GetLocalCatalog() *localcatalog.DataCatalog {
 	return p.dc
 }
 
-func (p *Provider) Validate() error {
+// Validate validates the provider's data catalog.
+// The method accepts a *resources.Graph but currently ignores it and validates directly from the catalog 
+// (same behavior as earlier); future implementations may validate against the graph.
+func (p *Provider) Validate(_ *resources.Graph) error {
 	err := validate.ValidateCatalog(p.dc)
 	if err == nil {
 		log.Info("successfully validated the catalog")
@@ -85,6 +90,45 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	}
 
 	return createResourceGraph(p.dc)
+}
+
+func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
+	switch resourceType {
+	case pstate.TrackingPlanResourceType:
+		return p.listTrackingPlans(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
+}
+
+func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceData, error) {
+	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tracking plans: %w", err)
+	}
+
+	var result []resources.ResourceData
+	for _, tp := range trackingPlans {
+		// Handle nil description
+		description := ""
+		if tp.Description != nil {
+			description = *tp.Description
+		}
+
+		// Include all relevant fields for Lister display
+		// "id" and "name" are shown in columns, other fields in details panel
+		resourceData := resources.ResourceData{
+			"name":        tp.Name,
+			"id":          tp.ID,
+			"version":     tp.Version,
+			"description": description,
+			"createdAt":   tp.CreatedAt.String(),
+			"updatedAt":   tp.UpdatedAt.String(),
+		}
+		result = append(result, resourceData)
+	}
+
+	return result, nil
 }
 
 func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {

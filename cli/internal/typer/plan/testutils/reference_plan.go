@@ -39,6 +39,25 @@ func init() {
 		Description: "Group association event",
 	}
 
+	// Event with quotes in name to test escaping
+	ReferenceEvents["Product \"Premium\" Clicked"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Product \"Premium\" Clicked",
+		Description: "Triggered when user clicks on a \"premium\" product /* important */",
+	}
+
+	ReferenceEvents["Empty Event With Additional Props"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Empty Event With Additional Props",
+		Description: "Empty event schema with additionalProperties true",
+	}
+
+	ReferenceEvents["Empty Event No Additional Props"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "Empty Event No Additional Props",
+		Description: "Empty event schema with additionalProperties false",
+	}
+
 	ReferenceCustomTypes["email"] = &plan.CustomType{
 		Name:        "email",
 		Description: "Custom type for email validation",
@@ -95,6 +114,23 @@ func init() {
 		},
 	}
 
+	// Property with special characters in description to test comment escaping
+	ReferenceProperties["special_field"] = &plan.Property{
+		Name:        "special_field",
+		Description: "Field with special chars: \"quotes\", backslash\\path, and /* comment */",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	// Property with enum containing special characters
+	ReferenceProperties["status_code"] = &plan.Property{
+		Name:        "status_code",
+		Description: "HTTP status with special characters",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"200: OK", "404: Not Found", "500: Internal \"Server\" Error"},
+		},
+	}
+
 	ReferenceProperties["tags"] = &plan.Property{
 		Name:        "tags",
 		Description: "User tags as array of strings",
@@ -148,20 +184,10 @@ func init() {
 		Type:        plan.PrimitiveTypeObject,
 		Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"first_name": {
-					Property: *ReferenceProperties["first_name"],
-					Required: true,
-				},
-				"last_name": {
-					Property: *ReferenceProperties["last_name"],
-					Required: false,
-				},
-				"email": {
-					Property: *ReferenceProperties["email"],
-					Required: true,
-				},
+				"first_name": {Property: *ReferenceProperties["first_name"], Required: true},
+				"last_name":  {Property: *ReferenceProperties["last_name"]},
+				"email":      {Property: *ReferenceProperties["email"], Required: true},
 			},
-			AdditionalProperties: false,
 		},
 	}
 
@@ -278,6 +304,29 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
 	}
 
+	// Add empty custom type with additionalProperties: false for testing
+	ReferenceCustomTypes["empty_object_no_additional_props"] = &plan.CustomType{
+		Name:        "empty_object_no_additional_props",
+		Description: "Empty object that does not allow additional properties",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
+		},
+	}
+
+	ReferenceProperties["empty_object_no_additional_props"] = &plan.Property{
+		Name:        "empty_object_no_additional_props",
+		Description: "Property with empty object not allowing additional properties",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["empty_object_no_additional_props"]},
+	}
+
+	ReferenceProperties["nested_empty_object_no_additional_props"] = &plan.Property{
+		Name:        "nested_empty_object_no_additional_props",
+		Description: "Nested property with empty object not allowing additional properties",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
+	}
+
 	// Properties for variant testing
 	ReferenceProperties["page_type"] = &plan.Property{
 		Name:        "page_type",
@@ -310,16 +359,8 @@ func init() {
 		Type:        plan.PrimitiveTypeObject,
 		Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"page_type": {
-					Property: plan.Property{
-						Name:        "page_type",
-						Description: "Type of page",
-						Types:       []plan.PropertyType{plan.PrimitiveTypeString},
-					},
-					Required: true,
-				},
+				"page_type": {Property: *ReferenceProperties["page_type"], Required: true},
 			},
-			AdditionalProperties: false,
 		},
 		Variants: []plan.Variant{
 			{
@@ -332,14 +373,7 @@ func init() {
 						Description: "Search page variant",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"query": {
-									Property: plan.Property{
-										Name:        "query",
-										Description: "Search query",
-										Types:       []plan.PropertyType{plan.PrimitiveTypeString},
-									},
-									Required: true,
-								},
+								"query": {Property: *ReferenceProperties["query"], Required: true},
 							},
 						},
 					},
@@ -349,28 +383,22 @@ func init() {
 						Description: "Product page variant",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"product_id": {
-									Property: plan.Property{
-										Name:        "product_id",
-										Description: "Product identifier",
-										Types:       []plan.PropertyType{plan.PrimitiveTypeString},
-									},
-									Required: true,
-								},
+								"product_id": {Property: *ReferenceProperties["product_id"], Required: true},
 							},
+						},
+					},
+					{
+						DisplayName: "Home",
+						Match:       []any{"home"},
+						Description: "Home page variant with no additional properties",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{},
 						},
 					},
 				},
 				DefaultSchema: &plan.ObjectSchema{
 					Properties: map[string]plan.PropertySchema{
-						"page_data": {
-							Property: plan.Property{
-								Name:        "page_data",
-								Description: "Additional page data",
-								Types:       []plan.PropertyType{plan.PrimitiveTypeObject},
-							},
-							Required: false,
-						},
+						"page_data": {Property: *ReferenceProperties["page_data"]},
 					},
 				},
 			},
@@ -381,6 +409,200 @@ func init() {
 		Name:        "page_context",
 		Description: "Page context information",
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["page_context"]},
+	}
+
+	// Custom type with boolean discriminator (no default case)
+	ReferenceCustomTypes["user_access"] = &plan.CustomType{
+		Name:        "user_access",
+		Description: "User access with variants based on active status",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"active": {Property: *ReferenceProperties["active"], Required: true},
+			},
+		},
+		Variants: []plan.Variant{
+			{
+				Type:          "discriminator",
+				Discriminator: "active",
+				Cases: []plan.VariantCase{
+					{
+						DisplayName: "Active",
+						Match:       []any{true},
+						Description: "Active user access",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"email": {Property: *ReferenceProperties["email"], Required: true},
+							},
+						},
+					},
+					{
+						DisplayName: "Inactive",
+						Match:       []any{false},
+						Description: "Inactive user access",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"status": {Property: *ReferenceProperties["status"], Required: true},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ReferenceProperties["user_access"] = &plan.Property{
+		Name:        "user_access",
+		Description: "User access information",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["user_access"]},
+	}
+
+	// Properties for multi-type discriminator testing
+	ReferenceProperties["feature_flag"] = &plan.Property{
+		Name:        "feature_flag",
+		Description: "Feature flag that can be boolean or string",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeBoolean, plan.PrimitiveTypeString},
+	}
+
+	// Custom type with multi-type discriminator (boolean | string)
+	ReferenceCustomTypes["feature_config"] = &plan.CustomType{
+		Name:        "feature_config",
+		Description: "Feature configuration with variants based on multi-type flag",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"feature_flag": {Property: *ReferenceProperties["feature_flag"], Required: true},
+			},
+		},
+		Variants: []plan.Variant{
+			{
+				Type:          "discriminator",
+				Discriminator: "feature_flag",
+				Cases: []plan.VariantCase{
+					{
+						DisplayName: "Enabled",
+						Match:       []any{true},
+						Description: "Feature enabled (boolean true)",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"age": {Property: *ReferenceProperties["age"]},
+							},
+						},
+					},
+					{
+						DisplayName: "Disabled",
+						Match:       []any{false},
+						Description: "Feature disabled (boolean false)",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"first_name": {Property: *ReferenceProperties["first_name"]},
+							},
+						},
+					},
+					{
+						DisplayName: "Beta",
+						Match:       []any{"beta"},
+						Description: "Feature in beta (string 'beta')",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"tags": {Property: *ReferenceProperties["tags"]},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ReferenceProperties["feature_config"] = &plan.Property{
+		Name:        "feature_config",
+		Description: "Feature configuration information",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["feature_config"]},
+	}
+
+	// Add properties with Unicode characters for testing
+	ReferenceProperties["用户名"] = &plan.Property{
+		Name:        "用户名",
+		Description: "Username in Chinese characters",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["unicode_enum_field"] = &plan.Property{
+		Name:        "unicode_enum_field",
+		Description: "Field demonstrating various Unicode characters in enum values",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{
+				"🎯",        // Emoji
+				"✅",        // Emoji
+				"активный", // Cyrillic
+				"已完成",      // Chinese
+				"ενεργός",  // Greek
+				"café",     // Latin with diacritics
+				"!!!",      // Symbols only (backtick escape)
+			},
+		},
+	}
+
+	ReferenceProperties["mixed_unicode"] = &plan.Property{
+		Name:        "mixed_unicode",
+		Description: "Property with mixed unicode: café, naïve, 日本語",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceCustomTypes["типы_данных"] = &plan.CustomType{
+		Name:        "типы_данных",
+		Description: "Custom type with Cyrillic name",
+		Type:        plan.PrimitiveTypeString,
+		Config: &plan.PropertyConfig{
+			Enum: []any{"активный", "неактивный", "pending"},
+		},
+	}
+
+	ReferenceProperties["unicode_custom_type"] = &plan.Property{
+		Name:        "unicode_custom_type",
+		Description: "Property using custom type with Unicode",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["типы_данных"]},
+	}
+
+	// Integer enum for testing non-string enum serialization
+	ReferenceProperties["priority"] = &plan.Property{
+		Name:        "priority",
+		Description: "Priority level",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeInteger},
+		Config: &plan.PropertyConfig{
+			Enum: []any{1, 2, 3},
+		},
+	}
+
+	// Boolean enum for testing non-string enum serialization
+	ReferenceProperties["enabled"] = &plan.Property{
+		Name:        "enabled",
+		Description: "Feature enabled flag",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeBoolean},
+		Config: &plan.PropertyConfig{
+			Enum: []any{true, false},
+		},
+	}
+
+	// Float enum for testing non-string enum serialization
+	ReferenceProperties["rating"] = &plan.Property{
+		Name:        "rating",
+		Description: "Rating value",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeNumber},
+		Config: &plan.PropertyConfig{
+			Enum: []any{1.5, 2.5, 3.5, 4.5, 5.0},
+		},
+	}
+
+	// Mixed-type enum for testing non-string enum serialization
+	ReferenceProperties["mixed_value"] = &plan.Property{
+		Name:        "mixed_value",
+		Description: "Mixed type enum",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"active", 1, true, 2.5},
+		},
 	}
 }
 
@@ -394,111 +616,66 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"age": {
-					Property: *ReferenceProperties["age"],
-					Required: false,
-				},
-				"active": {
-					Property: *ReferenceProperties["active"],
-					Required: true,
-				},
-				"profile": {
-					Property: *ReferenceProperties["profile"],
-					Required: true,
-				},
-				"device_type": {
-					Property: *ReferenceProperties["device_type"],
-					Required: false,
-				},
-				"tags": {
-					Property: *ReferenceProperties["tags"],
-					Required: false,
-				},
-				"contacts": {
-					Property: *ReferenceProperties["contacts"],
-					Required: false,
-				},
-				"property_of_any": {
-					Property: *ReferenceProperties["property_of_any"],
-					Required: false,
-				},
-				"untyped_field": {
-					Property: *ReferenceProperties["untyped_field"],
-					Required: false,
-				},
-				"array_of_any": {
-					Property: *ReferenceProperties["array_of_any"],
-					Required: false,
-				},
-				"untyped_array": {
-					Property: *ReferenceProperties["untyped_array"],
-					Required: false,
-				},
-				"object_property": {
-					Property: *ReferenceProperties["object_property"],
-					Required: false,
-				},
-				"status": {
-					Property: *ReferenceProperties["status"],
-					Required: false,
-				},
-				"email_list": {
-					Property: *ReferenceProperties["email_list"],
-					Required: false,
-				},
-				"profile_list": {
-					Property: *ReferenceProperties["profile_list"],
-					Required: false,
-				},
-				"empty_object_with_additional_props": {
-					Property: *ReferenceProperties["empty_object_with_additional_props"],
-					Required: false,
-				},
+				"age":                                {Property: *ReferenceProperties["age"]},
+				"active":                             {Property: *ReferenceProperties["active"], Required: true},
+				"profile":                            {Property: *ReferenceProperties["profile"], Required: true},
+				"device_type":                        {Property: *ReferenceProperties["device_type"]},
+				"tags":                               {Property: *ReferenceProperties["tags"]},
+				"contacts":                           {Property: *ReferenceProperties["contacts"]},
+				"property_of_any":                    {Property: *ReferenceProperties["property_of_any"]},
+				"untyped_field":                      {Property: *ReferenceProperties["untyped_field"]},
+				"array_of_any":                       {Property: *ReferenceProperties["array_of_any"]},
+				"untyped_array":                      {Property: *ReferenceProperties["untyped_array"]},
+				"object_property":                    {Property: *ReferenceProperties["object_property"]},
+				"status":                             {Property: *ReferenceProperties["status"]},
+				"email_list":                         {Property: *ReferenceProperties["email_list"]},
+				"profile_list":                       {Property: *ReferenceProperties["profile_list"]},
+				"empty_object_with_additional_props": {Property: *ReferenceProperties["empty_object_with_additional_props"]},
 				"nested_empty_object": {
 					Property: *ReferenceProperties["nested_empty_object"],
-					Required: false,
 					Schema: &plan.ObjectSchema{
 						Properties:           map[string]plan.PropertySchema{},
 						AdditionalProperties: true,
 					},
 				},
-				"multi_type_field": {
-					Property: *ReferenceProperties["multi_type_field"],
+				"multi_type_field": {Property: *ReferenceProperties["multi_type_field"]},
+				"multi_type_array": {Property: *ReferenceProperties["multi_type_array"]},
+				"user_access":      {Property: *ReferenceProperties["user_access"]},
+				"feature_config":   {Property: *ReferenceProperties["feature_config"]},
+				// Add Unicode properties for testing
+				"用户名":                              {Property: *ReferenceProperties["用户名"]},
+				"unicode_enum_field":               {Property: *ReferenceProperties["unicode_enum_field"]},
+				"mixed_unicode":                    {Property: *ReferenceProperties["mixed_unicode"]},
+				"unicode_custom_type":              {Property: *ReferenceProperties["unicode_custom_type"]},
+				"priority":                         {Property: *ReferenceProperties["priority"]},
+				"enabled":                          {Property: *ReferenceProperties["enabled"]},
+				"rating":                           {Property: *ReferenceProperties["rating"]},
+				"mixed_value":                      {Property: *ReferenceProperties["mixed_value"]},
+				"empty_object_no_additional_props": {Property: *ReferenceProperties["empty_object_no_additional_props"]},
+				"nested_empty_object_no_additional_props": {
+					Property: *ReferenceProperties["nested_empty_object_no_additional_props"],
 					Required: false,
-				},
-				"multi_type_array": {
-					Property: *ReferenceProperties["multi_type_array"],
-					Required: false,
+					Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
 				},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
-					Required: false,
 					Schema: &plan.ObjectSchema{
 						Properties: map[string]plan.PropertySchema{
-							"ip_address": {
-								Property: *ReferenceProperties["ip_address"],
-								Required: true,
-							},
+							"ip_address": {Property: *ReferenceProperties["ip_address"], Required: true},
 							"nested_context": {
 								Property: *ReferenceProperties["nested_context"],
 								Required: true,
 								Schema: &plan.ObjectSchema{
 									Properties: map[string]plan.PropertySchema{
-										"profile": {
-											Property: *ReferenceProperties["profile"],
-											Required: false,
-										},
+										"profile": {Property: *ReferenceProperties["profile"]},
 									},
-									AdditionalProperties: false,
 								},
 							},
 						},
-						AdditionalProperties: false,
 					},
 				},
 			},
-			AdditionalProperties: false,
 		},
 	})
 
@@ -507,20 +684,10 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"profile": {
-					Property: *ReferenceProperties["profile"],
-					Required: true,
-				},
-				"page_context": {
-					Property: *ReferenceProperties["page_context"],
-					Required: false,
-				},
-				"device_type": {
-					Property: *ReferenceProperties["device_type"],
-					Required: true,
-				},
+				"profile":      {Property: *ReferenceProperties["profile"], Required: true},
+				"page_context": {Property: *ReferenceProperties["page_context"]},
+				"device_type":  {Property: *ReferenceProperties["device_type"], Required: true},
 			},
-			AdditionalProperties: false,
 		},
 		Variants: []plan.Variant{
 			{
@@ -533,12 +700,8 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 						Description: "Mobile device page view",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"tags": {
-									Property: *ReferenceProperties["tags"],
-									Required: true,
-								},
+								"tags": {Property: *ReferenceProperties["tags"]},
 							},
-							AdditionalProperties: false,
 						},
 					},
 					{
@@ -547,27 +710,16 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 						Description: "Desktop page view",
 						Schema: plan.ObjectSchema{
 							Properties: map[string]plan.PropertySchema{
-								"first_name": {
-									Property: *ReferenceProperties["first_name"],
-									Required: true,
-								},
-								"last_name": {
-									Property: *ReferenceProperties["last_name"],
-									Required: false,
-								},
+								"first_name": {Property: *ReferenceProperties["first_name"], Required: true},
+								"last_name":  {Property: *ReferenceProperties["last_name"]},
 							},
-							AdditionalProperties: false,
 						},
 					},
 				},
 				DefaultSchema: &plan.ObjectSchema{
 					Properties: map[string]plan.PropertySchema{
-						"untyped_field": {
-							Property: *ReferenceProperties["untyped_field"],
-							Required: false,
-						},
+						"untyped_field": {Property: *ReferenceProperties["untyped_field"]},
 					},
-					AdditionalProperties: false,
 				},
 			},
 		},
@@ -579,16 +731,9 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"email": {
-					Property: *ReferenceProperties["email"],
-					Required: true,
-				},
-				"active": {
-					Property: *ReferenceProperties["active"],
-					Required: false,
-				},
+				"email":  {Property: *ReferenceProperties["email"], Required: true},
+				"active": {Property: *ReferenceProperties["active"]},
 			},
-			AdditionalProperties: false,
 		},
 	})
 
@@ -598,12 +743,8 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"profile": {
-					Property: *ReferenceProperties["profile"],
-					Required: true,
-				},
+				"profile": {Property: *ReferenceProperties["profile"], Required: true},
 			},
-			AdditionalProperties: false,
 		},
 	})
 
@@ -613,12 +754,8 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"profile": {
-					Property: *ReferenceProperties["profile"],
-					Required: false,
-				},
+				"profile": {Property: *ReferenceProperties["profile"]},
 			},
-			AdditionalProperties: false,
 		},
 	})
 
@@ -628,12 +765,45 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"active": {
-					Property: *ReferenceProperties["active"],
+				"active": {Property: *ReferenceProperties["active"], Required: true},
+			},
+		},
+	})
+
+	// Track event with special characters - properties
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Product \"Premium\" Clicked"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"special_field": {
+					Property: *ReferenceProperties["special_field"],
 					Required: true,
 				},
+				"status_code": {
+					Property: *ReferenceProperties["status_code"],
+					Required: false,
+				},
 			},
-			AdditionalProperties: false,
+		},
+	})
+
+	// Empty event with additionalProperties: true
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Empty Event With Additional Props"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: true,
+		},
+	})
+
+	// Empty event with additionalProperties: false
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["Empty Event No Additional Props"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{},
 		},
 	})
 
@@ -646,10 +816,3 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	}
 }
-
-// Constants for test assertions based on the reference plan
-const (
-	ExpectedCustomTypeCount = 9  // email, age, active, user_profile, status, email_list, profile_list, empty_object_with_additional_props, page_context
-	ExpectedPropertyCount   = 29 // email, first_name, last_name, age, active, device_type, profile, tags, contacts, property_of_any, untyped_field, array_of_any, untyped_array, object_property, status, email_list, profile_list, ip_address, nested_context, context, empty_object_with_additional_props, nested_empty_object, page_type, query, product_id, page_data, page_context, multi_type_field, multi_type_array
-	ExpectedEventCount      = 5  // User Signed Up, Identify, Page, Screen, Group
-)

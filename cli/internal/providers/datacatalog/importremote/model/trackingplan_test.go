@@ -368,7 +368,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved event reference is empty")
+		assert.Contains(t, err.Error(), "resolved reference is empty for event")
 	})
 
 	t.Run("errors when property reference resolution fails", func(t *testing.T) {
@@ -520,5 +520,180 @@ func TestTrackingPlanForExport(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "namer failed to generate name")
+	})
+
+	t.Run("creates tracking plan with variants including discriminator in properties", func(t *testing.T) {
+		desc := "Tracking plan with conditional variants"
+		upstream := &catalog.TrackingPlanWithIdentifiers{
+			Name:        "Variant Based Tracking",
+			Description: &desc,
+			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+				{
+					ID:                   "evt_user_action",
+					Name:                 "User Action",
+					AdditionalProperties: false,
+					IdentitySection:      "properties",
+					Properties: []*catalog.TrackingPlanEventProperty{
+						{ID: "prop_action_type", Required: true},
+						{ID: "prop_user_id", Required: true},
+						{ID: "prop_timestamp", Required: true},
+					},
+					Variants: []catalog.Variant{
+						{
+							Type:          "discriminator",
+							Discriminator: "prop_action_type",
+							Cases: []catalog.VariantCase{
+								{
+									DisplayName: "Sign Up Action",
+									Match:       []any{"signup"},
+									Description: "Properties specific to signup actions",
+									Properties: []catalog.PropertyReference{
+										{ID: "prop_email", Required: true},
+										{ID: "prop_referral_code", Required: false},
+									},
+								},
+								{
+									DisplayName: "Purchase Action",
+									Match:       []any{"purchase", "buy"},
+									Description: "Properties specific to purchase actions",
+									Properties: []catalog.PropertyReference{
+										{ID: "prop_product_id", Required: true},
+										{ID: "prop_amount", Required: true},
+										{ID: "prop_currency", Required: false},
+									},
+								},
+							},
+							Default: []catalog.PropertyReference{
+								{ID: "prop_session_id", Required: true},
+								{ID: "prop_device_type", Required: false},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mockRes := &mockTPResolver{
+			resolveFunc: func(entityType string, remoteID string) (string, error) {
+				switch entityType {
+				case state.EventResourceType:
+					if remoteID == "evt_user_action" {
+						return "#/events/analytics/user-action", nil
+					}
+				case state.PropertyResourceType:
+					refMap := map[string]string{
+						"prop_action_type":   "#/properties/common/action-type",
+						"prop_user_id":       "#/properties/user/user-id",
+						"prop_timestamp":     "#/properties/common/timestamp",
+						"prop_email":         "#/properties/user/email",
+						"prop_referral_code": "#/properties/marketing/referral-code",
+						"prop_product_id":    "#/properties/product/product-id",
+						"prop_amount":        "#/properties/transaction/amount",
+						"prop_currency":      "#/properties/transaction/currency",
+						"prop_session_id":    "#/properties/session/session-id",
+						"prop_device_type":   "#/properties/device/device-type",
+					}
+					if ref, ok := refMap[remoteID]; ok {
+						return ref, nil
+					}
+				}
+				return "", fmt.Errorf("unknown entity: %s/%s", entityType, remoteID)
+			},
+		}
+
+		mockNamer := &mockNamer{
+			nameFunc: func(scope namer.ScopeName) (string, error) {
+				assert.Equal(t, TypeEventRule, scope.Scope)
+				assert.Equal(t, "User Action Rule", scope.Name)
+				return "user-action-rule", nil
+			},
+		}
+
+		tp := &ImportableTrackingPlan{}
+		result, err := tp.ForExport("variant-tracking", upstream, mockRes, mockNamer)
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"id":           "variant-tracking",
+			"display_name": "Variant Based Tracking",
+			"description":  "Tracking plan with conditional variants",
+			"rules": []any{
+				map[string]any{
+					"type": TypeEventRule,
+					"id":   "user-action-rule",
+					"event": map[string]any{
+						"$ref":             "#/events/analytics/user-action",
+						"allow_unplanned":  false,
+						"identity_section": "properties",
+					},
+					"properties": []any{
+						map[string]any{
+							"$ref":     "#/properties/common/action-type",
+							"required": true,
+						},
+						map[string]any{
+							"$ref":     "#/properties/user/user-id",
+							"required": true,
+						},
+						map[string]any{
+							"$ref":     "#/properties/common/timestamp",
+							"required": true,
+						},
+					},
+					"variants": []any{
+						map[string]any{
+							"type":          "discriminator",
+							"discriminator": "#/properties/common/action-type",
+							"cases": []any{
+								map[string]any{
+									"display_name": "Sign Up Action",
+									"match":        []any{"signup"},
+									"description":  "Properties specific to signup actions",
+									"properties": []any{
+										map[string]any{
+											"$ref":     "#/properties/user/email",
+											"required": true,
+										},
+										map[string]any{
+											"$ref":     "#/properties/marketing/referral-code",
+											"required": false,
+										},
+									},
+								},
+								map[string]any{
+									"display_name": "Purchase Action",
+									"match":        []any{"purchase", "buy"},
+									"description":  "Properties specific to purchase actions",
+									"properties": []any{
+										map[string]any{
+											"$ref":     "#/properties/product/product-id",
+											"required": true,
+										},
+										map[string]any{
+											"$ref":     "#/properties/transaction/amount",
+											"required": true,
+										},
+										map[string]any{
+											"$ref":     "#/properties/transaction/currency",
+											"required": false,
+										},
+									},
+								},
+							},
+							"default": []any{
+								map[string]any{
+									"$ref":     "#/properties/session/session-id",
+									"required": true,
+								},
+								map[string]any{
+									"$ref":     "#/properties/device/device-type",
+									"required": false,
+								},
+							},
+						},
+					},
+				},
+			},
+		}, result)
 	})
 }
