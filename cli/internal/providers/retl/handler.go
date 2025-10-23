@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // resourceHandler defines the interface for type-specific resource handlers.
@@ -46,9 +47,10 @@ type resourceHandler interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 
 	// List lists all resources managed by this handler.
+	// The hasExternalId parameter is used to filter the resources by external ID.
 	// The returned resources will be added to the resource graph for
 	// dependency resolution and state management.
-	List(ctx context.Context) ([]resources.ResourceData, error)
+	List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error)
 
 	// FetchImportData retrieves data for multiple resources to be imported.
 	// This method fetches remote resources based on the provided import arguments
@@ -68,4 +70,12 @@ type resourceHandler interface {
 	// - map[string]any: contains result data with keys: "errorMessage", "rows", "rowCount", and "columns" (array of column info)
 	// - error: any error that occurred
 	Preview(ctx context.Context, ID string, data resources.ResourceData, limit int) ([]map[string]any, error)
+
+	// LoadResourcesFromRemote loads all RETL resources from remote
+	// Returns a collection of resources or an error if loading fails.
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+
+	// LoadStateFromResources reconstructs RETL state from loaded resources
+	// Returns a state or an error if loading fails.
+	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 }
