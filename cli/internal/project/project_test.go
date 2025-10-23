@@ -179,3 +179,263 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	assert.True(t, errors.Is(err, expectedErr))
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
 }
+
+func TestProject_ValidateSpec(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name          string
+		spec          *specs.Spec
+		parsedSpec    *specs.ParsedSpec
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "success - all metadata IDs match external IDs",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+									map[string]any{
+										"local_id":  "id2",
+										"remote_id": "remote2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1", "id2"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "error - extra IDs in metadata not in spec",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+									map[string]any{
+										"local_id":  "id2",
+										"remote_id": "remote2",
+									},
+									map[string]any{
+										"local_id":  "id3",
+										"remote_id": "remote3",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1", "id2"},
+			},
+			expectedError: true,
+			errorContains: "local_ids from metadata missing in spec: id3",
+		},
+		{
+			name: "success - missing IDs in metadata (not validated)",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1", "id2", "id3"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "success - empty both external IDs and metadata",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{},
+			},
+			expectedError: false,
+		},
+		{
+			name: "error - empty spec but metadata has resources",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{},
+			},
+			expectedError: true,
+			errorContains: "local_ids from metadata missing in spec: id1",
+		},
+		{
+			name: "error - invalid metadata structure",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": "invalid_string_not_object",
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1"},
+			},
+			expectedError: true,
+			errorContains: "failed to decode metadata",
+		},
+		{
+			name: "success - multiple workspaces with matching IDs",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+									map[string]any{
+										"local_id":  "id2",
+										"remote_id": "remote2",
+									},
+								},
+							},
+							map[string]any{
+								"workspace_id": "ws-456",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id3",
+										"remote_id": "remote3",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1", "id2", "id3"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "error - multiple workspaces with extra ID",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+								},
+							},
+							map[string]any{
+								"workspace_id": "ws-456",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id2",
+										"remote_id": "remote2",
+									},
+									map[string]any{
+										"local_id":  "id3",
+										"remote_id": "remote3",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{"id1"},
+			},
+			expectedError: true,
+			errorContains: "local_ids from metadata missing in spec",
+		},
+		{
+			name: "success - no import metadata key",
+			spec: &specs.Spec{
+				Kind:     "Source",
+				Metadata: map[string]any{},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				ExternalIDs: []string{},
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := project.ValidateSpec(tc.spec, tc.parsedSpec)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

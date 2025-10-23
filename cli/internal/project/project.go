@@ -103,7 +103,7 @@ func (p *project) Load() error {
 			return fmt.Errorf("provider failed to parse spec from path %s: %w", path, err)
 		}
 
-		if err := p.validateSpec(spec, parsed); err != nil {
+		if err := ValidateSpec(spec, parsed); err != nil {
 			return fmt.Errorf("provider failed to validate spec from path %s: %w", path, err)
 		}
 
@@ -120,7 +120,7 @@ func (p *project) Load() error {
 	return p.Provider.Validate(graph)
 }
 
-func (p *project) validateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
+func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 	var metadataIds []string
 
 	var metadata importremote.Metadata
@@ -135,7 +135,7 @@ func (p *project) validateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error
 		}
 	}
 
-	_, missingInSpec := lo.Difference(parsed.IDs, metadataIds)
+	_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
 	if len(missingInSpec) > 0 {
 		return fmt.Errorf("local_ids from metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
 	}

@@ -106,7 +106,7 @@ type ImportArgs struct {
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
 func NewMockProvider() *MockProvider {
 	return &MockProvider{
-		ParseSpecVal:            &specs.ParsedSpec{IDs: []string{}},
+		ParseSpecVal:            &specs.ParsedSpec{ExternalIDs: []string{}},
 		LoadSpecCalledWithArgs:  make([]LoadSpecArgs, 0),
 		ParseSpecCalledWithArgs: make([]ParseSpecArgs, 0),
 	}

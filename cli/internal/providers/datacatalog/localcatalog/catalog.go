@@ -137,7 +137,6 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 
 	var (
 		parsedSpec specs.ParsedSpec
-		errs       specs.Errors
 	)
 
 	var idArray []any
@@ -146,21 +145,21 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindProperties:
 		properties, ok := s.Spec["properties"].([]any)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("Kind: %s, properties not found in spec", s.Kind))
+			return nil, fmt.Errorf("Kind: %s, properties not found in spec", s.Kind)
 		}
 		idArray = properties
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("Kind: %s, events not found in spec", s.Kind))
+			return nil, fmt.Errorf("Kind: %s, events not found in spec", s.Kind)
 		}
 		idArray = events
 
 	case KindTrackingPlans:
 		trackingPlans, ok := s.Spec["id"].(string)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("Kind: %s, id not found in tracking plan spec", s.Kind))
+			return nil, fmt.Errorf("Kind: %s, id not found in tracking plan spec", s.Kind)
 		}
 		idArray = []any{map[string]any{
 			"id": trackingPlans,
@@ -169,14 +168,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("Kind: %s, custom types not found in spec", s.Kind))
+			return nil, fmt.Errorf("Kind: %s, custom types not found in spec", s.Kind)
 		}
 		idArray = customTypes
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("Kind: %s, categories not found in spec", s.Kind))
+			return nil, fmt.Errorf("Kind: %s, categories not found in spec", s.Kind)
 		}
 		idArray = categories
 	}
@@ -184,22 +183,16 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	for _, id := range idArray {
 		idMap, ok := id.(map[string]any)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("entity is not a map[string]any: %s", s.Kind))
-			continue
+			return nil, fmt.Errorf("entity is not a map[string]any: %s", s.Kind)
 		}
 		id, ok := idMap["id"].(string)
 		if !ok {
-			errs.Errors = append(errs.Errors, fmt.Errorf("id not found in entity: %s", s.Kind))
-			continue
+			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.IDs = append(parsedSpec.IDs, id)
+		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
 	}
 
-	if len(errs.Errors) == 0 {
-		return &parsedSpec, nil
-	}
-
-	return &parsedSpec, &errs
+	return &parsedSpec, nil
 }
 
 func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {

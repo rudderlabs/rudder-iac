@@ -152,6 +152,91 @@ func (m *mockRETLClient) GetSourcePreviewResult(ctx context.Context, resultID st
 func TestSQLModelHandler(t *testing.T) {
 	t.Parallel()
 
+	t.Run("ParseSpec", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name          string
+			spec          *specs.Spec
+			expectedIDs   []string
+			expectedError bool
+			errorContains string
+		}{
+			{
+				name: "success - parse spec with id",
+				spec: &specs.Spec{
+					Kind: "retl-source-sql-model",
+					Spec: map[string]any{
+						"id":                "test-model",
+						"display_name":      "Test Model",
+						"source_definition": "postgres",
+					},
+				},
+				expectedIDs:   []string{"test-model"},
+				expectedError: false,
+			},
+			{
+				name: "error - id not found in spec",
+				spec: &specs.Spec{
+					Kind: "retl-source-sql-model",
+					Spec: map[string]any{
+						"display_name":      "Test Model",
+						"source_definition": "postgres",
+					},
+				},
+				expectedIDs:   nil,
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
+			},
+			{
+				name: "error - id is not a string",
+				spec: &specs.Spec{
+					Kind: "retl-source-sql-model",
+					Spec: map[string]any{
+						"id":                123,
+						"display_name":      "Test Model",
+						"source_definition": "postgres",
+					},
+				},
+				expectedIDs:   nil,
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
+			},
+			{
+				name: "error - empty spec",
+				spec: &specs.Spec{
+					Kind: "retl-source-sql-model",
+					Spec: map[string]any{},
+				},
+				expectedIDs:   nil,
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc // capture range variable
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				mockClient := &mockRETLClient{}
+				handler := sqlmodel.NewHandler(mockClient)
+
+				parsedSpec, err := handler.ParseSpec("test/path.yaml", tc.spec)
+
+				if tc.expectedError {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errorContains)
+					assert.Nil(t, parsedSpec)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, parsedSpec)
+					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				}
+			})
+		}
+	})
+
 	t.Run("LoadSpec", func(t *testing.T) {
 		t.Parallel()
 

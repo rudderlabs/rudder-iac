@@ -38,7 +38,7 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 	if !ok {
 		return nil, fmt.Errorf("id not found in event stream source spec")
 	}
-	return &specs.ParsedSpec{IDs: []string{id}}, nil
+	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
 }
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
