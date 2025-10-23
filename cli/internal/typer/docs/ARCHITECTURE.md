@@ -186,9 +186,9 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 
 - **Location**: `cli/internal/typer/plan/testutils/reference_plan.go`
 - **Purpose**: Provides known test data with predictable structure for reliable testing
-- **Coverage**: Includes primitive custom types (email, age, active), object custom types (user_profile), nested properties, and comprehensive event rules for all RudderStack event types
+- **Coverage**: Includes primitive custom types (email, age, active, null_type), object custom types (user_profile), nested properties, multi-type properties with sealed classes, variant support, null type support, and comprehensive event rules for all RudderStack event types
 - **Event Types**: Covers Track events (with custom names), Identify, Page, Screen, and Group events with both Properties and Traits sections
-- **Constants**: Defines expected counts for validation (`ExpectedCustomTypeCount`, `ExpectedPropertyCount`, `ExpectedEventCount`)
+- **Test Validation**: Tests dynamically validate that all properties and custom types in the reference maps are correctly extracted from the tracking plan
 
 #### Modifying the Reference Plan
 
@@ -196,20 +196,15 @@ When adding new test data to the reference tracking plan, you **MUST** update mu
 
 1. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go`
 2. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
-3. **Update the constants** at the bottom of `reference_plan.go`:
-   - `ExpectedCustomTypeCount` - increment for each new custom type
-   - `ExpectedPropertyCount` - increment for each new property
-   - `ExpectedEventCount` - increment for each new event
-4. **Update the test expectations** in `cli/internal/typer/plan/helpers_test.go`:
-   - Add new property names to the `expectedNames` slice in `TestExtractAllProperties`
-   - Add new custom type names to the `expectedNames` slice in `TestExtractAllCustomTypes` (if applicable)
-5. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+   - Note: Properties and custom types are only extracted if they are actually used in event rules
+   - Unused items in the reference maps will not be tested
+3. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+4. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
 
 **Common Mistakes to Avoid**:
-- ❌ Adding properties to ReferenceProperties but forgetting to add them to the expectedNames list in helpers_test.go
-- ❌ Adding properties to event rules but not incrementing ExpectedPropertyCount
+- ❌ Adding properties/custom types to reference maps but not using them in any event rules (they won't be tested)
 - ❌ Forgetting to regenerate testdata after reference plan changes
-- ❌ Updating constants but not the corresponding test assertions
+- ❌ Not running tests after making changes
 
 **Workflow Example**:
 ```go
@@ -220,7 +215,7 @@ ReferenceProperties["new_field"] = &plan.Property{
     Types: []plan.PropertyType{plan.PrimitiveTypeString},
 }
 
-// 2. Use it in an event rule
+// 2. Use it in an event rule (otherwise it won't be extracted/tested)
 rules = append(rules, plan.EventRule{
     Event: *ReferenceEvents["Some Event"],
     Schema: plan.ObjectSchema{
@@ -233,14 +228,11 @@ rules = append(rules, plan.EventRule{
     },
 })
 
-// 3. Update constants
-ExpectedPropertyCount = 32  // was 31, now 32
-
-// 4. Update helpers_test.go
-expectedNames := []string{"...", "new_field", "..."}  // Add to list
-
-// 5. Regenerate testdata
+// 3. Regenerate testdata
 // Run: make typer-kotlin-update-testdata
+
+// 4. Run tests to verify
+// Run: go test ./cli/internal/typer/...
 ```
 
 ### Benefits

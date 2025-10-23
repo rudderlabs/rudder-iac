@@ -6,10 +6,10 @@ This package generates type-safe Kotlin bindings for RudderStack tracking plans,
 
 The Kotlin generator transforms tracking plan definitions into:
 
-- **Type aliases** for primitive custom types
+- **Type aliases** for primitive custom types and properties
 - **Data classes** for object custom types and event properties/traits
 - **Enum classes** for properties with enum constraints
-- **Sealed classes** for variant types (discriminated unions)
+- **Sealed classes** for variant types (discriminated unions) and multi-type properties/array items
 - **Wrapper methods** in a `RudderAnalytics` class for type-safe event tracking
 
 ## Architecture
@@ -192,6 +192,56 @@ analytics.track(
     ...
 )
 ```
+
+## Type Mappings
+
+### Primitive Type to Kotlin Type
+
+The generator maps tracking plan primitive types to Kotlin types as follows:
+
+| Primitive Type | Kotlin Type | Description |
+|---------------|-------------|-------------|
+| `string` | `String` | Text values |
+| `integer` | `Long` | Whole numbers |
+| `number` | `Double` | Decimal numbers |
+| `boolean` | `Boolean` | true/false values |
+| `object` | `JsonObject` | Object without defined schema |
+| `array` | `List<JsonElement>` | Array without defined item type |
+| `null` | `JsonNull` | JSON null literal |
+| `any` | `JsonElement` | Any JSON value |
+
+**Notes:**
+- Arrays with defined item types use `List<ItemType>` (e.g., `List<String>`, `List<CustomTypeEmail>`)
+- Multi-type properties/items generate sealed classes with subclasses for each type
+- Properties with enum constraints generate enum classes instead of primitive types
+
+### Multi-Type Support
+
+Properties or array items with multiple types are represented as sealed classes:
+
+```kotlin
+// Property with types: ["string", "null"]
+sealed class PropertyStringOrNull {
+    abstract val _jsonElement: JsonElement
+
+    data class StringValue(val value: String) : PropertyStringOrNull() {
+        override val _jsonElement: JsonElement = JsonPrimitive(value)
+    }
+
+    data class NullValue(val value: JsonNull) : PropertyStringOrNull() {
+        override val _jsonElement: JsonElement = value
+    }
+}
+```
+
+Each type in the union gets a corresponding subclass:
+- `StringValue` for `string`
+- `IntegerValue` for `integer`
+- `NumberValue` for `number`
+- `BooleanValue` for `boolean`
+- `ObjectValue` for `object`
+- `ArrayValue` for `array`
+- `NullValue` for `null`
 
 ## Testing
 
