@@ -30,6 +30,87 @@ func boolPtr(b bool) *bool {
 const importDir = ""
 
 func TestEventStreamSourceHandler(t *testing.T) {
+	t.Run("ParseSpec", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name          string
+			spec          *specs.Spec
+			expectedIDs   []string
+			expectedError bool
+			errorContains string
+		}{
+			{
+				name: "success - parse spec with id",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source-1",
+						"name": "Test Source 1",
+						"type": "javascript",
+					},
+				},
+				expectedIDs:   []string{"test-source-1"},
+				expectedError: false,
+			},
+			{
+				name: "error - id not found in spec",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+			{
+				name: "error - id is not a string",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   12345,
+						"name": "Test Source",
+					},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+			{
+				name: "error - empty spec",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc // capture range variable
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				mockClient := source.NewMockSourceClient()
+				handler := source.NewHandler(mockClient, importDir)
+
+				parsedSpec, err := handler.ParseSpec("test/path.yaml", tc.spec)
+
+				if tc.expectedError {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errorContains)
+					assert.Nil(t, parsedSpec)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, parsedSpec)
+					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				}
+			})
+		}
+	})
+
 	t.Run("LoadSpec", func(t *testing.T) {
 		testCases := []struct {
 			name         string
@@ -344,7 +425,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []map[string]interface{}{
 									{
-										"local_id": "test-source-1",
+										"local_id":  "test-source-1",
 										"remote_id": "test-source-1-123",
 									},
 								},
@@ -734,16 +815,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 	t.Run("Import", func(t *testing.T) {
 		testCases := []struct {
-			name                     string
-			id                       string
-			remoteId                 string
-			data                     resources.ResourceData
-			existingSources          []sourceClient.EventStreamSource
-			expectedUpdateCalled     bool
+			name                        string
+			id                          string
+			remoteId                    string
+			data                        resources.ResourceData
+			existingSources             []sourceClient.EventStreamSource
+			expectedUpdateCalled        bool
 			expectedSetExternalIDCalled bool
-			expectedError            bool
-			errorMessage             string
-			expectedResult           *resources.ResourceData
+			expectedError               bool
+			errorMessage                string
+			expectedResult              *resources.ResourceData
 		}{
 			{
 				name:     "source not found",
@@ -763,10 +844,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     false,
+				expectedUpdateCalled:        false,
 				expectedSetExternalIDCalled: false,
-				expectedError:            true,
-				errorMessage:             "event stream source with ID remote-not-found not found",
+				expectedError:               true,
+				errorMessage:                "event stream source with ID remote-not-found not found",
 			},
 			{
 				name:     "import source without tracking plan",
@@ -786,9 +867,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id": "remote123",
 				},
@@ -829,9 +910,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id":               "remote456",
 					"tracking_plan_id": "tp-456",
@@ -861,9 +942,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id":               "remote789",
 					"tracking_plan_id": "tp-999",
@@ -1007,39 +1088,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"name":    "Test Source 1",
 				"enabled": true,
 				"type":    "javascript",
-				"tracking_plan": &resources.PropertyRef{
-					URN:      "",
-					Property: "id",
-				},
-				"tracking_plan_config": map[string]interface{}{
-					"track": map[string]interface{}{
-						"drop_unplanned_events": true,
-					},
-					"identify": map[string]interface{}{
-						"propagate_violations":      false,
-						"drop_unplanned_properties": true,
-						"drop_other_violations":     false,
-					},
-					"group": map[string]interface{}{
-						"propagate_violations":      true,
-						"drop_unplanned_properties": false,
-						"drop_other_violations":     false,
-					},
-					"page": map[string]interface{}{
-						"propagate_violations":      false,
-						"drop_unplanned_properties": false,
-						"drop_other_violations":     true,
-					},
-					"screen": map[string]interface{}{
-						"propagate_violations":      true,
-						"drop_unplanned_properties": false,
-						"drop_other_violations":     false,
-					},
-				},
 			},
 			Output: resources.ResourceData{
 				"id":               "remote123",
-				"tracking_plan_id": "remote-tp-123",
 			},
 		}, resource123)
 
@@ -1122,112 +1173,173 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadStateFromResources", func(t *testing.T) {
-		handler := source.NewHandler(nil, importDir)
+		t.Run("success with valid resources", func(t *testing.T) {
+			handler := source.NewHandler(nil, importDir)
 
-		// Create a resource collection with event stream sources
-		collection := resources.NewResourceCollection()
-		resourceMap := map[string]*resources.RemoteResource{
-			"remote123": {
-				ID:         "remote123",
-				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+			// Create a resource collection with event stream sources
+			collection := resources.NewResourceCollection()
+			resourceMap := map[string]*resources.RemoteResource{
+				"remote123": {
 					ID:         "remote123",
 					ExternalID: "external-123",
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
+					Data: sourceClient.EventStreamSource{
+						ID:         "remote123",
+						ExternalID: "external-123",
+						Name:       "Test Source 1",
+						Type:       "javascript",
+						Enabled:    true,
+					},
 				},
-			},
-			"remote456": {
-				ID:         "remote456",
-				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				"remote456": {
 					ID:         "remote456",
-					ExternalID: "",
-					Name:       "Test Source 2",
-					Type:       "python",
-					Enabled:    false,
+					ExternalID: "external-456",
+					Data: sourceClient.EventStreamSource{
+						ID:         "remote456",
+						ExternalID: "",
+						Name:       "Test Source 2",
+						Type:       "python",
+						Enabled:    false,
+					},
 				},
-			},
-			"remote789": {
-				ID:         "remote789",
-				ExternalID: "external-789",
-				Data: sourceClient.EventStreamSource{
+				"remote789": {
 					ID:         "remote789",
 					ExternalID: "external-789",
-					Name:       "Test Source 3",
-					Type:       "javascript",
-					Enabled:    true,
-					TrackingPlan: &sourceClient.TrackingPlan{
-						ID: "remote-tp-789",
-						Config: &sourceClient.TrackingPlanConfig{
-							Track: &sourceClient.TrackConfig{
-								DropUnplannedEvents: boolPtr(true),
+					Data: sourceClient.EventStreamSource{
+						ID:         "remote789",
+						ExternalID: "external-789",
+						Name:       "Test Source 3",
+						Type:       "javascript",
+						Enabled:    true,
+						TrackingPlan: &sourceClient.TrackingPlan{
+							ID: "remote-tp-789",
+							Config: &sourceClient.TrackingPlanConfig{
+								Track: &sourceClient.TrackConfig{
+									DropUnplannedEvents: boolPtr(true),
+								},
 							},
 						},
 					},
 				},
-			},
-		}
-		collection.Set(source.ResourceType, resourceMap)
+			}
+			collection.Set(source.ResourceType, resourceMap)
 
-		// Add tracking plan resources to the collection so they can be resolved
-		trackingPlanResourceMap := map[string]*resources.RemoteResource{
-			"remote-tp-789": {
-				ID:         "remote-tp-789",
-				ExternalID: "external-tp-789",
-			},
-		}
-		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
-
-		st, err := handler.LoadStateFromResources(context.Background(), collection)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, st)
-
-		assert.Len(t, st.Resources, 2)
-
-		// Assert external-123 resource
-		resource123, exists := st.Resources["event-stream-source:external-123"]
-		require.True(t, exists, "event-stream-source:external-123 should exist in resources")
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-123",
-			Type: "event-stream-source",
-			Input: resources.ResourceData{
-				"name":    "Test Source 1",
-				"enabled": true,
-				"type":    "javascript",
-			},
-			Output: resources.ResourceData{
-				"id": "remote123",
-			},
-		}, resource123)
-
-		// Assert external-789 resource
-		resource789, exists := st.Resources["event-stream-source:external-789"]
-		require.True(t, exists, "event-stream-source:external-789 should exist in resources")
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-789",
-			Type: "event-stream-source",
-			Input: resources.ResourceData{
-				"name":    "Test Source 3",
-				"enabled": true,
-				"type":    "javascript",
-				"tracking_plan": &resources.PropertyRef{
-					URN:      resources.URN("external-tp-789", dcstate.TrackingPlanResourceType),
-					Property: "id",
+			// Add tracking plan resources to the collection so they can be resolved
+			trackingPlanResourceMap := map[string]*resources.RemoteResource{
+				"remote-tp-789": {
+					ID:         "remote-tp-789",
+					ExternalID: "external-tp-789",
 				},
-				"tracking_plan_config": map[string]interface{}{
-					"track": map[string]interface{}{
-						"drop_unplanned_events": true,
+			}
+			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+
+			st, err := handler.LoadStateFromResources(context.Background(), collection)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, st)
+
+			assert.Len(t, st.Resources, 2)
+
+			// Assert external-123 resource
+			resource123, exists := st.Resources["event-stream-source:external-123"]
+			require.True(t, exists, "event-stream-source:external-123 should exist in resources")
+			assert.Equal(t, &state.ResourceState{
+				ID:   "external-123",
+				Type: "event-stream-source",
+				Input: resources.ResourceData{
+					"name":    "Test Source 1",
+					"enabled": true,
+					"type":    "javascript",
+				},
+				Output: resources.ResourceData{
+					"id": "remote123",
+				},
+			}, resource123)
+
+			// Assert external-789 resource
+			resource789, exists := st.Resources["event-stream-source:external-789"]
+			require.True(t, exists, "event-stream-source:external-789 should exist in resources")
+			assert.Equal(t, &state.ResourceState{
+				ID:   "external-789",
+				Type: "event-stream-source",
+				Input: resources.ResourceData{
+					"name":    "Test Source 3",
+					"enabled": true,
+					"type":    "javascript",
+					"tracking_plan": &resources.PropertyRef{
+						URN:      resources.URN("external-tp-789", dcstate.TrackingPlanResourceType),
+						Property: "id",
+					},
+					"tracking_plan_config": map[string]interface{}{
+						"track": map[string]interface{}{
+							"drop_unplanned_events": true,
+						},
 					},
 				},
-			},
-			Output: resources.ResourceData{
-				"id":               "remote789",
-				"tracking_plan_id": "remote-tp-789",
-			},
-		}, resource789)
+				Output: resources.ResourceData{
+					"id":               "remote789",
+					"tracking_plan_id": "remote-tp-789",
+				},
+			}, resource789)
+		})
+
+		t.Run("tracking plan not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
+			handler := source.NewHandler(nil, importDir)
+
+			// Create a resource collection with event stream source that has a tracking plan
+			// but the tracking plan is not in the collection (simulates tracking plan created via UI)
+			collection := resources.NewResourceCollection()
+			resourceMap := map[string]*resources.RemoteResource{
+				"remote123": {
+					ID:         "remote123",
+					ExternalID: "external-123",
+					Data: sourceClient.EventStreamSource{
+						ID:         "remote123",
+						ExternalID: "external-123",
+						Name:       "Test Source 1",
+						Type:       "javascript",
+						Enabled:    true,
+						TrackingPlan: &sourceClient.TrackingPlan{
+							ID: "remote-tp-123",
+							Config: &sourceClient.TrackingPlanConfig{
+								Track: &sourceClient.TrackConfig{
+									DropUnplannedEvents: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+			}
+			collection.Set(source.ResourceType, resourceMap)
+			// Note: adding tracking plan without externalID to collection, so GetURNByID will return ErrRemoteResourceExternalIdNotFound
+			trackingPlanResourceMap := map[string]*resources.RemoteResource{
+				"remote-tp-123": {
+					ID:         "remote-tp-123",
+				},
+			}
+			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+
+			st, err := handler.LoadStateFromResources(context.Background(), collection)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, st)
+			assert.Len(t, st.Resources, 1)
+
+			// Assert external-123 resource exists without tracking plan reference in Input
+			resource123, exists := st.Resources["event-stream-source:external-123"]
+			require.True(t, exists, "event-stream-source:external-123 should exist in resources")
+			assert.Equal(t, &state.ResourceState{
+				ID:   "external-123",
+				Type: "event-stream-source",
+				Input: resources.ResourceData{
+					"name":    "Test Source 1",
+					"enabled": true,
+					"type":    "javascript",
+				},
+				Output: resources.ResourceData{
+					"id": "remote123",
+				},
+			}, resource123)
+		})
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {

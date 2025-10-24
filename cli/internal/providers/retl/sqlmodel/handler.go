@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // Handler implements the resourceHandler interface for SQL Model resources
@@ -26,6 +27,14 @@ func NewHandler(client retlClient.RETLStore) *Handler {
 		client:    client,
 		resources: make(map[string]*SQLModelResource),
 	}
+}
+
+func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	id, ok := s.Spec["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("id not found in sql model spec")
+	}
+	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
 }
 
 // LoadSpec loads and validates a SQL Model spec
@@ -163,6 +172,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
 		Enabled:              data[EnabledKey].(bool),
+		ExternalID:           ID,
 	}
 
 	// Call API to create RETL source
@@ -240,8 +250,8 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 	return nil
 }
 
-func (h *Handler) List(ctx context.Context) ([]resources.ResourceData, error) {
-	sources, err := h.client.ListRetlSources(ctx)
+func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error) {
+	sources, err := h.client.ListRetlSources(ctx, hasExternalId)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
@@ -330,6 +340,54 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		ResourceType: ResourceType,
 	}
 	return []importremote.ImportData{importData}, nil
+}
+
+func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	hasExternalID := true
+	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
+	if err != nil {
+		return nil, fmt.Errorf("listing RETL sources: %w", err)
+	}
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, source := range sources.Data {
+		resourceMap[source.ID] = &resources.RemoteResource{
+			ID:         source.ID,
+			ExternalID: source.ExternalID,
+			Data:       source,
+		}
+	}
+	collection.Set(ResourceType, resourceMap)
+	return collection, nil
+}
+
+func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	s := state.EmptyState()
+	sqlModelResources := collection.GetAll(ResourceType)
+	for _, resource := range sqlModelResources {
+		source, ok := resource.Data.(retlClient.RETLSource)
+		if !ok {
+			return nil, fmt.Errorf("unable to cast resource to retl source")
+		}
+		input := resources.ResourceData{
+			DisplayNameKey:      source.Name,
+			DescriptionKey:      source.Config.Description,
+			AccountIDKey:        source.AccountID,
+			PrimaryKeyKey:       source.Config.PrimaryKey,
+			SQLKey:              source.Config.Sql,
+			EnabledKey:          source.IsEnabled,
+			SourceDefinitionKey: source.SourceDefinitionName,
+			LocalIDKey:          source.ExternalID,
+		}
+		output := toResourceData(&source)
+		s.AddResource(&state.ResourceState{
+			Type:   ResourceType,
+			ID:     source.ExternalID,
+			Input:  input,
+			Output: *output,
+		})
+	}
+	return s, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {

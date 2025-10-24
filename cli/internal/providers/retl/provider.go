@@ -3,6 +3,7 @@ package retl
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
@@ -58,6 +59,19 @@ func (p *Provider) GetSupportedTypes() []string {
 		types = append(types, resourceType)
 	}
 	return types
+}
+
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.ParseSpec(path, s)
 }
 
 // LoadSpec loads a spec for the given kind
@@ -188,7 +202,16 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
-	return handler.List(ctx)
+
+	var hasExternalId *bool
+	if hasEsternalIdStr, ok := filters["hasExternalId"]; ok {
+		id, err := strconv.ParseBool(hasEsternalIdStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hasExternalId filter: %w", err)
+		}
+		hasExternalId = &id
+	}
+	return handler.List(ctx, hasExternalId)
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
@@ -217,16 +240,34 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 
 // LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
 func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	// TODO: Implement when ready - will use p.client.ListRetlSources()
-	// For now, return empty collection to keep provider functional
-	return resources.NewResourceCollection(), nil
+	collection := resources.NewResourceCollection()
+	for resourceType, handler := range p.handlers {
+		c, err := handler.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
+		}
+		collection, err = collection.Merge(c)
+		if err != nil {
+			return nil, fmt.Errorf("merging collection for %s: %w", resourceType, err)
+		}
+	}
+	return collection, nil
 }
 
 // LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
 func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
-	// TODO: Implement when ready
-	// For now, fall back to existing LoadState behavior
-	return state.EmptyState(), nil
+	s := state.EmptyState()
+	for sqlmodelResourceType, handler := range p.handlers {
+		providerState, err := handler.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, fmt.Errorf("loading state from provider handler %s: %w", sqlmodelResourceType, err)
+		}
+		s, err = s.Merge(providerState)
+		if err != nil {
+			return nil, fmt.Errorf("merging provider states: %w", err)
+		}
+	}
+	return s, nil
 }
 
 // Preview returns the preview results for a resource
