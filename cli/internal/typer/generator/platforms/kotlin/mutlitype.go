@@ -67,6 +67,8 @@ func createMultiTypeSubclass(primitiveType plan.PrimitiveType, nameRegistry *cor
 		typeName = "ObjectValue"
 	case plan.PrimitiveTypeArray:
 		typeName = "ArrayValue"
+	case plan.PrimitiveTypeNull:
+		typeName = "NullValue"
 	default:
 		return nil, fmt.Errorf("unsupported primitive type in multi-type union: %s", primitiveType)
 	}
@@ -85,6 +87,8 @@ func createMultiTypeSubclass(primitiveType plan.PrimitiveType, nameRegistry *cor
 		jsonConversion = "value" // JsonObject is already a JsonElement
 	case plan.PrimitiveTypeArray:
 		jsonConversion = "JsonArray(value)" // List needs to be wrapped in JsonArray
+	case plan.PrimitiveTypeNull:
+		jsonConversion = "value" // JsonNull is already a JsonElement
 	default:
 		return nil, fmt.Errorf("unsupported primitive type in multi-type union: %s", primitiveType)
 	}

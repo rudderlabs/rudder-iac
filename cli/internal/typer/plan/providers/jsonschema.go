@@ -89,6 +89,8 @@ func parsePrimitiveType(s string) (plan.PrimitiveType, error) {
 		return plan.PrimitiveTypeArray, nil
 	case "object":
 		return plan.PrimitiveTypeObject, nil
+	case "null":
+		return plan.PrimitiveTypeNull, nil
 	default:
 		return "", fmt.Errorf("invalid primitive type: %s", s)
 	}
@@ -237,7 +239,7 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 	// parse type
 	typeVal, exists := def["type"]
 	if !exists {
-		td.Types = []plan.PropertyType{plan.PrimitiveTypeAny}
+		td.Types = []plan.PropertyType{}
 	} else {
 		switch v := typeVal.(type) {
 		case string:
@@ -248,7 +250,7 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 			td.Types = []plan.PropertyType{pt}
 		case []any:
 			if len(v) == 0 {
-				td.Types = []plan.PropertyType{plan.PrimitiveTypeAny}
+				td.Types = []plan.PropertyType{}
 			} else {
 				for _, item := range v {
 					if str, ok := item.(string); ok {

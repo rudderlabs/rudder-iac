@@ -145,11 +145,11 @@ func init() {
 		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["email"]},
 	}
 
-	// Add properties for testing "any" type support
+	// Add properties for testing empty types support
 	ReferenceProperties["property_of_any"] = &plan.Property{
 		Name:        "property_of_any",
 		Description: "A field that can contain any type of value",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
+		Types:       []plan.PropertyType{},
 	}
 
 	ReferenceProperties["untyped_field"] = &plan.Property{
@@ -162,7 +162,7 @@ func init() {
 		Name:        "array_of_any",
 		Description: "An array that can contain any type of items",
 		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
-		ItemTypes:   []plan.PropertyType{plan.PrimitiveTypeAny},
+		ItemTypes:   []plan.PropertyType{},
 	}
 
 	ReferenceProperties["untyped_array"] = &plan.Property{
@@ -599,9 +599,60 @@ func init() {
 	ReferenceProperties["mixed_value"] = &plan.Property{
 		Name:        "mixed_value",
 		Description: "Mixed type enum",
-		Types:       []plan.PropertyType{plan.PrimitiveTypeAny},
+		Types:       []plan.PropertyType{},
 		Config: &plan.PropertyConfig{
 			Enum: []any{"active", 1, true, 2.5},
+		},
+	}
+
+	// Null type support testing
+	ReferenceCustomTypes["null_type"] = &plan.CustomType{
+		Name:        "null_type",
+		Description: "Custom type representing a null value",
+		Type:        plan.PrimitiveTypeNull,
+	}
+
+	ReferenceProperties["null_field"] = &plan.Property{
+		Name:        "null_field",
+		Description: "Property that is always null",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeNull},
+	}
+
+	ReferenceProperties["custom_null_field"] = &plan.Property{
+		Name:        "custom_null_field",
+		Description: "Property using custom null type",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["null_type"]},
+	}
+
+	ReferenceProperties["string_or_null"] = &plan.Property{
+		Name:        "string_or_null",
+		Description: "Property that can be string or null",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull},
+	}
+
+	ReferenceProperties["number_or_null"] = &plan.Property{
+		Name:        "number_or_null",
+		Description: "Property that can be number or null",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeNumber, plan.PrimitiveTypeNull},
+	}
+
+	ReferenceProperties["multi_type_with_null"] = &plan.Property{
+		Name:        "multi_type_with_null",
+		Description: "Property that can be string, integer, or null",
+		Types: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeInteger,
+			plan.PrimitiveTypeNull,
+		},
+	}
+
+	ReferenceProperties["array_with_null_items"] = &plan.Property{
+		Name:        "array_with_null_items",
+		Description: "Array with items that can be string or null",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes: []plan.PropertyType{
+			plan.PrimitiveTypeString,
+			plan.PrimitiveTypeNull,
 		},
 	}
 }
@@ -657,6 +708,13 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 					Required: false,
 					Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
 				},
+				// Null type properties for testing
+				"null_field":            {Property: *ReferenceProperties["null_field"]},
+				"custom_null_field":     {Property: *ReferenceProperties["custom_null_field"]},
+				"string_or_null":        {Property: *ReferenceProperties["string_or_null"]},
+				"number_or_null":        {Property: *ReferenceProperties["number_or_null"]},
+				"multi_type_with_null":  {Property: *ReferenceProperties["multi_type_with_null"]},
+				"array_with_null_items": {Property: *ReferenceProperties["array_with_null_items"]},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
