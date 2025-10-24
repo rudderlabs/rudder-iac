@@ -61,6 +61,19 @@ func (p *Provider) GetSupportedTypes() []string {
 	return types
 }
 
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.ParseSpec(path, s)
+}
+
 // LoadSpec loads a spec for the given kind
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	resourceType, ok := p.kindToType[s.Kind]

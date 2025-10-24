@@ -71,6 +71,14 @@ func (p *CompositeProvider) Validate(graph *resources.Graph) error {
 	return nil
 }
 
+func (p *CompositeProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	provider := p.providerForKind(s.Kind)
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for kind %s", s.Kind)
+	}
+	return provider.ParseSpec(path, s)
+}
+
 func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 	provider := p.providerForKind(s.Kind)
 	if provider == nil {

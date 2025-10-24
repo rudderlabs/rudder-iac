@@ -13,6 +13,10 @@ import (
 // Each resource type (e.g., SQL Model) must implement this interface to be
 // managed by the RETL provider.
 type resourceHandler interface {
+	// ParseSpec parses the spec generically for the resource type
+	// and returns the data
+	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
+
 	// LoadSpec loads and validates a resource specification from a file.
 	// The path parameter specifies the location of the spec file, and s contains
 	// the parsed spec data. Returns an error if the spec is invalid or cannot be loaded.

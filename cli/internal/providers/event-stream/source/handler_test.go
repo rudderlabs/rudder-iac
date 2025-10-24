@@ -30,6 +30,87 @@ func boolPtr(b bool) *bool {
 const importDir = ""
 
 func TestEventStreamSourceHandler(t *testing.T) {
+	t.Run("ParseSpec", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name          string
+			spec          *specs.Spec
+			expectedIDs   []string
+			expectedError bool
+			errorContains string
+		}{
+			{
+				name: "success - parse spec with id",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source-1",
+						"name": "Test Source 1",
+						"type": "javascript",
+					},
+				},
+				expectedIDs:   []string{"test-source-1"},
+				expectedError: false,
+			},
+			{
+				name: "error - id not found in spec",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+			{
+				name: "error - id is not a string",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   12345,
+						"name": "Test Source",
+					},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+			{
+				name: "error - empty spec",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{},
+				},
+				expectedError: true,
+				errorContains: "id not found in event stream source spec",
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc // capture range variable
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				mockClient := source.NewMockSourceClient()
+				handler := source.NewHandler(mockClient, importDir)
+
+				parsedSpec, err := handler.ParseSpec("test/path.yaml", tc.spec)
+
+				if tc.expectedError {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errorContains)
+					assert.Nil(t, parsedSpec)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, parsedSpec)
+					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				}
+			})
+		}
+	})
+
 	t.Run("LoadSpec", func(t *testing.T) {
 		testCases := []struct {
 			name         string
@@ -344,7 +425,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []map[string]interface{}{
 									{
-										"local_id": "test-source-1",
+										"local_id":  "test-source-1",
 										"remote_id": "test-source-1-123",
 									},
 								},
@@ -734,16 +815,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 	t.Run("Import", func(t *testing.T) {
 		testCases := []struct {
-			name                     string
-			id                       string
-			remoteId                 string
-			data                     resources.ResourceData
-			existingSources          []sourceClient.EventStreamSource
-			expectedUpdateCalled     bool
+			name                        string
+			id                          string
+			remoteId                    string
+			data                        resources.ResourceData
+			existingSources             []sourceClient.EventStreamSource
+			expectedUpdateCalled        bool
 			expectedSetExternalIDCalled bool
-			expectedError            bool
-			errorMessage             string
-			expectedResult           *resources.ResourceData
+			expectedError               bool
+			errorMessage                string
+			expectedResult              *resources.ResourceData
 		}{
 			{
 				name:     "source not found",
@@ -763,10 +844,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     false,
+				expectedUpdateCalled:        false,
 				expectedSetExternalIDCalled: false,
-				expectedError:            true,
-				errorMessage:             "event stream source with ID remote-not-found not found",
+				expectedError:               true,
+				errorMessage:                "event stream source with ID remote-not-found not found",
 			},
 			{
 				name:     "import source without tracking plan",
@@ -786,9 +867,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id": "remote123",
 				},
@@ -829,9 +910,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id":               "remote456",
 					"tracking_plan_id": "tp-456",
@@ -861,9 +942,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						Enabled:    true,
 					},
 				},
-				expectedUpdateCalled:     true,
+				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
-				expectedError:            false,
+				expectedError:               false,
 				expectedResult: &resources.ResourceData{
 					"id":               "remote789",
 					"tracking_plan_id": "tp-999",
