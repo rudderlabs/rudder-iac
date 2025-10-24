@@ -104,11 +104,25 @@ func (m model) View() string {
 	)
 }
 
-func printTableWithDetails(rs []resources.ResourceData) error {
+func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
+	// Default column widths
+	idWidth := 27
+	nameWidth := 30
+
+	// Override with custom widths if provided
+	if len(columnWidths) > 0 {
+		if w, ok := columnWidths["id"]; ok {
+			idWidth = w
+		}
+		if w, ok := columnWidths["name"]; ok {
+			nameWidth = w
+		}
+	}
+
 	columns := []table.Column{
 		{Title: "#", Width: 4},
-		{Title: "ID", Width: 27}, // KSUID length
-		{Title: "Name", Width: 30},
+		{Title: "ID", Width: idWidth},
+		{Title: "Name", Width: nameWidth},
 	}
 
 	rows := make([]table.Row, len(rs))

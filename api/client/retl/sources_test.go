@@ -52,7 +52,7 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
 		Enabled:              true,
-		ExternalID:           &externalID,
+		ExternalID:           externalID,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)
@@ -237,10 +237,18 @@ func TestListRetlSources(t *testing.T) {
 func TestListRetlSourcesWithExternalID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			if !assert.Equal(t, "https://api.rudderstack.com/v2/retl-sources?hasExternalID=true", req.URL.String()) {
+			url := req.URL
+			query := url.Query()
+			if query.Get("hasExternalId") != "true" {
 				return false
 			}
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-source?hasExternalID=false", "")
+			if query.Get("sourceType") != "model" {
+				return false
+			}
+			if url.Path != "/v2/retl-sources" {
+				return false
+			}
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources?sourceType=model&hasExternalId=false", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{

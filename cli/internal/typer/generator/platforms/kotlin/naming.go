@@ -9,170 +9,167 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
-var (
-	TypeAliasScope = "typealias"
-	DataclassScope = "dataclass"
-	EnumScope      = "enum"
-)
+const globalTypeScope = "types"
+
+func handleReservedKeyword(name string) string {
+	if KotlinHardKeywords[name] {
+		return "_" + name
+	}
+	return name
+}
+
+func handleStartingCharacter(name string) string {
+	if len(name) > 0 && unicode.IsDigit(rune(name[0])) {
+		return "_" + name
+	}
+	return name
+}
 
 // formatClassName converts a name to PascalCase suitable for Kotlin class names and type aliases
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToPascalCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
-	// Add prefix if provided
+	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
 	if prefix != "" {
-		formatted = prefix + formatted
+		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
+	}
+	formatted = core.ToPascalCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
+	return formatted
+}
+
+// FormatPropertyName converts a name to camelCase suitable for Kotlin property names
+// Returns empty string if input is empty.
+func FormatPropertyName(name string) string {
+	formatted := strings.TrimSpace(name)
+	formatted = core.ToCamelCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
+	return formatted
+}
+
+// sanitizeForIdentifier removes or replaces characters that are invalid in Kotlin identifiers
+// Invalid characters are replaced with spaces so they become word boundaries in PascalCase conversion
+func sanitizeForIdentifier(s string) string {
+	var result strings.Builder
+	result.Grow(len(s))
+
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
+			// Keep valid characters and common word separators
+			result.WriteRune(ch)
+		} else {
+			// Replace invalid characters with space to create word boundary
+			result.WriteRune(' ')
+		}
 	}
 
-	return formatted
+	return result.String()
 }
 
 // formatPropertyName converts a name to camelCase suitable for Kotlin property names
 // Returns empty string if input is empty.
 func formatPropertyName(name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToCamelCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
+	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
+	formatted = core.ToCamelCase(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
 // FormatMethodName converts a name to camelCase suitable for Kotlin method names
 // If prefix is provided, it's prepended to the formatted name with proper casing
 func FormatMethodName(prefix, name string) string {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return ""
-	}
-
-	originalLower := strings.ToLower(trimmedName)
-	formatted := core.ToCamelCase(trimmedName)
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
-	// Add prefix if provided
+	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
 	if prefix != "" {
-		// Convert prefix to camelCase and append the PascalCase name
-		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(name)
+		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(formatted)
+	} else {
+		formatted = core.ToCamelCase(formatted)
 	}
-
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
-// getOrRegisterCustomTypeClassName returns the registered class name for a custom type
-func getOrRegisterCustomTypeClassName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, DataclassScope, className)
+// getOrRegisterCustomTypeName returns the registered type name for a custom type.
+func getOrRegisterCustomTypeName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("CustomType", customType.Name)
+	return nameRegistry.RegisterName("customtype:"+customType.Name, globalTypeScope, typeName)
 }
 
-// getOrRegisterCustomTypeAliasName returns the registered alias name for a primitive custom type
-func getOrRegisterCustomTypeAliasName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	aliasName := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, TypeAliasScope, aliasName)
+// getOrRegisterPropertyTypeName returns the registered type name for a property-specific type.
+func getOrRegisterPropertyTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("Property", property.Name)
+	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
 }
 
-// getOrRegisterPropertyAliasName returns the registered alias name for a property-specific type
-func getOrRegisterPropertyAliasName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	aliasName := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, TypeAliasScope, aliasName)
-}
+// getOrRegisterEnumValue returns the registered enum value name for an enum value
+// Uses the enum's scope to ensure values within the same enum are deduplicated
+// typeName should be the name of the Kotlin type that contains the enum
+func getOrRegisterEnumValue(typeName string, value any, nameRegistry *core.NameRegistry) (string, error) {
+	enumScope := fmt.Sprintf("enum:%s", typeName)
+	formatted := FormatEnumValue(value)
+	valueKey := fmt.Sprintf("%v", value)
 
-// getOrRegisterPropertyEnumName returns the registered enum class name for a property with enum constraints
-func getOrRegisterPropertyEnumName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	enumName := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, EnumScope, enumName)
-}
+	// If FormatEnumValue returns empty string (e.g., for emojis or symbols only),
+	// use underscore as a placeholder which will be numbered by the collision handler
+	if formatted == "" {
+		formatted = "_"
+	}
 
-// getOrRegisterCustomTypeEnumName returns the registered enum class name for a custom type with enum constraints
-func getOrRegisterCustomTypeEnumName(customType *plan.CustomType, nameRegistry *core.NameRegistry) (string, error) {
-	enumName := FormatClassName("CustomType", customType.Name)
-	return nameRegistry.RegisterName("customtype:"+customType.Name, EnumScope, enumName)
+	// Check if the result is only underscores (_, __, ___, etc.)
+	// These are reserved in Kotlin, so we need to append a number
+	// by registering a dummy enum id to trigger the collision handler
+	isOnlyUnderscores := true
+	for _, r := range formatted {
+		if r != '_' {
+			isOnlyUnderscores = false
+			break
+		}
+	}
+	if isOnlyUnderscores {
+		_, err := nameRegistry.RegisterName(fmt.Sprintf("enum:placeholder:%s", formatted), enumScope, formatted)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	n, err := nameRegistry.RegisterName(valueKey, enumScope, formatted)
+	if err != nil {
+		return "", fmt.Errorf("failed to register name for enum %q", typeName)
+	}
+
+	return n, nil
 }
 
 // FormatEnumValue converts a string value to UPPER_SNAKE_CASE suitable for Kotlin enum constants
 func FormatEnumValue(value any) string {
-	valueStr := fmt.Sprintf("%v", value)
-	trimmedValue := strings.TrimSpace(valueStr)
-	if trimmedValue == "" {
-		return ""
-	}
+	formatted := fmt.Sprintf("%v", value)
+	formatted = strings.TrimSpace(formatted)
+	afterReplacement := core.ReplaceSpecialCharacters(formatted, "_")
 
-	// Convert to upper case and replace invalid characters with underscores
-	formatted := strings.ToUpper(trimmedValue)
-
-	// Replace non-alphanumeric characters with underscores
-	var result strings.Builder
-	for _, r := range formatted {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			result.WriteRune(r)
+	words := core.SplitIntoWords(afterReplacement)
+	if len(words) == 0 {
+		// If no words were found, check if we have underscores from special char replacement
+		// This handles cases like "!!!" -> "___" where the underscores should be preserved
+		if len(afterReplacement) > 0 && strings.Trim(afterReplacement, "_") == "" {
+			// The string contains only underscores, preserve them
+			formatted = afterReplacement
 		} else {
-			result.WriteRune('_')
+			// Empty or whitespace only
+			return ""
 		}
+	} else {
+		formatted = strings.Join(words, "_")
 	}
 
-	formatted = result.String()
-
-	// If it starts with a number, prefix with underscore
-	if len(formatted) > 0 && unicode.IsDigit(rune(formatted[0])) {
-		formatted = "_" + formatted
-	}
-
-	// Handle reserved keywords by prefixing with underscore
-	originalLower := strings.ToLower(trimmedValue)
-	if KotlinReservedKeywords[originalLower] {
-		formatted = "_" + formatted
-	}
-
+	formatted = strings.ToUpper(formatted)
+	formatted = handleStartingCharacter(formatted)
+	formatted = handleReservedKeyword(formatted)
 	return formatted
-}
-
-func FormatEnumSerialName(value any) string {
-	switch v := value.(type) {
-	case string:
-		// For strings, preserve the original value with quotes
-		return fmt.Sprintf("%q", v)
-	default:
-		return fmt.Sprintf("%v", value)
-	}
 }
 
 // formatSealedSubclassName formats a match value into a valid Kotlin class name prefixed with "Case"
@@ -224,9 +221,15 @@ func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.Na
 	registrationKey := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name
 	return nameRegistry.RegisterName(
 		registrationKey,
-		DataclassScope,
+		globalTypeScope,
 		className,
 	)
+}
+
+// getOrRegisterPropertyArrayItemTypeName returns the registered type name for array items with multiple types
+func getOrRegisterPropertyArrayItemTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
+	typeName := FormatClassName("ArrayItem", property.Name)
+	return nameRegistry.RegisterName("property:item:"+property.Name, globalTypeScope, typeName)
 }
 
 // KotlinCollisionHandler provides a Kotlin-specific collision handler for the NameRegistry
@@ -237,16 +240,4 @@ func KotlinCollisionHandler(name string, existingNames []string) string {
 // CreateKotlinNameRegistry creates a new NameRegistry with Kotlin-specific collision handling
 func CreateKotlinNameRegistry() *core.NameRegistry {
 	return core.NewNameRegistry(KotlinCollisionHandler)
-}
-
-// getOrRegisterPropertyMultiTypeClassName returns the registered sealed class name for a property with multiple types
-func getOrRegisterPropertyMultiTypeClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("Property", property.Name)
-	return nameRegistry.RegisterName("property:"+property.Name, DataclassScope, className)
-}
-
-// getOrRegisterPropertyMultiTypeArrayItemClassName returns the registered sealed class name for array items with multiple types
-func getOrRegisterPropertyMultiTypeArrayItemClassName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
-	className := FormatClassName("ArrayItem", property.Name)
-	return nameRegistry.RegisterName("property:item:"+property.Name, DataclassScope, className)
 }

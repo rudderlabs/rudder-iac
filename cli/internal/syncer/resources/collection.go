@@ -22,8 +22,9 @@ type ResourceCollection struct {
 }
 
 var (
-	ErrDuplicateResource      = errors.New("duplicate resource detected")
-	ErrRemoteResourceNotFound = errors.New("remote resource not found")
+	ErrDuplicateResource                = errors.New("duplicate resource detected")
+	ErrRemoteResourceNotFound           = errors.New("remote resource not found")
+	ErrRemoteResourceExternalIdNotFound = errors.New("remote resource does not have externalId")
 )
 
 // NewResourceCollection creates a new empty ResourceCollection
@@ -71,6 +72,10 @@ func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound
+	}
+
+	if resource.ExternalID == "" {
+		return "", ErrRemoteResourceExternalIdNotFound
 	}
 
 	return URN(resource.ExternalID, resourceType), nil

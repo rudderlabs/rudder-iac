@@ -84,12 +84,16 @@ func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId 
 	if event.CategoryId != nil {
 		// get URN for the category using remoteId
 		urn, err := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
-		if err != nil {
+		switch {
+		case err == nil:
+			args.CategoryId = &resources.PropertyRef{
+				URN:      urn,
+				Property: "id",
+			}
+		case err == resources.ErrRemoteResourceExternalIdNotFound:
+			args.CategoryId = nil
+		default:
 			return err
-		}
-		args.CategoryId = &resources.PropertyRef{
-			URN:      urn,
-			Property: "id",
 		}
 	}
 	return nil

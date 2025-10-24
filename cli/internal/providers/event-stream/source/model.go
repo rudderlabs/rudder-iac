@@ -1,6 +1,8 @@
 package source
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+)
 
 const (
 	IDKey               = "id" // remote id
@@ -24,7 +26,7 @@ const (
 
 	// YAML keys for import spec
 	TrackingPlanRefYAMLKey         = "tracking_plan"
-	TrackingPlanConfigYAMLKey     = "config"
+	TrackingPlanConfigYAMLKey      = "config"
 	GovernanceYAMLKey              = "governance"
 	ValidationsYAMLKey             = "validations"
 	TrackYAMLKey                   = "track"
@@ -105,15 +107,21 @@ type sourceResource struct {
 	SourceDefinition string
 	Enabled          bool
 	Governance       *governanceResource
+	ImportMetadata   map[string]*WorkspaceRemoteIDMapping
+}
+
+type WorkspaceRemoteIDMapping struct {
+	WorkspaceId string
+	RemoteId    string
 }
 
 type governanceResource struct {
-	TrackingPlan *trackingPlanResource
+	Validations *validationsResource
 }
 
-type trackingPlanResource struct {
-	Ref    *resources.PropertyRef
-	Config *trackingPlanConfigResource
+type validationsResource struct {
+	TrackingPlanRef *resources.PropertyRef
+	Config          *trackingPlanConfigResource
 }
 
 type trackingPlanConfigResource struct {

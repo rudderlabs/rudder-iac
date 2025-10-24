@@ -168,7 +168,7 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
 		Enabled:              data[EnabledKey].(bool),
-		ExternalID:           &ID,
+		ExternalID:           ID,
 	}
 
 	// Call API to create RETL source
@@ -347,12 +347,9 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources.Data {
-		if source.ExternalID == nil {
-			continue
-		}
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
-			ExternalID: *source.ExternalID,
+			ExternalID: source.ExternalID,
 			Data:       source,
 		}
 	}
@@ -376,12 +373,12 @@ func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 			SQLKey:              source.Config.Sql,
 			EnabledKey:          source.IsEnabled,
 			SourceDefinitionKey: source.SourceDefinitionName,
-			LocalIDKey:          *source.ExternalID,
+			LocalIDKey:          source.ExternalID,
 		}
 		output := toResourceData(&source)
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
-			ID:     *source.ExternalID,
+			ID:     source.ExternalID,
 			Input:  input,
 			Output: *output,
 		})

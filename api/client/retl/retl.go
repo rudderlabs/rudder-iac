@@ -37,7 +37,7 @@ type RETLSourceStore interface {
 	GetRetlSource(ctx context.Context, id string) (*RETLSource, error)
 
 	// ListRetlSources lists all RETL sources
-	ListRetlSources(ctx context.Context, hasExternalID *bool) (*RETLSources, error)
+	ListRetlSources(ctx context.Context, hasExternalId *bool) (*RETLSources, error)
 }
 
 // PreviewStore is the interface for RETL source preview operations

@@ -14,11 +14,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	collection := resources.NewResourceCollection()
 
 	for _, provider := range p.providerStore {
-		if _, ok := provider.(resourceImportProvider); !ok {
-			continue
-		}
-
-		resources, err := provider.(resourceImportProvider).LoadImportable(ctx, idNamer)
+		resources, err := provider.LoadImportable(ctx, idNamer)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from provider %w", err)
 		}
@@ -39,19 +35,15 @@ func (p *Provider) FormatForExport(
 ) ([]importremote.FormattableEntity, error) {
 	normalized := make([]importremote.FormattableEntity, 0)
 
-	for _, provider := range p.providerStore {
-		if _, ok := provider.(resourceImportProvider); !ok {
-			continue
-		}
-
-		entities, err := provider.(resourceImportProvider).FormatForExport(
+	for resourceType, provider := range p.providerStore {
+		entities, err := provider.FormatForExport(
 			ctx,
 			collection,
 			idNamer,
 			resolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("normalizing for import for provider %w", err)
+			return nil, fmt.Errorf("formatting for export for provider %s: %w", resourceType, err)
 		}
 
 		normalized = append(normalized, entities...)

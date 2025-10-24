@@ -2,7 +2,6 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -44,13 +43,6 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 			TrackingPlanVersion: apitp.Version,
 		},
 	}
-
-	// Pretty print the tracking plan for debugging
-	b, err := json.MarshalIndent(tp, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(string(b))
 
 	return tp, nil
 }
@@ -160,13 +152,11 @@ func parseTrackingPlanEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.Ev
 
 func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.CustomType, error) {
 	customTypes := make(map[string]*plan.CustomType)
-	fmt.Println("Parsing $defs for event:", ev.Name)
 	if ev.Rules.Defs != nil {
 		customTypes = make(map[string]*plan.CustomType)
 
 		// First pass: create custom types without resolving references
 		for typeName := range ev.Rules.Defs {
-			fmt.Println("Found custom type:", typeName)
 			customTypes[typeName] = &plan.CustomType{
 				Name: typeName,
 			}
@@ -210,8 +200,6 @@ func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.
 			}
 		}
 
-	} else {
-		fmt.Println("No $defs found for event:", ev.Name)
 	}
 
 	return customTypes, nil
@@ -282,11 +270,19 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 		}
 		td.Schema = objSchema
 
-		// Parse additionalProperties field
+		// Parse additionalProperties and unevaluatedProperties fields
+		// Priority: additionalProperties > unevaluatedProperties > default to true
 		if additionalPropsVal, exists := def["additionalProperties"]; exists {
 			if additionalProps, ok := additionalPropsVal.(bool); ok {
 				objSchema.AdditionalProperties = additionalProps
 			}
+		} else if unevaluatedPropsVal, exists := def["unevaluatedProperties"]; exists {
+			// If additionalProperties is not specified, use unevaluatedProperties
+			if unevaluatedProps, ok := unevaluatedPropsVal.(bool); ok {
+				objSchema.AdditionalProperties = unevaluatedProps
+			}
+		} else {
+			objSchema.AdditionalProperties = true // default to true if neither is specified
 		}
 
 		if propertiesMap, exists := def["properties"]; exists {
@@ -495,7 +491,7 @@ func parseVariantCases(
 					return nil, "", nil, fmt.Errorf("default case 'then' must be an object")
 				}
 
-				schema, err := parseObjectSchemaFromDef(thenMap, customTypes)
+				schema, err := parseVariantCaseSchema(thenMap, customTypes)
 				if err != nil {
 					return nil, "", nil, fmt.Errorf("parsing default schema: %w", err)
 				}
@@ -513,7 +509,7 @@ func parseVariantCases(
 					return nil, "", nil, fmt.Errorf("case 'then' must be an object")
 				}
 
-				schema, err := parseObjectSchemaFromDef(thenMap, customTypes)
+				schema, err := parseVariantCaseSchema(thenMap, customTypes)
 				if err != nil {
 					return nil, "", nil, fmt.Errorf("parsing case schema: %w", err)
 				}
@@ -532,8 +528,8 @@ func parseVariantCases(
 	return cases, discriminator, defaultSchema, nil
 }
 
-// parseObjectSchemaFromDef parses an ObjectSchema from a JSON Schema definition
-func parseObjectSchemaFromDef(
+// parseVariantCaseSchema parses an ObjectSchema from a variant case definition (if-then-else)
+func parseVariantCaseSchema(
 	def map[string]any,
 	customTypes map[string]*plan.CustomType,
 ) (*plan.ObjectSchema, error) {
@@ -541,12 +537,19 @@ func parseObjectSchemaFromDef(
 		Properties: make(map[string]plan.PropertySchema),
 	}
 
-	// Parse additionalProperties field
+	// Parse additionalProperties and unevaluatedProperties fields
+	// Priority: additionalProperties > unevaluatedProperties > default to false (for variant schemas)
 	if additionalPropsVal, exists := def["additionalProperties"]; exists {
 		if additionalProps, ok := additionalPropsVal.(bool); ok {
 			schema.AdditionalProperties = additionalProps
 		}
+	} else if unevaluatedPropsVal, exists := def["unevaluatedProperties"]; exists {
+		// If additionalProperties is not specified, use unevaluatedProperties
+		if unevaluatedProps, ok := unevaluatedPropsVal.(bool); ok {
+			schema.AdditionalProperties = unevaluatedProps
+		}
 	}
+	// Note: No else clause here - variant schemas don't default to true
 
 	// Parse properties
 	if propertiesMap, exists := def["properties"]; exists {

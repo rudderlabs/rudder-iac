@@ -551,7 +551,7 @@ func TestProvider(t *testing.T) {
 				}
 
 				// Validate all specs
-				err := provider.Validate()
+				err := provider.Validate(nil)
 				if tc.expectedError {
 					assert.Error(t, err)
 					if tc.errorMessage != "" {
@@ -672,7 +672,7 @@ func TestProviderList(t *testing.T) {
 							SourceType:           retlClient.ModelSourceType,
 							SourceDefinitionName: "postgres",
 							AccountID:            "account-1",
-							ExternalID:           &externalId,
+							ExternalID:           externalId,
 							Config: retlClient.RETLSQLModelConfig{
 								Description: "Test description 1",
 								PrimaryKey:  "id",
@@ -859,24 +859,11 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 						SourceType:           retlClient.ModelSourceType,
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
-						ExternalID:           &externalID,
+						ExternalID:           externalID,
 						Config: retlClient.RETLSQLModelConfig{
 							Description: "d1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT 1",
-						},
-					},
-					{
-						ID:                   "source-no-ext",
-						Name:                 "No External",
-						SourceType:           retlClient.ModelSourceType,
-						SourceDefinitionName: "postgres",
-						AccountID:            "acc-2",
-						// ExternalID is nil => should be ignored
-						Config: retlClient.RETLSQLModelConfig{
-							Description: "d2",
-							PrimaryKey:  "id",
-							Sql:         "SELECT 2",
 						},
 					},
 				},
@@ -934,7 +921,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			SourceDefinitionName: "postgres",
 			AccountID:            "acc-1",
 			IsEnabled:            true,
-			ExternalID:           &extID,
+			ExternalID:           extID,
 			Config: retlClient.RETLSQLModelConfig{
 				Description: "desc-1",
 				PrimaryKey:  "id",
@@ -945,7 +932,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			source.ID: {
 				ID:         source.ID,
-				ExternalID: *source.ExternalID,
+				ExternalID: source.ExternalID,
 				Data:       source,
 			},
 		})

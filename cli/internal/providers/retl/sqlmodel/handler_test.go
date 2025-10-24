@@ -20,11 +20,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
-// stringPtr is a helper function to create a pointer to a string
-func stringPtr(s string) *string {
-	return &s
-}
-
 // createTestRETLSourceWithConfig creates a test RETL source with custom config
 func createTestRETLSourceWithConfig(id, name, sourceDefn, accountID string, enabled bool, config retlClient.RETLSQLModelConfig) retlClient.RETLSource {
 	return retlClient.RETLSource{
@@ -1306,7 +1301,7 @@ func TestSQLModelHandler(t *testing.T) {
 				})
 			source1.CreatedAt = &createdAt
 			source1.UpdatedAt = &updatedAt
-			source1.ExternalID = stringPtr("ext-1")
+			source1.ExternalID = "ext-1"
 
 			source2 := createTestRETLSourceWithConfig("source-2", "Test Source 2", "mysql", "account-2", false,
 				retlClient.RETLSQLModelConfig{
@@ -1314,7 +1309,7 @@ func TestSQLModelHandler(t *testing.T) {
 					PrimaryKey:  "id",
 					Sql:         "SELECT * FROM table2",
 				})
-			source2.ExternalID = stringPtr("ext-2")
+			source2.ExternalID = "ext-2"
 
 			mockClient := &mockRETLClient{
 				listRetlSourcesFunc: mockListRetlSources(source1, source2),
@@ -1355,7 +1350,7 @@ func TestSQLModelHandler(t *testing.T) {
 					PrimaryKey:  "id",
 					Sql:         "SELECT * FROM single_table",
 				})
-			source.ExternalID = stringPtr("ext-single")
+			source.ExternalID = "ext-single"
 
 			mockClient := &mockRETLClient{
 				listRetlSourcesFunc: mockListRetlSources(source),
@@ -1395,32 +1390,6 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Len(t, resources, 0)
 		})
 
-		t.Run("Success with sources without external IDs", func(t *testing.T) {
-			t.Parallel()
-
-			source := createTestRETLSourceWithConfig("source-no-ext", "Source Without External ID", "postgres", "account-1", true,
-				retlClient.RETLSQLModelConfig{
-					Description: "No external ID",
-					PrimaryKey:  "id",
-					Sql:         "SELECT * FROM no_ext_table",
-				})
-			source.ExternalID = nil // No external ID
-
-			mockClient := &mockRETLClient{
-				listRetlSourcesFunc: mockListRetlSources(source),
-			}
-
-			handler := sqlmodel.NewHandler(mockClient, "retl")
-
-			collection, err := handler.LoadResourcesFromRemote(context.Background())
-
-			assert.NoError(t, err)
-			assert.NotNil(t, collection)
-
-			resources := collection.GetAll(sqlmodel.ResourceType)
-			assert.Len(t, resources, 0) // Should be filtered out
-		})
-
 		t.Run("Success with mixed sources", func(t *testing.T) {
 			t.Parallel()
 
@@ -1430,18 +1399,10 @@ func TestSQLModelHandler(t *testing.T) {
 					PrimaryKey:  "id",
 					Sql:         "SELECT * FROM with_ext_table",
 				})
-			sourceWithExt.ExternalID = stringPtr("ext-with")
-
-			sourceNoExt := createTestRETLSourceWithConfig("source-no-ext", "Source Without External ID", "mysql", "account-2", true,
-				retlClient.RETLSQLModelConfig{
-					Description: "Without external ID",
-					PrimaryKey:  "id",
-					Sql:         "SELECT * FROM no_ext_table",
-				})
-			sourceNoExt.ExternalID = nil // No external ID
+			sourceWithExt.ExternalID = "ext-with"
 
 			mockClient := &mockRETLClient{
-				listRetlSourcesFunc: mockListRetlSources(sourceWithExt, sourceNoExt),
+				listRetlSourcesFunc: mockListRetlSources(sourceWithExt),
 			}
 
 			handler := sqlmodel.NewHandler(mockClient, "retl")
@@ -1452,7 +1413,7 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.NotNil(t, collection)
 
 			resources := collection.GetAll(sqlmodel.ResourceType)
-			assert.Len(t, resources, 1) // Only the one with external ID
+			assert.Len(t, resources, 1)
 
 			resource, exists := resources["source-with-ext"]
 			assert.True(t, exists)
@@ -1504,7 +1465,7 @@ func TestSQLModelHandler(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						IsEnabled:            true,
 						WorkspaceID:          "ws-1",
-						ExternalID:           stringPtr("local-1"),
+						ExternalID:           "local-1",
 						CreatedAt:            &createdAt,
 						UpdatedAt:            &updatedAt,
 						Config: retlClient.RETLSQLModelConfig{
@@ -1525,7 +1486,7 @@ func TestSQLModelHandler(t *testing.T) {
 						SourceDefinitionName: "mysql",
 						IsEnabled:            false,
 						WorkspaceID:          "ws-2",
-						ExternalID:           stringPtr("local-2"),
+						ExternalID:           "local-2",
 						Config: retlClient.RETLSQLModelConfig{
 							Description: "desc 2",
 							PrimaryKey:  "pk",
