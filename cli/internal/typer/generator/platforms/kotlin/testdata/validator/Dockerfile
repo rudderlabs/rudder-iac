@@ -1,5 +1,5 @@
 # Use a lightweight base image with JDK
-FROM openjdk:17-slim
+FROM openjdk:21-slim
 
 # Install Gradle
 ENV GRADLE_VERSION=8.4
@@ -18,9 +18,6 @@ WORKDIR /app
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
-
-# Copy source code
-RUN mkdir -p ./src/main/kotlin
 
 # Copy run script
 COPY run.sh .
