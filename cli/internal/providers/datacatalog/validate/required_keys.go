@@ -18,7 +18,7 @@ var ValidTypes = []string{
 }
 
 var validFormatValues = []string{
-	"datetime",
+	"date-time",
 	"date",
 	"time",
 	"email",
@@ -660,13 +660,21 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	}
 
 	// validate the property type
-	if property.Type != "object" {
-		return []ValidationError{
-			{
-				error:     fmt.Errorf("property %s in event_rule %s must have type 'object', but has type '%s' - nested properties are only supported for object type properties", prop.Ref, ruleRef, property.Type),
+	allowed, err := nestedPropertiesAllowed(property.Type, property.Config)
+	if !allowed {
+		errs := make([]ValidationError, 0)
+		errs = append(errs, ValidationError{
+			error:     fmt.Errorf("nested properties are not allowed for property %s", prop.Ref),
+			Reference: ruleRef,
+		})
+
+		if err != nil {
+			errs = append(errs, ValidationError{
+				error:     fmt.Errorf("error validating nested property %s: %w", prop.Ref, err),
 				Reference: ruleRef,
-			},
+			})
 		}
+		return errs
 	}
 
 	var errors []ValidationError
@@ -698,4 +706,45 @@ func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRu
 	}
 
 	return errors
+}
+
+func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, error) {
+	if strings.Contains(propertyType, "object") && strings.Contains(propertyType, "array") {
+		// type array and object cannot be present together
+		// for a property to allow nesting
+		return false, nil
+	}
+
+	if strings.Contains(propertyType, "object") {
+		return true, nil
+	}
+
+	if strings.Contains(propertyType, "array") {
+		itemTypes, itemTypesOk := config["itemTypes"]
+		if !itemTypesOk {
+			return true, nil
+		}
+
+		itemTypesArray, ok := itemTypes.([]any)
+		if !ok {
+			return false, fmt.Errorf("itemTypes must be an array")
+		}
+
+		found := false
+		for i, itemType := range itemTypesArray {
+			val, ok := itemType.(string)
+			if !ok {
+				return false, fmt.Errorf("itemTypes at index %d must be a string value", i)
+			}
+			if val == "object" {
+				found = true
+			}
+		}
+
+		if found {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
