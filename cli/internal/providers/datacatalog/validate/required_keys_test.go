@@ -1185,7 +1185,7 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:          "object and array type - should not allow",
 			propertyType:  "object, array",
 			config:        map[string]any{},
-			expectedAllow: true,
+			expectedAllow: false,
 			expectError:   false,
 		},
 		{

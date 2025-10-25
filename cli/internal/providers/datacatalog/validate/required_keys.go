@@ -714,14 +714,12 @@ func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, 
 		return true, nil
 	}
 
-	itemTypes, itemTypesOk := config["itemTypes"]
-	if strings.Contains(propertyType, "array") && !itemTypesOk {
-		// If the type contains array and itemTypes are empty,
-		// then nested properties are allowed.
-		return true, nil
-	}
+	if strings.Contains(propertyType, "array") && !strings.Contains(propertyType, "object") {
+		itemTypes, itemTypesOk := config["itemTypes"]
+		if !itemTypesOk {
+			return true, nil
+		}
 
-	if strings.Contains(propertyType, "array") && itemTypesOk {
 		itemTypesArray, ok := itemTypes.([]any)
 		if !ok {
 			return false, fmt.Errorf("itemTypes must be an array")
