@@ -53,8 +53,9 @@ test-all: test test-e2e ## Run all unit and end-to-end tests
 
 .PHONY: typer-kotlin-validate
 typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
-	cd cli/internal/typer/generator/platforms/kotlin/validator && make run
+	cd cli/internal/typer/generator/platforms/kotlin/testdata/validator && make run
 
 .PHONY: typer-kotlin-update-testdata
 typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
-	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go > cli/internal/typer/generator/platforms/kotlin/testdata/Main.kt
+	mkdir -p cli/internal/typer/generator/platforms/kotlin/testdata/main/kotlin/com/rudderstack/ruddertyper
+	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go > cli/internal/typer/generator/platforms/kotlin/testdata/main/kotlin/com/rudderstack/ruddertyper/Main.kt

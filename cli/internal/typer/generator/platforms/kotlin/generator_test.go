@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed testdata/Main.kt
+//go:embed testdata/validator/src/main/kotlin/com/rudderstack/ruddertyper/Main.kt
 var mainContent string
 
 func TestGenerate(t *testing.T) {
