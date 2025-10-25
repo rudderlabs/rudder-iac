@@ -1,5 +1,82 @@
 # Changelog
 
+## [0.11.0](https://github.com/rudderlabs/rudder-iac/compare/v0.10.0...v0.11.0) (2025-10-25)
+
+
+### Features
+
+* add ability to import custom types from upstream ([#213](https://github.com/rudderlabs/rudder-iac/issues/213)) ([2d2e4ec](https://github.com/rudderlabs/rudder-iac/commit/2d2e4ecfb04c4b72c9edcd341fe947fcd5aad0c9))
+* add APIs for event stream tracking plan connections ([#182](https://github.com/rudderlabs/rudder-iac/issues/182)) ([12003ac](https://github.com/rudderlabs/rudder-iac/commit/12003acb1cac03819fc68c00da91e04ac3f385f6))
+* add conconcurrency flag to apply and destroy commands ([#186](https://github.com/rudderlabs/rudder-iac/issues/186)) ([5c2258a](https://github.com/rudderlabs/rudder-iac/commit/5c2258aed9db54da3c068b0a7f6d193a19ad4768))
+* add CRUD APIs for event stream sources ([#172](https://github.com/rudderlabs/rudder-iac/issues/172)) ([220267f](https://github.com/rudderlabs/rudder-iac/commit/220267fe697ea855f1042edaee38aa6ac1ef57b3))
+* add Enabled field to create RETL source requests ([#175](https://github.com/rudderlabs/rudder-iac/issues/175)) ([4232437](https://github.com/rudderlabs/rudder-iac/commit/423243702dce72541c199bf83c0bd3680825f1d4))
+* add support for event stream source governance validations ([#190](https://github.com/rudderlabs/rudder-iac/issues/190)) ([71ecef8](https://github.com/rudderlabs/rudder-iac/commit/71ecef8c66537f97de44373494e5dd5833af5b15))
+* add support for running operations concurrently ([#167](https://github.com/rudderlabs/rudder-iac/issues/167)) ([cae599c](https://github.com/rudderlabs/rudder-iac/commit/cae599c52a751d2a6035e0a4cb96711dc1376f8a))
+* add tests for the import handler for the data catalog entities ([#244](https://github.com/rudderlabs/rudder-iac/issues/244)) ([756e609](https://github.com/rudderlabs/rudder-iac/commit/756e609fae6841e00ae139ed9314bc6a841bdb7e))
+* add validations for invalid tracking plan references in event stream sources ([#224](https://github.com/rudderlabs/rudder-iac/issues/224)) ([a36c0fb](https://github.com/rudderlabs/rudder-iac/commit/a36c0fb652b21dcc82afae210676532014f3608f))
+* added ability to validate spec in terms of import metadata at global level ([#248](https://github.com/rudderlabs/rudder-iac/issues/248)) ([8f2cc38](https://github.com/rudderlabs/rudder-iac/commit/8f2cc38ef387c3515fb7ed041868c5776c09a77d))
+* added base support for importing categories in the system ([#215](https://github.com/rudderlabs/rudder-iac/issues/215)) ([21ea8cf](https://github.com/rudderlabs/rudder-iac/commit/21ea8cf4021d6a64b8a082068d99404fc1ebe72c))
+* added formatter with ability to format data of specific extension ([#206](https://github.com/rudderlabs/rudder-iac/issues/206)) ([b6ae6ca](https://github.com/rudderlabs/rudder-iac/commit/b6ae6ca815e66b0fbd80e6f73a16af8dbffb752d))
+* added spinner for the import flow to have a visual feedback when importing ([#229](https://github.com/rudderlabs/rudder-iac/issues/229)) ([a87a8a7](https://github.com/rudderlabs/rudder-iac/commit/a87a8a7824e4f26e15a36996408b1e9750e37210))
+* error out on importing if the directory for import already exists ([#220](https://github.com/rudderlabs/rudder-iac/issues/220)) ([4b14ea3](https://github.com/rudderlabs/rudder-iac/commit/4b14ea3970a935e881bc60138be3465f43c76a2d))
+* implement event-stream-source provider ([#181](https://github.com/rudderlabs/rudder-iac/issues/181)) ([58a9da9](https://github.com/rudderlabs/rudder-iac/commit/58a9da99034f63d5e426394295e160083698f27f))
+* implement import operation for event stream sources ([#241](https://github.com/rudderlabs/rudder-iac/issues/241)) ([b5f5dd7](https://github.com/rudderlabs/rudder-iac/commit/b5f5dd7438c7517e0cbb1fc62205b7f461e38fe4))
+* import functionality for event stream sources ([#218](https://github.com/rudderlabs/rudder-iac/issues/218)) ([c93cbc3](https://github.com/rudderlabs/rudder-iac/commit/c93cbc3b89a0cfa8de4439372bfdb292e136645c))
+* import tracking plans ([#221](https://github.com/rudderlabs/rudder-iac/issues/221)) ([e7ef563](https://github.com/rudderlabs/rudder-iac/commit/e7ef563c1a4ab5d1cda9b498343fcae974af0b31))
+* prevent importing workspace when detected changes not synced ([#219](https://github.com/rudderlabs/rudder-iac/issues/219)) ([9650787](https://github.com/rudderlabs/rudder-iac/commit/96507876703258b044df4e713960c4b936405a52))
+* **retl:** add external ID support to RETL sources ([#227](https://github.com/rudderlabs/rudder-iac/issues/227)) ([c787ed3](https://github.com/rudderlabs/rudder-iac/commit/c787ed362cdb697fabcdb32847230580e66dda25))
+* ruddertyper orchestrating component ([#183](https://github.com/rudderlabs/rudder-iac/issues/183)) ([3000ff7](https://github.com/rudderlabs/rudder-iac/commit/3000ff744133831817b023e403423b9883d625aa))
+* separate out the importable resources in the print diff ([#201](https://github.com/rudderlabs/rudder-iac/issues/201)) ([2670ca1](https://github.com/rudderlabs/rudder-iac/commit/2670ca15dba01e04aedb6210081bcec8cad0ce5c))
+* show listing table for all tracking plans ([#225](https://github.com/rudderlabs/rudder-iac/issues/225)) ([f1c2b3f](https://github.com/rudderlabs/rudder-iac/commit/f1c2b3ff46e3d891176b3f2f18ae120dcb3531d3))
+* **type:** improved handling of Kotlin keywords ([#232](https://github.com/rudderlabs/rudder-iac/issues/232)) ([d339bb4](https://github.com/rudderlabs/rudder-iac/commit/d339bb44b61f9eb726563a315488c5f1d5ce98a2))
+* **typer:** add enum & arrays support for Kotlin generator ([#196](https://github.com/rudderlabs/rudder-iac/issues/196)) ([8e8c7d5](https://github.com/rudderlabs/rudder-iac/commit/8e8c7d5a745ec28fba50d617629b0d44819d6efe))
+* **typer:** add support for properties and arrays with multiple types ([#208](https://github.com/rudderlabs/rudder-iac/issues/208)) ([caad086](https://github.com/rudderlabs/rudder-iac/commit/caad086a3ed2a1bbd5cae75f27cc0d5fe1814ed2))
+* **typer:** additional check for plans with multiple variants (not supported) ([#233](https://github.com/rudderlabs/rudder-iac/issues/233)) ([f02ad6e](https://github.com/rudderlabs/rudder-iac/commit/f02ad6e71965a1ffe0e603fab696be13fda090a7))
+* **typer:** discriminator default value for non string types ([#234](https://github.com/rudderlabs/rudder-iac/issues/234)) ([1a03efe](https://github.com/rudderlabs/rudder-iac/commit/1a03efec43b84fd9739d3db491cb89562539758f))
+* **typer:** extended Kotlin custom types support ([#203](https://github.com/rudderlabs/rudder-iac/issues/203)) ([4d96278](https://github.com/rudderlabs/rudder-iac/commit/4d96278455249127a2ba5aa4354646585aff1a47))
+* **typer:** kotlin generator adds ruddertyper context to events ([#202](https://github.com/rudderlabs/rudder-iac/issues/202)) ([61a80b7](https://github.com/rudderlabs/rudder-iac/commit/61a80b712232c5415223afb427db6c771ec3afad))
+* **typer:** proper unicode support in Kotlin generated code ([#235](https://github.com/rudderlabs/rudder-iac/issues/235)) ([c52ac1c](https://github.com/rudderlabs/rudder-iac/commit/c52ac1cd29164414f6bedcc009cccd6ea25488bd))
+* **typer:** rudder typer support for null types ([#251](https://github.com/rudderlabs/rudder-iac/issues/251)) ([75ae5ad](https://github.com/rudderlabs/rudder-iac/commit/75ae5ad3894de74754e5ceb2b7e3b5a1d7e91e93))
+* **typer:** rudder typer variants sealed classes ([#205](https://github.com/rudderlabs/rudder-iac/issues/205)) ([d0a21cb](https://github.com/rudderlabs/rudder-iac/commit/d0a21cbbbfd3ec85c45bc023cbe0481da66feb46))
+* **typer:** support for json schema based plan provider ([#193](https://github.com/rudderlabs/rudder-iac/issues/193)) ([655aab8](https://github.com/rudderlabs/rudder-iac/commit/655aab857c38a263f4b6d4c39257b9150336b18b))
+* **typer:** support for nested objects in Kotlin generation ([#204](https://github.com/rudderlabs/rudder-iac/issues/204)) ([b79f397](https://github.com/rudderlabs/rudder-iac/commit/b79f397969e77f61e89a86d25fb6b4604499d7ce))
+* **typer:** typer command to execute rudder typer bindings generation ([#197](https://github.com/rudderlabs/rudder-iac/issues/197)) ([ad1dbbc](https://github.com/rudderlabs/rudder-iac/commit/ad1dbbc8b9b80e41d0383cad0b97e0ebfda90a9c))
+* use new event stream sources APIs ([#188](https://github.com/rudderlabs/rudder-iac/issues/188)) ([86e7c65](https://github.com/rudderlabs/rudder-iac/commit/86e7c65c17c143c564778dc2623a4b116063fd68))
+
+
+### Bug Fixes
+
+* add missing variant support trackingplan ([#236](https://github.com/rudderlabs/rudder-iac/issues/236)) ([95a8007](https://github.com/rudderlabs/rudder-iac/commit/95a800775f159cbb364e486a826992f7a10c82c1))
+* building state fails if tracking plan connected to source lacks external id ([#242](https://github.com/rudderlabs/rudder-iac/issues/242)) ([13abbeb](https://github.com/rudderlabs/rudder-iac/commit/13abbeb1ed5e832f3bc21243df06db4ff854a9c9))
+* copy the config before attaching it to state ([#250](https://github.com/rudderlabs/rudder-iac/issues/250)) ([77451b5](https://github.com/rudderlabs/rudder-iac/commit/77451b55b55aab5194d4bee9febc10779151520d))
+* enabled field of EventStreamSource is defaulting to false ([#207](https://github.com/rudderlabs/rudder-iac/issues/207)) ([1f84442](https://github.com/rudderlabs/rudder-iac/commit/1f84442fcf7e2ea5130b7bf4d20da28e53990b41))
+* handle dependencies between CLI managed and non CLI managed resources ([#243](https://github.com/rudderlabs/rudder-iac/issues/243)) ([9e6c85d](https://github.com/rudderlabs/rudder-iac/commit/9e6c85d5b84f85052d0c05fc1fbbe17d4ba58885))
+* incorrect field type used when configuring tracking plan connection ([#212](https://github.com/rudderlabs/rudder-iac/issues/212)) ([74cd314](https://github.com/rudderlabs/rudder-iac/commit/74cd314ba4e0c2b0ef75721a15253b37564fbbc9))
+* incorrect response schema used in get event stream sources API ([#209](https://github.com/rudderlabs/rudder-iac/issues/209)) ([dfe7aca](https://github.com/rudderlabs/rudder-iac/commit/dfe7aca4d03b908c07629a498c0f861df649575e))
+* make property type as optional in validation ([#223](https://github.com/rudderlabs/rudder-iac/issues/223)) ([bfc1013](https://github.com/rudderlabs/rudder-iac/commit/bfc10136429abc475125eae23f1abf2f4b88ac69))
+* move the e2e tests to generic apply and destroy ([#211](https://github.com/rudderlabs/rudder-iac/issues/211)) ([6415b95](https://github.com/rudderlabs/rudder-iac/commit/6415b95d49035ccfaa05de6c9fa017cdc60e3d2a))
+* ordering for the trackingplan spec test ([#247](https://github.com/rudderlabs/rudder-iac/issues/247)) ([9ce8115](https://github.com/rudderlabs/rudder-iac/commit/9ce81154158487c0af6708879bcb42c11a789fb4))
+* panic when casting tracking plan version to float64 ([#210](https://github.com/rudderlabs/rudder-iac/issues/210)) ([7ed1701](https://github.com/rudderlabs/rudder-iac/commit/7ed1701f43101273e7e65ac819d5ffe8bb1deef7))
+* process to load state using the stateless cli ([#245](https://github.com/rudderlabs/rudder-iac/issues/245)) ([9474428](https://github.com/rudderlabs/rudder-iac/commit/94744282d047d10b77cd87f3af3b3ee5716eb959))
+* reference calculation for the trackingplans and add tests ([#228](https://github.com/rudderlabs/rudder-iac/issues/228)) ([97b0f32](https://github.com/rudderlabs/rudder-iac/commit/97b0f3275507c5f869ea1a2aa65a0cabe8ec7494))
+* resolve reference for trackingplan correctly ([#230](https://github.com/rudderlabs/rudder-iac/issues/230)) ([aa984d8](https://github.com/rudderlabs/rudder-iac/commit/aa984d881030438d896a9f3f2b5d8ccc969d6da3))
+* set identitySection to properties by default if it is not explicitly set in the project YAMLs ([#217](https://github.com/rudderlabs/rudder-iac/issues/217)) ([62ca1c7](https://github.com/rudderlabs/rudder-iac/commit/62ca1c787db1b27a45b65182bf3d4d30be92c390))
+* tests failing in main branch ([#187](https://github.com/rudderlabs/rudder-iac/issues/187)) ([a3dca92](https://github.com/rudderlabs/rudder-iac/commit/a3dca923ed9835f6604a2c491d6e06c419b390eb))
+* **typer:** correct serialization of Kotlin enums of non-string types ([#240](https://github.com/rudderlabs/rudder-iac/issues/240)) ([e7a2d1b](https://github.com/rudderlabs/rudder-iac/commit/e7a2d1b7a092562cbe044dc23715874e3bee1181))
+* **typer:** proper escape of comments and strings in Kotlin generation ([#237](https://github.com/rudderlabs/rudder-iac/issues/237)) ([d45d23f](https://github.com/rudderlabs/rudder-iac/commit/d45d23f5b723ba51842d5e1aa5ab99eb58271b2a))
+* **typer:** proper handling of object types to avoid empty data classes ([#238](https://github.com/rudderlabs/rudder-iac/issues/238)) ([6e502b1](https://github.com/rudderlabs/rudder-iac/commit/6e502b1e353fbb504040828d0536ca50584e459c))
+* **typer:** use common naming scope for all generated kotlin types ([#231](https://github.com/rudderlabs/rudder-iac/issues/231)) ([1c7ddd1](https://github.com/rudderlabs/rudder-iac/commit/1c7ddd1c22a1d60870f1ee0894d8325bc699d8ab))
+
+
+### Miscellaneous
+
+* add support to reconstruct state for custom types and properties ([#185](https://github.com/rudderlabs/rudder-iac/issues/185)) ([a6c191c](https://github.com/rudderlabs/rudder-iac/commit/a6c191c0df0bb9e374675f39bd67c5a0073c7d69))
+* apiClient - add projectId for events, categories, properties and custom types ([#156](https://github.com/rudderlabs/rudder-iac/issues/156)) ([c407b52](https://github.com/rudderlabs/rudder-iac/commit/c407b52050dd51a37474b3bfe10270ffc1a3986a))
+* import apply changes introducing capturing of workspace information and using it in planning operations ([#195](https://github.com/rudderlabs/rudder-iac/issues/195)) ([a7e8e93](https://github.com/rudderlabs/rudder-iac/commit/a7e8e934c4792e43da34592cee9eadc2480f4fb2))
+* new workspace importer interface ([#192](https://github.com/rudderlabs/rudder-iac/issues/192)) ([6263dcc](https://github.com/rudderlabs/rudder-iac/commit/6263dcc24b8cc1c51a60fcf3078fcc362cdd578d))
+* reconstruct state for tracking plans ([#194](https://github.com/rudderlabs/rudder-iac/issues/194)) ([f8c64e5](https://github.com/rudderlabs/rudder-iac/commit/f8c64e535b95474dea5733363b33e984917af051))
+* refactor lister with Options pattern ([#246](https://github.com/rudderlabs/rudder-iac/issues/246)) ([0b019ec](https://github.com/rudderlabs/rudder-iac/commit/0b019ece340282c723febad56af54bf309173e1b))
+
 ## [0.10.0](https://github.com/rudderlabs/rudder-iac/compare/v0.9.0...v0.10.0) (2025-09-18)
 
 
