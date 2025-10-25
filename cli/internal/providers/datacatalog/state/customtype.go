@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 
@@ -116,7 +117,8 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	args.Name = from.Name
 	args.Description = from.Description
 	args.Type = from.Type
-	args.Config = from.Config
+	args.Config = make(map[string]any)
+	maps.Copy(args.Config, from.Config)
 
 	properties := make([]*CustomTypeProperty, 0, len(from.Properties))
 	for _, prop := range from.Properties {
@@ -197,7 +199,7 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 		case err == resources.ErrRemoteResourceExternalIdNotFound:
 			properties = append(properties, &CustomTypeProperty{
 				Required: prop.Required,
-				RefToID: nil,
+				RefToID:  nil,
 			})
 		default:
 			return err
