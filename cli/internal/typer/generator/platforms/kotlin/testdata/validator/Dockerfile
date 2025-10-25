@@ -24,9 +24,6 @@ COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
 
-# Copy source code
-RUN mkdir -p ./src/main/kotlin
-
 # Copy run script
 COPY run.sh .
 RUN chmod +x run.sh
