@@ -709,12 +709,17 @@ func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRu
 }
 
 func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, error) {
-	// type contains object and doesn't contain array
-	if strings.Contains(propertyType, "object") && !strings.Contains(propertyType, "array") {
+	if strings.Contains(propertyType, "object") && strings.Contains(propertyType, "array") {
+		// type array and object cannot be present together
+		// for a property to allow nesting
+		return false, nil
+	}
+
+	if strings.Contains(propertyType, "object") {
 		return true, nil
 	}
 
-	if strings.Contains(propertyType, "array") && !strings.Contains(propertyType, "object") {
+	if strings.Contains(propertyType, "array") {
 		itemTypes, itemTypesOk := config["itemTypes"]
 		if !itemTypesOk {
 			return true, nil
