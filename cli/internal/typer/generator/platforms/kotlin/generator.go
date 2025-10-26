@@ -548,12 +548,12 @@ func mapPrimitiveToKotlinType(primitiveType plan.PrimitiveType) (string, error) 
 		return "Double", nil
 	case plan.PrimitiveTypeBoolean:
 		return "Boolean", nil
-	case plan.PrimitiveTypeAny:
-		return "JsonElement", nil
 	case plan.PrimitiveTypeObject:
 		return "JsonObject", nil
 	case plan.PrimitiveTypeArray:
 		return "List<JsonElement>", nil
+	case plan.PrimitiveTypeNull:
+		return "JsonNull", nil
 	default:
 		return "", fmt.Errorf("unsupported primitive type: %s", primitiveType)
 	}

@@ -36,7 +36,7 @@ const (
 	PrimitiveTypeBoolean PrimitiveType = "boolean"
 	PrimitiveTypeArray   PrimitiveType = "array"
 	PrimitiveTypeObject  PrimitiveType = "object"
-	PrimitiveTypeAny     PrimitiveType = "any"
+	PrimitiveTypeNull    PrimitiveType = "null"
 )
 
 // PropertyType represents either a primitive type or a custom type

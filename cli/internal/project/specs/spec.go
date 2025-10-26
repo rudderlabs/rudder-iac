@@ -17,6 +17,10 @@ type Spec struct {
 	Spec     map[string]interface{} `yaml:"spec"`
 }
 
+type ParsedSpec struct {
+	ExternalIDs []string
+}
+
 // New creates and validates a Spec from YAML data
 func New(data []byte) (*Spec, error) {
 	var spec Spec

@@ -33,6 +33,14 @@ func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 	}
 }
 
+func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	id, ok := s.Spec["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("id not found in sql model spec")
+	}
+	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+}
+
 // LoadSpec loads and validates a SQL Model spec
 func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	spec := &SQLModelSpec{}

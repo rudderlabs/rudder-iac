@@ -18,6 +18,7 @@ import (
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
 	Validate(graph *resources.Graph) error
+	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
 	LoadState(ctx context.Context) (*state.State, error)
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
@@ -69,6 +70,18 @@ func (p *Provider) GetSupportedTypes() []string {
 		types = append(types, t)
 	}
 	return types
+}
+
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+	return handler.ParseSpec(path, s)
 }
 
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {

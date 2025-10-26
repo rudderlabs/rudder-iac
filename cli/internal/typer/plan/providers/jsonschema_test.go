@@ -308,7 +308,7 @@ func TestJSONSchemaPlanProvider_GetTrackingPlan(t *testing.T) {
 									}), nil, nil),
 								}, false, nil, nil, nil),
 								"arrayWithMultipleTypes": constructPropertySchema("arrayWithMultipleTypes", []plan.PropertyType{plan.PrimitiveTypeArray}, false, nil, nil, []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger}),
-								"propertyWithoutType":    constructPropertySchema("propertyWithoutType", []plan.PropertyType{plan.PrimitiveTypeAny}, false, nil, nil, nil),
+								"propertyWithoutType":    constructPropertySchema("propertyWithoutType", []plan.PropertyType{}, false, nil, nil, nil),
 								"multipleTypesProperty":  constructPropertySchema("multipleTypesProperty", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}, false, nil, nil, nil),
 							},
 						},

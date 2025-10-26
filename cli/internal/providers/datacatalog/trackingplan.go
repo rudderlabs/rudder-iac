@@ -290,16 +290,11 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 		return nil, fmt.Errorf("setting tracking plan external id: %w", err)
 	}
 
-	trackingPlan, err = p.client.GetTrackingPlan(ctx, remoteId)
-	if err != nil {
-		return nil, fmt.Errorf("re-fetching tracking plan after update: %w", err)
-	}
-
 	trackingPlanState := state.TrackingPlanState{
 		TrackingPlanArgs: toArgs,
 		ID:               trackingPlan.ID,
-		Name:             trackingPlan.Name,
-		Description:      *trackingPlan.Description,
+		Name:             toArgs.Name,
+		Description:      toArgs.Description,
 		Version:          trackingPlan.Version,
 		CreationType:     trackingPlan.CreationType,
 		WorkspaceID:      trackingPlan.WorkspaceID,
