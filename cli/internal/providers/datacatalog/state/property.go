@@ -46,7 +46,10 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 	args.Name = prop.Name
 	args.Description = prop.Description
 	args.Type = prop.Type
-	args.Config = prop.Config
+	args.Config = make(map[string]interface{})
+	for k, v := range prop.Config {
+		args.Config[k] = v
+	}
 
 	if strings.HasPrefix(prop.Type, "#/custom-types/") {
 		customTypeURN := urnFromRef(prop.Type)
