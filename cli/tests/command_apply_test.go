@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -27,6 +28,7 @@ func TestProjectApply(t *testing.T) {
 	})
 
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
+		time.Sleep(5 * time.Second)
 		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "project", "update"), "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
