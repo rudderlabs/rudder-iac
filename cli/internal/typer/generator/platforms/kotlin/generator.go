@@ -15,6 +15,7 @@ const (
 
 func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
 	ctx := NewKotlinContext()
+	ctx.RudderCLIVersion = options.RudderCLIVersion
 	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
