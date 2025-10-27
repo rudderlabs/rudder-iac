@@ -188,24 +188,6 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	return toResourceData(resp), nil
 }
 
-func (h *Handler) createCall(ctx context.Context, data resources.ResourceData) (*resources.ResourceData, error) {
-	source := &retlClient.RETLSourceCreateRequest{
-		Name:                 data[DisplayNameKey].(string),
-		Config:               toRETLSQLModelConfig(data),
-		SourceType:           retlClient.ModelSourceType,
-		SourceDefinitionName: data[SourceDefinitionKey].(string),
-		AccountID:            data[AccountIDKey].(string),
-	}
-
-	// Call API to create RETL source
-	resp, err := h.client.CreateRetlSource(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("creating RETL source: %w", err)
-	}
-
-	return toResourceData(resp), nil
-}
-
 // Update updates an existing SQL Model resource
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	// Get source_id from state - needed for API call
@@ -283,12 +265,31 @@ func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.Re
 }
 
 func (h *Handler) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
-	_, err := h.client.GetRetlSource(ctx, remoteId)
-	if err == nil {
-		return h.updateCall(ctx, remoteId, data)
+	existingSource, err := h.client.GetRetlSource(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting RETL source: %w", err)
 	}
 
-	return h.createCall(ctx, data)
+	existingState := &SQLModelResource{}
+	existingState.FromResourceData(*toResourceData(existingSource))
+
+	currentState := &SQLModelResource{}
+	currentState.FromResourceData(data)
+
+	changed := currentState.DiffUpstream(existingState)
+	result := toResourceData(existingSource)
+	if changed {
+		updatedData, err := h.updateCall(ctx, remoteId, data)
+		if err != nil {
+			return nil, fmt.Errorf("updating RETL source: %w", err)
+		}
+		result = updatedData
+	}
+	err = h.client.SetExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting external ID for RETL source: %w", err)
+	}
+	return result, nil
 }
 
 func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {

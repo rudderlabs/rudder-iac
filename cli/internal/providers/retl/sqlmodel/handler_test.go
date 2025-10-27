@@ -96,6 +96,7 @@ type mockRETLClient struct {
 	readStateFunc              func(ctx context.Context) (*retlClient.State, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	setExternalIdFunc          func(ctx context.Context, sourceID string, externalId string) error
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
@@ -210,6 +211,13 @@ func (m *mockRETLClient) GetSourcePreviewResult(ctx context.Context, resultID st
 	}, nil
 }
 
+func (m *mockRETLClient) SetExternalId(ctx context.Context, sourceID string, externalId string) error {
+	if m.setExternalIdFunc != nil {
+		return m.setExternalIdFunc(ctx, sourceID, externalId)
+	}
+	return nil
+}
+
 func TestSQLModelHandler(t *testing.T) {
 	t.Parallel()
 
@@ -281,7 +289,7 @@ func TestSQLModelHandler(t *testing.T) {
 				t.Parallel()
 
 				mockClient := &mockRETLClient{}
-				handler := sqlmodel.NewHandler(mockClient)
+				handler := sqlmodel.NewHandler(mockClient, "retl")
 
 				parsedSpec, err := handler.ParseSpec("test/path.yaml", tc.spec)
 

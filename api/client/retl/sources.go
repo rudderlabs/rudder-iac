@@ -110,3 +110,16 @@ func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalId *bo
 
 	return &sources, nil
 }
+
+func (r *RudderRETLStore) SetExternalId(ctx context.Context, id string, externalId string) error {
+	path := fmt.Sprintf("/v2/retl-sources/%s/external-id", id)
+	data, err := json.Marshal(map[string]string{"externalId": externalId})
+	if err != nil {
+		return fmt.Errorf("marshalling external ID: %w", err)
+	}
+	_, err = r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("setting external ID: %w", err)
+	}
+	return nil
+}

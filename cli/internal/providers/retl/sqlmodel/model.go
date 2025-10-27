@@ -2,6 +2,8 @@ package sqlmodel
 
 import (
 	"fmt"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 type SourceDefinition string
@@ -109,4 +111,33 @@ func ValidateSQLModelResource(spec *SQLModelResource) error {
 		return fmt.Errorf("sql is required")
 	}
 	return nil
+}
+
+func (s *SQLModelResource) FromResourceData(data resources.ResourceData) {
+	s.DisplayName = data[DisplayNameKey].(string)
+	s.Description = data[DescriptionKey].(string)
+	s.SQL = data[SQLKey].(string)
+	s.AccountID = data[AccountIDKey].(string)
+	s.PrimaryKey = data[PrimaryKeyKey].(string)
+	s.SourceDefinition = data[SourceDefinitionKey].(string)
+	s.Enabled = data[EnabledKey].(bool)
+}
+
+func (s *SQLModelResource) DiffUpstream(upstream *SQLModelResource) bool {
+	if s.DisplayName != upstream.DisplayName {
+		return true
+	}
+	if s.Description != upstream.Description {
+		return true
+	}
+	if s.AccountID != upstream.AccountID {
+		return true
+	}
+	if s.PrimaryKey != upstream.PrimaryKey {
+		return true
+	}
+	if s.Enabled != upstream.Enabled {
+		return true
+	}
+	return s.SQL != upstream.SQL
 }
