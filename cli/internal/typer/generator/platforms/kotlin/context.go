@@ -96,6 +96,7 @@ type KotlinContext struct {
 	Enums                  []KotlinEnum            // Enum classes for properties with enum constraints
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
 	EventContext           map[string]string       // Fixed context to be included with every event
+	RudderCLIVersion       string                  // Version of Rudder CLI used to generate this code
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices
