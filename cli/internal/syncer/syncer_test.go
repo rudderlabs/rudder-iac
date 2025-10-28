@@ -65,6 +65,7 @@ func TestSyncerCreate(t *testing.T) {
 
 	provider := &testutils.DataCatalogProvider{
 		InitialState: state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
 	}
 
 	s, _ := syncer.New(provider, mockWorkspace())
@@ -169,6 +170,7 @@ func TestSyncerDelete(t *testing.T) {
 
 	provider := &testutils.DataCatalogProvider{
 		InitialState: initialState,
+		ReconstructedState: initialState,
 	}
 
 	// Create empty target graph (all resources should be deleted)
@@ -236,6 +238,7 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 	// Create provider with empty initial state
 	provider := &testutils.DataCatalogProvider{
 		InitialState: state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
 	}
 
 	s, err := syncer.New(provider, mockWorkspace())
@@ -441,6 +444,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 		provider := &testutils.DataCatalogProvider{
 			InitialState: state.EmptyState(),
+			ReconstructedState: state.EmptyState(),
 		}
 
 		// Create a custom provider that fails for event2

@@ -12,7 +12,6 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -73,9 +72,6 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
-	}
-	if spec.Governance.TrackingPlan != nil && !config.GetConfig().ExperimentalFlags.StatelessCLI {
-		return fmt.Errorf("governance.validations is supported only in stateless CLI mode")
 	}
 
 	tp := spec.Governance.TrackingPlan
