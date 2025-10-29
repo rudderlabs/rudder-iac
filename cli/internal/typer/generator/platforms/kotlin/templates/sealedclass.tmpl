@@ -2,7 +2,7 @@
 /** {{ escapeComment .Comment }} */
 {{- end }}
 @Serializable(with = Rudder{{ .Name }}Serializer::class)
-sealed class {{ .Name }} : SealedClassWithJson() {
+sealed class {{ .Name }} : SealedClassWithJson {
 {{- range $prop := .Properties }}
 {{- if $prop.Abstract }}
     {{- if $prop.Comment }}

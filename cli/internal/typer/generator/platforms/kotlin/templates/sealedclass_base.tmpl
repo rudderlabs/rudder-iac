@@ -1,6 +1,6 @@
 {{- define "sealedclass_base" }}
-abstract class SealedClassWithJson {
-    abstract val _jsonElement: JsonElement
+interface SealedClassWithJson {
+    val _jsonElement: JsonElement
 }
 
 open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {

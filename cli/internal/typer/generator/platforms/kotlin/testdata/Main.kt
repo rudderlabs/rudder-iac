@@ -409,8 +409,8 @@ private object RudderPropertyUnicodeEnumFieldSerializer : KSerializer<PropertyUn
     }
 }
 
-abstract class SealedClassWithJson {
-    abstract val _jsonElement: JsonElement
+interface SealedClassWithJson {
+    val _jsonElement: JsonElement
 }
 
 open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
@@ -429,7 +429,7 @@ open class SealedClassJsonSerializer<T : SealedClassWithJson> : KSerializer<T> {
 
 /** Feature configuration with variants based on multi-type flag */
 @Serializable(with = RudderCustomTypeFeatureConfigSerializer::class)
-sealed class CustomTypeFeatureConfig : SealedClassWithJson() {
+sealed class CustomTypeFeatureConfig : SealedClassWithJson {
     /** Feature flag that can be boolean or string */
     @SerialName("feature_flag")
     abstract val featureFlag: PropertyFeatureFlag
@@ -500,7 +500,7 @@ private object RudderCustomTypeFeatureConfigSerializer : SealedClassJsonSerializ
 
 /** Page context with variants based on page type */
 @Serializable(with = RudderCustomTypePageContextSerializer::class)
-sealed class CustomTypePageContext : SealedClassWithJson() {
+sealed class CustomTypePageContext : SealedClassWithJson {
     /** Type of page */
     @SerialName("page_type")
     abstract val pageType: PropertyPageType
@@ -571,7 +571,7 @@ private object RudderCustomTypePageContextSerializer : SealedClassJsonSerializer
 
 /** User access with variants based on active status */
 @Serializable(with = RudderCustomTypeUserAccessSerializer::class)
-sealed class CustomTypeUserAccess : SealedClassWithJson() {
+sealed class CustomTypeUserAccess : SealedClassWithJson {
     /** User active status */
     @SerialName("active")
     abstract val active: PropertyActive
@@ -626,7 +626,7 @@ private object RudderCustomTypeUserAccessSerializer : SealedClassJsonSerializer<
 
 /** Item type for array_with_null_items array */
 @Serializable(with = RudderArrayItemArrayWithNullItemsSerializer::class)
-sealed class ArrayItemArrayWithNullItems : SealedClassWithJson() {
+sealed class ArrayItemArrayWithNullItems : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'string' value */
     @Serializable
@@ -653,7 +653,7 @@ private object RudderArrayItemArrayWithNullItemsSerializer : SealedClassJsonSeri
 
 /** Feature flag that can be boolean or string */
 @Serializable(with = RudderPropertyFeatureFlagSerializer::class)
-sealed class PropertyFeatureFlag : SealedClassWithJson() {
+sealed class PropertyFeatureFlag : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'boolean' value */
     @Serializable
@@ -680,7 +680,7 @@ private object RudderPropertyFeatureFlagSerializer : SealedClassJsonSerializer<P
 
 /** Item type for multi_type_array array */
 @Serializable(with = RudderArrayItemMultiTypeArraySerializer::class)
-sealed class ArrayItemMultiTypeArray : SealedClassWithJson() {
+sealed class ArrayItemMultiTypeArray : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'string' value */
     @Serializable
@@ -707,7 +707,7 @@ private object RudderArrayItemMultiTypeArraySerializer : SealedClassJsonSerializ
 
 /** A field that can be string, integer, or boolean */
 @Serializable(with = RudderPropertyMultiTypeFieldSerializer::class)
-sealed class PropertyMultiTypeField : SealedClassWithJson() {
+sealed class PropertyMultiTypeField : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'string' value */
     @Serializable
@@ -744,7 +744,7 @@ private object RudderPropertyMultiTypeFieldSerializer : SealedClassJsonSerialize
 
 /** Property that can be string, integer, or null */
 @Serializable(with = RudderPropertyMultiTypeWithNullSerializer::class)
-sealed class PropertyMultiTypeWithNull : SealedClassWithJson() {
+sealed class PropertyMultiTypeWithNull : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'string' value */
     @Serializable
@@ -781,7 +781,7 @@ private object RudderPropertyMultiTypeWithNullSerializer : SealedClassJsonSerial
 
 /** Property that can be number or null */
 @Serializable(with = RudderPropertyNumberOrNullSerializer::class)
-sealed class PropertyNumberOrNull : SealedClassWithJson() {
+sealed class PropertyNumberOrNull : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'number' value */
     @Serializable
@@ -808,7 +808,7 @@ private object RudderPropertyNumberOrNullSerializer : SealedClassJsonSerializer<
 
 /** Property that can be string or null */
 @Serializable(with = RudderPropertyStringOrNullSerializer::class)
-sealed class PropertyStringOrNull : SealedClassWithJson() {
+sealed class PropertyStringOrNull : SealedClassWithJson {
     abstract override val _jsonElement: JsonElement
     /** Represents a 'string' value */
     @Serializable
@@ -835,7 +835,7 @@ private object RudderPropertyStringOrNullSerializer : SealedClassJsonSerializer<
 
 /** Example event to demonstrate variants */
 @Serializable(with = RudderTrackEventWithVariantsPropertiesSerializer::class)
-sealed class TrackEventWithVariantsProperties : SealedClassWithJson() {
+sealed class TrackEventWithVariantsProperties : SealedClassWithJson {
     /** Type of device */
     @SerialName("device_type")
     abstract val deviceType: PropertyDeviceType
