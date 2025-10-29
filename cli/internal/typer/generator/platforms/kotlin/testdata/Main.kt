@@ -1164,6 +1164,31 @@ data class TrackUserSignedUpProperties(
     }
 }
 
+/** Merges the ruddertyper context with user-provided custom context */
+private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
+    return if (userOptions == null) {
+        RudderOption(customContext = ruddertyperContext)
+    } else {
+        // Merge contexts: start with ruddertyper context, then apply user's custom context
+        val mergedContext = buildJsonObject {
+            // Add ruddertyper context first
+            for ((key, value) in ruddertyperContext) {
+                put(key, value)
+            }
+            // Merge in user's custom context (if provided)
+            userOptions.customContext?.let { userContext ->
+                if (userContext is JsonObject) {
+                    for ((key, value) in userContext) {
+                        put(key, value)
+                    }
+                }
+            }
+        }
+        // Copy all properties from userOptions and set merged context
+        userOptions.copy(customContext = mergedContext)
+    }
+}
+
 class RudderAnalytics(private val analytics: Analytics) {
     private val json = Json {
         prettyPrint = true
@@ -1182,88 +1207,88 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Group association event
      */
-    fun group(groupId: String, traits: GroupTraits) {
+    fun group(groupId: String, traits: GroupTraits, options: RudderOption? = null) {
         analytics.group(
             groupId = groupId,
             traits = json.encodeToJsonElement(traits).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * User identification event
      */
-    fun identify(userId: String = "", traits: IdentifyTraits) {
+    fun identify(userId: String = "", traits: IdentifyTraits, options: RudderOption? = null) {
         analytics.identify(
             userId = userId,
             traits = json.encodeToJsonElement(traits).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Screen view event
      */
-    fun screen(screenName: String, category: String = "", properties: ScreenProperties) {
+    fun screen(screenName: String, category: String = "", properties: ScreenProperties, options: RudderOption? = null) {
         analytics.screen(
             screenName = screenName,
             category = category,
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Empty event schema with additionalProperties false
      */
-    fun trackEmptyEventNoAdditionalProps() {
+    fun trackEmptyEventNoAdditionalProps(options: RudderOption? = null) {
         analytics.track(
             name = "Empty Event No Additional Props",
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Empty event schema with additionalProperties true
      */
-    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties) {
+    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, options: RudderOption? = null) {
         analytics.track(
             name = "Empty Event With Additional Props",
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Example event to demonstrate variants
      */
-    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties) {
+    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, options: RudderOption? = null) {
         analytics.track(
             name = "Event With Variants",
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Triggered when user clicks on a "premium" product /\* important *\/
      */
-    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties) {
+    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, options: RudderOption? = null) {
         analytics.track(
             name = "Product \"Premium\" Clicked",
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 
     /**
      * Triggered when a user signs up
      */
-    fun trackUserSignedUp(properties: TrackUserSignedUpProperties) {
+    fun trackUserSignedUp(properties: TrackUserSignedUpProperties, options: RudderOption? = null) {
         analytics.track(
             name = "User Signed Up",
             properties = json.encodeToJsonElement(properties).jsonObject,
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 }

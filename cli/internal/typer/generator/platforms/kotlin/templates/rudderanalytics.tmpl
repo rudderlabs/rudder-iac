@@ -1,3 +1,28 @@
+/** Merges the ruddertyper context with user-provided custom context */
+private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
+    return if (userOptions == null) {
+        RudderOption(customContext = ruddertyperContext)
+    } else {
+        // Merge contexts: start with ruddertyper context, then apply user's custom context
+        val mergedContext = buildJsonObject {
+            // Add ruddertyper context first
+            for ((key, value) in ruddertyperContext) {
+                put(key, value)
+            }
+            // Merge in user's custom context (if provided)
+            userOptions.customContext?.let { userContext ->
+                if (userContext is JsonObject) {
+                    for ((key, value) in userContext) {
+                        put(key, value)
+                    }
+                }
+            }
+        }
+        // Copy all properties from userOptions and set merged context
+        userOptions.copy(customContext = mergedContext)
+    }
+}
+
 class RudderAnalytics(private val analytics: Analytics) {
     private val json = Json {
         prettyPrint = true
@@ -15,12 +40,12 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * {{ escapeComment .Comment }}
      */
-    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end -}}) {
+    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end }}{{- if .MethodArguments }}, {{ end }}options: RudderOption? = null) {
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
             {{ .Name }} ={{- if .ShouldSerialize }} json.encodeToJsonElement({{- if .IsLiteral }}{{ formatLiteral .Value }}{{- else }}{{ .Value }}{{- end }}).jsonObject{{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
         {{- end }}
-            options = RudderOption(customContext = context)
+            options = mergeRudderContext(options, context)
         )
     }
 {{ end -}}
