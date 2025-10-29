@@ -97,6 +97,10 @@ type KotlinContext struct {
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
 	EventContext           map[string]string       // Fixed context to be included with every event
 	RudderCLIVersion       string                  // Version of Rudder CLI used to generate this code
+	TrackingPlanName       string                  // Name of the tracking plan
+	TrackingPlanID         string                  // ID of the tracking plan
+	TrackingPlanVersion    int                     // Version of the tracking plan
+	TrackingPlanURL        string                  // URL to the tracking plan (if available)
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices

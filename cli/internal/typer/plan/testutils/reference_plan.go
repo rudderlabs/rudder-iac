@@ -871,6 +871,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Metadata: plan.PlanMetadata{
 			TrackingPlanID:      "plan_12345",
 			TrackingPlanVersion: 13,
+			URL:                 "https://app.rudderstack.com/trackingPlans/plan_12345",
 		},
 	}
 }

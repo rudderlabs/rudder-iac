@@ -41,6 +41,7 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 		Metadata: plan.PlanMetadata{
 			TrackingPlanID:      apitp.ID,
 			TrackingPlanVersion: apitp.Version,
+			URL:                 fmt.Sprintf("https://app.rudderstack.com/trackingPlans/%s", apitp.ID),
 		},
 	}
 
