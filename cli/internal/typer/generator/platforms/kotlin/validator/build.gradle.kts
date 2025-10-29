@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
     application
 }
 
@@ -13,7 +12,6 @@ repositories {
 
 dependencies {
     implementation("com.rudderstack.sdk.kotlin:core:1.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 }
 
 application {
