@@ -1647,4 +1647,167 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
 		})
 	})
+
+	t.Run("Import", func(t *testing.T) {
+		t.Parallel()
+
+		baseData := func() resources.ResourceData {
+			return resources.ResourceData{
+				sqlmodel.DisplayNameKey:      "Imported Model",
+				sqlmodel.DescriptionKey:      "desc",
+				sqlmodel.AccountIDKey:        "acc123",
+				sqlmodel.PrimaryKeyKey:       "id",
+				sqlmodel.SourceDefinitionKey: "postgres",
+				sqlmodel.EnabledKey:          true,
+				sqlmodel.SQLKey:              "SELECT * FROM t",
+			}
+		}
+
+		t.Run("Success - no changes upstream", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{}
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+			setCalled := false
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				setCalled = true
+				assert.Equal(t, "remote-id", sourceID)
+				assert.Equal(t, "local-id", externalId)
+				return nil
+			}
+
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			data := baseData()
+			res, err := h.Import(context.Background(), "local-id", data, "remote-id")
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.True(t, setCalled, "SetExternalId should be called")
+			// ensure response mirrors upstream (id and fields present)
+			assert.Equal(t, "remote-id", (*res)[sqlmodel.IDKey])
+			assert.Equal(t, "Imported Model", (*res)[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc", (*res)[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc123", (*res)[sqlmodel.AccountIDKey])
+			assert.Equal(t, "id", (*res)[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM t", (*res)[sqlmodel.SQLKey])
+		})
+
+		t.Run("Success - changes require update", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := &mockRETLClient{}
+			// Upstream differs (sql differs)
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM old"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+			mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+				assert.Equal(t, "remote-id", sourceID)
+				// Ensure update request reflects local data
+				assert.Equal(t, "Imported Model", req.Name)
+				assert.Equal(t, "acc123", req.AccountID)
+				assert.True(t, req.IsEnabled)
+				assert.Equal(t, "id", req.Config.PrimaryKey)
+				assert.Equal(t, "SELECT * FROM t", req.Config.Sql)
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 req.Name,
+					Config:               req.Config,
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            req.AccountID,
+					IsEnabled:            req.IsEnabled,
+				}, nil
+			}
+			setCalled := false
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				setCalled = true
+				return nil
+			}
+
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			data := baseData()
+			res, err := h.Import(context.Background(), "local-id", data, "remote-id")
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.True(t, mockClient.updateCalled, "update should be called when changes detected")
+			assert.True(t, setCalled, "SetExternalId should be called")
+			assert.Equal(t, "SELECT * FROM t", (*res)[sqlmodel.SQLKey])
+		})
+
+		t.Run("Error - get source API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("boom")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "getting RETL source")
+		})
+
+		t.Run("Error - update API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				// Force change so update is attempted
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM old"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+			mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("update failed")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "updating RETL source")
+		})
+
+		t.Run("Error - set external id API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 "Imported Model",
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            "acc123",
+					IsEnabled:            true,
+				}, nil
+			}
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				return fmt.Errorf("failed to set external id")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "setting external ID for RETL source")
+		})
+	})
 }
