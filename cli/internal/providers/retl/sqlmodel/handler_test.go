@@ -15,6 +15,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -304,6 +305,98 @@ func TestSQLModelHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("FormatForExport", func(t *testing.T) {
+		t.Parallel()
+
+		mkPtr := func(s retlClient.RETLSource) *retlClient.RETLSource { return &s }
+		mkCollection := func(sources ...retlClient.RETLSource) *resources.ResourceCollection {
+			c := resources.NewResourceCollection()
+			m := make(map[string]*resources.RemoteResource)
+			for _, s := range sources {
+				ss := s // copy for address stability
+				m[ss.ID] = &resources.RemoteResource{ID: ss.ID, ExternalID: ss.ExternalID, Data: mkPtr(ss)}
+			}
+			c.Set(sqlmodel.ResourceType, m)
+			return c
+		}
+
+		mkSource := func(id, name, externalID, workspaceID, def, account string, enabled bool, desc, pk, sql string) retlClient.RETLSource {
+			rc := createTestRETLSourceWithConfig(id, name, def, account, enabled, retlClient.RETLSQLModelConfig{
+				Description: desc,
+				PrimaryKey:  pk,
+				Sql:         sql,
+			})
+			rc.ExternalID = externalID
+			rc.WorkspaceID = workspaceID
+			return rc
+		}
+
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+
+		t.Run("Success with multiple sources", func(t *testing.T) {
+			t.Parallel()
+			s1 := mkSource("rid-1", "Orders Model", "orders-model", "ws-1", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
+			s2 := mkSource("rid-2", "Users Model", "users-model", "ws-2", "mysql", "acc-2", false, "users", "user_id", "SELECT * FROM users")
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := mkCollection(s1, s2)
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			require.NoError(t, err)
+			require.Len(t, entities, 2)
+
+			// Index entities by file basename
+			byName := map[string]int{}
+			for i, e := range entities {
+				byName[filepath.Base(e.RelativePath)] = i
+			}
+			// Validate Orders entity
+			idx, ok := byName["orders-model.yaml"]
+			require.True(t, ok)
+			ordersSpec, _ := entities[idx].Content.(*specs.Spec)
+			require.NotNil(t, ordersSpec)
+			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
+			assert.Equal(t, specs.SpecVersion, ordersSpec.Version)
+			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])
+			assert.Equal(t, "id", ordersSpec.Spec[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM orders", ordersSpec.Spec[sqlmodel.SQLKey])
+			assert.Equal(t, "postgres", ordersSpec.Spec[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, true, ordersSpec.Spec[sqlmodel.EnabledKey])
+			assert.Equal(t, "orders-model", ordersSpec.Spec[sqlmodel.IDKey])
+			assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[idx].RelativePath)
+
+			// Metadata checks: presence and name
+			assert.Equal(t, "orders-model", ordersSpec.Metadata["name"])
+			_, ok = ordersSpec.Metadata["import"].(map[string]any)
+			require.True(t, ok)
+		})
+
+		t.Run("Empty collection returns nil", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := resources.NewResourceCollection()
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			require.NoError(t, err)
+			assert.Nil(t, entities)
+		})
+
+		t.Run("Error on invalid data type", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := resources.NewResourceCollection()
+			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
+			})
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			assert.Error(t, err)
+			assert.Nil(t, entities)
+			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
+		})
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
@@ -1645,6 +1738,69 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, st)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
+		})
+	})
+
+	t.Run("LoadImportable", func(t *testing.T) {
+		t.Parallel()
+
+		// Helpers to avoid duplication
+		mkSource := func(id, name, def, account string, enabled bool, desc, pk, sql string) retlClient.RETLSource {
+			return createTestRETLSourceWithConfig(id, name, def, account, enabled, retlClient.RETLSQLModelConfig{
+				Description: desc,
+				PrimaryKey:  pk,
+				Sql:         sql,
+			})
+		}
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+
+		t.Run("Success with multiple sources", func(t *testing.T) {
+			t.Parallel()
+			// Two remote sources without external IDs
+			s1 := mkSource("rid-1", "Orders Model", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
+			s2 := mkSource("rid-2", "Users Model", "mysql", "acc-2", false, "users", "user_id", "SELECT * FROM users")
+			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources(s1, s2)}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			require.NoError(t, err)
+			require.NotNil(t, collection)
+
+			items := collection.GetAll(sqlmodel.ResourceType)
+			require.Len(t, items, 2)
+
+			// Validate first resource mapping
+			r1, ok := items["rid-1"]
+			require.True(t, ok)
+			assert.Equal(t, "rid-1", r1.ID)
+			assert.Equal(t, namer.NewKebabCase().Name("Orders Model"), r1.ExternalID)
+			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r1.ExternalID), r1.Reference)
+
+			// Validate second resource mapping
+			r2, ok := items["rid-2"]
+			require.True(t, ok)
+			assert.Equal(t, "rid-2", r2.ID)
+			assert.Equal(t, namer.NewKebabCase().Name("Users Model"), r2.ExternalID)
+			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r2.ExternalID), r2.Reference)
+		})
+
+		t.Run("Success with empty list", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources()}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			require.NoError(t, err)
+			require.NotNil(t, collection)
+			assert.Len(t, collection.GetAll(sqlmodel.ResourceType), 0)
+		})
+
+		t.Run("API error", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) { return nil, fmt.Errorf("api") }}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			assert.Error(t, err)
+			assert.Nil(t, collection)
+			assert.Contains(t, err.Error(), "listing RETL sources")
 		})
 	})
 
