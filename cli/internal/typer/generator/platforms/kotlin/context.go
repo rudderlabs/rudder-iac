@@ -91,6 +91,7 @@ type RudderAnalyticsMethod struct {
 
 // KotlinContext holds all the information needed to generate Kotlin code
 type KotlinContext struct {
+	PackageName            string                  // Package name for generated code
 	TypeAliases            []KotlinTypeAlias       // Type aliases for primitive custom types
 	DataClasses            []KotlinDataClass       // Data classes for object custom types
 	SealedClasses          []KotlinSealedClass     // Sealed classes for variant types
