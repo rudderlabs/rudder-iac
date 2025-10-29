@@ -1946,3 +1946,101 @@ func TestSQLModelHandler(t *testing.T) {
 		})
 	})
 }
+
+func TestSQLModelResource_DiffUpstream(t *testing.T) {
+	t.Parallel()
+
+	base := func() sqlmodel.SQLModelResource {
+		return sqlmodel.SQLModelResource{
+			ID:               "id-1",
+			DisplayName:      "Name",
+			Description:      "Desc",
+			SQL:              "SELECT * FROM t",
+			AccountID:        "acc-1",
+			PrimaryKey:       "id",
+			SourceDefinition: "postgres",
+			Enabled:          true,
+		}
+	}
+
+	cases := []struct {
+		name     string
+		mutate   func(up *sqlmodel.SQLModelResource)
+		expected bool
+	}{
+		{
+			name:     "no change returns false",
+			mutate:   func(up *sqlmodel.SQLModelResource) {},
+			expected: false,
+		},
+		{
+			name: "display name change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.DisplayName = "New Name"
+			},
+			expected: true,
+		},
+		{
+			name: "description change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.Description = "New Desc"
+			},
+			expected: true,
+		},
+		{
+			name: "account id change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.AccountID = "acc-2"
+			},
+			expected: true,
+		},
+		{
+			name: "primary key change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.PrimaryKey = "pk"
+			},
+			expected: true,
+		},
+		{
+			name: "enabled change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.Enabled = false
+			},
+			expected: true,
+		},
+		{
+			name: "sql change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.SQL = "SELECT id FROM t"
+			},
+			expected: true,
+		},
+		{
+			name: "source definition change does not diff",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.SourceDefinition = "mysql"
+			},
+			expected: false,
+		},
+		{
+			name: "multiple changes still true",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.DisplayName = "X"
+				up.SQL = "SELECT 1"
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			downstream := base()
+			upstream := base()
+			tc.mutate(&upstream)
+			got := downstream.DiffUpstream(&upstream)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}
