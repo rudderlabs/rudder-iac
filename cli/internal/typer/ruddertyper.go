@@ -3,10 +3,13 @@ package typer
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"slices"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
@@ -34,10 +37,31 @@ func NewRudderTyper(planProvider PlanProvider) *RudderTyper {
 }
 
 // Generate orchestrates the complete code generation process
-func (rt *RudderTyper) Generate(ctx context.Context, options core.GenerationOptions) error {
+func (rt *RudderTyper) Generate(ctx context.Context, options core.GenerateOptions) error {
 	rudderTyperLog.Debug("starting code generation",
 		"platform", options.Platform,
 		"outputPath", options.OutputPath)
+
+	generator, err := generator.GeneratorForPlatform(options.Platform)
+	if err != nil {
+		return err
+	}
+
+	// parse platform-specific options
+	platformOptions := generator.DefaultOptions()
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &platformOptions,
+		WeaklyTypedInput: true,
+		ErrorUnused:      true, // Returns error for unknown options
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := decoder.Decode(options.PlatformOptions); err != nil {
+		return formatOptionsError(generator, options)
+	}
 
 	// Step 1: Fetch tracking plan data
 	fmt.Println("📥 Fetching tracking plan data...")
@@ -48,7 +72,7 @@ func (rt *RudderTyper) Generate(ctx context.Context, options core.GenerationOpti
 
 	// Step 2: Generate platform-specific code
 	fmt.Printf("⚡ Generating %s code...\n", options.Platform)
-	files, err := rt.generateCode(trackingPlan, options)
+	files, err := generator.Generate(trackingPlan, options, platformOptions)
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}
@@ -86,18 +110,6 @@ func (rt *RudderTyper) fetchTrackingPlan(ctx context.Context) (*plan.TrackingPla
 	return plan, nil
 }
 
-// generateCode generates platform-specific code from the tracking plan
-func (rt *RudderTyper) generateCode(trackingPlan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
-	rudderTyperLog.Debug("generating code for platform", "platform", options.Platform, "rulesCount", len(trackingPlan.Rules))
-
-	switch options.Platform {
-	case "kotlin":
-		return kotlin.Generate(trackingPlan, options)
-	default:
-		return nil, fmt.Errorf("unsupported platform: %s (supported platforms: kotlin)", options.Platform)
-	}
-}
-
 // writeGeneratedFiles writes the generated files to the output directory
 func (rt *RudderTyper) writeGeneratedFiles(files []*core.File, outputPath string) error {
 	rudderTyperLog.Debug("writing generated files", "filesCount", len(files), "outputPath", outputPath)
@@ -112,4 +124,29 @@ func (rt *RudderTyper) writeGeneratedFiles(files []*core.File, outputPath string
 
 	rudderTyperLog.Debug("would call fileManager.WriteFiles() for atomic batch write")
 	return fileManager.WriteFiles(files)
+}
+
+// formatOptionsError formats a user-friendly error message for invalid platform options
+func formatOptionsError(gen core.Generator, options core.GenerateOptions) error {
+	// Get available options from the generator
+	defaults := gen.DefaultOptions()
+
+	// Build a list of available options by reflecting on the defaults struct
+	var availableOptions []string
+	defaultsType := reflect.TypeOf(defaults)
+	for i := 0; i < defaultsType.NumField(); i++ {
+		field := defaultsType.Field(i)
+		optionName := field.Tag.Get("mapstructure")
+		if optionName != "" {
+			availableOptions = append(availableOptions, optionName)
+		}
+	}
+
+	for o := range options.PlatformOptions {
+		if !slices.Contains(availableOptions, o) {
+			return fmt.Errorf("unknown option '%s' for platform '%s'", o, options.Platform)
+		}
+	}
+
+	return nil
 }

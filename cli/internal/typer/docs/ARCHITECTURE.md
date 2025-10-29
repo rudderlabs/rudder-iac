@@ -282,6 +282,88 @@ The validator uses the same test data as the unit tests (`testdata/Main.kt`), en
 
 ## Implementation Guidelines
 
+### Platform-Specific Options
+
+Generators can accept platform-specific options to customize code generation behavior. This pattern enables flexibility while maintaining a clean separation between generic and platform-specific configuration.
+
+#### How Options Work
+
+1. **Options Flow**: CLI `--option key=value` → Parsed map → RudderTyper orchestrator → Mapstructure decoding → Generator receives typed struct
+2. **Automatic Validation**: Unknown options are rejected by the mapstructure decoder with `ErrorUnused: true`
+3. **Defaults**: Each generator provides sensible defaults via `DefaultOptions()` method
+4. **Struct-Based**: Options are defined as simple Go structs with struct tags for metadata
+
+#### Implementing Platform Options
+
+Each platform generator must implement the `core.Generator` interface:
+
+```go
+// Define platform-specific options struct with metadata tags
+type KotlinOptions struct {
+    PackageName string `mapstructure:"packageName" description:"Package name for generated Kotlin code (e.g., com.example.analytics)"`
+}
+
+// Define the Generator struct
+type Generator struct{}
+
+// Implement Generate method
+func (g *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptions, platformOptions any) ([]*core.File, error) {
+    // platformOptions is already decoded to KotlinOptions by RudderTyper
+    kotlinOpts := platformOptions.(KotlinOptions)
+
+    // Validate options
+    if err := kotlinOpts.Validate(); err != nil {
+        return nil, err
+    }
+
+    // Use options in code generation
+    // ...
+}
+
+// Provide default options (used for validation and CLI discovery)
+func (g *Generator) DefaultOptions() any {
+    return KotlinOptions{
+        PackageName: "com.rudderstack.ruddertyper",
+    }
+}
+
+// Validate options after decoding (called by generator, not orchestrator)
+func (opts *KotlinOptions) Validate() error {
+    if opts.PackageName != "" && !isValidPackageName(opts.PackageName) {
+        return fmt.Errorf("invalid package name %q", opts.PackageName)
+    }
+    return nil
+}
+```
+
+**Struct Tags**:
+- `mapstructure:"key"` - Used by orchestrator to decode from `map[string]string` to struct fields
+- `description:"..."` - Used by CLI to display help text
+
+#### Registration
+
+Add your generator to the platform registry in `cli/internal/typer/generator/platforms.go`:
+
+```go
+var platforms = map[string]core.Generator{
+    "kotlin": &kotlin.Generator{},
+    // Add new platforms here
+}
+```
+
+#### CLI Usage
+
+Users pass platform-specific options using repeatable `--option key=value` flags:
+
+```bash
+# Generate with custom Kotlin package
+rudder typer generate --platform kotlin --tracking-plan-id ABC123 \
+  --option packageName=com.example.analytics
+
+# Discover available options for a platform
+rudder typer options --platform kotlin
+```
+
 ### Adding New Platforms
 
 1. Create a new package under `cli/internal/typer/generator/platforms/{platform}/`

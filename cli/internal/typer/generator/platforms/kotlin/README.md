@@ -199,18 +199,19 @@ analytics.track(
 
 The generator maps tracking plan primitive types to Kotlin types as follows:
 
-| Primitive Type | Kotlin Type | Description |
-|---------------|-------------|-------------|
-| `string` | `String` | Text values |
-| `integer` | `Long` | Whole numbers |
-| `number` | `Double` | Decimal numbers |
-| `boolean` | `Boolean` | true/false values |
-| `object` | `JsonObject` | Object without defined schema |
-| `array` | `List<JsonElement>` | Array without defined item type |
-| `null` | `JsonNull` | JSON null literal |
-| `any` | `JsonElement` | Any JSON value |
+| Primitive Type | Kotlin Type         | Description                     |
+| -------------- | ------------------- | ------------------------------- |
+| `string`       | `String`            | Text values                     |
+| `integer`      | `Long`              | Whole numbers                   |
+| `number`       | `Double`            | Decimal numbers                 |
+| `boolean`      | `Boolean`           | true/false values               |
+| `object`       | `JsonObject`        | Object without defined schema   |
+| `array`        | `List<JsonElement>` | Array without defined item type |
+| `null`         | `JsonNull`          | JSON null literal               |
+| `any`          | `JsonElement`       | Any JSON value                  |
 
 **Notes:**
+
 - Arrays with defined item types use `List<ItemType>` (e.g., `List<String>`, `List<CustomTypeEmail>`)
 - Multi-type properties/items generate sealed classes with subclasses for each type
 - Properties with enum constraints generate enum classes instead of primitive types
@@ -235,6 +236,7 @@ sealed class PropertyStringOrNull {
 ```
 
 Each type in the union gets a corresponding subclass:
+
 - `StringValue` for `string`
 - `IntegerValue` for `integer`
 - `NumberValue` for `number`
@@ -584,6 +586,27 @@ Don't rely solely on unit tests - always validate generated code compiles:
 ```bash
 make typer-kotlin-validate
 ```
+
+## Platform-Specific Options
+
+The Kotlin generator supports options to customize code generation behavior. Options are defined using struct tags and validated after being decoded from CLI arguments.
+
+### Available Options
+
+#### `packageName`
+
+**Type:** `string`
+**Default:** `com.rudderstack.ruddertyper`
+**Description:** Sets the package name for generated Kotlin code
+
+##### Validation Rules
+
+- Must be lowercase (regex: `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`)
+- Can contain letters, digits, and underscores
+- Segments separated by dots
+- Each segment must start with a letter
+- Cannot start or end with a dot
+- Cannot have consecutive dots
 
 ## References
 

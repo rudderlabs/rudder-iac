@@ -13,8 +13,20 @@ const (
 	Platform = "kotlin"
 )
 
-func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.File, error) {
+type Generator struct{}
+
+// Generate produces Kotlin code files from a tracking plan
+func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptions, platformOptions any) ([]*core.File, error) {
+	var kotlinOptions KotlinOptions = k.DefaultOptions().(KotlinOptions)
+	if platformOptions != nil {
+		kotlinOptions = platformOptions.(KotlinOptions)
+	}
+	if err := kotlinOptions.Validate(); err != nil {
+		return nil, err
+	}
+
 	ctx := NewKotlinContext()
+	ctx.PackageName = kotlinOptions.PackageName
 	ctx.RudderCLIVersion = options.RudderCLIVersion
 	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
@@ -576,7 +588,7 @@ func createNestedDataClass(propSchema *plan.PropertySchema, propName string, par
 	return dataClass, nil
 }
 
-// isEmptySchema checks if an ObjectSchema has no definedproperties
+// isEmptySchema checks if an ObjectSchema has no defined properties
 func isEmptySchema(schema *plan.ObjectSchema) bool {
 	return schema != nil && len(schema.Properties) == 0
 }
