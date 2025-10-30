@@ -10,7 +10,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # For repository_dispatch, checkout the specific tag
           ref: ${{ github.event.client_payload.tag || github.ref }}
