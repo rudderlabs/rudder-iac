@@ -12,9 +12,6 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// StatelessCLI enables stateless CLI mode, which does not depend on resource state being persisted across runs
-	StatelessCLI bool `mapstructure:"statelessCLI"`
-
 	// ConcurrentSyncs enables concurrent sync operations when applying changes
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 
