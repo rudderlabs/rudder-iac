@@ -10,12 +10,8 @@ private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: J
                 put(key, value)
             }
             // Merge in user's custom context (if provided)
-            userOptions.customContext?.let { userContext ->
-                if (userContext is JsonObject) {
-                    for ((key, value) in userContext) {
-                        put(key, value)
-                    }
-                }
+            for ((key, value) in userOptions.customContext) {
+                put(key, value)
             }
         }
         // Copy all properties from userOptions and set merged context
@@ -24,11 +20,6 @@ private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: J
 }
 
 class RudderAnalytics(private val analytics: Analytics) {
-    private val json = Json {
-        prettyPrint = true
-        encodeDefaults = false
-    }
-
     private val context = buildJsonObject {
         put("ruddertyper", buildJsonObject {
         {{- range $key, $value := .EventContext }}
@@ -43,7 +34,7 @@ class RudderAnalytics(private val analytics: Analytics) {
     fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end }}{{- if .MethodArguments }}, {{ end }}options: RudderOption? = null) {
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
-            {{ .Name }} ={{- if .ShouldSerialize }} json.encodeToJsonElement({{- if .IsLiteral }}{{ formatLiteral .Value }}{{- else }}{{ .Value }}{{- end }}).jsonObject{{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
+            {{ .Name }} ={{- if .ShouldSerialize }} {{ .Value }}.rudderSerialize(){{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
         {{- end }}
             options = mergeRudderContext(options, context)
         )
