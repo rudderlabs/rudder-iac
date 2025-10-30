@@ -17,6 +17,10 @@ func Generate(plan *plan.TrackingPlan, options core.GenerationOptions) ([]*core.
 	ctx := NewKotlinContext()
 	ctx.RudderCLIVersion = options.RudderCLIVersion
 	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
+	ctx.TrackingPlanName = plan.Name
+	ctx.TrackingPlanID = plan.Metadata.TrackingPlanID
+	ctx.TrackingPlanVersion = plan.Metadata.TrackingPlanVersion
+	ctx.TrackingPlanURL = plan.Metadata.URL
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)

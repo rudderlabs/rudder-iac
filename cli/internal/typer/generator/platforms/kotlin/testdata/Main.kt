@@ -1139,6 +1139,33 @@ private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: J
     }
 }
 
+/**
+ * This file provides type-safe wrappers for tracking events with RudderStack based on your tracking plan.
+ *
+ * ## Tracking Plan
+ * - **Name**: [Test Plan](https://app.rudderstack.com/trackingPlans/plan_12345)
+ * - **ID**: plan_12345
+ * - **Version**: 13
+ *
+ * ## Quick Start
+ *
+ * Initialize RudderStack Analytics:
+ * ```kotlin
+ * val analytics = Analytics(
+ *     configuration = Configuration(
+ *         writeKey = "YOUR_WRITE_KEY",
+ *         dataPlaneUrl = "YOUR_DATA_PLANE_URL"
+ *     ),
+ *     application = application
+ * )
+ * val rudderAnalytics = RudderAnalytics(analytics)
+ * ```
+ *
+ * Track events using the generated type-safe methods.
+ *
+ * For more information, refer to:
+ * - [RudderStack Kotlin SDK Documentation](https://github.com/rudderlabs/rudder-sdk-kotlin)
+ */
 class RudderAnalytics(private val analytics: Analytics) {
     private val context = buildJsonObject {
         put("ruddertyper", buildJsonObject {
@@ -1151,6 +1178,12 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Group association event
+     *
+     * @param groupId
+     * @param traits
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.group
      */
     fun group(groupId: String, traits: GroupTraits, options: RudderOption? = null) {
         analytics.group(
@@ -1162,6 +1195,12 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * User identification event
+     *
+     * @param userId
+     * @param traits
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.identify
      */
     fun identify(userId: String = "", traits: IdentifyTraits, options: RudderOption? = null) {
         analytics.identify(
@@ -1173,6 +1212,13 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Screen view event
+     *
+     * @param screenName
+     * @param category
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.screen
      */
     fun screen(screenName: String, category: String = "", properties: ScreenProperties, options: RudderOption? = null) {
         analytics.screen(
@@ -1185,6 +1231,9 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Empty event schema with additionalProperties false
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventNoAdditionalProps(options: RudderOption? = null) {
         analytics.track(
@@ -1195,6 +1244,11 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Empty event schema with additionalProperties true
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, options: RudderOption? = null) {
         analytics.track(
@@ -1206,6 +1260,11 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Example event to demonstrate variants
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, options: RudderOption? = null) {
         analytics.track(
@@ -1217,6 +1276,11 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Triggered when user clicks on a "premium" product /\* important *\/
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, options: RudderOption? = null) {
         analytics.track(
@@ -1228,6 +1292,11 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Triggered when a user signs up
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackUserSignedUp(properties: TrackUserSignedUpProperties, options: RudderOption? = null) {
         analytics.track(

@@ -178,4 +178,5 @@ type TrackingPlan struct {
 type PlanMetadata struct {
 	TrackingPlanID      string `json:"trackingPlanId,omitempty"`
 	TrackingPlanVersion int    `json:"trackingPlanVersion,omitempty"`
+	URL                 string `json:"url,omitempty"`
 }
