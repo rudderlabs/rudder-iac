@@ -51,10 +51,11 @@ type KotlinSealedSubclass struct {
 
 // KotlinSealedClass represents a Kotlin sealed class with subclasses
 type KotlinSealedClass struct {
-	Name       string                 // Sealed class name (e.g., "CustomTypePageType")
-	Comment    string                 // Documentation comment
-	Properties []KotlinProperty       // Direct properties of the sealed class
-	Subclasses []KotlinSealedSubclass // List of subclasses
+	Name              string                 // Sealed class name (e.g., "CustomTypePageType")
+	Comment           string                 // Documentation comment
+	Properties        []KotlinProperty       // Direct properties of the sealed class
+	Subclasses        []KotlinSealedSubclass // List of subclasses
+	SerializeToObject bool                   // Whether to generate serialization to JsonObject
 }
 
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature

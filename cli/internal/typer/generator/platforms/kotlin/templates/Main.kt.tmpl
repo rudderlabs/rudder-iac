@@ -4,33 +4,48 @@ package com.rudderstack.ruddertyper
 
 import com.rudderstack.sdk.kotlin.core.Analytics
 import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+
+private fun Unit.rudderSerialize(): JsonObject = buildJsonObject {}
+private fun String.rudderSerialize(): JsonPrimitive = JsonPrimitive(this)
+private fun Long.rudderSerialize(): JsonPrimitive = JsonPrimitive(this)
+private fun Double.rudderSerialize(): JsonPrimitive = JsonPrimitive(this)
+private fun Boolean.rudderSerialize(): JsonPrimitive = JsonPrimitive(this)
+private fun JsonElement.rudderSerialize(): JsonElement = this
+private fun JsonObject.rudderSerialize(): JsonObject = this
+private fun JsonArray.rudderSerialize(): JsonArray = this
+private fun JsonNull.rudderSerialize(): JsonNull = this
+
+@JvmName("rudderSerializeListUnit")
+private fun List<Unit>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListString")
+private fun List<String>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListLong")
+private fun List<Long>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListDouble")
+private fun List<Double>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListBoolean")
+private fun List<Boolean>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListJsonElement")
+private fun List<JsonElement>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListJsonObject")
+private fun List<JsonObject>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListJsonArray")
+private fun List<JsonArray>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListJsonNull")
+private fun List<JsonNull>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 {{- range .TypeAliases }}
 {{ template "typealias.tmpl" . -}}
 {{- end }}
 {{- range .Enums }}
 {{ template "enum.tmpl" . -}}
-{{- end }}
-{{- if .SealedClasses }}
-{{ template "sealedclass_base" }}
 {{- end }}
 {{- range .SealedClasses }}
 {{ template "sealedclass.tmpl" . }}

@@ -164,10 +164,11 @@ func createVariantSealedClass(
 	subclasses = append(subclasses, *defaultSubclass)
 
 	return &KotlinSealedClass{
-		Name:       name,
-		Comment:    comment,
-		Properties: abstractProperties,
-		Subclasses: subclasses,
+		Name:              name,
+		Comment:           comment,
+		Properties:        abstractProperties,
+		Subclasses:        subclasses,
+		SerializeToObject: true,
 	}, nil
 }
 
