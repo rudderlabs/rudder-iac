@@ -60,6 +60,23 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 		p.Property.Config = nil
 	}
 
+	if upstream.Type == "array" && upstream.ItemDefinitionId != "" {
+		customTypeRef, err := resolver.ResolveToReference(
+			state.CustomTypeResourceType,
+			upstream.ItemDefinitionId)
+		if err != nil {
+			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.Property.LocalID, err)
+		}
+
+		if customTypeRef == "" {
+			return fmt.Errorf("resolved custom type reference is empty")
+		}
+
+		p.Property.Config = map[string]interface{}{
+			"itemTypes": []interface{}{customTypeRef},
+		}
+	}
+
 	return nil
 }
 
