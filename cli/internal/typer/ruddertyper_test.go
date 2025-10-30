@@ -41,13 +41,13 @@ func TestRudderTyper_Generate(t *testing.T) {
 
 		tests := []struct {
 			name      string
-			options   core.GenerationOptions
+			options   core.GenerateOptions
 			expectErr bool
 			wantErr   string
 		}{
 			{
 				name: "valid kotlin generation",
-				options: core.GenerationOptions{
+				options: core.GenerateOptions{
 					Platform:   "kotlin",
 					OutputPath: "./output",
 				},
@@ -55,12 +55,12 @@ func TestRudderTyper_Generate(t *testing.T) {
 			},
 			{
 				name: "unsupported platform",
-				options: core.GenerationOptions{
+				options: core.GenerateOptions{
 					Platform:   "unsupported",
 					OutputPath: "./output",
 				},
 				expectErr: true,
-				wantErr:   "generating code: unsupported platform: unsupported (supported platforms: kotlin)",
+				wantErr:   "unsupported platform: unsupported",
 			},
 		}
 

@@ -52,7 +52,7 @@ typealias CustomTypeAge = Double
 typealias CustomTypeEmail = String
 
 /** List of email addresses */
-typealias CustomTypeEmailList = List<CustomTypeEmail>
+typealias CustomTypeEmailList = List<com.rudderstack.ruddertyper.CustomTypeEmail>
 
 /** Empty object that does not allow additional properties */
 typealias CustomTypeEmptyObjectNoAdditionalProps = Unit
@@ -64,43 +64,43 @@ typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
 typealias CustomTypeNullType = JsonNull
 
 /** List of user profiles */
-typealias CustomTypeProfileList = List<CustomTypeUserProfile>
+typealias CustomTypeProfileList = List<com.rudderstack.ruddertyper.CustomTypeUserProfile>
 
 /** User active status */
-typealias PropertyActive = CustomTypeActive
+typealias PropertyActive = com.rudderstack.ruddertyper.CustomTypeActive
 
 /** User's age */
-typealias PropertyAge = CustomTypeAge
+typealias PropertyAge = com.rudderstack.ruddertyper.CustomTypeAge
 
 /** An array that can contain any type of items */
 typealias PropertyArrayOfAny = List<JsonElement>
 
 /** Array with items that can be string or null */
-typealias PropertyArrayWithNullItems = List<ArrayItemArrayWithNullItems>
+typealias PropertyArrayWithNullItems = List<com.rudderstack.ruddertyper.ArrayItemArrayWithNullItems>
 
 /** Array of user contacts */
-typealias PropertyContacts = List<CustomTypeEmail>
+typealias PropertyContacts = List<com.rudderstack.ruddertyper.CustomTypeEmail>
 
 /** example of object property */
 typealias PropertyContext = JsonObject
 
 /** Property using custom null type */
-typealias PropertyCustomNullField = CustomTypeNullType
+typealias PropertyCustomNullField = com.rudderstack.ruddertyper.CustomTypeNullType
 
 /** User's email address */
-typealias PropertyEmail = CustomTypeEmail
+typealias PropertyEmail = com.rudderstack.ruddertyper.CustomTypeEmail
 
 /** User's email addresses */
-typealias PropertyEmailList = CustomTypeEmailList
+typealias PropertyEmailList = com.rudderstack.ruddertyper.CustomTypeEmailList
 
 /** Property with empty object not allowing additional properties */
-typealias PropertyEmptyObjectNoAdditionalProps = CustomTypeEmptyObjectNoAdditionalProps
+typealias PropertyEmptyObjectNoAdditionalProps = com.rudderstack.ruddertyper.CustomTypeEmptyObjectNoAdditionalProps
 
 /** Property with empty object allowing additional properties */
-typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
+typealias PropertyEmptyObjectWithAdditionalProps = com.rudderstack.ruddertyper.CustomTypeEmptyObjectWithAdditionalProps
 
 /** Feature configuration information */
-typealias PropertyFeatureConfig = CustomTypeFeatureConfig
+typealias PropertyFeatureConfig = com.rudderstack.ruddertyper.CustomTypeFeatureConfig
 
 /** User's first name */
 typealias PropertyFirstName = String
@@ -115,7 +115,7 @@ typealias PropertyLastName = String
 typealias PropertyMixedUnicode = String
 
 /** An array with items that can be string or integer */
-typealias PropertyMultiTypeArray = List<ArrayItemMultiTypeArray>
+typealias PropertyMultiTypeArray = List<com.rudderstack.ruddertyper.ArrayItemMultiTypeArray>
 
 /** demonstrates multiple levels of nesting */
 typealias PropertyNestedContext = JsonObject
@@ -133,7 +133,7 @@ typealias PropertyNullField = JsonNull
 typealias PropertyObjectProperty = JsonObject
 
 /** Page context information */
-typealias PropertyPageContext = CustomTypePageContext
+typealias PropertyPageContext = com.rudderstack.ruddertyper.CustomTypePageContext
 
 /** Additional page data */
 typealias PropertyPageData = JsonObject
@@ -145,10 +145,10 @@ typealias PropertyPageType = String
 typealias PropertyProductId = String
 
 /** User profile data */
-typealias PropertyProfile = CustomTypeUserProfile
+typealias PropertyProfile = com.rudderstack.ruddertyper.CustomTypeUserProfile
 
 /** List of related user profiles */
-typealias PropertyProfileList = CustomTypeProfileList
+typealias PropertyProfileList = com.rudderstack.ruddertyper.CustomTypeProfileList
 
 /** A field that can contain any type of value */
 typealias PropertyPropertyOfAny = JsonElement
@@ -160,13 +160,13 @@ typealias PropertyQuery = String
 typealias PropertySpecialField = String
 
 /** User account status */
-typealias PropertyStatus = CustomTypeStatus
+typealias PropertyStatus = com.rudderstack.ruddertyper.CustomTypeStatus
 
 /** User tags as array of strings */
 typealias PropertyTags = List<String>
 
 /** Property using custom type with Unicode */
-typealias PropertyUnicodeCustomType = CustomTypeТипыДанных
+typealias PropertyUnicodeCustomType = com.rudderstack.ruddertyper.CustomTypeТипыДанных
 
 /** An array with no explicit item type (treated as any) */
 typealias PropertyUntypedArray = List<JsonElement>
@@ -175,7 +175,7 @@ typealias PropertyUntypedArray = List<JsonElement>
 typealias PropertyUntypedField = JsonElement
 
 /** User access information */
-typealias PropertyUserAccess = CustomTypeUserAccess
+typealias PropertyUserAccess = com.rudderstack.ruddertyper.CustomTypeUserAccess
 
 /** Username in Chinese characters */
 typealias Property用户名 = String
@@ -348,16 +348,16 @@ fun List<PropertyUnicodeEnumField>.rudderSerialize(): JsonArray = JsonArray(this
 /** Feature configuration with variants based on multi-type flag */
 sealed class CustomTypeFeatureConfig {
     /** Feature flag that can be boolean or string */
-    abstract val featureFlag: PropertyFeatureFlag
+    abstract val featureFlag: com.rudderstack.ruddertyper.PropertyFeatureFlag
     abstract val _jsonElement: JsonObject
 
     /** Feature enabled (boolean true) */
     data class CaseTrue(
         /** User's age */
-        val age: PropertyAge? = null
+        val age: com.rudderstack.ruddertyper.PropertyAge? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
-        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(true)
+        override val featureFlag: com.rudderstack.ruddertyper.PropertyFeatureFlag = com.rudderstack.ruddertyper.PropertyFeatureFlag.BooleanValue(true)
         override val _jsonElement: JsonObject = buildJsonObject {
             age?.let { put("age", it.rudderSerialize()) }
             put("feature_flag", featureFlag.rudderSerialize())
@@ -367,10 +367,10 @@ sealed class CustomTypeFeatureConfig {
     /** Feature disabled (boolean false) */
     data class CaseFalse(
         /** User's first name */
-        val firstName: PropertyFirstName? = null
+        val firstName: com.rudderstack.ruddertyper.PropertyFirstName? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
-        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.BooleanValue(false)
+        override val featureFlag: com.rudderstack.ruddertyper.PropertyFeatureFlag = com.rudderstack.ruddertyper.PropertyFeatureFlag.BooleanValue(false)
         override val _jsonElement: JsonObject = buildJsonObject {
             firstName?.let { put("first_name", it.rudderSerialize()) }
             put("feature_flag", featureFlag.rudderSerialize())
@@ -380,10 +380,10 @@ sealed class CustomTypeFeatureConfig {
     /** Feature in beta (string 'beta') */
     data class CaseBeta(
         /** User tags as array of strings */
-        val tags: PropertyTags? = null
+        val tags: com.rudderstack.ruddertyper.PropertyTags? = null
     ) : CustomTypeFeatureConfig() {
         /** Feature flag that can be boolean or string */
-        override val featureFlag: PropertyFeatureFlag = PropertyFeatureFlag.StringValue("beta")
+        override val featureFlag: com.rudderstack.ruddertyper.PropertyFeatureFlag = com.rudderstack.ruddertyper.PropertyFeatureFlag.StringValue("beta")
         override val _jsonElement: JsonObject = buildJsonObject {
             tags?.let { put("tags", it.rudderSerialize()) }
             put("feature_flag", featureFlag.rudderSerialize())
@@ -393,7 +393,7 @@ sealed class CustomTypeFeatureConfig {
     /** Default case */
     data class Default(
         /** Feature flag that can be boolean or string */
-        override val featureFlag: PropertyFeatureFlag
+        override val featureFlag: com.rudderstack.ruddertyper.PropertyFeatureFlag
     ) : CustomTypeFeatureConfig() {
         override val _jsonElement: JsonObject = buildJsonObject {
             put("feature_flag", featureFlag.rudderSerialize())
@@ -408,16 +408,16 @@ fun List<CustomTypeFeatureConfig>.rudderSerialize(): JsonArray = JsonArray(this.
 /** Page context with variants based on page type */
 sealed class CustomTypePageContext {
     /** Type of page */
-    abstract val pageType: PropertyPageType
+    abstract val pageType: com.rudderstack.ruddertyper.PropertyPageType
     abstract val _jsonElement: JsonObject
 
     /** Search page variant */
     data class CaseSearch(
         /** Search query */
-        val query: PropertyQuery
+        val query: com.rudderstack.ruddertyper.PropertyQuery
     ) : CustomTypePageContext() {
         /** Type of page */
-        override val pageType: PropertyPageType = "search"
+        override val pageType: com.rudderstack.ruddertyper.PropertyPageType = "search"
         override val _jsonElement: JsonObject = buildJsonObject {
             put("query", query.rudderSerialize())
             put("page_type", pageType.rudderSerialize())
@@ -427,10 +427,10 @@ sealed class CustomTypePageContext {
     /** Product page variant */
     data class CaseProduct(
         /** Product identifier */
-        val productId: PropertyProductId
+        val productId: com.rudderstack.ruddertyper.PropertyProductId
     ) : CustomTypePageContext() {
         /** Type of page */
-        override val pageType: PropertyPageType = "product"
+        override val pageType: com.rudderstack.ruddertyper.PropertyPageType = "product"
         override val _jsonElement: JsonObject = buildJsonObject {
             put("product_id", productId.rudderSerialize())
             put("page_type", pageType.rudderSerialize())
@@ -440,7 +440,7 @@ sealed class CustomTypePageContext {
     /** Home page variant with no additional properties */
     class CaseHome() : CustomTypePageContext() {
         /** Type of page */
-        override val pageType: PropertyPageType = "home"
+        override val pageType: com.rudderstack.ruddertyper.PropertyPageType = "home"
         override val _jsonElement: JsonObject = buildJsonObject {
             put("page_type", pageType.rudderSerialize())
         }
@@ -449,10 +449,10 @@ sealed class CustomTypePageContext {
     /** Default case */
     data class Default(
         /** Additional page data */
-        val pageData: PropertyPageData? = null,
+        val pageData: com.rudderstack.ruddertyper.PropertyPageData? = null,
 
         /** Type of page */
-        override val pageType: PropertyPageType
+        override val pageType: com.rudderstack.ruddertyper.PropertyPageType
     ) : CustomTypePageContext() {
         override val _jsonElement: JsonObject = buildJsonObject {
             pageData?.let { put("page_data", it.rudderSerialize()) }
@@ -468,16 +468,16 @@ fun List<CustomTypePageContext>.rudderSerialize(): JsonArray = JsonArray(this.ma
 /** User access with variants based on active status */
 sealed class CustomTypeUserAccess {
     /** User active status */
-    abstract val active: PropertyActive
+    abstract val active: com.rudderstack.ruddertyper.PropertyActive
     abstract val _jsonElement: JsonObject
 
     /** Active user access */
     data class CaseTrue(
         /** User's email address */
-        val email: PropertyEmail
+        val email: com.rudderstack.ruddertyper.PropertyEmail
     ) : CustomTypeUserAccess() {
         /** User active status */
-        override val active: PropertyActive = true
+        override val active: com.rudderstack.ruddertyper.PropertyActive = true
         override val _jsonElement: JsonObject = buildJsonObject {
             put("email", email.rudderSerialize())
             put("active", active.rudderSerialize())
@@ -487,10 +487,10 @@ sealed class CustomTypeUserAccess {
     /** Inactive user access */
     data class CaseFalse(
         /** User account status */
-        val status: PropertyStatus
+        val status: com.rudderstack.ruddertyper.PropertyStatus
     ) : CustomTypeUserAccess() {
         /** User active status */
-        override val active: PropertyActive = false
+        override val active: com.rudderstack.ruddertyper.PropertyActive = false
         override val _jsonElement: JsonObject = buildJsonObject {
             put("status", status.rudderSerialize())
             put("active", active.rudderSerialize())
@@ -500,7 +500,7 @@ sealed class CustomTypeUserAccess {
     /** Default case */
     data class Default(
         /** User active status */
-        override val active: PropertyActive
+        override val active: com.rudderstack.ruddertyper.PropertyActive
     ) : CustomTypeUserAccess() {
         override val _jsonElement: JsonObject = buildJsonObject {
             put("active", active.rudderSerialize())
@@ -699,22 +699,22 @@ fun List<PropertyStringOrNull>.rudderSerialize(): JsonArray = JsonArray(this.map
 /** Example event to demonstrate variants */
 sealed class TrackEventWithVariantsProperties {
     /** Type of device */
-    abstract val deviceType: PropertyDeviceType
+    abstract val deviceType: com.rudderstack.ruddertyper.PropertyDeviceType
     abstract val _jsonElement: JsonObject
 
     /** Mobile device page view */
     data class CaseMobile(
         /** Page context information */
-        val pageContext: PropertyPageContext? = null,
+        val pageContext: com.rudderstack.ruddertyper.PropertyPageContext? = null,
 
         /** User profile data */
-        val profile: PropertyProfile,
+        val profile: com.rudderstack.ruddertyper.PropertyProfile,
 
         /** User tags as array of strings */
-        val tags: PropertyTags? = null
+        val tags: com.rudderstack.ruddertyper.PropertyTags? = null
     ) : TrackEventWithVariantsProperties() {
         /** Type of device */
-        override val deviceType: PropertyDeviceType = PropertyDeviceType.MOBILE
+        override val deviceType: com.rudderstack.ruddertyper.PropertyDeviceType = com.rudderstack.ruddertyper.PropertyDeviceType.MOBILE
         override val _jsonElement: JsonObject = buildJsonObject {
             pageContext?.let { put("page_context", it.rudderSerialize()) }
             put("profile", profile.rudderSerialize())
@@ -726,19 +726,19 @@ sealed class TrackEventWithVariantsProperties {
     /** Desktop page view */
     data class CaseDesktop(
         /** User's first name */
-        val firstName: PropertyFirstName,
+        val firstName: com.rudderstack.ruddertyper.PropertyFirstName,
 
         /** User's last name */
-        val lastName: PropertyLastName? = null,
+        val lastName: com.rudderstack.ruddertyper.PropertyLastName? = null,
 
         /** Page context information */
-        val pageContext: PropertyPageContext? = null,
+        val pageContext: com.rudderstack.ruddertyper.PropertyPageContext? = null,
 
         /** User profile data */
-        val profile: PropertyProfile
+        val profile: com.rudderstack.ruddertyper.PropertyProfile
     ) : TrackEventWithVariantsProperties() {
         /** Type of device */
-        override val deviceType: PropertyDeviceType = PropertyDeviceType.DESKTOP
+        override val deviceType: com.rudderstack.ruddertyper.PropertyDeviceType = com.rudderstack.ruddertyper.PropertyDeviceType.DESKTOP
         override val _jsonElement: JsonObject = buildJsonObject {
             put("first_name", firstName.rudderSerialize())
             lastName?.let { put("last_name", it.rudderSerialize()) }
@@ -751,16 +751,16 @@ sealed class TrackEventWithVariantsProperties {
     /** Default case */
     data class Default(
         /** Type of device */
-        override val deviceType: PropertyDeviceType,
+        override val deviceType: com.rudderstack.ruddertyper.PropertyDeviceType,
 
         /** Page context information */
-        val pageContext: PropertyPageContext? = null,
+        val pageContext: com.rudderstack.ruddertyper.PropertyPageContext? = null,
 
         /** User profile data */
-        val profile: PropertyProfile,
+        val profile: com.rudderstack.ruddertyper.PropertyProfile,
 
         /** A field with no explicit type (treated as any) */
-        val untypedField: PropertyUntypedField? = null
+        val untypedField: com.rudderstack.ruddertyper.PropertyUntypedField? = null
     ) : TrackEventWithVariantsProperties() {
         override val _jsonElement: JsonObject = buildJsonObject {
             put("device_type", deviceType.rudderSerialize())
@@ -778,13 +778,13 @@ fun List<TrackEventWithVariantsProperties>.rudderSerialize(): JsonArray = JsonAr
 /** User profile information */
 data class CustomTypeUserProfile(
     /** User's email address */
-    val email: PropertyEmail,
+    val email: com.rudderstack.ruddertyper.PropertyEmail,
 
     /** User's first name */
-    val firstName: PropertyFirstName,
+    val firstName: com.rudderstack.ruddertyper.PropertyFirstName,
 
     /** User's last name */
-    val lastName: PropertyLastName? = null
+    val lastName: com.rudderstack.ruddertyper.PropertyLastName? = null
 )
 fun CustomTypeUserProfile.rudderSerialize(): JsonObject = buildJsonObject {
     put("email", email.rudderSerialize())
@@ -799,7 +799,7 @@ fun List<CustomTypeUserProfile>.rudderSerialize(): JsonArray = JsonArray(this.ma
 /** Group association event */
 data class GroupTraits(
     /** User active status */
-    val active: PropertyActive
+    val active: com.rudderstack.ruddertyper.PropertyActive
 )
 fun GroupTraits.rudderSerialize(): JsonObject = buildJsonObject {
     put("active", active.rudderSerialize())
@@ -810,10 +810,10 @@ fun List<GroupTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rud
 /** User identification event */
 data class IdentifyTraits(
     /** User active status */
-    val active: PropertyActive? = null,
+    val active: com.rudderstack.ruddertyper.PropertyActive? = null,
 
     /** User's email address */
-    val email: PropertyEmail
+    val email: com.rudderstack.ruddertyper.PropertyEmail
 )
 fun IdentifyTraits.rudderSerialize(): JsonObject = buildJsonObject {
     if (active != null) {
@@ -827,7 +827,7 @@ fun List<IdentifyTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.
 /** Page view event */
 data class PageProperties(
     /** User profile data */
-    val profile: PropertyProfile
+    val profile: com.rudderstack.ruddertyper.PropertyProfile
 )
 fun PageProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("profile", profile.rudderSerialize())
@@ -838,7 +838,7 @@ fun List<PageProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.
 /** Screen view event */
 data class ScreenProperties(
     /** User profile data */
-    val profile: PropertyProfile? = null
+    val profile: com.rudderstack.ruddertyper.PropertyProfile? = null
 )
 fun ScreenProperties.rudderSerialize(): JsonObject = buildJsonObject {
     if (profile != null) {
@@ -851,10 +851,10 @@ fun List<ScreenProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { i
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 data class TrackProductPremiumClickedProperties(
     /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
-    val specialField: PropertySpecialField,
+    val specialField: com.rudderstack.ruddertyper.PropertySpecialField,
 
     /** HTTP status with special characters */
-    val statusCode: PropertyStatusCode? = null
+    val statusCode: com.rudderstack.ruddertyper.PropertyStatusCode? = null
 )
 fun TrackProductPremiumClickedProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("special_field", specialField.rudderSerialize())
@@ -868,128 +868,128 @@ fun List<TrackProductPremiumClickedProperties>.rudderSerialize(): JsonArray = Js
 /** Triggered when a user signs up */
 data class TrackUserSignedUpProperties(
     /** User active status */
-    val active: PropertyActive,
+    val active: com.rudderstack.ruddertyper.PropertyActive,
 
     /** User's age */
-    val age: PropertyAge? = null,
+    val age: com.rudderstack.ruddertyper.PropertyAge? = null,
 
     /** An array that can contain any type of items */
-    val arrayOfAny: PropertyArrayOfAny? = null,
+    val arrayOfAny: com.rudderstack.ruddertyper.PropertyArrayOfAny? = null,
 
     /** Array with items that can be string or null */
-    val arrayWithNullItems: PropertyArrayWithNullItems? = null,
+    val arrayWithNullItems: com.rudderstack.ruddertyper.PropertyArrayWithNullItems? = null,
 
     /** Array of user contacts */
-    val contacts: PropertyContacts? = null,
+    val contacts: com.rudderstack.ruddertyper.PropertyContacts? = null,
 
     /** example of object property */
-    val context: TrackUserSignedUpProperties.Context? = null,
+    val context: com.rudderstack.ruddertyper.TrackUserSignedUpProperties.Context? = null,
 
     /** Property using custom null type */
-    val customNullField: PropertyCustomNullField? = null,
+    val customNullField: com.rudderstack.ruddertyper.PropertyCustomNullField? = null,
 
     /** Type of device */
-    val deviceType: PropertyDeviceType? = null,
+    val deviceType: com.rudderstack.ruddertyper.PropertyDeviceType? = null,
 
     /** User's email addresses */
-    val emailList: PropertyEmailList? = null,
+    val emailList: com.rudderstack.ruddertyper.PropertyEmailList? = null,
 
     /** Property with empty object not allowing additional properties */
-    val emptyObjectNoAdditionalProps: PropertyEmptyObjectNoAdditionalProps? = null,
+    val emptyObjectNoAdditionalProps: com.rudderstack.ruddertyper.PropertyEmptyObjectNoAdditionalProps? = null,
 
     /** Property with empty object allowing additional properties */
-    val emptyObjectWithAdditionalProps: PropertyEmptyObjectWithAdditionalProps? = null,
+    val emptyObjectWithAdditionalProps: com.rudderstack.ruddertyper.PropertyEmptyObjectWithAdditionalProps? = null,
 
     /** Feature enabled flag */
-    val enabled: PropertyEnabled? = null,
+    val enabled: com.rudderstack.ruddertyper.PropertyEnabled? = null,
 
     /** Feature configuration information */
-    val featureConfig: PropertyFeatureConfig? = null,
+    val featureConfig: com.rudderstack.ruddertyper.PropertyFeatureConfig? = null,
 
     /** Property with mixed unicode: café, naïve, 日本語 */
-    val mixedUnicode: PropertyMixedUnicode? = null,
+    val mixedUnicode: com.rudderstack.ruddertyper.PropertyMixedUnicode? = null,
 
     /** Mixed type enum */
-    val mixedValue: PropertyMixedValue? = null,
+    val mixedValue: com.rudderstack.ruddertyper.PropertyMixedValue? = null,
 
     /** An array with items that can be string or integer */
-    val multiTypeArray: PropertyMultiTypeArray? = null,
+    val multiTypeArray: com.rudderstack.ruddertyper.PropertyMultiTypeArray? = null,
 
     /** A field that can be string, integer, or boolean */
-    val multiTypeField: PropertyMultiTypeField? = null,
+    val multiTypeField: com.rudderstack.ruddertyper.PropertyMultiTypeField? = null,
 
     /** Property that can be string, integer, or null */
-    val multiTypeWithNull: PropertyMultiTypeWithNull? = null,
+    val multiTypeWithNull: com.rudderstack.ruddertyper.PropertyMultiTypeWithNull? = null,
 
     /** Nested property with empty object allowing additional properties */
-    val nestedEmptyObject: PropertyNestedEmptyObject? = null,
+    val nestedEmptyObject: com.rudderstack.ruddertyper.PropertyNestedEmptyObject? = null,
 
     /** Nested property with empty object not allowing additional properties */
     val nestedEmptyObjectNoAdditionalProps: Unit? = null,
 
     /** Property that is always null */
-    val nullField: PropertyNullField? = null,
+    val nullField: com.rudderstack.ruddertyper.PropertyNullField? = null,
 
     /** Property that can be number or null */
-    val numberOrNull: PropertyNumberOrNull? = null,
+    val numberOrNull: com.rudderstack.ruddertyper.PropertyNumberOrNull? = null,
 
     /** An object field with no defined structure */
-    val objectProperty: PropertyObjectProperty? = null,
+    val objectProperty: com.rudderstack.ruddertyper.PropertyObjectProperty? = null,
 
     /** Priority level */
-    val priority: PropertyPriority? = null,
+    val priority: com.rudderstack.ruddertyper.PropertyPriority? = null,
 
     /** User profile data */
-    val profile: PropertyProfile,
+    val profile: com.rudderstack.ruddertyper.PropertyProfile,
 
     /** List of related user profiles */
-    val profileList: PropertyProfileList? = null,
+    val profileList: com.rudderstack.ruddertyper.PropertyProfileList? = null,
 
     /** A field that can contain any type of value */
-    val propertyOfAny: PropertyPropertyOfAny? = null,
+    val propertyOfAny: com.rudderstack.ruddertyper.PropertyPropertyOfAny? = null,
 
     /** Rating value */
-    val rating: PropertyRating? = null,
+    val rating: com.rudderstack.ruddertyper.PropertyRating? = null,
 
     /** User account status */
-    val status: PropertyStatus? = null,
+    val status: com.rudderstack.ruddertyper.PropertyStatus? = null,
 
     /** Property that can be string or null */
-    val stringOrNull: PropertyStringOrNull? = null,
+    val stringOrNull: com.rudderstack.ruddertyper.PropertyStringOrNull? = null,
 
     /** User tags as array of strings */
-    val tags: PropertyTags? = null,
+    val tags: com.rudderstack.ruddertyper.PropertyTags? = null,
 
     /** Property using custom type with Unicode */
-    val unicodeCustomType: PropertyUnicodeCustomType? = null,
+    val unicodeCustomType: com.rudderstack.ruddertyper.PropertyUnicodeCustomType? = null,
 
     /** Field demonstrating various Unicode characters in enum values */
-    val unicodeEnumField: PropertyUnicodeEnumField? = null,
+    val unicodeEnumField: com.rudderstack.ruddertyper.PropertyUnicodeEnumField? = null,
 
     /** An array with no explicit item type (treated as any) */
-    val untypedArray: PropertyUntypedArray? = null,
+    val untypedArray: com.rudderstack.ruddertyper.PropertyUntypedArray? = null,
 
     /** A field with no explicit type (treated as any) */
-    val untypedField: PropertyUntypedField? = null,
+    val untypedField: com.rudderstack.ruddertyper.PropertyUntypedField? = null,
 
     /** User access information */
-    val userAccess: PropertyUserAccess? = null,
+    val userAccess: com.rudderstack.ruddertyper.PropertyUserAccess? = null,
 
     /** Username in Chinese characters */
-    val 用户名: Property用户名? = null
+    val 用户名: com.rudderstack.ruddertyper.Property用户名? = null
 ) {
     /** example of object property */
     data class Context(
         /** IP address of the user */
-        val ipAddress: PropertyIpAddress,
+        val ipAddress: com.rudderstack.ruddertyper.PropertyIpAddress,
 
         /** demonstrates multiple levels of nesting */
-        val nestedContext: TrackUserSignedUpProperties.Context.NestedContext
+        val nestedContext: com.rudderstack.ruddertyper.TrackUserSignedUpProperties.Context.NestedContext
     ) {
         /** demonstrates multiple levels of nesting */
         data class NestedContext(
             /** User profile data */
-            val profile: PropertyProfile? = null
+            val profile: com.rudderstack.ruddertyper.PropertyProfile? = null
         )
         fun NestedContext.rudderSerialize(): JsonObject = buildJsonObject {
             if (profile != null) {
