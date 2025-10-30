@@ -39,7 +39,6 @@ func newCmdOptions() *cobra.Command {
 
 	cmd.Flags().StringVar(&platform, "platform", "", "Platform to show options for (kotlin)")
 	cmd.MarkFlagRequired("platform")
-
 	return cmd
 }
 
