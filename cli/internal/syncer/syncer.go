@@ -8,9 +8,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -72,42 +69,15 @@ func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []erro
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
-	// Load state from the state API
-	apistate, err := s.provider.LoadState(ctx)
+	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
 	}
 
-	var reconstate *state.State
-	if config.GetConfig().ExperimentalFlags.StatelessCLI {
-		// remove state for stateless resources - this is to avoid conflicts b/w the api state and the reconstructed state
-		apistate = removeStateForResourceTypes(apistate, []string{
-			dcstate.CategoryResourceType,
-			dcstate.EventResourceType,
-			dcstate.PropertyResourceType,
-			dcstate.CustomTypeResourceType,
-			dcstate.TrackingPlanResourceType,
-			esSource.ResourceType,
-			sqlmodel.ResourceType,
-		})
-		// load resources
-		resources, err := s.provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return []error{err}
-		}
-		// reconstruct state
-		reconstate, err = s.provider.LoadStateFromResources(ctx, resources)
-		if err != nil {
-			return []error{err}
-		}
-	}
-
-	// Merge the state from the state API and the reconstructed state
-	state, err := apistate.Merge(reconstate)
+	state, err := s.provider.LoadStateFromResources(ctx, resources)
 	if err != nil {
 		return []error{err}
 	}
-
 	source := StateToGraph(state)
 
 	p := planner.New(s.workspace.ID)
