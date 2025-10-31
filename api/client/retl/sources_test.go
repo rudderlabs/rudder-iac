@@ -576,3 +576,44 @@ func TestUpdateRetlSourceAPIError(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+func TestSetRetlSourceExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1/external-id", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"externalId":"ext-123"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	err = retlClient.SetExternalId(context.Background(), "src1", "ext-123")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestSetRetlSourceExternalIDAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1/external-id", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	err = retlClient.SetExternalId(context.Background(), "src1", "ext-123")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "setting external ID")
+
+	httpClient.AssertNumberOfCalls()
+}
