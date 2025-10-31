@@ -136,14 +136,13 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 		MustMapStringInterface(from, "trackingPlanArgs"),
 	)
 
-	events := InterfaceSlice(from, "events", nil)
+	events := NormalizeToSliceMap(from, "events")
 	if len(events) == 0 {
 		return
 	}
 
 	tpEvents := make([]*TrackingPlanEventState, len(events))
 	for idx, event := range events {
-		event := event.(map[string]interface{})
 
 		tpEvents[idx] = &TrackingPlanEventState{
 			ID:      MustString(event, "id"),
@@ -171,8 +170,9 @@ func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.Trackin
 	events := make([]*TrackingPlanEventState, 0, len(trackingPlan.Events))
 	for _, event := range trackingPlan.Events {
 		events = append(events, &TrackingPlanEventState{
-			// we dont set the tracking plan event ID in the stateless approach
-			ID:      "",
+			// we dont set the tracking plan event ID in the stateless approach(as it is not available in the remote event)
+			// but this ID is required to manage the state for tracking plan updates, so we use a combination of event.ID and event.ExternalID instead
+			ID:      fmt.Sprintf("%s-%s", event.ID, event.ExternalID),
 			EventID: event.ID,
 			LocalID: event.ExternalID,
 		})

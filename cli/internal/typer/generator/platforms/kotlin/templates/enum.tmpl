@@ -1,7 +1,6 @@
 {{- if .Comment }}
 /** {{ escapeComment .Comment }} */
 {{- end }}
-@Serializable(with = Rudder{{ .Name }}Serializer::class)
 enum class {{ .Name }} {
 {{- range $index, $value := .Values }}{{- if $index }},
 {{- end }}
@@ -9,19 +8,10 @@ enum class {{ .Name }} {
 {{- end }}
 }
 
-private object Rudder{{ .Name }}Serializer : KSerializer<{{ .Name }}> {
-    override val descriptor = buildClassSerialDescriptor("{{ .Name }}")
-
-    override fun serialize(encoder: Encoder, value: {{ .Name }}) {
-        val jsonValue = when (value) {
-            {{- range .Values }}
-            {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ formatLiteral .Value }})
-            {{- end }}
-        }
-        encoder.encodeSerializableValue(JsonPrimitive.serializer(), jsonValue)
-    }
-
-    override fun deserialize(decoder: Decoder): {{ .Name }} {
-        throw SerializationException("Deserialization not supported for {{ .Name }}")
-    }
+fun {{ .Name }}.rudderSerialize(): JsonElement = when (this) {
+    {{- range .Values }}
+    {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ formatLiteral .Value }})
+    {{- end }}
 }
+@JvmName("rudderSerializeList{{ .Name }}")
+fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })

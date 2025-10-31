@@ -3,6 +3,7 @@ package typer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -24,6 +25,7 @@ func NewCmdTyper() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdGenerate())
+	cmd.AddCommand(newCmdOptions())
 
 	return cmd
 }
@@ -32,6 +34,7 @@ func newCmdGenerate() *cobra.Command {
 	var trackingPlanID string
 	var platform string
 	var outputDir string
+	var options []string
 
 	cmd := &cobra.Command{
 		Use:   "generate",
@@ -69,14 +72,18 @@ func newCmdGenerate() *cobra.Command {
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)
 
-			options := core.GenerationOptions{
+			// Parse platform-specific options from key=value pairs
+			platformOptions := parsePlatformOptions(options)
+
+			genOptions := core.GenerateOptions{
 				RudderCLIVersion: app.GetVersion(),
 				Platform:         platform,
 				OutputPath:       outputDir,
+				PlatformOptions:  platformOptions,
 			}
 
 			ctx := context.Background()
-			return rudderTyper.Generate(ctx, options)
+			return rudderTyper.Generate(ctx, genOptions)
 		},
 	}
 
@@ -88,5 +95,22 @@ func newCmdGenerate() *cobra.Command {
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
 
+	cmd.Flags().StringArrayVar(&options, "option", []string{},
+		"Platform-specific options in key=value format (use 'rudder-cli typer options <platform>' to see available options)")
+
 	return cmd
+}
+
+// parsePlatformOptions converts a slice of "key=value" strings into a map[string]string
+func parsePlatformOptions(optionStrs []string) map[string]string {
+	options := make(map[string]string)
+	for _, optStr := range optionStrs {
+		parts := strings.SplitN(optStr, "=", 2)
+		if len(parts) == 2 {
+			options[parts[0]] = parts[1]
+		} else {
+			options[parts[0]] = ""
+		}
+	}
+	return options
 }

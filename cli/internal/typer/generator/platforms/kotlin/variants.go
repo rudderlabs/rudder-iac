@@ -48,6 +48,7 @@ func formatMultiTypeDiscriminatorValue(kotlinType string, value any) string {
 func createCustomTypeVariantSealedClass(
 	customType *plan.CustomType,
 	nameRegistry *core.NameRegistry,
+	packageName string,
 ) (*KotlinSealedClass, error) {
 	className, err := getOrRegisterCustomTypeName(customType, nameRegistry)
 	if err != nil {
@@ -60,6 +61,7 @@ func createCustomTypeVariantSealedClass(
 		customType.Schema,
 		customType.Variants,
 		nameRegistry,
+		packageName,
 	)
 }
 
@@ -67,6 +69,7 @@ func createCustomTypeVariantSealedClass(
 func createEventRuleVariantSealedClass(
 	rule *plan.EventRule,
 	nameRegistry *core.NameRegistry,
+	packageName string,
 ) (*KotlinSealedClass, error) {
 	className, err := getOrRegisterEventDataClassName(rule, nameRegistry)
 	if err != nil {
@@ -79,6 +82,7 @@ func createEventRuleVariantSealedClass(
 		&rule.Schema,
 		rule.Variants,
 		nameRegistry,
+		packageName,
 	)
 }
 
@@ -89,6 +93,7 @@ func createVariantSealedClass(
 	baseSchema *plan.ObjectSchema,
 	variants []plan.Variant,
 	nameRegistry *core.NameRegistry,
+	packageName string,
 ) (*KotlinSealedClass, error) {
 	if len(variants) == 0 {
 		return nil, fmt.Errorf("no variants provided")
@@ -112,7 +117,7 @@ func createVariantSealedClass(
 		abstractProperties = append(abstractProperties, KotlinProperty{
 			Name:       FormatPropertyName(variant.Discriminator),
 			SerialName: variant.Discriminator,
-			Type:       kotlinType,
+			Type:       fmt.Sprintf("%s.%s", packageName, kotlinType),
 			Comment:    discriminatorProp.Property.Description,
 			Nullable:   false,
 			Abstract:   true,
@@ -131,6 +136,7 @@ func createVariantSealedClass(
 				&variantCase.Schema,
 				variantCase.Description,
 				nameRegistry,
+				packageName,
 			)
 			if err != nil {
 				return nil, err
@@ -157,6 +163,7 @@ func createVariantSealedClass(
 		defaultSchema,
 		"Default case",
 		nameRegistry,
+		packageName,
 	)
 	if err != nil {
 		return nil, err
@@ -164,10 +171,11 @@ func createVariantSealedClass(
 	subclasses = append(subclasses, *defaultSubclass)
 
 	return &KotlinSealedClass{
-		Name:       name,
-		Comment:    comment,
-		Properties: abstractProperties,
-		Subclasses: subclasses,
+		Name:              name,
+		Comment:           comment,
+		Properties:        abstractProperties,
+		Subclasses:        subclasses,
+		SerializeToObject: true,
 	}, nil
 }
 
@@ -179,6 +187,7 @@ func createSealedSubclass(
 	caseSchema *plan.ObjectSchema,
 	comment string,
 	nameRegistry *core.NameRegistry,
+	packageName string,
 ) (*KotlinSealedSubclass, error) {
 	// Format subclass name from match value
 	var subclassName string
@@ -195,6 +204,7 @@ func createSealedSubclass(
 		discriminator,
 		matchValue,
 		nameRegistry,
+		packageName,
 	)
 	if err != nil {
 		return nil, err
@@ -223,6 +233,7 @@ func mergeVariantSchemaProperties(
 	discriminatorProp string,
 	discriminatorValue any,
 	nameRegistry *core.NameRegistry,
+	packageName string,
 ) ([]KotlinProperty, []KotlinProperty, error) {
 	// Create merged property map
 	merged := make(map[string]plan.PropertySchema)
@@ -265,6 +276,7 @@ func mergeVariantSchemaProperties(
 			if err != nil {
 				return nil, nil, err
 			}
+			qualifiedType := fmt.Sprintf("%s.%s", packageName, kotlinType)
 
 			var defaultValue string
 			if discriminatorValue != nil {
@@ -279,11 +291,11 @@ func mergeVariantSchemaProperties(
 					if err != nil {
 						return nil, nil, err
 					}
-					defaultValue = fmt.Sprintf("%s.%s", kotlinType, enumValueName)
+					defaultValue = fmt.Sprintf("%s.%s", qualifiedType, enumValueName)
 				} else {
 					// For non-enum types, format based on the discriminator value's type
 					// (handles both single-type and multi-type properties)
-					defaultValue = formatDiscriminatorValue(discriminatorValue, &propSchema.Property, kotlinType)
+					defaultValue = formatDiscriminatorValue(discriminatorValue, &propSchema.Property, qualifiedType)
 				}
 			}
 
@@ -291,7 +303,7 @@ func mergeVariantSchemaProperties(
 			discProp := KotlinProperty{
 				Name:       FormatPropertyName(name),
 				SerialName: name,
-				Type:       kotlinType,
+				Type:       qualifiedType,
 				Comment:    propSchema.Property.Description,
 				Nullable:   false, // Discriminator is always required
 				Default:    defaultValue,
@@ -315,7 +327,7 @@ func mergeVariantSchemaProperties(
 			prop := KotlinProperty{
 				Name:       FormatPropertyName(name),
 				SerialName: name,
-				Type:       kotlinType,
+				Type:       fmt.Sprintf("%s.%s", packageName, kotlinType),
 				Comment:    propSchema.Property.Description,
 				Nullable:   !propSchema.Required,
 			}

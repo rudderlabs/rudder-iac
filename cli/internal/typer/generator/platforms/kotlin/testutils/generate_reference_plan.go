@@ -12,9 +12,10 @@ import (
 func main() {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
-	files, err := kotlin.Generate(trackingPlan, core.GenerationOptions{
+	generator := &kotlin.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
 		RudderCLIVersion: "1.0.0",
-	})
+	}, kotlin.KotlinOptions{})
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

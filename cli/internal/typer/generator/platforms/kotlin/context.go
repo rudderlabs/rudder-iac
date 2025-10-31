@@ -51,10 +51,11 @@ type KotlinSealedSubclass struct {
 
 // KotlinSealedClass represents a Kotlin sealed class with subclasses
 type KotlinSealedClass struct {
-	Name       string                 // Sealed class name (e.g., "CustomTypePageType")
-	Comment    string                 // Documentation comment
-	Properties []KotlinProperty       // Direct properties of the sealed class
-	Subclasses []KotlinSealedSubclass // List of subclasses
+	Name              string                 // Sealed class name (e.g., "CustomTypePageType")
+	Comment           string                 // Documentation comment
+	Properties        []KotlinProperty       // Direct properties of the sealed class
+	Subclasses        []KotlinSealedSubclass // List of subclasses
+	SerializeToObject bool                   // Whether to generate serialization to JsonObject
 }
 
 // KotlinMethodArgument represents an argument in a generated Kotlin method's signature
@@ -90,6 +91,7 @@ type RudderAnalyticsMethod struct {
 
 // KotlinContext holds all the information needed to generate Kotlin code
 type KotlinContext struct {
+	PackageName            string                  // Package name for generated code
 	TypeAliases            []KotlinTypeAlias       // Type aliases for primitive custom types
 	DataClasses            []KotlinDataClass       // Data classes for object custom types
 	SealedClasses          []KotlinSealedClass     // Sealed classes for variant types
@@ -97,6 +99,10 @@ type KotlinContext struct {
 	RudderAnalyticsMethods []RudderAnalyticsMethod // Methods for the RudderAnalytics object
 	EventContext           map[string]string       // Fixed context to be included with every event
 	RudderCLIVersion       string                  // Version of Rudder CLI used to generate this code
+	TrackingPlanName       string                  // Name of the tracking plan
+	TrackingPlanID         string                  // ID of the tracking plan
+	TrackingPlanVersion    int                     // Version of the tracking plan
+	TrackingPlanURL        string                  // URL to the tracking plan (if available)
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices
