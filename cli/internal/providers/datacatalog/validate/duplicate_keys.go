@@ -24,8 +24,29 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		for _, prop := range props {
 
 			if lookup, ok := propName[prop.Name]; ok {
-				// If name and type on the property are same, then it's a duplicate
-				if lookup.Type == prop.Type {
+				lookupArrayItemType := ""
+				propArrayItemType := ""
+				if lookup.Type == "array" && lookup.Config != nil {
+					if itemTypes, ok := lookup.Config["itemTypes"]; ok {
+						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
+							if val, ok := arr[0].(string); ok {
+								lookupArrayItemType = val
+							}
+						}
+					}
+				}
+				if prop.Type == "array" && prop.Config != nil {
+					if itemTypes, ok := prop.Config["itemTypes"]; ok {
+						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
+							if val, ok := arr[0].(string); ok {
+								propArrayItemType = val
+							}
+						}
+					}
+				}
+
+				// If name, type and arrayItemType on the property are the same, then it's a duplicate
+				if lookup.Type == prop.Type && lookupArrayItemType == propArrayItemType {
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("duplicate name key: %s and type: %s", prop.Name, prop.Type),
 						Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
