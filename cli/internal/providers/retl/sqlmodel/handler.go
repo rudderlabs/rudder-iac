@@ -270,6 +270,11 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("getting RETL source: %w", err)
 	}
 
+	err = h.client.SetExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting external ID for RETL source: %w", err)
+	}
+
 	existingState := &SQLModelResource{}
 	existingState.FromResourceData(*toResourceData(existingSource))
 
@@ -284,10 +289,6 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 			return nil, fmt.Errorf("updating RETL source: %w", err)
 		}
 		result = updatedData
-	}
-	err = h.client.SetExternalId(ctx, remoteId, ID)
-	if err != nil {
-		return nil, fmt.Errorf("setting external ID for RETL source: %w", err)
 	}
 	return result, nil
 }
