@@ -23,7 +23,7 @@ import (
 )
 
 type Handler struct {
-	*provider.BaseHandler[sourceSpec, sourceResource]
+	*provider.BaseHandler[sourceSpec, SourceResource]
 	client    esClient.EventStreamStore
 	importDir string
 }
@@ -48,28 +48,27 @@ func (h *handlerImpl) ValidateSpec(spec *sourceSpec) error {
 	return nil
 }
 
-func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *sourceSpec) (map[string]*sourceResource, error) {
+func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *sourceSpec) (map[string]*SourceResource, error) {
 	enabled := true
 	if spec.Enabled != nil {
 		enabled = *spec.Enabled
 	}
-	sr := &sourceResource{
-		ID:               spec.LocalId,
-		Name:             spec.Name,
-		SourceDefinition: spec.SourceDefinition,
-		Enabled:          enabled,
-		Governance:       &governanceResource{},
+	sr := &SourceResource{
+		ID:      spec.LocalId,
+		Name:    spec.Name,
+		Type:    spec.Type,
+		Enabled: enabled,
 	}
 	if err := h.loadTrackingPlanSpec(spec, sr); err != nil {
 		return nil, err
 	}
 
-	return map[string]*sourceResource{
+	return map[string]*SourceResource{
 		sr.ID: sr,
 	}, nil
 }
 
-func (h *handlerImpl) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
+func (h *handlerImpl) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *SourceResource) error {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
 	}
@@ -87,9 +86,11 @@ func (h *handlerImpl) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sou
 		return fmt.Errorf("parsing tracking plan reference: %w", err)
 	}
 
-	sourceResource.Governance.Validations = &validationsResource{
-		TrackingPlanRef: trackingPlanRef,
-		Config:          &trackingPlanConfigResource{},
+	sourceResource.Governance = &GovernanceResource{
+		Validations: &ValidationsResource{
+			TrackingPlanRef: trackingPlanRef,
+			Config:          &TrackingPlanConfigResource{},
+		},
 	}
 
 	config := sourceResource.Governance.Validations.Config
@@ -129,18 +130,18 @@ func buildEventConfigFromSpec(specConfig *eventConfigSpec) *EventConfigResource 
 	}
 }
 
-func (h *handlerImpl) ValidateResource(source *sourceResource, graph *resources.Graph) error {
+func (h *handlerImpl) ValidateResource(source *SourceResource, graph *resources.Graph) error {
 	if source.ID == "" {
 		return fmt.Errorf("id is required")
 	}
 	if source.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if source.SourceDefinition == "" {
+	if source.Type == "" {
 		return fmt.Errorf("type is required")
 	}
-	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
-		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
+	if !slices.Contains(sourceDefinitions, source.Type) {
+		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.Type, sourceDefinitions)
 	}
 	if source.Governance != nil && source.Governance.Validations != nil {
 		ref := source.Governance.Validations.TrackingPlanRef
@@ -160,85 +161,34 @@ func (h *handlerImpl) ValidateResource(source *sourceResource, graph *resources.
 	return nil
 }
 
-func (h *handlerImpl) EncodeResource(s *sourceResource) resources.ResourceData {
-	data := resources.ResourceData{
-		NameKey:             s.Name,
-		EnabledKey:          s.Enabled,
-		SourceDefinitionKey: s.SourceDefinition,
-	}
-	if s.Governance.Validations != nil {
-		data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
-		data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
-	}
-
-	return data
-}
-
-func buildTrackingPlanConfigState(config *trackingPlanConfigResource) map[string]interface{} {
-	result := make(map[string]interface{})
-	if config.Track != nil {
-		trackState := buildEventConfigState(config.Track.EventConfigResource)
-		if config.Track.DropUnplannedEvents != nil {
-			trackState[DropUnplannedEventsKey] = *config.Track.DropUnplannedEvents
-		}
-		result[TrackKey] = trackState
-	}
-	if config.Identify != nil {
-		identifyState := buildEventConfigState(config.Identify)
-		result[IdentifyKey] = identifyState
-	}
-	if config.Group != nil {
-		groupState := buildEventConfigState(config.Group)
-		result[GroupKey] = groupState
-	}
-	if config.Page != nil {
-		pageState := buildEventConfigState(config.Page)
-		result[PageKey] = pageState
-	}
-	if config.Screen != nil {
-		screenState := buildEventConfigState(config.Screen)
-		result[ScreenKey] = screenState
-	}
-	return result
-}
-
-func buildEventConfigState(config *EventConfigResource) map[string]interface{} {
-	result := make(map[string]interface{})
-	if config.PropagateViolations != nil {
-		result[PropagateViolationsKey] = *config.PropagateViolations
-	}
-	if config.DropUnplannedProperties != nil {
-		result[DropUnplannedPropertiesKey] = *config.DropUnplannedProperties
-	}
-	if config.DropOtherViolations != nil {
-		result[DropOtherViolationsKey] = *config.DropOtherViolations
-	}
-	return result
-}
-
-func (h *Handler) Create(ctx context.Context, id string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*resources.ResourceData, error) {
 	createRequest := &sourceClient.CreateSourceRequest{
-		ExternalID: id,
-		Name:       data[NameKey].(string),
-		Type:       data[SourceDefinitionKey].(string),
-		Enabled:    data[EnabledKey].(bool),
+		ExternalID: data.ID,
+		Name:       data.Name,
+		Type:       data.Type,
+		Enabled:    data.Enabled,
 	}
 	resp, err := h.client.Create(ctx, createRequest)
 	if err != nil {
 		return nil, fmt.Errorf("creating event stream source: %w", err)
 	}
-	trackingPlanID, ok := data[TrackingPlanKey].(string)
-	if ok {
-		err := h.linkTrackingPlan(ctx, trackingPlanID, resp.ID, data)
-		if err != nil {
-			return nil, fmt.Errorf("linking tracking plan to event stream source: %w", err)
+
+	trackingPlanID := ""
+	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
+		trackingPlanRef := data.Governance.Validations.TrackingPlanRef
+		trackingPlanID = trackingPlanRef.Resolved.Value
+		if trackingPlanRef != nil {
+			err := h.linkTrackingPlan(ctx, trackingPlanRef.Resolved.Value, resp.ID, data)
+			if err != nil {
+				return nil, fmt.Errorf("linking tracking plan to event stream source: %w", err)
+			}
 		}
 	}
 	return toResourceData(resp.ID, trackingPlanID), nil
 }
 
-func (h *Handler) Update(ctx context.Context, id string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	if state[SourceDefinitionKey] != data[SourceDefinitionKey] {
+func (h *handlerImpl) Update(ctx context.Context, data *SourceResource, state resources.ResourceData) (*resources.ResourceData, error) {
+	if state[SourceDefinitionKey] != data.Type {
 		return nil, fmt.Errorf("type cannot be changed")
 	}
 	remoteID, ok := state[IDKey].(string)
@@ -252,21 +202,20 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	if err := h.updateTrackingPlanConnection(ctx, remoteID, data, state); err != nil {
 		return nil, err
 	}
-	newTrackingPlanID, newHasTP := data[TrackingPlanKey].(string)
-	if newHasTP {
-		return toResourceData(remoteID, newTrackingPlanID), nil
+	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
+		return toResourceData(remoteID, data.Governance.Validations.TrackingPlanRef.Resolved.Value), nil
 	}
 	return toResourceData(remoteID, ""), nil
 }
 
-func (h *Handler) updateSource(ctx context.Context, remoteID string, data, state resources.ResourceData) error {
-	needsUpdate := state[NameKey] != data[NameKey] || state[EnabledKey] != data[EnabledKey]
+func (h *handlerImpl) updateSource(ctx context.Context, remoteID string, data *SourceResource, state resources.ResourceData) error {
+	needsUpdate := state[NameKey] != data.Name || state[EnabledKey] != data.Enabled
 	if !needsUpdate {
 		return nil
 	}
 	updateRequest := &sourceClient.UpdateSourceRequest{
-		Name:    data[NameKey].(string),
-		Enabled: data[EnabledKey].(bool),
+		Name:    data.Name,
+		Enabled: data.Enabled,
 	}
 	_, err := h.client.Update(ctx, remoteID, updateRequest)
 	if err != nil {
@@ -275,33 +224,35 @@ func (h *Handler) updateSource(ctx context.Context, remoteID string, data, state
 	return nil
 }
 
-func (h *Handler) updateTrackingPlanConnection(ctx context.Context, remoteID string, data, state resources.ResourceData) error {
-	if data[TrackingPlanKey] == nil && state[TrackingPlanIDKey] == nil {
+func (h *handlerImpl) updateTrackingPlanConnection(ctx context.Context, remoteID string, data *SourceResource, state resources.ResourceData) error {
+	var trackingPlanRef *resources.PropertyRef = nil
+	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
+		trackingPlanRef = data.Governance.Validations.TrackingPlanRef
+	}
+
+	if trackingPlanRef == nil && state[TrackingPlanIDKey] == nil {
 		return nil
 	}
 
 	currentTrackingPlanID, currentHasTP := state[TrackingPlanIDKey].(string)
-	newTrackingPlanID, newHasTP := data[TrackingPlanKey].(string)
+	if trackingPlanRef != nil {
+		newTPID := trackingPlanRef.Resolved.Value
+		if currentHasTP {
+			return h.updateExistingTrackingPlanConnection(ctx, currentTrackingPlanID, newTPID, remoteID, data, state)
 
-	switch {
-	case !currentHasTP && newHasTP:
-		return h.linkTrackingPlan(ctx, newTrackingPlanID, remoteID, data)
-	case currentHasTP && !newHasTP:
+		} else {
+			return h.linkTrackingPlan(ctx, newTPID, remoteID, data)
+
+		}
+	} else if currentHasTP {
 		return h.unlinkTrackingPlan(ctx, currentTrackingPlanID, remoteID)
-	case currentHasTP && newHasTP:
-		return h.updateExistingTrackingPlanConnection(ctx, currentTrackingPlanID, newTrackingPlanID, remoteID, data, state)
-	default:
-		return nil
 	}
+
+	return nil
 }
 
-func (h *Handler) linkTrackingPlan(ctx context.Context, trackingPlanID, remoteID string, data resources.ResourceData) error {
-	config, ok := data[TrackingPlanConfigKey].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("missing tracking plan config in resource data")
-	}
-
-	remoteConfig, err := mapStateTPConfigToRemote(config)
+func (h *handlerImpl) linkTrackingPlan(ctx context.Context, trackingPlanID, remoteID string, data *SourceResource) error {
+	remoteConfig, err := mapStateTPConfigToRemote(data.Governance.Validations.Config)
 	if err != nil {
 		return fmt.Errorf("invalid tracking plan config: %w", err)
 	}
@@ -313,7 +264,7 @@ func (h *Handler) linkTrackingPlan(ctx context.Context, trackingPlanID, remoteID
 	return nil
 }
 
-func (h *Handler) unlinkTrackingPlan(ctx context.Context, trackingPlanID, remoteID string) error {
+func (h *handlerImpl) unlinkTrackingPlan(ctx context.Context, trackingPlanID, remoteID string) error {
 	err := h.client.UnlinkTP(ctx, trackingPlanID, remoteID)
 	if err != nil {
 		return fmt.Errorf("unlinking tracking plan from event stream source: %w", err)
@@ -321,7 +272,7 @@ func (h *Handler) unlinkTrackingPlan(ctx context.Context, trackingPlanID, remote
 	return nil
 }
 
-func (h *Handler) updateExistingTrackingPlanConnection(ctx context.Context, currentTrackingPlanID, newTrackingPlanID, remoteID string, data, state resources.ResourceData) error {
+func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, currentTrackingPlanID, newTrackingPlanID, remoteID string, data *SourceResource, state resources.ResourceData) error {
 	if currentTrackingPlanID == newTrackingPlanID {
 		return h.updateTrackingPlanConfig(ctx, currentTrackingPlanID, remoteID, data, state)
 	}
@@ -337,17 +288,14 @@ func (h *Handler) updateExistingTrackingPlanConnection(ctx context.Context, curr
 	return nil
 }
 
-func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, remoteID string, data, state resources.ResourceData) error {
-	currentConfig, ok := state[TrackingPlanConfigKey].(map[string]interface{})
+func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, remoteID string, data *SourceResource, state resources.ResourceData) error {
+	currentConfig, ok := state[TrackingPlanConfigKey].(*TrackingPlanConfigResource)
 	if !ok {
 		return fmt.Errorf("missing tracking plan config in state")
 	}
 
-	newConfig, ok := data[TrackingPlanConfigKey].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("missing tracking plan config in resource data")
-	}
-
+	newConfig := data.Governance.Validations.Config
+	// NOTE: DeepEqual will fail until ResourceData has been converted to trackingPlanConfigResource
 	if !reflect.DeepEqual(newConfig, currentConfig) {
 		remoteConfig, err := mapStateTPConfigToRemote(newConfig)
 		if err != nil {
@@ -417,7 +365,7 @@ func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 	return s, nil
 }
 
-func (h *Handler) Delete(ctx context.Context, id string, state resources.ResourceData) error {
+func (h *handlerImpl) Delete(ctx context.Context, id string, state resources.ResourceData) error {
 	sourceID, ok := state[IDKey].(string)
 	if !ok {
 		return fmt.Errorf("missing id in resource data")
@@ -440,7 +388,7 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	return nil
 }
 
-func (h *Handler) Import(ctx context.Context, id string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId string) (*resources.ResourceData, error) {
 	// FIXME: Instead of fetching all sources, fetch the source with the matching remoteId
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
@@ -475,12 +423,12 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	}
 
 	// Update the source if there are differences
-	result, err := h.Update(ctx, id, data, existingState)
+	result, err := h.Update(ctx, data, existingState)
 	if err != nil {
 		return nil, fmt.Errorf("updating event stream source during import: %w", err)
 	}
 
-	err = h.client.SetExternalID(ctx, remoteId, id)
+	err = h.client.SetExternalID(ctx, remoteId, data.ID)
 	if err != nil {
 		return nil, fmt.Errorf("setting external ID for event stream source during import: %w", err)
 	}
@@ -692,7 +640,7 @@ func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *s
 			URN:      *trackingPlanURN,
 			Property: "id",
 		}
-		input[TrackingPlanConfigKey] = mapRemoteTPConfigToState(source.TrackingPlan.Config)
+		input[TrackingPlanConfigKey] = source.TrackingPlan.Config
 		output = toResourceData(source.ID, source.TrackingPlan.ID)
 	} else {
 		output = toResourceData(source.ID, "")
@@ -731,45 +679,45 @@ func parseTrackingPlanRef(ref string) (*resources.PropertyRef, error) {
 	}, nil
 }
 
-func mapStateTPConfigToRemote(config map[string]interface{}) (*trackingplanClient.ConnectionConfig, error) {
+func mapStateTPConfigToRemote(config *TrackingPlanConfigResource) (*trackingplanClient.ConnectionConfig, error) {
 	result := &trackingplanClient.ConnectionConfig{}
 
-	if trackConfig := mapStateTrackConfigToRemote(config, TrackKey); trackConfig != nil {
-		result.Track = trackConfig
+	if config.Track != nil {
+		if trackConfig := mapStateTrackConfigToRemote(config.Track); trackConfig != nil {
+			result.Track = trackConfig
+		}
 	}
 
-	if identifyConfig := mapStateEventTypeConfigToRemote(config, IdentifyKey); identifyConfig != nil {
-		result.Identify = identifyConfig
+	if config.Identify != nil {
+		if identifyConfig := mapStateEventTypeConfigToRemote(config.Identify); identifyConfig != nil {
+			result.Identify = identifyConfig
+		}
 	}
 
-	if groupConfig := mapStateEventTypeConfigToRemote(config, GroupKey); groupConfig != nil {
-		result.Group = groupConfig
+	if config.Group != nil {
+		if groupConfig := mapStateEventTypeConfigToRemote(config.Group); groupConfig != nil {
+			result.Group = groupConfig
+		}
 	}
 
-	if pageConfig := mapStateEventTypeConfigToRemote(config, PageKey); pageConfig != nil {
-		result.Page = pageConfig
+	if config.Page != nil {
+		if pageConfig := mapStateEventTypeConfigToRemote(config.Page); pageConfig != nil {
+			result.Page = pageConfig
+		}
 	}
 
-	if screenConfig := mapStateEventTypeConfigToRemote(config, ScreenKey); screenConfig != nil {
-		result.Screen = screenConfig
+	if config.Screen != nil {
+		if screenConfig := mapStateEventTypeConfigToRemote(config.Screen); screenConfig != nil {
+			result.Screen = screenConfig
+		}
 	}
 
 	return result, nil
 }
 
-func mapStateTrackConfigToRemote(config map[string]interface{}, key string) *trackingplanClient.TrackConfig {
-	eventConfig, exists := config[key]
-	if !exists {
-		return nil
-	}
-
-	configMap, ok := eventConfig.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
+func mapStateTrackConfigToRemote(config *TrackConfigResource) *trackingplanClient.TrackConfig {
 	// Get the common EventTypeConfig using the shared function
-	eventTypeConfig := mapStateEventTypeConfigToRemote(config, key)
+	eventTypeConfig := mapStateEventTypeConfigToRemote(config.EventConfigResource)
 	if eventTypeConfig == nil {
 		return nil
 	}
@@ -779,61 +727,43 @@ func mapStateTrackConfigToRemote(config map[string]interface{}, key string) *tra
 		EventTypeConfig: eventTypeConfig,
 	}
 
-	if val, exists := configMap[DropUnplannedEventsKey]; exists {
-		if dropUnplannedEvents, ok := val.(bool); ok {
-			var allowUnplannedEvents trackingplanClient.StringBool
-			if dropUnplannedEvents {
-				allowUnplannedEvents = trackingplanClient.False
-			} else {
-				allowUnplannedEvents = trackingplanClient.True
-			}
-			trackConfig.AllowUnplannedEvents = &allowUnplannedEvents
+	if config.DropUnplannedEvents != nil {
+		var allowUnplannedEvents trackingplanClient.StringBool
+		if *config.DropUnplannedEvents {
+			allowUnplannedEvents = trackingplanClient.False
+		} else {
+			allowUnplannedEvents = trackingplanClient.True
 		}
+		trackConfig.AllowUnplannedEvents = &allowUnplannedEvents
 	}
 
 	return trackConfig
 }
 
-func mapStateEventTypeConfigToRemote(config map[string]interface{}, key string) *trackingplanClient.EventTypeConfig {
-	eventConfig, exists := config[key]
-	if !exists {
-		return nil
-	}
-
-	configMap, ok := eventConfig.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
+func mapStateEventTypeConfigToRemote(config *EventConfigResource) *trackingplanClient.EventTypeConfig {
 	eventTypeConfig := &trackingplanClient.EventTypeConfig{}
 
 	// Only set PropagateValidationErrors if explicitly provided
-	if val, exists := configMap[PropagateViolationsKey]; exists {
-		if propagateViolations, ok := val.(bool); ok {
-			var propagateViolationsStr trackingplanClient.StringBool
-			if propagateViolations {
-				propagateViolationsStr = trackingplanClient.True
-			} else {
-				propagateViolationsStr = trackingplanClient.False
-			}
-			eventTypeConfig.PropagateValidationErrors = &propagateViolationsStr
+	if config.PropagateViolations != nil {
+		var propagateViolationsStr trackingplanClient.StringBool
+		if *config.PropagateViolations {
+			propagateViolationsStr = trackingplanClient.True
+		} else {
+			propagateViolationsStr = trackingplanClient.False
 		}
+		eventTypeConfig.PropagateValidationErrors = &propagateViolationsStr
 	}
 
 	// Only set UnplannedProperties if explicitly provided
-	if val, exists := configMap[DropUnplannedPropertiesKey]; exists {
-		if dropUnplannedProperties, ok := val.(bool); ok {
-			action := dropToAction(dropUnplannedProperties)
-			eventTypeConfig.UnplannedProperties = &action
-		}
+	if config.DropUnplannedProperties != nil {
+		action := dropToAction(*config.DropUnplannedProperties)
+		eventTypeConfig.UnplannedProperties = &action
 	}
 
 	// Only set AnyOtherViolations if explicitly provided
-	if val, exists := configMap[DropOtherViolationsKey]; exists {
-		if dropOtherViolations, ok := val.(bool); ok {
-			action := dropToAction(dropOtherViolations)
-			eventTypeConfig.AnyOtherViolation = &action
-		}
+	if config.DropOtherViolations != nil {
+		action := dropToAction(*config.DropOtherViolations)
+		eventTypeConfig.AnyOtherViolation = &action
 	}
 
 	return eventTypeConfig

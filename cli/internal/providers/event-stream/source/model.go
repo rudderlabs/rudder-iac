@@ -65,11 +65,11 @@ var sourceDefinitions = []string{
 
 // YAML structs
 type sourceSpec struct {
-	LocalId          string                `mapstructure:"id"`
-	Name             string                `mapstructure:"name"`
-	SourceDefinition string                `mapstructure:"type"`
-	Enabled          *bool                 `mapstructure:"enabled"`
-	Governance       *sourceGovernanceSpec `mapstructure:"governance"`
+	LocalId    string                `mapstructure:"id"`
+	Name       string                `mapstructure:"name"`
+	Type       string                `mapstructure:"type"`
+	Enabled    *bool                 `mapstructure:"enabled"`
+	Governance *sourceGovernanceSpec `mapstructure:"governance"`
 }
 
 type sourceGovernanceSpec struct {
@@ -101,12 +101,12 @@ type trackConfigSpec struct {
 }
 
 // Resource structs
-type sourceResource struct {
-	ID               string
-	Name             string
-	SourceDefinition string
-	Enabled          bool
-	Governance       *governanceResource
+type SourceResource struct {
+	ID         string
+	Name       string
+	Type       string
+	Enabled    bool
+	Governance *GovernanceResource
 }
 
 type WorkspaceRemoteIDMapping struct {
@@ -114,16 +114,16 @@ type WorkspaceRemoteIDMapping struct {
 	RemoteId    string
 }
 
-type governanceResource struct {
-	Validations *validationsResource
+type GovernanceResource struct {
+	Validations *ValidationsResource
 }
 
-type validationsResource struct {
+type ValidationsResource struct {
 	TrackingPlanRef *resources.PropertyRef
-	Config          *trackingPlanConfigResource
+	Config          *TrackingPlanConfigResource
 }
 
-type trackingPlanConfigResource struct {
+type TrackingPlanConfigResource struct {
 	Track    *TrackConfigResource
 	Identify *EventConfigResource
 	Group    *EventConfigResource

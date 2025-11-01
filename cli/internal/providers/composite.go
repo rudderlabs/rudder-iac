@@ -112,12 +112,28 @@ func (p *CompositeProvider) Create(ctx context.Context, ID string, resourceType 
 	return provider.Create(ctx, ID, resourceType, data)
 }
 
+func (p *CompositeProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (*resources.ResourceData, error) {
+	provider := p.providerForType(resource.Type())
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resource.Type())
+	}
+	return provider.CreateRaw(ctx, resource)
+}
+
 func (p *CompositeProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	provider := p.providerForType(resourceType)
 	if provider == nil {
 		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
 	}
 	return provider.Update(ctx, ID, resourceType, data, state)
+}
+
+func (p *CompositeProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
+	provider := p.providerForType(resource.Type())
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resource.Type())
+	}
+	return provider.UpdateRaw(ctx, resource, state)
 }
 
 func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
@@ -134,6 +150,14 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
 	}
 	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
+}
+
+func (p *CompositeProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (*resources.ResourceData, error) {
+	provider := p.providerForType(resource.Type())
+	if provider == nil {
+		return nil, fmt.Errorf("no provider found for resource type %s", resource.Type())
+	}
+	return provider.ImportRaw(ctx, resource, remoteId)
 }
 
 type compositeProviderTask struct {

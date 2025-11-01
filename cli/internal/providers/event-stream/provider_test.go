@@ -179,13 +179,19 @@ func TestProvider(t *testing.T) {
 			provider := eventstream.New(source.NewMockSourceClient())
 			ctx := context.Background()
 
-			createData := resources.ResourceData{
-				"name":    "Test Source",
-				"enabled": true,
-				"type":    "javascript",
-			}
+			createData := resources.NewResource(
+				"test-source",
+				source.ResourceType,
+				resources.ResourceData{},
+				nil,
+				resources.WithRawData(&source.SourceResource{
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "javascript",
+				}),
+			)
 
-			result, err := provider.Create(ctx, "test-source", source.ResourceType, createData)
+			result, err := provider.CreateRaw(ctx, createData)
 			require.NoError(t, err)
 			require.Equal(t, &resources.ResourceData{
 				"id": "",
@@ -196,16 +202,24 @@ func TestProvider(t *testing.T) {
 			provider := eventstream.New(source.NewMockSourceClient())
 			ctx := context.Background()
 
-			updateData := resources.ResourceData{
-				"name":    "Updated Source",
-				"enabled": false,
-			}
+			updateData := resources.NewResource(
+				"test-source",
+				source.ResourceType,
+				resources.ResourceData{},
+				nil,
+				resources.WithRawData(&source.SourceResource{
+					Name:    "Updated Source",
+					Enabled: false,
+					Type:    "javascript",
+				}),
+			)
 
 			stateData := resources.ResourceData{
-				"id": "test-source-id",
+				"id":   "test-source-id",
+				"type": "javascript",
 			}
 
-			result, err := provider.Update(ctx, "test-source", source.ResourceType, updateData, stateData)
+			result, err := provider.UpdateRaw(ctx, updateData, stateData)
 			require.NoError(t, err)
 			assert.Equal(t, &resources.ResourceData{
 				"id": "test-source-id",
@@ -239,13 +253,19 @@ func TestProvider(t *testing.T) {
 		provider := eventstream.New(mockClient)
 		ctx := context.Background()
 
-		data := resources.ResourceData{
-			"name":    "Updated Source",
-			"enabled": false,
-			"type":    "javascript",
-		}
+		data := resources.NewResource(
+			"test-source",
+			source.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&source.SourceResource{
+				Name:    "Updated Source",
+				Enabled: false,
+				Type:    "javascript",
+			}),
+		)
 
-		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "workspace-123", "remote-123")
+		result, err := provider.ImportRaw(ctx, data, "remote-123")
 		require.NoError(t, err)
 		assert.Equal(t, &resources.ResourceData{
 			"id": "remote-123",

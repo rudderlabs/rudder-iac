@@ -3,7 +3,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -25,9 +24,12 @@ type SyncProvider interface {
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
+	CreateRaw(ctx context.Context, data *resources.Resource) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
+	UpdateRaw(ctx context.Context, data *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
 	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
+	ImportRaw(ctx context.Context, data *resources.Resource, remoteId string) (*resources.ResourceData, error)
 }
 
 func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
@@ -118,16 +120,6 @@ func StateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func removeStateForResourceTypes(state *state.State, resourceTypes []string) *state.State {
-	// loop over all resources in the state and remove a resource if it matches any of the resource types
-	for _, resource := range state.Resources {
-		if slices.Contains(resourceTypes, resource.Type) {
-			delete(state.Resources, resources.URN(resource.ID, resource.Type))
-		}
-	}
-	return state
-}
-
 type OperationError struct {
 	Operation *planner.Operation
 	Err       error
@@ -202,16 +194,32 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
+	var output *resources.ResourceData
 
-	output, err := s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
-	if err != nil {
-		return err
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.CreateRaw(ctx, r)
+		if err != nil {
+			return err
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
+		if err != nil {
+			return err
+		}
 	}
 
 	sr := &state.ResourceState{
@@ -230,16 +238,32 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 
 func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
+	var output *resources.ResourceData
 
-	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
-	if err != nil {
-		return err
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.ImportRaw(ctx, r, r.ImportMetadata().RemoteId)
+		if err != nil {
+			return err
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
+		if err != nil {
+			return err
+		}
 	}
 
 	sr := &state.ResourceState{
@@ -258,21 +282,35 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 
 func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
-
+	var output *resources.ResourceData
 	sr := st.GetResource(r.URN())
 	if sr == nil {
 		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
-	output, err := s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
-	if err != nil {
-		return err
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.UpdateRaw(ctx, r, sr.Data())
+		if err != nil {
+			return err
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+		output, err = s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
+		if err != nil {
+			return err
+		}
 	}
 
 	sr = &state.ResourceState{

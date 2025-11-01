@@ -147,9 +147,17 @@ func (m *MockProvider) Create(ctx context.Context, ID string, resourceType strin
 	return m.CreateVal, m.CreateErr
 }
 
+func (m *MockProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (*resources.ResourceData, error) {
+	return nil, nil
+}
+
 func (m *MockProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, s resources.ResourceData) (*resources.ResourceData, error) {
 	m.UpdateCalledWithArg = UpdateArgs{ID: ID, ResourceType: resourceType, Data: data, State: s}
 	return m.UpdateVal, m.UpdateErr
+}
+
+func (m *MockProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
+	return nil, nil
 }
 
 func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType string, s resources.ResourceData) error {
@@ -160,6 +168,10 @@ func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType strin
 func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
 	return m.ImportVal, m.ImportErr
+}
+
+func (m *MockProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (*resources.ResourceData, error) {
+	return nil, nil
 }
 
 func (m *MockProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {

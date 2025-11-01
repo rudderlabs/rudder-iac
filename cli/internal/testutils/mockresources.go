@@ -57,6 +57,15 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
+func (p *DataCatalogProvider) CreateRaw(_ context.Context, data *resources.Resource) (*resources.ResourceData, error) {
+	payload := make(resources.ResourceData)
+	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
+
+	p.logOperation("Create", "mock-id", "mock-type", data)
+
+	return &payload, nil
+}
+
 func (p *DataCatalogProvider) Import(_ context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
@@ -65,11 +74,30 @@ func (p *DataCatalogProvider) Import(_ context.Context, ID string, resourceType 
 
 	return &payload, nil
 }
+
+func (p *DataCatalogProvider) ImportRaw(_ context.Context, data *resources.Resource, remoteId string) (*resources.ResourceData, error) {
+	payload := make(resources.ResourceData)
+	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
+
+	p.logOperation("Import", "mock-id", "mock-type", data, remoteId)
+
+	return &payload, nil
+}
+
 func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
 
 	p.logOperation("Update", ID, resourceType, data, state)
+
+	return &payload, nil
+}
+
+func (p *DataCatalogProvider) UpdateRaw(_ context.Context, data *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
+	payload := make(resources.ResourceData)
+	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
+
+	p.logOperation("Update", "mock-id", "mock-type", data, state)
 
 	return &payload, nil
 }

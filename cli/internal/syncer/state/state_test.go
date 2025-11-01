@@ -135,6 +135,151 @@ func TestDereference(t *testing.T) {
 	}
 }
 
+func TestDereferenceByReflection(t *testing.T) {
+	// Setup test state
+	state := s.EmptyState()
+
+	// Add some resources to the state
+	state.AddResource(&s.ResourceState{
+		ID:   "source1",
+		Type: "source",
+		Output: map[string]interface{}{
+			"name": "test source",
+			"id":   "src1",
+		},
+	})
+
+	state.AddResource(&s.ResourceState{
+		ID:   "dest1",
+		Type: "destination",
+		Output: map[string]interface{}{
+			"name":     "test destination",
+			"sourceId": "src1",
+		},
+	})
+
+	type ExampleStruct struct {
+		Name      string
+		Enabled   bool
+		Connected *resources.PropertyRef // Changed to pointer
+	}
+
+	input := ExampleStruct{
+		Name:    "example",
+		Enabled: true,
+		Connected: &resources.PropertyRef{ // Changed to pointer
+			URN:      resources.URN("dest1", "destination"),
+			Property: "name",
+		},
+	}
+
+	expected := ExampleStruct{
+		Name:    "example",
+		Enabled: true,
+		Connected: &resources.PropertyRef{ // Changed to pointer
+			URN:      resources.URN("dest1", "destination"),
+			Property: "name",
+			Resolved: &resources.ResolvedValue{
+				Value: "test destination",
+			},
+		},
+	}
+
+	err := s.DereferenceByReflection(&input, state) // Pass pointer and check error
+	assert.Nil(t, err)
+	assert.Equal(t, expected, input) // Compare input after modification
+}
+
+func TestDereferenceByReflectionNested(t *testing.T) {
+	// Setup test state
+	state := s.EmptyState()
+
+	state.AddResource(&s.ResourceState{
+		ID:   "source1",
+		Type: "source",
+		Output: map[string]interface{}{
+			"name": "test source",
+			"id":   "src1",
+		},
+	})
+
+	state.AddResource(&s.ResourceState{
+		ID:   "dest1",
+		Type: "destination",
+		Output: map[string]interface{}{
+			"name":     "test destination",
+			"sourceId": "src1",
+		},
+	})
+
+	type NestedStruct struct {
+		DestinationRef *resources.PropertyRef
+		Tags           []string
+	}
+
+	type ComplexStruct struct {
+		Name       string
+		SourceRef  *resources.PropertyRef
+		Nested     NestedStruct
+		NestedPtr  *NestedStruct
+		RefSlice   []*resources.PropertyRef
+		StringMap  map[string]*resources.PropertyRef
+	}
+
+	input := ComplexStruct{
+		Name: "complex example",
+		SourceRef: &resources.PropertyRef{
+			URN:      resources.URN("source1", "source"),
+			Property: "name",
+		},
+		Nested: NestedStruct{
+			DestinationRef: &resources.PropertyRef{
+				URN:      resources.URN("dest1", "destination"),
+				Property: "name",
+			},
+			Tags: []string{"tag1", "tag2"},
+		},
+		NestedPtr: &NestedStruct{
+			DestinationRef: &resources.PropertyRef{
+				URN:      resources.URN("dest1", "destination"),
+				Property: "sourceId",
+			},
+			Tags: []string{"tag3"},
+		},
+		RefSlice: []*resources.PropertyRef{
+			{
+				URN:      resources.URN("source1", "source"),
+				Property: "id",
+			},
+		},
+		StringMap: map[string]*resources.PropertyRef{
+			"key1": {
+				URN:      resources.URN("dest1", "destination"),
+				Property: "name",
+			},
+		},
+	}
+
+	err := s.DereferenceByReflection(&input, state)
+	assert.Nil(t, err)
+
+	// Verify all PropertyRefs have been resolved
+	assert.NotNil(t, input.SourceRef.Resolved)
+	assert.Equal(t, "test source", input.SourceRef.Resolved.Value)
+
+	assert.NotNil(t, input.Nested.DestinationRef.Resolved)
+	assert.Equal(t, "test destination", input.Nested.DestinationRef.Resolved.Value)
+
+	assert.NotNil(t, input.NestedPtr.DestinationRef.Resolved)
+	assert.Equal(t, "src1", input.NestedPtr.DestinationRef.Resolved.Value)
+
+	assert.NotNil(t, input.RefSlice[0].Resolved)
+	assert.Equal(t, "src1", input.RefSlice[0].Resolved.Value)
+
+	assert.NotNil(t, input.StringMap["key1"].Resolved)
+	assert.Equal(t, "test destination", input.StringMap["key1"].Resolved.Value)
+}
+
 func TestMerge(t *testing.T) {
 	state1 := s.EmptyState()
 	state1.Version = "1.0.0"

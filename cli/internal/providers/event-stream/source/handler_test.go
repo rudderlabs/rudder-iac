@@ -146,7 +146,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"enabled": true,
 					},
 				},
-				errorMessage: "event stream source with id test-source already exists",
+				errorMessage: "a resource of type 'event-stream-source' with id 'test-source' already exists",
 			},
 			{
 				name: "with invalid tracking plan ref format",
@@ -491,41 +491,49 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		// Assert test-source-1
 		source1, exists := resourceMap["test-source-1"]
 		require.True(t, exists, "test-source-1 should exist in resources")
-		assert.Equal(t, resources.ResourceData{
-			"name":    "Test Source 1",
-			"enabled": true,
-			"type":    "javascript",
-		}, source1.Data())
+		assert.Equal(t, &source.SourceResource{
+			ID:      "test-source-1",
+			Name:    "Test Source 1",
+			Enabled: true,
+			Type:    "javascript",
+		}, source1.RawData())
 		assert.Equal(t, "workspace-123", source1.ImportMetadata().WorkspaceId)
 		assert.Equal(t, "test-source-1-123", source1.ImportMetadata().RemoteId)
 
 		// Assert test-source-2
 		source2, exists := resourceMap["test-source-2"]
 		require.True(t, exists, "test-source-2 should exist in resources")
-		assert.Equal(t, resources.ResourceData{
-			"name":    "Test Source 2",
-			"enabled": false,
-			"type":    "python",
-			"tracking_plan": &resources.PropertyRef{
-				URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
-				Property: "id",
+		assert.Equal(t, &source.SourceResource{
+			ID:      "test-source-2",
+			Name:    "Test Source 2",
+			Enabled: false,
+			Type:    "python",
+			Governance: &source.GovernanceResource{
+				Validations: &source.ValidationsResource{
+					TrackingPlanRef: &resources.PropertyRef{
+						URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
+						Property: "id",
+					},
+					Config: &source.TrackingPlanConfigResource{
+						Track: &source.TrackConfigResource{
+							EventConfigResource: &source.EventConfigResource{
+								PropagateViolations:     boolPtr(true),
+								DropUnplannedProperties: boolPtr(false),
+								DropOtherViolations:     boolPtr(true),
+							},
+							DropUnplannedEvents: boolPtr(false),
+						},
+						Identify: &source.EventConfigResource{
+							PropagateViolations: boolPtr(false),
+							DropOtherViolations: boolPtr(false),
+						},
+						Group: &source.EventConfigResource{
+							DropUnplannedProperties: boolPtr(true),
+						},
+					},
+				},
 			},
-			"tracking_plan_config": map[string]interface{}{
-				"track": map[string]interface{}{
-					"propagate_violations":      true,
-					"drop_unplanned_events":     false,
-					"drop_unplanned_properties": false,
-					"drop_other_violations":     true,
-				},
-				"identify": map[string]interface{}{
-					"propagate_violations":  false,
-					"drop_other_violations": false,
-				},
-				"group": map[string]interface{}{
-					"drop_unplanned_properties": true,
-				},
-			},
-		}, source2.Data())
+		}, source2.RawData())
 		assert.Nil(t, source2.ImportMetadata())
 	})
 
@@ -533,36 +541,48 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
 			name                 string
-			data                 resources.ResourceData
+			data                 *source.SourceResource
 			expectedLinkTPCalled bool
 		}{
 			{
 				name: "without tracking plan",
-				data: resources.ResourceData{
-					"name":    "Test Source",
-					"enabled": true,
-					"type":    "javascript",
+				data: &source.SourceResource{
+					ID:      "test-source",
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "javascript",
 				},
 				expectedLinkTPCalled: false,
 			},
 			{
 				name: "with tracking plan",
-				data: resources.ResourceData{
-					"name":          "Test Source",
-					"enabled":       true,
-					"type":          "javascript",
-					"tracking_plan": "tp-123",
-					"tracking_plan_config": map[string]interface{}{
-						"track": &source.TrackConfigResource{
-							EventConfigResource: &source.EventConfigResource{
-								PropagateViolations: boolPtr(true),
-								DropOtherViolations: boolPtr(false),
+				data: &source.SourceResource{
+					ID:      "test-source",
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
+								Property: "id",
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-123",
+								},
 							},
-							DropUnplannedEvents: boolPtr(true),
-						},
-						"page": &source.EventConfigResource{
-							PropagateViolations: boolPtr(false),
-							DropOtherViolations: boolPtr(true),
+							Config: &source.TrackingPlanConfigResource{
+								Track: &source.TrackConfigResource{
+									EventConfigResource: &source.EventConfigResource{
+										PropagateViolations: boolPtr(true),
+										DropOtherViolations: boolPtr(false),
+									},
+									DropUnplannedEvents: boolPtr(true),
+								},
+								Page: &source.EventConfigResource{
+									PropagateViolations: boolPtr(false),
+									DropOtherViolations: boolPtr(true),
+								},
+							},
 						},
 					},
 				},
@@ -575,7 +595,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
-				result, err := handler.Create(context.Background(), "test-source", tc.data)
+				result, err := handler.Create(context.Background(), tc.data)
 
 				assert.NoError(t, err)
 				assert.True(t, mockClient.CreateCalled())
@@ -596,8 +616,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 	t.Run("Update", func(t *testing.T) {
 		t.Parallel()
-		tpConfig := map[string]interface{}{
-			"track": &source.TrackConfigResource{
+		tpConfig := &source.TrackingPlanConfigResource{
+			Track: &source.TrackConfigResource{
 				EventConfigResource: &source.EventConfigResource{
 					PropagateViolations: boolPtr(true),
 					DropOtherViolations: boolPtr(false),
@@ -606,7 +626,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		testCases := []struct {
 			name                   string
-			data                   resources.ResourceData
+			data                   *source.SourceResource
 			state                  resources.ResourceData
 			expectedUpdateCalled   bool
 			expectedLinkTPCalled   bool
@@ -618,8 +638,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}{
 			{
 				name: "Source definition cannot be changed",
-				data: resources.ResourceData{
-					"type": "python",
+				data: &source.SourceResource{
+					Type: "python",
 				},
 				state: resources.ResourceData{
 					"id":      "remote123",
@@ -636,10 +656,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "without tracking plan",
-				data: resources.ResourceData{
-					"name":    "Updated Source",
-					"enabled": false,
-					"type":    "javascript",
+				data: &source.SourceResource{
+					Name: "Updated Source",
+					Type: "javascript",
 				},
 				state: resources.ResourceData{
 					"id":      "remote123",
@@ -658,12 +677,22 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "no tracking plan changes",
-				data: resources.ResourceData{
-					"name":                 "Updated Source",
-					"enabled":              false,
-					"type":                 "javascript",
-					"tracking_plan":        "tp-123",
-					"tracking_plan_config": tpConfig,
+				data: &source.SourceResource{
+					Name:    "Updated Source",
+					Enabled: false,
+					Type:    "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
+								Property: "id",
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-123",
+								},
+							},
+							Config: tpConfig,
+						},
+					},
 				},
 				state: resources.ResourceData{
 					"id":                   "remote123",
@@ -685,16 +714,26 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "same tracking plan with different config",
-				data: resources.ResourceData{
-					"name":          "Original Source",
-					"enabled":       true,
-					"type":          "javascript",
-					"tracking_plan": "tp-123",
-					"tracking_plan_config": map[string]interface{}{
-						"track": &source.TrackConfigResource{
-							EventConfigResource: &source.EventConfigResource{
-								PropagateViolations: boolPtr(false),
-								DropOtherViolations: boolPtr(false),
+				data: &source.SourceResource{
+					Name:    "Original Source",
+					Enabled: true,
+					Type:    "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
+								Property: "id",
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-123",
+								},
+							},
+							Config: &source.TrackingPlanConfigResource{
+								Track: &source.TrackConfigResource{
+									EventConfigResource: &source.EventConfigResource{
+										PropagateViolations: boolPtr(false),
+										DropOtherViolations: boolPtr(false),
+									},
+								},
 							},
 						},
 					},
@@ -719,12 +758,22 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "change tracking plan",
-				data: resources.ResourceData{
-					"name":                 "Original Source",
-					"enabled":              true,
-					"type":                 "javascript",
-					"tracking_plan":        "tp-456",
-					"tracking_plan_config": tpConfig,
+				data: &source.SourceResource{
+					Name:    "Original Source",
+					Enabled: true,
+					Type:    "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								URN:      resources.URN("tp-456", dcstate.TrackingPlanResourceType),
+								Property: "id",
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-456",
+								},
+							},
+							Config: tpConfig,
+						},
+					},
 				},
 				state: resources.ResourceData{
 					"id":                   "remote123",
@@ -746,12 +795,19 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "link tracking plan",
-				data: resources.ResourceData{
-					"name":                 "Updated Source",
-					"enabled":              false,
-					"type":                 "javascript",
-					"tracking_plan":        "tp-123",
-					"tracking_plan_config": tpConfig,
+				data: &source.SourceResource{
+					Name: "Updated Source",
+					Type: "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-123",
+								},
+							},
+							Config: tpConfig,
+						},
+					},
 				},
 				state: resources.ResourceData{
 					"id":      "remote123",
@@ -771,10 +827,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			},
 			{
 				name: "unlink tracking plan",
-				data: resources.ResourceData{
-					"name":    "Updated Source",
-					"enabled": false,
-					"type":    "javascript",
+				data: &source.SourceResource{
+					Name: "Updated Source",
+					Type: "javascript",
 				},
 				state: resources.ResourceData{
 					"id":                   "remote123",
@@ -800,7 +855,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
-				result, err := handler.Update(context.Background(), "test-source", tc.data, tc.state)
+				result, err := handler.Update(context.Background(), tc.data, tc.state)
 
 				if tc.expectedError {
 					assert.Error(t, err)
@@ -823,7 +878,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			name                        string
 			id                          string
 			remoteId                    string
-			data                        resources.ResourceData
+			data                        *source.SourceResource
 			existingSources             []sourceClient.EventStreamSource
 			expectedUpdateCalled        bool
 			expectedSetExternalIDCalled bool
@@ -835,10 +890,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				name:     "source not found",
 				id:       "test-source",
 				remoteId: "remote-not-found",
-				data: resources.ResourceData{
-					"name":    "Test Source",
-					"enabled": true,
-					"type":    "javascript",
+				data: &source.SourceResource{
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "javascript",
 				},
 				existingSources: []sourceClient.EventStreamSource{
 					{
@@ -858,10 +913,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				name:     "import source without tracking plan",
 				id:       "test-source",
 				remoteId: "remote123",
-				data: resources.ResourceData{
-					"name":    "Updated Source",
-					"enabled": false,
-					"type":    "javascript",
+				data: &source.SourceResource{
+					Name:    "Updated Source",
+					Enabled: false,
+					Type:    "javascript",
 				},
 				existingSources: []sourceClient.EventStreamSource{
 					{
@@ -883,15 +938,25 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				name:     "import source with tracking plan",
 				id:       "test-source",
 				remoteId: "remote456",
-				data: resources.ResourceData{
-					"name":          "Test Source",
-					"enabled":       true,
-					"type":          "python",
-					"tracking_plan": "tp-456",
-					"tracking_plan_config": map[string]interface{}{
-						"track": map[string]interface{}{
-							"propagate_violations":  true,
-							"drop_unplanned_events": false,
+				data: &source.SourceResource{
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "python",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-456",
+								},
+							},
+							Config: &source.TrackingPlanConfigResource{
+								Track: &source.TrackConfigResource{
+									EventConfigResource: &source.EventConfigResource{
+										PropagateViolations: boolPtr(true),
+									},
+									DropUnplannedEvents: boolPtr(false),
+								},
+							},
 						},
 					},
 				},
@@ -927,14 +992,24 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				name:     "import source and add tracking plan",
 				id:       "test-source",
 				remoteId: "remote789",
-				data: resources.ResourceData{
-					"name":          "Test Source",
-					"enabled":       true,
-					"type":          "javascript",
-					"tracking_plan": "tp-999",
-					"tracking_plan_config": map[string]interface{}{
-						"track": map[string]interface{}{
-							"propagate_violations": true,
+				data: &source.SourceResource{
+					Name:    "Test Source",
+					Enabled: true,
+					Type:    "javascript",
+					Governance: &source.GovernanceResource{
+						Validations: &source.ValidationsResource{
+							TrackingPlanRef: &resources.PropertyRef{
+								Resolved: &resources.ResolvedValue{
+									Value: "tp-999",
+								},
+							},
+							Config: &source.TrackingPlanConfigResource{
+								Track: &source.TrackConfigResource{
+									EventConfigResource: &source.EventConfigResource{
+										PropagateViolations: boolPtr(true),
+									},
+								},
+							},
 						},
 					},
 				},
@@ -965,7 +1040,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				})
 				handler := source.NewHandler(mockClient, importDir)
 
-				result, err := handler.Import(context.Background(), tc.id, tc.data, tc.remoteId)
+				result, err := handler.Import(context.Background(), tc.data, tc.remoteId)
 
 				if tc.expectedError {
 					assert.Error(t, err)
@@ -1188,9 +1263,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						URN:      resources.URN("external-tp-789", dcstate.TrackingPlanResourceType),
 						Property: "id",
 					},
-					"tracking_plan_config": map[string]interface{}{
-						"track": map[string]interface{}{
-							"drop_unplanned_events": true,
+					"tracking_plan_config": &sourceClient.TrackingPlanConfig{
+						Track: &sourceClient.TrackConfig{
+							DropUnplannedEvents: boolPtr(true),
 						},
 					},
 				},

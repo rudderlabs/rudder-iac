@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
@@ -12,47 +13,52 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
+var errNotImplemented = fmt.Errorf("not implemented")
+
 type ImportResourceInfo struct {
 	WorkspaceId string
 	RemoteId    string
 }
 
-type BaseHandler[S any, R any] struct {
+type BaseHandler[Spec any, Res any] struct {
 	ResourceType   string
-	resources      map[string]*R
+	resources      map[string]*Res
 	importMetadata map[string]*ImportResourceInfo
-	Impl           HandlerImpl[S, R]
+	Impl           HandlerImpl[Spec, Res]
 }
 
-func NewHandler[S any, R any](resourceType string, impl HandlerImpl[S, R]) *BaseHandler[S, R] {
-	return &BaseHandler[S, R]{
+func NewHandler[Spec any, Res any](resourceType string, impl HandlerImpl[Spec, Res]) *BaseHandler[Spec, Res] {
+	return &BaseHandler[Spec, Res]{
 		ResourceType:   resourceType,
-		resources:      make(map[string]*R),
+		resources:      make(map[string]*Res),
 		importMetadata: make(map[string]*ImportResourceInfo),
 		Impl:           impl,
 	}
 }
 
-type HandlerImpl[S any, R any] interface {
-	NewSpec() *S
-	ValidateSpec(spec *S) error
+type HandlerImpl[Spec any, Res any] interface {
+	NewSpec() *Spec
+	ValidateSpec(spec *Spec) error
 	// NOTE: path should be part of the spec
-	ExtractResourcesFromSpec(path string, spec *S) (map[string]*R, error)
+	ExtractResourcesFromSpec(path string, spec *Spec) (map[string]*Res, error)
 
-	ValidateResource(resource *R, graph *resources.Graph) error
+	ValidateResource(resource *Res, graph *resources.Graph) error
 
-	EncodeResource(resource *R) resources.ResourceData
+	Create(ctx context.Context, data *Res) (*resources.ResourceData, error)
+	Update(ctx context.Context, data *Res, state resources.ResourceData) (*resources.ResourceData, error)
+	Import(ctx context.Context, data *Res, remoteId string) (*resources.ResourceData, error)
+	Delete(ctx context.Context, id string, state resources.ResourceData) error
 }
 
-func (h *BaseHandler[S, R]) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+func (h *BaseHandler[Spec, Res]) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
 	return nil, nil
 }
 
-func (h *BaseHandler[S, R]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (h *BaseHandler[Spec, Res]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	return nil, nil
 }
 
-func (h *BaseHandler[S, R]) FormatForExport(
+func (h *BaseHandler[Spec, Res]) FormatForExport(
 	ctx context.Context,
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
@@ -61,7 +67,7 @@ func (h *BaseHandler[S, R]) FormatForExport(
 	return nil, nil
 }
 
-func (h *BaseHandler[S, R]) loadImportMetadata(fileMetadata map[string]interface{}) error {
+func (h *BaseHandler[Spec, Res]) loadImportMetadata(fileMetadata map[string]interface{}) error {
 	metadata := importremote.Metadata{}
 	err := mapstructure.Decode(fileMetadata, &metadata)
 	if err != nil {
@@ -81,7 +87,7 @@ func (h *BaseHandler[S, R]) loadImportMetadata(fileMetadata map[string]interface
 	return nil
 }
 
-func (h *BaseHandler[S, R]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+func (h *BaseHandler[Spec, Res]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	id, ok := s.Spec["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("id not found in event stream source spec")
@@ -89,7 +95,7 @@ func (h *BaseHandler[S, R]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpe
 	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
 }
 
-func (h *BaseHandler[S, R]) LoadSpec(path string, s *specs.Spec) error {
+func (h *BaseHandler[Spec, Res]) LoadSpec(path string, s *specs.Spec) error {
 	spec := h.Impl.NewSpec()
 
 	// Convert spec map to struct using mapstructure
@@ -107,7 +113,7 @@ func (h *BaseHandler[S, R]) LoadSpec(path string, s *specs.Spec) error {
 	}
 	for id, r := range rs {
 		if _, ok := h.resources[id]; ok {
-			return fmt.Errorf("resource with id %s already exists", id)
+			return fmt.Errorf("a resource of type '%s' with id '%s' already exists", h.ResourceType, id)
 		}
 		h.resources[id] = r
 	}
@@ -115,7 +121,7 @@ func (h *BaseHandler[S, R]) LoadSpec(path string, s *specs.Spec) error {
 	return h.loadImportMetadata(s.Metadata)
 }
 
-func (h *BaseHandler[S, R]) Validate(graph *resources.Graph) error {
+func (h *BaseHandler[Spec, Res]) Validate(graph *resources.Graph) error {
 	for _, source := range h.resources {
 		if err := h.Impl.ValidateResource(source, graph); err != nil {
 			return fmt.Errorf("validating event stream source spec: %w", err)
@@ -124,21 +130,19 @@ func (h *BaseHandler[S, R]) Validate(graph *resources.Graph) error {
 	return nil
 }
 
-func (h *BaseHandler[S, R]) GetResources() ([]*resources.Resource, error) {
+func (h *BaseHandler[Spec, Res]) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for resourceId, s := range h.resources {
-		data := h.Impl.EncodeResource(s)
-
-		opts := []resources.ResourceOpts{}
+		opts := []resources.ResourceOpts{
+			resources.WithRawData(s),
+		}
 		if importMetadata, ok := h.importMetadata[resourceId]; ok {
-			opts = []resources.ResourceOpts{
-				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
-			}
+			opts = append(opts, resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId))
 		}
 		r := resources.NewResource(
 			resourceId,
 			h.ResourceType,
-			data,
+			resources.ResourceData{}, // deprecated, will be removed
 			[]string{},
 			opts...,
 		)
@@ -156,3 +160,31 @@ func (h *BaseHandler[S, R]) GetResources() ([]*resources.Resource, error) {
 // 		externalID,
 // 	)
 // }
+
+func (h *BaseHandler[Spec, Res]) Create(ctx context.Context, rawData any) (*resources.ResourceData, error) {
+	raw, ok := rawData.(*Res)
+	if !ok {
+		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+	}
+	return h.Impl.Create(ctx, raw)
+}
+
+func (h *BaseHandler[Spec, Res]) Update(ctx context.Context, rawData any, state resources.ResourceData) (*resources.ResourceData, error) {
+	raw, ok := rawData.(*Res)
+	if !ok {
+		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+	}
+	return h.Impl.Update(ctx, raw, state)
+}
+
+func (h *BaseHandler[Spec, Res]) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
+	return h.Impl.Delete(ctx, ID, state)
+}
+
+func (h *BaseHandler[Spec, Res]) Import(ctx context.Context, rawData any, remoteId string) (*resources.ResourceData, error) {
+	raw, ok := rawData.(*Res)
+	if !ok {
+		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+	}
+	return h.Impl.Import(ctx, raw, remoteId)
+}

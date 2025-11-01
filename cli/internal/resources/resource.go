@@ -35,6 +35,12 @@ func WithResourceImportMetadata(remoteId, workspaceId string) ResourceOpts {
 	}
 }
 
+func WithRawData(rawData any) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.RawData = rawData
+	}
+}
+
 func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ResourceOpts) *Resource {
 	r := &internal.Resource{
 		URN:          URN(id, resourceType),
@@ -62,6 +68,10 @@ func (r *Resource) Type() string {
 
 func (r *Resource) Data() ResourceData {
 	return r.r.Data
+}
+
+func (r *Resource) RawData() any {
+	return r.r.RawData
 }
 
 func (r *Resource) URN() string {
