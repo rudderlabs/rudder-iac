@@ -102,12 +102,11 @@ type trackConfigSpec struct {
 
 // Resource structs
 type sourceResource struct {
-	LocalId          string
+	ID               string
 	Name             string
 	SourceDefinition string
 	Enabled          bool
 	Governance       *governanceResource
-	ImportMetadata   map[string]*WorkspaceRemoteIDMapping
 }
 
 type WorkspaceRemoteIDMapping struct {

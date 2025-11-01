@@ -15,61 +15,61 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	"github.com/samber/lo"
 )
 
 type Handler struct {
-	resources map[string]*sourceResource
+	*provider.BaseHandler[sourceSpec, sourceResource]
 	client    esClient.EventStreamStore
 	importDir string
 }
 
 func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
-	return &Handler{resources: make(map[string]*sourceResource), client: client, importDir: filepath.Join(importDir, ImportPath)}
+	return &Handler{
+		client:      client,
+		importDir:   filepath.Join(importDir, ImportPath),
+		BaseHandler: provider.NewHandler(ResourceType, &handlerImpl{client: client}),
+	}
 }
 
-func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	id, ok := s.Spec["id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("id not found in event stream source spec")
-	}
-	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+type handlerImpl struct {
+	client esClient.EventStreamStore
 }
 
-func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
-	spec := &sourceSpec{}
-	if err := mapstructure.Decode(s.Spec, spec); err != nil {
-		return fmt.Errorf("decoding spec: %w", err)
-	}
-	if _, exists := h.resources[spec.LocalId]; exists {
-		return fmt.Errorf("event stream source with id %s already exists", spec.LocalId)
-	}
-	// Default enabled to true when not specified in the spec
+func (h *handlerImpl) NewSpec() *sourceSpec {
+	return &sourceSpec{}
+}
+
+func (h *handlerImpl) ValidateSpec(spec *sourceSpec) error {
+	return nil
+}
+
+func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *sourceSpec) (map[string]*sourceResource, error) {
 	enabled := true
 	if spec.Enabled != nil {
 		enabled = *spec.Enabled
 	}
-	sourceResource := &sourceResource{
-		LocalId:          spec.LocalId,
+	sr := &sourceResource{
+		ID:               spec.LocalId,
 		Name:             spec.Name,
 		SourceDefinition: spec.SourceDefinition,
 		Enabled:          enabled,
 		Governance:       &governanceResource{},
-		ImportMetadata:   make(map[string]*WorkspaceRemoteIDMapping),
 	}
-	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
-		return err
+	if err := h.loadTrackingPlanSpec(spec, sr); err != nil {
+		return nil, err
 	}
-	sourceResource.addImportMetadata(s)
-	h.resources[spec.LocalId] = sourceResource
-	return nil
+
+	return map[string]*sourceResource{
+		sr.ID: sr,
+	}, nil
 }
 
-func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
+func (h *handlerImpl) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
 	}
@@ -129,8 +129,8 @@ func buildEventConfigFromSpec(specConfig *eventConfigSpec) *EventConfigResource 
 	}
 }
 
-func validateSource(source *sourceResource, graph *resources.Graph) error {
-	if source.LocalId == "" {
+func (h *handlerImpl) ValidateResource(source *sourceResource, graph *resources.Graph) error {
+	if source.ID == "" {
 		return fmt.Errorf("id is required")
 	}
 	if source.Name == "" {
@@ -160,45 +160,18 @@ func validateSource(source *sourceResource, graph *resources.Graph) error {
 	return nil
 }
 
-func (h *Handler) Validate(graph *resources.Graph) error {
-	for _, source := range h.resources {
-		if err := validateSource(source, graph); err != nil {
-			return fmt.Errorf("validating event stream source spec: %w", err)
-		}
+func (h *handlerImpl) EncodeResource(s *sourceResource) resources.ResourceData {
+	data := resources.ResourceData{
+		NameKey:             s.Name,
+		EnabledKey:          s.Enabled,
+		SourceDefinitionKey: s.SourceDefinition,
 	}
-	return nil
-}
+	if s.Governance.Validations != nil {
+		data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
+		data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
+	}
 
-func (h *Handler) GetResources() ([]*resources.Resource, error) {
-	result := make([]*resources.Resource, 0, len(h.resources))
-	for _, s := range h.resources {
-		data := resources.ResourceData{
-			NameKey:             s.Name,
-			EnabledKey:          s.Enabled,
-			SourceDefinitionKey: s.SourceDefinition,
-		}
-		if s.Governance.Validations != nil {
-			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
-			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
-		}
-		opts := []resources.ResourceOpts{
-			resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)),
-		}
-		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
-			opts = []resources.ResourceOpts{
-				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
-			}
-		}
-		r := resources.NewResource(
-			s.LocalId,
-			ResourceType,
-			data,
-			[]string{},
-			opts...,
-		)
-		result = append(result, r)
-	}
-	return result, nil
+	return data
 }
 
 func buildTrackingPlanConfigState(config *trackingPlanConfigResource) map[string]interface{} {
@@ -535,7 +508,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
-			Reference:  getFileMetadata(externalID),
+			Reference:  fmt.Sprintf("#/%s/%s/%s", ResourceKind, MetadataName, externalID),
 			Data:       &source,
 		}
 		resourceMap[source.ID] = remoteResource
@@ -639,22 +612,22 @@ func (p *Handler) toImportSpec(
 	}, nil
 }
 
-func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
-	metadata := importremote.Metadata{}
-	err := mapstructure.Decode(s.Metadata, &metadata)
-	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
-	}
-	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
-		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
-			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
-				WorkspaceId: workspace.WorkspaceID,
-				RemoteId:    resource.RemoteID,
-			}
-		})
-	})
-	return nil
-}
+// func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
+// 	metadata := importremote.Metadata{}
+// 	err := mapstructure.Decode(s.Metadata, &metadata)
+// 	if err != nil {
+// 		return fmt.Errorf("decoding import metadata: %w", err)
+// 	}
+// 	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
+// 		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+// 			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+// 				WorkspaceId: workspace.WorkspaceID,
+// 				RemoteId:    resource.RemoteID,
+// 			}
+// 		})
+// 	})
+// 	return nil
+// }
 
 func toTrackingPlanConfigImportSpec(config *sourceClient.TrackingPlanConfig) map[string]any {
 	result := make(map[string]any)
@@ -924,12 +897,4 @@ func dropToAction(drop bool) trackingplanClient.Action {
 		return trackingplanClient.Drop
 	}
 	return trackingplanClient.Forward
-}
-
-func getFileMetadata(externalID string) string {
-	return fmt.Sprintf("#/%s/%s/%s",
-		ResourceKind,
-		MetadataName,
-		externalID,
-	)
 }
