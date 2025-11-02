@@ -177,11 +177,10 @@ func TestDereferenceByReflection(t *testing.T) {
 		Name:    "example",
 		Enabled: true,
 		Connected: &resources.PropertyRef{ // Changed to pointer
-			URN:      resources.URN("dest1", "destination"),
-			Property: "name",
-			Resolved: &resources.ResolvedValue{
-				Value: "test destination",
-			},
+			URN:        resources.URN("dest1", "destination"),
+			Property:   "name",
+			IsResolved: true,
+			Value:      "test destination",
 		},
 	}
 
@@ -218,12 +217,12 @@ func TestDereferenceByReflectionNested(t *testing.T) {
 	}
 
 	type ComplexStruct struct {
-		Name       string
-		SourceRef  *resources.PropertyRef
-		Nested     NestedStruct
-		NestedPtr  *NestedStruct
-		RefSlice   []*resources.PropertyRef
-		StringMap  map[string]*resources.PropertyRef
+		Name      string
+		SourceRef *resources.PropertyRef
+		Nested    NestedStruct
+		NestedPtr *NestedStruct
+		RefSlice  []*resources.PropertyRef
+		StringMap map[string]*resources.PropertyRef
 	}
 
 	input := ComplexStruct{
@@ -264,20 +263,20 @@ func TestDereferenceByReflectionNested(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Verify all PropertyRefs have been resolved
-	assert.NotNil(t, input.SourceRef.Resolved)
-	assert.Equal(t, "test source", input.SourceRef.Resolved.Value)
+	assert.True(t, input.SourceRef.IsResolved)
+	assert.Equal(t, "test source", input.SourceRef.Value)
 
-	assert.NotNil(t, input.Nested.DestinationRef.Resolved)
-	assert.Equal(t, "test destination", input.Nested.DestinationRef.Resolved.Value)
+	assert.True(t, input.Nested.DestinationRef.IsResolved)
+	assert.Equal(t, "test destination", input.Nested.DestinationRef.Value)
 
-	assert.NotNil(t, input.NestedPtr.DestinationRef.Resolved)
-	assert.Equal(t, "src1", input.NestedPtr.DestinationRef.Resolved.Value)
+	assert.True(t, input.NestedPtr.DestinationRef.IsResolved)
+	assert.Equal(t, "src1", input.NestedPtr.DestinationRef.Value)
 
-	assert.NotNil(t, input.RefSlice[0].Resolved)
-	assert.Equal(t, "src1", input.RefSlice[0].Resolved.Value)
+	assert.True(t, input.RefSlice[0].IsResolved)
+	assert.Equal(t, "src1", input.RefSlice[0].Value)
 
-	assert.NotNil(t, input.StringMap["key1"].Resolved)
-	assert.Equal(t, "test destination", input.StringMap["key1"].Resolved.Value)
+	assert.True(t, input.StringMap["key1"].IsResolved)
+	assert.Equal(t, "test destination", input.StringMap["key1"].Value)
 }
 
 func TestMerge(t *testing.T) {
@@ -370,4 +369,171 @@ func TestMergeURNAlreadyExists(t *testing.T) {
 	assert.IsType(t, &s.ErrURNAlreadyExists{}, err)
 	assert.Equal(t, err.(*s.ErrURNAlreadyExists).URN, resources.URN("source1", "source"))
 	assert.Equal(t, "URN already exists: source:source1", err.Error())
+}
+
+func TestDereferenceByReflectionWithResolveFunction(t *testing.T) {
+	// Setup test state with typed OutputRaw
+	state := s.EmptyState()
+
+	type SourceStateRemote struct {
+		ID             string
+		TrackingPlanID string
+	}
+
+	// Add resource with typed OutputRaw
+	state.AddResource(&s.ResourceState{
+		ID:   "source1",
+		Type: "event-stream-source",
+		OutputRaw: &SourceStateRemote{
+			ID:             "remote-id-123",
+			TrackingPlanID: "tp-456",
+		},
+	})
+
+	type TestStruct struct {
+		Name          string
+		SourceIDRef   *resources.PropertyRef
+		TrackingPlanRef *resources.PropertyRef
+	}
+
+	// Create PropertyRefs with Resolve functions
+	input := TestStruct{
+		Name: "test",
+		SourceIDRef: &resources.PropertyRef{
+			URN: resources.URN("source1", "event-stream-source"),
+			Resolve: func(outputRaw any) (string, error) {
+				typed, ok := outputRaw.(*SourceStateRemote)
+				if !ok {
+					return "", assert.AnError
+				}
+				return typed.ID, nil
+			},
+		},
+		TrackingPlanRef: &resources.PropertyRef{
+			URN: resources.URN("source1", "event-stream-source"),
+			Resolve: func(outputRaw any) (string, error) {
+				typed, ok := outputRaw.(*SourceStateRemote)
+				if !ok {
+					return "", assert.AnError
+				}
+				return typed.TrackingPlanID, nil
+			},
+		},
+	}
+
+	err := s.DereferenceByReflection(&input, state)
+	assert.Nil(t, err)
+
+	// Verify PropertyRefs were resolved
+	assert.True(t, input.SourceIDRef.IsResolved)
+	assert.Equal(t, "remote-id-123", input.SourceIDRef.Value)
+
+	assert.True(t, input.TrackingPlanRef.IsResolved)
+	assert.Equal(t, "tp-456", input.TrackingPlanRef.Value)
+}
+
+func TestDereferenceByReflectionTypeSafetyError(t *testing.T) {
+	// Setup test state with typed OutputRaw
+	state := s.EmptyState()
+
+	type SourceStateRemote struct {
+		ID string
+	}
+
+	type WrongStateType struct {
+		DifferentField string
+	}
+
+	// Add resource with one type
+	state.AddResource(&s.ResourceState{
+		ID:   "source1",
+		Type: "event-stream-source",
+		OutputRaw: &WrongStateType{
+			DifferentField: "value",
+		},
+	})
+
+	type TestStruct struct {
+		SourceIDRef *resources.PropertyRef
+	}
+
+	// Create PropertyRef expecting different type
+	input := TestStruct{
+		SourceIDRef: &resources.PropertyRef{
+			URN: resources.URN("source1", "event-stream-source"),
+			Resolve: func(outputRaw any) (string, error) {
+				// This type assertion should fail
+				typed, ok := outputRaw.(*SourceStateRemote)
+				if !ok {
+					return "", assert.AnError
+				}
+				return typed.ID, nil
+			},
+		},
+	}
+
+	err := s.DereferenceByReflection(&input, state)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "resolving property ref")
+}
+
+func TestDereferenceByReflectionBackwardCompatibility(t *testing.T) {
+	// Setup test state with both Output (old style) and OutputRaw (new style)
+	state := s.EmptyState()
+
+	type NewStateType struct {
+		RemoteID string
+	}
+
+	// Old-style resource with Output map
+	state.AddResource(&s.ResourceState{
+		ID:   "old-resource",
+		Type: "old-type",
+		Output: map[string]interface{}{
+			"name": "old resource",
+			"id":   "old-123",
+		},
+	})
+
+	// New-style resource with OutputRaw
+	state.AddResource(&s.ResourceState{
+		ID:   "new-resource",
+		Type: "new-type",
+		OutputRaw: &NewStateType{
+			RemoteID: "new-456",
+		},
+	})
+
+	type TestStruct struct {
+		OldRef *resources.PropertyRef
+		NewRef *resources.PropertyRef
+	}
+
+	// Mix of old Property-based ref and new Resolve-based ref
+	input := TestStruct{
+		OldRef: &resources.PropertyRef{
+			URN:      resources.URN("old-resource", "old-type"),
+			Property: "id", // Old style - string property lookup
+		},
+		NewRef: &resources.PropertyRef{
+			URN: resources.URN("new-resource", "new-type"),
+			Resolve: func(outputRaw any) (string, error) {
+				typed, ok := outputRaw.(*NewStateType)
+				if !ok {
+					return "", assert.AnError
+				}
+				return typed.RemoteID, nil
+			},
+		},
+	}
+
+	err := s.DereferenceByReflection(&input, state)
+	assert.Nil(t, err)
+
+	// Both refs should be resolved
+	assert.True(t, input.OldRef.IsResolved)
+	assert.Equal(t, "old-123", input.OldRef.Value)
+
+	assert.True(t, input.NewRef.IsResolved)
+	assert.Equal(t, "new-456", input.NewRef.Value)
 }

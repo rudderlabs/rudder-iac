@@ -20,15 +20,15 @@ type ImportResourceInfo struct {
 	RemoteId    string
 }
 
-type BaseHandler[Spec any, Res any] struct {
+type BaseHandler[Spec any, Res any, State any] struct {
 	ResourceType   string
 	resources      map[string]*Res
 	importMetadata map[string]*ImportResourceInfo
-	Impl           HandlerImpl[Spec, Res]
+	Impl           HandlerImpl[Spec, Res, State]
 }
 
-func NewHandler[Spec any, Res any](resourceType string, impl HandlerImpl[Spec, Res]) *BaseHandler[Spec, Res] {
-	return &BaseHandler[Spec, Res]{
+func NewHandler[Spec any, Res any, State any](resourceType string, impl HandlerImpl[Spec, Res, State]) *BaseHandler[Spec, Res, State] {
+	return &BaseHandler[Spec, Res, State]{
 		ResourceType:   resourceType,
 		resources:      make(map[string]*Res),
 		importMetadata: make(map[string]*ImportResourceInfo),
@@ -36,7 +36,7 @@ func NewHandler[Spec any, Res any](resourceType string, impl HandlerImpl[Spec, R
 	}
 }
 
-type HandlerImpl[Spec any, Res any] interface {
+type HandlerImpl[Spec any, Res any, State any] interface {
 	NewSpec() *Spec
 	ValidateSpec(spec *Spec) error
 	// NOTE: path should be part of the spec
@@ -44,21 +44,21 @@ type HandlerImpl[Spec any, Res any] interface {
 
 	ValidateResource(resource *Res, graph *resources.Graph) error
 
-	Create(ctx context.Context, data *Res) (*resources.ResourceData, error)
-	Update(ctx context.Context, data *Res, state resources.ResourceData) (*resources.ResourceData, error)
-	Import(ctx context.Context, data *Res, remoteId string) (*resources.ResourceData, error)
-	Delete(ctx context.Context, id string, state resources.ResourceData) error
+	Create(ctx context.Context, data *Res) (*State, error)
+	Update(ctx context.Context, newData *Res, oldData *Res, oldState *State) (*State, error)
+	Import(ctx context.Context, data *Res, remoteId string) (*State, error)
+	Delete(ctx context.Context, id string, oldData *Res, oldState *State) error
 }
 
-func (h *BaseHandler[Spec, Res]) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+func (h *BaseHandler[Spec, Res, State]) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
 	return nil, nil
 }
 
-func (h *BaseHandler[Spec, Res]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (h *BaseHandler[Spec, Res, State]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	return nil, nil
 }
 
-func (h *BaseHandler[Spec, Res]) FormatForExport(
+func (h *BaseHandler[Spec, Res, State]) FormatForExport(
 	ctx context.Context,
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
@@ -67,7 +67,7 @@ func (h *BaseHandler[Spec, Res]) FormatForExport(
 	return nil, nil
 }
 
-func (h *BaseHandler[Spec, Res]) loadImportMetadata(fileMetadata map[string]interface{}) error {
+func (h *BaseHandler[Spec, Res, State]) loadImportMetadata(fileMetadata map[string]interface{}) error {
 	metadata := importremote.Metadata{}
 	err := mapstructure.Decode(fileMetadata, &metadata)
 	if err != nil {
@@ -87,7 +87,7 @@ func (h *BaseHandler[Spec, Res]) loadImportMetadata(fileMetadata map[string]inte
 	return nil
 }
 
-func (h *BaseHandler[Spec, Res]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+func (h *BaseHandler[Spec, Res, State]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	id, ok := s.Spec["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("id not found in event stream source spec")
@@ -95,7 +95,7 @@ func (h *BaseHandler[Spec, Res]) ParseSpec(_ string, s *specs.Spec) (*specs.Pars
 	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
 }
 
-func (h *BaseHandler[Spec, Res]) LoadSpec(path string, s *specs.Spec) error {
+func (h *BaseHandler[Spec, Res, State]) LoadSpec(path string, s *specs.Spec) error {
 	spec := h.Impl.NewSpec()
 
 	// Convert spec map to struct using mapstructure
@@ -121,7 +121,7 @@ func (h *BaseHandler[Spec, Res]) LoadSpec(path string, s *specs.Spec) error {
 	return h.loadImportMetadata(s.Metadata)
 }
 
-func (h *BaseHandler[Spec, Res]) Validate(graph *resources.Graph) error {
+func (h *BaseHandler[Spec, Res, State]) Validate(graph *resources.Graph) error {
 	for _, source := range h.resources {
 		if err := h.Impl.ValidateResource(source, graph); err != nil {
 			return fmt.Errorf("validating event stream source spec: %w", err)
@@ -130,7 +130,7 @@ func (h *BaseHandler[Spec, Res]) Validate(graph *resources.Graph) error {
 	return nil
 }
 
-func (h *BaseHandler[Spec, Res]) GetResources() ([]*resources.Resource, error) {
+func (h *BaseHandler[Spec, Res, State]) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for resourceId, s := range h.resources {
 		opts := []resources.ResourceOpts{
@@ -161,7 +161,7 @@ func (h *BaseHandler[Spec, Res]) GetResources() ([]*resources.Resource, error) {
 // 	)
 // }
 
-func (h *BaseHandler[Spec, Res]) Create(ctx context.Context, rawData any) (*resources.ResourceData, error) {
+func (h *BaseHandler[Spec, Res, State]) Create(ctx context.Context, rawData any) (any, error) {
 	raw, ok := rawData.(*Res)
 	if !ok {
 		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
@@ -169,22 +169,63 @@ func (h *BaseHandler[Spec, Res]) Create(ctx context.Context, rawData any) (*reso
 	return h.Impl.Create(ctx, raw)
 }
 
-func (h *BaseHandler[Spec, Res]) Update(ctx context.Context, rawData any, state resources.ResourceData) (*resources.ResourceData, error) {
-	raw, ok := rawData.(*Res)
+func (h *BaseHandler[Spec, Res, State]) Update(ctx context.Context, newData any, oldData any, oldState any) (any, error) {
+	newRaw, ok := newData.(*Res)
 	if !ok {
-		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(newData), reflect.TypeOf((*Res)(nil)))
 	}
-	return h.Impl.Update(ctx, raw, state)
+
+	oldRaw, ok := oldData.(*Res)
+	if !ok {
+		return nil, fmt.Errorf("invalid old resource data type. Found %v, expected %v", reflect.TypeOf(oldData), reflect.TypeOf((*Res)(nil)))
+	}
+
+	oldRawState, ok := oldState.(*State)
+	if !ok {
+		return nil, fmt.Errorf("invalid old resource state data type. Found %v, expected %v", reflect.TypeOf(oldState), reflect.TypeOf((*State)(nil)))
+	}
+	return h.Impl.Update(ctx, newRaw, oldRaw, oldRawState)
 }
 
-func (h *BaseHandler[Spec, Res]) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
-	return h.Impl.Delete(ctx, ID, state)
+func (h *BaseHandler[Spec, Res, State]) Delete(ctx context.Context, ID string, oldData any, oldState any) error {
+	oldRaw, ok := oldData.(*Res)
+	if !ok {
+		return fmt.Errorf("invalid old resource data type. Found %v, expected %v", reflect.TypeOf(oldData), reflect.TypeOf((*Res)(nil)))
+	}
+
+	oldRawState, ok := oldState.(*State)
+	if !ok {
+		return fmt.Errorf("invalid old resource state data type. Found %v, expected %v", reflect.TypeOf(oldState), reflect.TypeOf((*State)(nil)))
+	}
+	return h.Impl.Delete(ctx, ID, oldRaw, oldRawState)
 }
 
-func (h *BaseHandler[Spec, Res]) Import(ctx context.Context, rawData any, remoteId string) (*resources.ResourceData, error) {
+func (h *BaseHandler[Spec, Res, State]) Import(ctx context.Context, rawData any, remoteId string) (any, error) {
 	raw, ok := rawData.(*Res)
 	if !ok {
 		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
 	}
 	return h.Impl.Import(ctx, raw, remoteId)
+}
+
+func (h *BaseHandler[Spec, Res, State]) CreatePropertyRef(
+	urn string,
+	extractor func(*State) (string, error),
+) *resources.PropertyRef {
+	return &resources.PropertyRef{
+		URN: urn,
+		Resolve: func(outputRaw any) (string, error) {
+			typedState, ok := outputRaw.(*State)
+			if !ok {
+				expectedType := reflect.TypeOf((*State)(nil))
+				actualType := reflect.TypeOf(outputRaw)
+				return "", fmt.Errorf(
+					"invalid state type for %s: expected %v, got %v",
+					urn, expectedType, actualType,
+				)
+			}
+
+			return extractor(typedState)
+		},
+	}
 }

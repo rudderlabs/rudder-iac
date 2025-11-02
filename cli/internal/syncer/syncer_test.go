@@ -304,7 +304,6 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
 	assert.NoError(t, err)
 
-	// We expect 12 deletes
 	assert.Len(t, provider.OperationLog, 6)
 	deleteOps := make([]testutils.OperationLogEntry, 0)
 
@@ -449,8 +448,8 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 		// Verify error messages
 		expectedErrorContains := []string{
-			"simulated delete failure for property2",
 			"simulated delete failure for event2",
+			"simulated delete failure for property2",
 		}
 		errorMessages := make([]string, len(errors))
 		for i, err := range errors {

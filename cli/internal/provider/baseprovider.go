@@ -17,10 +17,10 @@ type Handler interface {
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
-	Create(ctx context.Context, data any) (*resources.ResourceData, error)
-	Update(ctx context.Context, data any, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, state resources.ResourceData) error
-	Import(ctx context.Context, data any, remoteId string) (*resources.ResourceData, error)
+	Create(ctx context.Context, data any) (any, error)
+	Update(ctx context.Context, newData any, oldData any, oldState any) (any, error)
+	Delete(ctx context.Context, ID string, oldData any, oldState any) error
+	Import(ctx context.Context, data any, remoteId string) (any, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
@@ -33,13 +33,18 @@ type Handler interface {
 }
 
 type BaseProvider struct {
+	EmptyProvider
 	name       string
 	handlers   map[string]Handler
 	kindToType map[string]string
 }
 
 func NewBaseProvider(name string, handlers map[string]Handler, kindToType map[string]string) *BaseProvider {
-	return &BaseProvider{name, handlers, kindToType}
+	return &BaseProvider{
+		name:       name,
+		handlers:   handlers,
+		kindToType: kindToType,
+	}
 }
 
 func (p *BaseProvider) GetName() string {
@@ -139,11 +144,7 @@ func (p *BaseProvider) LoadStateFromResources(ctx context.Context, collection *r
 	return s, nil
 }
 
-func (p *BaseProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
-}
-
-func (p *BaseProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (*resources.ResourceData, error) {
+func (p *BaseProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (any, error) {
 	handler, ok := p.handlers[resource.Type()]
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())
@@ -151,31 +152,23 @@ func (p *BaseProvider) CreateRaw(ctx context.Context, resource *resources.Resour
 	return handler.Create(ctx, resource.RawData())
 }
 
-func (p *BaseProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
-}
-
-func (p *BaseProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
+func (p *BaseProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, oldData any, oldState any) (any, error) {
 	handler, ok := p.handlers[resource.Type()]
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())
 	}
-	return handler.Update(ctx, resource.RawData(), state)
+	return handler.Update(ctx, resource.RawData(), oldData, oldState)
 }
 
-func (p *BaseProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *BaseProvider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
 		return fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
-	return handler.Delete(ctx, ID, state)
+	return handler.Delete(ctx, ID, oldData, oldState)
 }
 
-func (p *BaseProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
-}
-
-func (p *BaseProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (*resources.ResourceData, error) {
+func (p *BaseProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (any, error) {
 	handler, ok := p.handlers[resource.Type()]
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())

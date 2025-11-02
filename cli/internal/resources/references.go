@@ -5,13 +5,11 @@ import (
 )
 
 type PropertyRef struct {
-	URN      string         `json:"urn"`
-	Property string         `json:"property"`
-	Resolved *ResolvedValue `json:"resolved"`
-}
-
-type ResolvedValue struct {
-	Value string `json:"value"`
+	URN        string                                `json:"urn"`
+	Property   string                                `json:"property"`
+	IsResolved bool                                  `json:"resolved"`
+	Value      string                                `json:"value,omitempty"`
+	Resolve    func(stateOutput any) (string, error) `json:"-"`
 }
 
 func collectReferences(v any) []*PropertyRef {

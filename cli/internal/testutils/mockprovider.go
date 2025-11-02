@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -13,6 +14,7 @@ import (
 
 // MockProvider is a mock implementation of the project.Provider interface for testing.
 type MockProvider struct {
+	provider.EmptyProvider
 	SupportedKinds             []string
 	SupportedTypes             []string
 	ValidateArg                *resources.Graph
@@ -147,17 +149,9 @@ func (m *MockProvider) Create(ctx context.Context, ID string, resourceType strin
 	return m.CreateVal, m.CreateErr
 }
 
-func (m *MockProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (*resources.ResourceData, error) {
-	return nil, nil
-}
-
 func (m *MockProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, s resources.ResourceData) (*resources.ResourceData, error) {
 	m.UpdateCalledWithArg = UpdateArgs{ID: ID, ResourceType: resourceType, Data: data, State: s}
 	return m.UpdateVal, m.UpdateErr
-}
-
-func (m *MockProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, nil
 }
 
 func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType string, s resources.ResourceData) error {
@@ -170,15 +164,27 @@ func (m *MockProvider) Import(ctx context.Context, ID string, resourceType strin
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (*resources.ResourceData, error) {
-	return nil, nil
-}
-
 func (m *MockProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	return nil, nil
 }
 
 func (m *MockProvider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	return nil, nil
+}
+
+func (m *MockProvider) CreateRaw(ctx context.Context, data *resources.Resource) (any, error) {
+	return nil, nil
+}
+
+func (m *MockProvider) UpdateRaw(ctx context.Context, data *resources.Resource, oldData any, oldState any) (any, error) {
+	return nil, nil
+}
+
+func (m *MockProvider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
+	return nil
+}
+
+func (m *MockProvider) ImportRaw(ctx context.Context, data *resources.Resource, remoteId string) (any, error) {
 	return nil, nil
 }
 

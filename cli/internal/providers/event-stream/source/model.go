@@ -5,24 +5,24 @@ import (
 )
 
 const (
-	IDKey               = "id" // remote id
-	NameKey             = "name"
-	EnabledKey          = "enabled"
-	SourceDefinitionKey = "type"
+	// IDKey               = "id" // remote id
+	// NameKey             = "name"
+	// EnabledKey          = "enabled"
+	// SourceDefinitionKey = "type"
 
-	TrackKey              = "track"
-	IdentifyKey           = "identify"
-	GroupKey              = "group"
-	PageKey               = "page"
-	ScreenKey             = "screen"
-	TrackingPlanKey       = "tracking_plan"
-	TrackingPlanConfigKey = "tracking_plan_config"
-	TrackingPlanIDKey     = "tracking_plan_id"
+	// TrackKey              = "track"
+	// IdentifyKey           = "identify"
+	// GroupKey              = "group"
+	// PageKey               = "page"
+	// ScreenKey             = "screen"
+	// TrackingPlanKey       = "tracking_plan"
+	// TrackingPlanConfigKey = "tracking_plan_config"
+	// TrackingPlanIDKey     = "tracking_plan_id"
 
-	PropagateViolationsKey     = "propagate_violations"
-	DropUnplannedPropertiesKey = "drop_unplanned_properties"
-	DropOtherViolationsKey     = "drop_other_violations"
-	DropUnplannedEventsKey     = "drop_unplanned_events"
+	// PropagateViolationsKey     = "propagate_violations"
+	// DropUnplannedPropertiesKey = "drop_unplanned_properties"
+	// DropOtherViolationsKey     = "drop_other_violations"
+	// DropUnplannedEventsKey     = "drop_unplanned_events"
 
 	// YAML keys for import spec
 	TrackingPlanRefYAMLKey         = "tracking_plan"
@@ -109,6 +109,22 @@ type SourceResource struct {
 	Governance *GovernanceResource
 }
 
+// GetTrackingPlanID returns the tracking plan ID from the governance config, or empty string if not set
+func (sr *SourceResource) GetTrackingPlanID() string {
+	if sr.Governance == nil || sr.Governance.Validations == nil || sr.Governance.Validations.TrackingPlanRef == nil {
+		return ""
+	}
+	return sr.Governance.Validations.TrackingPlanRef.Value
+}
+
+// GetTrackingPlanConfig returns the tracking plan config from the governance config, or nil if not set
+func (sr *SourceResource) GetTrackingPlanConfig() *TrackingPlanConfigResource {
+	if sr.Governance == nil || sr.Governance.Validations == nil {
+		return nil
+	}
+	return sr.Governance.Validations.Config
+}
+
 type WorkspaceRemoteIDMapping struct {
 	WorkspaceId string
 	RemoteId    string
@@ -140,4 +156,9 @@ type EventConfigResource struct {
 type TrackConfigResource struct {
 	*EventConfigResource
 	DropUnplannedEvents *bool
+}
+
+type SourceStateRemote struct {
+	ID             string
+	TrackingPlanID string
 }

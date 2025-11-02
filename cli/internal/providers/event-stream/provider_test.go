@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -193,8 +194,8 @@ func TestProvider(t *testing.T) {
 
 			result, err := provider.CreateRaw(ctx, createData)
 			require.NoError(t, err)
-			require.Equal(t, &resources.ResourceData{
-				"id": "",
+			assert.Equal(t, &source.SourceStateRemote{
+				ID: "remote-123",
 			}, result)
 		})
 
@@ -214,25 +215,29 @@ func TestProvider(t *testing.T) {
 				}),
 			)
 
-			stateData := resources.ResourceData{
-				"id":   "test-source-id",
-				"type": "javascript",
+			oldInput := &source.SourceResource{
+				Type: "javascript",
 			}
 
-			result, err := provider.UpdateRaw(ctx, updateData, stateData)
+			oldOutput := &source.SourceStateRemote{
+				ID: "test-source-id",
+			}
+
+			result, err := provider.UpdateRaw(ctx, updateData, oldInput, oldOutput)
 			require.NoError(t, err)
-			assert.Equal(t, &resources.ResourceData{
-				"id": "test-source-id",
+			assert.Equal(t, &source.SourceStateRemote{
+				ID: "test-source-id",
 			}, result)
 		})
 
 		t.Run("Delete", func(t *testing.T) {
 			provider := eventstream.New(source.NewMockSourceClient())
 			ctx := context.Background()
-			stateData := resources.ResourceData{
-				"id": "test-source-id",
+			oldInput := &source.SourceResource{}
+			oldOutput := &source.SourceStateRemote{
+				ID: "test-source-id",
 			}
-			err := provider.Delete(ctx, "test-source", source.ResourceType, stateData)
+			err := provider.DeleteRaw(ctx, "test-source", source.ResourceType, oldInput, oldOutput)
 			require.NoError(t, err)
 		})
 	})
@@ -267,8 +272,8 @@ func TestProvider(t *testing.T) {
 
 		result, err := provider.ImportRaw(ctx, data, "remote-123")
 		require.NoError(t, err)
-		assert.Equal(t, &resources.ResourceData{
-			"id": "remote-123",
+		assert.Equal(t, &source.SourceStateRemote{
+			ID: "remote-123",
 		}, result)
 		assert.True(t, mockClient.GetSourcesCalled())
 		assert.True(t, mockClient.UpdateCalled())
@@ -371,32 +376,36 @@ func TestProvider(t *testing.T) {
 		assert.Len(t, loadedState.Resources, 2)
 
 		// Check first resource
-		assert.Equal(t, map[string]*state.ResourceState{
-			"event-stream-source:external-123": {
-				ID:   "external-123",
-				Type: "event-stream-source",
-				Input: resources.ResourceData{
-					"name":    "Test Source 1",
-					"enabled": true,
-					"type":    "javascript",
-				},
-				Output: resources.ResourceData{
-					"id": "remote123",
-				},
+		rs1 := loadedState.GetResource("event-stream-source:external-123")
+		assert.Equal(t, &state.ResourceState{
+			ID:   "external-123",
+			Type: "event-stream-source",
+			InputRaw: &source.SourceResource{
+				ID:      "external-123",
+				Name:    "Test Source 1",
+				Type:    "javascript",
+				Enabled: true,
 			},
-			"event-stream-source:external-456": {
-				ID:   "external-456",
-				Type: "event-stream-source",
-				Input: resources.ResourceData{
-					"name":    "Test Source 2",
-					"enabled": false,
-					"type":    "python",
-				},
-				Output: resources.ResourceData{
-					"id": "remote456",
-				},
+			OutputRaw: &source.SourceStateRemote{
+				ID: "remote123",
 			},
-		}, loadedState.Resources)
+		}, rs1)
+
+		// Check second resource
+		rs2 := loadedState.GetResource("event-stream-source:external-456")
+		assert.Equal(t, &state.ResourceState{
+			ID:   "external-456",
+			Type: "event-stream-source",
+			InputRaw: &source.SourceResource{
+				ID:      "external-456",
+				Name:    "Test Source 2",
+				Type:    "python",
+				Enabled: false,
+			},
+			OutputRaw: &source.SourceStateRemote{
+				ID: "remote456",
+			},
+		}, rs2)
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
@@ -506,24 +515,62 @@ func TestProvider(t *testing.T) {
 		}
 
 		spec1 := entityMap["test-source-1"]
-		require.NotNil(t, spec1)
-		assert.Equal(t, "event-stream-source", spec1.Kind)
-		assert.Equal(t, map[string]interface{}{
-			"id":      "test-source-1",
-			"name":    "Test Source 1",
-			"enabled": true,
-			"type":    "javascript",
-		}, spec1.Spec)
+		expectedMetadata1 := map[string]interface{}{
+			"name": "event-stream-source",
+			"import": map[string]interface{}{
+				"workspaces": []importremote.WorkspaceImportMetadata{
+					{
+						WorkspaceID: "workspace-123",
+						Resources: []importremote.ImportIds{
+							{
+								LocalID:  "test-source-1",
+								RemoteID: "remote123",
+							},
+						},
+					},
+				},
+			},
+		}
+		assert.Equal(t, &specs.Spec{
+			Version:  specs.SpecVersion,
+			Kind:     "event-stream-source",
+			Metadata: expectedMetadata1,
+			Spec: map[string]interface{}{
+				"id":      "test-source-1",
+				"name":    "Test Source 1",
+				"enabled": true,
+				"type":    "javascript",
+			},
+		}, spec1)
 
 		spec2 := entityMap["test-source-2"]
-		require.NotNil(t, spec2)
-		assert.Equal(t, "event-stream-source", spec2.Kind)
-		assert.Equal(t, map[string]interface{}{
-			"id":      "test-source-2",
-			"name":    "Test Source 2",
-			"enabled": false,
-			"type":    "python",
-		}, spec2.Spec)
+		expectedMetadata2 := map[string]interface{}{
+			"name": "event-stream-source",
+			"import": map[string]interface{}{
+				"workspaces": []importremote.WorkspaceImportMetadata{
+					{
+						WorkspaceID: "workspace-123",
+						Resources: []importremote.ImportIds{
+							{
+								LocalID:  "test-source-2",
+								RemoteID: "remote456",
+							},
+						},
+					},
+				},
+			},
+		}
+		assert.Equal(t, &specs.Spec{
+			Version:  specs.SpecVersion,
+			Kind:     "event-stream-source",
+			Metadata: expectedMetadata2,
+			Spec: map[string]interface{}{
+				"id":      "test-source-2",
+				"name":    "Test Source 2",
+				"enabled": false,
+				"type":    "python",
+			},
+		}, spec2)
 	})
 }
 

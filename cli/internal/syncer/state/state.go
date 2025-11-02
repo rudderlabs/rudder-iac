@@ -26,6 +26,8 @@ type ResourceState struct {
 	Type         string                 `json:"type"`
 	Input        map[string]interface{} `json:"input"`
 	Output       map[string]interface{} `json:"output"`
+	InputRaw     any                    `json:"-"` // Strongly-typed input (e.g., *SourceResource)
+	OutputRaw    any                    `json:"-"` // Strongly-typed output (e.g., *SourceStateRemote)
 	Dependencies []string               `json:"dependencies"`
 }
 
@@ -206,6 +208,21 @@ func resolvePropertyRef(propRef *resources.PropertyRef, state *State) error {
 		return nil
 	}
 
+	if propRef.Resolve != nil {
+		resource := state.GetResource(propRef.URN)
+		if resource == nil {
+			return fmt.Errorf("referred resource '%s' does not exist", propRef.URN)
+		}
+
+		value, err := propRef.Resolve(resource.OutputRaw)
+		if err != nil {
+			return fmt.Errorf("resolving property ref for %s: %w", propRef.URN, err)
+		}
+		propRef.IsResolved = true
+		propRef.Value = value
+		return nil
+	}
+
 	resource := state.GetResource(propRef.URN)
 	if resource == nil {
 		return fmt.Errorf("referred resource '%s' does not exist", propRef.URN)
@@ -232,10 +249,9 @@ func resolvePropertyRef(propRef *resources.PropertyRef, state *State) error {
 		stringValue = fmt.Sprintf("%v", v)
 	}
 
-	// Populate the Resolved field in place
-	propRef.Resolved = &resources.ResolvedValue{
-		Value: stringValue,
-	}
+	// Populate the IsResolved & Value fields in place
+	propRef.IsResolved = true
+	propRef.Value = stringValue
 
 	return nil
 }

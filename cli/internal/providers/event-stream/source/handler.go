@@ -23,7 +23,7 @@ import (
 )
 
 type Handler struct {
-	*provider.BaseHandler[sourceSpec, SourceResource]
+	*provider.BaseHandler[sourceSpec, SourceResource, SourceStateRemote]
 	client    esClient.EventStreamStore
 	importDir string
 }
@@ -34,6 +34,13 @@ func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 		importDir:   filepath.Join(importDir, ImportPath),
 		BaseHandler: provider.NewHandler(ResourceType, &handlerImpl{client: client}),
 	}
+}
+
+// CreateIDRef creates a PropertyRef that resolves to the remote ID of an event stream source
+func (h *Handler) CreateIDRef(urn string) *resources.PropertyRef {
+	return h.BaseHandler.CreatePropertyRef(urn, func(state *SourceStateRemote) (string, error) {
+		return state.ID, nil
+	})
 }
 
 type handlerImpl struct {
@@ -161,7 +168,7 @@ func (h *handlerImpl) ValidateResource(source *SourceResource, graph *resources.
 	return nil
 }
 
-func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*resources.ResourceData, error) {
+func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*SourceStateRemote, error) {
 	createRequest := &sourceClient.CreateSourceRequest{
 		ExternalID: data.ID,
 		Name:       data.Name,
@@ -173,86 +180,71 @@ func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*resour
 		return nil, fmt.Errorf("creating event stream source: %w", err)
 	}
 
-	trackingPlanID := ""
-	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
-		trackingPlanRef := data.Governance.Validations.TrackingPlanRef
-		trackingPlanID = trackingPlanRef.Resolved.Value
-		if trackingPlanRef != nil {
-			err := h.linkTrackingPlan(ctx, trackingPlanRef.Resolved.Value, resp.ID, data)
-			if err != nil {
-				return nil, fmt.Errorf("linking tracking plan to event stream source: %w", err)
-			}
+	trackingPlanID := data.GetTrackingPlanID()
+	if trackingPlanID != "" {
+		err := h.linkTrackingPlan(ctx, trackingPlanID, resp.ID, data)
+		if err != nil {
+			return nil, fmt.Errorf("linking tracking plan to event stream source: %w", err)
 		}
 	}
-	return toResourceData(resp.ID, trackingPlanID), nil
+	return &SourceStateRemote{ID: resp.ID, TrackingPlanID: trackingPlanID}, nil
 }
 
-func (h *handlerImpl) Update(ctx context.Context, data *SourceResource, state resources.ResourceData) (*resources.ResourceData, error) {
-	if state[SourceDefinitionKey] != data.Type {
+func (h *handlerImpl) Update(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) (*SourceStateRemote, error) {
+	if oldData.Type != newData.Type {
 		return nil, fmt.Errorf("type cannot be changed")
 	}
-	remoteID, ok := state[IDKey].(string)
-	if !ok {
-		return nil, fmt.Errorf("missing id in resource data")
-	}
-	err := h.updateSource(ctx, remoteID, data, state)
+
+	err := h.updateSource(ctx, newData, oldData, oldState)
 	if err != nil {
 		return nil, fmt.Errorf("updating event stream source: %w", err)
 	}
-	if err := h.updateTrackingPlanConnection(ctx, remoteID, data, state); err != nil {
+	if err := h.updateTrackingPlanConnection(ctx, newData, oldData, oldState); err != nil {
 		return nil, err
 	}
-	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
-		return toResourceData(remoteID, data.Governance.Validations.TrackingPlanRef.Resolved.Value), nil
-	}
-	return toResourceData(remoteID, ""), nil
+	return &SourceStateRemote{ID: oldState.ID, TrackingPlanID: newData.GetTrackingPlanID()}, nil
 }
 
-func (h *handlerImpl) updateSource(ctx context.Context, remoteID string, data *SourceResource, state resources.ResourceData) error {
-	needsUpdate := state[NameKey] != data.Name || state[EnabledKey] != data.Enabled
+func (h *handlerImpl) updateSource(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+	needsUpdate := oldData.Name != newData.Name || oldData.Enabled != newData.Enabled
 	if !needsUpdate {
 		return nil
 	}
 	updateRequest := &sourceClient.UpdateSourceRequest{
-		Name:    data.Name,
-		Enabled: data.Enabled,
+		Name:    newData.Name,
+		Enabled: newData.Enabled,
 	}
-	_, err := h.client.Update(ctx, remoteID, updateRequest)
+	_, err := h.client.Update(ctx, oldState.ID, updateRequest)
 	if err != nil {
 		return fmt.Errorf("updating event stream source: %w", err)
 	}
 	return nil
 }
 
-func (h *handlerImpl) updateTrackingPlanConnection(ctx context.Context, remoteID string, data *SourceResource, state resources.ResourceData) error {
-	var trackingPlanRef *resources.PropertyRef = nil
-	if data.Governance != nil && data.Governance.Validations != nil && data.Governance.Validations.TrackingPlanRef != nil {
-		trackingPlanRef = data.Governance.Validations.TrackingPlanRef
-	}
+func (h *handlerImpl) updateTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+	newTPID := newData.GetTrackingPlanID()
 
-	if trackingPlanRef == nil && state[TrackingPlanIDKey] == nil {
+	if newTPID == "" && oldState.TrackingPlanID == "" {
 		return nil
 	}
 
-	currentTrackingPlanID, currentHasTP := state[TrackingPlanIDKey].(string)
-	if trackingPlanRef != nil {
-		newTPID := trackingPlanRef.Resolved.Value
-		if currentHasTP {
-			return h.updateExistingTrackingPlanConnection(ctx, currentTrackingPlanID, newTPID, remoteID, data, state)
+	if newTPID != "" {
+		if oldState.TrackingPlanID != "" {
+			return h.updateExistingTrackingPlanConnection(ctx, newData, oldData, oldState)
 
 		} else {
-			return h.linkTrackingPlan(ctx, newTPID, remoteID, data)
+			return h.linkTrackingPlan(ctx, newTPID, oldState.ID, newData)
 
 		}
-	} else if currentHasTP {
-		return h.unlinkTrackingPlan(ctx, currentTrackingPlanID, remoteID)
+	} else if oldState.TrackingPlanID != "" {
+		return h.unlinkTrackingPlan(ctx, oldState.TrackingPlanID, oldState.ID)
 	}
 
 	return nil
 }
 
 func (h *handlerImpl) linkTrackingPlan(ctx context.Context, trackingPlanID, remoteID string, data *SourceResource) error {
-	remoteConfig, err := mapStateTPConfigToRemote(data.Governance.Validations.Config)
+	remoteConfig, err := mapStateTPConfigToRemote(data.GetTrackingPlanConfig())
 	if err != nil {
 		return fmt.Errorf("invalid tracking plan config: %w", err)
 	}
@@ -272,31 +264,33 @@ func (h *handlerImpl) unlinkTrackingPlan(ctx context.Context, trackingPlanID, re
 	return nil
 }
 
-func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, currentTrackingPlanID, newTrackingPlanID, remoteID string, data *SourceResource, state resources.ResourceData) error {
+func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+	currentTrackingPlanID := oldState.TrackingPlanID
+	newTrackingPlanID := newData.GetTrackingPlanID()
+	remoteID := oldState.ID
+
 	if currentTrackingPlanID == newTrackingPlanID {
-		return h.updateTrackingPlanConfig(ctx, currentTrackingPlanID, remoteID, data, state)
+		return h.updateTrackingPlanConfig(ctx, newData, oldData, oldState)
 	}
 
 	if err := h.unlinkTrackingPlan(ctx, currentTrackingPlanID, remoteID); err != nil {
 		return fmt.Errorf("unlinking old tracking plan: %w", err)
 	}
 
-	if err := h.linkTrackingPlan(ctx, newTrackingPlanID, remoteID, data); err != nil {
+	if err := h.linkTrackingPlan(ctx, newTrackingPlanID, remoteID, newData); err != nil {
 		return fmt.Errorf("linking new tracking plan: %w", err)
 	}
 
 	return nil
 }
 
-func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, remoteID string, data *SourceResource, state resources.ResourceData) error {
-	currentConfig, ok := state[TrackingPlanConfigKey].(*TrackingPlanConfigResource)
-	if !ok {
-		return fmt.Errorf("missing tracking plan config in state")
-	}
+func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+	trackingPlanID := newData.GetTrackingPlanID()
+	remoteID := oldState.ID
+	newConfig := newData.GetTrackingPlanConfig()
+	oldConfig := oldData.GetTrackingPlanConfig()
 
-	newConfig := data.Governance.Validations.Config
-	// NOTE: DeepEqual will fail until ResourceData has been converted to trackingPlanConfigResource
-	if !reflect.DeepEqual(newConfig, currentConfig) {
+	if !reflect.DeepEqual(newConfig, oldConfig) {
 		remoteConfig, err := mapStateTPConfigToRemote(newConfig)
 		if err != nil {
 			return fmt.Errorf("invalid tracking plan config: %w", err)
@@ -334,6 +328,10 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
+// TODO: Consider simplifying the handler interface once common patterns are identified across providers:
+//  1. ResourceType could be automatically added by BaseHandler instead of being repeated in each handler
+//  2. The response types could be made type-safe to ensure InputRaw and OutputRaw have the correct types
+//     (e.g., handler could return typed state directly instead of interface{})
 func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	esResources := collection.GetAll(ResourceType)
@@ -355,32 +353,31 @@ func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 				trackingPlanURN = &tpURN
 			}
 		}
-		resourceState, skip := mapRemoteToState(&source, trackingPlanURN)
+		inputRaw, outputRaw, skip := mapRemoteToState(&source, trackingPlanURN)
 		if skip {
 			continue
 		}
-		urn := resources.URN(esResource.ExternalID, ResourceType)
-		s.Resources[urn] = resourceState
+
+		s.AddResource(&state.ResourceState{
+			ID:        source.ExternalID,
+			Type:      ResourceType,
+			InputRaw:  inputRaw,
+			OutputRaw: outputRaw,
+		})
 	}
 	return s, nil
 }
 
-func (h *handlerImpl) Delete(ctx context.Context, id string, state resources.ResourceData) error {
-	sourceID, ok := state[IDKey].(string)
-	if !ok {
-		return fmt.Errorf("missing id in resource data")
-	}
-	trackingPlanID, ok := state[TrackingPlanIDKey].(string)
-	if ok {
-		err := h.client.UnlinkTP(ctx, trackingPlanID, sourceID)
+func (h *handlerImpl) Delete(ctx context.Context, id string, oldData *SourceResource, oldState *SourceStateRemote) error {
+	remoteID := oldState.ID
+	trackingPlanID := oldState.TrackingPlanID
+	if trackingPlanID != "" {
+		err := h.client.UnlinkTP(ctx, trackingPlanID, remoteID)
 		if err != nil {
 			return fmt.Errorf("unlinking tracking plan from event stream source: %w", err)
 		}
 	}
-	remoteID, ok := state[IDKey].(string)
-	if !ok {
-		return fmt.Errorf("missing id in resource data")
-	}
+
 	err := h.client.Delete(ctx, remoteID)
 	if err != nil {
 		return fmt.Errorf("deleting event stream source: %w", err)
@@ -388,7 +385,7 @@ func (h *handlerImpl) Delete(ctx context.Context, id string, state resources.Res
 	return nil
 }
 
-func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId string) (*resources.ResourceData, error) {
+func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId string) (*SourceStateRemote, error) {
 	// FIXME: Instead of fetching all sources, fetch the source with the matching remoteId
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
@@ -408,22 +405,31 @@ func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId
 		return nil, fmt.Errorf("event stream source with ID %s not found", remoteId)
 	}
 
-	// Build state from existing source to compare with desired data
-	existingState := resources.ResourceData{
-		IDKey:               remoteId,
-		NameKey:             existingSource.Name,
-		EnabledKey:          existingSource.Enabled,
-		SourceDefinitionKey: existingSource.Type,
+	// Build old input state from existing source to compare with desired data
+	oldData := &SourceResource{
+		ID:      data.ID,
+		Name:    existingSource.Name,
+		Enabled: existingSource.Enabled,
+		Type:    existingSource.Type,
 	}
 
-	// If there's a tracking plan on the existing source, include it in state
+	// Build old output state (remote metadata)
+	oldState := &SourceStateRemote{
+		ID: remoteId,
+	}
+
+	// If there's a tracking plan on the existing source, include it in states
 	if existingSource.TrackingPlan != nil {
-		existingState[TrackingPlanIDKey] = existingSource.TrackingPlan.ID
-		existingState[TrackingPlanConfigKey] = mapRemoteTPConfigToState(existingSource.TrackingPlan.Config)
+		oldState.TrackingPlanID = existingSource.TrackingPlan.ID
+		oldData.Governance = &GovernanceResource{
+			Validations: &ValidationsResource{
+				Config: mapRemoteTPConfigToState(existingSource.TrackingPlan.Config),
+			},
+		}
 	}
 
 	// Update the source if there are differences
-	result, err := h.Update(ctx, data, existingState)
+	result, err := h.Update(ctx, data, oldData, oldState)
 	if err != nil {
 		return nil, fmt.Errorf("updating event stream source during import: %w", err)
 	}
@@ -527,10 +533,10 @@ func (p *Handler) toImportSpec(
 	}
 
 	specMap := map[string]any{
-		IDKey:               externalID,
-		NameKey:             source.Name,
-		SourceDefinitionKey: source.Type,
-		EnabledKey:          source.Enabled,
+		"id":      externalID,
+		"name":    source.Name,
+		"type":    source.Type,
+		"enabled": source.Enabled,
 	}
 
 	if source.TrackingPlan != nil {
@@ -625,43 +631,36 @@ func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]an
 	return result
 }
 
-func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*state.ResourceState, bool) {
+func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*SourceResource, *SourceStateRemote, bool) {
 	if source.ExternalID == "" {
-		return nil, true
+		return nil, nil, true
 	}
-	input := resources.ResourceData{
-		NameKey:             source.Name,
-		EnabledKey:          source.Enabled,
-		SourceDefinitionKey: source.Type,
-	}
-	var output *resources.ResourceData
-	if trackingPlanURN != nil {
-		input[TrackingPlanKey] = &resources.PropertyRef{
-			URN:      *trackingPlanURN,
-			Property: "id",
-		}
-		input[TrackingPlanConfigKey] = source.TrackingPlan.Config
-		output = toResourceData(source.ID, source.TrackingPlan.ID)
-	} else {
-		output = toResourceData(source.ID, "")
-	}
-	return &state.ResourceState{
-		Type:   ResourceType,
-		ID:     source.ExternalID,
-		Input:  input,
-		Output: *output,
-	}, false
-}
 
-func toResourceData(sourceID string, trackingPlanID string) *resources.ResourceData {
-	result := map[string]interface{}{
-		IDKey: sourceID,
+	input := &SourceResource{
+		ID:      source.ExternalID,
+		Type:    source.Type,
+		Enabled: source.Enabled,
+		Name:    source.Name,
 	}
-	if trackingPlanID != "" {
-		result[TrackingPlanIDKey] = trackingPlanID
+
+	output := &SourceStateRemote{
+		ID: source.ID,
 	}
-	resourceData := resources.ResourceData(result)
-	return &resourceData
+
+	if trackingPlanURN != nil {
+		input.Governance = &GovernanceResource{
+			Validations: &ValidationsResource{
+				TrackingPlanRef: &resources.PropertyRef{
+					URN:      *trackingPlanURN,
+					Property: "id",
+				},
+				Config: mapRemoteTPConfigToState(source.TrackingPlan.Config),
+			},
+		}
+		output.TrackingPlanID = source.TrackingPlan.ID
+	}
+
+	return input, output, false
 }
 
 func parseTrackingPlanRef(ref string) (*resources.PropertyRef, error) {
@@ -769,57 +768,45 @@ func mapStateEventTypeConfigToRemote(config *EventConfigResource) *trackingplanC
 	return eventTypeConfig
 }
 
-func mapRemoteTPConfigToState(config *sourceClient.TrackingPlanConfig) map[string]interface{} {
-	result := make(map[string]interface{})
+func mapRemoteTPConfigToState(config *sourceClient.TrackingPlanConfig) *TrackingPlanConfigResource {
+	result := &TrackingPlanConfigResource{}
 
 	if config.Track != nil {
-		trackMap := buildStateEventConfigMap(config.Track.EventTypeConfig)
-		if config.Track.DropUnplannedEvents != nil {
-			trackMap[DropUnplannedEventsKey] = *config.Track.DropUnplannedEvents
+		result.Track = &TrackConfigResource{
+			EventConfigResource: buildEventConfigState(config.Track.EventTypeConfig),
+			DropUnplannedEvents: config.Track.DropUnplannedEvents,
 		}
-		result[TrackKey] = trackMap
 	}
 
 	if config.Identify != nil {
-		result[IdentifyKey] = buildStateEventConfigMap(config.Identify)
+		result.Identify = buildEventConfigState(config.Identify)
 	}
 
 	if config.Group != nil {
-		result[GroupKey] = buildStateEventConfigMap(config.Group)
+		result.Group = buildEventConfigState(config.Group)
 	}
 
 	if config.Page != nil {
-		result[PageKey] = buildStateEventConfigMap(config.Page)
+		result.Page = buildEventConfigState(config.Page)
 	}
 
 	if config.Screen != nil {
-		result[ScreenKey] = buildStateEventConfigMap(config.Screen)
+		result.Screen = buildEventConfigState(config.Screen)
 	}
 
 	return result
 }
 
-func buildStateEventConfigMap(config *sourceClient.EventTypeConfig) map[string]interface{} {
+func buildEventConfigState(config *sourceClient.EventTypeConfig) *EventConfigResource {
 	if config == nil {
-		return map[string]interface{}{}
+		return &EventConfigResource{}
 	}
 
-	result := map[string]interface{}{}
-
-	// Only include fields that are explicitly set
-	if config.PropagateViolations != nil {
-		result[PropagateViolationsKey] = *config.PropagateViolations
+	return &EventConfigResource{
+		PropagateViolations:     config.PropagateViolations,
+		DropUnplannedProperties: config.DropUnplannedProperties,
+		DropOtherViolations:     config.DropOtherViolations,
 	}
-
-	if config.DropUnplannedProperties != nil {
-		result[DropUnplannedPropertiesKey] = *config.DropUnplannedProperties
-	}
-
-	if config.DropOtherViolations != nil {
-		result[DropOtherViolationsKey] = *config.DropOtherViolations
-	}
-
-	return result
 }
 
 func dropToAction(drop bool) trackingplanClient.Action {

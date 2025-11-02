@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -33,6 +34,7 @@ type OperationLogEntry struct {
 }
 
 type DataCatalogProvider struct {
+	provider.EmptyProvider
 	InitialState       *state.State
 	ReconstructedState *state.State
 	InitialResources   *resources.ResourceCollection
@@ -57,29 +59,11 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) CreateRaw(_ context.Context, data *resources.Resource) (*resources.ResourceData, error) {
-	payload := make(resources.ResourceData)
-	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
-
-	p.logOperation("Create", "mock-id", "mock-type", data)
-
-	return &payload, nil
-}
-
 func (p *DataCatalogProvider) Import(_ context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
 
 	p.logOperation("Import", ID, resourceType, data, workspaceId, remoteId)
-
-	return &payload, nil
-}
-
-func (p *DataCatalogProvider) ImportRaw(_ context.Context, data *resources.Resource, remoteId string) (*resources.ResourceData, error) {
-	payload := make(resources.ResourceData)
-	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
-
-	p.logOperation("Import", "mock-id", "mock-type", data, remoteId)
 
 	return &payload, nil
 }
@@ -93,18 +77,29 @@ func (p *DataCatalogProvider) Update(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) UpdateRaw(_ context.Context, data *resources.Resource, state resources.ResourceData) (*resources.ResourceData, error) {
-	payload := make(resources.ResourceData)
-	payload["id"] = fmt.Sprintf("generated-%s-%s", "mock-type", "mock-id")
-
-	p.logOperation("Update", "mock-id", "mock-type", data, state)
-
-	return &payload, nil
-}
-
 func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType string, state resources.ResourceData) error {
 	p.logOperation("Delete", ID, resourceType, state)
 	return nil
+}
+
+func (p *DataCatalogProvider) CreateRaw(_ context.Context, data *resources.Resource) (any, error) {
+	p.logOperation("CreateRaw", data)
+	return nil, nil
+}
+
+func (p *DataCatalogProvider) UpdateRaw(_ context.Context, data *resources.Resource, oldData any, oldState any) (any, error) {
+	p.logOperation("UpdateRaw", data, oldData, oldState)
+	return nil, nil
+}
+
+func (p *DataCatalogProvider) DeleteRaw(_ context.Context, ID string, resourceType string, oldData any, oldState any) error {
+	p.logOperation("DeleteRaw", ID, resourceType, oldData, oldState)
+	return nil
+}
+
+func (p *DataCatalogProvider) ImportRaw(_ context.Context, data *resources.Resource, remoteId string) (any, error) {
+	p.logOperation("ImportRaw", data, remoteId)
+	return nil, nil
 }
 
 func (p *DataCatalogProvider) logOperation(operation string, args ...interface{}) {

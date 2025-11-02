@@ -22,6 +22,7 @@ type MockSourceClient struct {
 func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
 	m.createCalled = true
 	return &sourceClient.CreateUpdateSourceResponse{
+		ID:         "remote-123",
 		ExternalID: req.ExternalID,
 		Name:       req.Name,
 		Type:       req.Type,
