@@ -585,7 +585,6 @@ func (h *Handler) FormatForExport(
 			data,
 			source.ExternalID,
 			workspaceMetadata,
-			collection,
 			inputResolver,
 		)
 		if err != nil {
@@ -603,7 +602,6 @@ func (p *Handler) toImportSpec(
 	source *sourceClient.EventStreamSource,
 	externalID string,
 	workspaceMetadata importremote.WorkspaceImportMetadata,
-	collection *resources.ResourceCollection,
 	resolver resolver.ReferenceResolver,
 ) (*specs.Spec, error) {
 	metadata := importremote.Metadata{
@@ -626,14 +624,9 @@ func (p *Handler) toImportSpec(
 	}
 
 	if source.TrackingPlan != nil {
-		trackingPlanResource, exists := collection.GetByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
-		if !exists {
-			return nil, fmt.Errorf("tracking plan with ID %s not found in collection", source.TrackingPlan.ID)
-		}
-
 		tpRef, err := resolver.ResolveToReference(
 			dcstate.TrackingPlanResourceType,
-			trackingPlanResource.ID,
+			source.TrackingPlan.ID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("resolving tracking plan reference: %w", err)
@@ -762,12 +755,12 @@ func toResourceData(sourceID string, trackingPlanID string) *resources.ResourceD
 }
 
 func parseTrackingPlanRef(ref string) (*resources.PropertyRef, error) {
-	// Format: #/tracking-plans/group/id
+	// Format: #/tp/group/id
 	parts := strings.Split(ref, "/")
 	if len(parts) < 4 {
 		return nil, fmt.Errorf("invalid ref format: %s", ref)
 	}
-	if parts[1] != "tracking-plans" {
+	if parts[1] != "tp" {
 		return nil, fmt.Errorf("invalid entity type: %s", parts[1])
 	}
 	return &resources.PropertyRef{

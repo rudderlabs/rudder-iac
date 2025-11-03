@@ -11,8 +11,13 @@ type ReferenceResolver interface {
 }
 
 type ImportRefResolver struct {
-	Remote     *resources.ResourceCollection
-	Graph      *resources.Graph
+	// Remote is a collection of all remote resources already managed by the CLI
+	// Should correspond to the resources in Graph
+	Remote *resources.ResourceCollection
+	// Graph is the resource graph of all resources already managed by the CLI
+	Graph *resources.Graph
+
+	// Importable is a collection of resources that are being imported, not yet managed by the CLI
 	Importable *resources.ResourceCollection
 }
 

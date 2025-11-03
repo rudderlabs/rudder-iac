@@ -21,8 +21,6 @@ const (
 	KindCategories    = "categories"
 	KindTrackingPlans = "tp"
 	KindCustomTypes   = "custom-types"
-
-	KindTrackingPlanForReference = "tracking-plans"
 )
 
 // entity group is logical grouping of entities defined
