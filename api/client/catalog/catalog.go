@@ -83,7 +83,7 @@ func getAllResourcesWithPagination[T any](
 			var apiErr *client.APIError
 
 			if ok := errors.As(err, &apiErr); ok && apiErr.FeatureNotEnabled() {
-				return allItems, nil
+				return nil, nil
 			}
 			return nil, fmt.Errorf("sending get request for page %d: %w", page, err)
 		}
