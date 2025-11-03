@@ -99,11 +99,6 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 			}
 		}
 
-		if apiError.HTTPStatusCode == 403 && strings.Contains(apiError.Message, "Flag is not enabled for your account") {
-			// return an empty byte array without error if the corresponding resource's flag is not enabled for the user's account
-			return []byte{}, nil
-		}
-
 		return nil, apiError
 	}
 
