@@ -207,7 +207,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"enabled": true,
 						"governance": map[string]interface{}{
 							"validations": map[string]interface{}{
-								"tracking_plan": "#/tracking-plans/group/tp-123",
+								"tracking_plan": "#/tp/group/tp-123",
 							},
 						},
 					},
@@ -346,7 +346,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 							"type": "ios",
 							"governance": map[string]interface{}{
 								"validations": map[string]interface{}{
-									"tracking_plan": "#/tracking-plans/some-name/tp-123",
+									"tracking_plan": "#/tp/some-name/tp-123",
 									"config":        map[string]interface{}{},
 								},
 							},
@@ -367,7 +367,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 							"type": "ios",
 							"governance": map[string]interface{}{
 								"validations": map[string]interface{}{
-									"tracking_plan": "#/tracking-plans/some-name/non-existent-tp",
+									"tracking_plan": "#/tp/some-name/non-existent-tp",
 									"config":        map[string]interface{}{},
 								},
 							},
@@ -449,7 +449,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					"enabled": false,
 					"governance": map[string]interface{}{
 						"validations": map[string]interface{}{
-							"tracking_plan": "#/tracking-plans/group/tp-123",
+							"tracking_plan": "#/tp/group/tp-123",
 							"config": map[string]interface{}{
 								"track": map[string]interface{}{
 									"propagate_violations":      true,
@@ -1090,7 +1090,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"type":    "javascript",
 			},
 			Output: resources.ResourceData{
-				"id":               "remote123",
+				"id": "remote123",
 			},
 		}, resource123)
 
@@ -1313,7 +1313,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			// Note: adding tracking plan without externalID to collection, so GetURNByID will return ErrRemoteResourceExternalIdNotFound
 			trackingPlanResourceMap := map[string]*resources.RemoteResource{
 				"remote-tp-123": {
-					ID:         "remote-tp-123",
+					ID: "remote-tp-123",
 				},
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
@@ -1468,14 +1468,14 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"remote-tp-456": {
 				ID:         "remote-tp-456",
 				ExternalID: "test-tp-456",
-				Reference:  "#/tracking-plans/tracking-plan/test-tp-456",
+				Reference:  "#/tp/tracking-plan/test-tp-456",
 			},
 		}
 		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
 		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				return "#/tracking-plans/tracking-plan/test-tp-456", nil
+				return "#/tp/tracking-plan/test-tp-456", nil
 			},
 		})
 		require.NoError(t, err)
@@ -1529,7 +1529,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"type":    "python",
 			"governance": map[string]interface{}{
 				"validations": map[string]interface{}{
-					"tracking_plan": "#/tracking-plans/tracking-plan/test-tp-456",
+					"tracking_plan": "#/tp/tracking-plan/test-tp-456",
 					"config": map[string]interface{}{
 						"track": map[string]interface{}{
 							"drop_unplanned_events": true,
