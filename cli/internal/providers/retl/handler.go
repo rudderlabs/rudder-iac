@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -78,4 +80,15 @@ type resourceHandler interface {
 	// LoadStateFromResources reconstructs RETL state from loaded resources
 	// Returns a state or an error if loading fails.
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+
+	// LoadImportable loads all importable resources from remote
+	// The idNamer is used to generate unique IDs for the resources.
+	// Returns a collection of resources or an error if loading fails.
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+
+	// FormatForExport formats the resources for export
+	// The idNamer is used to generate unique IDs for the resources.
+	// The inputResolver is used to resolve references to other resources.
+	// Returns a list of importable entities or an error if formatting fails.
+	FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error)
 }

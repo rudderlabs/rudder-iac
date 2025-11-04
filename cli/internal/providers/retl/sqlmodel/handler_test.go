@@ -15,6 +15,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -96,6 +97,7 @@ type mockRETLClient struct {
 	readStateFunc              func(ctx context.Context) (*retlClient.State, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	setExternalIdFunc          func(ctx context.Context, sourceID string, externalId string) error
 }
 
 func (m *mockRETLClient) CreateRetlSource(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error) {
@@ -210,6 +212,13 @@ func (m *mockRETLClient) GetSourcePreviewResult(ctx context.Context, resultID st
 	}, nil
 }
 
+func (m *mockRETLClient) SetExternalId(ctx context.Context, sourceID string, externalId string) error {
+	if m.setExternalIdFunc != nil {
+		return m.setExternalIdFunc(ctx, sourceID, externalId)
+	}
+	return nil
+}
+
 func TestSQLModelHandler(t *testing.T) {
 	t.Parallel()
 
@@ -281,7 +290,7 @@ func TestSQLModelHandler(t *testing.T) {
 				t.Parallel()
 
 				mockClient := &mockRETLClient{}
-				handler := sqlmodel.NewHandler(mockClient)
+				handler := sqlmodel.NewHandler(mockClient, "retl")
 
 				parsedSpec, err := handler.ParseSpec("test/path.yaml", tc.spec)
 
@@ -296,6 +305,98 @@ func TestSQLModelHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("FormatForExport", func(t *testing.T) {
+		t.Parallel()
+
+		mkPtr := func(s retlClient.RETLSource) *retlClient.RETLSource { return &s }
+		mkCollection := func(sources ...retlClient.RETLSource) *resources.ResourceCollection {
+			c := resources.NewResourceCollection()
+			m := make(map[string]*resources.RemoteResource)
+			for _, s := range sources {
+				ss := s // copy for address stability
+				m[ss.ID] = &resources.RemoteResource{ID: ss.ID, ExternalID: ss.ExternalID, Data: mkPtr(ss)}
+			}
+			c.Set(sqlmodel.ResourceType, m)
+			return c
+		}
+
+		mkSource := func(id, name, externalID, workspaceID, def, account string, enabled bool, desc, pk, sql string) retlClient.RETLSource {
+			rc := createTestRETLSourceWithConfig(id, name, def, account, enabled, retlClient.RETLSQLModelConfig{
+				Description: desc,
+				PrimaryKey:  pk,
+				Sql:         sql,
+			})
+			rc.ExternalID = externalID
+			rc.WorkspaceID = workspaceID
+			return rc
+		}
+
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+
+		t.Run("Success with multiple sources", func(t *testing.T) {
+			t.Parallel()
+			s1 := mkSource("rid-1", "Orders Model", "orders-model", "ws-1", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
+			s2 := mkSource("rid-2", "Users Model", "users-model", "ws-2", "mysql", "acc-2", false, "users", "user_id", "SELECT * FROM users")
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := mkCollection(s1, s2)
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			require.NoError(t, err)
+			require.Len(t, entities, 2)
+
+			// Index entities by file basename
+			byName := map[string]int{}
+			for i, e := range entities {
+				byName[filepath.Base(e.RelativePath)] = i
+			}
+			// Validate Orders entity
+			idx, ok := byName["orders-model.yaml"]
+			require.True(t, ok)
+			ordersSpec, _ := entities[idx].Content.(*specs.Spec)
+			require.NotNil(t, ordersSpec)
+			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
+			assert.Equal(t, specs.SpecVersion, ordersSpec.Version)
+			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])
+			assert.Equal(t, "id", ordersSpec.Spec[sqlmodel.PrimaryKeyKey])
+			assert.Equal(t, "SELECT * FROM orders", ordersSpec.Spec[sqlmodel.SQLKey])
+			assert.Equal(t, "postgres", ordersSpec.Spec[sqlmodel.SourceDefinitionKey])
+			assert.Equal(t, true, ordersSpec.Spec[sqlmodel.EnabledKey])
+			assert.Equal(t, "orders-model", ordersSpec.Spec[sqlmodel.IDKey])
+			assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[idx].RelativePath)
+
+			// Metadata checks: presence and name
+			assert.Equal(t, "orders-model", ordersSpec.Metadata["name"])
+			_, ok = ordersSpec.Metadata["import"].(map[string]any)
+			require.True(t, ok)
+		})
+
+		t.Run("Empty collection returns nil", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := resources.NewResourceCollection()
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			require.NoError(t, err)
+			assert.Nil(t, entities)
+		})
+
+		t.Run("Error on invalid data type", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection := resources.NewResourceCollection()
+			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
+			})
+			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			assert.Error(t, err)
+			assert.Nil(t, entities)
+			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
+		})
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
@@ -450,7 +551,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 				// Setup
 				mockClient := &mockRETLClient{sourceID: "src123"}
-				handler := sqlmodel.NewHandler(mockClient)
+				handler := sqlmodel.NewHandler(mockClient, "retl")
 
 				// Convert spec to JSON and back to simulate loading from file
 				specJSON, err := json.Marshal(tc.spec.Spec)
@@ -516,7 +617,7 @@ func TestSQLModelHandler(t *testing.T) {
 				return resp, nil
 			}
 
-			h := sqlmodel.NewHandler(mockClient)
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			rows, err := h.Preview(context.Background(), "id", validData, 10)
 
 			require.NoError(t, err)
@@ -531,7 +632,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient.submitSourcePreviewFunc = func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
 				return nil, fmt.Errorf("boom")
 			}
-			h := sqlmodel.NewHandler(mockClient)
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			rows, err := h.Preview(context.Background(), "id", validData, 5)
 			assert.Error(t, err)
 			assert.Nil(t, rows)
@@ -544,7 +645,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient.submitSourcePreviewFunc = func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
 				return nil, fmt.Errorf("bad query")
 			}
-			h := sqlmodel.NewHandler(mockClient)
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			_, err := h.Preview(context.Background(), "id", validData, 5)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "submitting preview request")
@@ -561,7 +662,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient.getSourcePreviewResultFunc = func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error) {
 				return nil, fmt.Errorf("network")
 			}
-			h := sqlmodel.NewHandler(mockClient)
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			_, err := h.Preview(context.Background(), "id", validData, 5)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "getting preview results")
@@ -581,7 +682,7 @@ func TestSQLModelHandler(t *testing.T) {
 				resp.Error = "syntax error"
 				return resp, nil
 			}
-			h := sqlmodel.NewHandler(mockClient)
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			_, err := h.Preview(context.Background(), "id", validData, 5)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "preview request failed: syntax error")
@@ -593,7 +694,7 @@ func TestSQLModelHandler(t *testing.T) {
 				sqlmodel.AccountIDKey:        "acc123",
 				sqlmodel.SourceDefinitionKey: "postgres",
 			}
-			h := sqlmodel.NewHandler(&mockRETLClient{})
+			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
 			_, err := h.Preview(context.Background(), "id", data, 5)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "SQL not found")
@@ -605,7 +706,7 @@ func TestSQLModelHandler(t *testing.T) {
 				sqlmodel.SQLKey:              "SELECT 1",
 				sqlmodel.SourceDefinitionKey: "postgres",
 			}
-			h := sqlmodel.NewHandler(&mockRETLClient{})
+			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
 			_, err := h.Preview(context.Background(), "id", data, 5)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "account ID not found")
@@ -616,7 +717,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		err := handler.LoadSpec("test.yaml", createTestSpec("test-model", "Test Model", "Test description", "SELECT * FROM users"))
 		require.NoError(t, err)
@@ -631,7 +732,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		// Create a spec with invalid structure that will cause mapstructure.Decode to fail
 		invalidSpec := createTestSpecMap(map[string]interface{}{
@@ -649,7 +750,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		handler.LoadSpec("test.yaml", createTestSpec("test-model", "Test Model", "Test description", "SELECT * FROM users"))
 
@@ -662,7 +763,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		err := handler.LoadSpec("test.yaml", createTestSpecMap(map[string]interface{}{
 			"id":           "test-model",
@@ -682,7 +783,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 		handler.LoadSpec("test.yaml", createTestSpec("test-model", "Test Model", "Test description", "SELECT * FROM users"))
 		handler.LoadSpec("test-2.yaml", createTestSpec("test-model-2", "Test Model 2", "Test description 2", "SELECT * FROM users"))
 
@@ -701,7 +802,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		handler.LoadSpec("test.yaml", createTestSpec("test-model", "Test Model", "Test description", "SELECT * FROM users"))
 		data := createTestResourceData("test-model", "Test Model", "Test description", "SELECT * FROM users")
@@ -723,7 +824,7 @@ func TestSQLModelHandler(t *testing.T) {
 				return nil, fmt.Errorf("API error creating source")
 			},
 		}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 		data := createTestResourceData("test-model", "Test Model", "Test description", "SELECT * FROM users")
 
 		result, err := handler.Create(context.Background(), "test-model", data)
@@ -755,7 +856,7 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			},
 		}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 		data := createTestResourceData("test-model", "Test Model", "Test description", "SELECT * FROM users")
 
 		result, err := handler.Create(context.Background(), "test-model", data)
@@ -873,7 +974,7 @@ func TestSQLModelHandler(t *testing.T) {
 				t.Parallel()
 
 				mockClient := tc.mockSetup()
-				handler := sqlmodel.NewHandler(mockClient)
+				handler := sqlmodel.NewHandler(mockClient, "retl")
 
 				result, err := handler.Update(context.Background(), "test-model", tc.data, tc.state)
 
@@ -912,7 +1013,7 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			},
 		}
-		handler := sqlmodel.NewHandler(mockClient)
+		handler := sqlmodel.NewHandler(mockClient, "retl")
 
 		data := resources.ResourceData{
 			"display_name":      "Updated Model",
@@ -992,7 +1093,7 @@ func TestSQLModelHandler(t *testing.T) {
 				t.Parallel()
 
 				mockClient := tc.mockSetup()
-				handler := sqlmodel.NewHandler(mockClient)
+				handler := sqlmodel.NewHandler(mockClient, "retl")
 
 				err := handler.Delete(context.Background(), "test-model", tc.state)
 
@@ -1035,7 +1136,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(source1, source2),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			results, err := handler.List(context.Background(), nil)
 
@@ -1084,7 +1185,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(source),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 			hasExternalID := true
 			results, err := handler.List(context.Background(), &hasExternalID)
 			assert.NoError(t, err)
@@ -1111,7 +1212,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			results, err := handler.List(context.Background(), nil)
 
@@ -1129,7 +1230,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			results, err := handler.List(context.Background(), nil)
 
@@ -1279,7 +1380,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			// In Import tests, set mockClient.getRetlSourceFunc instead of mockClient.GetRetlSource
 			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
@@ -1317,7 +1418,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("Non-SQL-model type", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			// Non-SQL-model type
 			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
@@ -1336,7 +1437,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("API error", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			// API error
 			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
@@ -1352,7 +1453,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("Missing local id", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 			args := importremote.ImportArgs{RemoteID: "remote-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
@@ -1362,7 +1463,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("Missing remote id", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 			args := importremote.ImportArgs{LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
@@ -1400,7 +1501,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(source1, source2),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			collection, err := handler.LoadResourcesFromRemote(context.Background())
 
@@ -1441,7 +1542,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(source),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			collection, err := handler.LoadResourcesFromRemote(context.Background())
 
@@ -1464,7 +1565,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			collection, err := handler.LoadResourcesFromRemote(context.Background())
 
@@ -1490,7 +1591,7 @@ func TestSQLModelHandler(t *testing.T) {
 				listRetlSourcesFunc: mockListRetlSources(sourceWithExt),
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			collection, err := handler.LoadResourcesFromRemote(context.Background())
 
@@ -1515,7 +1616,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 			}
 
-			handler := sqlmodel.NewHandler(mockClient)
+			handler := sqlmodel.NewHandler(mockClient, "retl")
 
 			// Execute
 			collection, err := handler.LoadResourcesFromRemote(context.Background())
@@ -1531,7 +1632,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Run("Success with multiple resources", func(t *testing.T) {
 			t.Parallel()
 
-			h := sqlmodel.NewHandler(&mockRETLClient{})
+			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
 
 			createdAt := time.Now().Add(-48 * time.Hour)
 			updatedAt := time.Now()
@@ -1623,7 +1724,7 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Run("Error on invalid data type", func(t *testing.T) {
 			t.Parallel()
 
-			h := sqlmodel.NewHandler(&mockRETLClient{})
+			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
 			collection := resources.NewResourceCollection()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {
@@ -1639,4 +1740,307 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
 		})
 	})
+
+	t.Run("LoadImportable", func(t *testing.T) {
+		t.Parallel()
+
+		// Helpers to avoid duplication
+		mkSource := func(id, name, def, account string, enabled bool, desc, pk, sql string) retlClient.RETLSource {
+			return createTestRETLSourceWithConfig(id, name, def, account, enabled, retlClient.RETLSQLModelConfig{
+				Description: desc,
+				PrimaryKey:  pk,
+				Sql:         sql,
+			})
+		}
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+
+		t.Run("Success with multiple sources", func(t *testing.T) {
+			t.Parallel()
+			// Two remote sources without external IDs
+			s1 := mkSource("rid-1", "Orders Model", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
+			s2 := mkSource("rid-2", "Users Model", "mysql", "acc-2", false, "users", "user_id", "SELECT * FROM users")
+			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources(s1, s2)}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			require.NoError(t, err)
+			require.NotNil(t, collection)
+
+			items := collection.GetAll(sqlmodel.ResourceType)
+			require.Len(t, items, 2)
+
+			// Validate first resource mapping
+			r1, ok := items["rid-1"]
+			require.True(t, ok)
+			assert.Equal(t, "rid-1", r1.ID)
+			assert.Equal(t, namer.NewKebabCase().Name("Orders Model"), r1.ExternalID)
+			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r1.ExternalID), r1.Reference)
+
+			// Validate second resource mapping
+			r2, ok := items["rid-2"]
+			require.True(t, ok)
+			assert.Equal(t, "rid-2", r2.ID)
+			assert.Equal(t, namer.NewKebabCase().Name("Users Model"), r2.ExternalID)
+			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r2.ExternalID), r2.Reference)
+		})
+
+		t.Run("Success with empty list", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources()}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			require.NoError(t, err)
+			require.NotNil(t, collection)
+			assert.Len(t, collection.GetAll(sqlmodel.ResourceType), 0)
+		})
+
+		t.Run("API error", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) { return nil, fmt.Errorf("api") }}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			collection, err := h.LoadImportable(context.Background(), idNamer)
+			assert.Error(t, err)
+			assert.Nil(t, collection)
+			assert.Contains(t, err.Error(), "listing RETL sources")
+		})
+	})
+
+	t.Run("Import", func(t *testing.T) {
+		t.Parallel()
+
+		baseData := func() resources.ResourceData {
+			return resources.ResourceData{
+				sqlmodel.DisplayNameKey:      "Imported Model",
+				sqlmodel.DescriptionKey:      "desc",
+				sqlmodel.AccountIDKey:        "acc123",
+				sqlmodel.PrimaryKeyKey:       "id",
+				sqlmodel.SourceDefinitionKey: "postgres",
+				sqlmodel.EnabledKey:          true,
+				sqlmodel.SQLKey:              "SELECT * FROM t",
+			}
+		}
+
+		mkUpstream := func(sql string) *retlClient.RETLSource {
+			return &retlClient.RETLSource{
+				ID:                   "remote-id",
+				Name:                 "Imported Model",
+				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: sql},
+				SourceType:           retlClient.ModelSourceType,
+				SourceDefinitionName: "postgres",
+				AccountID:            "acc123",
+				IsEnabled:            true,
+			}
+		}
+
+		mkMock := func(upstream *retlClient.RETLSource) *mockRETLClient {
+			m := &mockRETLClient{}
+			m.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return upstream, nil
+			}
+			return m
+		}
+
+		assertStandardFields := func(t *testing.T, res *resources.ResourceData) {
+			t.Helper()
+			assert.Equal(t, "remote-id", (*res)[sqlmodel.IDKey])
+			assert.Equal(t, "Imported Model", (*res)[sqlmodel.DisplayNameKey])
+			assert.Equal(t, "desc", (*res)[sqlmodel.DescriptionKey])
+			assert.Equal(t, "acc123", (*res)[sqlmodel.AccountIDKey])
+			assert.Equal(t, "id", (*res)[sqlmodel.PrimaryKeyKey])
+		}
+
+		t.Run("Success - no changes upstream", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := mkMock(mkUpstream("SELECT * FROM t"))
+			setCalled := false
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				setCalled = true
+				assert.Equal(t, "remote-id", sourceID)
+				assert.Equal(t, "local-id", externalId)
+				return nil
+			}
+
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			data := baseData()
+			res, err := h.Import(context.Background(), "local-id", data, "remote-id")
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.True(t, setCalled, "SetExternalId should be called")
+			// ensure response mirrors upstream (id and fields present)
+			assertStandardFields(t, res)
+			assert.Equal(t, "SELECT * FROM t", (*res)[sqlmodel.SQLKey])
+		})
+
+		t.Run("Success - changes require update", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := mkMock(mkUpstream("SELECT * FROM old"))
+			mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+				assert.Equal(t, "remote-id", sourceID)
+				// Ensure update request reflects local data
+				assert.Equal(t, "Imported Model", req.Name)
+				assert.Equal(t, "acc123", req.AccountID)
+				assert.True(t, req.IsEnabled)
+				assert.Equal(t, "id", req.Config.PrimaryKey)
+				assert.Equal(t, "SELECT * FROM t", req.Config.Sql)
+				return &retlClient.RETLSource{
+					ID:                   "remote-id",
+					Name:                 req.Name,
+					Config:               req.Config,
+					SourceType:           retlClient.ModelSourceType,
+					SourceDefinitionName: "postgres",
+					AccountID:            req.AccountID,
+					IsEnabled:            req.IsEnabled,
+				}, nil
+			}
+			setCalled := false
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				setCalled = true
+				return nil
+			}
+
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			data := baseData()
+			res, err := h.Import(context.Background(), "local-id", data, "remote-id")
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.True(t, mockClient.updateCalled, "update should be called when changes detected")
+			assert.True(t, setCalled, "SetExternalId should be called")
+			assert.Equal(t, "SELECT * FROM t", (*res)[sqlmodel.SQLKey])
+		})
+
+		t.Run("Error - get source API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := &mockRETLClient{}
+			mockClient.getRetlSourceFunc = func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("boom")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "getting RETL source")
+		})
+
+		t.Run("Error - update API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := mkMock(mkUpstream("SELECT * FROM old"))
+			mockClient.updateRetlSourceFunc = func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error) {
+				return nil, fmt.Errorf("update failed")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "updating RETL source")
+		})
+
+		t.Run("Error - set external id API", func(t *testing.T) {
+			t.Parallel()
+			mockClient := mkMock(mkUpstream("SELECT * FROM t"))
+			mockClient.setExternalIdFunc = func(ctx context.Context, sourceID string, externalId string) error {
+				return fmt.Errorf("failed to set external id")
+			}
+			h := sqlmodel.NewHandler(mockClient, "retl")
+			_, err := h.Import(context.Background(), "local-id", baseData(), "remote-id")
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "setting external ID for RETL source")
+		})
+	})
+}
+
+func TestSQLModelResource_DiffUpstream(t *testing.T) {
+	t.Parallel()
+
+	base := func() sqlmodel.SQLModelResource {
+		return sqlmodel.SQLModelResource{
+			ID:               "id-1",
+			DisplayName:      "Name",
+			Description:      "Desc",
+			SQL:              "SELECT * FROM t",
+			AccountID:        "acc-1",
+			PrimaryKey:       "id",
+			SourceDefinition: "postgres",
+			Enabled:          true,
+		}
+	}
+
+	cases := []struct {
+		name     string
+		mutate   func(up *sqlmodel.SQLModelResource)
+		expected bool
+	}{
+		{
+			name:     "no change returns false",
+			mutate:   func(up *sqlmodel.SQLModelResource) {},
+			expected: false,
+		},
+		{
+			name: "display name change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.DisplayName = "New Name"
+			},
+			expected: true,
+		},
+		{
+			name: "description change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.Description = "New Desc"
+			},
+			expected: true,
+		},
+		{
+			name: "account id change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.AccountID = "acc-2"
+			},
+			expected: true,
+		},
+		{
+			name: "primary key change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.PrimaryKey = "pk"
+			},
+			expected: true,
+		},
+		{
+			name: "enabled change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.Enabled = false
+			},
+			expected: true,
+		},
+		{
+			name: "sql change",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.SQL = "SELECT id FROM t"
+			},
+			expected: true,
+		},
+		{
+			name: "source definition change does not diff",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.SourceDefinition = "mysql"
+			},
+			expected: false,
+		},
+		{
+			name: "multiple changes still true",
+			mutate: func(up *sqlmodel.SQLModelResource) {
+				up.DisplayName = "X"
+				up.SQL = "SELECT 1"
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			downstream := base()
+			upstream := base()
+			tc.mutate(&upstream)
+			got := downstream.DiffUpstream(&upstream)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
 }

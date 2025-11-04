@@ -24,6 +24,8 @@ type Provider struct {
 	kindToType map[string]string
 }
 
+const importDir = "retl"
+
 // New creates a new RETL provider instance
 func New(client retlClient.RETLStore) *Provider {
 	p := &Provider{
@@ -35,7 +37,7 @@ func New(client retlClient.RETLStore) *Provider {
 	}
 
 	// Register handlers
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
 	return p
 }
@@ -281,9 +283,28 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 }
 
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	return resources.NewResourceCollection(), nil
+	collection := resources.NewResourceCollection()
+	for _, handler := range p.handlers {
+		resources, err := handler.LoadImportable(ctx, idNamer)
+		if err != nil {
+			return nil, fmt.Errorf("loading importable resources from handler %w", err)
+		}
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collection for handler %w", err)
+		}
+	}
+	return collection, nil
 }
 
 func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
-	return nil, nil
+	allEntities := make([]importremote.FormattableEntity, 0)
+	for _, handler := range p.handlers {
+		entities, err := handler.FormatForExport(ctx, collection, idNamer, inputResolver)
+		if err != nil {
+			return nil, fmt.Errorf("formatting for export for handler %w", err)
+		}
+		allEntities = append(allEntities, entities...)
+	}
+	return allEntities, nil
 }
