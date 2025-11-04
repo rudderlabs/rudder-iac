@@ -817,13 +817,14 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	})
 
-	// Group event - traits
+	// Group event - context.traits (data added to context instead of traits parameter)
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Group"],
-		Section: plan.IdentitySectionTraits,
+		Section: plan.IdentitySectionContextTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"active": {Property: *ReferenceProperties["active"], Required: true},
+				"status": {Property: *ReferenceProperties["status"]},
 			},
 		},
 	})

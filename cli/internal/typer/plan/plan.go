@@ -136,8 +136,9 @@ func (c *CustomType) IsPrimitive() bool {
 type IdentitySection string
 
 const (
-	IdentitySectionProperties IdentitySection = "properties"
-	IdentitySectionTraits     IdentitySection = "traits"
+	IdentitySectionProperties    IdentitySection = "properties"
+	IdentitySectionTraits        IdentitySection = "traits"
+	IdentitySectionContextTraits IdentitySection = "context.traits"
 )
 
 // EventRule represents a rule for an event

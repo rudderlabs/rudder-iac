@@ -211,6 +211,8 @@ func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.Na
 		suffix = "Properties"
 	case plan.IdentitySectionTraits:
 		suffix = "Traits"
+	case plan.IdentitySectionContextTraits:
+		suffix = "Traits"
 	default:
 		return "", fmt.Errorf("unsupported event rule section: %s", rule.Section)
 	}

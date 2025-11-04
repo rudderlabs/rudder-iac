@@ -14,6 +14,8 @@ func sectionToParamName(section plan.IdentitySection) (string, error) {
 		return "properties", nil
 	case plan.IdentitySectionTraits:
 		return "traits", nil
+	case plan.IdentitySectionContextTraits:
+		return "traits", nil
 	default:
 		return "", fmt.Errorf("unknown event rule section: %s", section)
 	}
@@ -113,8 +115,13 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 		method.MethodArguments = append(method.MethodArguments,
 			KotlinMethodArgument{Name: paramName, Type: className})
 
-		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
-			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+		// For context.traits, add the data to context instead of as an SDK parameter
+		if rule.Section == plan.IdentitySectionContextTraits {
+			method.AddDataToContext = true
+		} else {
+			method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+				SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+		}
 	}
 
 	return nil
@@ -147,8 +154,13 @@ func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 		method.MethodArguments = append(method.MethodArguments,
 			KotlinMethodArgument{Name: paramName, Type: className})
 
-		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
-			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+		// For context.traits, add the data to context instead of as an SDK parameter
+		if rule.Section == plan.IdentitySectionContextTraits {
+			method.AddDataToContext = true
+		} else {
+			method.SDKCall.Arguments = append(method.SDKCall.Arguments,
+				SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
+		}
 	}
 	return nil
 }
