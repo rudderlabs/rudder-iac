@@ -46,6 +46,26 @@ func init() {
 		Description: "Triggered when user clicks on a \"premium\" product /* important */",
 	}
 
+	// Event with dollar sign in name to test $ escaping
+	ReferenceEvents["$Variable$String"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "$Variable$String",
+		Description: "Event with dollar signs to test string interpolation escaping",
+	}
+
+	// Events with names that collide after sanitization - test method name collision handling
+	ReferenceEvents["eventWithNameCamelCase"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "eventWithNameCamelCase",
+		Description: "Event with camel case name",
+	}
+
+	ReferenceEvents["$eventWithNameCamelCase$!"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "$eventWithNameCamelCase$!",
+		Description: "Event with special characters that collide after sanitization",
+	}
+
 	ReferenceEvents["Empty Event With Additional Props"] = &plan.Event{
 		EventType:   plan.EventTypeTrack,
 		Name:        "Empty Event With Additional Props",
@@ -128,6 +148,16 @@ func init() {
 		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
 		Config: &plan.PropertyConfig{
 			Enum: []any{"200: OK", "404: Not Found", "500: Internal \"Server\" Error"},
+		},
+	}
+
+	// Property with dollar sign in description and enum to test $ escaping
+	ReferenceProperties["dollar_field"] = &plan.Property{
+		Name:        "dollar_field",
+		Description: "Field with $ for testing string interpolation: $variable and ${expression}",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+		Config: &plan.PropertyConfig{
+			Enum: []any{"$USD", "$100", "Price: $99.99", "$variable_name"},
 		},
 	}
 
@@ -817,13 +847,14 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	})
 
-	// Group event - traits
+	// Group event - context.traits (data added to context instead of traits parameter)
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Group"],
-		Section: plan.IdentitySectionTraits,
+		Section: plan.IdentitySectionContextTraits,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
 				"active": {Property: *ReferenceProperties["active"], Required: true},
+				"status": {Property: *ReferenceProperties["status"]},
 			},
 		},
 	})
@@ -846,6 +877,20 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		},
 	})
 
+	// Track event with dollar sign - properties
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["$Variable$String"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"dollar_field": {
+					Property: *ReferenceProperties["dollar_field"],
+					Required: true,
+				},
+			},
+		},
+	})
+
 	// Empty event with additionalProperties: true
 	rules = append(rules, plan.EventRule{
 		Event:   *ReferenceEvents["Empty Event With Additional Props"],
@@ -862,6 +907,27 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{},
+		},
+	})
+
+	// Track events with names that collide after sanitization
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["eventWithNameCamelCase"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"active": {Property: *ReferenceProperties["active"]},
+			},
+		},
+	})
+
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["$eventWithNameCamelCase$!"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"email": {Property: *ReferenceProperties["email"]},
+			},
 		},
 	})
 

@@ -148,6 +148,18 @@ These helper methods provide convenient access to nested data without violating 
 - Generators: Business logic transformation layer (semantic decisions)
 - Templates: Syntax-level formatting (escaping, indentation, quoting) via template functions
 
+### Input Immutability
+
+**CRITICAL**: Generators MUST treat the input TrackingPlan and EventRules as **read-only**. No modifications to input objects are allowed.
+
+**Why this matters**:
+
+- Enables safe, deterministic multi-pass processing (data extraction, then code generation)
+- Guarantees that collision handling produces consistent results (same rule → same registration key)
+- Prevents subtle bugs where modifications in one generation phase affect later phases
+
+**Implementation guideline**: Only read from `rule.Event.EventType`, `rule.Event.Name`, `rule.Schema`, etc. Never set or modify any fields on the input rule object.
+
 ### Extensibility
 
 - Strategy pattern for platform-specific generation
@@ -192,21 +204,26 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 
 #### Modifying the Reference Plan
 
-When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
+When making changes to the generator, **FIRST** check if the reference tracking plan includes test cases relevant to your changes. If not, add them. When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
 
-1. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go`
-2. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
+1. **Check if reference plan covers your changes** - Verify that the reference tracking plan includes test cases for your new feature
+   - For example, when implementing `context.traits` support, add event rules using `IdentitySectionContextTraits`
+   - Each event type can only have one rule per section - plan accordingly to avoid conflicts
+2. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go` (if needed)
+3. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
    - Note: Properties and custom types are only extracted if they are actually used in event rules
    - Unused items in the reference maps will not be tested
-3. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
-4. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
+4. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+5. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
 
 **Common Mistakes to Avoid**:
+
 - ❌ Adding properties/custom types to reference maps but not using them in any event rules (they won't be tested)
 - ❌ Forgetting to regenerate testdata after reference plan changes
 - ❌ Not running tests after making changes
 
 **Workflow Example**:
+
 ```go
 // 1. Add property to reference plan
 ReferenceProperties["new_field"] = &plan.Property{
@@ -337,6 +354,7 @@ func (opts *KotlinOptions) Validate() error {
 ```
 
 **Struct Tags**:
+
 - `mapstructure:"key"` - Used by orchestrator to decode from `map[string]string` to struct fields
 - `description:"..."` - Used by CLI to display help text
 

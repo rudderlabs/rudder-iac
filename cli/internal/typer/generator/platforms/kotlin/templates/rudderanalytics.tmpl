@@ -57,10 +57,18 @@ class RudderAnalytics(private val analytics: Analytics) {
 {{ range .RudderAnalyticsMethods }}
     /**
      * {{ escapeComment .Comment }}
+     *
+     * Event:
+{{- if .EventName }}
+     *   Name: "{{ .EventName }}"
+{{- end }}
+{{- if .IdentitySection }}
+     *   Identity Section: "{{ .IdentitySection }}"
+{{- end }}
 {{- if .MethodArguments }}
      *
 {{- range .MethodArguments }}
-     * @param {{ .Name }}
+     * @param {{ .Name }}{{- if .Comment }} {{ escapeComment .Comment }}{{- end }}
 {{- end }}
 {{- end }}
      * @param options Optional RudderStack options for this event
@@ -68,11 +76,15 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.{{ .SDKCall.MethodName }}
      */
     fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end }}{{- if .MethodArguments }}, {{ end }}options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        {{- if .AddDataToContext }}
+        mergedOptions = mergeRudderContext(mergedOptions, buildJsonObject { put("traits", traits.rudderSerialize()) })
+        {{- end }}
         analytics.{{ .SDKCall.MethodName }}(
         {{- range $i, $arg := .SDKCall.Arguments }}
             {{ .Name }} ={{- if .ShouldSerialize }} {{ .Value }}.rudderSerialize(){{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
         {{- end }}
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 {{ end -}}

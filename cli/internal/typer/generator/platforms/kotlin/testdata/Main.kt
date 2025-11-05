@@ -237,6 +237,24 @@ fun PropertyDeviceType.rudderSerialize(): JsonElement = when (this) {
 fun List<PropertyDeviceType>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
+/** Field with $ for testing string interpolation: $variable and ${expression} */
+enum class PropertyDollarField {
+    USD,
+    _100,
+    PRICE_99_99,
+    VARIABLE_NAME
+}
+
+fun PropertyDollarField.rudderSerialize(): JsonElement = when (this) {
+    PropertyDollarField.USD -> JsonPrimitive("\$USD")
+    PropertyDollarField._100 -> JsonPrimitive("\$100")
+    PropertyDollarField.PRICE_99_99 -> JsonPrimitive("Price: \$99.99")
+    PropertyDollarField.VARIABLE_NAME -> JsonPrimitive("\$variable_name")
+}
+@JvmName("rudderSerializeListPropertyDollarField")
+fun List<PropertyDollarField>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
+
 /** Feature enabled flag */
 enum class PropertyEnabled {
     TRUE,
@@ -799,10 +817,16 @@ fun List<CustomTypeUserProfile>.rudderSerialize(): JsonArray = JsonArray(this.ma
 /** Group association event */
 data class GroupTraits(
     /** User active status */
-    val active: com.rudderstack.ruddertyper.PropertyActive
+    val active: com.rudderstack.ruddertyper.PropertyActive,
+
+    /** User account status */
+    val status: com.rudderstack.ruddertyper.PropertyStatus? = null
 )
 fun GroupTraits.rudderSerialize(): JsonObject = buildJsonObject {
     put("active", active.rudderSerialize())
+    if (status != null) {
+        put("status", status.rudderSerialize())
+    }
 }
 @JvmName("rudderSerializeListGroupTraits")
 fun List<GroupTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
@@ -847,6 +871,30 @@ fun ScreenProperties.rudderSerialize(): JsonObject = buildJsonObject {
 }
 @JvmName("rudderSerializeListScreenProperties")
 fun List<ScreenProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
+/** Event with dollar signs to test string interpolation escaping */
+data class TrackVariableStringProperties(
+    /** Field with $ for testing string interpolation: $variable and ${expression} */
+    val dollarField: com.rudderstack.ruddertyper.PropertyDollarField
+)
+fun TrackVariableStringProperties.rudderSerialize(): JsonObject = buildJsonObject {
+    put("dollar_field", dollarField.rudderSerialize())
+}
+@JvmName("rudderSerializeListTrackVariableStringProperties")
+fun List<TrackVariableStringProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
+/** Event with special characters that collide after sanitization */
+data class TrackEventWithNameCamelCaseProperties(
+    /** User's email address */
+    val email: com.rudderstack.ruddertyper.PropertyEmail? = null
+)
+fun TrackEventWithNameCamelCaseProperties.rudderSerialize(): JsonObject = buildJsonObject {
+    if (email != null) {
+        put("email", email.rudderSerialize())
+    }
+}
+@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties")
+fun List<TrackEventWithNameCamelCaseProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 data class TrackProductPremiumClickedProperties(
@@ -1118,6 +1166,19 @@ fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject 
 @JvmName("rudderSerializeListTrackUserSignedUpProperties")
 fun List<TrackUserSignedUpProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
+/** Event with camel case name */
+data class TrackEventWithNameCamelCaseProperties1(
+    /** User active status */
+    val active: com.rudderstack.ruddertyper.PropertyActive? = null
+)
+fun TrackEventWithNameCamelCaseProperties1.rudderSerialize(): JsonObject = buildJsonObject {
+    if (active != null) {
+        put("active", active.rudderSerialize())
+    }
+}
+@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties1")
+fun List<TrackEventWithNameCamelCaseProperties1>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 /** Merges the ruddertyper context with user-provided custom context */
 private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
     return if (userOptions == null) {
@@ -1179,130 +1240,230 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Group association event
      *
+     * Event:
+     *   Identity Section: "context.traits"
+     *
      * @param groupId
-     * @param traits
+     * @param traits The traits to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.group
      */
     fun group(groupId: String, traits: GroupTraits, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        mergedOptions = mergeRudderContext(mergedOptions, buildJsonObject { put("traits", traits.rudderSerialize()) })
         analytics.group(
             groupId = groupId,
-            traits = traits.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * User identification event
      *
+     * Event:
+     *   Identity Section: "traits"
+     *
      * @param userId
-     * @param traits
+     * @param traits The traits to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.identify
      */
     fun identify(userId: String = "", traits: IdentifyTraits, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.identify(
             userId = userId,
             traits = traits.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * Screen view event
      *
+     * Event:
+     *   Identity Section: "properties"
+     *
      * @param screenName
      * @param category
-     * @param properties
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.screen
      */
     fun screen(screenName: String, category: String = "", properties: ScreenProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.screen(
             screenName = screenName,
             category = category,
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with dollar signs to test string interpolation escaping
+     *
+     * Event:
+     *   Name: "$Variable$String"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackVariableString(properties: TrackVariableStringProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        analytics.track(
+            name = "\$Variable\$String",
+            properties = properties.rudderSerialize(),
+            options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with special characters that collide after sanitization
+     *
+     * Event:
+     *   Name: "$eventWithNameCamelCase$!"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackEventWithNameCamelCase(properties: TrackEventWithNameCamelCaseProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        analytics.track(
+            name = "\$eventWithNameCamelCase\$!",
+            properties = properties.rudderSerialize(),
+            options = mergedOptions
         )
     }
 
     /**
      * Empty event schema with additionalProperties false
+     *
+     * Event:
+     *   Name: "Empty Event No Additional Props"
+     *   Identity Section: "properties"
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventNoAdditionalProps(options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Empty Event No Additional Props",
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * Empty event schema with additionalProperties true
      *
-     * @param properties
+     * Event:
+     *   Name: "Empty Event With Additional Props"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Empty Event With Additional Props",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * Example event to demonstrate variants
      *
-     * @param properties
+     * Event:
+     *   Name: "Event With Variants"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Event With Variants",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * Triggered when user clicks on a "premium" product /\* important *\/
      *
-     * @param properties
+     * Event:
+     *   Name: "Product "Premium" Clicked"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Product \"Premium\" Clicked",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
     /**
      * Triggered when a user signs up
      *
-     * @param properties
+     * Event:
+     *   Name: "User Signed Up"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackUserSignedUp(properties: TrackUserSignedUpProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "User Signed Up",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with camel case name
+     *
+     * Event:
+     *   Name: "eventWithNameCamelCase"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackEventWithNameCamelCase1(properties: TrackEventWithNameCamelCaseProperties1, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        analytics.track(
+            name = "eventWithNameCamelCase",
+            properties = properties.rudderSerialize(),
+            options = mergedOptions
         )
     }
 }
