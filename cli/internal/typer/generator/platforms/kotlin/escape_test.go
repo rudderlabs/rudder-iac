@@ -85,6 +85,26 @@ func TestEscapeKotlinStringLiteral(t *testing.T) {
 			input:    `C:\Program Files\MyApp\config.json`,
 			expected: `C:\\Program Files\\MyApp\\config.json`,
 		},
+		{
+			name:     "string with dollar sign",
+			input:    "Price: $100",
+			expected: `Price: \$100`,
+		},
+		{
+			name:     "string with expression-like syntax",
+			input:    "${expression}",
+			expected: `\${expression}`,
+		},
+		{
+			name:     "string with multiple dollar signs",
+			input:    "$USD $100 $EUR",
+			expected: `\$USD \$100 \$EUR`,
+		},
+		{
+			name:     "mixed special characters with dollar signs",
+			input:    `Path: "C:\$Folder" and $variable`,
+			expected: `Path: \"C:\\\$Folder\" and \$variable`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -260,6 +280,31 @@ func TestFormatKotlinLiteral(t *testing.T) {
 			name:     "event name with special chars",
 			input:    `User "Premium" Event`,
 			expected: `"User \"Premium\" Event"`,
+		},
+		{
+			name:     "string with dollar sign",
+			input:    "Price: $100",
+			expected: `"Price: \$100"`,
+		},
+		{
+			name:     "string with variable-like syntax",
+			input:    "$variable",
+			expected: `"\$variable"`,
+		},
+		{
+			name:     "string with expression-like syntax",
+			input:    "${expression}",
+			expected: `"\${expression}"`,
+		},
+		{
+			name:     "event name with dollar signs",
+			input:    "$Variable$String",
+			expected: `"\$Variable\$String"`,
+		},
+		{
+			name:     "mixed special characters with dollar signs",
+			input:    `Text with "quotes" and $variable`,
+			expected: `"Text with \"quotes\" and \$variable"`,
 		},
 	}
 

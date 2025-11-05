@@ -6,12 +6,13 @@ import (
 )
 
 // EscapeKotlinStringLiteral escapes a string for use in Kotlin string literals.
-// It handles backslashes, quotes, newlines, tabs, carriage returns, and other special characters
+// It handles backslashes, quotes, dollar signs, newlines, tabs, carriage returns, and other special characters
 // to ensure the resulting string is valid Kotlin syntax.
 //
 // Examples:
 //   - `Hello "World"` → `Hello \"World\"`
 //   - `Path\To\File` → `Path\\To\\File`
+//   - `Price: $100` → `Price: \$100`
 //   - `Line 1\nLine 2` → `Line 1\\nLine 2`
 func EscapeKotlinStringLiteral(s string) string {
 	var builder strings.Builder
@@ -23,6 +24,8 @@ func EscapeKotlinStringLiteral(s string) string {
 			builder.WriteString(`\\`)
 		case '"':
 			builder.WriteString(`\"`)
+		case '$':
+			builder.WriteString(`\$`)
 		case '\n':
 			builder.WriteString(`\n`)
 		case '\r':

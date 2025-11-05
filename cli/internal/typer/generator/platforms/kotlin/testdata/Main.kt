@@ -237,6 +237,24 @@ fun PropertyDeviceType.rudderSerialize(): JsonElement = when (this) {
 fun List<PropertyDeviceType>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
+/** Field with $ for testing string interpolation: $variable and ${expression} */
+enum class PropertyDollarField {
+    USD,
+    _100,
+    PRICE_99_99,
+    VARIABLE_NAME
+}
+
+fun PropertyDollarField.rudderSerialize(): JsonElement = when (this) {
+    PropertyDollarField.USD -> JsonPrimitive("\$USD")
+    PropertyDollarField._100 -> JsonPrimitive("\$100")
+    PropertyDollarField.PRICE_99_99 -> JsonPrimitive("Price: \$99.99")
+    PropertyDollarField.VARIABLE_NAME -> JsonPrimitive("\$variable_name")
+}
+@JvmName("rudderSerializeListPropertyDollarField")
+fun List<PropertyDollarField>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
+
 /** Feature enabled flag */
 enum class PropertyEnabled {
     TRUE,
@@ -854,6 +872,17 @@ fun ScreenProperties.rudderSerialize(): JsonObject = buildJsonObject {
 @JvmName("rudderSerializeListScreenProperties")
 fun List<ScreenProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
+/** Event with dollar signs to test string interpolation escaping */
+data class TrackVariableStringProperties(
+    /** Field with $ for testing string interpolation: $variable and ${expression} */
+    val dollarField: com.rudderstack.ruddertyper.PropertyDollarField
+)
+fun TrackVariableStringProperties.rudderSerialize(): JsonObject = buildJsonObject {
+    put("dollar_field", dollarField.rudderSerialize())
+}
+@JvmName("rudderSerializeListTrackVariableStringProperties")
+fun List<TrackVariableStringProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 data class TrackProductPremiumClickedProperties(
     /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
@@ -1235,6 +1264,22 @@ class RudderAnalytics(private val analytics: Analytics) {
             category = category,
             properties = properties.rudderSerialize(),
             options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with dollar signs to test string interpolation escaping
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackVariableString(properties: TrackVariableStringProperties, options: RudderOption? = null) {
+        analytics.track(
+            name = "\$Variable\$String",
+            properties = properties.rudderSerialize(),
+            options = mergeRudderContext(options, context)
         )
     }
 
