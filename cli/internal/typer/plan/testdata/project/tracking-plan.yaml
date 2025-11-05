@@ -1,0 +1,98 @@
+version: "rudder/v0.1"
+kind: "tp"
+metadata:
+  name: "typer-test"
+spec:
+  id: "typer-test-tracking-plan"
+  display_name: "Typer Test Tracking Plan"
+  description: "Tracking plan for a testing application."
+  rules:
+    - type: "event_rule"
+      id: "some_track_event_rule"
+      event:
+        $ref: "#/events/typer-test/some_track_event"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/typer-test/some-string"
+          required: true
+        - $ref: "#/properties/typer-test/some-integer"
+          required: true
+        - $ref: "#/properties/typer-test/some-number"
+          required: true
+        - $ref: "#/properties/typer-test/some-boolean"
+          required: true
+        - $ref: "#/properties/typer-test/some-object"
+          required: true
+        # - $ref: "#/properties/typer-test/some-null"
+        #   required: true
+        - $ref: "#/properties/typer-test/some-multi-type"
+        - $ref: "#/properties/typer-test/some-array-of-any"
+        - $ref: "#/properties/typer-test/some-array-of-strings"
+        - $ref: "#/properties/typer-test/some-array-of-integers"
+        - $ref: "#/properties/typer-test/some-array-of-numbers"
+        - $ref: "#/properties/typer-test/some-array-of-booleans"
+        - $ref: "#/properties/typer-test/some-array-of-multiple-types"
+        - $ref: "#/properties/typer-test/some-string-with-enum"
+        - $ref: "#/properties/typer-test/some-integer-with-enum"
+        - $ref: "#/properties/typer-test/some-nested-object"
+          properties:
+            - $ref: "#/properties/typer-test/some-nested-level-1"
+              properties:
+                - $ref: "#/properties/typer-test/some-nested-level-2"
+                  properties:
+                    - $ref: "#/properties/typer-test/some-string"
+                    - $ref: "#/properties/typer-test/some-integer"
+                    - $ref: "#/properties/typer-test/some-number"
+                    - $ref: "#/properties/typer-test/some-boolean"
+                    - $ref: "#/properties/typer-test/some-object"
+        - $ref: "#/properties/typer-test/some-custom-string"
+        - $ref: "#/properties/typer-test/some-custom-integer"
+        - $ref: "#/properties/typer-test/some-custom-number"
+        - $ref: "#/properties/typer-test/some-custom-boolean"
+        - $ref: "#/properties/typer-test/some-custom-object"
+        - $ref: "#/properties/typer-test/some-custom-array"
+        - $ref: "#/properties/typer-test/some-variant-object"
+        # - $ref: "#/properties/typer-test/some-custom-null"
+        #   required: false
+    - type: "event_rule"
+      id: "some_empty_track_event_rule"
+      event:
+        $ref: "#/events/typer-test/some_empty_track_event"
+        allow_unplanned: false
+    - type: "event_rule"
+      id: "some_empty_track_event_with_additional_properties_rule"
+      event:
+        $ref: "#/events/typer-test/some_empty_track_event_with_additional_properties"
+        allow_unplanned: true
+    - type: "event_rule"
+      id: "some_track_event_with_variants_rule"
+      event:
+        $ref: "#/events/typer-test/some_track_event_with_variants"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/typer-test/some-string"
+          required: true
+        - $ref: "#/properties/typer-test/some-integer"
+          required: false
+      variants:
+        - type: "discriminator"
+          discriminator: "#/properties/typer-test/some-string"
+          cases:
+            - display_name: "Case 1 - Sets integer as required"
+              description: "This is case 1."
+              match:
+                - "case_1"
+              properties:
+                - $ref: "#/properties/typer-test/some-integer"
+                  required: true
+            - display_name: "Case 2 - Adds number as optional"
+              description: "This is case 2."
+              match:
+                - "case_2_a"
+                - "case_2_b"
+              properties:
+                - $ref: "#/properties/typer-test/some-number"
+                  required: false
+          default:
+            - $ref: "#/properties/typer-test/some-boolean"
+              required: false

@@ -3,6 +3,7 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
@@ -33,11 +34,22 @@ type OperationLogEntry struct {
 
 type DataCatalogProvider struct {
 	InitialState *state.State
+	ReconstructedState *state.State
+	InitialResources *resources.ResourceCollection
 	OperationLog []OperationLogEntry
+	operationMutex sync.Mutex
 }
 
 func (p *DataCatalogProvider) LoadState(_ context.Context) (*state.State, error) {
 	return p.InitialState, nil
+}
+
+func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.ResourceCollection, error) {
+	return p.InitialResources, nil
+}
+
+func (p *DataCatalogProvider) LoadStateFromResources(_ context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	return p.ReconstructedState, nil
 }
 
 func (p *DataCatalogProvider) PutResourceState(_ context.Context, ID string, state *state.ResourceState) error {
@@ -82,6 +94,8 @@ func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType 
 }
 
 func (p *DataCatalogProvider) logOperation(operation string, args ...interface{}) {
+	p.operationMutex.Lock()
+	defer p.operationMutex.Unlock()
 	p.OperationLog = append(p.OperationLog, OperationLogEntry{
 		Operation: operation,
 		Args:      args,

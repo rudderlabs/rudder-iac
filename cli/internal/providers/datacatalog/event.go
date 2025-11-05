@@ -6,22 +6,41 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
-// TODO: implement on the same lines as the propertyProvider
+type EventEntityProvider struct {
+	*EventProvider
+	*impProvider.EventImportProvider
+}
+
 type EventProvider struct {
 	catalog catalog.DataCatalog
 	log     *logger.Logger
 }
 
-func NewEventProvider(catalog catalog.DataCatalog) *EventProvider {
-	return &EventProvider{
-		catalog: catalog,
+func NewEventProvider(dc catalog.DataCatalog, importDir string) *EventEntityProvider {
+	ep := &EventProvider{
+		catalog: dc,
 		log: &logger.Logger{
 			Logger: log.With("type", "event"),
 		},
+	}
+
+	imp := impProvider.NewEventImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "event"),
+		},
+		importDir,
+	)
+
+	return &EventEntityProvider{
+		EventProvider:       ep,
+		EventImportProvider: imp,
 	}
 }
 
@@ -42,6 +61,7 @@ func (p *EventProvider) Create(ctx context.Context, ID string, data resources.Re
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
 		CategoryId:  categoryId,
+		ExternalId:  ID,
 	})
 
 	if err != nil {
@@ -89,11 +109,10 @@ func (p *EventProvider) Update(ctx context.Context, ID string, input resources.R
 		categoryId = &cId
 	}
 
-	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.Event{
+	updatedEvent, err := p.catalog.UpdateEvent(ctx, prevState.ID, &catalog.EventUpdate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		EventType:   toArgs.EventType,
-		WorkspaceId: prevState.WorkspaceID,
 		CategoryId:  categoryId,
 	})
 
@@ -127,4 +146,111 @@ func (p *EventProvider) Delete(ctx context.Context, ID string, state resources.R
 	}
 
 	return nil
+}
+
+func (p *EventProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	p.log.Debug("importing event resource", "id", ID, "remoteId", remoteId)
+
+	event, err := p.catalog.GetEvent(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting event from upstream: %w", err)
+	}
+
+	toArgs := state.EventArgs{}
+	toArgs.FromResourceData(data)
+
+	if toArgs.DiffUpstream(event) {
+		p.log.Debug("event has differences, updating", "id", ID, "remoteId", remoteId)
+
+		var categoryId *string
+		if cId, ok := data["categoryId"].(string); ok {
+			categoryId = &cId
+		}
+
+		event, err = p.catalog.UpdateEvent(ctx, remoteId, &catalog.EventUpdate{
+			Name:        toArgs.Name,
+			Description: toArgs.Description,
+			EventType:   toArgs.EventType,
+			CategoryId:  categoryId,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("updating event during import: %w", err)
+		}
+	}
+
+	err = p.catalog.SetEventExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting event external id: %w", err)
+	}
+
+	eventState := state.EventState{
+		EventArgs:   toArgs,
+		ID:          event.ID,
+		Name:        event.Name,
+		Description: event.Description,
+		EventType:   event.EventType,
+		WorkspaceID: event.WorkspaceId,
+		CategoryID:  event.CategoryId,
+		CreatedAt:   event.CreatedAt.String(),
+		UpdatedAt:   event.UpdatedAt.String(),
+	}
+
+	resourceData := eventState.ToResourceData()
+	return &resourceData, nil
+}
+
+// LoadResourcesFromRemote loads all events from the remote catalog
+func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	p.log.Debug("loading events from remote catalog")
+	collection := resources.NewResourceCollection()
+
+	// fetch events from remote
+	events, err := p.catalog.GetEvents(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert slice to map[string]interface{} where key is the event's remoteId
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, event := range events {
+		resourceMap[event.ID] = &resources.RemoteResource{
+			ID:         event.ID,
+			ExternalID: event.ExternalId,
+			Data:       event,
+		}
+	}
+	collection.Set(state.EventResourceType, resourceMap)
+
+	return collection, nil
+}
+
+func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	s := syncerstate.EmptyState()
+	events := collection.GetAll(state.EventResourceType)
+	for _, remoteEvent := range events {
+		if remoteEvent.ExternalID == "" {
+			continue
+		}
+		event, ok := remoteEvent.Data.(*catalog.Event)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Event")
+		}
+		args := &state.EventArgs{}
+		args.FromRemoteEvent(event, collection.GetURNByID)
+
+		stateArgs := state.EventState{}
+		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         state.EventResourceType,
+			ID:           event.ExternalId,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(event.ExternalId, state.EventResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
 }

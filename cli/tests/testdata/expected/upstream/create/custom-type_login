@@ -23,6 +23,7 @@
   },
   "itemDefinitions": [],
   "id": "def_2yxtwgKJVOO9o0o0XLvrFmPGkO4",
+  "externalId": "login",
   "name": "Login",
   "type": "object",
   "dataType": "object",

@@ -6,11 +6,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	SpecVersion = "rudder/v0.1"
+)
+
 type Spec struct {
 	Version  string                 `yaml:"version"`
 	Kind     string                 `yaml:"kind"`
 	Metadata map[string]interface{} `yaml:"metadata"`
 	Spec     map[string]interface{} `yaml:"spec"`
+}
+
+type ParsedSpec struct {
+	ExternalIDs []string
 }
 
 // New creates and validates a Spec from YAML data

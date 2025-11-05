@@ -1,0 +1,11 @@
+{
+    "id": "ev_30B3DyAMUbeE04TELNn4X4z7JpT",
+    "externalId": "logout",
+    "name": "Logout Event",
+    "description": "This event is triggered when a user logs out.",
+    "eventType": "track",
+    "categoryId": null,
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdAt": "2025-07-21T08:37:02.535Z",
+    "updatedAt": "2025-07-21T08:37:08.415Z"
+}

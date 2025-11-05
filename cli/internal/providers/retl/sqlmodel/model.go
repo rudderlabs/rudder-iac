@@ -2,6 +2,8 @@ package sqlmodel
 
 import (
 	"fmt"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 type SourceDefinition string
@@ -9,6 +11,9 @@ type SourceDefinition string
 // ResourceType is the type identifier for SQL Model resources
 const (
 	ResourceType = "retl-source-sql-model"
+	ResourceKind = "retl-source-sql-model"
+	MetadataName = "retl-source-sql-model"
+	ImportPath   = "sql-models"
 
 	LocalIDKey          = "local_id"
 	DisplayNameKey      = "display_name"
@@ -67,7 +72,7 @@ type SQLModelSpec struct {
 	AccountID        string           `mapstructure:"account_id"`
 	PrimaryKey       string           `mapstructure:"primary_key"`
 	SourceDefinition SourceDefinition `mapstructure:"source_definition"`
-	Enabled          bool             `mapstructure:"enabled"`
+	Enabled          *bool            `mapstructure:"enabled"`
 }
 
 // SQLModelResource represents a processed SQL Model resource ready for API operations
@@ -106,4 +111,33 @@ func ValidateSQLModelResource(spec *SQLModelResource) error {
 		return fmt.Errorf("sql is required")
 	}
 	return nil
+}
+
+func (s *SQLModelResource) FromResourceData(data resources.ResourceData) {
+	s.DisplayName = data[DisplayNameKey].(string)
+	s.Description = data[DescriptionKey].(string)
+	s.SQL = data[SQLKey].(string)
+	s.AccountID = data[AccountIDKey].(string)
+	s.PrimaryKey = data[PrimaryKeyKey].(string)
+	s.SourceDefinition = data[SourceDefinitionKey].(string)
+	s.Enabled = data[EnabledKey].(bool)
+}
+
+func (s *SQLModelResource) DiffUpstream(upstream *SQLModelResource) bool {
+	if s.DisplayName != upstream.DisplayName {
+		return true
+	}
+	if s.Description != upstream.Description {
+		return true
+	}
+	if s.AccountID != upstream.AccountID {
+		return true
+	}
+	if s.PrimaryKey != upstream.PrimaryKey {
+		return true
+	}
+	if s.Enabled != upstream.Enabled {
+		return true
+	}
+	return s.SQL != upstream.SQL
 }

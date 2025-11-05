@@ -3,13 +3,16 @@ package retl
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
@@ -20,6 +23,8 @@ type Provider struct {
 	handlers   map[string]resourceHandler
 	kindToType map[string]string
 }
+
+const importDir = "retl"
 
 // New creates a new RETL provider instance
 func New(client retlClient.RETLStore) *Provider {
@@ -32,9 +37,13 @@ func New(client retlClient.RETLStore) *Provider {
 	}
 
 	// Register handlers
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client)
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
 	return p
+}
+
+func (p *Provider) GetName() string {
+	return "retl"
 }
 
 func (p *Provider) GetSupportedKinds() []string {
@@ -54,6 +63,19 @@ func (p *Provider) GetSupportedTypes() []string {
 	return types
 }
 
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.ParseSpec(path, s)
+}
+
 // LoadSpec loads a spec for the given kind
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	resourceType, ok := p.kindToType[s.Kind]
@@ -70,7 +92,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 // Validate validates all loaded specs
-func (p *Provider) Validate() error {
+func (p *Provider) Validate(_ *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(); err != nil {
 			return fmt.Errorf("validating %s: %w", resourceType, err)
@@ -182,7 +204,16 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
-	return handler.List(ctx)
+
+	var hasExternalId *bool
+	if hasEsternalIdStr, ok := filters["hasExternalId"]; ok {
+		id, err := strconv.ParseBool(hasEsternalIdStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hasExternalId filter: %w", err)
+		}
+		hasExternalId = &id
+	}
+	return handler.List(ctx, hasExternalId)
 }
 
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
@@ -207,4 +238,73 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, arg
 	}
 
 	return handler.FetchImportData(ctx, args)
+}
+
+// LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	for resourceType, handler := range p.handlers {
+		c, err := handler.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
+		}
+		collection, err = collection.Merge(c)
+		if err != nil {
+			return nil, fmt.Errorf("merging collection for %s: %w", resourceType, err)
+		}
+	}
+	return collection, nil
+}
+
+// LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
+func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+	s := state.EmptyState()
+	for sqlmodelResourceType, handler := range p.handlers {
+		providerState, err := handler.LoadStateFromResources(ctx, collection)
+		if err != nil {
+			return nil, fmt.Errorf("loading state from provider handler %s: %w", sqlmodelResourceType, err)
+		}
+		s, err = s.Merge(providerState)
+		if err != nil {
+			return nil, fmt.Errorf("merging provider states: %w", err)
+		}
+	}
+	return s, nil
+}
+
+// Preview returns the preview results for a resource
+func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData, limit int) ([]map[string]any, error) {
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+
+	return handler.Preview(ctx, ID, data, limit)
+}
+
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	for _, handler := range p.handlers {
+		resources, err := handler.LoadImportable(ctx, idNamer)
+		if err != nil {
+			return nil, fmt.Errorf("loading importable resources from handler %w", err)
+		}
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collection for handler %w", err)
+		}
+	}
+	return collection, nil
+}
+
+func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	allEntities := make([]importremote.FormattableEntity, 0)
+	for _, handler := range p.handlers {
+		entities, err := handler.FormatForExport(ctx, collection, idNamer, inputResolver)
+		if err != nil {
+			return nil, fmt.Errorf("formatting for export for handler %w", err)
+		}
+		allEntities = append(allEntities, entities...)
+	}
+	return allEntities, nil
 }

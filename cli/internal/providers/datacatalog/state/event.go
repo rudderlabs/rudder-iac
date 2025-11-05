@@ -1,15 +1,18 @@
 package state
 
 import (
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
+
+const EventResourceType = "event"
 
 type EventArgs struct {
 	Name        string
 	Description string
 	EventType   string
-	CategoryId  *resources.PropertyRef
+	CategoryId  any
 }
 
 func (args *EventArgs) ToResourceData() resources.ResourceData {
@@ -25,8 +28,8 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 	args.Description = MustString(from, "description")
 	args.EventType = MustString(from, "eventType")
-	if categoryId, ok := from["categoryId"].(*resources.PropertyRef); ok {
-		args.CategoryId = categoryId
+	if from["categoryId"] != nil {
+		args.CategoryId = String(from, "categoryId", "")
 	}
 }
 
@@ -40,6 +43,60 @@ func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef
 			Property: "id",
 		}
 	}
+}
+
+func (args *EventArgs) DiffUpstream(upstream *catalog.Event) bool {
+	if args.Name != upstream.Name {
+		return true
+	}
+
+	if args.Description != upstream.Description {
+		return true
+	}
+
+	if args.EventType != upstream.EventType {
+		return true
+	}
+
+	if args.CategoryId != nil && upstream.CategoryId == nil {
+		return true
+	}
+
+	if args.CategoryId == nil && upstream.CategoryId != nil {
+		return true
+	}
+
+	if args.CategoryId != nil && upstream.CategoryId != nil {
+		if strId, ok := args.CategoryId.(string); ok {
+			if *upstream.CategoryId != strId {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// FromRemoteEvent converts from remote API Event to EventArgs
+func (args *EventArgs) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	args.Name = event.Name
+	args.Description = event.Description
+	args.EventType = event.EventType
+	if event.CategoryId != nil {
+		// get URN for the category using remoteId
+		urn, err := getURNFromRemoteId(CategoryResourceType, *event.CategoryId)
+		switch {
+		case err == nil:
+			args.CategoryId = &resources.PropertyRef{
+				URN:      urn,
+				Property: "id",
+			}
+		case err == resources.ErrRemoteResourceExternalIdNotFound:
+			args.CategoryId = nil
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 type EventState struct {
@@ -80,4 +137,25 @@ func (e *EventState) FromResourceData(from resources.ResourceData) {
 	e.EventArgs.FromResourceData(resources.ResourceData(
 		MustMapStringInterface(from, "eventArgs"),
 	))
+}
+
+// FromRemoteEvent converts from catalog.Event to EventState
+func (e *EventState) FromRemoteEvent(event *catalog.Event, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
+	e.EventArgs = EventArgs{
+		Name:        event.Name,
+		Description: event.Description,
+		EventType:   event.EventType,
+	}
+	if event.CategoryId != nil {
+		e.EventArgs.CategoryId = *event.CategoryId
+	}
+	e.ID = event.ID
+	e.Name = event.Name
+	e.Description = event.Description
+	e.EventType = event.EventType
+	e.WorkspaceID = event.WorkspaceId
+	e.CategoryID = event.CategoryId
+	e.CreatedAt = event.CreatedAt.String()
+	e.UpdatedAt = event.UpdatedAt.String()
+	return nil
 }

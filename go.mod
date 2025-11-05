@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/kyokomi/emoji/v2 v2.2.13
 	github.com/rudderlabs/analytics-go/v4 v4.2.1

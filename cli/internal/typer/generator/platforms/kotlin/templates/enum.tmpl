@@ -1,0 +1,17 @@
+{{- if .Comment }}
+/** {{ escapeComment .Comment }} */
+{{- end }}
+enum class {{ .Name }} {
+{{- range $index, $value := .Values }}{{- if $index }},
+{{- end }}
+    {{ $value.Name }}
+{{- end }}
+}
+
+fun {{ .Name }}.rudderSerialize(): JsonElement = when (this) {
+    {{- range .Values }}
+    {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ formatLiteral .Value }})
+    {{- end }}
+}
+@JvmName("rudderSerializeList{{ .Name }}")
+fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
