@@ -71,6 +71,8 @@ func parseIdentitySection(s string) (plan.IdentitySection, error) {
 		return plan.IdentitySectionProperties, nil
 	case "traits":
 		return plan.IdentitySectionTraits, nil
+	case "context.traits":
+		return plan.IdentitySectionContextTraits, nil
 	default:
 		return "", fmt.Errorf("invalid identity section: %s", s)
 	}
@@ -114,9 +116,42 @@ func parseTrackingPlanEventSchema(ev *catalog.TrackingPlanEventSchema) (*plan.Ev
 		return nil, fmt.Errorf("parsing event rules definitions: %w", err)
 	}
 
-	schemaProperties, ok := ev.Rules.Properties[ev.IdentitySection]
-	if !ok {
-		return nil, fmt.Errorf("identity section '%s' not found in properties", ev.IdentitySection)
+	// Handle different identity section formats
+	var schemaProperties any
+	var ok bool
+
+	if ev.IdentitySection == "context.traits" {
+		// For context.traits, navigate the nested structure: Properties["context"]["properties"]["traits"]
+		contextObj, contextExists := ev.Rules.Properties["context"]
+		if !contextExists {
+			return nil, fmt.Errorf("identity section '%s' not found in properties: 'context' key missing", ev.IdentitySection)
+		}
+
+		contextMap, ok := contextObj.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("identity section '%s': 'context' must be an object", ev.IdentitySection)
+		}
+
+		contextProps, propsExists := contextMap["properties"]
+		if !propsExists {
+			return nil, fmt.Errorf("identity section '%s' not found in properties: 'context.properties' key missing", ev.IdentitySection)
+		}
+
+		contextPropsMap, ok := contextProps.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("identity section '%s': 'context.properties' must be an object", ev.IdentitySection)
+		}
+
+		schemaProperties, ok = contextPropsMap["traits"]
+		if !ok {
+			return nil, fmt.Errorf("identity section '%s' not found in properties: 'context.properties.traits' key missing", ev.IdentitySection)
+		}
+	} else {
+		// For "properties" and "traits", use direct lookup
+		schemaProperties, ok = ev.Rules.Properties[ev.IdentitySection]
+		if !ok {
+			return nil, fmt.Errorf("identity section '%s' not found in properties", ev.IdentitySection)
+		}
 	}
 
 	schemaPropertiesMap, ok := schemaProperties.(map[string]any)

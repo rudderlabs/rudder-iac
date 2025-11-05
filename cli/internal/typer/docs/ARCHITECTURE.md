@@ -192,14 +192,17 @@ The testing approach leverages a comprehensive reference tracking plan that prov
 
 #### Modifying the Reference Plan
 
-When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
+When making changes to the generator, **FIRST** check if the reference tracking plan includes test cases relevant to your changes. If not, add them. When adding new test data to the reference tracking plan, you **MUST** update multiple locations to maintain test consistency:
 
-1. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go`
-2. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
+1. **Check if reference plan covers your changes** - Verify that the reference tracking plan includes test cases for your new feature
+   - For example, when implementing `context.traits` support, add event rules using `IdentitySectionContextTraits`
+   - Each event type can only have one rule per section - plan accordingly to avoid conflicts
+2. **Add to ReferenceProperties or ReferenceCustomTypes maps** in `reference_plan.go` (if needed)
+3. **Add to event rules** in `GetReferenceTrackingPlan()` function (if the property/type should be used in events)
    - Note: Properties and custom types are only extracted if they are actually used in event rules
    - Unused items in the reference maps will not be tested
-3. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
-4. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
+4. **Regenerate platform testdata** using `make typer-kotlin-update-testdata` to update expected generated code
+5. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
 
 **Common Mistakes to Avoid**:
 - ❌ Adding properties/custom types to reference maps but not using them in any event rules (they won't be tested)

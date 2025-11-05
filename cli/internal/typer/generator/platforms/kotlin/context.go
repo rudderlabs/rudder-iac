@@ -87,6 +87,7 @@ type RudderAnalyticsMethod struct {
 	MethodArguments []KotlinMethodArgument // Arguments for the public method's signature
 	SDKCall         SDKCall                // The structured, internal SDK call
 	Comment         string                 // KDoc comment
+	AddDataToContext bool                  // Whether to add the data parameter to context instead of SDK call
 }
 
 // KotlinContext holds all the information needed to generate Kotlin code

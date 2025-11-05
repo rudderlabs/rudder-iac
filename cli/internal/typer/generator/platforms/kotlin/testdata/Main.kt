@@ -799,10 +799,16 @@ fun List<CustomTypeUserProfile>.rudderSerialize(): JsonArray = JsonArray(this.ma
 /** Group association event */
 data class GroupTraits(
     /** User active status */
-    val active: com.rudderstack.ruddertyper.PropertyActive
+    val active: com.rudderstack.ruddertyper.PropertyActive,
+
+    /** User account status */
+    val status: com.rudderstack.ruddertyper.PropertyStatus? = null
 )
 fun GroupTraits.rudderSerialize(): JsonObject = buildJsonObject {
     put("active", active.rudderSerialize())
+    if (status != null) {
+        put("status", status.rudderSerialize())
+    }
 }
 @JvmName("rudderSerializeListGroupTraits")
 fun List<GroupTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
@@ -1186,10 +1192,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.group
      */
     fun group(groupId: String, traits: GroupTraits, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        mergedOptions = mergeRudderContext(mergedOptions, buildJsonObject { put("traits", traits.rudderSerialize()) })
         analytics.group(
             groupId = groupId,
-            traits = traits.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1203,10 +1210,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.identify
      */
     fun identify(userId: String = "", traits: IdentifyTraits, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.identify(
             userId = userId,
             traits = traits.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1221,11 +1229,12 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.screen
      */
     fun screen(screenName: String, category: String = "", properties: ScreenProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.screen(
             screenName = screenName,
             category = category,
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1236,9 +1245,10 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventNoAdditionalProps(options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Empty Event No Additional Props",
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1251,10 +1261,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Empty Event With Additional Props",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1267,10 +1278,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Event With Variants",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1283,10 +1295,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "Product \"Premium\" Clicked",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 
@@ -1299,10 +1312,11 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackUserSignedUp(properties: TrackUserSignedUpProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "User Signed Up",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
         )
     }
 }
