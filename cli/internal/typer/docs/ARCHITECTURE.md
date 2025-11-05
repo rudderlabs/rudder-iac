@@ -148,6 +148,18 @@ These helper methods provide convenient access to nested data without violating 
 - Generators: Business logic transformation layer (semantic decisions)
 - Templates: Syntax-level formatting (escaping, indentation, quoting) via template functions
 
+### Input Immutability
+
+**CRITICAL**: Generators MUST treat the input TrackingPlan and EventRules as **read-only**. No modifications to input objects are allowed.
+
+**Why this matters**:
+
+- Enables safe, deterministic multi-pass processing (data extraction, then code generation)
+- Guarantees that collision handling produces consistent results (same rule → same registration key)
+- Prevents subtle bugs where modifications in one generation phase affect later phases
+
+**Implementation guideline**: Only read from `rule.Event.EventType`, `rule.Event.Name`, `rule.Schema`, etc. Never set or modify any fields on the input rule object.
+
 ### Extensibility
 
 - Strategy pattern for platform-specific generation
@@ -205,11 +217,13 @@ When making changes to the generator, **FIRST** check if the reference tracking 
 5. **Run tests** to verify the changes: `go test ./cli/internal/typer/...`
 
 **Common Mistakes to Avoid**:
+
 - ❌ Adding properties/custom types to reference maps but not using them in any event rules (they won't be tested)
 - ❌ Forgetting to regenerate testdata after reference plan changes
 - ❌ Not running tests after making changes
 
 **Workflow Example**:
+
 ```go
 // 1. Add property to reference plan
 ReferenceProperties["new_field"] = &plan.Property{
@@ -340,6 +354,7 @@ func (opts *KotlinOptions) Validate() error {
 ```
 
 **Struct Tags**:
+
 - `mapstructure:"key"` - Used by orchestrator to decode from `map[string]string` to struct fields
 - `description:"..."` - Used by CLI to display help text
 

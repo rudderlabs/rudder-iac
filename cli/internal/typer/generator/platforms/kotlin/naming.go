@@ -10,6 +10,7 @@ import (
 )
 
 const globalTypeScope = "types"
+const methodScope = "methods"
 
 func handleReservedKeyword(name string) string {
 	if KotlinHardKeywords[name] {
@@ -225,6 +226,45 @@ func getOrRegisterEventDataClassName(rule *plan.EventRule, nameRegistry *core.Na
 		registrationKey,
 		globalTypeScope,
 		className,
+	)
+}
+
+// getOrRegisterEventMethodName returns the registered method name for an event.
+// It handles collision detection so that events with names that sanitize to the same method name
+// will be assigned unique names (e.g., trackEventName1, trackEventName2)
+func getOrRegisterEventMethodName(rule *plan.EventRule, nameRegistry *core.NameRegistry) (string, error) {
+	// Generate method name based on event type and name
+	var prefix string
+	var name string
+
+	switch rule.Event.EventType {
+	case plan.EventTypeTrack:
+		prefix = "track"
+		name = rule.Event.Name
+	case plan.EventTypeIdentify:
+		prefix = "identify"
+		name = ""
+	case plan.EventTypePage:
+		prefix = "page"
+		name = ""
+	case plan.EventTypeScreen:
+		prefix = "screen"
+		name = ""
+	case plan.EventTypeGroup:
+		prefix = "group"
+		name = ""
+	default:
+		return "", fmt.Errorf("unsupported event type: %s", rule.Event.EventType)
+	}
+
+	methodName := FormatMethodName(prefix, name)
+
+	// Register the method name with a unique key
+	registrationKey := "method:" + string(rule.Event.EventType) + ":" + rule.Event.Name
+	return nameRegistry.RegisterName(
+		registrationKey,
+		methodScope,
+		methodName,
 	)
 }
 
