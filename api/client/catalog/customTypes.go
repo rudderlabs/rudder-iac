@@ -14,6 +14,17 @@ type CustomTypeCreate struct {
 	Type        string                 `json:"type"`
 	Config      map[string]interface{} `json:"config"`
 	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+	Variants    Variants               `json:"variants,omitempty"`
+	ExternalId  string                 `json:"externalId"`
+}
+
+type CustomTypeUpdate struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Type        string                 `json:"type"`
+	Config      map[string]interface{} `json:"config"`
+	Properties  []CustomTypeProperty   `json:"properties,omitempty"`
+	Variants    Variants               `json:"variants,omitempty"`
 }
 
 type CustomType struct {
@@ -24,10 +35,12 @@ type CustomType struct {
 	Type            string                 `json:"type"`
 	DataType        string                 `json:"dataType"`
 	WorkspaceId     string                 `json:"workspaceId"`
+	ExternalId      string                 `json:"externalId,omitempty"`
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`
-	ItemDefinitions []string               `json:"itemDefinitions"`
+	ItemDefinitions []any                  `json:"itemDefinitions"`
+	Variants        Variants               `json:"variants,omitempty"`
 	CreatedAt       time.Time              `json:"createdAt"`
 	UpdatedAt       time.Time              `json:"updatedAt"`
 	CreatedBy       string                 `json:"createdBy"`
@@ -41,9 +54,11 @@ type CustomTypeProperty struct {
 
 type CustomTypeStore interface {
 	CreateCustomType(ctx context.Context, input CustomTypeCreate) (*CustomType, error)
-	UpdateCustomType(ctx context.Context, id string, input *CustomType) (*CustomType, error)
+	UpdateCustomType(ctx context.Context, id string, input *CustomTypeUpdate) (*CustomType, error)
 	DeleteCustomType(ctx context.Context, id string) error
 	GetCustomType(ctx context.Context, id string) (*CustomType, error)
+	GetCustomTypes(ctx context.Context) ([]*CustomType, error)
+	SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) error {
@@ -54,7 +69,7 @@ func (c *RudderDataCatalog) DeleteCustomType(ctx context.Context, id string) err
 	return nil
 }
 
-func (c *RudderDataCatalog) UpdateCustomType(ctx context.Context, id string, new *CustomType) (*CustomType, error) {
+func (c *RudderDataCatalog) UpdateCustomType(ctx context.Context, id string, new *CustomTypeUpdate) (*CustomType, error) {
 	byt, err := json.Marshal(new)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
@@ -104,4 +119,26 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 	}
 
 	return &customType, nil
+}
+
+func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context) ([]*CustomType, error) {
+	return getAllResourcesWithPagination[*CustomType](ctx, c.client, "v2/catalog/custom-types")
+}
+
+func (c *RudderDataCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/custom-types/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

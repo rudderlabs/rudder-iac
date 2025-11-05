@@ -5,11 +5,13 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 )
@@ -21,6 +23,7 @@ var (
 type Providers struct {
 	DataCatalog project.Provider
 	RETL        project.Provider
+	EventStream project.Provider
 	Workspace   *workspace.Provider
 }
 
@@ -61,7 +64,7 @@ func NewDeps() (Deps, error) {
 
 	p := setupProviders(c)
 
-	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL)
+	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL, p.EventStream)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -85,11 +88,13 @@ func setupClient(version string) (*client.Client, error) {
 func setupProviders(c *client.Client) *Providers {
 	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c))
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
+	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	wsp := workspace.New(c)
 
 	return &Providers{
 		DataCatalog: dcp,
 		RETL:        retlp,
+		EventStream: esp,
 		Workspace:   wsp,
 	}
 }
@@ -104,4 +109,8 @@ func (d *deps) Providers() *Providers {
 
 func (d *deps) CompositeProvider() project.Provider {
 	return d.compositeProvider
+}
+
+func GetVersion() string {
+	return v
 }

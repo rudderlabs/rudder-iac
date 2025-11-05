@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/spf13/cobra"
@@ -21,10 +23,11 @@ var (
 
 func NewCmdDestroy() *cobra.Command {
 	var (
-		deps    app.Deps
-		err     error
-		dryRun  bool
-		confirm bool
+		deps        app.Deps
+		err         error
+		dryRun      bool
+		confirm     bool
+		concurrency int
 	)
 
 	cmd := &cobra.Command{
@@ -47,6 +50,11 @@ func NewCmdDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
+			// Validate concurrency flag usage
+			if cmd.Flags().Changed("concurrency") && !config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
+				return fmt.Errorf("concurrency flag is only allowed when ConcurrentSyncs experimental feature is enabled")
+			}
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,8 +68,7 @@ func NewCmdDestroy() *cobra.Command {
 				}...)
 			}()
 
-			// Create syncer to handle the deletion
-			s, err := syncer.New(deps.CompositeProvider())
+			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{})
 			if err != nil {
 				return fmt.Errorf("creating syncer: %w", err)
 			}
@@ -70,8 +77,9 @@ func NewCmdDestroy() *cobra.Command {
 			errors := s.Destroy(
 				context.Background(),
 				syncer.SyncOptions{
-					DryRun:  dryRun,
-					Confirm: confirm,
+					DryRun:      dryRun,
+					Confirm:     confirm,
+					Concurrency: concurrency,
 				})
 
 			if len(errors) > 0 {
@@ -90,5 +98,6 @@ func NewCmdDestroy() *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the resources that would be destroyed without actually destroying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm before destroying resources")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 30, "Number of concurrent operations to run (only allowed when ConcurrentSyncs experimental feature is enabled)")
 	return cmd
 }

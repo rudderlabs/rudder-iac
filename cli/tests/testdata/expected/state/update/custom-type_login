@@ -10,7 +10,7 @@
       {
         "id": "",
         "refToId": {
-          "$__rudderRef": "property:user_mail",
+          "$__rudderRef": "property:password",
           "property": "id"
         },
         "required": true
@@ -18,12 +18,13 @@
       {
         "id": "",
         "refToId": {
-          "$__rudderRef": "property:password",
+          "$__rudderRef": "property:user_mail",
           "property": "id"
         },
         "required": true
       }
     ],
+    "variants": [],
     "type": "object"
   },
   "output": {
@@ -46,6 +47,7 @@
           "required": true
         }
       ],
+      "variants": [],
       "type": "object"
     },
     "description": "Object containing login details",

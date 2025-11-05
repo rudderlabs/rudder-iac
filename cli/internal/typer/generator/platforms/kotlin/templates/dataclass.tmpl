@@ -1,0 +1,38 @@
+{{- define "dataclasswithindent" -}}
+{{- $indentLevel := (index . 0) -}}
+{{- $dataClass := (index . 1) -}}
+{{- with $dataClass -}}
+{{- if .Comment }}
+/** {{ escapeComment .Comment }} */
+{{- end }}
+data class {{ .Name }}(
+{{- range $index, $prop := .Properties }}{{- if $index }},
+{{ end }}
+{{- if $prop.Comment }}
+    /** {{ escapeComment $prop.Comment }} */
+{{- end }}
+    val {{ $prop.Name }}: {{ $prop.Type }}{{ if $prop.Nullable }}?{{ end }}{{ if $prop.Default }} = {{ $prop.Default }}{{ end }}
+{{- end }}
+){{- if gt (len .NestedClasses) 0 }} {
+{{- range $nested :=.NestedClasses }}
+{{- $nestedIndentLevel := (add $indentLevel 1) }}
+{{- $ctx := mkSlice $nestedIndentLevel $nested }}
+{{- include "dataclasswithindent" $ctx | indent $nestedIndentLevel }}
+{{- end }}
+}
+{{- end }}
+fun {{ .Name }}.rudderSerialize(): JsonObject = buildJsonObject {
+{{- range .Properties }}
+{{- if .Nullable }}
+    if ({{ .Name }} != null) {
+        put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+    }
+{{- else }}
+    put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+{{- end }}
+{{- end }}
+}
+@JvmName("rudderSerializeList{{ .Name }}")
+fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+{{- end }}
+{{- end }}

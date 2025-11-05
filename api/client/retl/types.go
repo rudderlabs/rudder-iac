@@ -6,8 +6,14 @@ import (
 
 type SourceType string
 
+type AsyncStatus string
+
 const (
 	ModelSourceType SourceType = "model"
+
+	Pending   AsyncStatus = "pending"
+	Failed    AsyncStatus = "failed"
+	Completed AsyncStatus = "completed"
 )
 
 // State represents the complete RETL state
@@ -42,6 +48,8 @@ type RETLSource struct {
 	AccountID            string             `json:"accountId"`
 	CreatedAt            *time.Time         `json:"createdAt"`
 	UpdatedAt            *time.Time         `json:"updatedAt"`
+	WorkspaceID          string             `json:"workspaceId"`
+	ExternalID           string             `json:"externalId"`
 }
 
 type RETLSourceCreateRequest struct {
@@ -50,6 +58,8 @@ type RETLSourceCreateRequest struct {
 	SourceType           SourceType         `json:"sourceType"`
 	SourceDefinitionName string             `json:"sourceDefinitionName"`
 	AccountID            string             `json:"accountId"`
+	Enabled              bool               `json:"enabled"`
+	ExternalID           string             `json:"externalId"`
 }
 
 type RETLSourceUpdateRequest struct {
@@ -69,4 +79,29 @@ type RETLSQLModelConfig struct {
 // RETLSources represents a response of RETL sources
 type RETLSources struct {
 	Data []RETLSource `json:"data"`
+}
+
+// PreviewResultError represents an error in the preview result
+type PreviewResultError struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+// PreviewSubmitRequest represents the request to submit a RETL source preview
+type PreviewSubmitRequest struct {
+	AccountID string `json:"accountId"`
+	Limit     int    `json:"limit,omitempty"`
+	SQL       string `json:"sql"`
+}
+
+// PreviewSubmitResponse represents the response from submitting a RETL source preview
+type PreviewSubmitResponse struct {
+	ID string `json:"id"`
+}
+
+// PreviewResultResponse represents the response containing preview results
+type PreviewResultResponse struct {
+	Status AsyncStatus      `json:"status"`
+	Rows   []map[string]any `json:"rows,omitempty"`
+	Error  string           `json:"error,omitempty"`
 }

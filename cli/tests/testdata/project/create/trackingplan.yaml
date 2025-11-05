@@ -21,6 +21,20 @@ spec:
           required: true
         - $ref: "#/properties/api_tracking/password"
           required: true
+      variants:
+        - type: discriminator
+          discriminator: "#/properties/api_tracking/api_method"
+          cases:
+            - display_name: "Create Entity"
+              match:
+              - "POST"
+              description: "applies when creating a new entity"
+              properties:
+              - $ref: "#/properties/api_tracking/user_agent"
+                required: true
+              - $ref: "#/properties/api_tracking/host"
+                required: false
+              
     - type: "event_rule"
       id: "login_event"
       event:
@@ -31,3 +45,25 @@ spec:
           required: true
         - $ref: "#/properties/api_tracking/password"
           required: true
+        - $ref: "#/properties/api_tracking/signin_info"
+          required: true
+          properties:
+            - $ref: "#/properties/api_tracking/remember_me_checkbox_clicked"
+              required: false
+            - $ref: "#/properties/api_tracking/captcha"
+              required: true
+              properties:
+                - $ref: "#/properties/api_tracking/captcha_solved"
+                  required: true
+                - $ref: "#/properties/api_tracking/captcha_info"
+                  required: true
+                  properties:
+                    - $ref: "#/properties/api_tracking/captcha_type"
+                      required: true
+    
+    - type: "event_rule"
+      id: "logout_event"
+      event:
+        $ref: "#/events/api_tracking/logout"
+        allow_unplanned: false
+                    

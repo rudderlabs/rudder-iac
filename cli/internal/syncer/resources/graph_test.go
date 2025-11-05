@@ -116,3 +116,28 @@ func TestMerge(t *testing.T) {
 	assert.ElementsMatch(t, []string{r4_2.URN()}, gEmpty2.GetDependencies(r4_1.URN()))
 	assert.Empty(t, gEmpty2.GetDependencies(r4_2.URN()))
 }
+
+func TestDependents(t *testing.T) {
+	g := NewGraph()
+
+	r1 := NewResource("test:resource1", "test", map[string]interface{}{}, []string{})
+	r2 := NewResource("test:resource2", "test", map[string]interface{}{}, []string{})
+	r3 := NewResource("test:resource3", "test", map[string]interface{}{}, []string{})
+	r4 := NewResource("test:resource4", "test", map[string]interface{}{}, []string{})
+
+	g.AddResource(r1)
+	g.AddResource(r2)
+	g.AddResource(r3)
+	g.AddResource(r4)
+
+	// Set up dependencies: r2 and r3 depend on r1, r4 depends on r2
+	g.AddDependency(r2.URN(), r1.URN())
+	g.AddDependency(r3.URN(), r1.URN())
+	g.AddDependency(r4.URN(), r2.URN())
+
+	assert.ElementsMatch(t, []string{r2.URN(), r3.URN()}, g.GetDependents(r1.URN()))
+	assert.ElementsMatch(t, []string{r4.URN()}, g.GetDependents(r2.URN()))
+	assert.Empty(t, g.GetDependents(r3.URN()))
+	assert.Empty(t, g.GetDependents(r4.URN()))
+	assert.Empty(t, g.GetDependents("non:existent"))
+}

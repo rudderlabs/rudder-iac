@@ -49,7 +49,7 @@ func newCmdListAccounts() *cobra.Command {
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
-			l := lister.New(p, format)
+			l := lister.New(p, lister.WithFormat(format))
 
 			filters := make(lister.Filters)
 			if category != "" {

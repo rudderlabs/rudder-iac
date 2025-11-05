@@ -20,8 +20,10 @@ var _ catalog.DataCatalog = &MockEventCatalog{}
 
 type MockEventCatalog struct {
 	datacatalog.EmptyCatalog
-	mockEvent *catalog.Event
-	err       error
+	mockEvent           *catalog.Event
+	err                 error
+	updateCalled        bool
+	setExternalIdCalled bool
 }
 
 func (m *MockEventCatalog) SetEvent(event *catalog.Event) {
@@ -36,7 +38,16 @@ func (m *MockEventCatalog) CreateEvent(ctx context.Context, eventCreate catalog.
 	return m.mockEvent, m.err
 }
 
-func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
+func (m *MockEventCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.EventUpdate) (*catalog.Event, error) {
+	m.updateCalled = true
+	if m.mockEvent == nil {
+		return nil, m.err
+	}
+	m.mockEvent.Name = eventUpdate.Name
+	m.mockEvent.Description = eventUpdate.Description
+	m.mockEvent.EventType = eventUpdate.EventType
+	m.mockEvent.CategoryId = eventUpdate.CategoryId
+
 	return m.mockEvent, m.err
 }
 
@@ -48,12 +59,26 @@ func (m *MockEventCatalog) GetEvent(ctx context.Context, id string) (*catalog.Ev
 	return m.mockEvent, m.err
 }
 
+func (m *MockEventCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	m.setExternalIdCalled = true
+	if m.mockEvent == nil {
+		return m.err
+	}
+	m.mockEvent.ExternalId = externalId
+	return m.err
+}
+
+func (m *MockEventCatalog) ResetSpies() {
+	m.updateCalled = false
+	m.setExternalIdCalled = false
+}
+
 func TestEventProviderOperations(t *testing.T) {
 
 	var (
 		ctx           = context.Background()
 		mockCatalog   = &MockEventCatalog{}
-		eventProvider = datacatalog.NewEventProvider(mockCatalog)
+		eventProvider = datacatalog.NewEventProvider(mockCatalog, "test-import-dir")
 		created, _    = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
 		updated, _    = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
 	)
@@ -72,6 +97,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
+			ExternalId:  "event-id-1",
 			CategoryId:  nil,
 			CreatedAt:   created,
 			UpdatedAt:   updated,
@@ -93,7 +119,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event description",
 				"eventType":   "event type",
-				"categoryId":  (*resources.PropertyRef)(nil),
+				"categoryId":  nil,
 			},
 		}, *createdResource)
 	})
@@ -104,10 +130,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Name:        "event",
 			Description: "event new description",
 			EventType:   "event type",
-			CategoryId: &resources.PropertyRef{
-				URN:      "category:123",
-				Property: "id",
-			},
+			CategoryId:  "Marketing",
 		}
 
 		prevState := state.EventState{
@@ -145,6 +168,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event new description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
+			ExternalId:  "test-project-id",
 			CategoryId:  strptr("Marketing"),
 			CreatedAt:   created,
 			UpdatedAt:   updated,
@@ -166,10 +190,7 @@ func TestEventProviderOperations(t *testing.T) {
 				"name":        "event",
 				"description": "event new description",
 				"eventType":   "event type",
-				"categoryId": &resources.PropertyRef{
-					URN:      "category:123",
-					Property: "id",
-				},
+				"categoryId":  "Marketing",
 			},
 		}, *updatedResource)
 
@@ -186,6 +207,127 @@ func TestEventProviderOperations(t *testing.T) {
 		require.Nil(t, err)
 	})
 
+	t.Run("Import", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			localArgs      state.EventArgs
+			remoteEvent    *catalog.Event
+			mockErr        error
+			expectErr      bool
+			expectUpdate   bool
+			expectSetExtId bool
+			expectResource resources.ResourceData
+		}{
+			{
+				name:           "successful import no differences",
+				localArgs:      state.EventArgs{Name: "test-event", Description: "desc", EventType: "track", CategoryId: nil},
+				remoteEvent:    &catalog.Event{ID: "remote-id", Name: "test-event", Description: "desc", EventType: "track", CategoryId: nil, WorkspaceId: "ws-id", CreatedAt: created, UpdatedAt: updated},
+				mockErr:        nil,
+				expectErr:      false,
+				expectUpdate:   false,
+				expectSetExtId: true,
+				expectResource: resources.ResourceData{
+					"id":          "remote-id",
+					"name":        "test-event",
+					"description": "desc",
+					"eventType":   "track",
+					"categoryId":  (*string)(nil),
+					"workspaceId": "ws-id",
+					"createdAt":   created.String(),
+					"updatedAt":   updated.String(),
+					"eventArgs":   map[string]interface{}{"name": "test-event", "description": "desc", "eventType": "track", "categoryId": nil},
+				},
+			},
+			{
+				name:           "successful import with differences",
+				localArgs:      state.EventArgs{Name: "new-name", Description: "new-desc", EventType: "new-type", CategoryId: "cat-id"},
+				remoteEvent:    &catalog.Event{ID: "remote-id", Name: "old-name", Description: "old-desc", EventType: "old-type", CategoryId: nil, WorkspaceId: "ws-id", CreatedAt: created, UpdatedAt: updated},
+				mockErr:        nil,
+				expectErr:      false,
+				expectUpdate:   true,
+				expectSetExtId: true,
+				expectResource: resources.ResourceData{
+					"id":          "remote-id",
+					"name":        "new-name",
+					"description": "new-desc",
+					"eventType":   "new-type",
+					"categoryId":  strptr("cat-id"),
+					"workspaceId": "ws-id",
+					"createdAt":   created.String(),
+					"updatedAt":   updated.String(), // Note: Actual test will use the updated time from mock
+					"eventArgs":   map[string]interface{}{"name": "new-name", "description": "new-desc", "eventType": "new-type", "categoryId": "cat-id"},
+				},
+			},
+			{
+				name:        "error on get event",
+				localArgs:   state.EventArgs{Name: "test"},
+				remoteEvent: nil,
+				mockErr:     errors.New("get failed"),
+				expectErr:   true,
+			},
+			{
+				name:         "error on update",
+				localArgs:    state.EventArgs{Name: "new-name"},
+				remoteEvent:  &catalog.Event{ID: "remote-id", Name: "old-name"},
+				mockErr:      errors.New("update failed"),
+				expectErr:    true,
+				expectUpdate: true,
+			},
+			{
+				name:           "error on set external ID",
+				localArgs:      state.EventArgs{Name: "test"},
+				remoteEvent:    &catalog.Event{ID: "remote-id", Name: "test"},
+				mockErr:        errors.New("set ext id failed"),
+				expectErr:      true,
+				expectSetExtId: true,
+			},
+			// Additional case: Handling nil CategoryId and special EventType like "identify" with empty name
+			{
+				name:           "successful import for identify event",
+				localArgs:      state.EventArgs{Name: "", Description: "identify desc", EventType: "identify", CategoryId: nil},
+				remoteEvent:    &catalog.Event{ID: "remote-id", Name: "", Description: "identify desc", EventType: "identify", CategoryId: nil, WorkspaceId: "ws-id", CreatedAt: created, UpdatedAt: updated},
+				mockErr:        nil,
+				expectErr:      false,
+				expectUpdate:   false,
+				expectSetExtId: true,
+				expectResource: resources.ResourceData{
+					"id":          "remote-id",
+					"name":        "",
+					"description": "identify desc",
+					"eventType":   "identify",
+					"categoryId":  (*string)(nil),
+					"workspaceId": "ws-id",
+					"createdAt":   created.String(),
+					"updatedAt":   updated.String(),
+					"eventArgs":   map[string]interface{}{"name": "", "description": "identify desc", "eventType": "identify", "categoryId": nil},
+				},
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(tt.name, func(t *testing.T) {
+				mockCatalog.ResetSpies()
+				mockCatalog.SetEvent(tt.remoteEvent)
+				mockCatalog.SetError(tt.mockErr)
+
+				res, err := eventProvider.Import(ctx, "local-event-id", tt.localArgs.ToResourceData(), "remote-id")
+
+				if tt.expectErr {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				var (
+					expected = tt.expectResource
+					actual   = *res
+				)
+				assert.Equal(t, expected, actual)
+				assert.Equal(t, tt.expectUpdate, mockCatalog.updateCalled)
+				assert.Equal(t, tt.expectSetExtId, mockCatalog.setExternalIdCalled)
+			})
+		}
+	})
 }
 
 func strptr(str string) *string {
@@ -261,7 +403,7 @@ func TestEventProviderDuplicateError(t *testing.T) {
 
 			mockCatalog := &MockEventCatalog{}
 			mockCatalog.SetError(c.err)
-			eventProvider := datacatalog.NewEventProvider(mockCatalog)
+			eventProvider := datacatalog.NewEventProvider(mockCatalog, "test-import-dir")
 
 			_, err := eventProvider.Create(ctx, "event-id", c.args.ToResourceData())
 			require.Error(t, err)

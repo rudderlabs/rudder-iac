@@ -1,0 +1,27 @@
+{
+  "id": "user_agent",
+  "type": "property",
+  "input": {
+    "config": {},
+    "description": "User agent of the API Request",
+    "name": "User Agent",
+    "type": "string"
+  },
+  "output": {
+    "config": {},
+    "createdAt": "2025-06-19 13:00:19.689 +0000 UTC",
+    "description": "User agent of the API Request",
+    "id": "prop_4JnMkLpQrStUvWxYzAbCdEfGhIj",
+    "name": "User Agent",
+    "propertyArgs": {
+      "config": {},
+      "description": "User agent of the API Request",
+      "name": "User Agent",
+      "type": "string"
+    },
+    "type": "string",
+    "updatedAt": "2025-06-19 13:00:19.689 +0000 UTC",
+    "workspaceId": "32cnk5YEnH69oHpC4xwPFvabcDd"
+  },
+  "dependencies": []
+}

@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.10.0](https://github.com/rudderlabs/rudder-iac/compare/v0.9.0...v0.10.0) (2025-09-18)
+
+
+### Features
+
+* add import workspace command to the cli ([#170](https://github.com/rudderlabs/rudder-iac/issues/170)) ([35d7ba4](https://github.com/rudderlabs/rudder-iac/commit/35d7ba431cf11e715eb482be12d6807f901d9f07))
+* add RETL source preview functionality ([#154](https://github.com/rudderlabs/rudder-iac/issues/154)) ([6861e00](https://github.com/rudderlabs/rudder-iac/commit/6861e009c22d31bcd93849c315ed91aed76c44b4))
+* add sample file manager ([#162](https://github.com/rudderlabs/rudder-iac/issues/162)) ([6b7ce6c](https://github.com/rudderlabs/rudder-iac/commit/6b7ce6c06e678c4529e091aa363b3167ab8cbd2f))
+* rudder-typer 2.0, basic infrastructure type aliases ([#132](https://github.com/rudderlabs/rudder-iac/issues/132)) ([ecd5814](https://github.com/rudderlabs/rudder-iac/commit/ecd5814996034bd54eb710458f5b253653221076))
+* rudder-typer 2.0, object custom types and properties ([#133](https://github.com/rudderlabs/rudder-iac/issues/133)) ([8ee24b9](https://github.com/rudderlabs/rudder-iac/commit/8ee24b9adde0f47cae0b25abccdd7b8eca4aaf54))
+* rudder-typer 2.0, phase3, adds support for event property payloads ([#134](https://github.com/rudderlabs/rudder-iac/issues/134)) ([c496c0b](https://github.com/rudderlabs/rudder-iac/commit/c496c0b97d1cbe4b9721a4cb2ab9424cd9b5bb30))
+* rudder-typer 2.0, RudderAnalytics object with event methods ([#135](https://github.com/rudderlabs/rudder-iac/issues/135)) ([9d6fdb0](https://github.com/rudderlabs/rudder-iac/commit/9d6fdb062d78becb85b3415a038e004ff220b7da))
+
+
+### Bug Fixes
+
+* the API request payload to not omitempty properties when sending event_rule update requests to upstream ([#174](https://github.com/rudderlabs/rudder-iac/issues/174)) ([dad5950](https://github.com/rudderlabs/rudder-iac/commit/dad5950e572d36e75a104d91e4f5c917ab7370ce))
+
+
+### Miscellaneous
+
+* add new namer package to create a naming abstraction for externalId naming ([#171](https://github.com/rudderlabs/rudder-iac/issues/171)) ([9f40747](https://github.com/rudderlabs/rudder-iac/commit/9f40747ddfae62e731af73433f3bd3f9b3c586b8))
+* framework for managing experimental flags ([#173](https://github.com/rudderlabs/rudder-iac/issues/173)) ([d4c5a61](https://github.com/rudderlabs/rudder-iac/commit/d4c5a61f893041f8d108600f71e6dfa11ca99e52))
+
+## [0.9.0](https://github.com/rudderlabs/rudder-iac/compare/v0.8.0...v0.9.0) (2025-08-25)
+
+
+### Features
+
+* add base support for variants model within trackingplans and customtypes ([#127](https://github.com/rudderlabs/rudder-iac/issues/127)) ([de60651](https://github.com/rudderlabs/rudder-iac/commit/de606510bd825cec1ea4f70f0a4f671c2d36a487))
+* add variants to catalog api ([#138](https://github.com/rudderlabs/rudder-iac/issues/138)) ([f24ac67](https://github.com/rudderlabs/rudder-iac/commit/f24ac67f0054516a13a894a9799e0a601025b278))
+* **cli:** add import command for RETL SQL models ([#129](https://github.com/rudderlabs/rudder-iac/issues/129)) ([49d7ff0](https://github.com/rudderlabs/rudder-iac/commit/49d7ff0bc155bf85dedf378d961fe3a72bb55318))
+* **cli:** implementing import operation for sql models ([#130](https://github.com/rudderlabs/rudder-iac/issues/130)) ([40422bc](https://github.com/rudderlabs/rudder-iac/commit/40422bc31a2b5fa3881266bd9ee2477389efe464))
+* **cli:** new command to list retl sources supports only sql models ([#126](https://github.com/rudderlabs/rudder-iac/issues/126)) ([2650b13](https://github.com/rudderlabs/rudder-iac/commit/2650b13d282cd079b9bab65665606c8cec1203cd))
+* implement custom differ for custom types to prevent unnecessary updates ([#150](https://github.com/rudderlabs/rudder-iac/issues/150)) ([700633c](https://github.com/rudderlabs/rudder-iac/commit/700633c51f014b1431e4b6ca80568c89f5af36bd))
+
+
+### Bug Fixes
+
+* make additionalProperties as optional to allow for backward compatible state ([#153](https://github.com/rudderlabs/rudder-iac/issues/153)) ([d110986](https://github.com/rudderlabs/rudder-iac/commit/d110986d80ff77cebe830c194c0b19c48bcb6d78))
+* remove unnecessary UnmarshalJSON when handling variantcase and updated the match value validation ([#144](https://github.com/rudderlabs/rudder-iac/issues/144)) ([6fc0592](https://github.com/rudderlabs/rudder-iac/commit/6fc059221b72ab453619ab5bd65084a9c69f3c3d))
+* support defining events with the same metadata.name in separate files ([#151](https://github.com/rudderlabs/rudder-iac/issues/151)) ([29a5115](https://github.com/rudderlabs/rudder-iac/commit/29a5115ee1ccf565992f92bdcdbbd673de67ea3a))
+
+
+### Miscellaneous
+
+* add e2e tests for nested properties ([#146](https://github.com/rudderlabs/rudder-iac/issues/146)) ([8d55f32](https://github.com/rudderlabs/rudder-iac/commit/8d55f325f9661413bc1c4343260bc32876206556))
+* add e2e tests for variant support in trackingplan ([#145](https://github.com/rudderlabs/rudder-iac/issues/145)) ([6d9f327](https://github.com/rudderlabs/rudder-iac/commit/6d9f327023378d2f55c9f8ef76058624d11e46e8))
+* add nested properties in the CLI ([#136](https://github.com/rudderlabs/rudder-iac/issues/136)) ([95220c3](https://github.com/rudderlabs/rudder-iac/commit/95220c307b654edb46bde5ce88041613b1e9dba3))
+* add variants custom type provider ([#142](https://github.com/rudderlabs/rudder-iac/issues/142)) ([fff0487](https://github.com/rudderlabs/rudder-iac/commit/fff04875515d54f1702e90ae8b1dff759ad842b8))
+
 ## [0.8.0](https://github.com/rudderlabs/rudder-iac/compare/v0.7.0...v0.8.0) (2025-07-22)
 
 

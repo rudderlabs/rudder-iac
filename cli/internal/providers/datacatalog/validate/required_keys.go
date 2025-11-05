@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -12,12 +13,12 @@ import (
 type RequiredKeysValidator struct {
 }
 
-var validTypes = []string{
+var ValidTypes = []string{
 	"string", "number", "integer", "boolean", "null", "array", "object",
 }
 
 var validFormatValues = []string{
-	"datetime",
+	"date-time",
 	"date",
 	"time",
 	"email",
@@ -33,6 +34,8 @@ var customTypeNameRegex = regexp.MustCompile(`^[A-Z][a-zA-Z0-9_-]{2,64}$`)
 // Regex for category name validation
 var categoryNameRegex = regexp.MustCompile(`^[A-Z_a-z][\s\w,.-]{2,64}$`)
 
+const MAX_NESTING_DEPTH = 3
+
 func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	log.Info("validating required keys on the entities in catalog")
 
@@ -42,7 +45,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		for _, prop := range props {
 			reference := fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID)
 
-			if prop.Name == "" || prop.Type == "" || prop.LocalID == "" {
+			if prop.Name == "" || prop.LocalID == "" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("id, name and type fields on property are mandatory"),
 					Reference: reference,
@@ -138,6 +141,8 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		}
 
 		for _, rule := range tp.Rules {
+			ruleRef := fmt.Sprintf("%s/rules/%s", reference, rule.LocalID)
+
 			if rule.LocalID == "" {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("id field is mandatory on the rules in tracking plan"),
@@ -161,13 +166,26 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			if rule.Event == nil && len(rule.Properties) > 0 {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("properties without events in rule: %s are not allowed", rule.LocalID),
+					error:     fmt.Errorf("properties without events in event_rule: %s are not allowed", rule.LocalID),
 					Reference: reference,
 				})
 			}
 
 			if len(rule.Variants) > 0 {
-				errors = append(errors, rk.validateVariantsRequiredKeys(rule.Variants, fmt.Sprintf("%s/rules/%s", reference, rule.LocalID))...)
+				errors = append(errors, rk.validateVariantsRequiredKeys(rule.Variants, ruleRef)...)
+			}
+
+			// Validate nested properties if they exist
+			if rule.Event != nil && len(rule.Properties) > 0 {
+				// iterate over the properties and validate each of them
+				for _, prop := range rule.Properties {
+					// we only need to validate nested properties, there are no validations for flat properties
+					if len(prop.Properties) > 0 {
+						errors = append(errors, rk.validateNestedProperty(prop, ruleRef, dc)...)
+						errors = append(errors, rk.validateNestingDepth(prop.Properties, 1, MAX_NESTING_DEPTH, ruleRef)...)
+					}
+				}
+
 			}
 		}
 	}
@@ -215,9 +233,9 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Type validation
-			if !slices.Contains(validTypes, customType.Type) {
+			if !slices.Contains(ValidTypes, customType.Type) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(validTypes, ", ")),
+					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(ValidTypes, ", ")),
 					Reference: reference,
 				})
 			}
@@ -434,9 +452,9 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 				continue
 			}
 
-			if !slices.Contains(validTypes, val) {
+			if !slices.Contains(ValidTypes, val) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(validTypes, ",")),
+					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
 					Reference: reference,
 				})
 			}
@@ -529,12 +547,19 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.V
 			}
 
 			for k, matchValue := range variantCase.Match {
-				switch matchValue.(type) {
-				case string, bool:
-				case float32, float64:
+				switch matchValue := matchValue.(type) {
+				case string, bool, int:
+				case float64:
+					if matchValue != math.Trunc(matchValue) {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("match value at index %d must be an integer", k),
+							Reference: caseReference,
+						})
+					}
+
 				default:
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("match value at index %d must be string, bool or number type (got: %T)", k, matchValue),
+						error:     fmt.Errorf("match value at index %d must be string, bool or integer type (got: %T)", k, matchValue),
 						Reference: caseReference,
 					})
 				}
@@ -593,4 +618,133 @@ func isInteger(val any) bool {
 		return float64(int64(v)) == v
 	}
 	return false
+}
+
+func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProperty, ruleRef string, dc *catalog.DataCatalog) []ValidationError {
+	if prop.Ref == "" {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("ref field is mandatory for property %s in event_rule %s", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	// there is nothing to validate if the property has no nested properties
+	if len(prop.Properties) == 0 {
+		return nil
+	}
+
+	// validate the property reference
+	matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
+	if len(matches) != 3 {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("invalid property reference format: %s in event_rule %s", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	propertyGroup, propertyID := matches[1], matches[2]
+
+	// check if the property exists in the data catalog
+	property := dc.Property(propertyGroup, propertyID)
+	if property == nil {
+		return []ValidationError{
+			{
+				error:     fmt.Errorf("invalid property reference: %s found in tracking plan rule: %s - referred property does not exist", prop.Ref, ruleRef),
+				Reference: ruleRef,
+			},
+		}
+	}
+
+	// validate the property type
+	allowed, err := nestedPropertiesAllowed(property.Type, property.Config)
+	if !allowed {
+		errs := make([]ValidationError, 0)
+		errs = append(errs, ValidationError{
+			error:     fmt.Errorf("nested properties are not allowed for property %s", prop.Ref),
+			Reference: ruleRef,
+		})
+
+		if err != nil {
+			errs = append(errs, ValidationError{
+				error:     fmt.Errorf("error validating nested property %s: %w", prop.Ref, err),
+				Reference: ruleRef,
+			})
+		}
+		return errs
+	}
+
+	var errors []ValidationError
+	for _, prop := range prop.Properties {
+		if len(prop.Properties) > 0 {
+			errors = append(errors, rk.validateNestedProperty(prop, ruleRef, dc)...)
+		}
+	}
+
+	return errors
+}
+
+// validateNestingDepth validates maximum nesting depth (3 levels)
+func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRuleProperty, currentDepth int, maxDepth int, ruleRef string) []ValidationError {
+	var errors []ValidationError
+
+	if currentDepth > maxDepth {
+		errors = append(errors, ValidationError{
+			error:     fmt.Errorf("maximum property nesting depth of %d levels exceeded in event_rule %s", maxDepth, ruleRef),
+			Reference: ruleRef,
+		})
+		return errors
+	}
+
+	for _, prop := range properties {
+		if len(prop.Properties) > 0 {
+			errors = append(errors, rk.validateNestingDepth(prop.Properties, currentDepth+1, maxDepth, ruleRef)...)
+		}
+	}
+
+	return errors
+}
+
+func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, error) {
+	if strings.Contains(propertyType, "object") && strings.Contains(propertyType, "array") {
+		// type array and object cannot be present together
+		// for a property to allow nesting
+		return false, nil
+	}
+
+	if strings.Contains(propertyType, "object") {
+		return true, nil
+	}
+
+	if strings.Contains(propertyType, "array") {
+		itemTypes, itemTypesOk := config["itemTypes"]
+		if !itemTypesOk {
+			return true, nil
+		}
+
+		itemTypesArray, ok := itemTypes.([]any)
+		if !ok {
+			return false, fmt.Errorf("itemTypes must be an array")
+		}
+
+		found := false
+		for i, itemType := range itemTypesArray {
+			val, ok := itemType.(string)
+			if !ok {
+				return false, fmt.Errorf("itemTypes at index %d must be a string value", i)
+			}
+			if val == "object" {
+				found = true
+			}
+		}
+
+		if found {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
