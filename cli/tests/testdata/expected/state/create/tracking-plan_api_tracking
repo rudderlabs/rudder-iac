@@ -6,108 +6,186 @@
         "events": [
             {
                 "allowUnplanned": false,
-                "categoryId": {
-                    "$__rudderRefPtr": "category:user_actions",
-                    "property": "id"
-                },
-                "description": "This event is triggered every time a user views a product.",
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "api_tracking",
-                "name": "API Tracking",
+                "id": {
+                   "$__rudderRef": "event:api_tracking",
+                   "property": "id"
+                },
                 "properties": [
                     {
-                        "config": {
-                            "enum": [
-                                "GET",
-                                "PUT",
-                                "POST",
-                                "DELETE",
-                                "PATCH"
-                            ]
-                        },
-                        "description": "http method of the api called",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
                         "localId": "api_method",
-                        "name": "API Method",
-                        "required": true,
-                        "type": "string"
-                    },
-                    {
-                        "config": {},
-                        "description": "subpath of the api requested",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
-                        "localId": "api_path",
-                        "name": "API Path",
-                        "required": true,
-                        "type": "string"
-                    },
-                    {
-                        "config": {},
-                        "description": "Username for the API",
-                        "hasCustomTypeRef": true,
-                        "hasItemTypesRef": false,
-                        "localId": "username",
-                        "name": "Username",
-                        "required": true,
-                        "type": {
-                            "$__rudderRef": "custom-type:email_type",
-                            "property": "name"
-                        }
-                    },
-                    {
-                        "config": {
-                            "maxLength": 64,
-                            "minLength": 10
+                        "id": {
+                            "$__rudderRef": "property:api_method",
+                            "property": "id"
                         },
-                        "description": "Password for the API",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
-                        "localId": "password",
-                        "name": "Password",
                         "required": true,
-                        "type": "string"
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "api_path",
+                        "id": {
+                            "$__rudderRef": "property:api_path",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "password",
+                        "id": {
+                            "$__rudderRef": "property:password",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "username",
+                        "id": {
+                            "$__rudderRef": "property:username",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
                     }
                 ],
-                "type": "track"
+                "variants": [
+                    {
+                        "cases": [
+                            {
+                                "description": "applies when creating a new entity",
+                                "display_name": "Create Entity",
+                                "match": [
+                                    "POST"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": {
+                                            "$__rudderRef": "property:user_agent",
+                                            "property": "id"
+                                        },
+                                        "required": true
+                                    },
+                                    {
+                                        "id": {
+                                            "$__rudderRef": "property:host",
+                                            "property": "id"
+                                        },
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": [],
+                        "discriminator": {
+                            "$__rudderRef": "property:api_method",
+                            "property": "id"
+                        },
+                        "type": "discriminator"
+                    }
+                ]
             },
             {
                 "allowUnplanned": false,
-                "categoryId": null,
-                "description": "This is a login event without a category",
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "login",
-                "name": "Login Event",
+                "id": {
+                    "$__rudderRef": "event:login",
+                    "property": "id"
+                },
                 "properties": [
                     {
-                        "config": {},
-                        "description": "Username for the API",
-                        "hasCustomTypeRef": true,
-                        "hasItemTypesRef": false,
-                        "localId": "username",
-                        "name": "Username",
+                        "localId": "password",
+                        "id": {
+                            "$__rudderRef": "property:password",
+                            "property": "id"
+                        },
                         "required": true,
-                        "type": {
-                            "$__rudderRef": "custom-type:email_type",
-                            "property": "name"
-                        }
+                        "additionalProperties": false
                     },
                     {
-                        "config": {
-                            "maxLength": 64,
-                            "minLength": 10
+                        "localId": "signin_info",
+                        "id": {
+                            "$__rudderRef": "property:signin_info",
+                            "property": "id"
                         },
-                        "description": "Password for the API",
-                        "hasCustomTypeRef": false,
-                        "hasItemTypesRef": false,
-                        "localId": "password",
-                        "name": "Password",
                         "required": true,
-                        "type": "string"
+                        "additionalProperties": true,
+                        "properties": [
+                            {
+                                "localId": "captcha",
+                                "id": {
+                                    "$__rudderRef": "property:captcha",
+                                    "property": "id"
+                                },
+                                "required": true,
+                                "additionalProperties": true,
+                                "properties": [
+                                    {
+                                        "localId": "captcha_info",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_info",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": true,
+                                        "properties": [
+                                            {
+                                                "localId": "captcha_type",
+                                                "id": {
+                                                    "$__rudderRef": "property:captcha_type",
+                                                    "property": "id"
+                                                },
+                                                "required": true,
+                                                "additionalProperties": false
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "localId": "captcha_solved",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_solved",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": false
+                                    }
+                                ]
+                            },
+                            {
+                                "localId": "remember_me_checkbox_clicked",
+                                "id": {
+                                    "$__rudderRef": "property:remember_me_checkbox_clicked",
+                                    "property": "id"
+                                },
+                                "required": false,
+                                "additionalProperties": false
+                            }
+                        ]
+                    },
+                    {
+                        "localId": "username",
+                        "id": {
+                            "$__rudderRef": "property:username",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
                     }
                 ],
-                "type": "track"
+                "variants": []
+            },
+            {
+                "allowUnplanned": false,
+                "identitySection": "properties",
+                "localId": "logout",
+                "id": {
+                    "$__rudderRef": "event:logout",
+                    "property": "id"
+                },
+                "properties": [],
+                "variants": []
             }
         ],
         "localId": "api_tracking",
@@ -127,6 +205,11 @@
                 "eventId": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
                 "id": "tpe_30AygUBAlPdHGNZ84ufoK9X5eCr",
                 "localId": "login"
+            },
+            {
+                "eventId": "ev_30AyfkI5RPrtJDZw5aypsZzEftS",
+                "id": "tpe_30AygUBAlPdHGNZ84ufoK9X5eCs",
+                "localId": "logout"
             }
         ],
         "id": "tp_30AygDmnmMYbmyP4mMfl9ZNi4MG",
@@ -136,99 +219,130 @@
             "events": [
                 {
                     "allowUnplanned": false,
-                    "categoryId": "",
-                    "description": "This event is triggered every time a user views a product.",
-                    "identitySection": "",
+                    "identitySection": "properties",
+                    "id": "ev_30AyfWxvSYDxDw7uLkSOGUA4fl1",
                     "localId": "api_tracking",
-                    "name": "API Tracking",
                     "properties": [
                         {
-                            "config": {
-                                "enum": [
-                                    "GET",
-                                    "PUT",
-                                    "POST",
-                                    "DELETE",
-                                    "PATCH"
-                                ]
-                            },
-                            "description": "http method of the api called",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "api_method",
-                            "name": "API Method",
+                            "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "required": true,
-                            "type": "string"
+                            "additionalProperties": false
                         },
                         {
-                            "config": {},
-                            "description": "subpath of the api requested",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "api_path",
-                            "name": "API Path",
+                            "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
                             "required": true,
-                            "type": "string"
+                            "additionalProperties": false
                         },
                         {
-                            "config": {},
-                            "description": "Username for the API",
-                            "hasCustomTypeRef": true,
-                            "hasItemTypesRef": false,
-                            "localId": "username",
-                            "name": "Username",
-                            "required": true,
-                            "type": "EmailType"
-                        },
-                        {
-                            "config": {
-                                "maxLength": 64,
-                                "minLength": 10
-                            },
-                            "description": "Password for the API",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
                             "localId": "password",
-                            "name": "Password",
+                            "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
                             "required": true,
-                            "type": "string"
+                            "additionalProperties": false
+                        },
+                        {
+                            "localId": "username",
+                            "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+                            "required": true,
+                            "additionalProperties": false
                         }
                     ],
-                    "type": "track"
+                    "variants": [{
+                        "cases": [
+                            {
+                                "description": "applies when creating a new entity",
+                                "display_name": "Create Entity",
+                                "match": [
+                                    "POST"
+                                ],
+                                "properties": [
+                                    {
+                                        "id": "prop_31S8bPPNOQoWfpRVZWHX4TDcWVm",
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "prop_31S8apfLBLpdSXTEPZ43c6UGAuY",
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": [],
+                        "discriminator": "prop_31S8aMA5BJ8yA0mmlXKQNnE3M5Y",
+                        "type": "discriminator"
+                    }]
                 },
                 {
                     "allowUnplanned": false,
-                    "categoryId": "",
-                    "description": "This is a login event without a category",
-                    "identitySection": "",
+                    "identitySection": "properties",
                     "localId": "login",
-                    "name": "Login Event",
+                    "id": "ev_30AyfkI5RPrtJDZw5aypsZzEftR",
                     "properties": [
                         {
-                            "config": {},
-                            "description": "Username for the API",
-                            "hasCustomTypeRef": true,
-                            "hasItemTypesRef": false,
-                            "localId": "username",
-                            "name": "Username",
+                            "localId": "password",
+                            "id": "prop_2yxtwN9qLmo4i5brA9Oxq1dXy09",
                             "required": true,
-                            "type": "EmailType"
+                            "additionalProperties": false
                         },
                         {
-                            "config": {
-                                "maxLength": 64,
-                                "minLength": 10
-                            },
-                            "description": "Password for the API",
-                            "hasCustomTypeRef": false,
-                            "hasItemTypesRef": false,
-                            "localId": "password",
-                            "name": "Password",
+                            "localId": "signin_info",
+                            "id": "prop_31T8RMRIm7LFE4Ks28CF5sN8PIU",
                             "required": true,
-                            "type": "string"
+                            "additionalProperties": true,
+                            "properties": [
+                                {
+                                    "localId": "captcha",
+                                    "id": "prop_31T8QUcgapNbwhFpuux9WBiwBeK",
+                                    "required": true,
+                                    "additionalProperties": true,
+                                    "properties": [
+                                        {
+                                            "localId": "captcha_info",
+                                            "id": "prop_31T8QmJh6TRdeocjZ9XlZTWAxcX",
+                                            "required": true,
+                                            "additionalProperties": true,
+                                            "properties": [
+                                                {
+                                                    "localId": "captcha_type",
+                                                    "id": "prop_31T8QvC0GzeU2rX1PjjFgwuofex",
+                                                    "required": true,
+                                                    "additionalProperties": false
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "localId": "captcha_solved",
+                                            "id": "prop_31T8QrNiCqKZeczxQp8EGqfF8Qa",
+                                            "required": true,
+                                            "additionalProperties": false
+                                        }
+                                    ]
+                                },
+                                {
+                                    "localId": "remember_me_checkbox_clicked",
+                                    "id": "prop_31T8RErKzrgZkFcaEDjGQzC3MdX",
+                                    "required": false,
+                                    "additionalProperties": false
+                                }
+                            ]
+                        },
+                        {
+                            "localId": "username",
+                            "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+                            "required": true,
+                            "additionalProperties": false
                         }
                     ],
-                    "type": "track"
+                    "variants": []
+                },
+                {
+                    "allowUnplanned": false,
+                    "identitySection": "properties",
+                    "localId": "logout",
+                    "id": "ev_30AyfkI5RPrtJDZw5aypsZzEftS",
+                    "properties": [],
+                    "variants": []
                 }
             ],
             "localId": "api_tracking",

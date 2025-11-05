@@ -10,6 +10,7 @@ import (
 )
 
 type Planner struct {
+	workspaceId string
 }
 
 type OperationType int
@@ -18,6 +19,7 @@ const (
 	Create OperationType = iota
 	Update
 	Delete
+	Import
 )
 
 type Operation struct {
@@ -37,6 +39,8 @@ func (t *OperationType) String() string {
 		return "Update"
 	case Delete:
 		return "Delete"
+	case Import:
+		return "Import"
 	default:
 		return "Unknown"
 	}
@@ -47,22 +51,33 @@ type Plan struct {
 	Operations []*Operation
 }
 
-func New() *Planner {
-	return &Planner{}
+func New(workspaceId string) *Planner {
+	return &Planner{
+		workspaceId: workspaceId,
+	}
 }
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
-	diff := differ.ComputeDiff(source, target)
+	diff := differ.ComputeDiff(source, target, differ.DiffOptions{WorkspaceID: p.workspaceId})
 	plan := &Plan{
 		Diff: diff,
 	}
 
+	// Handle importable resources (will be imported from remote)
+	sortedImportable := sortByDependencies(diff.ImportableResources, target)
+	for _, urn := range sortedImportable {
+		resource, _ := target.GetResource(urn)
+		plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
+	}
+
+	// Handle new resources (will be created)
 	sortedNew := sortByDependencies(diff.NewResources, target)
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
 		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
 	}
 
+	// Handle updated resources
 	updatedURNs := make([]string, 0, len(diff.UpdatedResources))
 	for r := range diff.UpdatedResources {
 		updatedURNs = append(updatedURNs, r)
@@ -73,6 +88,7 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 		plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})
 	}
 
+	// Handle deleted resources
 	sortedDeleted := sortByDependencies(diff.RemovedResources, source)
 	slices.Reverse(sortedDeleted)
 	for _, urn := range sortedDeleted {

@@ -1,0 +1,91 @@
+/** Merges the ruddertyper context with user-provided custom context */
+private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
+    return if (userOptions == null) {
+        RudderOption(customContext = ruddertyperContext)
+    } else {
+        // Merge contexts: start with ruddertyper context, then apply user's custom context
+        val mergedContext = buildJsonObject {
+            // Add ruddertyper context first
+            for ((key, value) in ruddertyperContext) {
+                put(key, value)
+            }
+            // Merge in user's custom context (if provided)
+            for ((key, value) in userOptions.customContext) {
+                put(key, value)
+            }
+        }
+        // Copy all properties from userOptions and set merged context
+        userOptions.copy(customContext = mergedContext)
+    }
+}
+
+/**
+ * This file provides type-safe wrappers for tracking events with RudderStack based on your tracking plan.
+ *
+ * ## Tracking Plan
+ {{ if .TrackingPlanURL }}* - **Name**: [{{ .TrackingPlanName }}]({{ .TrackingPlanURL }}){{ else }}* - **Name**: {{ .TrackingPlanName }}{{ end }}
+ * - **ID**: {{ .TrackingPlanID }}
+ * - **Version**: {{ .TrackingPlanVersion }}
+ *
+ * ## Quick Start
+ *
+ * Initialize RudderStack Analytics:
+ * ```kotlin
+ * val analytics = Analytics(
+ *     configuration = Configuration(
+ *         writeKey = "YOUR_WRITE_KEY",
+ *         dataPlaneUrl = "YOUR_DATA_PLANE_URL"
+ *     ),
+ *     application = application
+ * )
+ * val rudderAnalytics = RudderAnalytics(analytics)
+ * ```
+ *
+ * Track events using the generated type-safe methods.
+ *
+ * For more information, refer to:
+ * - [RudderStack Kotlin SDK Documentation](https://github.com/rudderlabs/rudder-sdk-kotlin)
+ */
+class RudderAnalytics(private val analytics: Analytics) {
+    private val context = buildJsonObject {
+        put("ruddertyper", buildJsonObject {
+        {{- range $key, $value := .EventContext }}
+            put("{{ $key }}", {{ $value }})
+        {{- end }}
+        })
+    }
+{{ range .RudderAnalyticsMethods }}
+    /**
+     * {{ escapeComment .Comment }}
+     *
+     * Event:
+{{- if .EventName }}
+     *   Name: "{{ .EventName }}"
+{{- end }}
+{{- if .IdentitySection }}
+     *   Identity Section: "{{ .IdentitySection }}"
+{{- end }}
+{{- if .MethodArguments }}
+     *
+{{- range .MethodArguments }}
+     * @param {{ .Name }}{{- if .Comment }} {{ escapeComment .Comment }}{{- end }}
+{{- end }}
+{{- end }}
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.{{ .SDKCall.MethodName }}
+     */
+    fun {{ .Name }}({{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end }}{{- if .MethodArguments }}, {{ end }}options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        {{- if .AddDataToContext }}
+        mergedOptions = mergeRudderContext(mergedOptions, buildJsonObject { put("traits", traits.rudderSerialize()) })
+        {{- end }}
+        analytics.{{ .SDKCall.MethodName }}(
+        {{- range $i, $arg := .SDKCall.Arguments }}
+            {{ .Name }} ={{- if .ShouldSerialize }} {{ .Value }}.rudderSerialize(){{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
+        {{- end }}
+            options = mergedOptions
+        )
+    }
+{{ end -}}
+}

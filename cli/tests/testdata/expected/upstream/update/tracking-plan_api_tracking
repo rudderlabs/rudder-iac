@@ -1,6 +1,7 @@
 {
   "createdAt": "2025-06-25T08:11:46.21Z",
   "creationType": "Data catalog API",
+  "externalId": "api_tracking",
   "description": "Tracking plan for an e-commerce application.",
   "events": [
     {
@@ -11,61 +12,35 @@
       "eventType": "track",
       "id": "ev_2yzYxszrUnzSogGdZOAPO7yF47u",
       "identitySection": "properties",
+      "externalId": "api_error",
       "name": "API Error",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": true,
-            "properties": {
-              "API Method": {
-                "enum": [
-                  "GET",
-                  "PUT",
-                  "POST",
-                  "DELETE",
-                  "PATCH",
-                  "HEAD"
-                ],
-                "type": [
-                  "string"
-                ]
-              },
-              "API Path": {
-                "type": [
-                  "string"
-                ]
-              },
-              "Error Code": {
-                "enum": [
-                  400,
-                  401,
-                  404,
-                  500
-                ],
-                "type": [
-                  "integer"
-                ]
-              },
-              "HTTP Retry Count": {
-                "maximum": 10,
-                "minimum": 0,
-                "multipleOf": 2,
-                "type": [
-                  "integer"
-                ]
-              }
-            },
-            "required": [
-              "API Method",
-              "API Path",
-              "Error Code"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": true,
+      "properties": [
+        {
+          "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "name": "API Method",
+          "required": true,
+          "additionalProperties": false
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "name": "API Path",
+          "required": true,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_2yxtw66uqPJNgwTN9bDumlkXqvp",
+          "name": "HTTP Retry Count",
+          "required": false,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
+          "name": "Error Code",
+          "required": true,
+          "additionalProperties": false
+        }
+      ],
       "updatedAt": "2025-06-25T08:12:07.417Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -78,53 +53,80 @@
       "eventType": "track",
       "id": "ev_2yzYvjMKk0y4X6GzlgLW9uJi7Er",
       "identitySection": "properties",
+      "externalId": "api_tracking",
       "name": "API Tracking",
-      "rules": {
-        "$schema": "",
-        "properties": {
-          "properties": {
-            "additionalProperties": true,
-            "properties": {
-              "API Method": {
-                "enum": [
-                  "GET",
-                  "PUT",
-                  "POST",
-                  "DELETE",
-                  "PATCH",
-                  "HEAD"
-                ],
-                "type": [
-                  "string"
-                ]
-              },
-              "API Path": {
-                "type": [
-                  "string"
-                ]
-              },
-              "Password": {
-                "maxLength": 64,
-                "minLength": 10,
-                "type": [
-                  "string"
-                ]
-              },
-              "User Email": {
-                "$ref": "#/$defs/EmailType"
-              }
-            },
-            "required": [
-              "API Method",
-              "API Path",
-              "Password",
-              "User Email"
-            ],
-            "type": "object"
-          }
+      "additionalProperties": true,
+      "properties": [
+        {
+          "id": "prop_2yx87NwSytDgk2DsTG7GijTJjvR",
+          "required": true,
+          "name": "User Email",
+          "additionalProperties": false
         },
-        "type": "object"
-      },
+        {
+          "id": "prop_2yx87bJGmEmlFvRv5CdOXMaVxaV",
+          "required": true,
+          "name": "Password",
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+          "name": "API Path",
+          "required": true,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+          "name": "API Method",
+          "required": true,
+          "additionalProperties": false
+        }
+      ],
+      "variants": [
+        {
+          "type": "discriminator",
+          "discriminator": "prop_33Ska98tn1cayaQRCphD1mwpExt",
+          "cases": [
+            {
+              "display_name": "Create Entity",
+              "match": [
+                "POST"
+              ],
+              "description": "applies when creating a new entity",
+              "properties": [
+                {
+                  "id": "prop_33Skb8u6Gnuy5nt0GCg0HSttaaE",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "display_name": "Update Entity",
+              "match": [
+                "PUT",
+                "PATCH"
+              ],
+              "description": "applies when updating an existing entity",
+              "properties": [
+                {
+                  "id": "prop_33SkbKuAr5ZG9SChfPJRrjRbqVJ",
+                  "required": true
+                }
+              ]
+            }
+          ],
+          "default": [
+            {
+              "id": "prop_33SkbdJHI1dHGXT49e3OWsmZL4H",
+              "required": false
+            },
+            {
+              "id": "prop_33Skb2HSLkcbOX220qCr7X7pGqv",
+              "required": true
+            }
+          ]
+        }
+      ],
       "updatedAt": "2025-06-25T08:11:46.632Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -137,37 +139,75 @@
       "eventType": "track",
       "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
       "identitySection": "properties",
+      "externalId": "login",
       "name": "Login Event",
-      "rules": {
-          "$schema": "",
-          "properties": {
-              "properties": {
-                  "additionalProperties": false,
-                  "properties": {
-                      "Password": {
-                          "maxLength": 64,
-                          "minLength": 10,
-                          "type": [
-                              "string"
-                          ]
-                      },
-                      "User Email": {
-                          "$ref": "#/$defs/EmailType"
-                      }
-                  },
-                  "required": [
-                      "Password", 
-                      "User Email"
-                  ],
-                  "type": "object"
-              }
-          },
-          "type": "object"
-      },
+      "additionalProperties": false,
+      "properties": [
+        {
+          "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+          "name": "User Email",
+          "required": true,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+          "name": "Password",
+          "required": true,
+          "additionalProperties": false
+        },
+        {
+          "id": "prop_31TA42kdL1UNUtR1PtKpi9hxWt7",
+          "name": "Signin Info",
+          "required": true,
+          "additionalProperties": true,
+          "properties": [
+            {
+              "id": "prop_31TA3Qk24n8NExMntP7PgffBRlG",
+              "name": "Captcha",
+              "required": true,
+              "additionalProperties": true,
+              "properties": [
+                {
+                  "id": "prop_31TA3Z2ASEI7CGaf2RsTpqBXd2O",
+                  "name": "Captcha Info",
+                  "required": true,
+                  "additionalProperties": true,
+                  "properties": [
+                    {
+                      "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
+                      "name": "Captcha Type",
+                      "required": true,
+                      "additionalProperties": false
+                    },
+                    {
+                      "id": "prop_31TA3ltAM0RP3yLCe4g0cxm0oCm",
+                      "name": "Captcha Attempts",
+                      "required": true,
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                {
+                  "id": "prop_31TA3VQw3zNqCtBTl2fWT6jiacq",
+                  "name": "Captcha Solved",
+                  "required": true,
+                  "additionalProperties": false
+                }
+              ]
+            },
+            {
+              "id": "prop_31TA3wtIcbJwsNHK6ot7Sh7NwvK",
+              "name": "Remember Me Checkbox Clicked",
+              "required": true,
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
       "updatedAt": "2025-07-21T20:59:56.665Z",
       "updatedBy": "300EdpkzmrxHDc0k8nuVsZdS2t3",
       "workspaceId": "2tFmje5VkxuoDp5UCLkSLq7j30T"
-  }
+    }
   ],
   "id": "tp_2yzYwMQquIHaXUOOYP5FCHXfUYU",
   "name": "API Tracking",

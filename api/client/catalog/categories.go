@@ -9,17 +9,19 @@ import (
 )
 
 type CategoryCreate struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
+	ExternalId string `json:"externalId"`
 }
 
 type CategoryUpdate struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
 }
 
 type Category struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	WorkspaceID string    `json:"workspaceId"`
+	ExternalId  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -29,6 +31,8 @@ type CategoryStore interface {
 	UpdateCategory(ctx context.Context, id string, input CategoryUpdate) (*Category, error)
 	DeleteCategory(ctx context.Context, id string) error
 	GetCategory(ctx context.Context, id string) (*Category, error)
+	GetCategories(ctx context.Context) ([]*Category, error)
+	SetCategoryExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) CreateCategory(ctx context.Context, input CategoryCreate) (*Category, error) {
@@ -90,4 +94,26 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 	}
 
 	return &category, nil
+}
+
+func (c *RudderDataCatalog) GetCategories(ctx context.Context) ([]*Category, error) {
+	return getAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
+}
+
+func (c *RudderDataCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/categories/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

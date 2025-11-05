@@ -6,23 +6,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var _ catalog.DataCatalog = &MockTrackingPlanCatalog{}
 
 type MockTrackingPlanCatalog struct {
 	datacatalog.EmptyCatalog
-	tp           *catalog.TrackingPlan
-	tpWithSchema *catalog.TrackingPlanWithSchemas
-	tpes         *catalog.TrackingPlanEventSchema
-	err          error
+	tp                   *catalog.TrackingPlan
+	tpWithSchema         *catalog.TrackingPlanWithSchemas
+	tpWithIdentifiers    *catalog.TrackingPlanWithIdentifiers
+	tpes                 *catalog.TrackingPlanEventSchema
+	err                  error
+	updateCalled         bool
+	setExternalIdCalled  bool
+	deleteEventCalled    bool
+	updateEventCalled    bool
+	deleteEventCallCount int
+	updateEventCallCount int
 }
 
 func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
@@ -30,6 +38,15 @@ func (m *MockTrackingPlanCatalog) CreateTrackingPlan(ctx context.Context, tracki
 }
 
 func (m *MockTrackingPlanCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
+	m.updateCalled = true
+	if m.tp != nil {
+		m.tp.Name = name
+		m.tp.Description = &description
+	}
+	if m.tpWithIdentifiers != nil {
+		m.tpWithIdentifiers.Name = name
+		m.tpWithIdentifiers.Description = &description
+	}
 	return m.tp, m.err
 }
 
@@ -38,6 +55,8 @@ func (m *MockTrackingPlanCatalog) DeleteTrackingPlan(ctx context.Context, tracki
 }
 
 func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
+	m.deleteEventCalled = true
+	m.deleteEventCallCount++
 	return m.err
 }
 
@@ -45,7 +64,11 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+	return m.tpWithIdentifiers, m.err
+}
+
+func (m *MockTrackingPlanCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
 	return m.tpWithSchema, m.err
 }
 
@@ -53,7 +76,9 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input catalog.TrackingPlanEventsUpdate) (*catalog.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
+	m.updateEventCalled = true
+	m.updateEventCallCount++
 	return m.tp, m.err
 }
 
@@ -69,13 +94,34 @@ func (m *MockTrackingPlanCatalog) SetError(err error) {
 	m.err = err
 }
 
+func (m *MockTrackingPlanCatalog) SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error {
+	m.setExternalIdCalled = true
+	if m.tpWithIdentifiers != nil {
+		m.tpWithIdentifiers.ExternalID = externalId
+	}
+	return m.err
+}
+
+func (m *MockTrackingPlanCatalog) SetTrackingPlanWithIdentifiers(tpWithIdentifiers *catalog.TrackingPlanWithIdentifiers) {
+	m.tpWithIdentifiers = tpWithIdentifiers
+}
+
+func (m *MockTrackingPlanCatalog) ResetSpies() {
+	m.updateCalled = false
+	m.setExternalIdCalled = false
+	m.deleteEventCalled = false
+	m.updateEventCalled = false
+	m.deleteEventCallCount = 0
+	m.updateEventCallCount = 0
+}
+
 func TestTrackingPlanProvider_Create(t *testing.T) {
 	t.Parallel()
 
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -107,25 +153,19 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 			"description": "tracking-plan-description",
 			"events": []map[string]interface{}{
 				{
-					"name":            "event",
+					"id":              "",
 					"localId":         "event-id",
-					"categoryId":      "",
-					"description":     "event-description",
-					"type":            "event-type",
 					"allowUnplanned":  false,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"name":             "property",
-							"localId":          "property-id",
-							"description":      "property-description",
-							"type":             "string",
-							"required":         true,
-							"config":           map[string]interface{}(nil),
-							"hasCustomTypeRef": false,
-							"hasItemTypesRef":  false,
+							"localId":              "property-id",
+							"id":                   "",
+							"required":             true,
+							"additionalProperties": false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},
@@ -139,7 +179,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -172,19 +212,12 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event",
 			LocalID:        "event-id",
-			Type:           "event-type",
-			Description:    "event-description",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property",
-					LocalID:     "property-id",
-					Description: "property-description",
-					Type:        "string",
-					Required:    true,
-					Config:      nil,
+					LocalID:  "property-id",
+					Required: true,
 				},
 			},
 		}).Build()
@@ -215,25 +248,19 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"name":            "event",
 					"localId":         "event-id",
-					"categoryId":      "",
-					"description":     "event-description",
-					"type":            "event-type",
+					"id":              "",
 					"allowUnplanned":  false,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"name":             "property",
-							"localId":          "property-id",
-							"description":      "property-description",
-							"type":             "string",
-							"required":         true,
-							"config":           map[string]interface{}(nil),
-							"hasCustomTypeRef": false,
-							"hasItemTypesRef":  false,
+							"id":                   "",
+							"localId":              "property-id",
+							"required":             true,
+							"additionalProperties": false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},
@@ -246,7 +273,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	var (
 		ctx         = context.Background()
 		mockCatalog = &MockTrackingPlanCatalog{}
-		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog)
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
 	)
 
 	var (
@@ -265,19 +292,12 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{               // updated events under the trackingplan +1 Added -1 Removed
-			Name:           "event-1",
 			LocalID:        "event-id-1",
-			Type:           "event-type-1",
-			Description:    "event-description-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property-1",
-					LocalID:     "property-id-1",
-					Description: "property-description-1",
-					Type:        "string",
-					Required:    false,
-					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+					LocalID:  "property-id-1",
+					Required: false,
 				},
 			},
 		}).Build()
@@ -322,25 +342,19 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"name":            "event-1",
+					"id":              "",
 					"localId":         "event-id-1",
-					"categoryId":      "",
-					"description":     "event-description-1",
-					"type":            "event-type-1",
 					"allowUnplanned":  true,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"name":             "property-1",
-							"localId":          "property-id-1",
-							"description":      "property-description-1",
-							"type":             "string",
-							"required":         false,
-							"config":           map[string]interface{}{"enum": []string{"value1", "value2"}},
-							"hasCustomTypeRef": false,
-							"hasItemTypesRef":  false,
+							"id":                   "",
+							"localId":              "property-id-1",
+							"required":             false,
+							"additionalProperties": false,
 						},
 					},
+					"variants": []map[string]interface{}{},
 				},
 			},
 		},
@@ -354,36 +368,22 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	// 2 Added 1 Removed 1 Updated
 	oldArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event",
 			LocalID:        "event-id",
-			Type:           "event-type",
-			Description:    "event-description",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property",
-					LocalID:     "property-id",
-					Description: "property-description",
-					Type:        "string",
-					Required:    true,
-					Config:      nil,
+					LocalID:  "property-id",
+					Required: true,
 				},
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event-1",
 			LocalID:        "event-id-1",
-			Type:           "event-type-1",
-			Description:    "event-description-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property",
-					LocalID:     "property-id",
-					Description: "property-description",
-					Type:        "string",
-					Required:    true,
-					Config:      nil,
+					LocalID:  "property-id",
+					Required: true,
 				},
 			},
 		}).
@@ -391,44 +391,26 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 
 	newArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event",
 			LocalID:        "event-id",
-			Type:           "event-type",
-			Description:    "event-description",
 			AllowUnplanned: true, // updated
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property",
-					LocalID:     "property-id",
-					Description: "property-description",
-					Type:        "string",
-					Required:    true,
-					Config:      map[string]interface{}{"enum": []string{"value1", "value2"}}, // updated
+					LocalID:  "property-id",
+					Required: true,
 				},
 				{
-					Name:        "property-1",
-					LocalID:     "property-id-1",
-					Description: "property-description-1",
-					Type:        "int",
-					Required:    false,
-					Config:      map[string]interface{}{"enum": []int{1, 2, 3}},
+					LocalID:  "property-id-1",
+					Required: false,
 				},
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
-			Name:           "event-2",
 			LocalID:        "event-id-2",
-			Type:           "event-type-2",
-			Description:    "event-description-2",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					Name:        "property-2",
-					LocalID:     "property-id-2",
-					Description: "property-description-2",
-					Type:        "string",
-					Required:    false,
-					Config:      nil,
+					LocalID:  "property-id-2",
+					Required: false,
 				},
 			},
 		}).Build()
@@ -439,63 +421,38 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	require.Equal(t, 1, len(diffed.Deleted))
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
-		Name:           "event-2",
 		LocalID:        "event-id-2",
-		Type:           "event-type-2",
-		Description:    "event-description-2",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
-				Name:        "property-2",
-				LocalID:     "property-id-2",
-				Description: "property-description-2",
-				Type:        "string",
-				Required:    false,
-				Config:      nil,
+				LocalID:  "property-id-2",
+				Required: false,
 			},
 		},
 	}, diffed.Added[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
-		Name:           "event-1",
 		LocalID:        "event-id-1",
-		Type:           "event-type-1",
-		Description:    "event-description-1",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
-				Name:        "property",
-				LocalID:     "property-id",
-				Description: "property-description",
-				Type:        "string",
-				Required:    true,
-				Config:      nil,
+				LocalID:  "property-id",
+				Required: true,
 			},
 		},
 	}, diffed.Deleted[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
-		Name:           "event",
 		LocalID:        "event-id",
-		Type:           "event-type",
-		Description:    "event-description",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
-				Name:        "property",
-				LocalID:     "property-id",
-				Description: "property-description",
-				Type:        "string",
-				Required:    true,
-				Config:      map[string]interface{}{"enum": []string{"value1", "value2"}},
+				LocalID:  "property-id",
+				Required: true,
 			},
 			{
-				Name:        "property-1",
-				LocalID:     "property-id-1",
-				Description: "property-description-1",
-				Type:        "int",
-				Required:    false,
-				Config:      map[string]interface{}{"enum": []int{1, 2, 3}},
+				LocalID:  "property-id-1",
+				Required: false,
 			},
 		},
 	}, diffed.Updated[0])
@@ -518,31 +475,293 @@ func TestTrackingPlanProvider_Delete(t *testing.T) {
 
 	var (
 		ctx      = context.Background()
-		provider = datacatalog.NewTrackingPlanProvider(&MockTrackingPlanCatalog{})
+		provider = datacatalog.NewTrackingPlanProvider(&MockTrackingPlanCatalog{}, "data-catalog")
 	)
 
 	err := provider.Delete(ctx, "tracking-plan-id", resources.ResourceData{"id": "upstream-tracking-plan-id"})
 	require.Nil(t, err)
 }
 
+func TestTrackingPlanProvider_Import(t *testing.T) {
+	var (
+		ctx         = context.Background()
+		mockCatalog = &MockTrackingPlanCatalog{}
+		provider    = datacatalog.NewTrackingPlanProvider(mockCatalog, "data-catalog")
+		created, _  = time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
+		updated, _  = time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
+	)
+
+	tests := []struct {
+		name                   string
+		localArgs              state.TrackingPlanArgs
+		remoteTrackingPlan     *catalog.TrackingPlanWithIdentifiers
+		mockErr                error
+		expectErr              bool
+		expectUpdate           bool
+		expectSetExtId         bool
+		expectDeleteEventCount int
+		expectUpdateEventCount int
+		expectResource         *resources.ResourceData
+	}{
+		{
+			name: "successful import no differences",
+			localArgs: state.TrackingPlanArgs{
+				LocalID:     "local-tp-id",
+				Name:        "TestTP",
+				Description: "desc",
+				Events: []*state.TrackingPlanEventArgs{
+					{
+						LocalID:        "event-1",
+						ID:             "remote-event-1",
+						AllowUnplanned: false,
+						Properties: []*state.TrackingPlanPropertyArgs{
+							{LocalID: "prop-1", ID: "remote-prop-1", Required: true},
+						},
+					},
+				},
+			},
+			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				Version:      1,
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+					{
+						ID:                   "remote-event-1",
+						AdditionalProperties: false,
+						IdentitySection:      "",
+						Properties: []*catalog.TrackingPlanEventProperty{
+							{ID: "remote-prop-1", Required: true},
+						},
+					},
+				},
+			},
+			mockErr:                nil,
+			expectErr:              false,
+			expectUpdate:           false,
+			expectSetExtId:         true,
+			expectDeleteEventCount: 0,
+			expectUpdateEventCount: 0,
+			expectResource: &resources.ResourceData{
+				"id":           "remote-tp-id",
+				"name":         "TestTP",
+				"description":  "desc",
+				"version":      1,
+				"creationType": "backend",
+				"workspaceId":  "ws-id",
+				"createdAt":    created.String(),
+				"updatedAt":    updated.String(),
+				"events":       []map[string]any(nil),
+				"trackingPlanArgs": map[string]any{
+					"localId":     "local-tp-id",
+					"name":        "TestTP",
+					"description": "desc",
+					"events": []map[string]any{
+						{
+							"localId":         "event-1",
+							"id":              "remote-event-1",
+							"allowUnplanned":  false,
+							"identitySection": "",
+							"properties": []map[string]any{
+								{
+									"localId":              "prop-1",
+									"id":                   "remote-prop-1",
+									"required":             true,
+									"additionalProperties": false,
+								},
+							},
+							"variants": []map[string]any{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "successful import with differences",
+			localArgs: state.TrackingPlanArgs{
+				LocalID:     "local-tp-id",
+				Name:        "UpdatedTP",
+				Description: "new desc",
+				Events: []*state.TrackingPlanEventArgs{
+					{
+						// Event that exists in remote but with changes (UPDATE)
+						LocalID:        "event-1",
+						ID:             "remote-event-1",
+						AllowUnplanned: true, // changed from false
+						Properties: []*state.TrackingPlanPropertyArgs{
+							{LocalID: "prop-1", ID: "remote-prop-1", Required: false}, // changed from true
+						},
+					},
+					{
+						// New event that doesn't exist in remote (ADD)
+						LocalID:        "event-3",
+						ID:             "remote-event-3",
+						AllowUnplanned: false,
+						Properties: []*state.TrackingPlanPropertyArgs{
+							{LocalID: "prop-3", ID: "remote-prop-3", Required: true},
+						},
+					},
+				},
+			},
+			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				Version:      1,
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+					{
+						// Event that will be updated
+						ID:                   "remote-event-1",
+						AdditionalProperties: false,
+						IdentitySection:      "",
+						Properties: []*catalog.TrackingPlanEventProperty{
+							{ID: "remote-prop-1", Required: true},
+						},
+					},
+					{
+						// Event that exists in remote but not in local (DELETE)
+						ID:                   "remote-event-2",
+						AdditionalProperties: true,
+						IdentitySection:      "",
+						Properties: []*catalog.TrackingPlanEventProperty{
+							{ID: "remote-prop-2", Required: false},
+						},
+					},
+				},
+			},
+			mockErr:                nil,
+			expectErr:              false,
+			expectUpdate:           true,
+			expectSetExtId:         true,
+			expectDeleteEventCount: 1, // one event deleted (event-2)
+			expectUpdateEventCount: 2, // one event updated (event-1) + one event added (event-3)
+			expectResource: &resources.ResourceData{
+				"id":           "remote-tp-id",
+				"name":         "UpdatedTP",
+				"description":  "new desc",
+				"version":      1,
+				"creationType": "backend",
+				"workspaceId":  "ws-id",
+				"createdAt":    created.String(),
+				"updatedAt":    updated.String(),
+				"events":       []map[string]any(nil),
+				"trackingPlanArgs": map[string]any{
+					"localId":     "local-tp-id",
+					"name":        "UpdatedTP",
+					"description": "new desc",
+					"events": []map[string]any{
+						{
+							"localId":         "event-1",
+							"id":              "remote-event-1",
+							"allowUnplanned":  true,
+							"identitySection": "",
+							"properties": []map[string]any{
+								{
+									"localId":              "prop-1",
+									"id":                   "remote-prop-1",
+									"required":             false,
+									"additionalProperties": false,
+								},
+							},
+							"variants": []map[string]any{},
+						},
+						{
+							"localId":         "event-3",
+							"id":              "remote-event-3",
+							"allowUnplanned":  false,
+							"identitySection": "",
+							"properties": []map[string]any{
+								{
+									"localId":              "prop-3",
+									"id":                   "remote-prop-3",
+									"required":             true,
+									"additionalProperties": false,
+								},
+							},
+							"variants": []map[string]any{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error on get tracking plan",
+			localArgs: state.TrackingPlanArgs{
+				LocalID:     "local-tp-id",
+				Name:        "TestTP",
+				Description: "desc",
+			},
+			remoteTrackingPlan: nil,
+			mockErr:            assert.AnError,
+			expectErr:          true,
+		},
+		{
+			name: "error on set external ID",
+			localArgs: state.TrackingPlanArgs{
+				LocalID:     "local-tp-id",
+				Name:        "TestTP",
+				Description: "desc",
+			},
+			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				Version:      1,
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+				Events:       []*catalog.TrackingPlanEventPropertyIdentifiers{},
+			},
+			mockErr:        assert.AnError,
+			expectErr:      true,
+			expectSetExtId: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCatalog.ResetSpies()
+			mockCatalog.SetTrackingPlanWithIdentifiers(tt.remoteTrackingPlan)
+			mockCatalog.SetError(tt.mockErr)
+
+			res, err := provider.Import(ctx, "local-tp-id", tt.localArgs.ToResourceData(), "remote-tp-id")
+
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			actual := *res
+			expected := *tt.expectResource
+			actual["updatedAt"] = expected["updatedAt"]
+			assert.Equal(t, expected, actual)
+			assert.Equal(t, tt.expectUpdate, mockCatalog.updateCalled)
+			assert.Equal(t, tt.expectSetExtId, mockCatalog.setExternalIdCalled)
+			assert.Equal(t, tt.expectDeleteEventCount, mockCatalog.deleteEventCallCount)
+			assert.Equal(t, tt.expectUpdateEventCount, mockCatalog.updateEventCallCount)
+		})
+	}
+}
+
 func getTrackingPlanArgs() *state.TrackingPlanArgs {
 
 	f := defaultTrackingPlanArgsFactory()
 	f = f.WithEvent(&state.TrackingPlanEventArgs{
-		Name:           "event",
 		LocalID:        "event-id",
-		Type:           "event-type",
-		Description:    "event-description",
 		AllowUnplanned: false,
-		CategoryId:     nil,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
-				Name:        "property",
-				LocalID:     "property-id",
-				Description: "property-description",
-				Type:        "string",
-				Required:    true,
-				Config:      nil,
+				LocalID:  "property-id",
+				Required: true,
 			},
 		},
 	})
@@ -595,202 +814,4 @@ func getTestTrackingPlan() *catalog.TrackingPlan {
 
 	tp := f.Build()
 	return &tp
-}
-
-func TestGetUpsertEventWithCustomTypeRefs(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name     string
-		property *state.TrackingPlanPropertyArgs
-		expected catalog.TrackingPlanUpsertEvent
-	}{
-		{
-			name: "Regular string type",
-			property: &state.TrackingPlanPropertyArgs{
-				Name:             "prop1",
-				LocalID:          "prop-id-1",
-				Description:      "Property description",
-				Type:             "string",
-				Required:         true,
-				Config:           map[string]interface{}{"enum": []string{"value1", "value2"}},
-				HasCustomTypeRef: false,
-				HasItemTypesRef:  false,
-			},
-			expected: catalog.TrackingPlanUpsertEvent{
-				Name:            "event1",
-				Description:     "Event description",
-				EventType:       "track",
-				IdentitySection: "properties",
-				Rules: catalog.TrackingPlanUpsertEventRules{
-					Type: "object",
-					Properties: struct {
-						Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-						Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-						Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
-					}{
-						Properties: &catalog.TrackingPlanUpsertEventProperties{
-							Type:                 "object",
-							AdditionalProperties: false,
-							Required:             []string{"prop1"},
-							Properties: map[string]interface{}{
-								"prop1": map[string]interface{}{
-									"type": []string{"string"},
-									"enum": []string{"value1", "value2"},
-								},
-							},
-						},
-						Traits:  nil,
-						Context: nil,
-					},
-				},
-			},
-		},
-		{
-			name: "Custom type reference",
-			property: &state.TrackingPlanPropertyArgs{
-				Name:             "prop2",
-				LocalID:          "prop-id-2",
-				Description:      "Custom type property",
-				Type:             "CustomType", // This would be the resolved value after dereferencing
-				Required:         true,
-				HasCustomTypeRef: true,
-				HasItemTypesRef:  false,
-			},
-			expected: catalog.TrackingPlanUpsertEvent{
-				Name:            "event1",
-				Description:     "Event description",
-				EventType:       "track",
-				IdentitySection: "properties",
-				Rules: catalog.TrackingPlanUpsertEventRules{
-					Type: "object",
-					Properties: struct {
-						Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-						Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-						Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
-					}{
-						Properties: &catalog.TrackingPlanUpsertEventProperties{
-							Type:                 "object",
-							AdditionalProperties: false,
-							Required:             []string{"prop2"},
-							Properties: map[string]interface{}{
-								"prop2": map[string]interface{}{
-									"$ref": "#/$defs/CustomType",
-								},
-							},
-						},
-						Traits:  nil,
-						Context: nil,
-					},
-				},
-			},
-		},
-		{
-			name: "Array with regular itemTypes",
-			property: &state.TrackingPlanPropertyArgs{
-				Name:             "prop3",
-				LocalID:          "prop-id-3",
-				Description:      "Array property",
-				Type:             "array",
-				Required:         false,
-				Config:           map[string]interface{}{"itemTypes": []any{"string"}},
-				HasCustomTypeRef: false,
-				HasItemTypesRef:  false,
-			},
-			expected: catalog.TrackingPlanUpsertEvent{
-				Name:            "event1",
-				Description:     "Event description",
-				EventType:       "track",
-				IdentitySection: "properties",
-				Rules: catalog.TrackingPlanUpsertEventRules{
-					Type: "object",
-					Properties: struct {
-						Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-						Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-						Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
-					}{
-						Properties: &catalog.TrackingPlanUpsertEventProperties{
-							Type:                 "object",
-							AdditionalProperties: false,
-							Required:             []string{},
-							Properties: map[string]interface{}{
-								"prop3": map[string]interface{}{
-									"type": []string{"array"},
-									"items": map[string]interface{}{
-										"type": []any{"string"},
-									},
-								},
-							},
-						},
-						Traits:  nil,
-						Context: nil,
-					},
-				},
-			},
-		},
-		{
-			name: "Array with custom type in itemTypes",
-			property: &state.TrackingPlanPropertyArgs{
-				Name:             "prop4",
-				LocalID:          "prop-id-4",
-				Description:      "Array with custom type",
-				Type:             "array",
-				Required:         false,
-				Config:           map[string]interface{}{"itemTypes": []any{"CustomType"}},
-				HasCustomTypeRef: false,
-				HasItemTypesRef:  true,
-			},
-			expected: catalog.TrackingPlanUpsertEvent{
-				Name:            "event1",
-				Description:     "Event description",
-				EventType:       "track",
-				IdentitySection: "properties",
-				Rules: catalog.TrackingPlanUpsertEventRules{
-					Type: "object",
-					Properties: struct {
-						Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-						Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-						Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
-					}{
-						Properties: &catalog.TrackingPlanUpsertEventProperties{
-							Type:                 "object",
-							AdditionalProperties: false,
-							Required:             []string{},
-							Properties: map[string]interface{}{
-								"prop4": map[string]interface{}{
-									"type": []string{"array"},
-									"items": map[string]interface{}{
-										"$ref": "#/$defs/CustomType",
-									},
-								},
-							},
-						},
-						Traits:  nil,
-						Context: nil,
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc // capture range variable
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Create an event with the test property
-			event := &state.TrackingPlanEventArgs{
-				Name:           "event1",
-				LocalID:        "event-id-1",
-				Type:           "track",
-				Description:    "Event description",
-				AllowUnplanned: false,
-				Properties:     []*state.TrackingPlanPropertyArgs{tc.property},
-			}
-
-			// Call GetUpsertEvent
-			actual := datacatalog.GetUpsertEvent(event)
-			assert.Equal(t, tc.expected, actual)
-		})
-	}
 }

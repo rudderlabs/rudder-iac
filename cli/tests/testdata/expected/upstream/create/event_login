@@ -1,7 +1,8 @@
 {
     "id": "ev_30B3DyAMUbeE04TELNn4X4z6IUu",
+    "externalId": "login",
     "name": "Login Event",
-    "description": "This is a login event without a category",
+    "description": "This event is triggered when a user logs in.",
     "eventType": "track",
     "categoryId": null,
     "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",

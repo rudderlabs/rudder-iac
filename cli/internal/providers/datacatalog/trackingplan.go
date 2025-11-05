@@ -3,14 +3,21 @@ package datacatalog
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/samber/lo"
 )
+
+type TrackingPlanEntityProvider struct {
+	*TrackingPlanProvider
+	*impProvider.TrackingPlanImportProvider
+}
 
 type TrackingPlanProvider struct {
 	client catalog.DataCatalog
@@ -23,12 +30,25 @@ const (
 	ContextTraitsIdentity = "context.traits"
 )
 
-func NewTrackingPlanProvider(client catalog.DataCatalog) *TrackingPlanProvider {
-	return &TrackingPlanProvider{
-		client: client,
+func NewTrackingPlanProvider(dc catalog.DataCatalog, importDir string) *TrackingPlanEntityProvider {
+	tp := &TrackingPlanProvider{
+		client: dc,
 		log: &logger.Logger{
 			Logger: log.With("type", "trackingplan"),
 		},
+	}
+
+	imp := impProvider.NewTrackingPlanImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "trackingplan"),
+		},
+		importDir,
+	)
+
+	return &TrackingPlanEntityProvider{
+		TrackingPlanProvider:       tp,
+		TrackingPlanImportProvider: imp,
 	}
 }
 
@@ -41,6 +61,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 	created, err := p.client.CreateTrackingPlan(ctx, catalog.TrackingPlanCreate{
 		Name:        args.Name,
 		Description: args.Description,
+		ExternalID:  ID,
 	})
 
 	if err != nil {
@@ -51,12 +72,14 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		eventStates []*state.TrackingPlanEventState
 	)
 
+	version := created.Version
 	for _, event := range args.Events {
-		lastupserted, err := p.client.UpsertTrackingPlan(
+		lastupserted, err := p.client.UpdateTrackingPlanEvent(
 			ctx,
 			created.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
 		}
@@ -67,13 +90,17 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 			EventID: lastEvent.EventID,
 			LocalID: event.LocalID,
 		})
+		version = lastupserted.Version
 	}
+
+	// sort eventStates based on localId
+	utils.SortByLocalID(eventStates)
 
 	tpState := state.TrackingPlanState{
 		TrackingPlanArgs: args,
 		ID:               created.ID,
 		Name:             created.Name,
-		Version:          created.Version,
+		Version:          version,
 		CreationType:     created.CreationType,
 		Description:      *created.Description,
 		WorkspaceID:      created.WorkspaceID,
@@ -113,7 +140,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		}
 	}
 
-	diff := prevState.Diff(toArgs)
+	diff := prevState.TrackingPlanArgs.Diff(toArgs)
 
 	var deletedEvents []string
 	for _, event := range diff.Deleted {
@@ -133,10 +160,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Added {
-		updated, err = p.client.UpsertTrackingPlan(
+		updated, err = p.client.UpdateTrackingPlanEvent(
 			ctx,
 			prevState.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
 
 		if err != nil {
@@ -151,10 +178,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Updated {
-		updated, err = p.client.UpsertTrackingPlan(
+		updated, err = p.client.UpdateTrackingPlanEvent(
 			ctx,
 			prevState.ID,
-			GetUpsertEvent(event),
+			GetUpsertEventIdentifier(event),
 		)
 
 		if err != nil {
@@ -167,6 +194,9 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	updatedEventStates = lo.Filter(updatedEventStates, func(event *state.TrackingPlanEventState, idx int) bool {
 		return !lo.Contains(deletedEvents, event.ID)
 	})
+
+	// sort updatedEventStates based on localId
+	utils.SortByLocalID(updatedEventStates)
 
 	var tpState state.TrackingPlanState
 
@@ -213,125 +243,147 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 	return nil
 }
 
-func GetUpsertEvent(from *state.TrackingPlanEventArgs) catalog.TrackingPlanUpsertEvent {
-	// Get the properties in correct shape before we can
-	// send it to the catalog
-	var (
-		requiredProps   = make([]string, 0)
-		propLookup      = make(map[string]interface{})
-		identitySection = from.IdentitySection
-	)
+func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	p.log.Debug("importing tracking plan resource", "id", ID, "remoteId", remoteId)
 
-	// If the identity section empty, default to properties
-	if from.IdentitySection == "" {
-		identitySection = PropertiesIdentity
+	trackingPlan, err := p.client.GetTrackingPlan(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting tracking plan from upstream: %w", err)
 	}
 
-	for _, prop := range from.Properties {
-		propMap := make(map[string]any)
+	toArgs := state.TrackingPlanArgs{}
+	toArgs.FromResourceData(data)
 
-		// Handle Type field based on HasCustomTypeRef flag
-		if prop.HasCustomTypeRef {
-			// This is a custom type reference, use $ref format
-			// The Type has been dereferenced by the syncer to the actual name
-			typValue := fmt.Sprint(prop.Type)
-			propMap["$ref"] = fmt.Sprintf("#/$defs/%s", typValue)
-		} else {
-			// Regular type handling
-			typValue, ok := prop.Type.(string)
-			if !ok {
-				// If not a string but something else, convert to string
-				typValue = fmt.Sprint(prop.Type)
-			}
+	changed, diffed := toArgs.DiffUpstream(trackingPlan)
+	if changed {
+		p.log.Debug("tracking plan has differences, updating", "id", ID, "remoteId", remoteId)
 
-			typ := lo.Map(strings.Split(typValue, ","), func(t string, _ int) string {
-				return strings.TrimSpace(t)
-			})
-			propMap["type"] = typ
+		_, err = p.client.UpdateTrackingPlan(ctx, remoteId, toArgs.Name, toArgs.Description)
+		if err != nil {
+			return nil, fmt.Errorf("updating tracking plan during import: %w", err)
 		}
 
-		for k, v := range prop.Config {
-			if k == "itemTypes" && prop.HasItemTypesRef {
-				refValue := v.([]any)[0].(string)
-
-				propMap["items"] = map[string]any{
-					"$ref": fmt.Sprintf("#/$defs/%s", refValue),
-				}
-			} else if k == "itemTypes" {
-				propMap["items"] = map[string]interface{}{
-					"type": v,
-				}
-			} else {
-				// Other config fields
-				propMap[k] = v
+		for _, deleted := range diffed.Deleted {
+			err = p.client.DeleteTrackingPlanEvent(ctx, remoteId, deleted.ID.(string))
+			if err != nil {
+				return nil, fmt.Errorf("deleting tracking plan event during import: %w", err)
 			}
 		}
 
-		propLookup[prop.Name] = propMap
+		for _, added := range diffed.Added {
+			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(added))
+			if err != nil {
+				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
+			}
+		}
 
-		if prop.Required {
-			requiredProps = append(requiredProps, prop.Name)
+		for _, updated := range diffed.Updated {
+			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(updated))
+			if err != nil {
+				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
+			}
 		}
 	}
 
-	var categoryId *string
-	if val, ok := from.CategoryId.(string); ok && val != "" {
-		categoryId = &val
+	err = p.client.SetTrackingPlanExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting tracking plan external id: %w", err)
 	}
 
-	return catalog.TrackingPlanUpsertEvent{
-		Name:            from.Name,
-		Description:     from.Description,
-		EventType:       from.Type,
-		CategoryId:      categoryId,
-		IdentitySection: identitySection,
-		Rules: getRulesBasedonIdentity(identitySection, &catalog.TrackingPlanUpsertEventProperties{
-			Type:                 "object",
-			AdditionalProperties: from.AllowUnplanned,
-			Required:             requiredProps,
-			Properties:           propLookup,
-		}),
+	trackingPlanState := state.TrackingPlanState{
+		TrackingPlanArgs: toArgs,
+		ID:               trackingPlan.ID,
+		Name:             toArgs.Name,
+		Description:      toArgs.Description,
+		Version:          trackingPlan.Version,
+		CreationType:     trackingPlan.CreationType,
+		WorkspaceID:      trackingPlan.WorkspaceID,
+		CreatedAt:        trackingPlan.CreatedAt.String(),
+		UpdatedAt:        trackingPlan.UpdatedAt.String(),
+	}
+
+	resourceData := trackingPlanState.ToResourceData()
+	return &resourceData, nil
+}
+
+// LoadResourcesFromRemote loads all tracking plans from the remote catalog
+func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	p.log.Debug("loading tracking plans from remote catalog ")
+	collection := resources.NewResourceCollection()
+	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource)
+	for _, trackingPlan := range trackingPlans {
+		resourceMap[trackingPlan.ID] = &resources.RemoteResource{
+			ID:         trackingPlan.ID,
+			ExternalID: trackingPlan.ExternalID,
+			Data:       trackingPlan,
+		}
+	}
+	collection.Set(state.TrackingPlanResourceType, resourceMap)
+	return collection, nil
+}
+
+func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
+	s := syncerstate.EmptyState()
+	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
+	for _, remoteTP := range trackingPlans {
+		if remoteTP.ExternalID == "" {
+			continue
+		}
+		trackingPlan, ok := remoteTP.Data.(*catalog.TrackingPlanWithIdentifiers)
+		if !ok {
+			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.TrackingPlan")
+		}
+		args := &state.TrackingPlanArgs{}
+		args.FromRemoteTrackingPlan(trackingPlan, collection)
+
+		stateArgs := state.TrackingPlanState{}
+		stateArgs.FromRemoteTrackingPlan(trackingPlan, collection)
+
+		resourceState := &syncerstate.ResourceState{
+			Type:         state.TrackingPlanResourceType,
+			ID:           remoteTP.ExternalID,
+			Input:        args.ToResourceData(),
+			Output:       stateArgs.ToResourceData(),
+			Dependencies: make([]string, 0),
+		}
+
+		urn := resources.URN(remoteTP.ExternalID, state.TrackingPlanResourceType)
+		s.Resources[urn] = resourceState
+	}
+	return s, nil
+}
+
+func GetUpsertEventIdentifier(from *state.TrackingPlanEventArgs) catalog.EventIdentifierDetail {
+	return catalog.EventIdentifierDetail{
+		ID: from.ID.(string),
+		Properties: lo.Map(
+			from.Properties,
+			func(prop *state.TrackingPlanPropertyArgs, _ int) catalog.PropertyIdentifierDetail {
+				return GetUpsertPropertyIdentifier(prop)
+			}),
+		AdditionalProperties: from.AllowUnplanned,
+		IdentitySection:      from.IdentitySection,
+		Variants:             from.Variants.ToCatalogVariants(),
 	}
 }
 
-func getRulesBasedonIdentity(identity string, properties *catalog.TrackingPlanUpsertEventProperties) catalog.TrackingPlanUpsertEventRules {
-	var (
-		propertiesIdentity *catalog.TrackingPlanUpsertEventProperties
-		traitsIdentity     *catalog.TrackingPlanUpsertEventProperties
-		contextIdentity    *catalog.TrackingPlanUpsertEventContextTraitsIdentity
-	)
-
-	switch identity {
-
-	case PropertiesIdentity:
-		propertiesIdentity = properties
-
-	case TraitsIdentity:
-		traitsIdentity = properties
-
-	case ContextTraitsIdentity:
-		contextIdentity = &catalog.TrackingPlanUpsertEventContextTraitsIdentity{
-			Properties: struct {
-				Traits catalog.TrackingPlanUpsertEventProperties `json:"traits,omitempty"`
-			}{
-				Traits: *properties,
-			},
-		}
-
-	default:
-		propertiesIdentity = properties // fallback to properties
+func GetUpsertPropertyIdentifier(from *state.TrackingPlanPropertyArgs) catalog.PropertyIdentifierDetail {
+	res := catalog.PropertyIdentifierDetail{
+		ID:                   from.ID.(string),
+		Required:             from.Required,
+		AdditionalProperties: from.AdditionalProperties,
 	}
 
-	return catalog.TrackingPlanUpsertEventRules{
-		Type: "object",
-		Properties: struct {
-			Properties *catalog.TrackingPlanUpsertEventProperties            `json:"properties,omitempty"`
-			Traits     *catalog.TrackingPlanUpsertEventProperties            `json:"traits,omitempty"`
-			Context    *catalog.TrackingPlanUpsertEventContextTraitsIdentity `json:"context,omitempty"`
-		}{
-			Properties: propertiesIdentity,
-			Traits:     traitsIdentity,
-			Context:    contextIdentity,
-		},
+	if len(from.Properties) > 0 {
+		res.Properties = lo.Map(from.Properties, func(prop *state.TrackingPlanPropertyArgs, _ int) catalog.PropertyIdentifierDetail {
+			return GetUpsertPropertyIdentifier(prop)
+		})
 	}
+
+	return res
 }

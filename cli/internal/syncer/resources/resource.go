@@ -16,16 +16,40 @@ func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
 }
 
-func NewResource(id string, resourceType string, data ResourceData, dependencies []string) *Resource {
-	return &Resource{
-		r: &internal.Resource{
-			URN:          URN(id, resourceType),
-			ID:           id,
-			Type:         resourceType,
-			Data:         data,
-			Dependencies: dependencies,
-		},
+type ResourceOpts func(*internal.Resource)
+
+func WithResourceFileMetadata(metadataRef string) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.FileMetadata = &internal.ResourceFileMetadata{
+			MetadataRef: metadataRef,
+		}
 	}
+}
+
+func WithResourceImportMetadata(remoteId, workspaceId string) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.ImportMetadata = &internal.ResourceImportMetadata{
+			RemoteId:    remoteId,
+			WorkspaceId: workspaceId,
+		}
+	}
+}
+
+func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ResourceOpts) *Resource {
+	r := &internal.Resource{
+		URN:          URN(id, resourceType),
+		ID:           id,
+		Type:         resourceType,
+		Data:         data,
+		Dependencies: dependencies,
+	}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		opt(r)
+	}
+	return &Resource{r: r}
 }
 
 func (r *Resource) ID() string {
@@ -46,4 +70,12 @@ func (r *Resource) URN() string {
 
 func (r *Resource) Dependencies() []string {
 	return r.r.Dependencies
+}
+
+func (r *Resource) ImportMetadata() *internal.ResourceImportMetadata {
+	return r.r.ImportMetadata
+}
+
+func (r *Resource) FileMetadata() *internal.ResourceFileMetadata {
+	return r.r.FileMetadata
 }

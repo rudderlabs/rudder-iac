@@ -12,6 +12,11 @@ import (
 
 var log = logger.New("loader")
 
+const (
+	ExtensionYAML = ".yaml"
+	ExtensionYML  = ".yml"
+)
+
 // Loader is responsible for finding and loading project specification files.
 type Loader struct {
 }
@@ -37,7 +42,7 @@ func (l *Loader) Load(location string) (map[string]*specs.Spec, error) {
 
 		// Check file extension
 		ext := filepath.Ext(path)
-		if ext != ".yaml" && ext != ".yml" {
+		if ext != ExtensionYAML && ext != ExtensionYML {
 			return nil
 		}
 

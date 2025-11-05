@@ -1,6 +1,7 @@
 {
     "propConfig": {},
     "id": "prop_2yx87obaIdwSN6KIB6t3oKUa4vt",
+    "externalId": "user_mail",
     "name": "User Email",
     "description": "User's email address",
     "type": "string",
@@ -8,5 +9,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T11:31:38.853Z",
-    "updatedAt": "2025-06-24T11:31:38.853Z"
+    "updatedAt": "2025-06-24T11:31:38.853Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

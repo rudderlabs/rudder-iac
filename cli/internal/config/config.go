@@ -35,6 +35,7 @@ type Config = struct {
 		WriteKey     string `mapstructure:"writeKey"`
 		DataplaneURL string `mapstructure:"dataplaneURL"`
 	} `mapstructure:"telemetry"`
+	ExperimentalFlags ExperimentalConfig `mapstructure:"flags"`
 }
 
 func defaultConfigPath() string {
@@ -76,6 +77,9 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
+
+	// Automatically bind environment variables for all experimental flags
+	BindExperimentalFlags()
 
 	// load configuration
 	_ = viper.ReadInConfig()
@@ -119,6 +123,23 @@ func SetTelemetryAnonymousID(anonymousID string) {
 	})
 }
 
+func SetExperimentalFlag(flagName string, enabled bool) {
+	updateConfig(func(data []byte) ([]byte, error) {
+		// Validate flag name exists
+		if !IsValidExperimentalFlag(flagName) {
+			return nil, fmt.Errorf("unknown experimental flag: %s", flagName)
+		}
+
+		return sjson.SetBytes(data, fmt.Sprintf("flags.%s", flagName), enabled)
+	})
+}
+
+func ResetExperimentalFlags() {
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.DeleteBytes(data, "flags")
+	})
+}
+
 func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
 	data, err := os.ReadFile(configFile)
@@ -139,6 +160,10 @@ func GetConfig() Config {
 	var config Config
 	err := viper.Unmarshal(&config)
 	cobra.CheckErr(err)
+
+	if !viper.GetBool("experimental") {
+		config.ExperimentalFlags = ExperimentalConfig{}
+	}
 
 	return config
 }

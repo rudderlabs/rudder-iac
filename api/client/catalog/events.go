@@ -13,6 +13,14 @@ type EventCreate struct {
 	Description string  `json:"description"`
 	EventType   string  `json:"eventType"`
 	CategoryId  *string `json:"categoryId"`
+	ExternalId  string  `json:"externalId"`
+}
+
+type EventUpdate struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	EventType   string  `json:"eventType"`
+	CategoryId  *string `json:"categoryId"`
 }
 
 type Event struct {
@@ -22,15 +30,18 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
+	ExternalId  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type EventStore interface {
 	CreateEvent(ctx context.Context, input EventCreate) (*Event, error)
-	UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error)
+	UpdateEvent(ctx context.Context, id string, input *EventUpdate) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
+	GetEvents(ctx context.Context) ([]*Event, error)
+	SetEventExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
@@ -61,7 +72,7 @@ func (c *RudderDataCatalog) CreateEvent(ctx context.Context, input EventCreate) 
 	return &event, nil
 }
 
-func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *Event) (*Event, error) {
+func (c *RudderDataCatalog) UpdateEvent(ctx context.Context, id string, input *EventUpdate) (*Event, error) {
 	byt, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
@@ -92,4 +103,26 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 	}
 
 	return &event, nil
+}
+
+func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
+	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
+}
+
+func (c *RudderDataCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/events/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

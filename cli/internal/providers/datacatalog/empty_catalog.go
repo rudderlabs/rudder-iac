@@ -15,7 +15,7 @@ func (m *EmptyCatalog) CreateEvent(ctx context.Context, eventCreate catalog.Even
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.Event) (*catalog.Event, error) {
+func (m *EmptyCatalog) UpdateEvent(ctx context.Context, id string, eventUpdate *catalog.EventUpdate) (*catalog.Event, error) {
 	return nil, nil
 }
 
@@ -32,7 +32,7 @@ func (m *EmptyCatalog) CreateProperty(ctx context.Context, propertyCreate catalo
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.Property) (*catalog.Property, error) {
+func (m *EmptyCatalog) UpdateProperty(ctx context.Context, id string, propertyUpdate *catalog.PropertyUpdate) (*catalog.Property, error) {
 	return nil, nil
 }
 
@@ -42,6 +42,10 @@ func (m *EmptyCatalog) DeleteProperty(ctx context.Context, propertyID string) er
 
 func (m *EmptyCatalog) GetProperty(ctx context.Context, id string) (*catalog.Property, error) {
 	return nil, nil
+}
+
+func (m *EmptyCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
 }
 
 func (m *EmptyCatalog) CreateTrackingPlan(ctx context.Context, trackingPlanCreate catalog.TrackingPlanCreate) (*catalog.TrackingPlan, error) {
@@ -56,7 +60,7 @@ func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID st
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, input catalog.TrackingPlanEventsUpdate) (*catalog.TrackingPlan, error) {
+func (m *EmptyCatalog) UpdateTrackingPlanEvent(ctx context.Context, trackingPlanID string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
@@ -68,7 +72,15 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
@@ -76,11 +88,15 @@ func (m *EmptyCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string
 	return nil, nil
 }
 
+func (m *EmptyCatalog) GetTrackingPlanEventWithIdentifiers(ctx context.Context, id string, eventId string) (*catalog.TrackingPlanEventPropertyIdentifiers, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) CreateCustomType(ctx context.Context, customTypeCreate catalog.CustomTypeCreate) (*catalog.CustomType, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomType) (*catalog.CustomType, error) {
+func (m *EmptyCatalog) UpdateCustomType(ctx context.Context, id string, customTypeUpdate *catalog.CustomTypeUpdate) (*catalog.CustomType, error) {
 	return nil, nil
 }
 
@@ -89,6 +105,10 @@ func (m *EmptyCatalog) GetCustomType(ctx context.Context, id string) (*catalog.C
 }
 
 func (m *EmptyCatalog) DeleteCustomType(ctx context.Context, customTypeID string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
 	return nil
 }
 
@@ -118,4 +138,32 @@ func (m *EmptyCatalog) DeleteCategory(ctx context.Context, categoryID string) er
 
 func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
 	return nil, nil
+}
+
+func (m *EmptyCatalog) GetEvents(ctx context.Context) ([]*catalog.Event, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetProperties(ctx context.Context) ([]*catalog.Property, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomType, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
+}
+
+func (m *EmptyCatalog) SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error {
+	return nil
 }

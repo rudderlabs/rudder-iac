@@ -158,3 +158,448 @@ func TestFromCatalogCustomType(t *testing.T) {
 	assert.Equal(t, "id", propRef2.Property)
 	assert.False(t, args.Properties[1].Required)
 }
+
+func TestCustomTypePropertyDiff(t *testing.T) {
+	tests := []struct {
+		name     string
+		prop1    *CustomTypeProperty
+		prop2    *CustomTypeProperty
+		expected bool
+	}{
+		{
+			name: "identical properties",
+			prop1: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: true,
+			},
+			prop2: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: true,
+			},
+			expected: false,
+		},
+		{
+			name: "different ID",
+			prop1: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: true,
+			},
+			prop2: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id2",
+				Required: true,
+			},
+			expected: true,
+		},
+		{
+			name: "different Required",
+			prop1: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: true,
+			},
+			prop2: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: false,
+			},
+			expected: true,
+		},
+		{
+			name: "different RefToID",
+			prop1: &CustomTypeProperty{
+				RefToID:  "ref1",
+				ID:       "id1",
+				Required: true,
+			},
+			prop2: &CustomTypeProperty{
+				RefToID:  "ref2",
+				ID:       "id1",
+				Required: true,
+			},
+			expected: true,
+		},
+		{
+			name: "complex RefToID objects",
+			prop1: &CustomTypeProperty{
+				RefToID: resources.PropertyRef{
+					URN:      "property:prop1",
+					Property: "id",
+				},
+				ID:       "id1",
+				Required: true,
+			},
+			prop2: &CustomTypeProperty{
+				RefToID: resources.PropertyRef{
+					URN:      "property:prop2",
+					Property: "id",
+				},
+				ID:       "id1",
+				Required: true,
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.prop1.Diff(tt.prop2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCustomTypeArgs_Diff(t *testing.T) {
+	baseArgs := &CustomTypeArgs{
+		LocalID:     "TestType",
+		Name:        "Test Type",
+		Description: "Test description",
+		Type:        "string",
+		Config: map[string]any{
+			"format": "email",
+			"length": 100,
+		},
+		Properties: []*CustomTypeProperty{
+			{
+				RefToID:  "ref1",
+				ID:       "prop1",
+				Required: true,
+			},
+		},
+		Variants: Variants{
+			{
+				Type:          "string",
+				Discriminator: "type",
+				Cases:         []VariantCase{},
+				Default:       []PropertyReference{},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		args1    *CustomTypeArgs
+		args2    *CustomTypeArgs
+		expected bool
+	}{
+		{
+			name:     "identical args",
+			args1:    baseArgs,
+			args2:    baseArgs,
+			expected: false,
+		},
+		{
+			name:  "different LocalID",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "DifferentType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Name",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Different Name",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Description",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Different description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Type",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "number",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Config",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "url",
+					"length": 200,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Properties length",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+					{
+						RefToID:  "ref2",
+						ID:       "prop2",
+						Required: false,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "property not found",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "different_prop",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "property differs",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: false, // Different from baseArgs
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "string",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:  "different Variants",
+			args1: baseArgs,
+			args2: &CustomTypeArgs{
+				LocalID:     "TestType",
+				Name:        "Test Type",
+				Description: "Test description",
+				Type:        "string",
+				Config: map[string]any{
+					"format": "email",
+					"length": 100,
+				},
+				Properties: []*CustomTypeProperty{
+					{
+						RefToID:  "ref1",
+						ID:       "prop1",
+						Required: true,
+					},
+				},
+				Variants: Variants{
+					{
+						Type:          "number",
+						Discriminator: "type",
+						Cases:         []VariantCase{},
+						Default:       []PropertyReference{},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.args1.Diff(tt.args2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPropertyByID(t *testing.T) {
+	args := &CustomTypeArgs{
+		Properties: []*CustomTypeProperty{
+			{
+				ID:       "prop1",
+				RefToID:  "ref1",
+				Required: true,
+			},
+			{
+				ID:       "prop2",
+				RefToID:  "ref2",
+				Required: false,
+			},
+		},
+	}
+
+	// Test existing property
+	prop := args.PropertyByID("prop1")
+	assert.NotNil(t, prop)
+	assert.Equal(t, "prop1", prop.ID)
+	assert.Equal(t, "ref1", prop.RefToID)
+	assert.True(t, prop.Required)
+
+	// Test non-existing property
+	prop = args.PropertyByID("nonexistent")
+	assert.Nil(t, prop)
+}

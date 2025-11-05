@@ -5,6 +5,7 @@
         "multipleOf": 2
     },
     "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
+    "externalId": "http_retry_count",
     "name": "HTTP Retry Count",
     "description": "Number of times to retry the API call",
     "type": "integer",
@@ -12,5 +13,7 @@
     "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
     "updatedBy": null,
     "createdAt": "2025-06-24T19:43:14.086Z",
-    "updatedAt": "2025-06-24T19:43:14.086Z"
+    "updatedAt": "2025-06-24T19:43:14.086Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
 }

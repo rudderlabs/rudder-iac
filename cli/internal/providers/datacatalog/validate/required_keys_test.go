@@ -369,6 +369,18 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		errorContains  string
 	}{
 		{
+			name: "property with empty type",
+			properties: map[catalog.EntityGroup][]catalog.Property{
+				"test-group": {
+					{
+						LocalID: "prop-without-type",
+						Name:    "Property Without Type",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
 			name: "valid property name without whitespace",
 			properties: map[catalog.EntityGroup][]catalog.Property{
 				"test-group": {
@@ -756,7 +768,7 @@ func TestVariantsValidation(t *testing.T) {
 										Cases: []catalog.VariantCase{
 											{
 												DisplayName: "Admin User",
-												Match:       []any{123.0, 456.78, true, "admin"}, // Fixed: using float64 instead of int
+												Match:       []any{123, 123.0, true, "admin"},
 												Properties: []catalog.PropertyReference{
 													{Ref: "#/properties/test-group/admin_level", Required: true},
 												},
@@ -936,4 +948,310 @@ func TestVariantsValidation(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
+	t.Parallel()
+
+	// Setup test data catalog
+	dc := &catalog.DataCatalog{
+		Properties: map[catalog.EntityGroup][]catalog.Property{
+			"test_props": {
+				{
+					LocalID:     "user_id",
+					Name:        "User ID",
+					Type:        "string",
+					Description: "User identifier",
+				},
+				{
+					LocalID:     "user_profile",
+					Name:        "User Profile",
+					Type:        "object",
+					Description: "User profile object",
+				},
+				{
+					LocalID:     "profile_name",
+					Name:        "Profile Name",
+					Type:        "string",
+					Description: "User's display name",
+				},
+				{
+					LocalID:     "profile_settings",
+					Name:        "Profile Settings",
+					Type:        "object",
+					Description: "User profile settings",
+				},
+				{
+					LocalID:     "theme_preference",
+					Name:        "Theme Preference",
+					Type:        "string",
+					Description: "User's theme preference",
+				},
+				{
+					LocalID:     "button_signin",
+					Name:        "Button Sign In",
+					Type:        "string", // Wrong type for nested properties
+					Description: "Sign in button",
+				},
+				{
+					LocalID:     "deeply_nested_property",
+					Name:        "Deeply Nested Property",
+					Type:        "string",
+					Description: "Deeply nested property",
+				},
+			},
+		},
+		TrackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
+			"test_tp": {
+				LocalID: "test_plan",
+				Name:    "Test Tracking Plan",
+				Rules: []*catalog.TPRule{
+					{
+						LocalID: "valid_nested_rule",
+						Type:    "event_rule",
+						Event: &catalog.TPRuleEvent{
+							Ref: "#/events/test/signup",
+						},
+						Properties: []*catalog.TPRuleProperty{
+							{
+								Ref:      "#/properties/test_props/user_profile",
+								Required: true,
+								Properties: []*catalog.TPRuleProperty{
+									{
+										Ref:      "#/properties/test_props/profile_name",
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+					{
+						LocalID: "invalid_object_type_rule",
+						Type:    "event_rule",
+						Event: &catalog.TPRuleEvent{
+							Ref: "#/events/test/signup",
+						},
+						Properties: []*catalog.TPRuleProperty{
+							{
+								Ref:      "#/properties/test_props/button_signin", // string type with nested properties
+								Required: true,
+								Properties: []*catalog.TPRuleProperty{
+									{
+										Ref:      "#/properties/test_props/user_id",
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+					{
+						LocalID: "exceed_depth_rule",
+						Type:    "event_rule",
+						Event: &catalog.TPRuleEvent{
+							Ref: "#/events/test/signup",
+						},
+						Properties: []*catalog.TPRuleProperty{
+							{
+								Ref:      "#/properties/test_props/user_profile",
+								Required: true,
+								Properties: []*catalog.TPRuleProperty{
+									{
+										Ref:      "#/properties/test_props/profile_settings",
+										Required: true,
+										Properties: []*catalog.TPRuleProperty{
+											{
+												Ref:      "#/properties/test_props/user_profile",
+												Required: true,
+												Properties: []*catalog.TPRuleProperty{
+													{
+														Ref:      "#/properties/test_props/theme_preference", // 4th level - should exceed limit
+														Required: true,
+														Properties: []*catalog.TPRuleProperty{
+															{
+																Ref:      "#/properties/test_props/deeply_nested_property",
+																Required: true,
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Events:      make(map[catalog.EntityGroup][]catalog.Event),
+		CustomTypes: make(map[catalog.EntityGroup][]catalog.CustomType),
+		Categories:  make(map[catalog.EntityGroup][]catalog.Category),
+	}
+
+	validator := &RequiredKeysValidator{}
+	errors := validator.Validate(dc)
+
+	// Test 1: Valid nested properties should not generate errors for nested structure
+	validRuleErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/valid_nested_rule")
+	assert.Empty(t, validRuleErrors, "Valid nested properties should not generate validation errors")
+
+	// Test 2: Object-type constraint violation should generate error
+	objectTypeErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/invalid_object_type_rule")
+	assert.Len(t, objectTypeErrors, 1, "Should have one error for object-type constraint violation")
+	assert.Contains(t, objectTypeErrors[0].Error(), "nested properties are not allowed for property")
+
+	// Test 3: Nesting depth exceeded should generate error
+	depthErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/exceed_depth_rule")
+	depthFound := false
+	for _, err := range depthErrors {
+		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in event_rule") {
+			depthFound = true
+			break
+		}
+	}
+	assert.True(t, depthFound, "Should have error for exceeding maximum nesting depth")
+}
+
+// Helper function to filter errors by reference pattern
+func filterErrorsByReference(errors []ValidationError, referencePattern string) []ValidationError {
+	var filtered []ValidationError
+	for _, err := range errors {
+		if strings.Contains(err.Reference, referencePattern) {
+			filtered = append(filtered, err)
+		}
+	}
+	return filtered
+}
+
+func TestNestedPropertiesAllowed(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		propertyType  string
+		config        map[string]any
+		expectedAllow bool
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:          "object type only - should allow",
+			propertyType:  "object",
+			config:        map[string]any{},
+			expectedAllow: true,
+			expectError:   false,
+		},
+		{
+			name:          "object type with other types - should allow",
+			propertyType:  "string, object, null",
+			config:        map[string]any{},
+			expectedAllow: true,
+			expectError:   false,
+		},
+		{
+			name:          "array type without itemTypes config - should allow",
+			propertyType:  "array, string, number",
+			config:        map[string]any{"maxItems": 10, "minItems": 1},
+			expectedAllow: true,
+			expectError:   false,
+		},
+		{
+			name:         "array with itemTypes containing object - should allow",
+			propertyType: "array",
+			config: map[string]any{
+				"itemTypes": []any{"string", "object", "null"},
+			},
+			expectedAllow: true,
+			expectError:   false,
+		},
+		{
+			name:         "array with itemTypes containing multiple non-object types - should not allow",
+			propertyType: "array",
+			config: map[string]any{
+				"itemTypes": []any{"string", "number", "boolean"},
+			},
+			expectedAllow: false,
+			expectError:   false,
+		},
+		{
+			name:          "string type - should not allow",
+			propertyType:  "string,number,boolean",
+			config:        map[string]any{},
+			expectedAllow: false,
+			expectError:   false,
+		},
+		{
+			name:          "object and array type - should not allow",
+			propertyType:  "object, array",
+			config:        map[string]any{},
+			expectedAllow: false,
+			expectError:   false,
+		},
+		{
+			name:         "array with itemTypes as string instead of array - should error",
+			propertyType: "array",
+			config: map[string]any{
+				"itemTypes": "string",
+			},
+			expectedAllow: false,
+			expectError:   true,
+			errorContains: "itemTypes must be an array",
+		},
+		{
+			name:         "array with itemTypes containing mixed types - should error",
+			propertyType: "array",
+			config: map[string]any{
+				"itemTypes": []any{"object", "string", 456},
+			},
+			expectedAllow: false,
+			expectError:   true,
+			errorContains: "itemTypes at index 2 must be a string value",
+		},
+		{
+			name:         "array with itemTypes containing nil - should error",
+			propertyType: "array",
+			config: map[string]any{
+				"itemTypes": []any{nil},
+			},
+			expectedAllow: false,
+			expectError:   true,
+			errorContains: "itemTypes at index 0 must be a string value",
+		},
+		{
+			name:          "empty property type - should not allow",
+			propertyType:  "",
+			config:        map[string]any{},
+			expectedAllow: false,
+			expectError:   false,
+		},
+		{
+			name:          "nil config with object type - should allow",
+			propertyType:  "object",
+			config:        nil,
+			expectedAllow: true,
+			expectError:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			allowed, err := nestedPropertiesAllowed(tc.propertyType, tc.config)
+
+			// Check error expectations
+			if tc.expectError {
+				assert.Error(t, err, "Expected an error but got none")
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains, "Error message should contain expected text")
+				}
+			} else {
+				assert.NoError(t, err, "Expected no error but got: %v", err)
+			}
+
+			// Check allowed expectation
+			assert.Equal(t, tc.expectedAllow, allowed, "nestedPropertiesAllowed returned unexpected result")
+		})
+	}
 }
