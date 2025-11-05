@@ -53,7 +53,7 @@ func newCmdListRetlSources() *cobra.Command {
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
-			l := lister.New(retlProvider, format)
+			l := lister.New(retlProvider, lister.WithFormat(format))
 
 			err = l.List(cmd.Context(), sqlmodel.ResourceType, nil)
 			return err

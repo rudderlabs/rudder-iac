@@ -1,6 +1,7 @@
 {
   "createdAt": "2025-06-25T08:11:46.21Z",
   "creationType": "Data catalog API",
+  "externalId": "api_tracking",
   "description": "Tracking plan for an e-commerce application.",
   "events": [
     {
@@ -11,6 +12,7 @@
       "eventType": "track",
       "id": "ev_2yzYxszrUnzSogGdZOAPO7yF47u",
       "identitySection": "properties",
+      "externalId": "api_error",
       "name": "API Error",
       "additionalProperties": true,
       "properties": [
@@ -51,6 +53,7 @@
       "eventType": "track",
       "id": "ev_2yzYvjMKk0y4X6GzlgLW9uJi7Er",
       "identitySection": "properties",
+      "externalId": "api_tracking",
       "name": "API Tracking",
       "additionalProperties": true,
       "properties": [
@@ -79,6 +82,51 @@
           "additionalProperties": false
         }
       ],
+      "variants": [
+        {
+          "type": "discriminator",
+          "discriminator": "prop_33Ska98tn1cayaQRCphD1mwpExt",
+          "cases": [
+            {
+              "display_name": "Create Entity",
+              "match": [
+                "POST"
+              ],
+              "description": "applies when creating a new entity",
+              "properties": [
+                {
+                  "id": "prop_33Skb8u6Gnuy5nt0GCg0HSttaaE",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "display_name": "Update Entity",
+              "match": [
+                "PUT",
+                "PATCH"
+              ],
+              "description": "applies when updating an existing entity",
+              "properties": [
+                {
+                  "id": "prop_33SkbKuAr5ZG9SChfPJRrjRbqVJ",
+                  "required": true
+                }
+              ]
+            }
+          ],
+          "default": [
+            {
+              "id": "prop_33SkbdJHI1dHGXT49e3OWsmZL4H",
+              "required": false
+            },
+            {
+              "id": "prop_33Skb2HSLkcbOX220qCr7X7pGqv",
+              "required": true
+            }
+          ]
+        }
+      ],
       "updatedAt": "2025-06-25T08:11:46.632Z",
       "updatedBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
       "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly"
@@ -91,6 +139,7 @@
       "eventType": "track",
       "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
       "identitySection": "properties",
+      "externalId": "login",
       "name": "Login Event",
       "additionalProperties": false,
       "properties": [
@@ -137,7 +186,7 @@
                       "additionalProperties": false
                     }
                   ]
-                }, 
+                },
                 {
                   "id": "prop_31TA3VQw3zNqCtBTl2fWT6jiacq",
                   "name": "Captcha Solved",

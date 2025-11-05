@@ -3,12 +3,14 @@ package datacatalog_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,8 +20,10 @@ var _ catalog.DataCatalog = &MockCategoryCatalog{}
 
 type MockCategoryCatalog struct {
 	datacatalog.EmptyCatalog
-	mockCategory *catalog.Category
-	err          error
+	mockCategory        *catalog.Category
+	err                 error
+	updateCalled        bool
+	setExternalIdCalled bool
 }
 
 func (m *MockCategoryCatalog) SetCategory(category *catalog.Category) {
@@ -30,11 +34,20 @@ func (m *MockCategoryCatalog) SetError(err error) {
 	m.err = err
 }
 
+func (m *MockCategoryCatalog) ResetSpies() {
+	m.updateCalled = false
+	m.setExternalIdCalled = false
+}
+
 func (m *MockCategoryCatalog) CreateCategory(ctx context.Context, categoryCreate catalog.CategoryCreate) (*catalog.Category, error) {
 	return m.mockCategory, m.err
 }
 
 func (m *MockCategoryCatalog) UpdateCategory(ctx context.Context, id string, categoryUpdate catalog.CategoryUpdate) (*catalog.Category, error) {
+	m.updateCalled = true
+	if m.mockCategory != nil {
+		m.mockCategory.Name = categoryUpdate.Name
+	}
 	return m.mockCategory, m.err
 }
 
@@ -44,6 +57,11 @@ func (m *MockCategoryCatalog) DeleteCategory(ctx context.Context, categoryID str
 
 func (m *MockCategoryCatalog) GetCategory(ctx context.Context, id string) (*catalog.Category, error) {
 	return m.mockCategory, m.err
+}
+
+func (m *MockCategoryCatalog) SetCategoryExternalId(ctx context.Context, categoryID, externalID string) error {
+	m.setExternalIdCalled = true
+	return m.err
 }
 
 func TestCategoryProviderOperations(t *testing.T) {
@@ -63,7 +81,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetCategory(mockCategory)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "User Actions",
@@ -93,7 +111,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("creation failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "User Actions",
@@ -123,7 +141,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetCategory(updatedCategory)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "Updated User Actions",
@@ -164,7 +182,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("update failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			inputData := resources.ResourceData{
 				"name": "Updated User Actions",
@@ -196,7 +214,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			// No error set, should succeed
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
@@ -219,7 +237,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			}
 			mockCatalog.SetError(notFoundErr)
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
@@ -238,7 +256,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 			mockCatalog := &MockCategoryCatalog{}
 			mockCatalog.SetError(errors.New("deletion failed"))
 
-			provider := datacatalog.NewCategoryProvider(mockCatalog)
+			provider := datacatalog.NewCategoryProvider(mockCatalog, "test-import-dir")
 
 			stateData := resources.ResourceData{
 				"id":          "cat-123",
@@ -251,5 +269,130 @@ func TestCategoryProviderOperations(t *testing.T) {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "deleting category resource in upstream catalog")
 		})
+	})
+
+	t.Run("Import", func(t *testing.T) {
+		createdAt, _ := time.Parse(time.RFC3339, "2021-09-01T00:00:00Z")
+		updatedAt, _ := time.Parse(time.RFC3339, "2021-09-02T00:00:00Z")
+		mockCatalog := &MockCategoryCatalog{}
+		categoryProvider := datacatalog.NewCategoryProvider(mockCatalog, "data-catalog")
+		ctx := context.Background()
+
+		tests := []struct {
+			name           string
+			localArgs      state.CategoryArgs
+			remoteCategory *catalog.Category
+			mockErr        error
+			expectErr      bool
+			expectUpdate   bool
+			expectSetExtId bool
+			expectResource *resources.ResourceData
+		}{
+			{
+				name: "successful import no differences",
+				localArgs: state.CategoryArgs{
+					Name: "test-category",
+				},
+				remoteCategory: &catalog.Category{
+					ID:          "remote-id",
+					Name:        "test-category",
+					WorkspaceID: "ws-id",
+					CreatedAt:   createdAt,
+					UpdatedAt:   updatedAt,
+				},
+				expectErr:      false,
+				expectUpdate:   false,
+				expectSetExtId: true,
+				expectResource: &resources.ResourceData{
+					"id":          "remote-id",
+					"name":        "test-category",
+					"workspaceId": "ws-id",
+					"createdAt":   createdAt.String(),
+					"updatedAt":   updatedAt.String(),
+					"categoryArgs": map[string]interface{}{
+						"name": "test-category",
+					},
+				},
+			},
+			{
+				name: "successful import with differences",
+				localArgs: state.CategoryArgs{
+					Name: "new-category",
+				},
+				remoteCategory: &catalog.Category{
+					ID:          "remote-id",
+					Name:        "old-category",
+					WorkspaceID: "ws-id",
+					CreatedAt:   createdAt,
+					UpdatedAt:   updatedAt,
+				},
+				expectErr:      false,
+				expectUpdate:   true,
+				expectSetExtId: true,
+				expectResource: &resources.ResourceData{
+					"id":          "remote-id",
+					"name":        "new-category",
+					"workspaceId": "ws-id",
+					"createdAt":   createdAt.String(),
+					"updatedAt":   updatedAt.String(),
+					"categoryArgs": map[string]interface{}{
+						"name": "new-category",
+					},
+				},
+			},
+			{
+				name:           "error on get category",
+				localArgs:      state.CategoryArgs{Name: "test-category"},
+				remoteCategory: nil,
+				mockErr:        fmt.Errorf("error getting category"),
+				expectErr:      true,
+			},
+			{
+				name: "error on update category",
+				localArgs: state.CategoryArgs{
+					Name: "new-category",
+				},
+				remoteCategory: &catalog.Category{
+					ID:   "remote-id",
+					Name: "old-category",
+				},
+				mockErr:      fmt.Errorf("error updating category"),
+				expectErr:    true,
+				expectUpdate: true,
+			},
+			{
+				name: "error on set external ID",
+				localArgs: state.CategoryArgs{
+					Name: "test-category",
+				},
+				remoteCategory: &catalog.Category{
+					ID:   "remote-id",
+					Name: "test-category",
+				},
+				mockErr:        fmt.Errorf("error setting external ID"),
+				expectErr:      true,
+				expectSetExtId: true,
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(tt.name, func(t *testing.T) {
+				mockCatalog.ResetSpies()
+				mockCatalog.SetCategory(tt.remoteCategory)
+				mockCatalog.SetError(tt.mockErr)
+
+				res, err := categoryProvider.Import(ctx, "local-id", tt.localArgs.ToResourceData(), "remote-id")
+
+				if tt.expectErr {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectResource, res)
+				assert.Equal(t, tt.expectUpdate, mockCatalog.updateCalled)
+				assert.Equal(t, tt.expectSetExtId, mockCatalog.setExternalIdCalled)
+			})
+		}
 	})
 }

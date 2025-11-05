@@ -6,7 +6,55 @@
        "events": [
             {
                 "allowUnplanned": true,
-                "identitySection": "",
+                "identitySection": "properties",
+                "localId": "api_error",
+                "id": {
+                    "$__rudderRef": "event:api_error",
+                    "property": "id"
+                },
+                "properties": [
+                    {
+                        "localId": "api_method",
+                        "id": {
+                            "$__rudderRef": "property:api_method",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "api_path",
+                        "id": {
+                            "$__rudderRef": "property:api_path",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "error_code",
+                        "id": {
+                            "$__rudderRef": "property:error_code",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
+                    },
+                    {
+                        "localId": "http_retry_count",
+                        "id": {
+                            "$__rudderRef": "property:http_retry_count",
+                            "property": "id"
+                        },
+                        "required": false,
+                        "additionalProperties": false
+                    }
+                ],
+                "variants": []
+            },
+            {
+                "allowUnplanned": true,
+                "identitySection": "properties",
                 "localId": "api_tracking",
                 "id": {
                    "$__rudderRef": "event:api_tracking",
@@ -32,18 +80,18 @@
                         "additionalProperties": false
                     },
                     {
-                        "localId": "user_mail",
+                        "localId": "password",
                         "id": {
-                            "$__rudderRef": "property:user_mail",
+                            "$__rudderRef": "property:password",
                             "property": "id"
                         },
                         "required": true,
                         "additionalProperties": false
                     },
                     {
-                        "localId": "password",
+                        "localId": "user_mail",
                         "id": {
-                            "$__rudderRef": "property:password",
+                            "$__rudderRef": "property:user_mail",
                             "property": "id"
                         },
                         "required": true,
@@ -110,71 +158,14 @@
                 }]
             },
             {
-                "allowUnplanned": true,
-                "identitySection": "",
-                "localId": "api_error",
-                "id": {
-                    "$__rudderRef": "event:api_error",
-                    "property": "id"
-                },
-                "properties": [
-                    {
-                        "localId": "api_method",
-                        "id": {
-                            "$__rudderRef": "property:api_method",
-                            "property": "id"
-                        },
-                        "required": true,
-                        "additionalProperties": false
-                    },
-                    {
-                        "localId": "api_path",
-                        "id": {
-                            "$__rudderRef": "property:api_path",
-                            "property": "id"
-                        },
-                        "required": true,
-                        "additionalProperties": false
-                    },
-                    {
-                        "localId": "http_retry_count",
-                        "id": {
-                            "$__rudderRef": "property:http_retry_count",
-                            "property": "id"
-                        },
-                        "required": false,
-                        "additionalProperties": false
-                    },
-                    {
-                        "localId": "error_code",
-                        "id": {
-                            "$__rudderRef": "property:error_code",
-                            "property": "id"
-                        },
-                        "required": true,
-                        "additionalProperties": false
-                    }
-                ],
-                "variants": []
-            },
-            {
                 "allowUnplanned": false,
-                "identitySection": "",
+                "identitySection": "properties",
                 "localId": "login",
                 "id": {
                     "$__rudderRef": "event:login",
                     "property": "id"
                 },
                 "properties": [
-                    {
-                        "localId": "user_mail",
-                        "id": {
-                            "$__rudderRef": "property:user_mail",
-                            "property": "id"
-                        },
-                        "required": true,
-                        "additionalProperties": false
-                    },
                     {
                         "localId": "password",
                         "id": {
@@ -194,15 +185,6 @@
                         "additionalProperties": true,
                         "properties": [
                             {
-                                "localId": "remember_me_checkbox_clicked",
-                                "id": {
-                                    "$__rudderRef": "property:remember_me_checkbox_clicked",
-                                    "property": "id"
-                                },
-                                "required": true,
-                                "additionalProperties": false
-                            },
-                            {
                                 "localId": "captcha",
                                 "id": {
                                     "$__rudderRef": "property:captcha",
@@ -211,15 +193,6 @@
                                 "required": true,
                                 "additionalProperties": true,
                                 "properties": [
-                                    {
-                                        "localId": "captcha_solved",
-                                        "id": {
-                                            "$__rudderRef": "property:captcha_solved",
-                                            "property": "id"
-                                        },
-                                        "required": true,
-                                        "additionalProperties": false
-                                    },
                                     {
                                         "localId": "captcha_info",
                                         "id": {
@@ -230,15 +203,6 @@
                                         "additionalProperties": true,
                                         "properties": [
                                             {
-                                                "localId": "captcha_type",
-                                                "id": {
-                                                    "$__rudderRef": "property:captcha_type",
-                                                    "property": "id"
-                                                },
-                                                "required": true,
-                                                "additionalProperties": false
-                                            },
-                                            {
                                                 "localId": "captcha_attempts",
                                                 "id": {
                                                     "$__rudderRef": "property:captcha_attempts",
@@ -246,12 +210,48 @@
                                                 },
                                                 "required": true,
                                                 "additionalProperties": false
+                                            },
+                                            {
+                                                "localId": "captcha_type",
+                                                "id": {
+                                                    "$__rudderRef": "property:captcha_type",
+                                                    "property": "id"
+                                                },
+                                                "required": true,
+                                                "additionalProperties": false
                                             }
                                         ]
+                                    },
+                                    {
+                                        "localId": "captcha_solved",
+                                        "id": {
+                                            "$__rudderRef": "property:captcha_solved",
+                                            "property": "id"
+                                        },
+                                        "required": true,
+                                        "additionalProperties": false
                                     }
                                 ]
+                            },
+                            {
+                                "localId": "remember_me_checkbox_clicked",
+                                "id": {
+                                    "$__rudderRef": "property:remember_me_checkbox_clicked",
+                                    "property": "id"
+                                },
+                                "required": true,
+                                "additionalProperties": false
                             }
                         ]
+                    },
+                    {
+                        "localId": "user_mail",
+                        "id": {
+                            "$__rudderRef": "property:user_mail",
+                            "property": "id"
+                        },
+                        "required": true,
+                        "additionalProperties": false
                     }
                 ],
                 "variants": []
@@ -266,6 +266,11 @@
         "description": "Tracking plan for an e-commerce application.",
         "events": [
             {
+                "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
+                "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
+                "localId": "api_error"
+            },
+            {
                 "eventId": "ev_2yzT9moeasqOjAnECGEjlTKfagA",
                 "id": "tpe_2yzTAYjWsm2hk1JbXTpq5EcmNWI",
                 "localId": "api_tracking"
@@ -274,11 +279,6 @@
                 "eventId": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                 "id": "tpe_30CVISL0E9XhrxH6OeB9vtnedcv",
                 "localId": "login"
-            },
-            {
-                "eventId": "ev_2yzT9WNsmEQd6nlK4fhbkQsITmG",
-                "id": "tpe_2yzTAd3E2AO6v40rRHV3IEbMaUu",
-                "localId": "api_error"
             }  
         ],
         "id": "tp_2yzTAKlo8XTDcoPezOYjo2dNn5r",
@@ -288,7 +288,40 @@
             "events": [
                 {
                     "allowUnplanned": true,
-                    "identitySection": "",
+                    "identitySection": "properties",
+                    "localId": "api_error",
+                    "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
+                    "properties": [
+                        {
+                            "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
+                            "localId": "api_method",
+                            "required": true,
+                            "additionalProperties": false
+                        },
+                        {
+                            "localId": "api_path",
+                            "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
+                            "required": true,
+                            "additionalProperties": false
+                        },
+                        {
+                            "localId": "error_code",
+                            "required": true,
+                            "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
+                            "additionalProperties": false
+                        },
+                        {
+                            "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
+                            "localId": "http_retry_count",
+                            "required": false,
+                            "additionalProperties": false
+                        }
+                    ],
+                    "variants": []
+                },
+                {
+                    "allowUnplanned": true,
+                    "identitySection": "properties",
                     "localId": "api_tracking",
                     "id": "ev_2yzT9moeasqOjAnECGEjlTKfagA",
                     "properties": [
@@ -305,14 +338,14 @@
                             "additionalProperties": false
                         },
                         {
-                            "localId": "user_mail",
-                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+                            "localId": "password",
+                            "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
                             "required": true,
                             "additionalProperties": false
                         },
                         {
-                            "localId": "password",
-                            "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
+                            "localId": "user_mail",
+                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
                             "required": true,
                             "additionalProperties": false
                         }
@@ -362,50 +395,11 @@
                     }]
                 },
                 {
-                    "allowUnplanned": true,
-                    "identitySection": "",
-                    "localId": "api_error",
-                    "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
-                    "properties": [
-                        {
-                            "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
-                            "localId": "api_method",
-                            "required": true,
-                            "additionalProperties": false
-                        },
-                        {
-                            "localId": "api_path",
-                            "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
-                            "required": true,
-                            "additionalProperties": false
-                        },
-                        {
-                            "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
-                            "localId": "http_retry_count",
-                            "required": false,
-                            "additionalProperties": false
-                        },
-                        {
-                            "localId": "error_code",
-                            "required": true,
-                            "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
-                            "additionalProperties": false
-                        }
-                    ],
-                    "variants": []
-                },
-                {
                     "allowUnplanned": false,
-                    "identitySection": "",
+                    "identitySection": "properties",
                     "localId": "login",
                     "id": "ev_30CVHjEINIzw7jIk72cGy8GXCrH",
                     "properties": [
-                        {
-                            "localId": "user_mail",
-                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
-                            "required": true,
-                            "additionalProperties": false
-                        },
                         {
                             "localId": "password",
                             "id": "prop_31TQTDK6nIWxPmbHhtvlfDGh3lU",
@@ -419,23 +413,11 @@
                             "additionalProperties": true,
                             "properties": [
                                 {
-                                    "localId": "remember_me_checkbox_clicked",
-                                    "id": "prop_31TQUiZ1eqVBdWZbcclQ0Nqk6Oi",
-                                    "required": true,
-                                    "additionalProperties": false
-                                },
-                                {
                                     "localId": "captcha",
                                     "id": "prop_31TQU28M4YA6hKRPmuaoGMAtBAO",
                                     "required": true,
                                     "additionalProperties": true,
                                     "properties": [
-                                        {
-                                            "localId": "captcha_solved",
-                                            "id": "prop_31TQUFQtCYGSKXmCSlyxfADSkUh",
-                                            "required": true,
-                                            "additionalProperties": false
-                                        },
                                         {
                                             "localId": "captcha_info",
                                             "id": "prop_31TQUCE6IP0tBTBTDnWa29YkzOA",
@@ -443,22 +425,40 @@
                                             "additionalProperties": true,
                                             "properties": [
                                                 {
-                                                    "localId": "captcha_type",
-                                                    "id": "prop_31TQUKqiEt200DvzYmENWbfq6d6",
-                                                    "required": true,
-                                                    "additionalProperties": false
-                                                },
-                                                {
                                                     "localId": "captcha_attempts",
                                                     "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
                                                     "required": true,
                                                     "additionalProperties": false
+                                                },
+                                                {
+                                                    "localId": "captcha_type",
+                                                    "id": "prop_31TQUKqiEt200DvzYmENWbfq6d6",
+                                                    "required": true,
+                                                    "additionalProperties": false
                                                 }
                                             ]
+                                        },
+                                        {
+                                            "localId": "captcha_solved",
+                                            "id": "prop_31TQUFQtCYGSKXmCSlyxfADSkUh",
+                                            "required": true,
+                                            "additionalProperties": false
                                         }
                                     ]
+                                },
+                                {
+                                    "localId": "remember_me_checkbox_clicked",
+                                    "id": "prop_31TQUiZ1eqVBdWZbcclQ0Nqk6Oi",
+                                    "required": true,
+                                    "additionalProperties": false
                                 }
                             ]
+                        },
+                        {
+                            "localId": "user_mail",
+                            "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
+                            "required": true,
+                            "additionalProperties": false
                         }
                     ],
                     "variants": []

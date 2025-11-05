@@ -18,10 +18,11 @@ func TestCreateRetlSource(t *testing.T) {
 		Sql:         "SELECT * FROM users",
 		Description: "Test source",
 	}
+	externalID := "ext-123"
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123"}`
+			expected := `{"name":"Test Source","config":{"primaryKey":"id","sql":"SELECT * FROM users","description":"Test source"},"sourceType":"model","sourceDefinitionName":"postgres","accountId":"acc123", "enabled":true, "externalId":"ext-123"}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-sources", expected)
 		},
 		ResponseStatus: 200,
@@ -34,7 +35,8 @@ func TestCreateRetlSource(t *testing.T) {
 			"sourceDefinitionName": "postgres",
 			"accountId": "acc123",
 			"createdAt": "2023-07-01T12:00:00Z",
-			"updatedAt": "2023-07-01T12:00:00Z"
+			"updatedAt": "2023-07-01T12:00:00Z",
+			"externalId": "ext-123"
 		}`,
 	})
 
@@ -49,6 +51,8 @@ func TestCreateRetlSource(t *testing.T) {
 		SourceType:           retl.ModelSourceType,
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
+		Enabled:              true,
+		ExternalID:           externalID,
 	}
 
 	created, err := retlClient.CreateRetlSource(context.Background(), source)
@@ -209,7 +213,7 @@ func TestListRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background())
+	sources, err := retlClient.ListRetlSources(context.Background(), nil)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 2)
@@ -230,10 +234,21 @@ func TestListRetlSources(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestNextRetlSources(t *testing.T) {
+func TestListRetlSourcesWithExternalID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources", "")
+			url := req.URL
+			query := url.Query()
+			if query.Get("hasExternalId") != "true" {
+				return false
+			}
+			if query.Get("sourceType") != "model" {
+				return false
+			}
+			if url.Path != "/v2/retl-sources" {
+				return false
+			}
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources?sourceType=model&hasExternalId=false", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -244,7 +259,8 @@ func TestNextRetlSources(t *testing.T) {
 					"enabled": true,
 					"sourceType": "model",
 					"sourceDefinitionName": "postgres",
-					"accountId": "acc123"
+					"accountId": "acc123",
+					"externalId": "ext-123"
 				}
 			]
 		}`,
@@ -255,7 +271,8 @@ func TestNextRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background())
+	hasExternalID := true
+	sources, err := retlClient.ListRetlSources(context.Background(), &hasExternalID)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 1)
@@ -377,7 +394,7 @@ func TestListRetlSourcesAPIError(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background())
+	_, err = retlClient.ListRetlSources(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listing RETL sources")
 
@@ -425,7 +442,7 @@ func TestListRetlSourcesMalformedResponse(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background())
+	_, err = retlClient.ListRetlSources(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshalling response")
 
@@ -556,6 +573,47 @@ func TestUpdateRetlSourceAPIError(t *testing.T) {
 	_, err = retlClient.UpdateRetlSource(context.Background(), "src1", source)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "updating RETL source")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestSetRetlSourceExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1/external-id", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"externalId":"ext-123"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	err = retlClient.SetExternalId(context.Background(), "src1", "ext-123")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestSetRetlSourceExternalIDAPIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-sources/src1/external-id", "")
+		},
+		ResponseStatus: 500,
+		ResponseBody:   `{"error":"Internal Server Error"}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	err = retlClient.SetExternalId(context.Background(), "src1", "ext-123")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "setting external ID")
 
 	httpClient.AssertNumberOfCalls()
 }

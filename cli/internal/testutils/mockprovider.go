@@ -3,52 +3,65 @@ package testutils
 import (
 	"context"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 // MockProvider is a mock implementation of the project.Provider interface for testing.
 type MockProvider struct {
-	SupportedKinds         []string
-	SupportedTypes         []string
-	ValidateErr            error
-	LoadSpecErr            error
-	GetResourceGraphVal    *resources.Graph
-	GetResourceGraphErr    error
-	LoadStateVal           *state.State
-	LoadStateErr           error
+	SupportedKinds             []string
+	SupportedTypes             []string
+	ValidateArg                *resources.Graph
+	ValidateErr                error
+	LoadSpecErr                error
+	GetResourceGraphVal        *resources.Graph
+	GetResourceGraphErr        error
+	LoadStateVal               *state.State
+	LoadStateErr               error
 	LoadResourcesFromRemoteVal *resources.ResourceCollection
 	LoadResourcesFromRemoteErr error
-	LoadStateFromResourcesVal *state.State
-	LoadStateFromResourcesErr error
-	PutResourceStateErr    error
-	DeleteResourceStateErr error
-	CreateVal              *resources.ResourceData
-	CreateErr              error
-	UpdateVal              *resources.ResourceData
-	UpdateErr              error
-	DeleteErr              error
-	ImportVal              *resources.ResourceData
-	ImportErr              error
+	LoadStateFromResourcesVal  *state.State
+	LoadStateFromResourcesErr  error
+	PutResourceStateErr        error
+	DeleteResourceStateErr     error
+	CreateVal                  *resources.ResourceData
+	CreateErr                  error
+	UpdateVal                  *resources.ResourceData
+	UpdateErr                  error
+	DeleteErr                  error
+	ImportVal                  *resources.ResourceData
+	ImportErr                  error
+	ParseSpecVal               *specs.ParsedSpec
+	ParseSpecErr               error
 
 	// Tracking calls
-	ValidateCalledCount              int
-	LoadSpecCalledWithArgs           []LoadSpecArgs
-	GetResourceGraphCalledCount      int
-	LoadStateCalledCount             int
+	ValidateCalledCount                int
+	LoadSpecCalledWithArgs             []LoadSpecArgs
+	ParseSpecCalledWithArgs            []ParseSpecArgs
+	GetResourceGraphCalledCount        int
+	LoadStateCalledCount               int
 	LoadResourcesFromRemoteCalledCount int
-	LoadStateFromResourcesCalledCount int
-	PutResourceStateCalledWithArg    PutResourceStateArgs
-	DeleteResourceStateCalledWithArg *state.ResourceState
-	CreateCalledWithArg              CreateArgs
-	UpdateCalledWithArg              UpdateArgs
-	DeleteCalledWithArg              DeleteArgs
-	ImportCalledWithArg              ImportArgs
+	LoadStateFromResourcesCalledCount  int
+	PutResourceStateCalledWithArg      PutResourceStateArgs
+	DeleteResourceStateCalledWithArg   *state.ResourceState
+	CreateCalledWithArg                CreateArgs
+	UpdateCalledWithArg                UpdateArgs
+	DeleteCalledWithArg                DeleteArgs
+	ImportCalledWithArg                ImportArgs
 }
 
 // LoadSpecArgs stores arguments for LoadSpec calls
 type LoadSpecArgs struct {
+	Path string
+	Spec *specs.Spec
+}
+
+// ParseSpecArgs stores arguments for ParseSpec calls
+type ParseSpecArgs struct {
 	Path string
 	Spec *specs.Spec
 }
@@ -93,8 +106,14 @@ type ImportArgs struct {
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
 func NewMockProvider() *MockProvider {
 	return &MockProvider{
-		LoadSpecCalledWithArgs: make([]LoadSpecArgs, 0),
+		ParseSpecVal:            &specs.ParsedSpec{ExternalIDs: []string{}},
+		LoadSpecCalledWithArgs:  make([]LoadSpecArgs, 0),
+		ParseSpecCalledWithArgs: make([]ParseSpecArgs, 0),
 	}
+}
+
+func (m *MockProvider) GetName() string {
+	return "mock"
 }
 
 func (m *MockProvider) GetSupportedKinds() []string {
@@ -105,9 +124,15 @@ func (m *MockProvider) GetSupportedTypes() []string {
 	return m.SupportedTypes
 }
 
-func (m *MockProvider) Validate() error {
+func (m *MockProvider) Validate(graph *resources.Graph) error {
+	m.ValidateArg = graph
 	m.ValidateCalledCount++
 	return m.ValidateErr
+}
+
+func (m *MockProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	m.ParseSpecCalledWithArgs = append(m.ParseSpecCalledWithArgs, ParseSpecArgs{Path: path, Spec: s})
+	return m.ParseSpecVal, m.ParseSpecErr
 }
 
 func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
@@ -165,10 +190,19 @@ func (m *MockProvider) Import(ctx context.Context, ID string, resourceType strin
 	return m.ImportVal, m.ImportErr
 }
 
+func (m *MockProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	return nil, nil
+}
+
+func (m *MockProvider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+	return nil, nil
+}
+
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
+	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0
 	m.LoadStateCalledCount = 0
 	m.PutResourceStateCalledWithArg = PutResourceStateArgs{}

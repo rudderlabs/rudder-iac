@@ -61,7 +61,7 @@ func IsCatalogAlreadyExistsError(err error) bool {
 // getAllResourcesWithPagination is a generic helper function that fetches all items from a paginated catalog API endpoint
 func getAllResourcesWithPagination[T any](
 	ctx context.Context,
-	client *client.Client,
+	apiClient *client.Client,
 	endpoint string,
 ) ([]T, error) {
 	var allItems []T
@@ -78,8 +78,13 @@ func getAllResourcesWithPagination[T any](
 		q.Set("page", strconv.Itoa(page))
 		u.RawQuery = q.Encode()
 
-		resp, err := client.Do(ctx, "GET", u.String(), nil)
+		resp, err := apiClient.Do(ctx, "GET", u.String(), nil)
 		if err != nil {
+			var apiErr *client.APIError
+
+			if ok := errors.As(err, &apiErr); ok && apiErr.FeatureNotEnabled() {
+				return nil, nil
+			}
 			return nil, fmt.Errorf("sending get request for page %d: %w", page, err)
 		}
 

@@ -1,6 +1,4 @@
-{{- range .TypeAliases }}
 {{- if .Comment }}
-/** {{ .Comment }} */
+/** {{ escapeComment .Comment }} */
 {{- end }}
 typealias {{ .Alias }} = {{ .Type }}
-{{ end }}

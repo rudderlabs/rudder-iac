@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -67,8 +68,7 @@ func NewCmdDestroy() *cobra.Command {
 				}...)
 			}()
 
-			// Create syncer to handle the deletion
-			s, err := syncer.New(deps.CompositeProvider())
+			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{})
 			if err != nil {
 				return fmt.Errorf("creating syncer: %w", err)
 			}

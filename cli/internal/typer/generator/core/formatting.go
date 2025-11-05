@@ -3,20 +3,23 @@ package core
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // ToPascalCase converts a string to PascalCase (UpperCamelCase)
 // Examples: "user_id" -> "UserId", "email-address" -> "EmailAddress"
+// Supports Unicode characters correctly by using rune-based operations
 func ToPascalCase(input string) string {
 	words := SplitIntoWords(input)
 
 	var result strings.Builder
 	for _, word := range words {
 		if len(word) > 0 {
-			// Capitalize first letter, lowercase the rest
-			result.WriteString(strings.ToUpper(string(word[0])))
-			if len(word) > 1 {
-				result.WriteString(strings.ToLower(word[1:]))
+			// Capitalize first rune, lowercase the rest
+			runes := []rune(word)
+			result.WriteString(string(unicode.ToUpper(runes[0])))
+			if len(runes) > 1 {
+				result.WriteString(strings.ToLower(string(runes[1:])))
 			}
 		}
 	}
@@ -26,6 +29,7 @@ func ToPascalCase(input string) string {
 
 // ToCamelCase converts a string to camelCase (lowerCamelCase)
 // Examples: "user_id" -> "userId", "email-address" -> "emailAddress"
+// Supports Unicode characters correctly by using rune-based operations
 func ToCamelCase(input string) string {
 	words := SplitIntoWords(input)
 
@@ -44,9 +48,11 @@ func ToCamelCase(input string) string {
 	for i := 1; i < len(words); i++ {
 		word := words[i]
 		if len(word) > 0 {
-			result.WriteString(strings.ToUpper(string(word[0])))
-			if len(word) > 1 {
-				result.WriteString(strings.ToLower(word[1:]))
+			// Capitalize first rune, lowercase the rest
+			runes := []rune(word)
+			result.WriteString(string(unicode.ToUpper(runes[0])))
+			if len(runes) > 1 {
+				result.WriteString(strings.ToLower(string(runes[1:])))
 			}
 		}
 	}
@@ -55,6 +61,8 @@ func ToCamelCase(input string) string {
 }
 
 // SplitIntoWords splits a string into words based on various delimiters and case changes
+// Note: If the input contains only underscores, this will return an empty slice
+// since underscores are treated as delimiters
 func SplitIntoWords(input string) []string {
 	if input == "" {
 		return []string{}
@@ -88,4 +96,13 @@ func SplitIntoWords(input string) []string {
 	}
 
 	return result
+}
+
+func ReplaceSpecialCharacters(input, replacement string) string {
+	// Match Unicode letters (L), numbers (N), underscores, and whitespace
+	// Replace everything else (punctuation, symbols, etc.) with the replacement
+	// This preserves Cyrillic, Greek, Chinese, etc. while replacing special chars
+	re := regexp.MustCompile(`[^\pL\pN_\s]`)
+	// Replace special characters with the specified replacement string
+	return re.ReplaceAllString(input, replacement)
 }

@@ -10,7 +10,7 @@
       {
         "id": "",
         "refToId": {
-          "$__rudderRef": "property:user_mail",
+          "$__rudderRef": "property:password",
           "property": "id"
         },
         "required": true
@@ -18,7 +18,7 @@
       {
         "id": "",
         "refToId": {
-          "$__rudderRef": "property:password",
+          "$__rudderRef": "property:user_mail",
           "property": "id"
         },
         "required": true

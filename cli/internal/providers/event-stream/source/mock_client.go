@@ -15,12 +15,13 @@ type MockSourceClient struct {
 	unlinkTPCalled   bool
 	updateTPConnectionCalled bool
 	getSourcesCalled bool
+	setExternalIDCalled bool
 	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
 
-func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.EventStreamSource, error) {
+func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
 	m.createCalled = true
-	return &sourceClient.EventStreamSource{
+	return &sourceClient.CreateUpdateSourceResponse{
 		ExternalID: req.ExternalID,
 		Name:       req.Name,
 		Type:       req.Type,
@@ -28,9 +29,9 @@ func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateS
 	}, nil
 }
 
-func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sourceClient.UpdateSourceRequest) (*sourceClient.EventStreamSource, error) {
+func (m *MockSourceClient) Update(ctx context.Context, sourceID string, req *sourceClient.UpdateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
 	m.updateCalled = true
-	return &sourceClient.EventStreamSource{
+	return &sourceClient.CreateUpdateSourceResponse{
 		ID:         sourceID,
 		ExternalID: "external-123",
 		Name:       req.Name,
@@ -64,6 +65,11 @@ func (m *MockSourceClient) UnlinkTP(ctx context.Context, trackingPlanID string, 
 
 func (m *MockSourceClient) UpdateTPConnection(ctx context.Context, trackingPlanID string, sourceId string, config *trackingplanClient.ConnectionConfig) error {
 	m.updateTPConnectionCalled = true
+	return nil
+}
+
+func (m *MockSourceClient) SetExternalID(ctx context.Context, sourceID string, externalID string) error {
+	m.setExternalIDCalled = true
 	return nil
 }
 
@@ -101,4 +107,8 @@ func (m *MockSourceClient) UnlinkTPCalled() bool {
 
 func (m *MockSourceClient) UpdateTPConnectionCalled() bool {
 	return m.updateTPConnectionCalled
+}
+
+func (m *MockSourceClient) SetExternalIDCalled() bool {
+	return m.setExternalIDCalled
 }

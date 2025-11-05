@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
@@ -16,7 +16,8 @@ import (
 )
 
 type ProjectSyncer struct {
-	provider SyncProvider
+	provider   SyncProvider
+	workspace  *client.Workspace
 	stateMutex sync.RWMutex
 }
 
@@ -32,13 +33,17 @@ type SyncProvider interface {
 	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
 }
 
-func New(p SyncProvider) (*ProjectSyncer, error) {
+func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
+	if workspace == nil {
+		return nil, fmt.Errorf("workspace is required")
+	}
 
 	return &ProjectSyncer{
-		provider: p,
+		provider:  p,
+		workspace: workspace,
 	}, nil
 }
 
@@ -64,37 +69,18 @@ func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []erro
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
-	// Load state from the state API
-	apistate, err := s.provider.LoadState(ctx)
+	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
 	}
 
-	var reconstate *state.State
-	if config.GetConfig().ExperimentalFlags.StatelessCLI {
-		// remove state for stateless resources - this is to avoid conflicts b/w the api state and the reconstructed state
-		apistate = removeStateForResourceTypes(apistate, []string{dcstate.CategoryResourceType, dcstate.EventResourceType, dcstate.PropertyResourceType, dcstate.CustomTypeResourceType})
-		// load resources
-		resources, err := s.provider.LoadResourcesFromRemote(ctx)
-		if err != nil {
-			return []error{err}
-		}
-		// reconstruct state
-		reconstate, err = s.provider.LoadStateFromResources(ctx, resources)
-		if err != nil {
-			return []error{err}
-		}
-	}
-
-	// Merge the state from the state API and the reconstructed state
-	state, err := apistate.Merge(reconstate)
+	state, err := s.provider.LoadStateFromResources(ctx, resources)
 	if err != nil {
 		return []error{err}
 	}
+	source := StateToGraph(state)
 
-	source := stateToGraph(state)
-
-	p := planner.New()
+	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
 	differ.PrintDiff(plan.Diff)
@@ -122,7 +108,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 	return s.executePlan(ctx, state, plan, target, continueOnFail, options)
 }
 
-func stateToGraph(state *state.State) *resources.Graph {
+func StateToGraph(state *state.State) *resources.Graph {
 	graph := resources.NewGraph()
 
 	for _, stateResource := range state.Resources {
@@ -166,7 +152,7 @@ func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, pla
 }
 
 func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
-	var errors       []error
+	var errors []error
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
@@ -193,7 +179,7 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 
 func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
 	tasks := make([]Task, 0, len(plan.Operations))
-	sourceGraph := stateToGraph(state)
+	sourceGraph := StateToGraph(state)
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
 	}

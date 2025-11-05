@@ -3,6 +3,7 @@ package retl_test
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -29,7 +31,7 @@ type mockRETLStore struct {
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc  func(ctx context.Context) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc  func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -86,9 +88,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx)
+		return m.listRetlSourcesFunc(ctx, hasExternalID)
 	}
 	return &retlClient.RETLSources{}, nil
 }
@@ -551,7 +553,7 @@ func TestProvider(t *testing.T) {
 				}
 
 				// Validate all specs
-				err := provider.Validate()
+				err := provider.Validate(nil)
 				if tc.expectedError {
 					assert.Error(t, err)
 					if tc.errorMessage != "" {
@@ -618,7 +620,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return &retlClient.RETLSources{
 					Data: []retlClient.RETLSource{
 						{
@@ -652,13 +654,51 @@ func TestProviderList(t *testing.T) {
 			assert.Equal(t, "account-1", results[0]["account_id"])
 		})
 
+		t.Run("Success hasExternaId true", func(t *testing.T) {
+			t.Parallel()
+			mockClient := newDefaultMockClient()
+			provider := retl.New(mockClient)
+
+			// Mock successful listing in the client that the handler will use
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+				if !assert.True(t, *hasExternalID) {
+					return nil, fmt.Errorf("hasExternalID is not true")
+				}
+				externalId := "ext-123"
+				return &retlClient.RETLSources{
+					Data: []retlClient.RETLSource{
+						{
+							ID:                   "source-1",
+							Name:                 "Test Source 1",
+							IsEnabled:            true,
+							SourceType:           retlClient.ModelSourceType,
+							SourceDefinitionName: "postgres",
+							AccountID:            "account-1",
+							ExternalID:           externalId,
+							Config: retlClient.RETLSQLModelConfig{
+								Description: "Test description 1",
+								PrimaryKey:  "id",
+								Sql:         "SELECT * FROM table1",
+							},
+						},
+					},
+				}, nil
+			}
+
+			ctx := context.Background()
+			results, err := provider.List(ctx, "retl-source-sql-model", map[string]string{"hasExternalId": "true"})
+
+			require.NoError(t, err)
+			assert.Len(t, results, 1)
+			assert.Equal(t, "source-1", results[0]["id"])
+		})
 		t.Run("HandlerError", func(t *testing.T) {
 			t.Parallel()
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
 
 			// Mock error from client that the handler will encounter
-			mockClient.listRetlSourcesFunc = func(ctx context.Context) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return nil, fmt.Errorf("API error")
 			}
 
@@ -682,6 +722,39 @@ func TestProviderList(t *testing.T) {
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "no handler for resource type")
 		})
+	})
+}
+
+func TestProviderParseSpec(t *testing.T) {
+	t.Run("UnsupportedKind", func(t *testing.T) {
+		t.Parallel()
+		provider := retl.New(newDefaultMockClient())
+		_, err := provider.ParseSpec("test.yaml", &specs.Spec{
+			Kind: "unsupported-kind",
+			Spec: map[string]any{"id": "abc"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported kind")
+	})
+
+	t.Run("DelegatesToHandlerAndReturnsExternalIDs", func(t *testing.T) {
+		t.Parallel()
+		provider := retl.New(newDefaultMockClient())
+		parsed, err := provider.ParseSpec("test.yaml", &specs.Spec{
+			Kind: sqlmodel.ResourceKind,
+			Spec: map[string]any{
+				"id":                "orders-model",
+				"display_name":      "Orders",
+				"description":       "desc",
+				"sql":               "SELECT 1",
+				"account_id":        "acc-1",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+		assert.ElementsMatch(t, []string{"orders-model"}, parsed.ExternalIDs)
 	})
 }
 
@@ -798,5 +871,317 @@ func TestProviderPreview(t *testing.T) {
 		_, err := provider.Preview(ctx, "test", sqlmodel.ResourceType, data, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "preview request failed")
+	})
+}
+
+func TestProviderLoadResourcesFromRemote(t *testing.T) {
+	t.Run("Success collects only resources with ExternalID", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Prepare two sources: one with ExternalID (should be included), one without (should be skipped)
+		externalID := "ext-123"
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			if hasExternalID == nil || !*hasExternalID {
+				return nil, fmt.Errorf("expected hasExternalID=true filter")
+			}
+			return &retlClient.RETLSources{
+				Data: []retlClient.RETLSource{
+					{
+						ID:                   "source-with-ext",
+						Name:                 "With External",
+						SourceType:           retlClient.ModelSourceType,
+						SourceDefinitionName: "postgres",
+						AccountID:            "acc-1",
+						ExternalID:           externalID,
+						Config: retlClient.RETLSQLModelConfig{
+							Description: "d1",
+							PrimaryKey:  "id",
+							Sql:         "SELECT 1",
+						},
+					},
+				},
+			}, nil
+		}
+
+		ctx := context.Background()
+		collection, err := provider.LoadResourcesFromRemote(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, collection)
+
+		// Only one resource should be present (the one with ExternalID)
+		assert.Equal(t, 1, collection.Len())
+
+		// Validate the stored resource
+		resourcesMap := collection.GetAll(sqlmodel.ResourceType)
+		require.NotNil(t, resourcesMap)
+		remoteRes, exists := resourcesMap["source-with-ext"]
+		require.True(t, exists, "expected resource with id 'source-with-ext'")
+		assert.Equal(t, "ext-123", remoteRes.ExternalID)
+		// Ensure Data is the full RETLSource
+		_, ok := remoteRes.Data.(retlClient.RETLSource)
+		require.True(t, ok, "expected Data to be retlClient.RETLSource")
+	})
+
+	t.Run("Handler error surfaces with context", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			return nil, fmt.Errorf("API error")
+		}
+
+		ctx := context.Background()
+		collection, err := provider.LoadResourcesFromRemote(ctx)
+		require.Error(t, err)
+		assert.Nil(t, collection)
+		assert.Contains(t, err.Error(), "loading retl-source-sql-model")
+		assert.Contains(t, err.Error(), "listing RETL sources")
+	})
+}
+
+func TestProviderLoadStateFromResources(t *testing.T) {
+	t.Run("Success reconstructs state from collection", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Build a resource collection with one valid RETLSource carrying ExternalID
+		extID := "local-1"
+		source := retlClient.RETLSource{
+			ID:                   "remote-1",
+			Name:                 "Model One",
+			SourceType:           retlClient.ModelSourceType,
+			SourceDefinitionName: "postgres",
+			AccountID:            "acc-1",
+			IsEnabled:            true,
+			ExternalID:           extID,
+			Config: retlClient.RETLSQLModelConfig{
+				Description: "desc-1",
+				PrimaryKey:  "id",
+				Sql:         "SELECT 1",
+			},
+		}
+		collection := resources.NewResourceCollection()
+		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+			source.ID: {
+				ID:         source.ID,
+				ExternalID: source.ExternalID,
+				Data:       source,
+			},
+		})
+
+		ctx := context.Background()
+		st, err := provider.LoadStateFromResources(ctx, collection)
+		require.NoError(t, err)
+		require.NotNil(t, st)
+
+		// Validate state contains resource keyed by local (external) id
+		rs := st.GetResource("retl-source-sql-model:" + extID)
+		require.NotNil(t, rs)
+		assert.Equal(t, sqlmodel.ResourceType, rs.Type)
+		assert.Equal(t, extID, rs.ID)
+		// Inputs reconstructed from source
+		assert.Equal(t, any("Model One"), rs.Input[sqlmodel.DisplayNameKey])
+		assert.Equal(t, any("desc-1"), rs.Input[sqlmodel.DescriptionKey])
+		assert.Equal(t, any("acc-1"), rs.Input[sqlmodel.AccountIDKey])
+		assert.Equal(t, any("id"), rs.Input[sqlmodel.PrimaryKeyKey])
+		assert.Equal(t, any("SELECT 1"), rs.Input[sqlmodel.SQLKey])
+		assert.Equal(t, any(true), rs.Input[sqlmodel.EnabledKey])
+		assert.Equal(t, any("postgres"), rs.Input[sqlmodel.SourceDefinitionKey])
+		assert.Equal(t, any(extID), rs.Input[sqlmodel.LocalIDKey])
+		// Outputs come from toResourceData
+		assert.Equal(t, any("remote-1"), rs.Output[sqlmodel.IDKey])
+		assert.Equal(t, any(retlClient.ModelSourceType), rs.Output[sqlmodel.SourceTypeKey])
+	})
+
+	t.Run("Error when handler fails to cast resource data", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Insert a malformed resource (Data is wrong type)
+		collection := resources.NewResourceCollection()
+		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+			"bad-1": {
+				ID:         "bad-1",
+				ExternalID: "local-bad",
+				Data:       "not a retlClient.RETLSource",
+			},
+		})
+
+		ctx := context.Background()
+		st, err := provider.LoadStateFromResources(ctx, collection)
+		require.Error(t, err)
+		assert.Nil(t, st)
+		// Wrapped error should mention provider handler and inner cast error
+		assert.Contains(t, err.Error(), "loading state from provider handler retl-source-sql-model")
+		assert.Contains(t, err.Error(), "unable to cast resource to retl source")
+	})
+}
+
+func TestProviderLoadImportable(t *testing.T) {
+	t.Run("Success generates external IDs and references", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Mock list to return sources that do NOT have ExternalID yet
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			// Expect false for hasExternalID
+			require.NotNil(t, hasExternalID)
+			require.False(t, *hasExternalID)
+			return &retlClient.RETLSources{
+				Data: []retlClient.RETLSource{
+					{
+						ID:                   "source-1",
+						Name:                 "Orders Model",
+						SourceType:           retlClient.ModelSourceType,
+						SourceDefinitionName: "postgres",
+						AccountID:            "acc-1",
+						WorkspaceID:          "ws-1",
+						Config: retlClient.RETLSQLModelConfig{
+							Description: "desc-1",
+							PrimaryKey:  "id",
+							Sql:         "SELECT 1",
+						},
+					},
+					{
+						ID:                   "source-2",
+						Name:                 "Users Model",
+						SourceType:           retlClient.ModelSourceType,
+						SourceDefinitionName: "postgres",
+						AccountID:            "acc-1",
+						WorkspaceID:          "ws-1",
+						Config: retlClient.RETLSQLModelConfig{
+							Description: "desc-2",
+							PrimaryKey:  "user_id",
+							Sql:         "SELECT 2",
+						},
+					},
+				},
+			}, nil
+		}
+
+		ctx := context.Background()
+		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
+		collection, err := provider.LoadImportable(ctx, idNamer)
+		require.NoError(t, err)
+		require.NotNil(t, collection)
+
+		// Two items imported
+		m := collection.GetAll(sqlmodel.ResourceType)
+		require.Len(t, m, 2)
+
+		// External IDs should be kebab-cased names
+		s1, ok := collection.GetByID(sqlmodel.ResourceType, "source-1")
+		require.True(t, ok)
+		assert.Equal(t, "orders-model", s1.ExternalID)
+		assert.Equal(t, "#/retl-source-sql-model/retl-source-sql-model/orders-model", s1.Reference)
+
+		s2, ok := collection.GetByID(sqlmodel.ResourceType, "source-2")
+		require.True(t, ok)
+		assert.Equal(t, "users-model", s2.ExternalID)
+		assert.Equal(t, "#/retl-source-sql-model/retl-source-sql-model/users-model", s2.Reference)
+	})
+
+	t.Run("Handler error surfaces with context", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			return nil, fmt.Errorf("API error")
+		}
+
+		ctx := context.Background()
+		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
+		collection, err := provider.LoadImportable(ctx, idNamer)
+		require.Error(t, err)
+		assert.Nil(t, collection)
+		assert.Contains(t, err.Error(), "loading importable resources from handler")
+	})
+}
+
+// minimal resolver implementation; not used by current FormatForExport flow
+type noopResolver struct{}
+
+func (n noopResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
+	return "", nil
+}
+
+func TestProviderFormatForExport(t *testing.T) {
+	t.Run("Formats entities with correct paths and metadata", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Prepare a collection similar to LoadImportable output
+		src := retlClient.RETLSource{
+			ID:                   "remote-1",
+			Name:                 "Orders Model",
+			SourceType:           retlClient.ModelSourceType,
+			SourceDefinitionName: "postgres",
+			AccountID:            "acc-1",
+			WorkspaceID:          "ws-1",
+			IsEnabled:            true,
+			Config: retlClient.RETLSQLModelConfig{
+				Description: "desc-1",
+				PrimaryKey:  "id",
+				Sql:         "SELECT 1",
+			},
+		}
+		collection := resources.NewResourceCollection()
+		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+			src.ID: {
+				ID:         src.ID,
+				ExternalID: "orders-model",
+				Data:       &src,
+			},
+		})
+
+		ctx := context.Background()
+		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
+		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		// Validate relative path and core spec content
+		assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[0].RelativePath)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		assert.Equal(t, sqlmodel.ResourceKind, spec.Kind)
+		assert.Equal(t, any("Orders Model"), spec.Spec[sqlmodel.DisplayNameKey])
+		assert.Equal(t, any("desc-1"), spec.Spec[sqlmodel.DescriptionKey])
+		assert.Equal(t, any("acc-1"), spec.Spec[sqlmodel.AccountIDKey])
+		assert.Equal(t, any("id"), spec.Spec[sqlmodel.PrimaryKeyKey])
+		assert.Equal(t, any("SELECT 1"), spec.Spec[sqlmodel.SQLKey])
+		assert.Equal(t, any("postgres"), spec.Spec[sqlmodel.SourceDefinitionKey])
+		assert.Equal(t, any(true), spec.Spec[sqlmodel.EnabledKey])
+		assert.Equal(t, any("orders-model"), spec.Spec[sqlmodel.IDKey])
+	})
+
+	t.Run("Handler cast error is wrapped by provider", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		// Malformed data type inside collection
+		collection := resources.NewResourceCollection()
+		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+			"bad": {
+				ID:         "bad",
+				ExternalID: "bad-external",
+				Data:       "not a pointer to retlClient.RETLSource",
+			},
+		})
+
+		ctx := context.Background()
+		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
+		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		require.Error(t, err)
+		assert.Nil(t, entities)
+		assert.Contains(t, err.Error(), "formatting for export for handler")
 	})
 }

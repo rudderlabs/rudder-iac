@@ -1,7 +1,6 @@
 package core_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -25,6 +24,16 @@ func TestToPascalCase(t *testing.T) {
 		{"numbers", "user123_id", "User123Id"},
 		{"consecutive delimiters", "user__id", "UserId"},
 		{"leading/trailing delimiters", "_user_id_", "UserId"},
+		// Unicode test cases - ensure proper rune-based handling
+		{"chinese_characters", "用户_标识", "用户标识"},
+		{"cyrillic_characters", "тип_данных", "ТипДанных"},
+		{"greek_characters", "όνομα_χρήστη", "ΌνομαΧρήστη"},
+		{"arabic_characters", "اسم_المستخدم", "اسمالمستخدم"},
+		{"mixed_unicode_ascii", "user_用户_id", "User用户Id"},
+		{"latin_diacritics", "café_crème", "CaféCrème"},
+		{"japanese_katakana", "ユーザー_識別子", "ユーザー識別子"},
+		{"emoji_preserved", "🎯", "🎯"},
+		{"hebrew_characters", "שם_משתמש", "שםמשתמש"},
 	}
 
 	for _, tt := range tests {
@@ -52,6 +61,16 @@ func TestToCamelCase(t *testing.T) {
 		{"numbers", "user123_id", "user123Id"},
 		{"consecutive delimiters", "user__id", "userId"},
 		{"leading/trailing delimiters", "_user_id_", "userId"},
+		// Unicode test cases - ensure proper rune-based handling
+		{"chinese_characters", "用户_标识", "用户标识"},
+		{"cyrillic_characters", "получить_данные", "получитьДанные"},
+		{"greek_characters", "όνομα_χρήστη", "όνομαΧρήστη"},
+		{"arabic_characters", "اسم_المستخدم", "اسمالمستخدم"},
+		{"mixed_unicode_ascii", "get_用户_data", "get用户Data"},
+		{"latin_diacritics", "café_créme", "caféCréme"},
+		{"japanese_hiragana", "データ_取得", "データ取得"},
+		{"emoji_preserved", "🚀_launch", "🚀Launch"},
+		{"thai_characters", "ชื่อ_ผู้ใช้", "ชื่อผู้ใช้"},
 	}
 
 	for _, tt := range tests {
@@ -122,6 +141,8 @@ func TestFormattingConsistency(t *testing.T) {
 		"email-address",
 		"first name",
 		"XMLHttpRequest",
+		"用户_数据",      // Unicode test
+		"тип_класса", // Cyrillic test
 	}
 
 	for _, input := range inputs {
@@ -131,9 +152,12 @@ func TestFormattingConsistency(t *testing.T) {
 
 			// Pascal case should be camel case with first letter uppercase
 			if len(camel) > 0 && len(pascal) > 0 {
-				expectedPascal := strings.ToUpper(string(camel[0])) + camel[1:]
+				// Use rune-based comparison for Unicode correctness
+				pascalRunes := []rune(pascal)
+				camelRunes := []rune(camel)
+				expectedPascal := string([]rune{pascalRunes[0]}) + string(camelRunes[1:])
 				assert.Equal(t, expectedPascal, pascal,
-					"ToPascalCase should be ToCamelCase with first letter capitalized")
+					"ToPascalCase should be ToCamelCase with first rune capitalized")
 			}
 		})
 	}

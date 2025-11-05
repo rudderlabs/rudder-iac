@@ -12,6 +12,7 @@ func NewCmdImport() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewCmdRetlSource())
+	cmd.AddCommand(NewCmdWorkspaceImport())
 
 	return cmd
 }

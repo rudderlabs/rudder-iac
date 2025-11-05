@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func TestCreateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -43,7 +47,7 @@ func TestCreateSource(t *testing.T) {
 	created, err := eventStreamClient.Create(context.Background(), source)
 	require.NoError(t, err)
 
-	assert.Equal(t, &esSource.EventStreamSource{
+	assert.Equal(t, &esSource.CreateUpdateSourceResponse{
 		ID:         "src-123",
 		ExternalID: "ext-123",
 		Name:       "Test Source",
@@ -56,7 +60,7 @@ func TestCreateSource(t *testing.T) {
 func TestUpdateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Updated Source"}`
+			expected := `{"name":"Updated Source","enabled":true}`
 			return testutils.ValidateRequest(t, req, "PUT", "/v2/event-stream-sources/src-123", expected)
 		},
 		ResponseStatus: 200,
@@ -75,13 +79,14 @@ func TestUpdateSource(t *testing.T) {
 	eventStreamClient := esSource.NewRudderSourceStore(c)
 
 	source := &esSource.UpdateSourceRequest{
-		Name: "Updated Source",
+		Name:    "Updated Source",
+		Enabled: true,
 	}
 
 	updated, err := eventStreamClient.Update(context.Background(), "src-123", source)
 	require.NoError(t, err)
 
-	assert.Equal(t, &esSource.EventStreamSource{
+	assert.Equal(t, &esSource.CreateUpdateSourceResponse{
 		ID:         "src-123",
 		ExternalID: "ext-123",
 		Name:       "Updated Source",
@@ -111,29 +116,216 @@ func TestDeleteSource(t *testing.T) {
 }
 
 func TestGetSources(t *testing.T) {
-	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
-		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "/v2/sources", "")
-		},
-		ResponseStatus: 200,
-		ResponseBody: `{
-			"sources": [
+	tests := []struct {
+		name            string
+		calls           []testutils.Call
+		expectedSources []esSource.EventStreamSource
+	}{
+		{
+			name: "single page",
+			calls: []testutils.Call{
 				{
-					"id": "src-123",
-					"externalId": "ext-123",
-					"name": "Source 1",
-					"type": "webhook",
-					"enabled": true
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "/v2/event-stream-sources", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [
+							{
+								"id": "src-123",
+								"externalId": "ext-123",
+								"name": "Source 1",
+								"type": "webhook",
+								"enabled": true
+							},
+							{
+								"id": "src-456",
+								"externalId": "ext-456",
+								"name": "Source 2",
+								"type": "api",
+								"enabled": false
+							}
+						],
+						"paging": {
+							"total": 2,
+							"next": ""
+						}
+					}`,
+				},
+			},
+			expectedSources: []esSource.EventStreamSource{
+				{
+					ID:         "src-123",
+					ExternalID: "ext-123",
+					Name:       "Source 1",
+					Type:       "webhook",
+					Enabled:    true,
 				},
 				{
-					"id": "src-456",
-					"externalId": "ext-456",
-					"name": "Source 2",
-					"type": "api",
-					"enabled": false
-				}
-			]
-		}`,
+					ID:         "src-456",
+					ExternalID: "ext-456",
+					Name:       "Source 2",
+					Type:       "api",
+					Enabled:    false,
+				},
+			},
+		},
+		{
+			name: "multiple pages",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "/v2/event-stream-sources", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [
+							{
+								"id": "src-123",
+								"externalId": "ext-123",
+								"name": "Source 1",
+								"type": "webhook",
+								"enabled": true,
+								"trackingPlan": {
+									"id": "tp-123",
+									"config": {
+										"track": {
+											"propagateViolations": true,
+											"dropUnplannedEvents": true
+										}
+									}
+								}
+							}
+						],
+						"paging": {
+							"total": 3,
+							"next": "/v2/event-stream-sources?page=2"
+						}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "/v2/event-stream-sources?page=2", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [
+							{
+								"id": "src-456",
+								"externalId": "ext-456",
+								"name": "Source 2",
+								"type": "api",
+								"enabled": false
+							}
+						],
+						"paging": {
+							"total": 3,
+							"next": "/v2/event-stream-sources?page=3"
+						}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "/v2/event-stream-sources?page=3", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [
+							{
+								"id": "src-789",
+								"externalId": "ext-789",
+								"name": "Source 3",
+								"type": "mobile",
+								"enabled": true
+							}
+						],
+						"paging": {
+							"total": 3,
+							"next": ""
+						}
+					}`,
+				},
+			},
+			expectedSources: []esSource.EventStreamSource{
+				{
+					ID:         "src-123",
+					ExternalID: "ext-123",
+					Name:       "Source 1",
+					Type:       "webhook",
+					Enabled:    true,
+					TrackingPlan: &esSource.TrackingPlan{
+						ID: "tp-123",
+						Config: &esSource.TrackingPlanConfig{
+							Track: &esSource.TrackConfig{
+								EventTypeConfig: &esSource.EventTypeConfig{
+									PropagateViolations: boolPtr(true),
+								},
+								DropUnplannedEvents: boolPtr(true),
+							},
+						},
+					},
+				},
+				{
+					ID:         "src-456",
+					ExternalID: "ext-456",
+					Name:       "Source 2",
+					Type:       "api",
+					Enabled:    false,
+				},
+				{
+					ID:         "src-789",
+					ExternalID: "ext-789",
+					Name:       "Source 3",
+					Type:       "mobile",
+					Enabled:    true,
+				},
+			},
+		},
+		{
+			name: "empty response",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "/v2/event-stream-sources", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [],
+						"paging": {
+							"total": 0
+						}
+					}`,
+				},
+			},
+			expectedSources: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpClient := testutils.NewMockHTTPClient(t, tt.calls...)
+
+			c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+			require.NoError(t, err)
+
+			eventStreamClient := esSource.NewRudderSourceStore(c)
+
+			sources, err := eventStreamClient.GetSources(context.Background())
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedSources, sources)
+			httpClient.AssertNumberOfCalls()
+		})
+	}
+}
+
+func TestSetExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"externalId":"ext-123"}`
+			return testutils.ValidateRequest(t, req, "PUT", "/v2/event-stream-sources/src-123/external-id", expected)
+		},
+		ResponseStatus: 200,
 	})
 
 	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
@@ -141,23 +333,8 @@ func TestGetSources(t *testing.T) {
 
 	eventStreamClient := esSource.NewRudderSourceStore(c)
 
-	sources, err := eventStreamClient.GetSources(context.Background())
+	err = eventStreamClient.SetExternalID(context.Background(), "src-123", "ext-123")
 	require.NoError(t, err)
 
-	assert.Equal(t, []esSource.EventStreamSource{
-		{
-			ID:         "src-123",
-			ExternalID: "ext-123",
-			Name:       "Source 1",
-			Type:       "webhook",
-			Enabled:    true,
-		},
-		{
-			ID:         "src-456",
-			ExternalID: "ext-456",
-			Name:       "Source 2",
-			Type:       "api",
-			Enabled:    false,
-		},
-	}, sources)
+	httpClient.AssertNumberOfCalls()
 }
