@@ -17,14 +17,14 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           check-latest: true
           cache: true
-          go-version: "~1.22"
+          go-version: "~1.23"
 
       - name: checking go version
         run: go version
