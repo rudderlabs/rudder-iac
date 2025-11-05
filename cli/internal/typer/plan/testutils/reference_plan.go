@@ -53,6 +53,19 @@ func init() {
 		Description: "Event with dollar signs to test string interpolation escaping",
 	}
 
+	// Events with names that collide after sanitization - test method name collision handling
+	ReferenceEvents["eventWithNameCamelCase"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "eventWithNameCamelCase",
+		Description: "Event with camel case name",
+	}
+
+	ReferenceEvents["$eventWithNameCamelCase$!"] = &plan.Event{
+		EventType:   plan.EventTypeTrack,
+		Name:        "$eventWithNameCamelCase$!",
+		Description: "Event with special characters that collide after sanitization",
+	}
+
 	ReferenceEvents["Empty Event With Additional Props"] = &plan.Event{
 		EventType:   plan.EventTypeTrack,
 		Name:        "Empty Event With Additional Props",
@@ -894,6 +907,27 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 		Section: plan.IdentitySectionProperties,
 		Schema: plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{},
+		},
+	})
+
+	// Track events with names that collide after sanitization
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["eventWithNameCamelCase"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"active": {Property: *ReferenceProperties["active"]},
+			},
+		},
+	})
+
+	rules = append(rules, plan.EventRule{
+		Event:   *ReferenceEvents["$eventWithNameCamelCase$!"],
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"email": {Property: *ReferenceProperties["email"]},
+			},
 		},
 	})
 

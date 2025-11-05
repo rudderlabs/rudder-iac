@@ -57,7 +57,12 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 
 // buildTrackMethod configures a RudderAnalyticsMethod for a 'track' event
 func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameRegistry *core.NameRegistry) error {
-	method.Name = FormatMethodName("track", rule.Event.Name)
+	methodName, err := getOrRegisterEventMethodName(rule, nameRegistry)
+	if err != nil {
+		return err
+	}
+	method.Name = methodName
+
 	className, err := getOrRegisterEventDataClassName(rule, nameRegistry)
 	if err != nil {
 		return err
@@ -90,7 +95,12 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 
 // buildIdentifyMethod configures a RudderAnalyticsMethod for an 'identify' event
 func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameRegistry *core.NameRegistry) error {
-	method.Name = "identify"
+	methodName, err := getOrRegisterEventMethodName(rule, nameRegistry)
+	if err != nil {
+		return err
+	}
+	method.Name = methodName
+
 	className, err := getOrRegisterEventDataClassName(rule, nameRegistry)
 	if err != nil {
 		return err
@@ -129,7 +139,12 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 
 // buildGroupMethod configures a RudderAnalyticsMethod for a 'group' event
 func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameRegistry *core.NameRegistry) error {
-	method.Name = "group"
+	methodName, err := getOrRegisterEventMethodName(rule, nameRegistry)
+	if err != nil {
+		return err
+	}
+	method.Name = methodName
+
 	className, err := getOrRegisterEventDataClassName(rule, nameRegistry)
 	if err != nil {
 		return err
@@ -167,7 +182,12 @@ func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 
 // buildScreenMethod configures a RudderAnalyticsMethod for a 'screen' event
 func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameRegistry *core.NameRegistry) error {
-	method.Name = "screen"
+	methodName, err := getOrRegisterEventMethodName(rule, nameRegistry)
+	if err != nil {
+		return err
+	}
+	method.Name = methodName
+
 	className, err := getOrRegisterEventDataClassName(rule, nameRegistry)
 	if err != nil {
 		return err

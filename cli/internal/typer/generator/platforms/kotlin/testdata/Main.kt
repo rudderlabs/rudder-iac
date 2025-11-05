@@ -883,6 +883,19 @@ fun TrackVariableStringProperties.rudderSerialize(): JsonObject = buildJsonObjec
 @JvmName("rudderSerializeListTrackVariableStringProperties")
 fun List<TrackVariableStringProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
+/** Event with special characters that collide after sanitization */
+data class TrackEventWithNameCamelCaseProperties(
+    /** User's email address */
+    val email: com.rudderstack.ruddertyper.PropertyEmail? = null
+)
+fun TrackEventWithNameCamelCaseProperties.rudderSerialize(): JsonObject = buildJsonObject {
+    if (email != null) {
+        put("email", email.rudderSerialize())
+    }
+}
+@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties")
+fun List<TrackEventWithNameCamelCaseProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 data class TrackProductPremiumClickedProperties(
     /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
@@ -1153,6 +1166,19 @@ fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject 
 @JvmName("rudderSerializeListTrackUserSignedUpProperties")
 fun List<TrackUserSignedUpProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
+/** Event with camel case name */
+data class TrackEventWithNameCamelCaseProperties1(
+    /** User active status */
+    val active: com.rudderstack.ruddertyper.PropertyActive? = null
+)
+fun TrackEventWithNameCamelCaseProperties1.rudderSerialize(): JsonObject = buildJsonObject {
+    if (active != null) {
+        put("active", active.rudderSerialize())
+    }
+}
+@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties1")
+fun List<TrackEventWithNameCamelCaseProperties1>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 /** Merges the ruddertyper context with user-provided custom context */
 private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
     return if (userOptions == null) {
@@ -1276,10 +1302,28 @@ class RudderAnalytics(private val analytics: Analytics) {
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
      */
     fun trackVariableString(properties: TrackVariableStringProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "\$Variable\$String",
             properties = properties.rudderSerialize(),
-            options = mergeRudderContext(options, context)
+            options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with special characters that collide after sanitization
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackEventWithNameCamelCase(properties: TrackEventWithNameCamelCaseProperties, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        analytics.track(
+            name = "\$eventWithNameCamelCase\$!",
+            properties = properties.rudderSerialize(),
+            options = mergedOptions
         )
     }
 
@@ -1360,6 +1404,23 @@ class RudderAnalytics(private val analytics: Analytics) {
         var mergedOptions = mergeRudderContext(options, context)
         analytics.track(
             name = "User Signed Up",
+            properties = properties.rudderSerialize(),
+            options = mergedOptions
+        )
+    }
+
+    /**
+     * Event with camel case name
+     *
+     * @param properties
+     * @param options Optional RudderStack options for this event
+     *
+     * @see com.rudderstack.sdk.kotlin.core.Analytics.track
+     */
+    fun trackEventWithNameCamelCase1(properties: TrackEventWithNameCamelCaseProperties1, options: RudderOption? = null) {
+        var mergedOptions = mergeRudderContext(options, context)
+        analytics.track(
+            name = "eventWithNameCamelCase",
             properties = properties.rudderSerialize(),
             options = mergedOptions
         )
