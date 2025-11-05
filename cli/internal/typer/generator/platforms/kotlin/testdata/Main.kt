@@ -1240,8 +1240,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Group association event
      *
+     * Event:
+     *   Identity Section: "context.traits"
+     *
      * @param groupId
-     * @param traits
+     * @param traits The traits to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.group
@@ -1258,8 +1261,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * User identification event
      *
+     * Event:
+     *   Identity Section: "traits"
+     *
      * @param userId
-     * @param traits
+     * @param traits The traits to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.identify
@@ -1276,9 +1282,12 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Screen view event
      *
+     * Event:
+     *   Identity Section: "properties"
+     *
      * @param screenName
      * @param category
-     * @param properties
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.screen
@@ -1296,7 +1305,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Event with dollar signs to test string interpolation escaping
      *
-     * @param properties
+     * Event:
+     *   Name: "$Variable$String"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1313,7 +1326,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Event with special characters that collide after sanitization
      *
-     * @param properties
+     * Event:
+     *   Name: "$eventWithNameCamelCase$!"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1329,6 +1346,10 @@ class RudderAnalytics(private val analytics: Analytics) {
 
     /**
      * Empty event schema with additionalProperties false
+     *
+     * Event:
+     *   Name: "Empty Event No Additional Props"
+     *   Identity Section: "properties"
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1344,7 +1365,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Empty event schema with additionalProperties true
      *
-     * @param properties
+     * Event:
+     *   Name: "Empty Event With Additional Props"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1361,7 +1386,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Example event to demonstrate variants
      *
-     * @param properties
+     * Event:
+     *   Name: "Event With Variants"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1378,7 +1407,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Triggered when user clicks on a "premium" product /\* important *\/
      *
-     * @param properties
+     * Event:
+     *   Name: "Product "Premium" Clicked"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1395,7 +1428,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Triggered when a user signs up
      *
-     * @param properties
+     * Event:
+     *   Name: "User Signed Up"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track
@@ -1412,7 +1449,11 @@ class RudderAnalytics(private val analytics: Analytics) {
     /**
      * Event with camel case name
      *
-     * @param properties
+     * Event:
+     *   Name: "eventWithNameCamelCase"
+     *   Identity Section: "properties"
+     *
+     * @param properties The properties to include with this event
      * @param options Optional RudderStack options for this event
      *
      * @see com.rudderstack.sdk.kotlin.core.Analytics.track

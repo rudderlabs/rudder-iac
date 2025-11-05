@@ -57,10 +57,18 @@ class RudderAnalytics(private val analytics: Analytics) {
 {{ range .RudderAnalyticsMethods }}
     /**
      * {{ escapeComment .Comment }}
+     *
+     * Event:
+{{- if .EventName }}
+     *   Name: "{{ .EventName }}"
+{{- end }}
+{{- if .IdentitySection }}
+     *   Identity Section: "{{ .IdentitySection }}"
+{{- end }}
 {{- if .MethodArguments }}
      *
 {{- range .MethodArguments }}
-     * @param {{ .Name }}
+     * @param {{ .Name }}{{- if .Comment }} {{ escapeComment .Comment }}{{- end }}
 {{- end }}
 {{- end }}
      * @param options Optional RudderStack options for this event

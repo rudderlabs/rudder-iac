@@ -62,6 +62,7 @@ type KotlinSealedClass struct {
 type KotlinMethodArgument struct {
 	Name             string // e.g., "groupId", "properties"
 	Type             string // e.g., "String", "TrackProductClickedProperties"
+	Comment          string // Documentation comment for the parameter
 	Nullable         bool   // e.g., true for "userId: String?"
 	Default          any    // The default value: nil (no default), string (for literals), or variable name
 	IsLiteralDefault bool   // If true, Default should be formatted as a Kotlin literal
@@ -84,6 +85,8 @@ type SDKCall struct {
 // RudderAnalyticsMethod represents a method in the generated RudderAnalytics object
 type RudderAnalyticsMethod struct {
 	Name            string                 // The public method name, e.g., "productClicked"
+	EventName       string                 // The underlying event name, e.g., "Product Clicked"
+	IdentitySection string                 // The identity section, e.g., "properties" or "traits"
 	MethodArguments []KotlinMethodArgument // Arguments for the public method's signature
 	SDKCall         SDKCall                // The structured, internal SDK call
 	Comment         string                 // KDoc comment
