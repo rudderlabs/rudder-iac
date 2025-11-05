@@ -1,5 +1,5 @@
 # Use a lightweight base image with JDK
-FROM eclipse-temurin:17-jdk
+FROM eclipse-temurin:17-jdk@sha256:06ee07a59dc7011f643baaa45889ecd15a0b9176490943b0e4379630e832ac2d
 
 # Install Gradle
 ENV GRADLE_VERSION=8.4
