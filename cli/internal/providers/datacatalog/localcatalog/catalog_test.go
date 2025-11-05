@@ -840,3 +840,299 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Contains(t, err.Error(), "only one tracking plan per entity group is allowed")
 	})
 }
+
+func TestDataCatalog_ParseSpec(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name           string
+		spec           *specs.Spec
+		expectedIDs    []string
+		expectedError  bool
+		errorContains  string
+	}{
+		{
+			name: "success - parse properties spec with multiple IDs",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{
+						map[string]any{"id": "prop1", "name": "Property 1"},
+						map[string]any{"id": "prop2", "name": "Property 2"},
+						map[string]any{"id": "prop3", "name": "Property 3"},
+					},
+				},
+			},
+			expectedIDs:   []string{"prop1", "prop2", "prop3"},
+			expectedError: false,
+		},
+		{
+			name: "success - parse events spec with multiple IDs",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": []any{
+						map[string]any{"id": "event1", "name": "Event 1"},
+						map[string]any{"id": "event2", "name": "Event 2"},
+					},
+				},
+			},
+			expectedIDs:   []string{"event1", "event2"},
+			expectedError: false,
+		},
+		{
+			name: "success - parse tracking plan spec",
+			spec: &specs.Spec{
+				Kind: KindTrackingPlans,
+				Spec: map[string]any{
+					"id":           "my_tracking_plan",
+					"display_name": "My Tracking Plan",
+				},
+			},
+			expectedIDs:   []string{"my_tracking_plan"},
+			expectedError: false,
+		},
+		{
+			name: "success - parse custom types spec with multiple IDs",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"types": []any{
+						map[string]any{"id": "type1", "name": "Type 1"},
+						map[string]any{"id": "type2", "name": "Type 2"},
+					},
+				},
+			},
+			expectedIDs:   []string{"type1", "type2"},
+			expectedError: false,
+		},
+		{
+			name: "success - parse categories spec with multiple IDs",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"categories": []any{
+						map[string]any{"id": "cat1", "name": "Category 1"},
+						map[string]any{"id": "cat2", "name": "Category 2"},
+						map[string]any{"id": "cat3", "name": "Category 3"},
+					},
+				},
+			},
+			expectedIDs:   []string{"cat1", "cat2", "cat3"},
+			expectedError: false,
+		},
+		{
+			name: "error - properties not found in spec",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"other": "value",
+				},
+			},
+			expectedError: true,
+			errorContains: "properties not found in spec",
+		},
+		{
+			name: "error - properties is not an array",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": "not_an_array",
+				},
+			},
+			expectedError: true,
+			errorContains: "properties not found in spec",
+		},
+		{
+			name: "error - events not found in spec",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"other": "value",
+				},
+			},
+			expectedError: true,
+			errorContains: "events not found in spec",
+		},
+		{
+			name: "error - events is not an array",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": "not_an_array",
+				},
+			},
+			expectedError: true,
+			errorContains: "events not found in spec",
+		},
+		{
+			name: "error - tracking plan id not found",
+			spec: &specs.Spec{
+				Kind: KindTrackingPlans,
+				Spec: map[string]any{
+					"display_name": "My TP",
+				},
+			},
+			expectedError: true,
+			errorContains: "id not found in tracking plan spec",
+		},
+		{
+			name: "error - tracking plan id is not a string",
+			spec: &specs.Spec{
+				Kind: KindTrackingPlans,
+				Spec: map[string]any{
+					"id": 12345,
+				},
+			},
+			expectedError: true,
+			errorContains: "id not found in tracking plan spec",
+		},
+		{
+			name: "error - custom types not found in spec",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"other": "value",
+				},
+			},
+			expectedError: true,
+			errorContains: "custom types not found in spec",
+		},
+		{
+			name: "error - custom types is not an array",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"types": "not_an_array",
+				},
+			},
+			expectedError: true,
+			errorContains: "custom types not found in spec",
+		},
+		{
+			name: "error - categories not found in spec",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"other": "value",
+				},
+			},
+			expectedError: true,
+			errorContains: "categories not found in spec",
+		},
+		{
+			name: "error - categories is not an array",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"categories": "not_an_array",
+				},
+			},
+			expectedError: true,
+			errorContains: "categories not found in spec",
+		},
+		{
+			name: "error - entity is not a map",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{
+						"not_a_map",
+					},
+				},
+			},
+			expectedError: true,
+			errorContains: "entity is not a map[string]any",
+		},
+		{
+			name: "error - id field not found in entity",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{
+						map[string]any{"name": "Property without ID"},
+					},
+				},
+			},
+			expectedError: true,
+			errorContains: "id not found in entity",
+		},
+		{
+			name: "error - id field is not a string",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": []any{
+						map[string]any{"id": 12345},
+					},
+				},
+			},
+			expectedError: true,
+			errorContains: "id not found in entity",
+		},
+		{
+			name: "success - empty properties array",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{},
+				},
+			},
+			expectedIDs:   nil,
+			expectedError: false,
+		},
+		{
+			name: "success - empty events array",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": []any{},
+				},
+			},
+			expectedIDs:   nil,
+			expectedError: false,
+		},
+		{
+			name: "success - empty custom types array",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"types": []any{},
+				},
+			},
+			expectedIDs:   nil,
+			expectedError: false,
+		},
+		{
+			name: "success - empty categories array",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"categories": []any{},
+				},
+			},
+			expectedIDs:   nil,
+			expectedError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dc := New()
+			parsedSpec, err := dc.ParseSpec("test/path.yaml", tc.spec)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorContains)
+				assert.Nil(t, parsedSpec)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, parsedSpec)
+				assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+			}
+		})
+	}
+}

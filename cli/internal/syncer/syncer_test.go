@@ -3,22 +3,35 @@ package syncer_test
 import (
 	"context"
 	"fmt"
-	"os"
+
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
+func mockWorkspace() *client.Workspace {
+	return &client.Workspace{
+		ID:          "test-workspace-id",
+		Name:        "Test Workspace",
+		Environment: "DEVELOPMENT",
+		Status:      "ACTIVE",
+		Region:      "US",
+	}
+}
+
 func enableConcurrentSyncs(t *testing.T) {
-	os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "true")
-	config.InitConfig("")
+	viper.Set("experimental", true)
+	viper.Set("flags.concurrentSyncs", true)
+
 	t.Cleanup(func() {
-		os.Setenv("RUDDERSTACK_X_CONCURRENT_SYNCS", "false")
+		viper.Set("experimental", false)
+		viper.Set("flags.concurrentSyncs", false)
 	})
 }
 
@@ -52,9 +65,10 @@ func TestSyncerCreate(t *testing.T) {
 
 	provider := &testutils.DataCatalogProvider{
 		InitialState: state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
 	}
 
-	s, _ := syncer.New(provider)
+	s, _ := syncer.New(provider, mockWorkspace())
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
@@ -156,12 +170,13 @@ func TestSyncerDelete(t *testing.T) {
 
 	provider := &testutils.DataCatalogProvider{
 		InitialState: initialState,
+		ReconstructedState: initialState,
 	}
 
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, _ := syncer.New(provider)
+	s, _ := syncer.New(provider, mockWorkspace())
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
@@ -223,9 +238,10 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 	// Create provider with empty initial state
 	provider := &testutils.DataCatalogProvider{
 		InitialState: state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
 	}
 
-	s, err := syncer.New(provider)
+	s, err := syncer.New(provider, mockWorkspace())
 	assert.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
@@ -321,16 +337,18 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	trackingPlans := createTrackingPlans(events, properties)
 
 	initialState := createInitialStateWithResources(events, properties, trackingPlans)
+	reconstructedState := createInitialStateWithResources(events, properties, trackingPlans)
 
 	// Create provider with initial state
 	provider := &testutils.DataCatalogProvider{
 		InitialState: initialState,
+		ReconstructedState: reconstructedState,
 	}
 
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, err := syncer.New(provider)
+	s, err := syncer.New(provider, mockWorkspace())
 	assert.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
@@ -426,6 +444,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 		provider := &testutils.DataCatalogProvider{
 			InitialState: state.EmptyState(),
+			ReconstructedState: state.EmptyState(),
 		}
 
 		// Create a custom provider that fails for event2
@@ -434,7 +453,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2"},
 		}
 
-		s, err := syncer.New(failingProvider)
+		s, err := syncer.New(failingProvider, mockWorkspace())
 		assert.NoError(t, err)
 
 		targetGraph := createGraphWithResources(events, properties, trackingPlans)
@@ -448,7 +467,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 		// Expected operation count: 12 total operations in success case.
 		// When event2 fails, its 2 operations + 2 tracking plan operations are skipped.
 		// Therefore, we expect at most 8 operations to be executed.
-	
+
 		// FIXME: This assertion is not very helpful because if there is bug in the
 		// continueOnFail logic, the assertion will still not fail.
 		assert.LessOrEqual(t, len(failingProvider.OperationLog), 8, "Should have fewer operations due to early failure")
@@ -462,6 +481,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 		provider := &testutils.DataCatalogProvider{
 			InitialState: createInitialStateWithResources(events, properties, trackingPlans),
+			ReconstructedState: createInitialStateWithResources(events, properties, trackingPlans),
 		}
 
 		// Create a custom provider that fails for event2 and property2
@@ -470,7 +490,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2", "property2"},
 		}
 
-		s, err := syncer.New(failingProvider)
+		s, err := syncer.New(failingProvider, mockWorkspace())
 		assert.NoError(t, err)
 
 		errors := s.Destroy(context.Background(), syncer.SyncOptions{Concurrency: 2})

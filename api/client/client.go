@@ -23,6 +23,7 @@ type Client struct {
 	Destinations *destinations
 	Connections  *connections
 	Accounts     *accounts
+	Workspaces   *workspaces
 }
 
 const BASE_URL = "https://api.rudderstack.com"
@@ -45,6 +46,7 @@ func New(accessToken string, options ...Option) (*Client, error) {
 	client.Destinations = &destinations{service: client.service("/v2/destinations")}
 	client.Connections = &connections{service: client.service("/v2/connections")}
 	client.Accounts = &accounts{service: client.service("/v2/accounts")}
+	client.Workspaces = &workspaces{client: client}
 
 	for _, o := range options {
 		if err := o(client); err != nil {

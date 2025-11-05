@@ -3,25 +3,43 @@ package localcatalog
 import (
 	"fmt"
 
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/samber/lo"
 )
 
 var (
 	log = logger.New("localcatalog")
 )
 
+const (
+	KindProperties    = "properties"
+	KindEvents        = "events"
+	KindCategories    = "categories"
+	KindTrackingPlans = "tp"
+	KindCustomTypes   = "custom-types"
+)
+
 // entity group is logical grouping of entities defined
 // as metadata->name in respective yaml file
 type EntityGroup string
 
+type WorkspaceRemoteIDMapping struct {
+	WorkspaceID string
+	RemoteID    string
+}
+
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties    map[EntityGroup][]Property    `json:"properties"`
-	Events        map[EntityGroup][]Event       `json:"events"`
-	TrackingPlans map[EntityGroup]*TrackingPlan `json:"trackingPlans"` // Only one tracking plan per entity group
-	CustomTypes   map[EntityGroup][]CustomType  `json:"customTypes"`   // Custom types grouped by entity group
-	Categories    map[EntityGroup][]Category    `json:"categories"`    // Categories grouped by entity group
+	Properties     map[EntityGroup][]Property           `json:"properties"`
+	Events         map[EntityGroup][]Event              `json:"events"`
+	TrackingPlans  map[EntityGroup]*TrackingPlan        `json:"trackingPlans"` // Only one tracking plan per entity group
+	CustomTypes    map[EntityGroup][]CustomType         `json:"customTypes"`   // Custom types grouped by entity group
+	Categories     map[EntityGroup][]Category           `json:"categories"`    // Categories grouped by entity group
+	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 }
 
 func (dc *DataCatalog) Property(groupName string, id string) *Property {
@@ -104,18 +122,107 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 
 func New() *DataCatalog {
 	return &DataCatalog{
-		Properties:    map[EntityGroup][]Property{},
-		Events:        map[EntityGroup][]Event{},
-		TrackingPlans: map[EntityGroup]*TrackingPlan{},
-		CustomTypes:   map[EntityGroup][]CustomType{},
-		Categories:    map[EntityGroup][]Category{},
+		Properties:     map[EntityGroup][]Property{},
+		Events:         map[EntityGroup][]Event{},
+		TrackingPlans:  map[EntityGroup]*TrackingPlan{},
+		CustomTypes:    map[EntityGroup][]CustomType{},
+		Categories:     map[EntityGroup][]Category{},
+		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
 	}
+}
+
+func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+
+	var (
+		parsedSpec specs.ParsedSpec
+	)
+
+	var idArray []any
+
+	switch s.Kind {
+	case KindProperties:
+		properties, ok := s.Spec["properties"].([]any)
+		if !ok {
+			return nil, fmt.Errorf("Kind: %s, properties not found in spec", s.Kind)
+		}
+		idArray = properties
+
+	case KindEvents:
+		events, ok := s.Spec["events"].([]any)
+		if !ok {
+			return nil, fmt.Errorf("Kind: %s, events not found in spec", s.Kind)
+		}
+		idArray = events
+
+	case KindTrackingPlans:
+		trackingPlans, ok := s.Spec["id"].(string)
+		if !ok {
+			return nil, fmt.Errorf("Kind: %s, id not found in tracking plan spec", s.Kind)
+		}
+		idArray = []any{map[string]any{
+			"id": trackingPlans,
+		}}
+
+	case KindCustomTypes:
+		customTypes, ok := s.Spec["types"].([]any)
+		if !ok {
+			return nil, fmt.Errorf("Kind: %s, custom types not found in spec", s.Kind)
+		}
+		idArray = customTypes
+
+	case KindCategories:
+		categories, ok := s.Spec["categories"].([]any)
+		if !ok {
+			return nil, fmt.Errorf("Kind: %s, categories not found in spec", s.Kind)
+		}
+		idArray = categories
+	}
+
+	for _, id := range idArray {
+		idMap, ok := id.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("entity is not a map[string]any: %s", s.Kind)
+		}
+		id, ok := idMap["id"].(string)
+		if !ok {
+			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
+		}
+		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
+	}
+
+	return &parsedSpec, nil
 }
 
 func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 	if err := extractEntities(s, dc); err != nil {
 		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
 	}
+
+	if err := addImportMetadata(s, dc); err != nil {
+		return fmt.Errorf("adding import metadata: %w", err)
+	}
+
+	return nil
+}
+
+func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
+	metadata := importremote.Metadata{}
+
+	err := mapstructure.Decode(s.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("decoding import metadata: %w", err)
+	}
+
+	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
+		// For each resource within the workspace, load the import metadata
+		// which will be used during the creation of resourceGraph
+		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+			dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				WorkspaceID: workspace.WorkspaceID,
+				RemoteID:    resource.RemoteID,
+			}
+		})
+	})
 
 	return nil
 }
@@ -129,28 +236,28 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		name = ""
 	}
 	switch s.Kind {
-	case "properties":
+	case KindProperties:
 		properties, err := ExtractProperties(s)
 		if err != nil {
 			return fmt.Errorf("extracting properties: %w", err)
 		}
 		dc.Properties[EntityGroup(name)] = append(dc.Properties[EntityGroup(name)], properties...)
 
-	case "events":
+	case KindEvents:
 		events, err := ExtractEvents(s)
 		if err != nil {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
 		dc.Events[EntityGroup(name)] = append(dc.Events[EntityGroup(name)], events...)
 
-	case "categories":
+	case KindCategories:
 		categories, err := ExtractCategories(s)
 		if err != nil {
 			return fmt.Errorf("extracting categories: %w", err)
 		}
 		dc.Categories[EntityGroup(name)] = append(dc.Categories[EntityGroup(name)], categories...)
 
-	case "tp":
+	case KindTrackingPlans:
 		tp, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return fmt.Errorf("extracting tracking plan: %w", err)
@@ -161,7 +268,7 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		}
 		dc.TrackingPlans[EntityGroup(name)] = &tp
 
-	case "custom-types":
+	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)
 		if err != nil {
 			return fmt.Errorf("extracting custom types: %w", err)

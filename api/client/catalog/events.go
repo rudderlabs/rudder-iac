@@ -41,6 +41,7 @@ type EventStore interface {
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
 	GetEvents(ctx context.Context) ([]*Event, error)
+	SetEventExternalId(ctx context.Context, id string, externalId string) error
 }
 
 func (c *RudderDataCatalog) DeleteEvent(ctx context.Context, id string) error {
@@ -106,4 +107,22 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 
 func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
 	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
+}
+
+func (c *RudderDataCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {
+	payload := map[string]string{
+		"externalId": externalId,
+	}
+
+	byt, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshalling payload: %w", err)
+	}
+
+	_, err = c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/events/%s/external-id", id), bytes.NewReader(byt))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+
+	return nil
 }

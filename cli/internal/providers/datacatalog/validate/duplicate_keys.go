@@ -27,7 +27,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 				// If name and type on the property are same, then it's a duplicate
 				if lookup.Type == prop.Type {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("duplicate name key %s", prop.Name),
+						error:     fmt.Errorf("duplicate name key: %s and type: %s", prop.Name, prop.Type),
 						Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
 					})
 				}
@@ -78,9 +78,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	}
 
 	var (
-		tpName   = make(map[string]any)
-		tpID     = make(map[string]any)
-		tpRuleID = make(map[string]any)
+		tpName = make(map[string]any)
+		tpID   = make(map[string]any)
 	)
 
 	// Checking duplicate id and name keys of trackingplans
@@ -99,19 +98,20 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 			})
 		}
 
+		eventRuleIDs := make(map[string]any)
+		for _, rule := range tp.Rules {
+			if _, ok := eventRuleIDs[rule.LocalID]; ok {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
+					Reference: fmt.Sprintf("#/tp/%s/%s/rules/%s", group, tp.LocalID, rule.LocalID),
+				})
+			}
+			eventRuleIDs[rule.LocalID] = nil
+		}
+
 		tpName[tp.Name] = nil
 		tpID[tp.LocalID] = nil
 
-		for _, rule := range tp.Rules {
-			if _, ok := tpRuleID[rule.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
-				})
-			}
-
-			tpRuleID[rule.LocalID] = nil
-		}
 	}
 
 	var (

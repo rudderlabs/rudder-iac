@@ -6,22 +6,41 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
+
+type CustomTypeEntityProvider struct {
+	*CustomTypeProvider
+	*impProvider.CustomTypeImportProvider
+}
 
 type CustomTypeProvider struct {
 	client catalog.DataCatalog
 	log    logger.Logger
 }
 
-func NewCustomTypeProvider(dc catalog.DataCatalog) *CustomTypeProvider {
-	return &CustomTypeProvider{
+func NewCustomTypeProvider(dc catalog.DataCatalog, importDir string) *CustomTypeEntityProvider {
+	ctp := &CustomTypeProvider{
 		client: dc,
 		log: logger.Logger{
 			Logger: logger.New("provider").With("type", "customtype"),
 		},
+	}
+
+	imp := impProvider.NewCustomTypeImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "customtype"),
+		},
+		importDir,
+	)
+
+	return &CustomTypeEntityProvider{
+		CustomTypeProvider:       ctp,
+		CustomTypeImportProvider: imp,
 	}
 }
 
@@ -162,6 +181,71 @@ func (p *CustomTypeProvider) Delete(ctx context.Context, ID string, data resourc
 	}
 
 	return nil
+}
+
+func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	p.log.Debug("importing custom type resource", "id", ID, "remoteId", remoteId)
+
+	// Get the custom type from upstream based on the remoteId
+	customType, err := p.client.GetCustomType(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting custom type from upstream: %w", err)
+	}
+
+	toArgs := state.CustomTypeArgs{}
+	toArgs.FromResourceData(data)
+
+	if toArgs.DiffUpstream(customType) {
+		p.log.Debug("custom type has differences, updating", "id", ID, "remoteId", remoteId)
+
+		// Prepare properties for update
+		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
+		for _, prop := range toArgs.Properties {
+			properties = append(properties, catalog.CustomTypeProperty{
+				ID:       prop.ID,
+				Required: prop.Required,
+			})
+		}
+
+		// Call the updateCustomType if there are any differences
+		customType, err = p.client.UpdateCustomType(ctx, remoteId, &catalog.CustomTypeUpdate{
+			Name:        toArgs.Name,
+			Description: toArgs.Description,
+			Type:        toArgs.Type,
+			Config:      toArgs.Config,
+			Properties:  properties,
+			Variants:    toArgs.Variants.ToCatalogVariants(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("updating custom type during import: %w", err)
+		}
+	}
+
+	// Set the external ID on the custom type
+	err = p.client.SetCustomTypeExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting custom type external id: %w", err)
+	}
+
+	// Build and return the custom type state
+	customTypeState := state.CustomTypeState{
+		CustomTypeArgs:  toArgs,
+		ID:              customType.ID,
+		LocalID:         toArgs.LocalID,
+		Name:            customType.Name,
+		Description:     customType.Description,
+		Type:            customType.Type,
+		Config:          customType.Config,
+		Version:         customType.Version,
+		ItemDefinitions: customType.ItemDefinitions,
+		Rules:           customType.Rules,
+		WorkspaceID:     customType.WorkspaceId,
+		CreatedAt:       customType.CreatedAt.String(),
+		UpdatedAt:       customType.UpdatedAt.String(),
+	}
+
+	resourceData := customTypeState.ToResourceData()
+	return &resourceData, nil
 }
 
 // LoadResourcesFromRemote loads all custom types from the remote catalog

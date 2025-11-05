@@ -5,15 +5,20 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
-	Validate() error
+	Validate(graph *resources.Graph) error
+	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
 	LoadState(ctx context.Context) (*state.State, error)
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
@@ -22,7 +27,18 @@ type handler interface {
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	FormatForExport(
+		ctx context.Context,
+		collection *resources.ResourceCollection,
+		idNamer namer.Namer,
+		inputResolver resolver.ReferenceResolver,
+	) ([]importremote.FormattableEntity, error)
 }
+
+var _ project.Provider = &Provider{}
+
+const importDir = "event-stream"
 
 type Provider struct {
 	kindToType map[string]string
@@ -36,7 +52,7 @@ func New(client esClient.EventStreamStore) *Provider {
 		},
 		handlers: make(map[string]handler),
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client)
+	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	return p
 }
 
@@ -56,6 +72,18 @@ func (p *Provider) GetSupportedTypes() []string {
 	return types
 }
 
+func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+	return handler.ParseSpec(path, s)
+}
+
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	resourceType, ok := p.kindToType[s.Kind]
 	if !ok {
@@ -68,9 +96,9 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
-func (p *Provider) Validate() error {
+func (p *Provider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
-		if err := handler.Validate(); err != nil {
+		if err := handler.Validate(graph); err != nil {
 			return fmt.Errorf("validating %s: %w", resourceType, err)
 		}
 	}
@@ -177,4 +205,45 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 	return handler.Import(ctx, ID, data, remoteId)
+}
+
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
+	for _, handler := range p.handlers {
+		resources, err := handler.LoadImportable(ctx, idNamer)
+		if err != nil {
+			return nil, fmt.Errorf("loading importable resources from handler %w", err)
+		}
+		collection, err = collection.Merge(resources)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collection for handler %w", err)
+		}
+	}
+	return collection, nil
+}
+
+func (p *Provider) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]importremote.FormattableEntity, error) {
+	result := make([]importremote.FormattableEntity, 0)
+	for _, handler := range p.handlers {
+		entities, err := handler.FormatForExport(
+			ctx,
+			collection,
+			idNamer,
+			inputResolver,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("formatting for export for handler %w", err)
+		}
+		result = append(result, entities...)
+	}
+	return result, nil
+}
+
+func (p *Provider) GetName() string {
+	return "event-stream"
 }

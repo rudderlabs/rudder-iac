@@ -11,11 +11,9 @@ func TestExtractAllCustomTypes(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
 	customTypes := trackingPlan.ExtractAllCustomTypes()
-	assert.Len(t, customTypes, testutils.ExpectedCustomTypeCount)
 
-	expectedNames := []string{"email", "age", "active", "user_profile"}
-	assert.Len(t, expectedNames, testutils.ExpectedCustomTypeCount) // consistency check
-	for _, name := range expectedNames {
+	assert.Len(t, customTypes, len(testutils.ReferenceCustomTypes))
+	for name := range testutils.ReferenceCustomTypes {
 		assert.Contains(t, customTypes, name, "Custom type %s should be present", name)
 	}
 
@@ -30,12 +28,9 @@ func TestExtractAllProperties(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
 	properties := trackingPlan.ExtractAllProperties()
-	expectedNames := []string{"email", "first_name", "last_name", "age", "active", "profile"}
 
-	assert.Len(t, properties, testutils.ExpectedPropertyCount)
-	assert.Len(t, expectedNames, testutils.ExpectedPropertyCount) // consistency check
-
-	for _, name := range expectedNames {
+	assert.Len(t, properties, len(testutils.ReferenceProperties))
+	for name := range testutils.ReferenceProperties {
 		assert.Contains(t, properties, name, "Property %s should be present", name)
 	}
 

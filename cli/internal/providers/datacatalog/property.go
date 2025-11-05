@@ -6,22 +6,42 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
+
+type PropertyEntityProvider struct {
+	*PropertyProvider
+	*impProvider.PropertyImportProvider
+}
 
 type PropertyProvider struct {
 	client catalog.DataCatalog
 	log    logger.Logger
 }
 
-func NewPropertyProvider(dc catalog.DataCatalog) *PropertyProvider {
-	return &PropertyProvider{
+func NewPropertyProvider(dc catalog.DataCatalog, importDir string) *PropertyEntityProvider {
+
+	pp := &PropertyProvider{
 		client: dc,
 		log: logger.Logger{
 			Logger: logger.New("provider").With("type", "property"),
 		},
+	}
+
+	imp := impProvider.NewPropertyImportProvider(
+		dc,
+		logger.Logger{
+			Logger: logger.New("importremote.provider").With("type", "property"),
+		},
+		importDir,
+	)
+
+	return &PropertyEntityProvider{
+		PropertyProvider:       pp,
+		PropertyImportProvider: imp,
 	}
 }
 
@@ -107,6 +127,54 @@ func (p *PropertyProvider) Delete(ctx context.Context, ID string, data resources
 	return nil
 }
 
+func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	p.log.Debug("importing property resource", "id", ID, "remoteId", remoteId)
+
+	property, err := p.client.GetProperty(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting property from upstream: %w", err)
+	}
+
+	toArgs := state.PropertyArgs{}
+	toArgs.FromResourceData(data)
+
+	if toArgs.DiffUpstream(property) {
+		p.log.Debug("property has differences, updating", "id", ID, "remoteId", remoteId)
+
+		property, err = p.client.UpdateProperty(ctx, remoteId, &catalog.PropertyUpdate{
+			Name:        toArgs.Name,
+			Description: toArgs.Description,
+			Type:        toArgs.Type.(string),
+			Config:      toArgs.Config,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("updating property during import: %w", err)
+		}
+	}
+
+	// Set the external ID on the property
+	err = p.client.SetPropertyExternalId(ctx, remoteId, ID)
+	if err != nil {
+		return nil, fmt.Errorf("setting property external id: %w", err)
+	}
+
+	// Build and return the property state
+	propertyState := state.PropertyState{
+		PropertyArgs: toArgs,
+		ID:           property.ID,
+		Name:         property.Name,
+		Description:  property.Description,
+		Type:         property.Type,
+		Config:       property.Config,
+		WorkspaceID:  property.WorkspaceId,
+		CreatedAt:    property.CreatedAt.String(),
+		UpdatedAt:    property.UpdatedAt.String(),
+	}
+
+	resourceData := propertyState.ToResourceData()
+	return &resourceData, nil
+}
+
 // LoadResourcesFromRemote loads all properties from the remote catalog
 func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading properties from remote catalog")
@@ -128,7 +196,6 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 		}
 	}
 	collection.Set(state.PropertyResourceType, resourceMap)
-
 	return collection, nil
 }
 
