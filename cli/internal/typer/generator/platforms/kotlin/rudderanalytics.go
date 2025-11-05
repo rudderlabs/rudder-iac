@@ -28,10 +28,16 @@ func shouldIncludePropertiesParameter(rule *plan.EventRule) bool {
 	return !isEmpty || rule.Schema.AdditionalProperties
 }
 
+// buildPropertiesDescription creates documentation for a properties/traits parameter
+func buildPropertiesDescription(paramName string) string {
+	return fmt.Sprintf("The %s to include with this event", paramName)
+}
+
 // createRudderAnalyticsMethod creates a single RudderAnalyticsMethod from a plan.Event
 func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRegistry) (*RudderAnalyticsMethod, error) {
 	method := &RudderAnalyticsMethod{
-		Comment: rule.Event.Description,
+		Comment:   rule.Event.Description,
+		EventName: rule.Event.Name,
 	}
 
 	var err error
@@ -68,6 +74,7 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 		return err
 	}
 
+	method.IdentitySection = string(rule.Section)
 	paramName, err := sectionToParamName(rule.Section)
 	if err != nil {
 		return err
@@ -84,7 +91,11 @@ func buildTrackMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 
 	if shouldIncludePropertiesParameter(rule) {
 		method.MethodArguments = append(method.MethodArguments,
-			KotlinMethodArgument{Name: paramName, Type: className, Nullable: false})
+			KotlinMethodArgument{
+				Name:    paramName,
+				Type:    className,
+				Comment: buildPropertiesDescription(paramName),
+			})
 
 		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
 			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
@@ -106,6 +117,7 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 		return err
 	}
 
+	method.IdentitySection = string(rule.Section)
 	paramName, err := sectionToParamName(rule.Section)
 	if err != nil {
 		return err
@@ -123,7 +135,11 @@ func buildIdentifyMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, na
 
 	if shouldIncludePropertiesParameter(rule) {
 		method.MethodArguments = append(method.MethodArguments,
-			KotlinMethodArgument{Name: paramName, Type: className})
+			KotlinMethodArgument{
+				Name:    paramName,
+				Type:    className,
+				Comment: buildPropertiesDescription(paramName),
+			})
 
 		// For context.traits, add the data to context instead of as an SDK parameter
 		if rule.Section == plan.IdentitySectionContextTraits {
@@ -150,6 +166,7 @@ func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 		return err
 	}
 
+	method.IdentitySection = string(rule.Section)
 	paramName, err := sectionToParamName(rule.Section)
 	if err != nil {
 		return err
@@ -167,7 +184,11 @@ func buildGroupMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, nameR
 
 	if shouldIncludePropertiesParameter(rule) {
 		method.MethodArguments = append(method.MethodArguments,
-			KotlinMethodArgument{Name: paramName, Type: className})
+			KotlinMethodArgument{
+				Name:    paramName,
+				Type:    className,
+				Comment: buildPropertiesDescription(paramName),
+			})
 
 		// For context.traits, add the data to context instead of as an SDK parameter
 		if rule.Section == plan.IdentitySectionContextTraits {
@@ -193,6 +214,7 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 		return err
 	}
 
+	method.IdentitySection = string(rule.Section)
 	paramName, err := sectionToParamName(rule.Section)
 	if err != nil {
 		return err
@@ -212,7 +234,11 @@ func buildScreenMethod(rule *plan.EventRule, method *RudderAnalyticsMethod, name
 
 	if shouldIncludePropertiesParameter(rule) {
 		method.MethodArguments = append(method.MethodArguments,
-			KotlinMethodArgument{Name: paramName, Type: className})
+			KotlinMethodArgument{
+				Name:    paramName,
+				Type:    className,
+				Comment: buildPropertiesDescription(paramName),
+			})
 
 		method.SDKCall.Arguments = append(method.SDKCall.Arguments,
 			SDKCallArgument{Name: paramName, Value: paramName, ShouldSerialize: true})
