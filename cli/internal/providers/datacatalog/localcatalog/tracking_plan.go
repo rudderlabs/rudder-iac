@@ -58,14 +58,15 @@ func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
 }
 
 type TPEventProperty struct {
-	Name        string                 `json:"name"`
-	Ref         string                 `json:"$ref"`
-	LocalID     string                 `json:"id"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Required    bool                   `json:"required"`
-	Properties  []*TPEventProperty     `json:"properties,omitempty"` // NEW: Nested properties
+	Name                 string                 `json:"name"`
+	Ref                  string                 `json:"$ref"`
+	LocalID              string                 `json:"id"`
+	Description          string                 `json:"description"`
+	Type                 string                 `json:"type"`
+	Config               map[string]interface{} `json:"config"`
+	Required             bool                   `json:"required"`
+	Properties           []*TPEventProperty     `json:"properties,omitempty"` // NEW: Nested properties
+	AdditionalProperties *bool                   `json:"additionalProperties,omitempty"`
 }
 
 type TPRule struct {

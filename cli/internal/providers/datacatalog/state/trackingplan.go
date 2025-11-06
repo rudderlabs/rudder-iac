@@ -492,12 +492,16 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
+	// Default to allowing additional properties when no nested properties exist
+	additionalPropsDefault := true
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
 		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(prop.Properties))
 		for _, nestedProp := range prop.Properties {
 			nestedArgs := &TrackingPlanPropertyArgs{}
+			// set additionalProperties to false by default if there are nested properties
+			nestedArgs.AdditionalProperties = false
 			if err := nestedArgs.FromCatalogTrackingPlanEventProperty(nestedProp, urnFromRef); err != nil {
 				return fmt.Errorf("processing nested property %s: %w", nestedProp.LocalID, err)
 			}
@@ -506,8 +510,13 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
+		// Default to not allowing additional properties when nested properties exist
+		additionalPropsDefault = false
+	}
+
+	args.AdditionalProperties = additionalPropsDefault
+	if prop.AdditionalProperties != nil {
+		args.AdditionalProperties = *prop.AdditionalProperties
 	}
 
 	return nil
