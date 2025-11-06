@@ -23,7 +23,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         id: release
         with:
           # Use manifest-based configuration for advanced Go project setup
@@ -41,7 +41,7 @@ jobs:
           egress-policy: audit
 
       - name: Trigger Release Workflows
-        uses: peter-evans/repository-dispatch@v4
+        uses: peter-evans/repository-dispatch@5fc4efd1a4797ddb68ffd0714a238564e4cc0e6f # v4.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: release-created
