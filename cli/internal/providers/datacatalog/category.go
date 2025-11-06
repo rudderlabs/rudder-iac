@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type CategoryEntityProvider struct {
@@ -166,7 +167,7 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	collection := resources.NewResourceCollection()
 
 	// fetch categories from remote
-	categories, err := p.client.GetCategories(ctx)
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}

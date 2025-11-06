@@ -14,7 +14,7 @@ type CategoryCreate struct {
 }
 
 type CategoryUpdate struct {
-	Name       string `json:"name"`
+	Name string `json:"name"`
 }
 
 type Category struct {
@@ -31,7 +31,7 @@ type CategoryStore interface {
 	UpdateCategory(ctx context.Context, id string, input CategoryUpdate) (*Category, error)
 	DeleteCategory(ctx context.Context, id string) error
 	GetCategory(ctx context.Context, id string) (*Category, error)
-	GetCategories(ctx context.Context) ([]*Category, error)
+	GetCategories(ctx context.Context, options ListOptions) ([]*Category, error)
 	SetCategoryExternalId(ctx context.Context, id string, externalId string) error
 }
 
@@ -96,8 +96,8 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 	return &category, nil
 }
 
-func (c *RudderDataCatalog) GetCategories(ctx context.Context) ([]*Category, error) {
-	return getAllResourcesWithPagination[*Category](ctx, c.client, "v2/catalog/categories")
+func (c *RudderDataCatalog) GetCategories(ctx context.Context, options ListOptions) ([]*Category, error) {
+	return getAllResourcesWithPagination[*Category](ctx, c.client, fmt.Sprintf("v2/catalog/categories%s", options.ToQuery()))
 }
 
 func (c *RudderDataCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {
