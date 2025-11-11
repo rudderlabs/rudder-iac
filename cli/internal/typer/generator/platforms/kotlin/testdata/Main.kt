@@ -48,6 +48,9 @@ typealias CustomTypeActive = Boolean
 /** User's age in years */
 typealias CustomTypeAge = Double
 
+/** Custom type for Colors */
+typealias CustomTypeColor = String
+
 /** Custom type for email validation */
 typealias CustomTypeEmail = String
 
@@ -62,6 +65,9 @@ typealias CustomTypeEmptyObjectWithAdditionalProps = JsonObject
 
 /** Custom type representing a null value */
 typealias CustomTypeNullType = JsonNull
+
+/** Custom type for phone numbers */
+typealias CustomTypePhoneNumber = String
 
 /** List of user profiles */
 typealias CustomTypeProfileList = List<com.rudderstack.ruddertyper.CustomTypeUserProfile>
@@ -98,6 +104,9 @@ typealias PropertyEmptyObjectNoAdditionalProps = com.rudderstack.ruddertyper.Cus
 
 /** Property with empty object allowing additional properties */
 typealias PropertyEmptyObjectWithAdditionalProps = com.rudderstack.ruddertyper.CustomTypeEmptyObjectWithAdditionalProps
+
+/** Array of favorite colors using custom type */
+typealias PropertyFavoriteColors = List<com.rudderstack.ruddertyper.CustomTypeColor>
 
 /** Feature configuration information */
 typealias PropertyFeatureConfig = com.rudderstack.ruddertyper.CustomTypeFeatureConfig
@@ -140,6 +149,9 @@ typealias PropertyPageData = JsonObject
 
 /** Type of page */
 typealias PropertyPageType = String
+
+/** Array of phone numbers using custom type */
+typealias PropertyPhoneNumbers = List<com.rudderstack.ruddertyper.CustomTypePhoneNumber>
 
 /** Product identifier */
 typealias PropertyProductId = String
@@ -984,6 +996,9 @@ data class TrackUserSignedUpProperties(
     /** An object field with no defined structure */
     val objectProperty: com.rudderstack.ruddertyper.PropertyObjectProperty? = null,
 
+    /** Array of phone numbers using custom type */
+    val phoneNumbers: com.rudderstack.ruddertyper.PropertyPhoneNumbers? = null,
+
     /** Priority level */
     val priority: com.rudderstack.ruddertyper.PropertyPriority? = null,
 
@@ -1036,10 +1051,16 @@ data class TrackUserSignedUpProperties(
     ) {
         /** demonstrates multiple levels of nesting */
         data class NestedContext(
+            /** Array of favorite colors using custom type */
+            val favoriteColors: com.rudderstack.ruddertyper.PropertyFavoriteColors? = null,
+
             /** User profile data */
             val profile: com.rudderstack.ruddertyper.PropertyProfile? = null
         )
         fun NestedContext.rudderSerialize(): JsonObject = buildJsonObject {
+            if (favoriteColors != null) {
+                put("favorite_colors", favoriteColors.rudderSerialize())
+            }
             if (profile != null) {
                 put("profile", profile.rudderSerialize())
             }
@@ -1121,6 +1142,9 @@ fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject 
     }
     if (objectProperty != null) {
         put("object_property", objectProperty.rudderSerialize())
+    }
+    if (phoneNumbers != null) {
+        put("phone_numbers", phoneNumbers.rudderSerialize())
     }
     if (priority != null) {
         put("priority", priority.rudderSerialize())

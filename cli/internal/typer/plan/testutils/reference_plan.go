@@ -685,6 +685,35 @@ func init() {
 			plan.PrimitiveTypeNull,
 		},
 	}
+
+	// Custom type only referenced through array ItemTypes (not through property Types)
+	ReferenceCustomTypes["phone_number"] = &plan.CustomType{
+		Name:        "phone_number",
+		Description: "Custom type for phone numbers",
+		Type:        plan.PrimitiveTypeString,
+	}
+
+	// Custom type only referenced through array ItemTypes (not through property Types)
+	ReferenceCustomTypes["color"] = &plan.CustomType{
+		Name:        "color",
+		Description: "Custom type for Colors",
+		Type:        plan.PrimitiveTypeString,
+	}
+
+	// Property using phone_number custom type ONLY in ItemTypes
+	ReferenceProperties["phone_numbers"] = &plan.Property{
+		Name:        "phone_numbers",
+		Description: "Array of phone numbers using custom type",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["phone_number"]},
+	}
+
+	ReferenceProperties["favorite_colors"] = &plan.Property{
+		Name:        "favorite_colors",
+		Description: "Array of favorite colors using custom type",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["color"]},
+	}
 }
 
 // GetReferenceTrackingPlan creates a tracking plan with various primitive and object custom types for testing
@@ -745,6 +774,8 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"number_or_null":        {Property: *ReferenceProperties["number_or_null"]},
 				"multi_type_with_null":  {Property: *ReferenceProperties["multi_type_with_null"]},
 				"array_with_null_items": {Property: *ReferenceProperties["array_with_null_items"]},
+				// Array property with custom type items (tests extraction from ItemTypes)
+				"phone_numbers": {Property: *ReferenceProperties["phone_numbers"]},
 				// Add nested object properties for testing
 				"context": {
 					Property: *ReferenceProperties["context"],
@@ -756,7 +787,8 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 								Required: true,
 								Schema: &plan.ObjectSchema{
 									Properties: map[string]plan.PropertySchema{
-										"profile": {Property: *ReferenceProperties["profile"]},
+										"profile":         {Property: *ReferenceProperties["profile"]},
+										"favorite_colors": {Property: *ReferenceProperties["favorite_colors"]},
 									},
 								},
 							},
