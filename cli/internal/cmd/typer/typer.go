@@ -59,7 +59,12 @@ func newCmdGenerate() *cobra.Command {
 			}
 
 			client := deps.Client()
-			dataCatalogClient := catalog.NewRudderDataCatalog(client)
+
+			cfg := config.GetConfig()
+			dataCatalogClient := catalog.NewRudderDataCatalog(
+				client,
+				cfg.Concurrency.CatalogClient,
+			)
 
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)

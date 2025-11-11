@@ -46,12 +46,14 @@ func (o *ListOptions) ToQuery() string {
 }
 
 type RudderDataCatalog struct {
-	client *client.Client
+	client      *client.Client
+	concurrency int
 }
 
-func NewRudderDataCatalog(client *client.Client) DataCatalog {
+func NewRudderDataCatalog(client *client.Client, concurrency int) DataCatalog {
 	return &RudderDataCatalog{
-		client: client,
+		client:      client,
+		concurrency: concurrency,
 	}
 }
 

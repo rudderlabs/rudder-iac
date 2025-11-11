@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
@@ -17,6 +18,7 @@ import (
 )
 
 type CompositeProvider struct {
+	concurrency     int
 	Providers       []project.Provider
 	registeredKinds map[string]project.Provider
 	registeredTypes map[string]project.Provider
@@ -46,6 +48,7 @@ func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, er
 	}
 
 	return &CompositeProvider{
+		concurrency:     config.GetConfig().Concurrency.CompositeProvider,
 		Providers:       providers,
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
@@ -199,7 +202,7 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 		})
 	}
 
-	errs := tasker.RunTasks(ctx, tasks, 2, false, func(task tasker.Task) error {
+	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)
@@ -265,7 +268,7 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 		})
 	}
 
-	errs := tasker.RunTasks(ctx, tasks, 2, false, func(task tasker.Task) error {
+	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)

@@ -23,7 +23,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 		})
 	}
 
-	errs := tasker.RunTasks(ctx, tasks, 4, false, func(task tasker.Task) error {
+	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*entityProviderTask)
 		if !ok {
 			return fmt.Errorf("expected entityProviderTask, got %T", task)
