@@ -53,14 +53,14 @@ sealed class {{ .Name }} {
         override val _jsonElement: {{ if $.SerializeToObject }}JsonObject{{ else }}JsonElement{{ end }} = buildJsonObject {
         {{- range $subclass.Properties }}
             {{- if .Nullable }}
-            {{ .Name }}?.let { put("{{ .SerialName }}", it.rudderSerialize()) }
+            {{ .Name }}?.let { put("{{ escapeString .SerialName }}", it.rudderSerialize()) }
             {{- else }}
-            put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+            put("{{ escapeString .SerialName }}", {{ .Name }}.rudderSerialize())
             {{- end }}
         {{- end }}
         {{- range $subclass.BodyProperties }}
             {{- if ne .Name "_jsonElement" }}
-            put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+            put("{{ escapeString .SerialName }}", {{ .Name }}.rudderSerialize())
             {{- end }}
         {{- end }}
         }

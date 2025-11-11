@@ -114,8 +114,13 @@ func createVariantSealedClass(
 			return nil, err
 		}
 
+		dpn, err := getOrRegisterPropertyName(name, variant.Discriminator, nameRegistry)
+		if err != nil {
+			return nil, err
+		}
+
 		abstractProperties = append(abstractProperties, KotlinProperty{
-			Name:       FormatPropertyName(variant.Discriminator),
+			Name:       dpn,
 			SerialName: variant.Discriminator,
 			Type:       fmt.Sprintf("%s.%s", packageName, kotlinType),
 			Comment:    discriminatorProp.Property.Description,
@@ -130,13 +135,14 @@ func createVariantSealedClass(
 	for _, variantCase := range variant.Cases {
 		for _, matchValue := range variantCase.Match {
 			subclass, err := createSealedSubclass(
+				name,
 				matchValue,
 				variant.Discriminator,
 				baseSchema,
 				&variantCase.Schema,
 				variantCase.Description,
-				nameRegistry,
 				packageName,
+				nameRegistry,
 			)
 			if err != nil {
 				return nil, err
@@ -157,13 +163,14 @@ func createVariantSealedClass(
 	}
 
 	defaultSubclass, err := createSealedSubclass(
+		name,
 		nil,
 		variant.Discriminator,
 		baseSchema,
 		defaultSchema,
 		"Default case",
-		nameRegistry,
 		packageName,
+		nameRegistry,
 	)
 	if err != nil {
 		return nil, err
@@ -181,13 +188,14 @@ func createVariantSealedClass(
 
 // createSealedSubclass creates a sealed subclass for a specific match value
 func createSealedSubclass(
+	baseClassName string,
 	matchValue any,
 	discriminator string,
 	baseSchema *plan.ObjectSchema,
 	caseSchema *plan.ObjectSchema,
 	comment string,
-	nameRegistry *core.NameRegistry,
 	packageName string,
+	nameRegistry *core.NameRegistry,
 ) (*KotlinSealedSubclass, error) {
 	// Format subclass name from match value
 	var subclassName string
@@ -199,12 +207,13 @@ func createSealedSubclass(
 
 	// Merge base and case properties
 	constructorProps, bodyProps, err := mergeVariantSchemaProperties(
+		baseClassName,
 		baseSchema,
 		caseSchema,
 		discriminator,
 		matchValue,
-		nameRegistry,
 		packageName,
+		nameRegistry,
 	)
 	if err != nil {
 		return nil, err
@@ -228,12 +237,13 @@ func createSealedSubclass(
 // constructorProperties are the properties that go in the constructor (non-override) of the subclass.
 // bodyProperties are the properties that go in the body (override) of the subclass.
 func mergeVariantSchemaProperties(
+	baseClassName string,
 	baseSchema *plan.ObjectSchema,
 	caseSchema *plan.ObjectSchema,
 	discriminatorProp string,
 	discriminatorValue any,
-	nameRegistry *core.NameRegistry,
 	packageName string,
+	nameRegistry *core.NameRegistry,
 ) ([]KotlinProperty, []KotlinProperty, error) {
 	// Create merged property map
 	merged := make(map[string]plan.PropertySchema)
@@ -299,9 +309,14 @@ func mergeVariantSchemaProperties(
 				}
 			}
 
+			propName, err := getOrRegisterPropertyName(baseClassName, name, nameRegistry)
+			if err != nil {
+				return nil, nil, err
+			}
+
 			// Discriminator goes in the body as an override property (or constructor for Default case)
 			discProp := KotlinProperty{
-				Name:       FormatPropertyName(name),
+				Name:       propName,
 				SerialName: name,
 				Type:       qualifiedType,
 				Comment:    propSchema.Property.Description,
@@ -324,8 +339,13 @@ func mergeVariantSchemaProperties(
 				return nil, nil, err
 			}
 
+			propName, err := getOrRegisterPropertyName(baseClassName, name, nameRegistry)
+			if err != nil {
+				return nil, nil, err
+			}
+
 			prop := KotlinProperty{
-				Name:       FormatPropertyName(name),
+				Name:       propName,
 				SerialName: name,
 				Type:       fmt.Sprintf("%s.%s", packageName, kotlinType),
 				Comment:    propSchema.Property.Description,
