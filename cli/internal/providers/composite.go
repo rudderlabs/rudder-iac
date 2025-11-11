@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
@@ -11,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"golang.org/x/exp/maps"
 )
 
@@ -169,22 +171,53 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
 }
 
+type compositeProviderTask struct {
+	name     string
+	provider project.Provider
+}
+
+func (t *compositeProviderTask) Id() string {
+	return t.name
+}
+
+func (t *compositeProviderTask) Dependencies() []string {
+	return []string{}
+}
+
+var _ tasker.Task = &compositeProviderTask{}
+
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
 func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
+	tasks := make([]tasker.Task, 0)
 	for _, provider := range p.Providers {
-		resources, err := provider.LoadImportable(ctx, idNamer)
+		tasks = append(tasks, &compositeProviderTask{
+			name:     provider.GetName(),
+			provider: provider,
+		})
+	}
+
+	errs := tasker.RunTasks(ctx, tasks, 2, false, func(task tasker.Task) error {
+		t, ok := task.(*compositeProviderTask)
+		if !ok {
+			return fmt.Errorf("expected compositeProviderTask, got %T", task)
+		}
+		resources, err := t.provider.LoadImportable(ctx, idNamer)
 		if err != nil {
-			return nil, fmt.Errorf("loading importable resources from provider %s: %w", provider.GetName(), err)
+			return fmt.Errorf("loading importable resources for composite provider %s: %w", t.name, err)
 		}
 		collection, err = collection.Merge(resources)
 		if err != nil {
-			return nil, fmt.Errorf("merging importable resource collection for provider %s: %w", provider.GetName(), err)
+			return fmt.Errorf("merging collection for composite provider %s: %w", t.name, err)
 		}
-	}
+		return nil
+	})
 
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("error loading importable resources for composite provider: %w", errors.Join(errs...))
+	}
 	return collection, nil
 }
 
@@ -223,16 +256,35 @@ func (p *CompositeProvider) providerForType(resourceType string) project.Provide
 
 func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
+
+	tasks := make([]tasker.Task, 0)
 	for _, provider := range p.Providers {
-		resources, err := provider.LoadResourcesFromRemote(ctx)
+		tasks = append(tasks, &compositeProviderTask{
+			name:     provider.GetName(),
+			provider: provider,
+		})
+	}
+
+	errs := tasker.RunTasks(ctx, tasks, 2, false, func(task tasker.Task) error {
+		t, ok := task.(*compositeProviderTask)
+		if !ok {
+			return fmt.Errorf("expected compositeProviderTask, got %T", task)
+		}
+		resources, err := t.provider.LoadResourcesFromRemote(ctx)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("loading resources from remote for composite provider %s: %w", t.name, err)
 		}
 		collection, err = collection.Merge(resources)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("merging collection from remote for composite provider %s: %w", t.name, err)
 		}
+		return nil
+	})
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("error loading resources from remote for composite provider: %w", errors.Join(errs...))
 	}
+
 	return collection, nil
 }
 

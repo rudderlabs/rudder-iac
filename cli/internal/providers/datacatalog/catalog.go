@@ -2,6 +2,7 @@ package datacatalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -11,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 var resourceTypeCollection = map[string]catalog.ResourceCollection{
@@ -130,23 +132,56 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return provider.Import(ctx, ID, data, remoteId)
 }
 
+type entityProviderTask struct {
+	resourceType string
+	provider     entityProvider
+}
+
+func (t *entityProviderTask) Id() string {
+	return t.resourceType
+}
+
+func (t *entityProviderTask) Dependencies() []string {
+	return []string{}
+}
+
+var _ tasker.Task = &entityProviderTask{}
+
 // LoadResourcesFromRemote loads all resources from remote catalog into a ResourceCollection
 func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	log.Debug("loading all resources from remote catalog")
+
 	collection := resources.NewResourceCollection()
 
-	// Load resources for stateless resources from provider store
+	tasks := make([]tasker.Task, 0)
 	for resourceType, provider := range p.providerStore {
-		c, err := provider.LoadResourcesFromRemote(ctx)
+		tasks = append(tasks, &entityProviderTask{
+			resourceType: resourceType,
+			provider:     provider,
+		})
+	}
+
+	errs := tasker.RunTasks(ctx, tasks, 4, false, func(task tasker.Task) error {
+		t, ok := task.(*entityProviderTask)
+		if !ok {
+			return fmt.Errorf("expected entityProviderTask, got %T", task)
+		}
+
+		c, err := t.provider.LoadResourcesFromRemote(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("loading %s: %w", resourceType, err)
+			return fmt.Errorf("loading resources from remote for provider of resource type %s: %w", t.resourceType, err)
 		}
 
 		collection, err = collection.Merge(c)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("merging collection from remote for provider of resource type %s: %w", t.resourceType, err)
 		}
-		log.Debug("loaded resources from remote", "type", resourceType)
+
+		return nil
+	})
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("error loading resources from remote: %w", errors.Join(errs...))
 	}
 
 	return collection, nil

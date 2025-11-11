@@ -2,28 +2,50 @@ package datacatalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 
-	for _, provider := range p.providerStore {
-		resources, err := provider.LoadImportable(ctx, idNamer)
+	tasks := make([]tasker.Task, 0)
+	for resourceType, provider := range p.providerStore {
+		tasks = append(tasks, &entityProviderTask{
+			resourceType: resourceType,
+			provider:     provider,
+		})
+	}
+
+	errs := tasker.RunTasks(ctx, tasks, 4, false, func(task tasker.Task) error {
+		t, ok := task.(*entityProviderTask)
+		if !ok {
+			return fmt.Errorf("expected entityProviderTask, got %T", task)
+		}
+
+		resources, err := t.provider.LoadImportable(ctx, idNamer)
 		if err != nil {
-			return nil, fmt.Errorf("loading importable resources from provider %w", err)
+			return fmt.Errorf("loading importable resources collection for provider of resource type %s: %w", t.resourceType, err)
 		}
 
 		collection, err = collection.Merge(resources)
 		if err != nil {
-			return nil, fmt.Errorf("merging importable resource collection for provider %w", err)
+			return fmt.Errorf("merging importable resource collection for provider of resource type %s: %w", t.resourceType, err)
 		}
+
+		return nil
+	})
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("error loading importable resources: %w", errors.Join(errs...))
 	}
+
 	return collection, nil
 }
 
