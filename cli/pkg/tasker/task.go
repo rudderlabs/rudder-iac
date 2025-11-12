@@ -72,19 +72,25 @@ func (job *job) run(ctx context.Context, command func(task Task) error) []error 
 }
 
 func (job *job) runTask(ctx context.Context, cancelCtx context.CancelFunc, task Task, command func(task Task) error) (err error) {
+	semaphoreAcquired := false
+
 	defer func() {
 		if err != nil && !job.continueOnFail {
-			// cancellation should happen before releasing the semaphore otherwise some other goroutine might start running a task
+			// cancellation should happen before releasing the semaphore
+			// otherwise some other goroutine might start running a task
 			cancelCtx()
 		}
-		select {
-		case job.semaphore <- struct{}{}:
-		default:
+		if semaphoreAcquired {
+			select {
+			case job.semaphore <- struct{}{}:
+			default:
+			}
 		}
 
 		// Notify dependent tasks that this task has completed
 		close(job.taskStatus[task.Id()])
 	}()
+
 	dependencies := task.Dependencies()
 	// Wait for all dependencies to be completed
 	for _, depTaskId := range dependencies {
@@ -102,6 +108,7 @@ func (job *job) runTask(ctx context.Context, cancelCtx context.CancelFunc, task 
 
 	select {
 	case <-job.semaphore:
+		semaphoreAcquired = true
 	case <-ctx.Done():
 		return ctx.Err()
 	}
