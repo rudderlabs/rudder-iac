@@ -37,6 +37,9 @@ func NewResourceCollection() *ResourceCollection {
 }
 
 func (rc *ResourceCollection) Len() int {
+	rc.RLock()
+	defer rc.RUnlock()
+
 	count := 0
 	for _, resources := range rc.resources {
 		count += len(resources)
@@ -79,9 +82,8 @@ func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteRe
 }
 
 func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string, error) {
-	rc.RLock()
-	defer rc.RUnlock()
-
+	// No RLock needed here as we are delegating the access to the GetByID method
+	// which already has the RLock applied to it
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound
