@@ -22,7 +22,7 @@ type mockEventCatalog struct {
 	err    error
 }
 
-func (m *mockEventCatalog) GetEvents(ctx context.Context) ([]*catalog.Event, error) {
+func (m *mockEventCatalog) GetEvents(ctx context.Context, options catalog.ListOptions) ([]*catalog.Event, error) {
 	return m.events, m.err
 }
 

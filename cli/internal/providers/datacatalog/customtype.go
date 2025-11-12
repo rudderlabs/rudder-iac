@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type CustomTypeEntityProvider struct {
@@ -254,7 +255,7 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	collection := resources.NewResourceCollection()
 
 	// fetch custom types from remote
-	customTypes, err := p.client.GetCustomTypes(ctx)
+	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/samber/lo"
 )
 
 const (
@@ -44,7 +45,7 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 	p.log.Debug("loading importable tracking plans from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plans from remote catalog: %w", err)
 	}

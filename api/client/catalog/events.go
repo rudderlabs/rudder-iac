@@ -40,7 +40,7 @@ type EventStore interface {
 	UpdateEvent(ctx context.Context, id string, input *EventUpdate) (*Event, error)
 	DeleteEvent(ctx context.Context, id string) error
 	GetEvent(ctx context.Context, id string) (*Event, error)
-	GetEvents(ctx context.Context) ([]*Event, error)
+	GetEvents(ctx context.Context, options ListOptions) ([]*Event, error)
 	SetEventExternalId(ctx context.Context, id string, externalId string) error
 }
 
@@ -105,8 +105,8 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 	return &event, nil
 }
 
-func (c *RudderDataCatalog) GetEvents(ctx context.Context) ([]*Event, error) {
-	return getAllResourcesWithPagination[*Event](ctx, c.client, "v2/catalog/events")
+func (c *RudderDataCatalog) GetEvents(ctx context.Context, options ListOptions) ([]*Event, error) {
+	return getAllResourcesWithPagination[*Event](ctx, c.client, fmt.Sprintf("v2/catalog/events%s", options.ToQuery()))
 }
 
 func (c *RudderDataCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {

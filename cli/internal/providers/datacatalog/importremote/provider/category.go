@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/samber/lo"
 )
 
 const (
@@ -43,7 +44,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 	p.log.Debug("loading importable categories from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	categories, err := p.client.GetCategories(ctx)
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting categories from remote catalog: %w", err)
 	}

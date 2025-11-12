@@ -22,7 +22,7 @@ type mockCustomTypeDataCatalog struct {
 	err         error
 }
 
-func (m *mockCustomTypeDataCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomType, error) {
+func (m *mockCustomTypeDataCatalog) GetCustomTypes(ctx context.Context, options catalog.ListOptions) ([]*catalog.CustomType, error) {
 	return m.customTypes, m.err
 }
 

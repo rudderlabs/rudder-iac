@@ -22,7 +22,7 @@ type mockDataCatalog struct {
 	err        error
 }
 
-func (m *mockDataCatalog) GetProperties(ctx context.Context) ([]*catalog.Property, error) {
+func (m *mockDataCatalog) GetProperties(ctx context.Context, options catalog.ListOptions) ([]*catalog.Property, error) {
 	return m.properties, m.err
 }
 
