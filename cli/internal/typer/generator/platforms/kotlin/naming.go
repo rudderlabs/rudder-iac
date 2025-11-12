@@ -44,6 +44,7 @@ func FormatClassName(prefix, name string) string {
 // Returns empty string if input is empty.
 func FormatPropertyName(name string) string {
 	formatted := strings.TrimSpace(name)
+	formatted = sanitizeForIdentifier(formatted)
 	formatted = core.ToCamelCase(formatted)
 	formatted = handleStartingCharacter(formatted)
 	formatted = handleReservedKeyword(formatted)
@@ -67,17 +68,6 @@ func sanitizeForIdentifier(s string) string {
 	}
 
 	return result.String()
-}
-
-// formatPropertyName converts a name to camelCase suitable for Kotlin property names
-// Returns empty string if input is empty.
-func formatPropertyName(name string) string {
-	formatted := strings.TrimSpace(name)
-	formatted = sanitizeForIdentifier(formatted)
-	formatted = core.ToCamelCase(formatted)
-	formatted = handleStartingCharacter(formatted)
-	formatted = handleReservedKeyword(formatted)
-	return formatted
 }
 
 // FormatMethodName converts a name to camelCase suitable for Kotlin method names
@@ -105,6 +95,15 @@ func getOrRegisterCustomTypeName(customType *plan.CustomType, nameRegistry *core
 func getOrRegisterPropertyTypeName(property *plan.Property, nameRegistry *core.NameRegistry) (string, error) {
 	typeName := FormatClassName("Property", property.Name)
 	return nameRegistry.RegisterName("property:"+property.Name, globalTypeScope, typeName)
+}
+
+// getOrRegisterPropertyName registers a property name within a class scope and returns a collision-free identifier
+// This ensures that properties with names that sanitize to the same identifier get unique names
+func getOrRegisterPropertyName(className string, propName string, nameRegistry *core.NameRegistry) (string, error) {
+	// Create a per-class scope for property names: "class:{className}:properties"
+	propertyScope := fmt.Sprintf("class:%s:properties", className)
+	formattedName := FormatPropertyName(propName)
+	return nameRegistry.RegisterName(propName, propertyScope, formattedName)
 }
 
 // getOrRegisterEnumValue returns the registered enum value name for an enum value
