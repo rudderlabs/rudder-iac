@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const concurrencyForTest = 1
+
 func TestProjectApply(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -45,7 +47,7 @@ func verifyState(t *testing.T, dir string) {
 	)
 
 	require.NoError(t, err)
-	dataCatalog := catalog.NewRudderDataCatalog(apiClient)
+	dataCatalog := catalog.NewRudderDataCatalog(apiClient, concurrencyForTest)
 	reader := helpers.NewAPIClientAdapter(dataCatalog)
 
 	expectedStateDir := filepath.Join("testdata", "expected", "upstream", dir)

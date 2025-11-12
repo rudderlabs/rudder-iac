@@ -82,7 +82,6 @@ func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Clie
 	}
 
 	totalPages := int(math.Ceil(float64(firstPage.Total) / float64(firstPage.PageSize)))
-	fmt.Printf("Endpoint: %s Total pages: %d\n", endpoint, totalPages)
 
 	if totalPages <= 1 {
 		return firstPage.Data, nil
