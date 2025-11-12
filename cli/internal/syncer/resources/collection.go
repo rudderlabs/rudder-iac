@@ -99,8 +99,8 @@ func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string
 // Merge merges resources from another ResourceCollection into a new collection
 // Returns a new ResourceCollection or an error if there are any overlapping keys
 func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollection, error) {
-	rc.Lock()
-	defer rc.Unlock()
+	rc.RLock()
+	defer rc.RUnlock()
 
 	if other == nil {
 		return rc, nil
@@ -115,6 +115,9 @@ func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollect
 		}
 		newCollection.resources[k1] = newMap
 	}
+
+	other.RLock()
+	defer other.RUnlock()
 
 	// Check for overlaps and merge from other collection
 	for k1, v1 := range other.resources {
