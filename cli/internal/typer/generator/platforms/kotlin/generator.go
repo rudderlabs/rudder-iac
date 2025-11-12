@@ -349,6 +349,12 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 		var property *KotlinProperty
 		propSchema := schema.Properties[propName]
 
+		// Register the property name to detect and handle collisions
+		registeredPropName, err := getOrRegisterPropertyName(className, propName, nameRegistry)
+		if err != nil {
+			return nil, err
+		}
+
 		// Check if this property has nested object schema
 		if propSchema.Schema != nil {
 			// Check if this is an empty object
@@ -366,7 +372,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 				}
 
 				property = &KotlinProperty{
-					Name:       FormatPropertyName(propName),
+					Name:       registeredPropName,
 					SerialName: propName,
 					Type:       kotlinType,
 					Comment:    propSchema.Property.Description,
@@ -383,7 +389,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 				// Property type references the nested class (fully qualified)
 				nestedClassName := fmt.Sprintf("%s.%s.%s", packageName, className, nestedClass.Name)
 				property = &KotlinProperty{
-					Name:       FormatPropertyName(propName),
+					Name:       registeredPropName,
 					SerialName: propName,
 					Type:       nestedClassName,
 					Comment:    propSchema.Property.Description,
@@ -397,7 +403,7 @@ func createDataClass(className string, comment string, schema *plan.ObjectSchema
 			}
 
 			property = &KotlinProperty{
-				Name:       FormatPropertyName(propName),
+				Name:       registeredPropName,
 				SerialName: propName,
 				Type:       fmt.Sprintf("%s.%s", packageName, kotlinType),
 				Comment:    propSchema.Property.Description,

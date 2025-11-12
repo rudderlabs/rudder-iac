@@ -2,8 +2,10 @@ package validate
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type DuplicateNameIDKeysValidator struct {
@@ -24,12 +26,42 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		for _, prop := range props {
 
 			if lookup, ok := propName[prop.Name]; ok {
-				// If name and type on the property are same, then it's a duplicate
+				var lookupArrayItemType []any
+				var propArrayItemType []any
+				if lookup.Type == "array" && lookup.Config != nil {
+					if itemTypes, ok := lookup.Config["itemTypes"]; ok {
+						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
+							utils.SortLexicographically(arr)
+							lookupArrayItemType = arr
+						}
+					}
+				}
+				if prop.Type == "array" && prop.Config != nil {
+					if itemTypes, ok := prop.Config["itemTypes"]; ok {
+						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
+							utils.SortLexicographically(arr)
+							propArrayItemType = arr
+						}
+					}
+				}
+
+				// If name, type and arrayItemType on the property are the same, then it's a duplicate
 				if lookup.Type == prop.Type {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("duplicate name key: %s and type: %s", prop.Name, prop.Type),
-						Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
-					})
+					switch {
+					// the property is a duplicate if - 
+					// 1. lookupArrayItemType and propArrayItemType are both nil
+					// 2. lookupArrayItemType and propArrayItemType are not nil and identical
+					case lookupArrayItemType == nil && propArrayItemType == nil:
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("duplicate name key: %s, type: %s", prop.Name, prop.Type),
+							Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
+						})
+					case lookupArrayItemType != nil && propArrayItemType != nil && slices.Equal(lookupArrayItemType, propArrayItemType):
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("duplicate name key: %s, type: %s and arrayItemType: %v", prop.Name, prop.Type, propArrayItemType),
+							Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
+						})
+					}
 				}
 			}
 
