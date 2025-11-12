@@ -25,10 +25,10 @@ fun {{ .Name }}.rudderSerialize(): JsonObject = buildJsonObject {
 {{- range .Properties }}
 {{- if .Nullable }}
     if ({{ .Name }} != null) {
-        put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+        put("{{ escapeString .SerialName }}", {{ .Name }}.rudderSerialize())
     }
 {{- else }}
-    put("{{ .SerialName }}", {{ .Name }}.rudderSerialize())
+    put("{{ escapeString .SerialName }}", {{ .Name }}.rudderSerialize())
 {{- end }}
 {{- end }}
 }

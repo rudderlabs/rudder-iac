@@ -52,6 +52,59 @@ func TestFormatClassName(t *testing.T) {
 	}
 }
 
+func TestFormatPropertyName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"snake_case", "user_id", "userId"},
+		{"kebab-case", "email-address", "emailAddress"},
+		{"space separated", "first name", "firstName"},
+		{"camelCase", "firstName", "firstName"},
+		{"PascalCase", "FirstName", "firstName"},
+		{"single word", "user", "user"},
+		{"with numbers", "user123", "user123"},
+		{"number at end", "user123Id", "user123Id"},
+		{"leading number", "123user", "_123user"},
+		{"reserved keyword", "class", "_class"},
+		{"reserved keyword uppercase", "Class", "_class"},
+		{"reserved keyword mixed", "CLASS", "_class"},
+		{"empty string", "", ""},
+		{"whitespace only", "   ", ""},
+		{"complex name", "user_email-address.type", "userEmailAddressType"},
+		// Special characters - CRITICAL TEST CASES FOR THE BUG FIX
+		{"percent sign", "user%status", "userStatus"},
+		{"dollar sign", "price$amount", "priceAmount"},
+		{"percent and dollar", "Obj Obj Obj %$", "objObjObj"},
+		{"with quotes", "Product \"Premium\"", "productPremium"},
+		{"with backslash", "path\\to\\file", "pathToFile"},
+		{"with at symbol", "user@email", "userEmail"},
+		{"with brackets", "array[index]", "arrayIndex"},
+		{"with braces", "object{key}", "objectKey"},
+		{"with equals", "key=value", "keyValue"},
+		{"with plus", "count+total", "countTotal"},
+		{"with asterisk", "count*multiplier", "countMultiplier"},
+		{"with slash", "path/to/file", "pathToFile"},
+		{"with colon", "key:value", "keyValue"},
+		{"with semicolon", "statement;end", "statementEnd"},
+		{"with comma", "a,b,c", "aBC"},
+		{"multiple special chars", "user!@#$%^&*()name", "userName"},
+		// Unicode test cases
+		{"chinese_property", "用户名", "用户名"},
+		{"cyrillic_property", "тип_данных", "типДанных"},
+		{"property_with_diacritics", "café", "café"},
+		{"japanese_property", "日本語", "日本語"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := kotlin.FormatPropertyName(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestFormatPropertyName_ReservedKeywords(t *testing.T) {
 	// Test various reserved keywords
 	reservedKeywords := []string{}
