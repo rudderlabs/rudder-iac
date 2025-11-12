@@ -122,7 +122,12 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 }
 
 func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context, options ListOptions) ([]*CustomType, error) {
-	return getAllResourcesPaginated[*CustomType](ctx, c.client, fmt.Sprintf("v2/catalog/custom-types%s", options.ToQuery()))
+	return getAllResourcesPaginated[*CustomType](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/custom-types%s", options.ToQuery()),
+		c.concurrency,
+	)
 }
 
 func (c *RudderDataCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {

@@ -109,7 +109,12 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 }
 
 func (c *RudderDataCatalog) GetProperties(ctx context.Context, options ListOptions) ([]*Property, error) {
-	return getAllResourcesPaginated[*Property](ctx, c.client, fmt.Sprintf("v2/catalog/properties%s", options.ToQuery()))
+	return getAllResourcesPaginated[*Property](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/properties%s", options.ToQuery()),
+		c.concurrency,
+	)
 }
 
 func (c *RudderDataCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {

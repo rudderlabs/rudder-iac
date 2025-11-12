@@ -30,9 +30,8 @@ func (t *APIFetchTask[T]) Dependencies() []string {
 }
 
 func (t *APIFetchTask[T]) Execute(ctx context.Context) (T, error) {
-	fmt.Printf("Executing API fetch task: %s\n", t.path)
-
 	var result T
+
 	data, err := t.client.Do(ctx, "GET", t.path, nil)
 	if err != nil {
 		return *new(T), fmt.Errorf("failed to fetch data from API: %w", err)

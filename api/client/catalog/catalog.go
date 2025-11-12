@@ -75,7 +75,7 @@ func IsCatalogAlreadyExistsError(err error) bool {
 	return apiErr.HTTPStatusCode == 400 && strings.Contains(apiErr.Message, "already exists")
 }
 
-func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Client, endpoint string) ([]T, error) {
+func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Client, endpoint string, concurrency int) ([]T, error) {
 	firstPage, err := getFirstPage[T](ctx, apiClient, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("getting first page: %w", err)
@@ -105,7 +105,7 @@ func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Clie
 	errs := tasker.RunTasks(
 		ctx,
 		tasks,
-		10,
+		concurrency,
 		false,
 		apitask.RunAPIFetchTask(ctx, results),
 	)

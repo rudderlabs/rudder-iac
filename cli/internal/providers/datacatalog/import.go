@@ -39,10 +39,6 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 		}
 
 		results.Store(t.resourceType, importable)
-		if err != nil {
-			return fmt.Errorf("merging importable resource collection for provider of resource type %s: %w", t.resourceType, err)
-		}
-
 		return nil
 	})
 
