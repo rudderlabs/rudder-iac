@@ -76,7 +76,7 @@ func (p *Provider) GetLocalCatalog() *localcatalog.DataCatalog {
 }
 
 // Validate validates the provider's data catalog.
-// The method accepts a *resources.Graph but currently ignores it and validates directly from the catalog 
+// The method accepts a *resources.Graph but currently ignores it and validates directly from the catalog
 // (same behavior as earlier); future implementations may validate against the graph.
 func (p *Provider) Validate(_ *resources.Graph) error {
 	err := validate.ValidateCatalog(p.dc)
@@ -106,7 +106,7 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 }
 
 func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceData, error) {
-	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tracking plans: %w", err)
 	}

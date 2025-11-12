@@ -68,6 +68,26 @@ func extractCustomTypesFromSchema(schema *ObjectSchema, customTypes map[string]*
 				}
 			}
 		}
+
+		// Also extract custom types from array item types
+		for _, itemType := range propSchema.Property.ItemTypes {
+			if IsCustomType(itemType) {
+				customType := AsCustomType(itemType)
+				if customType != nil {
+					customTypes[customType.Name] = customType
+
+					// Recursively process referenced custom types
+					if customType.Schema != nil {
+						extractCustomTypesFromSchema(customType.Schema, customTypes)
+					}
+				}
+			}
+		}
+
+		// Recursively process nested property schemas
+		if propSchema.Schema != nil {
+			extractCustomTypesFromSchema(propSchema.Schema, customTypes)
+		}
 	}
 }
 

@@ -50,7 +50,7 @@ class RudderAnalytics(private val analytics: Analytics) {
     private val context = buildJsonObject {
         put("ruddertyper", buildJsonObject {
         {{- range $key, $value := .EventContext }}
-            put("{{ $key }}", {{ $value }})
+            put("{{ escapeString $key }}", {{ $value }})
         {{- end }}
         })
     }
