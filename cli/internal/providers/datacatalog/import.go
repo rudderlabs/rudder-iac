@@ -13,7 +13,10 @@ import (
 )
 
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+	var (
+		collection = resources.NewResourceCollection()
+		err        error
+	)
 
 	tasks := make([]tasker.Task, 0)
 	for resourceType, provider := range p.providerStore {
@@ -23,18 +26,19 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 		})
 	}
 
+	results := tasker.NewResults[*resources.ResourceCollection]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*entityProviderTask)
 		if !ok {
 			return fmt.Errorf("expected entityProviderTask, got %T", task)
 		}
 
-		resources, err := t.provider.LoadImportable(ctx, idNamer)
+		importable, err := t.provider.LoadImportable(ctx, idNamer)
 		if err != nil {
 			return fmt.Errorf("loading importable resources collection for provider of resource type %s: %w", t.resourceType, err)
 		}
 
-		collection, err = collection.Merge(resources)
+		results.Store(t.resourceType, importable)
 		if err != nil {
 			return fmt.Errorf("merging importable resource collection for provider of resource type %s: %w", t.resourceType, err)
 		}
@@ -44,6 +48,17 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("error loading importable resources: %w", errors.Join(errs...))
+	}
+
+	for _, key := range results.GetKeys() {
+		importable, ok := results.Get(key)
+		if !ok {
+			return nil, fmt.Errorf("importable resource collection not found for key %s", key)
+		}
+		collection, err = collection.Merge(importable)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collections: %w", err)
+		}
 	}
 
 	return collection, nil

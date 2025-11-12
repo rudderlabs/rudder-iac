@@ -192,7 +192,10 @@ var _ tasker.Task = &compositeProviderTask{}
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
 func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+	var (
+		collection = resources.NewResourceCollection()
+		err        error
+	)
 
 	tasks := make([]tasker.Task, 0)
 	for _, provider := range p.Providers {
@@ -202,25 +205,35 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 		})
 	}
 
+	results := tasker.NewResults[*resources.ResourceCollection]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)
 		}
-		resources, err := t.provider.LoadImportable(ctx, idNamer)
+		importable, err := t.provider.LoadImportable(ctx, idNamer)
 		if err != nil {
 			return fmt.Errorf("loading importable resources for composite provider %s: %w", t.name, err)
 		}
-		collection, err = collection.Merge(resources)
-		if err != nil {
-			return fmt.Errorf("merging collection for composite provider %s: %w", t.name, err)
-		}
+		results.Store(t.name, importable)
 		return nil
 	})
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("error loading importable resources for composite provider: %w", errors.Join(errs...))
 	}
+
+	for _, key := range results.GetKeys() {
+		importable, ok := results.Get(key)
+		if !ok {
+			return nil, fmt.Errorf("importable resource collection not found for composite provider %s", key)
+		}
+		collection, err = collection.Merge(importable)
+		if err != nil {
+			return nil, fmt.Errorf("merging importable resource collections for composite provider %s: %w", key, err)
+		}
+	}
+
 	return collection, nil
 }
 
@@ -258,7 +271,10 @@ func (p *CompositeProvider) providerForType(resourceType string) project.Provide
 }
 
 func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+	var (
+		collection = resources.NewResourceCollection()
+		err        error
+	)
 
 	tasks := make([]tasker.Task, 0)
 	for _, provider := range p.Providers {
@@ -268,24 +284,33 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 		})
 	}
 
+	results := tasker.NewResults[*resources.ResourceCollection]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)
 		}
-		resources, err := t.provider.LoadResourcesFromRemote(ctx)
+		r, err := t.provider.LoadResourcesFromRemote(ctx)
 		if err != nil {
 			return fmt.Errorf("loading resources from remote for composite provider %s: %w", t.name, err)
 		}
-		collection, err = collection.Merge(resources)
-		if err != nil {
-			return fmt.Errorf("merging collection from remote for composite provider %s: %w", t.name, err)
-		}
+		results.Store(t.name, r)
 		return nil
 	})
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("error loading resources from remote for composite provider: %w", errors.Join(errs...))
+	}
+
+	for _, key := range results.GetKeys() {
+		remoteResources, ok := results.Get(key)
+		if !ok {
+			return nil, fmt.Errorf("remote resource collection not found for composite provider %s", key)
+		}
+		collection, err = collection.Merge(remoteResources)
+		if err != nil {
+			return nil, fmt.Errorf("merging resources from remote for composite provider %s: %w", key, err)
+		}
 	}
 
 	return collection, nil

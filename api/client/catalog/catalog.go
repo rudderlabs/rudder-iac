@@ -90,7 +90,7 @@ func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Clie
 
 	tasks := make([]tasker.Task, totalPages)
 
-	results := apitask.NewResults[PaginatedResponse[T]]()
+	results := tasker.NewResults[PaginatedResponse[T]]()
 	for i := 1; i <= totalPages; i++ {
 		u, err := url.Parse(endpoint)
 		if err != nil {

@@ -45,7 +45,7 @@ func (t *APIFetchTask[T]) Execute(ctx context.Context) (T, error) {
 	return result, nil
 }
 
-func RunAPIFetchTask[T any](ctx context.Context, results *Results[T]) func(task tasker.Task) error {
+func RunAPIFetchTask[T any](ctx context.Context, results *tasker.Results[T]) func(task tasker.Task) error {
 	return func(task tasker.Task) error {
 		apiFetchTask, ok := task.(*APIFetchTask[T])
 		if !ok {

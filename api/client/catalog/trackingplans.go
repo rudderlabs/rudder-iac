@@ -304,7 +304,7 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		)
 	}
 
-	results := apitask.NewResults[*TrackingPlanEventPropertyIdentifiers]()
+	results := tasker.NewResults[*TrackingPlanEventPropertyIdentifiers]()
 	errs := tasker.RunTasks(
 		ctx,
 		eventTasks,

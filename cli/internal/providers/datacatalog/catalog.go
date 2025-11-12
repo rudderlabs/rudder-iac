@@ -151,7 +151,10 @@ var _ tasker.Task = &entityProviderTask{}
 func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	log.Debug("loading all resources from remote catalog")
 
-	collection := resources.NewResourceCollection()
+	var (
+		collection = resources.NewResourceCollection()
+		err        error
+	)
 
 	tasks := make([]tasker.Task, 0)
 	for resourceType, provider := range p.providerStore {
@@ -161,6 +164,7 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 		})
 	}
 
+	results := tasker.NewResults[*resources.ResourceCollection]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*entityProviderTask)
 		if !ok {
@@ -172,16 +176,23 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 			return fmt.Errorf("loading resources from remote for provider of resource type %s: %w", t.resourceType, err)
 		}
 
-		collection, err = collection.Merge(c)
-		if err != nil {
-			return fmt.Errorf("merging collection from remote for provider of resource type %s: %w", t.resourceType, err)
-		}
-
+		results.Store(t.resourceType, c)
 		return nil
 	})
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("error loading resources from remote: %w", errors.Join(errs...))
+	}
+
+	for _, key := range results.GetKeys() {
+		remoteResources, ok := results.Get(key)
+		if !ok {
+			return nil, fmt.Errorf("importable resource collection not found for key %s", key)
+		}
+		collection, err = collection.Merge(remoteResources)
+		if err != nil {
+			return nil, fmt.Errorf("merging resources from remote: %w", err)
+		}
 	}
 
 	return collection, nil
