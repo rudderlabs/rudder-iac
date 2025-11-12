@@ -44,7 +44,7 @@ type PropertyStore interface {
 	UpdateProperty(ctx context.Context, id string, input *PropertyUpdate) (*Property, error)
 	DeleteProperty(ctx context.Context, id string) error
 	GetProperty(ctx context.Context, id string) (*Property, error)
-	GetProperties(ctx context.Context) ([]*Property, error)
+	GetProperties(ctx context.Context, options ListOptions) ([]*Property, error)
 	SetPropertyExternalId(ctx context.Context, id string, externalId string) error
 }
 
@@ -108,8 +108,8 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 	return &property, nil
 }
 
-func (c *RudderDataCatalog) GetProperties(ctx context.Context) ([]*Property, error) {
-	return getAllResourcesWithPagination[*Property](ctx, c.client, "v2/catalog/properties")
+func (c *RudderDataCatalog) GetProperties(ctx context.Context, options ListOptions) ([]*Property, error) {
+	return getAllResourcesWithPagination[*Property](ctx, c.client, fmt.Sprintf("v2/catalog/properties%s", options.ToQuery()))
 }
 
 func (c *RudderDataCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {

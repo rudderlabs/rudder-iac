@@ -80,7 +80,7 @@ func (m *EmptyCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context) ([]*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context, _ catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
@@ -140,19 +140,19 @@ func (m *EmptyCatalog) GetCategory(ctx context.Context, id string) (*catalog.Cat
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetEvents(ctx context.Context) ([]*catalog.Event, error) {
+func (m *EmptyCatalog) GetEvents(ctx context.Context, _ catalog.ListOptions) ([]*catalog.Event, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetProperties(ctx context.Context) ([]*catalog.Property, error) {
+func (m *EmptyCatalog) GetProperties(ctx context.Context, _ catalog.ListOptions) ([]*catalog.Property, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetCustomTypes(ctx context.Context) ([]*catalog.CustomType, error) {
+func (m *EmptyCatalog) GetCustomTypes(ctx context.Context, _ catalog.ListOptions) ([]*catalog.CustomType, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
+func (m *EmptyCatalog) GetCategories(ctx context.Context, _ catalog.ListOptions) ([]*catalog.Category, error) {
 	return nil, nil
 }
 

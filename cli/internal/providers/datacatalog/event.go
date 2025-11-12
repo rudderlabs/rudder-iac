@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type EventEntityProvider struct {
@@ -205,7 +206,7 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	collection := resources.NewResourceCollection()
 
 	// fetch events from remote
-	events, err := p.catalog.GetEvents(ctx)
+	events, err := p.catalog.GetEvents(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
