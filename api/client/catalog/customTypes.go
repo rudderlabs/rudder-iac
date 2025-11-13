@@ -35,7 +35,7 @@ type CustomType struct {
 	Type            string                 `json:"type"`
 	DataType        string                 `json:"dataType"`
 	WorkspaceId     string                 `json:"workspaceId"`
-	ExternalId      string                 `json:"externalId,omitempty"`
+	ExternalID      string                 `json:"externalId,omitempty"`
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`

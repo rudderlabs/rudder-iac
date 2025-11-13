@@ -174,7 +174,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 
 // FromRemoteCustomType converts from remote API CustomType to CustomTypeArgs
 func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
-	args.LocalID = customType.ExternalId
+	args.LocalID = customType.ExternalID
 	args.Name = customType.Name
 	args.Description = customType.Description
 	args.Type = customType.Type
@@ -425,7 +425,7 @@ func (s *CustomTypeState) FromResourceData(from resources.ResourceData) {
 // FromRemoteCustomType converts from catalog.CustomType to CustomTypeState
 func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, getURNFromRemoteId func(resourceType string, remoteId string) (string, error)) error {
 	s.ID = customType.ID
-	s.LocalID = customType.ExternalId
+	s.LocalID = customType.ExternalID
 	s.Name = customType.Name
 	s.Description = customType.Description
 	s.Type = customType.Type
@@ -448,7 +448,7 @@ func (s *CustomTypeState) FromRemoteCustomType(customType *catalog.CustomType, g
 	}
 
 	// create custom type args
-	s.CustomTypeArgs.LocalID = customType.ExternalId
+	s.CustomTypeArgs.LocalID = customType.ExternalID
 	s.CustomTypeArgs.Name = customType.Name
 	s.CustomTypeArgs.Description = customType.Description
 	s.CustomTypeArgs.Type = customType.Type

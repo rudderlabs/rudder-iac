@@ -52,7 +52,7 @@ func (m *MockCustomTypeCatalog) GetCustomType(ctx context.Context, id string) (*
 func (m *MockCustomTypeCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
 	m.setExternalIdCalled = true
 	if m.mockCustomType != nil {
-		m.mockCustomType.ExternalId = externalId
+		m.mockCustomType.ExternalID = externalId
 	}
 	return m.err
 }

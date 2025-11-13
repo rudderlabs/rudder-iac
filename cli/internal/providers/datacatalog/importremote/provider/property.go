@@ -44,14 +44,14 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer nam
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
+	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting properties from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
-		if property.ExternalId != "" {
+		if property.ExternalID != "" {
 			continue
 		}
 		resourceMap[property.ID] = &resources.RemoteResource{

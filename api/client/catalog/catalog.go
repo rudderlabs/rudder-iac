@@ -31,13 +31,13 @@ type DataCatalog interface {
 }
 
 type ListOptions struct {
-	HasExternalId *bool
+	HasExternalID *bool
 }
 
 func (o *ListOptions) ToQuery() string {
 	query := ""
-	if o.HasExternalId != nil {
-		query += fmt.Sprintf("?hasExternalId=%t", *o.HasExternalId)
+	if o.HasExternalID != nil {
+		query += fmt.Sprintf("?hasExternalId=%t", *o.HasExternalID)
 	}
 	return query
 }

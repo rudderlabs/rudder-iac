@@ -31,7 +31,7 @@ func TestEventLoadImportable(t *testing.T) {
 		mockClient := &mockEventCatalog{
 			events: []*catalog.Event{
 				{ID: "evt1", Name: "Page Viewed", EventType: "track", WorkspaceId: "ws1"},
-				{ID: "evt2", Name: "Button Clicked", EventType: "track", WorkspaceId: "ws1", ExternalId: "button_clicked"},
+				{ID: "evt2", Name: "Button Clicked", EventType: "track", WorkspaceId: "ws1", ExternalID: "button_clicked"},
 				{ID: "evt3", Name: "Product Purchased", EventType: "track", WorkspaceId: "ws1"},
 			},
 		}

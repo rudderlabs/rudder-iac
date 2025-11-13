@@ -31,7 +31,7 @@ func TestCustomTypeLoadImportable(t *testing.T) {
 		mockClient := &mockCustomTypeDataCatalog{
 			customTypes: []*catalog.CustomType{
 				{ID: "ct1", Name: "Custom Type 1", Type: "object", WorkspaceId: "ws1"},
-				{ID: "ct2", Name: "Custom Type 2", Type: "object", WorkspaceId: "ws1", ExternalId: "custom-type-2"},
+				{ID: "ct2", Name: "Custom Type 2", Type: "object", WorkspaceId: "ws1", ExternalID: "custom-type-2"},
 				{ID: "ct3", Name: "Custom Type 3", Type: "object", WorkspaceId: "ws1"},
 			},
 		}

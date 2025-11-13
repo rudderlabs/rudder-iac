@@ -112,7 +112,7 @@ func TestEventArgs_FromRemoteEvent(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  &categoryID,
-		ExternalId:  "category-123-local",
+		ExternalID:  "category-123-local",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -143,7 +143,7 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  nil,
-		ExternalId:  "project-456",
+		ExternalID:  "project-456",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -164,7 +164,6 @@ func TestEventArgs_FromRemoteEvent_NoCategory(t *testing.T) {
 	assert.Nil(t, args.CategoryId)
 }
 
-
 func TestEventArgs_FromRemoteEvent_NonCLIManagedCategory(t *testing.T) {
 	t.Parallel()
 
@@ -177,7 +176,7 @@ func TestEventArgs_FromRemoteEvent_NonCLIManagedCategory(t *testing.T) {
 		Description: "Test Description",
 		EventType:   "track",
 		CategoryId:  &categoryID,
-		ExternalId:  "project-456",
+		ExternalID:  "project-456",
 		WorkspaceId: "workspace-789",
 		CreatedAt:   now,
 		UpdatedAt:   now,
