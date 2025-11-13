@@ -23,6 +23,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 				AllowUnplanned: false,
 				Properties: []*state.TrackingPlanPropertyArgs{
 					{
+						ID:       "upstream-property-id",
 						LocalID:  "property-local-id",
 						Required: true,
 					},
@@ -93,6 +94,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id",
 					LocalID:  "property-local-id",
 					Required: false,
 				},
@@ -105,6 +107,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id",
 					LocalID:  "property-local-id",
 					Required: true, // Same properties length
 				},
