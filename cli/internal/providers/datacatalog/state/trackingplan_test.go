@@ -18,6 +18,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		toArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
+				ID:             "event-id",
 				LocalID:        "event-local-id",
 				AllowUnplanned: false,
 				Properties: []*state.TrackingPlanPropertyArgs{
@@ -51,11 +52,13 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		toArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
+				ID:              "event-id-updated",
 				LocalID:         "event-local-id-updated", // added
 				AllowUnplanned:  false,
 				IdentitySection: "traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
+				ID:              "event-id-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  true, // updated
 				IdentitySection: "",
@@ -63,11 +66,13 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().
 			WithEvent(&state.TrackingPlanEventArgs{
+				ID:              "event-id",
 				LocalID:         "event-local-id",
 				AllowUnplanned:  true,
 				IdentitySection: "context.traits",
 			}).
 			WithEvent(&state.TrackingPlanEventArgs{
+				ID:              "event-id-1",
 				LocalID:         "event-local-id-1",
 				AllowUnplanned:  false,
 				IdentitySection: "",
@@ -83,6 +88,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		t.Parallel()
 
 		toArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -94,6 +100,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}).Build()
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -128,6 +135,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}
 
 		toArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties:     []*state.TrackingPlanPropertyArgs{propertyWithNested},
@@ -147,6 +155,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties:     []*state.TrackingPlanPropertyArgs{propertyWithNestedChanged},
@@ -176,6 +185,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}
 
 		fromArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties:     []*state.TrackingPlanPropertyArgs{propertyWithoutNested},
@@ -201,6 +211,7 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 		}
 
 		toArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-local-id",
 			AllowUnplanned: false,
 			Properties:     []*state.TrackingPlanPropertyArgs{propertyWithOneNested},

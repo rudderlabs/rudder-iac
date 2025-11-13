@@ -66,15 +66,6 @@ func (t *TrackingPlanState) EventByID(eventID string) *TrackingPlanEventState {
 	return nil
 }
 
-func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
-	for _, event := range t.Events {
-		if event.LocalID == localID {
-			return event
-		}
-	}
-	return nil
-}
-
 type TrackingPlanPropertyState struct {
 	Name        string
 	LocalID     string
@@ -238,14 +229,14 @@ func (args TrackingPlanArgs) Diff(other TrackingPlanArgs) *TrackingPlanArgsDiff 
 	}
 
 	for _, otherEvent := range other.Events {
-		if args.EventByLocalID(otherEvent.LocalID) == nil {
+		if args.EventByID(otherEvent.ID.(string)) == nil {
 			diffed.Added = append(diffed.Added, otherEvent)
 		}
 	}
 
 	for _, event := range args.Events {
 
-		otherEvent := other.EventByLocalID(event.LocalID)
+		otherEvent := other.EventByID(event.ID.(string))
 
 		if otherEvent == nil {
 			diffed.Deleted = append(diffed.Deleted, event)
@@ -352,11 +343,7 @@ func (args *TrackingPlanEventArgs) diffUpstream(upstream *catalog.TrackingPlanEv
 	var upstreamVariants Variants
 	upstreamVariants.FromCatalogVariants(upstream.Variants)
 
-	if args.Variants.Diff(upstreamVariants) {
-		return true
-	}
-
-	return false
+	return args.Variants.Diff(upstreamVariants)
 }
 
 func diffPropertyArgs(localProps []*TrackingPlanPropertyArgs, upstreamProps []*catalog.TrackingPlanEventProperty) bool {
@@ -416,11 +403,7 @@ func (args *TrackingPlanEventArgs) diff(other *TrackingPlanEventArgs) bool {
 		}
 	}
 
-	if args.Variants.Diff(other.Variants) {
-		return true
-	}
-
-	return false
+	return args.Variants.Diff(other.Variants)
 }
 
 func (args *TrackingPlanEventArgs) PropertyByLocalID(id string) *TrackingPlanPropertyArgs {
@@ -670,6 +653,15 @@ func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
 
 	for _, event := range args.Events {
 		if event.LocalID == id {
+			return event
+		}
+	}
+	return nil
+}
+
+func (args *TrackingPlanArgs) EventByID(id string) *TrackingPlanEventArgs {
+	for _, event := range args.Events {
+		if event.ID == id {
 			return event
 		}
 	}

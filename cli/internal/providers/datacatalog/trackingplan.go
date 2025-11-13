@@ -163,7 +163,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		)
 
 		if err != nil {
-			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
+			return nil, fmt.Errorf("upserting event during add: %s tracking plan in catalog: %w", event.LocalID, err)
 		}
 
 		updatedEventStates = append(updatedEventStates, &state.TrackingPlanEventState{
@@ -180,7 +180,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		)
 
 		if err != nil {
-			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
+			return nil, fmt.Errorf("upserting event during update: %s tracking plan in catalog: %w", event.LocalID, err)
 		}
 
 	}
@@ -196,7 +196,8 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	var tpState state.TrackingPlanState
 
 	if updated == nil {
-		// Copy from previous if anything isn't getting updated so we don't panic
+		// Copy from previous if anything isn't getting updated
+		// so we don't panic
 		tpState = state.TrackingPlanState{
 			TrackingPlanArgs: toArgs,
 			ID:               prevState.ID,
@@ -207,7 +208,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 			WorkspaceID:      prevState.WorkspaceID,
 			CreatedAt:        prevState.CreatedAt,
 			UpdatedAt:        prevState.UpdatedAt,
-			Events:           prevState.Events,
+			Events:           updatedEventStates,
 		}
 	} else {
 		tpState = state.TrackingPlanState{

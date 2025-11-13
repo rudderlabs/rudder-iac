@@ -210,6 +210,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "upstream-event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -246,7 +247,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			"events": []map[string]interface{}{
 				{
 					"localId":         "event-id",
-					"id":              "",
+					"id":              "upstream-event-id",
 					"allowUnplanned":  false,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
@@ -364,6 +365,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	// 2 Added 1 Removed 1 Updated
 	oldArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -374,6 +376,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id-1",
 			LocalID:        "event-id-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -387,6 +390,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 
 	newArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: true, // updated
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -401,6 +405,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id-2",
 			LocalID:        "event-id-2",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -417,6 +422,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	require.Equal(t, 1, len(diffed.Deleted))
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id-2",
 		LocalID:        "event-id-2",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
@@ -428,6 +434,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	}, diffed.Added[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id-1",
 		LocalID:        "event-id-1",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
@@ -439,6 +446,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	}, diffed.Deleted[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id",
 		LocalID:        "event-id",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
