@@ -45,6 +45,9 @@ private fun List<JsonNull>.rudderSerialize(): JsonArray = JsonArray(this.map { i
 /** Whether user is active */
 typealias CustomTypeActive = Boolean
 
+/** List of addresses */
+typealias CustomTypeAddressList = List<com.rudderstack.ruddertyper.CustomTypeAddressDetails>
+
 /** User's age in years */
 typealias CustomTypeAge = Double
 
@@ -75,6 +78,9 @@ typealias CustomTypeProfileList = List<com.rudderstack.ruddertyper.CustomTypeUse
 /** User active status */
 typealias PropertyActive = com.rudderstack.ruddertyper.CustomTypeActive
 
+/** User's addresses */
+typealias PropertyAddresses = com.rudderstack.ruddertyper.CustomTypeAddressList
+
 /** User's age */
 typealias PropertyAge = com.rudderstack.ruddertyper.CustomTypeAge
 
@@ -83,6 +89,9 @@ typealias PropertyArrayOfAny = List<JsonElement>
 
 /** Array with items that can be string or null */
 typealias PropertyArrayWithNullItems = List<com.rudderstack.ruddertyper.ArrayItemArrayWithNullItems>
+
+/** City name */
+typealias PropertyCity = String
 
 /** Array of user contacts */
 typealias PropertyContacts = List<com.rudderstack.ruddertyper.CustomTypeEmail>
@@ -153,6 +162,9 @@ typealias PropertyPageType = String
 /** Array of phone numbers using custom type */
 typealias PropertyPhoneNumbers = List<com.rudderstack.ruddertyper.CustomTypePhoneNumber>
 
+/** Postal code */
+typealias PropertyPostalCode = String
+
 /** Product identifier */
 typealias PropertyProductId = String
 
@@ -173,6 +185,9 @@ typealias PropertySpecialField = String
 
 /** User account status */
 typealias PropertyStatus = com.rudderstack.ruddertyper.CustomTypeStatus
+
+/** Street address */
+typealias PropertyStreet = String
 
 /** User tags as array of strings */
 typealias PropertyTags = List<String>
@@ -805,6 +820,27 @@ fun TrackEventWithVariantsProperties.rudderSerialize(): JsonObject = this._jsonE
 @JvmName("rudderSerializeListTrackEventWithVariantsProperties")
 fun List<TrackEventWithVariantsProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
+/** Address details object */
+data class CustomTypeAddressDetails(
+    /** City name */
+    val city: com.rudderstack.ruddertyper.PropertyCity,
+
+    /** Postal code */
+    val postalCode: com.rudderstack.ruddertyper.PropertyPostalCode? = null,
+
+    /** Street address */
+    val street: com.rudderstack.ruddertyper.PropertyStreet
+)
+fun CustomTypeAddressDetails.rudderSerialize(): JsonObject = buildJsonObject {
+    put("city", city.rudderSerialize())
+    if (postalCode != null) {
+        put("postal_code", postalCode.rudderSerialize())
+    }
+    put("street", street.rudderSerialize())
+}
+@JvmName("rudderSerializeListCustomTypeAddressDetails")
+fun List<CustomTypeAddressDetails>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+
 /** User profile information */
 data class CustomTypeUserProfile(
     /** User's email address */
@@ -929,6 +965,9 @@ fun List<TrackProductPremiumClickedProperties>.rudderSerialize(): JsonArray = Js
 data class TrackUserSignedUpProperties(
     /** User active status */
     val active: com.rudderstack.ruddertyper.PropertyActive,
+
+    /** User's addresses */
+    val addresses: com.rudderstack.ruddertyper.PropertyAddresses? = null,
 
     /** User's age */
     val age: com.rudderstack.ruddertyper.PropertyAge? = null,
@@ -1077,6 +1116,9 @@ data class TrackUserSignedUpProperties(
 }
 fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("active", active.rudderSerialize())
+    if (addresses != null) {
+        put("addresses", addresses.rudderSerialize())
+    }
     if (age != null) {
         put("age", age.rudderSerialize())
     }
