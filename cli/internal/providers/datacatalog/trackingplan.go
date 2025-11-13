@@ -74,10 +74,10 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 
 	version := created.Version
 	for _, event := range args.Events {
-		lastupserted, err := p.client.UpdateTrackingPlanEvent(
+		lastupserted, err := p.client.UpdateTrackingPlanEvents(
 			ctx,
 			created.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
@@ -160,10 +160,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Added {
-		updated, err = p.client.UpdateTrackingPlanEvent(
+		updated, err = p.client.UpdateTrackingPlanEvents(
 			ctx,
 			prevState.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
@@ -178,10 +178,10 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	}
 
 	for _, event := range diff.Updated {
-		updated, err = p.client.UpdateTrackingPlanEvent(
+		updated, err = p.client.UpdateTrackingPlanEvents(
 			ctx,
 			prevState.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
@@ -271,14 +271,14 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 		}
 
 		for _, added := range diffed.Added {
-			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(added))
+			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, []catalog.EventIdentifierDetail{GetUpsertEventIdentifier(added)})
 			if err != nil {
 				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
 			}
 		}
 
 		for _, updated := range diffed.Updated {
-			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(updated))
+			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, []catalog.EventIdentifierDetail{GetUpsertEventIdentifier(updated)})
 			if err != nil {
 				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
 			}

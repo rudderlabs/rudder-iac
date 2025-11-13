@@ -188,7 +188,7 @@ type TrackingPlanStore interface {
 	GetTrackingPlans(ctx context.Context) ([]*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
-	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
+	UpdateTrackingPlanEvents(ctx context.Context, id string, inputs []EventIdentifierDetail) (*TrackingPlan, error)
 	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
 
@@ -402,8 +402,9 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 	return &schema, nil
 }
 
-func (c *RudderDataCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error) {
-	byt, err := json.Marshal(input)
+func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, inputs []EventIdentifierDetail) (*TrackingPlan, error) {
+	update := TrackingPlanEventsUpdate{Events: inputs}
+	byt, err := json.Marshal(update)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}

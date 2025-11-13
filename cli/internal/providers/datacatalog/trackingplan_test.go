@@ -76,7 +76,7 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, inputs []catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
 	m.updateEventCalled = true
 	m.updateEventCallCount++
 	return m.tp, m.err

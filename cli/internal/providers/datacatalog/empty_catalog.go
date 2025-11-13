@@ -56,11 +56,11 @@ func (m *EmptyCatalog) UpsertTrackingPlan(ctx context.Context, trackingPlanID st
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
+func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, inputs []catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlanEvent(ctx context.Context, trackingPlanID string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
+func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID string, name string, description string) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
 
