@@ -12,16 +12,29 @@ func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {
 		extractCustomTypesFromVariants(rule.Variants, customTypes)
 	}
 
-	// Extract properties from within custom type schemas and variants
+	// Extract all custom types from custom types recursively
 	for _, customType := range customTypes {
-		if !customType.IsPrimitive() {
-			extractCustomTypesFromSchema(customType.Schema, customTypes)
-		}
-		// Extract from custom type variants
-		extractCustomTypesFromVariants(customType.Variants, customTypes)
+		extractCustomTypesFromCustomType(customType, customTypes)
 	}
 
 	return customTypes
+}
+
+func extractCustomTypesFromCustomType(customType *CustomType, customTypes map[string]*CustomType) {
+	if !customType.IsPrimitive() {
+		extractCustomTypesFromSchema(customType.Schema, customTypes)
+	}
+	extractCustomTypesFromVariants(customType.Variants, customTypes)
+
+	if customType.Type == PrimitiveTypeArray && customType.ItemType != nil {
+		if IsCustomType(customType.ItemType) {
+			itemCustomType := AsCustomType(customType.ItemType)
+			if itemCustomType != nil {
+				customTypes[itemCustomType.Name] = itemCustomType
+				extractCustomTypesFromCustomType(itemCustomType, customTypes)
+			}
+		}
+	}
 }
 
 // ExtractAllProperties extracts all properties from a tracking plan
