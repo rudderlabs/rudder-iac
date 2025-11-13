@@ -142,8 +142,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 		"version":      1,
 		"events": []map[string]interface{}{
 			{
-				"id":      "upstream-tracking-plan-event-id",
-				"eventId": "upsream-event-id",
+				"eventId": "upstream-event-id",
 				"localId": "event-id",
 			},
 		},
@@ -153,7 +152,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 			"description": "tracking-plan-description",
 			"events": []map[string]interface{}{
 				{
-					"id":              "",
+					"id":              "upstream-event-id",
 					"localId":         "event-id",
 					"allowUnplanned":  false,
 					"identitySection": "",
@@ -188,7 +187,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 
 	oldsState := defaultTrackingPlanStateFactory().
 		WithEvent(&state.TrackingPlanEventState{
-			ID:      "upstream-tracking-plan-event-id",
 			LocalID: "event-id",
 			EventID: "upstream-event-id",
 		}).
@@ -237,7 +235,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		"version":      2,
 		"events": []map[string]interface{}{
 			{
-				"id":      "upstream-tracking-plan-event-id",
 				"eventId": "upstream-event-id",
 				"localId": "event-id",
 			},
@@ -282,7 +279,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 
 	oldsState := defaultTrackingPlanStateFactory().
 		WithEvent(&state.TrackingPlanEventState{
-			ID:      "upstream-tracking-plan-event-id",
 			LocalID: "event-id",
 			EventID: "upstream-event-id",
 		}).
@@ -292,6 +288,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{               // updated events under the trackingplan +1 Added -1 Removed
+			ID:             "upstream-event-id-1",
 			LocalID:        "event-id-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -331,8 +328,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 		"version":      2,
 		"events": []map[string]interface{}{
 			{
-				"id":      "upstream-tracking-plan-event-id-1",
-				"eventId": "upsream-event-id-1",
+				"eventId": "upstream-event-id-1",
 				"localId": "event-id-1",
 			},
 		},
@@ -342,7 +338,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"id":              "",
+					"id":              "upstream-event-id-1",
 					"localId":         "event-id-1",
 					"allowUnplanned":  true,
 					"identitySection": "",
@@ -756,6 +752,7 @@ func getTrackingPlanArgs() *state.TrackingPlanArgs {
 
 	f := defaultTrackingPlanArgsFactory()
 	f = f.WithEvent(&state.TrackingPlanEventArgs{
+		ID:             "upstream-event-id",
 		LocalID:        "event-id",
 		AllowUnplanned: false,
 		Properties: []*state.TrackingPlanPropertyArgs{
