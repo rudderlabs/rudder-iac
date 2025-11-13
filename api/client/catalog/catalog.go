@@ -30,6 +30,18 @@ type DataCatalog interface {
 	CategoryStore
 }
 
+type ListOptions struct {
+	HasExternalId *bool
+}
+
+func (o *ListOptions) ToQuery() string {
+	query := ""
+	if o.HasExternalId != nil {
+		query += fmt.Sprintf("?hasExternalId=%t", *o.HasExternalId)
+	}
+	return query
+}
+
 type RudderDataCatalog struct {
 	client *client.Client
 }

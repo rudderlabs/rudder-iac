@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/samber/lo"
 )
 
 type PropertyEntityProvider struct {
@@ -181,7 +182,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	collection := resources.NewResourceCollection()
 
 	// fetch properties from remote
-	properties, err := p.client.GetProperties(ctx)
+	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}

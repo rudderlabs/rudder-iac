@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/samber/lo"
 )
 
 const (
@@ -43,7 +44,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 	p.log.Debug("loading importable events from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	events, err := p.client.GetEvents(ctx)
+	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting events from remote catalog: %w", err)
 	}

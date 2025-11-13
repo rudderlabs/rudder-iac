@@ -309,8 +309,9 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 // LoadResourcesFromRemote loads all tracking plans from the remote catalog
 func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	p.log.Debug("loading tracking plans from remote catalog ")
+
 	collection := resources.NewResourceCollection()
-	trackingPlans, err := p.client.GetTrackingPlans(ctx)
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}

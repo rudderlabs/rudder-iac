@@ -22,7 +22,7 @@ type mockCategoryCatalog struct {
 	err        error
 }
 
-func (m *mockCategoryCatalog) GetCategories(ctx context.Context) ([]*catalog.Category, error) {
+func (m *mockCategoryCatalog) GetCategories(ctx context.Context, options catalog.ListOptions) ([]*catalog.Category, error) {
 	return m.categories, m.err
 }
 
