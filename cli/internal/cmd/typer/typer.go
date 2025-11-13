@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
@@ -17,11 +16,10 @@ import (
 
 func NewCmdTyper() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    "typer",
-		Short:  "Generate type-safe tracking code",
-		Long:   "Generate type-safe tracking code from RudderStack tracking plans",
-		Hidden: true,
-		Args:   cobra.NoArgs,
+		Use:   "typer",
+		Short: "Generate type-safe tracking code",
+		Long:  "Generate type-safe tracking code from RudderStack tracking plans",
+		Args:  cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdGenerate())
@@ -40,12 +38,6 @@ func newCmdGenerate() *cobra.Command {
 		Use:   "generate",
 		Short: "Generate type-safe code from tracking plan",
 		Long:  "Generate type-safe code from a RudderStack tracking plan",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if !config.GetConfig().ExperimentalFlags.RudderTyper {
-				return fmt.Errorf("typer commands are disabled")
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if trackingPlanID == "" {
 				return fmt.Errorf("tracking-plan-id is required")

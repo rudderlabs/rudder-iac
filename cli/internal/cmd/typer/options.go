@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -18,12 +17,6 @@ func newCmdOptions() *cobra.Command {
 		Use:   "options",
 		Short: "Show available options for a platform",
 		Long:  "Show all available platform-specific options for code generation",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if !config.GetConfig().ExperimentalFlags.RudderTyper {
-				return fmt.Errorf("typer commands are disabled")
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gen, err := generator.GeneratorForPlatform(platform)
 			if err != nil {
