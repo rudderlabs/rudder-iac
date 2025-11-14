@@ -399,7 +399,12 @@ func (c *RudderDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context,
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties", id, eventId), nil)
+	resp, err := c.client.Do(
+		ctx,
+		"GET",
+		fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties&rebuildSchemas=false", id, eventId),
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
