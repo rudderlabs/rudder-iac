@@ -49,13 +49,21 @@ func (t *TrackingPlanState) CatalogEventIDForLocalID(localID string) string {
 }
 
 type TrackingPlanEventState struct {
-	ID      string
 	LocalID string
 	EventID string
 }
 
 func (t *TrackingPlanEventState) GetLocalID() string {
 	return t.LocalID
+}
+
+func (t *TrackingPlanState) EventByID(eventID string) *TrackingPlanEventState {
+	for _, event := range t.Events {
+		if event.EventID == eventID {
+			return event
+		}
+	}
+	return nil
 }
 
 func (t *TrackingPlanState) EventByLocalID(localID string) *TrackingPlanEventState {
@@ -95,7 +103,6 @@ func (t *TrackingPlanState) ToResourceData() resources.ResourceData {
 	for _, event := range t.Events {
 
 		events = append(events, map[string]interface{}{
-			"id":      event.ID,
 			"eventId": event.EventID,
 			"localId": event.LocalID,
 		})
@@ -145,7 +152,6 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	for idx, event := range events {
 
 		tpEvents[idx] = &TrackingPlanEventState{
-			ID:      MustString(event, "id"),
 			EventID: MustString(event, "eventId"),
 			LocalID: MustString(event, "localId"),
 		}
@@ -170,9 +176,6 @@ func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.Trackin
 	events := make([]*TrackingPlanEventState, 0, len(trackingPlan.Events))
 	for _, event := range trackingPlan.Events {
 		events = append(events, &TrackingPlanEventState{
-			// we dont set the tracking plan event ID in the stateless approach(as it is not available in the remote event)
-			// but this ID is required to manage the state for tracking plan updates, so we use a combination of event.ID and event.ExternalID instead
-			ID:      fmt.Sprintf("%s-%s", event.ID, event.ExternalID),
 			EventID: event.ID,
 			LocalID: event.ExternalID,
 		})

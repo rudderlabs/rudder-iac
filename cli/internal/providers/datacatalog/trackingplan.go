@@ -74,21 +74,19 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 
 	version := created.Version
 	for _, event := range args.Events {
-		lastupserted, err := p.client.UpdateTrackingPlanEvent(
+		lastupserted, err := p.client.UpdateTrackingPlanEvents(
 			ctx,
 			created.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
 			return nil, fmt.Errorf("upserting event: %s tracking plan in catalog: %w", event.LocalID, err)
 		}
 
-		lastEvent := lastupserted.Events[len(lastupserted.Events)-1]
 		eventStates = append(eventStates, &state.TrackingPlanEventState{
-			ID:      lastEvent.ID,
-			EventID: lastEvent.EventID,
 			LocalID: event.LocalID,
+			EventID: event.ID.(string),
 		})
 		version = lastupserted.Version
 	}
@@ -145,25 +143,23 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	var deletedEvents []string
 	for _, event := range diff.Deleted {
 
-		upstreamEvent := prevState.EventByLocalID(event.LocalID)
+		upstreamEvent := prevState.EventByID(event.ID.(string))
 		if upstreamEvent == nil {
-			return nil, fmt.Errorf("state discrepancy as upstream event not found for local id: %s", event.LocalID)
+			return nil, fmt.Errorf("state discrepancy as upstream event not found for event id: %s", event.ID.(string))
 		}
 
 		if err := p.client.DeleteTrackingPlanEvent(ctx, prevState.ID, upstreamEvent.EventID); err != nil && !catalog.IsCatalogNotFoundError(err) {
 			return nil, fmt.Errorf("deleting tracking plan event in catalog: %w", err)
 		}
 
-		// capture the catalogeventID which are unique as
-		// the newly created events can have same localID
-		deletedEvents = append(deletedEvents, upstreamEvent.ID)
+		deletedEvents = append(deletedEvents, upstreamEvent.EventID)
 	}
 
 	for _, event := range diff.Added {
-		updated, err = p.client.UpdateTrackingPlanEvent(
+		updated, err = p.client.UpdateTrackingPlanEvents(
 			ctx,
 			prevState.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
@@ -171,17 +167,16 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		}
 
 		updatedEventStates = append(updatedEventStates, &state.TrackingPlanEventState{
-			ID:      updated.Events[len(updated.Events)-1].ID,
-			EventID: updated.Events[len(updated.Events)-1].EventID,
+			EventID: event.ID.(string),
 			LocalID: event.LocalID,
 		})
 	}
 
 	for _, event := range diff.Updated {
-		updated, err = p.client.UpdateTrackingPlanEvent(
+		updated, err = p.client.UpdateTrackingPlanEvents(
 			ctx,
 			prevState.ID,
-			GetUpsertEventIdentifier(event),
+			[]catalog.EventIdentifierDetail{GetUpsertEventIdentifier(event)},
 		)
 
 		if err != nil {
@@ -192,7 +187,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 
 	// filter the deleted events in it.
 	updatedEventStates = lo.Filter(updatedEventStates, func(event *state.TrackingPlanEventState, idx int) bool {
-		return !lo.Contains(deletedEvents, event.ID)
+		return !lo.Contains(deletedEvents, event.EventID)
 	})
 
 	// sort updatedEventStates based on localId
@@ -271,14 +266,14 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 		}
 
 		for _, added := range diffed.Added {
-			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(added))
+			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, []catalog.EventIdentifierDetail{GetUpsertEventIdentifier(added)})
 			if err != nil {
 				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
 			}
 		}
 
 		for _, updated := range diffed.Updated {
-			_, err = p.client.UpdateTrackingPlanEvent(ctx, remoteId, GetUpsertEventIdentifier(updated))
+			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, []catalog.EventIdentifierDetail{GetUpsertEventIdentifier(updated)})
 			if err != nil {
 				return nil, fmt.Errorf("updating tracking plan event during import: %w", err)
 			}
