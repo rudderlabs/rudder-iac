@@ -13,5 +13,7 @@ fun {{ .Name }}.rudderSerialize(): JsonElement = when (this) {
     {{ $.Name }}.{{ .Name }} -> JsonPrimitive({{ formatLiteral .Value }})
     {{- end }}
 }
-@JvmName("rudderSerializeList{{ .Name }}")
+@JvmName("rudderSerializeList_{{ .Name }}")
 fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_{{ .Name }}")
+fun List<List<{{ .Name }}>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })

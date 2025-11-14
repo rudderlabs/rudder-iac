@@ -25,22 +25,40 @@ private fun JsonNull.rudderSerialize(): JsonNull = this
 
 @JvmName("rudderSerializeListUnit")
 private fun List<Unit>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListUnit")
+private fun List<List<Unit>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListString")
 private fun List<String>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListString")
+private fun List<List<String>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListLong")
 private fun List<Long>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListLong")
+private fun List<List<Long>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListDouble")
 private fun List<Double>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListDouble")
+private fun List<List<Double>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListBoolean")
 private fun List<Boolean>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListBoolean")
+private fun List<List<Boolean>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListJsonElement")
 private fun List<JsonElement>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListJsonElement")
+private fun List<List<JsonElement>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListJsonObject")
 private fun List<JsonObject>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListJsonObject")
+private fun List<List<JsonObject>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListJsonArray")
 private fun List<JsonArray>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListJsonArray")
+private fun List<List<JsonArray>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 @JvmName("rudderSerializeListJsonNull")
 private fun List<JsonNull>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListListJsonNull")
+private fun List<List<JsonNull>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Whether user is active */
 typealias CustomTypeActive = Boolean
@@ -224,8 +242,10 @@ fun CustomTypeStatus.rudderSerialize(): JsonElement = when (this) {
     CustomTypeStatus.SUSPENDED -> JsonPrimitive("suspended")
     CustomTypeStatus.DELETED -> JsonPrimitive("deleted")
 }
-@JvmName("rudderSerializeListCustomTypeStatus")
+@JvmName("rudderSerializeList_CustomTypeStatus")
 fun List<CustomTypeStatus>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeStatus")
+fun List<List<CustomTypeStatus>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Custom type with Cyrillic name */
@@ -240,8 +260,10 @@ fun CustomTypeТипыДанных.rudderSerialize(): JsonElement = when (this) 
     CustomTypeТипыДанных.НЕАКТИВНЫЙ -> JsonPrimitive("неактивный")
     CustomTypeТипыДанных.PENDING -> JsonPrimitive("pending")
 }
-@JvmName("rudderSerializeListCustomTypeТипыДанных")
+@JvmName("rudderSerializeList_CustomTypeТипыДанных")
 fun List<CustomTypeТипыДанных>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeТипыДанных")
+fun List<List<CustomTypeТипыДанных>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Type of device */
@@ -260,8 +282,10 @@ fun PropertyDeviceType.rudderSerialize(): JsonElement = when (this) {
     PropertyDeviceType.SMART_TV -> JsonPrimitive("smartTV")
     PropertyDeviceType.IO_T_DEVICE -> JsonPrimitive("IoT-Device")
 }
-@JvmName("rudderSerializeListPropertyDeviceType")
+@JvmName("rudderSerializeList_PropertyDeviceType")
 fun List<PropertyDeviceType>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyDeviceType")
+fun List<List<PropertyDeviceType>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Field with $ for testing string interpolation: $variable and ${expression} */
@@ -278,8 +302,10 @@ fun PropertyDollarField.rudderSerialize(): JsonElement = when (this) {
     PropertyDollarField.PRICE_99_99 -> JsonPrimitive("Price: \$99.99")
     PropertyDollarField.VARIABLE_NAME -> JsonPrimitive("\$variable_name")
 }
-@JvmName("rudderSerializeListPropertyDollarField")
+@JvmName("rudderSerializeList_PropertyDollarField")
 fun List<PropertyDollarField>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyDollarField")
+fun List<List<PropertyDollarField>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Feature enabled flag */
@@ -292,8 +318,10 @@ fun PropertyEnabled.rudderSerialize(): JsonElement = when (this) {
     PropertyEnabled.TRUE -> JsonPrimitive(true)
     PropertyEnabled.FALSE -> JsonPrimitive(false)
 }
-@JvmName("rudderSerializeListPropertyEnabled")
+@JvmName("rudderSerializeList_PropertyEnabled")
 fun List<PropertyEnabled>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyEnabled")
+fun List<List<PropertyEnabled>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Mixed type enum */
@@ -310,8 +338,10 @@ fun PropertyMixedValue.rudderSerialize(): JsonElement = when (this) {
     PropertyMixedValue.TRUE -> JsonPrimitive(true)
     PropertyMixedValue._2_5 -> JsonPrimitive(2.5)
 }
-@JvmName("rudderSerializeListPropertyMixedValue")
+@JvmName("rudderSerializeList_PropertyMixedValue")
 fun List<PropertyMixedValue>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyMixedValue")
+fun List<List<PropertyMixedValue>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Priority level */
@@ -326,8 +356,10 @@ fun PropertyPriority.rudderSerialize(): JsonElement = when (this) {
     PropertyPriority._2 -> JsonPrimitive(2)
     PropertyPriority._3 -> JsonPrimitive(3)
 }
-@JvmName("rudderSerializeListPropertyPriority")
+@JvmName("rudderSerializeList_PropertyPriority")
 fun List<PropertyPriority>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyPriority")
+fun List<List<PropertyPriority>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Rating value */
@@ -346,8 +378,10 @@ fun PropertyRating.rudderSerialize(): JsonElement = when (this) {
     PropertyRating._4_5 -> JsonPrimitive(4.5)
     PropertyRating._5 -> JsonPrimitive(5)
 }
-@JvmName("rudderSerializeListPropertyRating")
+@JvmName("rudderSerializeList_PropertyRating")
 fun List<PropertyRating>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyRating")
+fun List<List<PropertyRating>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** HTTP status with special characters */
@@ -362,8 +396,10 @@ fun PropertyStatusCode.rudderSerialize(): JsonElement = when (this) {
     PropertyStatusCode._404_NOT_FOUND -> JsonPrimitive("404: Not Found")
     PropertyStatusCode._500_INTERNAL_SERVER_ERROR -> JsonPrimitive("500: Internal \"Server\" Error")
 }
-@JvmName("rudderSerializeListPropertyStatusCode")
+@JvmName("rudderSerializeList_PropertyStatusCode")
 fun List<PropertyStatusCode>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyStatusCode")
+fun List<List<PropertyStatusCode>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Field demonstrating various Unicode characters in enum values */
@@ -386,8 +422,10 @@ fun PropertyUnicodeEnumField.rudderSerialize(): JsonElement = when (this) {
     PropertyUnicodeEnumField.CAFÉ -> JsonPrimitive("café")
     PropertyUnicodeEnumField.___1 -> JsonPrimitive("!!!")
 }
-@JvmName("rudderSerializeListPropertyUnicodeEnumField")
+@JvmName("rudderSerializeList_PropertyUnicodeEnumField")
 fun List<PropertyUnicodeEnumField>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyUnicodeEnumField")
+fun List<List<PropertyUnicodeEnumField>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 
 /** Feature configuration with variants based on multi-type flag */
@@ -447,8 +485,10 @@ sealed class CustomTypeFeatureConfig {
 }
 
 fun CustomTypeFeatureConfig.rudderSerialize(): JsonObject = this._jsonElement
-@JvmName("rudderSerializeListCustomTypeFeatureConfig")
+@JvmName("rudderSerializeList_CustomTypeFeatureConfig")
 fun List<CustomTypeFeatureConfig>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeFeatureConfig")
+fun List<List<CustomTypeFeatureConfig>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Page context with variants based on page type */
 sealed class CustomTypePageContext {
@@ -507,8 +547,10 @@ sealed class CustomTypePageContext {
 }
 
 fun CustomTypePageContext.rudderSerialize(): JsonObject = this._jsonElement
-@JvmName("rudderSerializeListCustomTypePageContext")
+@JvmName("rudderSerializeList_CustomTypePageContext")
 fun List<CustomTypePageContext>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypePageContext")
+fun List<List<CustomTypePageContext>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** User access with variants based on active status */
 sealed class CustomTypeUserAccess {
@@ -554,8 +596,10 @@ sealed class CustomTypeUserAccess {
 }
 
 fun CustomTypeUserAccess.rudderSerialize(): JsonObject = this._jsonElement
-@JvmName("rudderSerializeListCustomTypeUserAccess")
+@JvmName("rudderSerializeList_CustomTypeUserAccess")
 fun List<CustomTypeUserAccess>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeUserAccess")
+fun List<List<CustomTypeUserAccess>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Item type for array_with_null_items array */
 sealed class ArrayItemArrayWithNullItems {
@@ -578,8 +622,10 @@ sealed class ArrayItemArrayWithNullItems {
 }
 
 fun ArrayItemArrayWithNullItems.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListArrayItemArrayWithNullItems")
+@JvmName("rudderSerializeList_ArrayItemArrayWithNullItems")
 fun List<ArrayItemArrayWithNullItems>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_ArrayItemArrayWithNullItems")
+fun List<List<ArrayItemArrayWithNullItems>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Feature flag that can be boolean or string */
 sealed class PropertyFeatureFlag {
@@ -602,8 +648,10 @@ sealed class PropertyFeatureFlag {
 }
 
 fun PropertyFeatureFlag.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListPropertyFeatureFlag")
+@JvmName("rudderSerializeList_PropertyFeatureFlag")
 fun List<PropertyFeatureFlag>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyFeatureFlag")
+fun List<List<PropertyFeatureFlag>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Item type for multi_type_array array */
 sealed class ArrayItemMultiTypeArray {
@@ -626,8 +674,10 @@ sealed class ArrayItemMultiTypeArray {
 }
 
 fun ArrayItemMultiTypeArray.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListArrayItemMultiTypeArray")
+@JvmName("rudderSerializeList_ArrayItemMultiTypeArray")
 fun List<ArrayItemMultiTypeArray>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_ArrayItemMultiTypeArray")
+fun List<List<ArrayItemMultiTypeArray>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** A field that can be string, integer, or boolean */
 sealed class PropertyMultiTypeField {
@@ -658,8 +708,10 @@ sealed class PropertyMultiTypeField {
 }
 
 fun PropertyMultiTypeField.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListPropertyMultiTypeField")
+@JvmName("rudderSerializeList_PropertyMultiTypeField")
 fun List<PropertyMultiTypeField>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyMultiTypeField")
+fun List<List<PropertyMultiTypeField>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Property that can be string, integer, or null */
 sealed class PropertyMultiTypeWithNull {
@@ -690,8 +742,10 @@ sealed class PropertyMultiTypeWithNull {
 }
 
 fun PropertyMultiTypeWithNull.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListPropertyMultiTypeWithNull")
+@JvmName("rudderSerializeList_PropertyMultiTypeWithNull")
 fun List<PropertyMultiTypeWithNull>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyMultiTypeWithNull")
+fun List<List<PropertyMultiTypeWithNull>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Property that can be number or null */
 sealed class PropertyNumberOrNull {
@@ -714,8 +768,10 @@ sealed class PropertyNumberOrNull {
 }
 
 fun PropertyNumberOrNull.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListPropertyNumberOrNull")
+@JvmName("rudderSerializeList_PropertyNumberOrNull")
 fun List<PropertyNumberOrNull>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyNumberOrNull")
+fun List<List<PropertyNumberOrNull>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Property that can be string or null */
 sealed class PropertyStringOrNull {
@@ -738,8 +794,10 @@ sealed class PropertyStringOrNull {
 }
 
 fun PropertyStringOrNull.rudderSerialize(): JsonElement = this._jsonElement
-@JvmName("rudderSerializeListPropertyStringOrNull")
+@JvmName("rudderSerializeList_PropertyStringOrNull")
 fun List<PropertyStringOrNull>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PropertyStringOrNull")
+fun List<List<PropertyStringOrNull>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Example event to demonstrate variants */
 sealed class TrackEventWithVariantsProperties {
@@ -817,8 +875,10 @@ sealed class TrackEventWithVariantsProperties {
 }
 
 fun TrackEventWithVariantsProperties.rudderSerialize(): JsonObject = this._jsonElement
-@JvmName("rudderSerializeListTrackEventWithVariantsProperties")
+@JvmName("rudderSerializeList_TrackEventWithVariantsProperties")
 fun List<TrackEventWithVariantsProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackEventWithVariantsProperties")
+fun List<List<TrackEventWithVariantsProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Address details object */
 data class CustomTypeAddressDetails(
@@ -838,8 +898,10 @@ fun CustomTypeAddressDetails.rudderSerialize(): JsonObject = buildJsonObject {
     }
     put("street", street.rudderSerialize())
 }
-@JvmName("rudderSerializeListCustomTypeAddressDetails")
+@JvmName("rudderSerializeList_CustomTypeAddressDetails")
 fun List<CustomTypeAddressDetails>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeAddressDetails")
+fun List<List<CustomTypeAddressDetails>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** User profile information */
 data class CustomTypeUserProfile(
@@ -859,8 +921,10 @@ fun CustomTypeUserProfile.rudderSerialize(): JsonObject = buildJsonObject {
         put("last_name", lastName.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListCustomTypeUserProfile")
+@JvmName("rudderSerializeList_CustomTypeUserProfile")
 fun List<CustomTypeUserProfile>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_CustomTypeUserProfile")
+fun List<List<CustomTypeUserProfile>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Group association event */
 data class GroupTraits(
@@ -876,8 +940,10 @@ fun GroupTraits.rudderSerialize(): JsonObject = buildJsonObject {
         put("status", status.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListGroupTraits")
+@JvmName("rudderSerializeList_GroupTraits")
 fun List<GroupTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_GroupTraits")
+fun List<List<GroupTraits>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** User identification event */
 data class IdentifyTraits(
@@ -893,8 +959,10 @@ fun IdentifyTraits.rudderSerialize(): JsonObject = buildJsonObject {
     }
     put("email", email.rudderSerialize())
 }
-@JvmName("rudderSerializeListIdentifyTraits")
+@JvmName("rudderSerializeList_IdentifyTraits")
 fun List<IdentifyTraits>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_IdentifyTraits")
+fun List<List<IdentifyTraits>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Page view event */
 data class PageProperties(
@@ -904,8 +972,10 @@ data class PageProperties(
 fun PageProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("profile", profile.rudderSerialize())
 }
-@JvmName("rudderSerializeListPageProperties")
+@JvmName("rudderSerializeList_PageProperties")
 fun List<PageProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_PageProperties")
+fun List<List<PageProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Screen view event */
 data class ScreenProperties(
@@ -917,8 +987,10 @@ fun ScreenProperties.rudderSerialize(): JsonObject = buildJsonObject {
         put("profile", profile.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListScreenProperties")
+@JvmName("rudderSerializeList_ScreenProperties")
 fun List<ScreenProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_ScreenProperties")
+fun List<List<ScreenProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Event with dollar signs to test string interpolation escaping */
 data class TrackVariableStringProperties(
@@ -928,8 +1000,10 @@ data class TrackVariableStringProperties(
 fun TrackVariableStringProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("dollar_field", dollarField.rudderSerialize())
 }
-@JvmName("rudderSerializeListTrackVariableStringProperties")
+@JvmName("rudderSerializeList_TrackVariableStringProperties")
 fun List<TrackVariableStringProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackVariableStringProperties")
+fun List<List<TrackVariableStringProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Event with special characters that collide after sanitization */
 data class TrackEventWithNameCamelCaseProperties(
@@ -941,8 +1015,10 @@ fun TrackEventWithNameCamelCaseProperties.rudderSerialize(): JsonObject = buildJ
         put("email", email.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties")
+@JvmName("rudderSerializeList_TrackEventWithNameCamelCaseProperties")
 fun List<TrackEventWithNameCamelCaseProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackEventWithNameCamelCaseProperties")
+fun List<List<TrackEventWithNameCamelCaseProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 data class TrackProductPremiumClickedProperties(
@@ -958,8 +1034,10 @@ fun TrackProductPremiumClickedProperties.rudderSerialize(): JsonObject = buildJs
         put("status_code", statusCode.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListTrackProductPremiumClickedProperties")
+@JvmName("rudderSerializeList_TrackProductPremiumClickedProperties")
 fun List<TrackProductPremiumClickedProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackProductPremiumClickedProperties")
+fun List<List<TrackProductPremiumClickedProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Triggered when a user signs up */
 data class TrackUserSignedUpProperties(
@@ -1104,15 +1182,19 @@ data class TrackUserSignedUpProperties(
                 put("profile", profile.rudderSerialize())
             }
         }
-        @JvmName("rudderSerializeListNestedContext")
+        @JvmName("rudderSerializeList_NestedContext")
         fun List<NestedContext>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+        @JvmName("rudderSerializeListList_NestedContext")
+        fun List<List<NestedContext>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
     }
     fun Context.rudderSerialize(): JsonObject = buildJsonObject {
         put("ip_address", ipAddress.rudderSerialize())
         put("nested_context", nestedContext.rudderSerialize())
     }
-    @JvmName("rudderSerializeListContext")
+    @JvmName("rudderSerializeList_Context")
     fun List<Context>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+    @JvmName("rudderSerializeListList_Context")
+    fun List<List<Context>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 }
 fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject {
     put("active", active.rudderSerialize())
@@ -1229,8 +1311,10 @@ fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject 
         put("用户名", 用户名.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListTrackUserSignedUpProperties")
+@JvmName("rudderSerializeList_TrackUserSignedUpProperties")
 fun List<TrackUserSignedUpProperties>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackUserSignedUpProperties")
+fun List<List<TrackUserSignedUpProperties>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Event with camel case name */
 data class TrackEventWithNameCamelCaseProperties1(
@@ -1242,8 +1326,10 @@ fun TrackEventWithNameCamelCaseProperties1.rudderSerialize(): JsonObject = build
         put("active", active.rudderSerialize())
     }
 }
-@JvmName("rudderSerializeListTrackEventWithNameCamelCaseProperties1")
+@JvmName("rudderSerializeList_TrackEventWithNameCamelCaseProperties1")
 fun List<TrackEventWithNameCamelCaseProperties1>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_TrackEventWithNameCamelCaseProperties1")
+fun List<List<TrackEventWithNameCamelCaseProperties1>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 
 /** Merges the ruddertyper context with user-provided custom context */
 private fun mergeRudderContext(userOptions: RudderOption?, ruddertyperContext: JsonObject): RudderOption {
