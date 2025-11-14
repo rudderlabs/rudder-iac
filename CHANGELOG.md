@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/rudderlabs/rudder-iac/compare/v0.11.0...v0.11.1) (2025-11-14)
+
+
+### Bug Fixes
+
+* use 1.24.0 go version when running releaser ([#289](https://github.com/rudderlabs/rudder-iac/issues/289)) ([edba33c](https://github.com/rudderlabs/rudder-iac/commit/edba33c2126205c153443db588be47c93d60194f))
+
 ## [0.11.0](https://github.com/rudderlabs/rudder-iac/compare/v0.10.0...v0.11.0) (2025-11-14)
 
 
