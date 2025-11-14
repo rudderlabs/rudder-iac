@@ -21,7 +21,7 @@ type Category struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	WorkspaceID string    `json:"workspaceId"`
-	ExternalId  string    `json:"externalId,omitempty"`
+	ExternalID  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -97,7 +97,19 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 }
 
 func (c *RudderDataCatalog) GetCategories(ctx context.Context, options ListOptions) ([]*Category, error) {
-	return getAllResourcesWithPagination[*Category](ctx, c.client, fmt.Sprintf("v2/catalog/categories%s", options.ToQuery()))
+	cats, err := getAllResourcesWithPagination[*Category](ctx, c.client, fmt.Sprintf("v2/catalog/categories%s", options.ToQuery()))
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]*Category, 0, len(cats))
+	for _, cat := range cats {
+		if cat.WorkspaceID != "" {
+			filtered = append(filtered, cat)
+		}
+	}
+
+	return filtered, nil
 }
 
 func (c *RudderDataCatalog) SetCategoryExternalId(ctx context.Context, id string, externalId string) error {

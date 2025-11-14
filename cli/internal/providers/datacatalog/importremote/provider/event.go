@@ -44,14 +44,14 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 	p.log.Debug("loading importable events from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
+	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting events from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, event := range events {
-		if event.ExternalId != "" {
+		if event.ExternalID != "" {
 			continue
 		}
 		resourceMap[event.ID] = &resources.RemoteResource{

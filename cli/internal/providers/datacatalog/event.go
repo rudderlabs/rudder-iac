@@ -206,7 +206,7 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	collection := resources.NewResourceCollection()
 
 	// fetch events from remote
-	events, err := p.catalog.GetEvents(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
+	events, err := p.catalog.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	for _, event := range events {
 		resourceMap[event.ID] = &resources.RemoteResource{
 			ID:         event.ID,
-			ExternalID: event.ExternalId,
+			ExternalID: event.ExternalID,
 			Data:       event,
 		}
 	}
@@ -244,13 +244,13 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 
 		resourceState := &syncerstate.ResourceState{
 			Type:         state.EventResourceType,
-			ID:           event.ExternalId,
+			ID:           event.ExternalID,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(event.ExternalId, state.EventResourceType)
+		urn := resources.URN(event.ExternalID, state.EventResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

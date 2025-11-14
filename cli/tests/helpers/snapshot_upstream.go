@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -37,14 +38,9 @@ func NewUpstreamSnapshotTester(
 // SnapshotTest performs upstream validation by extracting IDs from state and calling catalog APIs
 // to verify actual upstream data against expected upstream state files
 func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
-	actualState, err := u.stateReader.RawState(ctx)
+	remoteIDs, err := u.stateReader.RemoteIDs(ctx)
 	if err != nil {
 		return fmt.Errorf("reading actual state: %w", err)
-	}
-
-	actualResources, ok := actualState["resources"].(map[string]any)
-	if !ok {
-		return fmt.Errorf("actual state resources is not a map: %T", actualState["outputs"])
 	}
 
 	expectedResources, err := u.fileManager.ListResources()
@@ -52,10 +48,10 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 		return fmt.Errorf("listing upstream files: %w", err)
 	}
 
-	if len(actualResources) != len(expectedResources) {
+	if len(remoteIDs) != len(expectedResources) {
 		return fmt.Errorf(
 			"resource count mismatch: got %d resources, want %d resources",
-			len(actualResources),
+			len(remoteIDs),
 			len(expectedResources),
 		)
 	}
@@ -63,26 +59,11 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 	var errs Errors
 
 	// For each entity ID, call appropriate API method and compare with expected upstream state
-	for urn, resourceData := range actualResources {
-		resource, ok := resourceData.(map[string]any)
-		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: is not a map: %T", urn, resourceData))
-			continue
-		}
+	for urn, resourceID := range remoteIDs {
+		parts := strings.Split(urn, ":")
+		resourceType := parts[0]
 
-		output, ok := resource["output"].(map[string]any)
-		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: output is not a map: %T", urn, resource))
-			continue
-		}
-
-		entityID, ok := output["id"].(string)
-		if !ok {
-			errs = append(errs, fmt.Errorf("resource %s: output.id is not a string: %T", urn, output["id"]))
-			continue
-		}
-
-		actual, err := u.upstreamEntity(ctx, entityID, resource["type"].(string))
+		actual, err := u.upstreamEntity(ctx, resourceID, resourceType)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("resource %s: failed to fetch upstream data: %v", urn, err))
 			continue

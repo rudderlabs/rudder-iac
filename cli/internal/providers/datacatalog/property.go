@@ -182,7 +182,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	collection := resources.NewResourceCollection()
 
 	// fetch properties from remote
-	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
+	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	for _, property := range properties {
 		resourceMap[property.ID] = &resources.RemoteResource{
 			ID:         property.ID,
-			ExternalID: property.ExternalId,
+			ExternalID: property.ExternalID,
 			Data:       property,
 		}
 	}
@@ -219,13 +219,13 @@ func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collectio
 
 		resourceState := &syncerstate.ResourceState{
 			Type:         state.PropertyResourceType,
-			ID:           property.ExternalId,
+			ID:           property.ExternalID,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(property.ExternalId, state.PropertyResourceType)
+		urn := resources.URN(property.ExternalID, state.PropertyResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

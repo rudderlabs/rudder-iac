@@ -44,14 +44,14 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 	p.log.Debug("loading importable categories from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting categories from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, category := range categories {
-		if category.ExternalId != "" {
+		if category.ExternalID != "" {
 			continue
 		}
 

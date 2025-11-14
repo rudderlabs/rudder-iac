@@ -225,9 +225,6 @@ func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resour
 		Dependencies: r.Dependencies(),
 	}
 
-	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return fmt.Errorf("failed to update resource state: %w", err)
-	}
 	s.stateMutex.Lock()
 	st.AddResource(sr)
 	s.stateMutex.Unlock()
@@ -256,9 +253,6 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 		Dependencies: r.Dependencies(),
 	}
 
-	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return fmt.Errorf("failed to update resource state: %w", err)
-	}
 	s.stateMutex.Lock()
 	st.AddResource(sr)
 	s.stateMutex.Unlock()
@@ -292,9 +286,6 @@ func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resour
 		Dependencies: r.Dependencies(),
 	}
 
-	if err := s.provider.PutResourceState(ctx, r.URN(), sr); err != nil {
-		return fmt.Errorf("failed to update resource state: %w", err)
-	}
 	s.stateMutex.Lock()
 	st.AddResource(sr)
 	s.stateMutex.Unlock()
@@ -308,10 +299,6 @@ func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resour
 	s.stateMutex.RUnlock()
 	if sr == nil {
 		return fmt.Errorf("resource not found in state: %s", r.URN())
-	}
-
-	if err := s.provider.DeleteResourceState(ctx, sr); err != nil {
-		return fmt.Errorf("failed to delete resource state: %w", err)
 	}
 
 	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())

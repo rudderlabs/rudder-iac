@@ -75,7 +75,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				ID:          "cat-123",
 				Name:        "User Actions",
 				WorkspaceID: "ws-456",
-				ExternalId:  "test-id",
+				ExternalID:  "test-id",
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			}
@@ -135,7 +135,7 @@ func TestCategoryProviderOperations(t *testing.T) {
 				ID:          "cat-123",
 				Name:        "Updated User Actions",
 				WorkspaceID: "ws-456",
-				ExternalId:  "test-project-id",
+				ExternalID:  "test-project-id",
 				CreatedAt:   now.Add(-time.Hour),
 				UpdatedAt:   now,
 			}

@@ -44,7 +44,7 @@ func TestLoadImportable(t *testing.T) {
 		mockClient := &mockDataCatalog{
 			properties: []*catalog.Property{
 				{ID: "prop1", Name: "Property 1", Type: "string", WorkspaceId: "ws1"},
-				{ID: "prop2", Name: "Property 2", Type: "number", WorkspaceId: "ws1", ExternalId: "property-2"},
+				{ID: "prop2", Name: "Property 2", Type: "number", WorkspaceId: "ws1", ExternalID: "property-2"},
 				{ID: "prop3", Name: "Property 3", Type: "boolean", WorkspaceId: "ws1"},
 			},
 		}
