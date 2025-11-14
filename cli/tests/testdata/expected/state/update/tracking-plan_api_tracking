@@ -20,7 +20,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "api_path",
@@ -29,7 +29,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "error_code",
@@ -38,7 +38,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "http_retry_count",
@@ -47,7 +47,7 @@
                             "property": "id"
                         },
                         "required": false,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     }
                 ],
                 "variants": []
@@ -68,7 +68,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "api_path",
@@ -77,7 +77,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "password",
@@ -86,7 +86,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "user_mail",
@@ -95,7 +95,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     }
                 ],
                 "variants": [{
@@ -173,7 +173,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     },
                     {
                         "localId": "signin_info",
@@ -182,7 +182,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": true,
+                        "additionalProperties": false,
                         "properties": [
                             {
                                 "localId": "captcha",
@@ -191,7 +191,7 @@
                                     "property": "id"
                                 },
                                 "required": true,
-                                "additionalProperties": true,
+                                "additionalProperties": false,
                                 "properties": [
                                     {
                                         "localId": "captcha_info",
@@ -200,7 +200,7 @@
                                             "property": "id"
                                         },
                                         "required": true,
-                                        "additionalProperties": true,
+                                        "additionalProperties": false,
                                         "properties": [
                                             {
                                                 "localId": "captcha_attempts",
@@ -209,7 +209,7 @@
                                                     "property": "id"
                                                 },
                                                 "required": true,
-                                                "additionalProperties": false
+                                                "additionalProperties": true
                                             },
                                             {
                                                 "localId": "captcha_type",
@@ -218,7 +218,7 @@
                                                     "property": "id"
                                                 },
                                                 "required": true,
-                                                "additionalProperties": false
+                                                "additionalProperties": true
                                             }
                                         ]
                                     },
@@ -229,7 +229,7 @@
                                             "property": "id"
                                         },
                                         "required": true,
-                                        "additionalProperties": false
+                                        "additionalProperties": true
                                     }
                                 ]
                             },
@@ -240,7 +240,7 @@
                                     "property": "id"
                                 },
                                 "required": true,
-                                "additionalProperties": false
+                                "additionalProperties": true
                             }
                         ]
                     },
@@ -251,7 +251,7 @@
                             "property": "id"
                         },
                         "required": true,
-                        "additionalProperties": false
+                        "additionalProperties": true
                     }
                 ],
                 "variants": []
@@ -296,25 +296,25 @@
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "localId": "api_method",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "error_code",
                             "required": true,
                             "id": "prop_2yjBuW4iUzfJ2XLjHNtTs2zuhJo",
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "id": "prop_2yy5uSkr3kGADpnXYthUoTvEeL7",
                             "localId": "http_retry_count",
                             "required": false,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         }
                     ],
                     "variants": []
@@ -329,25 +329,25 @@
                             "localId": "api_method",
                             "id": "prop_2yjBHl28rQaMsuHT5z67il2SSH0",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "api_path",
                             "id": "prop_2yjBHw1iGjMmIzmwUFmQLJlTd2t",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "password",
                             "id": "prop_2yy5sovSrvok1KZFTLSeUH0WRVi",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "user_mail",
                             "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         }
                     ],
                     "variants": [{
@@ -404,37 +404,37 @@
                             "localId": "password",
                             "id": "prop_31TQTDK6nIWxPmbHhtvlfDGh3lU",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         },
                         {
                             "localId": "signin_info",
                             "id": "prop_31TQUoDDQ5EbbgFKJn0hxwr7iST",
                             "required": true,
-                            "additionalProperties": true,
+                            "additionalProperties": false,
                             "properties": [
                                 {
                                     "localId": "captcha",
                                     "id": "prop_31TQU28M4YA6hKRPmuaoGMAtBAO",
                                     "required": true,
-                                    "additionalProperties": true,
+                                    "additionalProperties": false,
                                     "properties": [
                                         {
                                             "localId": "captcha_info",
                                             "id": "prop_31TQUCE6IP0tBTBTDnWa29YkzOA",
                                             "required": true,
-                                            "additionalProperties": true,
+                                            "additionalProperties": false,
                                             "properties": [
                                                 {
                                                     "localId": "captcha_attempts",
                                                     "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
                                                     "required": true,
-                                                    "additionalProperties": false
+                                                    "additionalProperties": true
                                                 },
                                                 {
                                                     "localId": "captcha_type",
                                                     "id": "prop_31TQUKqiEt200DvzYmENWbfq6d6",
                                                     "required": true,
-                                                    "additionalProperties": false
+                                                    "additionalProperties": true
                                                 }
                                             ]
                                         },
@@ -442,7 +442,7 @@
                                             "localId": "captcha_solved",
                                             "id": "prop_31TQUFQtCYGSKXmCSlyxfADSkUh",
                                             "required": true,
-                                            "additionalProperties": false
+                                            "additionalProperties": true
                                         }
                                     ]
                                 },
@@ -450,7 +450,7 @@
                                     "localId": "remember_me_checkbox_clicked",
                                     "id": "prop_31TQUiZ1eqVBdWZbcclQ0Nqk6Oi",
                                     "required": true,
-                                    "additionalProperties": false
+                                    "additionalProperties": true
                                 }
                             ]
                         },
@@ -458,7 +458,7 @@
                             "localId": "user_mail",
                             "id": "prop_2yy5sdzzbqa6D7CgaBa1r13hQHD",
                             "required": true,
-                            "additionalProperties": false
+                            "additionalProperties": true
                         }
                     ],
                     "variants": []
