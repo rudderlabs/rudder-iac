@@ -42,7 +42,6 @@ func (a *APIClientAdapter) RemoteIDs(ctx context.Context) (map[string]string, er
 	for _, category := range categories {
 		resourceIDs[urn("category", category.ExternalID)] = category.ID
 	}
-	// panic("Exit")
 
 	events, err := a.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
@@ -74,10 +73,6 @@ func (a *APIClientAdapter) RemoteIDs(ctx context.Context) (map[string]string, er
 	}
 	for _, trackingPlan := range trackingPlans {
 		resourceIDs[urn("tracking-plan", trackingPlan.ExternalID)] = trackingPlan.ID
-	}
-
-	for urn, id := range resourceIDs {
-		fmt.Println(urn, id)
 	}
 
 	return resourceIDs, nil

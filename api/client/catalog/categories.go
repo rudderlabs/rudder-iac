@@ -102,11 +102,9 @@ func (c *RudderDataCatalog) GetCategories(ctx context.Context, options ListOptio
 		return nil, err
 	}
 
-	// TODO: External ID filterin is not working properly so we are filtering here as well
-	// until this is resovled in the backend
 	filtered := make([]*Category, 0, len(cats))
 	for _, cat := range cats {
-		if cat.ExternalID != "" {
+		if cat.WorkspaceID != "" {
 			filtered = append(filtered, cat)
 		}
 	}

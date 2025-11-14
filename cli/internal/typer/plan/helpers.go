@@ -12,9 +12,31 @@ func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {
 		extractCustomTypesFromVariants(rule.Variants, customTypes)
 	}
 
-	// Extract all custom types from custom types recursively
-	for _, customType := range customTypes {
-		extractCustomTypesFromCustomType(customType, customTypes)
+	// Use a worklist approach to handle newly discovered custom types
+	processedTypes := make(map[string]bool)
+	for len(processedTypes) < len(customTypes) {
+		for name, customType := range customTypes {
+			if processedTypes[name] {
+				continue
+			}
+			processedTypes[name] = true
+
+			if !customType.IsPrimitive() {
+				extractCustomTypesFromSchema(customType.Schema, customTypes)
+			}
+			// Extract from custom type variants
+			extractCustomTypesFromVariants(customType.Variants, customTypes)
+
+			// Extract from custom type item types (for array custom types)
+			if customType.Type == PrimitiveTypeArray && customType.ItemType != nil {
+				if IsCustomType(customType.ItemType) {
+					itemCustomType := AsCustomType(customType.ItemType)
+					if itemCustomType != nil {
+						customTypes[itemCustomType.Name] = itemCustomType
+					}
+				}
+			}
+		}
 	}
 
 	return customTypes
