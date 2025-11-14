@@ -68,7 +68,7 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.tpWithIdentifiers, m.err
 }
 
@@ -80,7 +80,7 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail) error {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail, rebuildSchemas bool) error {
 	for range input {
 		m.updateEventCalled = true
 		m.updateEventCallCount++

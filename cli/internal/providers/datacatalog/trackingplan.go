@@ -67,7 +67,7 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		return nil, fmt.Errorf("creating tracking plan in catalog: %w", err)
 	}
 
-	if err = p.client.UpdateTrackingPlanEvents(ctx, created.ID, getUpdateEventIdentifiers(args.Events)); err != nil {
+	if err = p.client.UpdateTrackingPlanEvents(ctx, created.ID, getUpdateEventIdentifiers(args.Events), false); err != nil {
 		return nil, fmt.Errorf("updating tracking plan events during create: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	changed = append(changed, diff.Added...)
 	changed = append(changed, diff.Updated...)
 
-	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(changed)); err != nil {
+	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(changed), false); err != nil {
 		return nil, fmt.Errorf("updating tracking plan events which are added or updated: %w", err)
 	}
 
@@ -164,7 +164,7 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	p.log.Debug("importing tracking plan resource", "id", ID, "remoteId", remoteId)
 
-	trackingPlan, err := p.client.GetTrackingPlanWithIdentifiers(ctx, remoteId)
+	trackingPlan, err := p.client.GetTrackingPlanWithIdentifiers(ctx, remoteId, false)
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plan from upstream: %w", err)
 	}
@@ -192,7 +192,7 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 		changed = append(changed, diffed.Added...)
 		changed = append(changed, diffed.Updated...)
 
-		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(changed)); err != nil {
+		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(changed), false); err != nil {
 			return nil, fmt.Errorf("updating tracking plan events which are added or updated during import: %w", err)
 		}
 
@@ -222,7 +222,10 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 	p.log.Debug("loading tracking plans from remote catalog ")
 
 	collection := resources.NewRemoteResources()
-	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{
+		HasExternalID:  lo.ToPtr(true),
+		RebuildSchemas: false,
+	})
 	if err != nil {
 		return nil, err
 	}
