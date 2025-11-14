@@ -3,7 +3,6 @@ package resources
 import (
 	"errors"
 	"fmt"
-	"sync"
 )
 
 // RemoteResource represents a resource that is fetched from the remote catalog
@@ -19,7 +18,6 @@ type RemoteResource struct {
 // ResourceCollection provides a generic container for mixed resource types
 // with generic getters and efficient ID-based lookups
 type ResourceCollection struct {
-	sync.RWMutex
 	resources map[string]map[string]*RemoteResource
 }
 
@@ -37,9 +35,6 @@ func NewResourceCollection() *ResourceCollection {
 }
 
 func (rc *ResourceCollection) Len() int {
-	rc.RLock()
-	defer rc.RUnlock()
-
 	count := 0
 	for _, resources := range rc.resources {
 		count += len(resources)
@@ -49,16 +44,11 @@ func (rc *ResourceCollection) Len() int {
 
 // Set stores a resource map for the given resource type
 func (rc *ResourceCollection) Set(resourceType string, resourceMap map[string]*RemoteResource) {
-	rc.Lock()
-	defer rc.Unlock()
 	rc.resources[resourceType] = resourceMap
 }
 
 // GetAll returns all resources of the given type as a slice
 func (rc *ResourceCollection) GetAll(resourceType string) map[string]*RemoteResource {
-	rc.RLock()
-	defer rc.RUnlock()
-
 	resourceMap := rc.resources[resourceType]
 	if len(resourceMap) == 0 {
 		return nil
@@ -69,9 +59,6 @@ func (rc *ResourceCollection) GetAll(resourceType string) map[string]*RemoteReso
 
 // GetByID returns a specific resource by ID and type
 func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteResource, bool) {
-	rc.RLock()
-	defer rc.RUnlock()
-
 	resourceMap := rc.resources[resourceType]
 	if resourceMap == nil {
 		return nil, false
@@ -82,8 +69,6 @@ func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteRe
 }
 
 func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string, error) {
-	// No RLock needed here as we are delegating the access to the GetByID method
-	// which already has the RLock applied to it
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound
@@ -99,9 +84,6 @@ func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string
 // Merge merges resources from another ResourceCollection into a new collection
 // Returns a new ResourceCollection or an error if there are any overlapping keys
 func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollection, error) {
-	rc.RLock()
-	defer rc.RUnlock()
-
 	if other == nil {
 		return rc, nil
 	}
@@ -115,9 +97,6 @@ func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollect
 		}
 		newCollection.resources[k1] = newMap
 	}
-
-	other.RLock()
-	defer other.RUnlock()
 
 	// Check for overlaps and merge from other collection
 	for k1, v1 := range other.resources {
