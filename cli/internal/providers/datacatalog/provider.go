@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -20,6 +21,7 @@ var log = logger.New("datacatalogprovider")
 const importDir = "data-catalog"
 
 type Provider struct {
+	concurrency   int
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
 	providerStore map[string]entityProvider
@@ -27,8 +29,9 @@ type Provider struct {
 
 func New(client catalog.DataCatalog) *Provider {
 	return &Provider{
-		client: client,
-		dc:     localcatalog.New(),
+		concurrency: config.GetConfig().Concurrency.CatalogProvider,
+		client:      client,
+		dc:          localcatalog.New(),
 		providerStore: map[string]entityProvider{
 			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
 			pstate.EventResourceType:        NewEventProvider(client, importDir),

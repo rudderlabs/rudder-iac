@@ -271,6 +271,63 @@ func init() {
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["profile_list"]},
 	}
 
+	// Properties for address_details custom type (defined before the custom type)
+	ReferenceProperties["street"] = &plan.Property{
+		Name:        "street",
+		Description: "Street address",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["city"] = &plan.Property{
+		Name:        "city",
+		Description: "City name",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	ReferenceProperties["postal_code"] = &plan.Property{
+		Name:        "postal_code",
+		Description: "Postal code",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeString},
+	}
+
+	// Custom object type that is ONLY referenced via ItemType (not directly)
+	// This tests the ItemType extraction bug fix
+	ReferenceCustomTypes["address_details"] = &plan.CustomType{
+		Name:        "address_details",
+		Description: "Address details object",
+		Type:        plan.PrimitiveTypeObject,
+		Schema: &plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"street": {
+					Property: *ReferenceProperties["street"],
+					Required: true,
+				},
+				"city": {
+					Property: *ReferenceProperties["city"],
+					Required: true,
+				},
+				"postal_code": {
+					Property: *ReferenceProperties["postal_code"],
+					Required: false,
+				},
+			},
+		},
+	}
+
+	// Array custom type that uses address_details ONLY via ItemType
+	ReferenceCustomTypes["address_list"] = &plan.CustomType{
+		Name:        "address_list",
+		Description: "List of addresses",
+		Type:        plan.PrimitiveTypeArray,
+		ItemType:    ReferenceCustomTypes["address_details"],
+	}
+
+	ReferenceProperties["addresses"] = &plan.Property{
+		Name:        "addresses",
+		Description: "User's addresses",
+		Types:       []plan.PropertyType{*ReferenceCustomTypes["address_list"]},
+	}
+
 	// Add properties for testing nested objects
 	ReferenceProperties["ip_address"] = &plan.Property{
 		Name:        "ip_address",
@@ -740,6 +797,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"status":                             {Property: *ReferenceProperties["status"]},
 				"email_list":                         {Property: *ReferenceProperties["email_list"]},
 				"profile_list":                       {Property: *ReferenceProperties["profile_list"]},
+				"addresses":                          {Property: *ReferenceProperties["addresses"]},
 				"empty_object_with_additional_props": {Property: *ReferenceProperties["empty_object_with_additional_props"]},
 				"nested_empty_object": {
 					Property: *ReferenceProperties["nested_empty_object"],

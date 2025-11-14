@@ -64,7 +64,7 @@ func (m *MockEventCatalog) SetEventExternalId(ctx context.Context, id string, ex
 	if m.mockEvent == nil {
 		return m.err
 	}
-	m.mockEvent.ExternalId = externalId
+	m.mockEvent.ExternalID = externalId
 	return m.err
 }
 
@@ -97,7 +97,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
-			ExternalId:  "event-id-1",
+			ExternalID:  "event-id-1",
 			CategoryId:  nil,
 			CreatedAt:   created,
 			UpdatedAt:   updated,
@@ -168,7 +168,7 @@ func TestEventProviderOperations(t *testing.T) {
 			Description: "event new description",
 			EventType:   "event type",
 			WorkspaceId: "workspace-id",
-			ExternalId:  "test-project-id",
+			ExternalID:  "test-project-id",
 			CategoryId:  strptr("Marketing"),
 			CreatedAt:   created,
 			UpdatedAt:   updated,

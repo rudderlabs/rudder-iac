@@ -30,7 +30,7 @@ type Event struct {
 	EventType   string    `json:"eventType"`
 	CategoryId  *string   `json:"categoryId"`
 	WorkspaceId string    `json:"workspaceId"`
-	ExternalId  string    `json:"externalId,omitempty"`
+	ExternalID  string    `json:"externalId,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -106,7 +106,12 @@ func (c *RudderDataCatalog) GetEvent(ctx context.Context, id string) (*Event, er
 }
 
 func (c *RudderDataCatalog) GetEvents(ctx context.Context, options ListOptions) ([]*Event, error) {
-	return getAllResourcesWithPagination[*Event](ctx, c.client, fmt.Sprintf("v2/catalog/events%s", options.ToQuery()))
+	return getAllResourcesPaginated[*Event](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/events%s", options.ToQuery()),
+		c.concurrency,
+	)
 }
 
 func (c *RudderDataCatalog) SetEventExternalId(ctx context.Context, id string, externalId string) error {

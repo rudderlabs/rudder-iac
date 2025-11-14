@@ -167,7 +167,7 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	collection := resources.NewResourceCollection()
 
 	// fetch categories from remote
-	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	for _, category := range categories {
 		resourceMap[category.ID] = &resources.RemoteResource{
 			ID:         category.ID,
-			ExternalID: category.ExternalId,
+			ExternalID: category.ExternalID,
 			Data:       category,
 		}
 	}
@@ -205,13 +205,13 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 
 		resourceState := &syncerstate.ResourceState{
 			Type:         state.CategoryResourceType,
-			ID:           category.ExternalId,
+			ID:           category.ExternalID,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(category.ExternalId, state.CategoryResourceType)
+		urn := resources.URN(category.ExternalID, state.CategoryResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

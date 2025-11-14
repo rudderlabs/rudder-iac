@@ -70,5 +70,7 @@ sealed class {{ .Name }} {
 }
 
 fun {{ .Name }}.rudderSerialize(): {{ if .SerializeToObject }}JsonObject{{ else }}JsonElement{{ end }} = this._jsonElement
-@JvmName("rudderSerializeList{{ .Name }}")
+@JvmName("rudderSerializeList_{{ .Name }}")
 fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_{{ .Name }}")
+fun List<List<{{ .Name }}>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })

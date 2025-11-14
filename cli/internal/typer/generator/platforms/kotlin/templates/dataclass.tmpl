@@ -32,7 +32,9 @@ fun {{ .Name }}.rudderSerialize(): JsonObject = buildJsonObject {
 {{- end }}
 {{- end }}
 }
-@JvmName("rudderSerializeList{{ .Name }}")
+@JvmName("rudderSerializeList_{{ .Name }}")
 fun List<{{ .Name }}>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
+@JvmName("rudderSerializeListList_{{ .Name }}")
+fun List<List<{{ .Name }}>>.rudderSerialize(): JsonArray = JsonArray(this.map { it.rudderSerialize() })
 {{- end }}
 {{- end }}
