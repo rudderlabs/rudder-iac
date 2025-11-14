@@ -45,7 +45,10 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 	p.log.Debug("loading importable tracking plans from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{
+		HasExternalID:  lo.ToPtr(false),
+		RebuildSchemas: false,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plans from remote catalog: %w", err)
 	}

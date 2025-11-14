@@ -16,7 +16,6 @@ func NewTrackingPlanCatalogFactory() *TrackingPlanCatalogFactory {
 	tp := catalog.TrackingPlan{
 		ID:           uuid.New().String(),
 		Name:         "default-tracking-plan",
-		Version:      1,
 		CreationType: "backend",
 		WorkspaceID:  "workspace-id",
 		CreatedAt:    time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC),
@@ -61,11 +60,6 @@ func (f *TrackingPlanCatalogFactory) WithCreatedAt(createdAt time.Time) *Trackin
 
 func (f *TrackingPlanCatalogFactory) WithUpdatedAt(updatedAt time.Time) *TrackingPlanCatalogFactory {
 	f.trackingplan.UpdatedAt = updatedAt
-	return f
-}
-
-func (f *TrackingPlanCatalogFactory) WithVersion(version int) *TrackingPlanCatalogFactory {
-	f.trackingplan.Version = version
 	return f
 }
 

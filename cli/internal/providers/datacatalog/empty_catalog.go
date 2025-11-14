@@ -72,7 +72,7 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string, schemasRebuild bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 

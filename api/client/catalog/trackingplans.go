@@ -187,11 +187,10 @@ type TrackingPlanStore interface {
 	UpdateTrackingPlan(ctx context.Context, id string, name, description string) (*TrackingPlan, error)
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
-	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithIdentifiers, error)
+	GetTrackingPlan(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanWithSchemas(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
-	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
 	UpdateTrackingPlanEvent(ctx context.Context, id string, input EventIdentifierDetail) (*TrackingPlan, error)
 	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
@@ -277,7 +276,7 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 	return nil
 }
 
-func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlanWithIdentifiers, error) {
+func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error) {
 	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
@@ -288,12 +287,7 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
-	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](
-		ctx,
-		c.client,
-		fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id),
-		c.concurrency,
-	)
+	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), c.concurrency)
 	if err != nil {
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
@@ -302,9 +296,10 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 	for i, event := range events {
 		eventTasks[i] = apitask.NewAPIFetchTask[*TrackingPlanEventPropertyIdentifiers](
 			c.client,
-			fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties",
+			fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties&rebuildSchemas=%t",
 				id,
 				event.ID,
+				rebuildSchemas,
 			),
 		)
 	}
@@ -382,7 +377,7 @@ func (c *RudderDataCatalog) GetTrackingPlans(ctx context.Context, options ListOp
 	result := make([]*TrackingPlanWithIdentifiers, len(trackingPlansResp.TrackingPlans))
 	for i := range trackingPlansResp.TrackingPlans {
 		// Get full tracking plan details with events
-		trackingPlan, err := c.GetTrackingPlan(ctx, trackingPlansResp.TrackingPlans[i].ID)
+		trackingPlan, err := c.GetTrackingPlan(ctx, trackingPlansResp.TrackingPlans[i].ID, options.RebuildSchemas)
 		if err != nil {
 			return nil, fmt.Errorf("fetching tracking plan %s: %w", trackingPlansResp.TrackingPlans[i].ID, err)
 		}
@@ -390,20 +385,6 @@ func (c *RudderDataCatalog) GetTrackingPlans(ctx context.Context, options ListOp
 	}
 
 	return result, nil
-}
-
-func (c *RudderDataCatalog) GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties", id, eventId), nil)
-	if err != nil {
-		return nil, fmt.Errorf("executing http request: %w", err)
-	}
-
-	eventWithProps := TrackingPlanEventPropertyIdentifiers{}
-	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&eventWithProps); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	return &eventWithProps, nil
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error) {
