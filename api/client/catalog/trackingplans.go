@@ -287,41 +287,21 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string, rebu
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
-<<<<<<< HEAD
-	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](
-		ctx,
-		c.client,
-		fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id),
-		c.concurrency,
-=======
-	events, err := getAllResourcesWithPagination[*TrackingPlanEventResponse](
-		ctx,
-		c.client,
-		fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id),
->>>>>>> fcfe6dd (fix: push setting of the rebuildSchemas flag to the callers for extensibility)
-	)
+	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), c.concurrency)
 	if err != nil {
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
 
 	eventTasks := make([]tasker.Task, len(events))
 	for i, event := range events {
-<<<<<<< HEAD
 		eventTasks[i] = apitask.NewAPIFetchTask[*TrackingPlanEventPropertyIdentifiers](
 			c.client,
-			fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties",
+			fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties&rebuildSchemas=%t",
 				id,
 				event.ID,
+				rebuildSchemas,
 			),
 		)
-=======
-
-		schema, err := c.getTrackingPlanEventWithIdentifiers(ctx, id, event.ID, rebuildSchemas)
-		if err != nil {
-			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
-		}
-		trackingPlan.Events[i] = schema
->>>>>>> fcfe6dd (fix: push setting of the rebuildSchemas flag to the callers for extensibility)
 	}
 
 	results := tasker.NewResults[*TrackingPlanEventPropertyIdentifiers]()
@@ -405,30 +385,6 @@ func (c *RudderDataCatalog) GetTrackingPlans(ctx context.Context, options ListOp
 	}
 
 	return result, nil
-}
-
-func (c *RudderDataCatalog) getTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string, schemasRebuild bool) (*TrackingPlanEventPropertyIdentifiers, error) {
-	resp, err := c.client.Do(
-		ctx,
-		"GET",
-		fmt.Sprintf(
-			"v2/catalog/tracking-plans/%s/events/%s?format=properties&rebuildSchemas=%t",
-			id,
-			eventId,
-			schemasRebuild,
-		),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("executing http request: %w", err)
-	}
-
-	eventWithProps := TrackingPlanEventPropertyIdentifiers{}
-	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&eventWithProps); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	return &eventWithProps, nil
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error) {
