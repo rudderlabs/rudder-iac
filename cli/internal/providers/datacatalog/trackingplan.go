@@ -241,7 +241,7 @@ func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state reso
 func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	p.log.Debug("importing tracking plan resource", "id", ID, "remoteId", remoteId)
 
-	trackingPlan, err := p.client.GetTrackingPlan(ctx, remoteId)
+	trackingPlan, err := p.client.GetTrackingPlan(ctx, remoteId, false)
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plan from upstream: %w", err)
 	}
@@ -305,7 +305,10 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 	p.log.Debug("loading tracking plans from remote catalog ")
 
 	collection := resources.NewResourceCollection()
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{
+		HasExternalID:  lo.ToPtr(true),
+		RebuildSchemas: false,
+	})
 	if err != nil {
 		return nil, err
 	}

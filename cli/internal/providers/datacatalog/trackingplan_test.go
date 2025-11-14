@@ -64,7 +64,7 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string, schemasRebuild bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.tpWithIdentifiers, m.err
 }
 
