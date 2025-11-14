@@ -191,7 +191,16 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	// // the default tracking plan with version
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
+<<<<<<< HEAD
 		WithVersion(2).
+=======
+		WithEvent(catalog.TrackingPlanEvent{
+			ID:             "upstream-tracking-plan-event-id",
+			TrackingPlanID: "tracking-plan-id",
+			SchemaID:       "upstream-schema-id",
+			EventID:        "upstream-event-id",
+		}).
+>>>>>>> 95b2679 (feat: remove the version field from the state management in trackingplan)
 		Build()
 
 	mockCatalog.SetTrackingPlan(&updatedTP)
@@ -282,8 +291,17 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
+<<<<<<< HEAD
 		WithVersion(2).
 		Build()
+=======
+		WithEvent(catalog.TrackingPlanEvent{
+			ID:             "upstream-tracking-plan-event-id-1",
+			TrackingPlanID: "tracking-plan-id",
+			SchemaID:       "upstream-schema-id-1",
+			EventID:        "upsream-event-id-1",
+		}).Build()
+>>>>>>> 95b2679 (feat: remove the version field from the state management in trackingplan)
 
 	mockCatalog.SetError(nil)
 	mockCatalog.SetTrackingPlan(&updatedTP)
@@ -493,7 +511,17 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				},
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+<<<<<<< HEAD
 				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
+=======
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+>>>>>>> 95b2679 (feat: remove the version field from the state management in trackingplan)
 				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 					{
 						ID:                   "remote-event-1",
@@ -571,7 +599,17 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				},
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+<<<<<<< HEAD
 				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
+=======
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+>>>>>>> 95b2679 (feat: remove the version field from the state management in trackingplan)
 				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 					{
 						// Event that will be updated
@@ -665,6 +703,7 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				Description: "desc",
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
+<<<<<<< HEAD
 				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
 				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 					{
@@ -676,6 +715,16 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 						},
 					},
 				},
+=======
+				ID:           "remote-tp-id",
+				Name:         "TestTP",
+				Description:  strptr("desc"),
+				CreationType: "backend",
+				WorkspaceID:  "ws-id",
+				CreatedAt:    created,
+				UpdatedAt:    updated,
+				Events:       []*catalog.TrackingPlanEventPropertyIdentifiers{},
+>>>>>>> 95b2679 (feat: remove the version field from the state management in trackingplan)
 			},
 			mockErr:        assert.AnError,
 			expectErr:      true,
@@ -737,7 +786,6 @@ func defaultTrackingPlanFactory() *factory.TrackingPlanCatalogFactory {
 	f.WithCreationType("backend")
 	f.WithCreatedAt(time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC))
 	f.WithUpdatedAt(time.Date(2021, 9, 2, 0, 0, 0, 0, time.UTC))
-	f.WithVersion(1)
 	return f
 }
 
