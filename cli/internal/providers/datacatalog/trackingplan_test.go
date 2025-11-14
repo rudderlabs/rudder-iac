@@ -139,7 +139,6 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      1,
 		"events": []map[string]interface{}{
 			{
 				"id":      "upstream-tracking-plan-event-id",
@@ -204,7 +203,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			SchemaID:       "upstream-schema-id",
 			EventID:        "upstream-event-id",
 		}).
-		WithVersion(2).
 		Build()
 
 	mockCatalog.SetTrackingPlan(&updatedTP)
@@ -234,7 +232,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
 		"events": []map[string]interface{}{
 			{
 				"id":      "upstream-tracking-plan-event-id",
@@ -304,7 +301,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
-		WithVersion(2).
 		WithEvent(catalog.TrackingPlanEvent{
 			ID:             "upstream-tracking-plan-event-id-1",
 			TrackingPlanID: "tracking-plan-id",
@@ -328,7 +324,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
 		"events": []map[string]interface{}{
 			{
 				"id":      "upstream-tracking-plan-event-id-1",
@@ -524,7 +519,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				ID:           "remote-tp-id",
 				Name:         "TestTP",
 				Description:  strptr("desc"),
-				Version:      1,
 				CreationType: "backend",
 				WorkspaceID:  "ws-id",
 				CreatedAt:    created,
@@ -550,7 +544,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "TestTP",
 				"description":  "desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
@@ -611,7 +604,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				ID:           "remote-tp-id",
 				Name:         "TestTP",
 				Description:  strptr("desc"),
-				Version:      1,
 				CreationType: "backend",
 				WorkspaceID:  "ws-id",
 				CreatedAt:    created,
@@ -647,7 +639,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "UpdatedTP",
 				"description":  "new desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
@@ -714,7 +705,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				ID:           "remote-tp-id",
 				Name:         "TestTP",
 				Description:  strptr("desc"),
-				Version:      1,
 				CreationType: "backend",
 				WorkspaceID:  "ws-id",
 				CreatedAt:    created,
@@ -779,7 +769,6 @@ func defaultTrackingPlanFactory() *factory.TrackingPlanCatalogFactory {
 	f.WithCreationType("backend")
 	f.WithCreatedAt(time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC))
 	f.WithUpdatedAt(time.Date(2021, 9, 2, 0, 0, 0, 0, time.UTC))
-	f.WithVersion(1)
 	return f
 }
 

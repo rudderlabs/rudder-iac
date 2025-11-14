@@ -72,7 +72,6 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		eventStates []*state.TrackingPlanEventState
 	)
 
-	version := created.Version
 	for _, event := range args.Events {
 		lastupserted, err := p.client.UpdateTrackingPlanEvent(
 			ctx,
@@ -90,7 +89,6 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 			EventID: lastEvent.EventID,
 			LocalID: event.LocalID,
 		})
-		version = lastupserted.Version
 	}
 
 	// sort eventStates based on localId
@@ -100,7 +98,6 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		TrackingPlanArgs: args,
 		ID:               created.ID,
 		Name:             created.Name,
-		Version:          version,
 		CreationType:     created.CreationType,
 		Description:      *created.Description,
 		WorkspaceID:      created.WorkspaceID,
@@ -208,7 +205,6 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 			Name:             prevState.Name,
 			Description:      prevState.Description,
 			CreationType:     prevState.CreationType,
-			Version:          prevState.Version,
 			WorkspaceID:      prevState.WorkspaceID,
 			CreatedAt:        prevState.CreatedAt,
 			UpdatedAt:        prevState.UpdatedAt,
@@ -221,7 +217,6 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 			Name:             updated.Name,
 			Description:      *updated.Description,
 			CreationType:     updated.CreationType,
-			Version:          updated.Version,
 			WorkspaceID:      updated.WorkspaceID,
 			CreatedAt:        updated.CreatedAt.String(),
 			UpdatedAt:        updated.UpdatedAt.String(),
@@ -295,7 +290,6 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 		ID:               trackingPlan.ID,
 		Name:             toArgs.Name,
 		Description:      toArgs.Description,
-		Version:          trackingPlan.Version,
 		CreationType:     trackingPlan.CreationType,
 		WorkspaceID:      trackingPlan.WorkspaceID,
 		CreatedAt:        trackingPlan.CreatedAt.String(),

@@ -62,7 +62,6 @@ func NewTrackingPlanStateFactory() *TrackingPlanStateFactory {
 		Name:         "tracking-plan-name",
 		Description:  "tracking-plan-description",
 		WorkspaceID:  "workspace-id",
-		Version:      1,
 		CreationType: "backend",
 		CreatedAt:    "2021-09-01T00:00:00Z",
 		UpdatedAt:    "2021-09-02T00:00:00Z",
