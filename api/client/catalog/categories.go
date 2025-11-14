@@ -97,7 +97,7 @@ func (c *RudderDataCatalog) GetCategory(ctx context.Context, id string) (*Catego
 }
 
 func (c *RudderDataCatalog) GetCategories(ctx context.Context, options ListOptions) ([]*Category, error) {
-	cats, err := getAllResourcesWithPagination[*Category](ctx, c.client, fmt.Sprintf("v2/catalog/categories%s", options.ToQuery()))
+	cats, err := getAllResourcesPaginated[*Category](ctx, c.client, fmt.Sprintf("v2/catalog/categories%s", options.ToQuery()), c.concurrency)
 	if err != nil {
 		return nil, err
 	}

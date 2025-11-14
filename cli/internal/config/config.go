@@ -36,6 +36,11 @@ type Config = struct {
 		DataplaneURL string `mapstructure:"dataplaneURL"`
 	} `mapstructure:"telemetry"`
 	ExperimentalFlags ExperimentalConfig `mapstructure:"flags"`
+	Concurrency       struct {
+		CatalogClient     int `mapstructure:"catalogClient"`
+		CompositeProvider int `mapstructure:"compositeProvider"`
+		CatalogProvider   int `mapstructure:"catalogProvider"`
+	}
 }
 
 func defaultConfigPath() string {
@@ -70,6 +75,9 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
+	viper.SetDefault("concurrency.catalogClient", 10)
+	viper.SetDefault("concurrency.compositeProvider", 2)
+	viper.SetDefault("concurrency.catalogProvider", 4)
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
@@ -77,6 +85,9 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
+	viper.BindEnv("concurrency.catalogClient", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_CLIENT")
+	viper.BindEnv("concurrency.compositeProvider", "RUDDERSTACK_CLI_CONCURRENCY_COMPOSITE_PROVIDER")
+	viper.BindEnv("concurrency.catalogProvider", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_PROVIDER")
 
 	// Automatically bind environment variables for all experimental flags
 	BindExperimentalFlags()

@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
@@ -59,7 +60,12 @@ func newCmdGenerate() *cobra.Command {
 			}
 
 			client := deps.Client()
-			dataCatalogClient := catalog.NewRudderDataCatalog(client)
+
+			cfg := config.GetConfig()
+			dataCatalogClient := catalog.NewRudderDataCatalog(
+				client,
+				cfg.Concurrency.CatalogClient,
+			)
 
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)

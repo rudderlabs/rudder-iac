@@ -62,7 +62,7 @@ func WorkspaceImport(
 		return nil
 	}
 
-	resolver, err := initResolver(ctx, p, importable, targetGraph)
+	resolver, err := initResolver(remoteCollection, importable, targetGraph)
 	if err != nil {
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
@@ -101,15 +101,10 @@ func initNamer(graph *resources.Graph) (namer.Namer, error) {
 }
 
 func initResolver(
-	ctx context.Context,
-	p project.Provider,
+	remoteCollection *resources.ResourceCollection,
 	importable *resources.ResourceCollection,
 	graph *resources.Graph,
 ) (*resolver.ImportRefResolver, error) {
-	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("loading remote resources: %w", err)
-	}
 
 	return &resolver.ImportRefResolver{
 		Remote:     remoteCollection,

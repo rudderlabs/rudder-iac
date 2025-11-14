@@ -86,7 +86,8 @@ func setupClient(version string) (*client.Client, error) {
 }
 
 func setupProviders(c *client.Client) *Providers {
-	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c))
+	cfg := config.GetConfig()
+	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c, cfg.Concurrency.CatalogClient))
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	wsp := workspace.New(c)

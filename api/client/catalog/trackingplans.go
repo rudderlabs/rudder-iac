@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/rudderlabs/rudder-iac/api/client/apitask"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 type TrackingPlanCreate struct {
@@ -284,21 +288,50 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
-	events, err := getAllResourcesWithPagination[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id))
+	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id),
+		c.concurrency,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
 
-	trackingPlan.Events = make([]*TrackingPlanEventPropertyIdentifiers, len(events))
+	eventTasks := make([]tasker.Task, len(events))
 	for i, event := range events {
-
-		schema, err := c.GetTrackingPlanEventWithIdentifiers(ctx, id, event.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
-		}
-		trackingPlan.Events[i] = schema
+		eventTasks[i] = apitask.NewAPIFetchTask[*TrackingPlanEventPropertyIdentifiers](
+			c.client,
+			fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=properties",
+				id,
+				event.ID,
+			),
+		)
 	}
 
+	results := tasker.NewResults[*TrackingPlanEventPropertyIdentifiers]()
+	errs := tasker.RunTasks(
+		ctx,
+		eventTasks,
+		c.concurrency,
+		false,
+		apitask.RunAPIFetchTask(ctx, results),
+	)
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("errors fetching events identifiers: %w", errors.Join(errs...))
+	}
+
+	eventSchemas := make([]*TrackingPlanEventPropertyIdentifiers, len(events))
+	for i, key := range results.GetKeys() {
+		event, ok := results.Get(key)
+		if !ok {
+			return nil, fmt.Errorf("event %s not found in results", key)
+		}
+		eventSchemas[i] = event
+	}
+
+	trackingPlan.Events = eventSchemas
 	return &trackingPlan, nil
 }
 
@@ -317,7 +350,7 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
-	events, err := getAllResourcesWithPagination[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id))
+	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), c.concurrency)
 	if err != nil {
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
