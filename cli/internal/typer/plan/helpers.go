@@ -42,23 +42,6 @@ func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {
 	return customTypes
 }
 
-func extractCustomTypesFromCustomType(customType *CustomType, customTypes map[string]*CustomType) {
-	if !customType.IsPrimitive() {
-		extractCustomTypesFromSchema(customType.Schema, customTypes)
-	}
-	extractCustomTypesFromVariants(customType.Variants, customTypes)
-
-	if customType.Type == PrimitiveTypeArray && customType.ItemType != nil {
-		if IsCustomType(customType.ItemType) {
-			itemCustomType := AsCustomType(customType.ItemType)
-			if itemCustomType != nil {
-				customTypes[itemCustomType.Name] = itemCustomType
-				extractCustomTypesFromCustomType(itemCustomType, customTypes)
-			}
-		}
-	}
-}
-
 // ExtractAllProperties extracts all properties from a tracking plan
 // Returns a map of property name to Property
 func (tp *TrackingPlan) ExtractAllProperties() map[string]*Property {
