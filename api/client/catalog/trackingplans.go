@@ -350,7 +350,7 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
-	events, err := getAllResourcesWithPagination[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id))
+	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](ctx, c.client, fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id), c.concurrency)
 	if err != nil {
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
