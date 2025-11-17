@@ -11,10 +11,8 @@ RUN apt-get update && \
     ln -s /opt/gradle/bin/gradle /usr/local/bin/gradle && \
     rm gradle.zip && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user for running the application
-RUN groupadd -r gradle && useradd -r -g gradle -m gradle
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -r gradle && useradd -r -g gradle -m gradle
 
 # Set work directory
 WORKDIR /app
@@ -26,10 +24,8 @@ COPY gradle.properties .
 
 # Copy run script
 COPY run.sh .
-RUN chmod +x run.sh
-
-# Change ownership of app directory and gradle home to non-root user after building
-RUN chown -R gradle:gradle /app && \
+RUN chmod +x run.sh && \
+    chown -R gradle:gradle /app && \
     chown -R gradle:gradle /home/gradle
 
 # Switch to non-root user for running the application

@@ -6,16 +6,19 @@ plugins {
 group = "com.example"
 version = "1.0.0"
 
+val sdkVersion = "[1.1.0,2.0.0)"
+val junitVersion = "5.9.3"
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation("com.rudderstack.sdk.kotlin:core:[1.1.0,2.0.0)")
+    implementation("com.rudderstack.sdk.kotlin:core:$sdkVersion")
 
     // Test dependencies
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.9.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
 }
 
 tasks.test {
