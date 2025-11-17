@@ -459,7 +459,7 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 // Helper method to find nested property by LocalID
 func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingPlanPropertyArgs {
 	for _, prop := range args.Properties {
-		if prop.ID == propertyID {
+		if prop.ID.(string) == propertyID {
 			return prop
 		}
 	}
@@ -662,7 +662,7 @@ func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
 
 func (args *TrackingPlanArgs) eventByID(eventID string) *TrackingPlanEventArgs {
 	for _, event := range args.Events {
-		if event.ID == eventID {
+		if event.ID.(string) == eventID {
 			return event
 		}
 	}
