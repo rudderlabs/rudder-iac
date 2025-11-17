@@ -4,8 +4,8 @@ FROM eclipse-temurin:21-jdk@sha256:ec2005c536f3661c6ef1253292c9c623e582186749a3e
 # Install Gradle
 ENV GRADLE_VERSION=8.4
 RUN apt-get update && \
-    apt-get install -y curl unzip && \
-    curl -L https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -o gradle.zip && \
+    apt-get --no-install-recommends install -y curl unzip && \
+    curl --proto "=https" --tlsv1.2 -sSf -L https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -o gradle.zip && \
     unzip gradle.zip && \
     mv gradle-${GRADLE_VERSION} /opt/gradle && \
     ln -s /opt/gradle/bin/gradle /usr/local/bin/gradle && \
