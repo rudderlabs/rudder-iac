@@ -1,5 +1,5 @@
 # Use a lightweight base image with JDK
-FROM eclipse-temurin:17-jdk@sha256:06ee07a59dc7011f643baaa45889ecd15a0b9176490943b0e4379630e832ac2d
+FROM eclipse-temurin:21-jdk@sha256:ec2005c536f3661c6ef1253292c9c623e582186749a3ef2ed90903d1aaf74640
 
 # Install Gradle
 ENV GRADLE_VERSION=8.4
@@ -23,9 +23,6 @@ WORKDIR /app
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
-
-# Copy source code
-RUN mkdir -p ./src/main/kotlin
 
 # Copy run script
 COPY run.sh .

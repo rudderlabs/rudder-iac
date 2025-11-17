@@ -6,4 +6,4 @@ build:
 
 .PHONY: run
 run: build
-	docker run --rm -v "$(PWD)/../testdata:/app/external" $(IMAGE_NAME)
+	docker run --rm -v "$(PWD)/src:/app/external" $(IMAGE_NAME)
