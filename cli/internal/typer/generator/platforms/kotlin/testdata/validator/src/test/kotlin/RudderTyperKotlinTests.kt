@@ -83,9 +83,7 @@ class RudderTyperKotlinTests {
         validations.validateNext(
             EventValidation.GroupValidation(
                 groupId = "company-xyz-789",
-                traits = buildJsonObject {
-                    put("active", true)
-                }
+                traits = buildJsonObject {}
             )
         )
     }
@@ -193,6 +191,54 @@ class RudderTyperKotlinTests {
             EventValidation.TrackValidation(
                 name = "User Signed Up",
                 properties = buildJsonObject {
+                    put("active", true)
+                    put("age", 28.5)
+                    put("array_of_any", buildJsonArray {
+                        add(JsonPrimitive("string item"))
+                        add(JsonPrimitive(42))
+                        add(JsonPrimitive(true))
+                        add(buildJsonObject {
+                            put("nested", "object")
+                            put("count", 100)
+                        })
+                    })
+                    put("contacts", buildJsonArray {
+                        add("contact1@example.com")
+                        add("contact2@example.com")
+                        add("support@company.org")
+                    })
+                    put("device_type", "mobile")
+                    put("profile", buildJsonObject {
+                        put("email", "newuser@example.com")
+                        put("first_name", "Bob")
+                        put("last_name", "Williams")
+                    })
+                    put("property_of_any", buildJsonObject {
+                        put("custom_field_1", "value1")
+                        put("custom_field_2", 999)
+                        put("nested_object", buildJsonObject {
+                            put("deep_field", "deep_value")
+                        })
+                    })
+                    put("tags", buildJsonArray {
+                        add("premium")
+                        add("early-adopter")
+                        add("beta-tester")
+                        add("verified")
+                    })
+                    put("untyped_array", buildJsonArray {
+                        add(3.14159)
+                        add("mixed")
+                        add(false)
+                        add(buildJsonObject {
+                            put("id", 123)
+                            put("name", "test")
+                        })
+                    })
+                    put("untyped_field", buildJsonObject {
+                        put("arbitrary_key", "arbitrary_value")
+                        put("number", 42.5)
+                    })
                 }
             )
         )
@@ -215,7 +261,13 @@ class RudderTyperKotlinTests {
         validations.validateNext(
             EventValidation.TrackValidation(
                 name = "User Signed Up",
-                properties = buildJsonObject {}
+                properties = buildJsonObject {
+                    put("active", false)
+                    put("profile", buildJsonObject {
+                        put("email", "minimal@example.com")
+                        put("first_name", "Charlie")
+                    })
+                }
             )
         )
     }
@@ -272,10 +324,57 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(4)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("device_type", "tablet")
+                put("profile", buildJsonObject {
+                    put("email", "tablet.user@example.com")
+                    put("first_name", "Diana")
+                    put("last_name", "Martinez")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("device_type", "desktop")
+                put("profile", buildJsonObject {
+                    put("email", "desktop.user@example.com")
+                    put("first_name", "Edward")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("device_type", "smartTV")
+                put("age", 45.0)
+                put("profile", buildJsonObject {
+                    put("email", "tv.user@example.com")
+                    put("first_name", "Fiona")
+                    put("last_name", "Chen")
+                })
+                put("tags", buildJsonArray {
+                    add("smart-home")
+                    add("entertainment")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("device_type", "IoT-Device")
+                put("profile", buildJsonObject {
+                    put("email", "iot@example.com")
+                    put("first_name", "George")
+                })
+            }
+        ))
     }
 
     @Test
@@ -293,7 +392,21 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(1)
-        validations.validateNext(EventValidation.TrackValidation(name = "Event With Variants", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "Event With Variants",
+            properties = buildJsonObject {
+                put("profile", buildJsonObject {
+                    put("email", "mobile.user@example.com")
+                    put("first_name", "Hannah")
+                    put("last_name", "Smith")
+                })
+                put("tags", buildJsonArray {
+                    add("mobile")
+                    add("app-user")
+                })
+                put("device_type", "mobile")
+            }
+        ))
     }
 
     @Test
@@ -356,10 +469,69 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(4)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("feature_config", buildJsonObject {
+                    put("age", 30.0)
+                    put("feature_flag", true)
+                })
+                put("profile", buildJsonObject {
+                    put("email", "feature.enabled@example.com")
+                    put("first_name", "Premium")
+                    put("last_name", "User")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("feature_config", buildJsonObject {
+                    put("feature_flag", false)
+                    put("first_name", "some-name")
+                })
+                put("profile", buildJsonObject {
+                    put("email", "feature.disabled@example.com")
+                    put("first_name", "Free")
+                    put("last_name", "User")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("feature_config", buildJsonObject {
+                    put("feature_flag", "beta")
+                    put("tags", buildJsonArray {
+                        add("beta-user")
+                        add("early-access")
+                        add("experimental")
+                    })
+                })
+                put("profile", buildJsonObject {
+                    put("email", "feature.beta@example.com")
+                    put("first_name", "Beta")
+                    put("last_name", "Tester")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("feature_config", buildJsonObject {
+                    put("feature_flag", "alpha")
+                })
+                put("profile", buildJsonObject {
+                    put("email", "feature.alpha@example.com")
+                    put("first_name", "Alpha")
+                    put("last_name", "User")
+                })
+            }
+        ))
     }
 
     @Test
@@ -410,12 +582,50 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(4)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {
-
-        }))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("priority", 1)
+                put("profile", buildJsonObject {
+                    put("email", "priority.user@example.com")
+                    put("first_name", "Ivan")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("enabled", true)
+                put("profile", buildJsonObject {
+                    put("email", "enabled.user@example.com")
+                    put("first_name", "Julia")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("rating", 4.5)
+                put("profile", buildJsonObject {
+                    put("email", "rating.user@example.com")
+                    put("first_name", "Kevin")
+                })
+            }
+        ))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("mixed_value", 2.5)
+                put("profile", buildJsonObject {
+                    put("email", "mixed.user@example.com")
+                    put("first_name", "Laura")
+                })
+            }
+        ))
     }
 
     @Test
@@ -436,7 +646,20 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(1)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("profile", buildJsonObject {
+                    put("email", "default.user@example.com")
+                    put("first_name", "Default")
+                    put("last_name", "Case")
+                })
+                put("user_access", buildJsonObject {
+                    put("active", true)
+                })
+            }
+        ))
     }
 
     @Test
@@ -459,7 +682,22 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(1)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("device_type", "mobile")
+                put("enabled", false)
+                put("mixed_value", "active")
+                put("priority", 3)
+                put("profile", buildJsonObject {
+                    put("email", "all.enums@example.com")
+                    put("first_name", "Michael")
+                })
+                put("rating", 5)
+                put("status", "active")
+            }
+        ))
     }
 
     @Test
@@ -479,6 +717,21 @@ class RudderTyperKotlinTests {
 
         analytics.flush()
         validations.validateCount(1)
-        validations.validateNext(EventValidation.TrackValidation(name = "User Signed Up", properties = buildJsonObject {}))
+        validations.validateNext(EventValidation.TrackValidation(
+            name = "User Signed Up",
+            properties = buildJsonObject {
+                put("active", true)
+                put("nested_empty_object_no_additional_props", buildJsonObject {})
+                put("profile", buildJsonObject {
+                    put("email", "unit.test@example.com")
+                    put("first_name", "Unit")
+                    put("last_name", "Test")
+                })
+                put("tags", buildJsonArray {
+                    add("unit")
+                    add("test")
+                })
+            }
+        ))
     }
 }
