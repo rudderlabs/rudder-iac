@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/rudderlabs/rudder-iac/compare/v0.11.1...v0.11.2) (2025-11-18)
+
+
+### Bug Fixes
+
+* filter the list of sources which have no externalID set ([#294](https://github.com/rudderlabs/rudder-iac/issues/294)) ([da8b538](https://github.com/rudderlabs/rudder-iac/commit/da8b53891b3e7a3f49cd72c361f6cd51d84d3111))
+
 ## [0.11.1](https://github.com/rudderlabs/rudder-iac/compare/v0.11.0...v0.11.1) (2025-11-14)
 
 
