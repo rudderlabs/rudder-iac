@@ -1129,6 +1129,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:       "python",
 					Enabled:    false,
 				},
+				{
+					ID:         "remote789",
+					ExternalID: "", // This should be skipped
+					Name:       "Test Source 3",
+					Type:       "Go",
+					Enabled:    true,
+				},
 			}, nil
 		})
 		handler := source.NewHandler(mockClient, importDir)
