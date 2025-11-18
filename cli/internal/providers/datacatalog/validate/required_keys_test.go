@@ -953,6 +953,7 @@ func TestVariantsValidation(t *testing.T) {
 func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	t.Parallel()
 
+	falseVal := false
 	// Setup test data catalog
 	dc := &catalog.DataCatalog{
 		Properties: map[catalog.EntityGroup][]catalog.Property{
@@ -1006,6 +1007,20 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				LocalID: "test_plan",
 				Name:    "Test Tracking Plan",
 				Rules: []*catalog.TPRule{
+					{
+						LocalID: "valid_non_nested_rule",
+						Type:    "event_rule",
+						Event: &catalog.TPRuleEvent{
+							Ref: "#/events/test/signup",
+						},
+						Properties: []*catalog.TPRuleProperty{
+							{
+								Ref:      "#/properties/test_props/user_profile",
+								Required: true,
+								AdditionalProperties: &falseVal,
+							},
+						},
+					},
 					{
 						LocalID: "valid_nested_rule",
 						Type:    "event_rule",
@@ -1111,6 +1126,11 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 		}
 	}
 	assert.True(t, depthFound, "Should have error for exceeding maximum nesting depth")
+
+	// Test 4: Additional properties not allowed for non-nested properties
+	additionalPropertiesErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/valid_non_nested_rule")
+	assert.Len(t, additionalPropertiesErrors, 1, "Should have one error for additional properties not allowed for non-nested properties")
+	assert.Contains(t, additionalPropertiesErrors[0].Error(), "setting additional_properties is only allowed for nested properties")
 }
 
 // Helper function to filter errors by reference pattern

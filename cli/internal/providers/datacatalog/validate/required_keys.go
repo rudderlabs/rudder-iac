@@ -179,10 +179,19 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			if rule.Event != nil && len(rule.Properties) > 0 {
 				// iterate over the properties and validate each of them
 				for _, prop := range rule.Properties {
+					isNested := false
 					// we only need to validate nested properties, there are no validations for flat properties
 					if len(prop.Properties) > 0 {
+						isNested = true
 						errors = append(errors, rk.validateNestedProperty(prop, ruleRef, dc)...)
 						errors = append(errors, rk.validateNestingDepth(prop.Properties, 1, MAX_NESTING_DEPTH, ruleRef)...)
+					}
+
+					if !isNested && prop.AdditionalProperties != nil {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("setting additional_properties is only allowed for nested properties"),
+							Reference: fmt.Sprintf("%s/properties/%s", ruleRef, prop.Ref),
+						})
 					}
 				}
 
