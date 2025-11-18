@@ -145,11 +145,18 @@ func buildRuleProperties(
 			return nil, fmt.Errorf("building nested properties for property %s: %w", prop.ID, err)
 		}
 
-		ruleProps = append(ruleProps, &localcatalog.TPRuleProperty{
+		ruleProp := &localcatalog.TPRuleProperty{
 			Ref:        propRef,
 			Required:   prop.Required,
 			Properties: nestedProps,
-		})
+		}
+		// only set additionalProperties if there are nested properties
+		if len(nestedProps) > 0 {
+			// copy the additionalProperties value to ensure we're not setting the address of a loop variable in ruleProps
+			additionalProperties := prop.AdditionalProperties
+			ruleProp.AdditionalProperties = &additionalProperties
+		}
+		ruleProps = append(ruleProps, ruleProp)
 	}
 
 	return ruleProps, nil

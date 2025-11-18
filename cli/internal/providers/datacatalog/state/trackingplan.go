@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -492,6 +493,14 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
+	// default additional properties to - 
+	// 1. false for non object and non nested types
+	// 2. true for object types
+	// 3. true if there are nested properties (this case is covered in 2, but we are keeping it here for backwards compatibility)
+	additionalPropertiesDefaultVal := false
+	if strings.Contains(prop.Type, "object") {
+		additionalPropertiesDefaultVal = true
+	}
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
@@ -506,8 +515,13 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
+		// set additional properties to true by default if there are nested properties
+		additionalPropertiesDefaultVal = true
+	}
+
+	args.AdditionalProperties = additionalPropertiesDefaultVal
+	if prop.AdditionalProperties != nil {
+		args.AdditionalProperties = *prop.AdditionalProperties
 	}
 
 	return nil
@@ -538,6 +552,8 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 	}
 	args.LocalID = prop.ExternalID
 	args.Required = remoteProp.Required
+	// when creating args from a remote tp property, set additionalProperties to the value from the remote property
+	args.AdditionalProperties = remoteProp.AdditionalProperties
 
 	// Handle nested properties recursively
 	if len(remoteProp.Properties) > 0 {
@@ -552,8 +568,6 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
 	}
 
 	return nil
