@@ -152,7 +152,7 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 					"properties": []map[string]interface{}{
 						{
 							"localId":              "property-id",
-							"id":                   "",
+							"id":                   "upstream-property-id",
 							"required":             true,
 							"additionalProperties": false,
 						},
@@ -204,6 +204,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id",
 					LocalID:  "property-id",
 					Required: true,
 				},
@@ -234,7 +235,7 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":                   "",
+							"id":                   "upstream-property-id",
 							"localId":              "property-id",
 							"required":             true,
 							"additionalProperties": false,
@@ -272,6 +273,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id-1",
 					LocalID:  "property-id-1",
 					Required: false,
 				},
@@ -316,7 +318,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":                   "",
+							"id":                   "upstream-property-id-1",
 							"localId":              "property-id-1",
 							"required":             false,
 							"additionalProperties": false,
@@ -732,6 +734,7 @@ func getTrackingPlanArgs() *state.TrackingPlanArgs {
 		AllowUnplanned: false,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
+				ID:       "upstream-property-id",
 				LocalID:  "property-id",
 				Required: true,
 			},

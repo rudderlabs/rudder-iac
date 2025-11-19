@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	sstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -614,8 +615,9 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 
 func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T) {
 	tests := []struct {
-		name     string
-		property *state.TrackingPlanPropertyArgs
+		name           string
+		property       *state.TrackingPlanPropertyArgs
+		resourceStates []*sstate.ResourceState
 	}{
 		{
 			name: "Simple property without nested properties",
@@ -623,6 +625,15 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 				ID:       resources.PropertyRef{URN: "property:simple-property-id", Property: "id"},
 				LocalID:  "simple-property-id",
 				Required: true,
+			},
+			resourceStates: []*sstate.ResourceState{
+				{
+					ID:   "simple-property-id",
+					Type: "property",
+					Output: map[string]interface{}{
+						"id": "upstream-property-id",
+					},
+				},
 			},
 		},
 		{
@@ -668,6 +679,57 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					},
 				},
 			},
+			resourceStates: []*sstate.ResourceState{
+				{
+					ID:   "user-profile-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-user-profile-id",
+					},
+				},
+				{
+					ID:   "profile-settings-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-profile-settings-id",
+					},
+				},
+				{
+					ID:   "notifications-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-notifications-id",
+					},
+				},
+				{
+					ID:   "email-enabled-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-email-enabled-id",
+					},
+				},
+				{
+					ID:   "push-enabled-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-push-enabled-id",
+					},
+				},
+				{
+					ID:   "theme-preference-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-theme-preference-id",
+					},
+				},
+				{
+					ID:   "profile-visibility-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-profile-visibility-id",
+					},
+				},
+			},
 		},
 		{
 			name: "Property with custom type reference and nested properties",
@@ -683,15 +745,31 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					},
 				},
 			},
+			resourceStates: []*sstate.ResourceState{
+				{
+					ID:   "user-data-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-user-data-id",
+					},
+				},
+				{
+					ID:   "custom-field-id",
+					Type: "property",
+					Output: map[string]any{
+						"id": "upstream-custom-field-id",
+					},
+				},
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Test ToResourceData
+			t.Parallel()
+
 			resourceData := tc.property.ToResourceData()
 
-			// Verify basic fields are present
 			assert.Equal(t, tc.property.ID, resourceData["id"])
 			assert.Equal(t, tc.property.LocalID, resourceData["localId"])
 			assert.Equal(t, tc.property.Required, resourceData["required"])
@@ -703,12 +781,19 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 				assert.Len(t, nestedProps, len(tc.property.Properties))
 			}
 
+			mockedState := sstate.EmptyState()
+			for _, rs := range tc.resourceStates {
+				mockedState.AddResource(rs)
+			}
+			dereferencedResourceData, err := sstate.Dereference(resourceData, mockedState)
+			require.NoError(t, err)
+
 			// Test FromResourceData roundtrip
 			reconstructedProperty := &state.TrackingPlanPropertyArgs{}
-			reconstructedProperty.FromResourceData(resourceData)
+			reconstructedProperty.FromResourceData(dereferencedResourceData)
 
 			// Verify the reconstructed property matches the original
-			assert.Equal(t, "", reconstructedProperty.ID)
+			assert.NotEmpty(t, reconstructedProperty.ID)
 			assert.Equal(t, tc.property.LocalID, reconstructedProperty.LocalID)
 			assert.Equal(t, tc.property.Required, reconstructedProperty.Required)
 
@@ -716,7 +801,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 			assert.Len(t, reconstructedProperty.Properties, len(tc.property.Properties))
 			for i, originalNested := range tc.property.Properties {
 				reconstructedNested := reconstructedProperty.Properties[i]
-				assert.Equal(t, "", reconstructedNested.ID)
+				assert.NotEmpty(t, reconstructedNested.ID)
 				assert.Equal(t, originalNested.LocalID, reconstructedNested.LocalID)
 				assert.Equal(t, originalNested.Required, reconstructedNested.Required)
 
@@ -725,7 +810,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					assert.Len(t, reconstructedNested.Properties, len(originalNested.Properties))
 					for j, originalDeepNested := range originalNested.Properties {
 						reconstructedDeepNested := reconstructedNested.Properties[j]
-						assert.Equal(t, "", reconstructedDeepNested.ID)
+						assert.NotEmpty(t, reconstructedDeepNested.ID)
 						assert.Equal(t, originalDeepNested.LocalID, reconstructedDeepNested.LocalID)
 						assert.Equal(t, originalDeepNested.Required, reconstructedDeepNested.Required)
 					}
