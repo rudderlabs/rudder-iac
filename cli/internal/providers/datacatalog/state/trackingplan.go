@@ -72,11 +72,6 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	t.TrackingPlanArgs.FromResourceData(
 		MustMapStringInterface(from, "trackingPlanArgs"),
 	)
-
-	events := NormalizeToSliceMap(from, "events")
-	if len(events) == 0 {
-		return
-	}
 }
 
 // FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
@@ -489,7 +484,7 @@ func (args *TrackingPlanPropertyArgs) ToResourceData() map[string]interface{} {
 func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interface{}) {
 	args.LocalID = MustString(propMap, "localId")
 	args.Required = MustBool(propMap, "required")
-	args.ID = String(propMap, "id", "")
+	args.ID = MustString(propMap, "id")
 	args.AdditionalProperties = Bool(propMap, "additionalProperties", false)
 
 	// Handle nested properties recursively
@@ -612,7 +607,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		event := event.(map[string]interface{})
 
 		eventProps[idx] = &TrackingPlanEventArgs{
-			ID:              String(event, "id", ""),
+			ID:              MustString(event, "id"),
 			LocalID:         MustString(event, "localId"),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
