@@ -414,6 +414,11 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources {
+		if source.ExternalID == "" {
+			// loop over the sources which have externalID not set
+			// as they are not anyway part of the state
+			continue
+		}
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: source.ExternalID,
