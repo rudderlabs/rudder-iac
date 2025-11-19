@@ -41,7 +41,7 @@ func NewCmdTPValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p := project.New(location, deps.Providers().DataCatalog)
+			p := project.New(location, deps.CompositeProvider())
 
 			if err := p.Load(); err != nil {
 				return fmt.Errorf("loading project: %w", err)

@@ -13,9 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	log = logger.New("trackingplan.apply")
-)
+var log = logger.New("trackingplan.apply")
 
 func NewCmdTPApply() *cobra.Command {
 	var (
@@ -43,7 +41,7 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = project.New(location, deps.Providers().DataCatalog)
+			p = project.New(location, deps.CompositeProvider())
 			if err := p.Load(); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
@@ -71,7 +69,7 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog, workspace)
+			s, err := syncer.New(deps.CompositeProvider(), workspace)
 			if err != nil {
 				return err
 			}
@@ -83,7 +81,6 @@ func NewCmdTPApply() *cobra.Command {
 					DryRun:  dryRun,
 					Confirm: confirm,
 				})
-
 			if err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
