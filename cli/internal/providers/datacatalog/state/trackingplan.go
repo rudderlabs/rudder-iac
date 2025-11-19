@@ -408,7 +408,7 @@ func (args *TrackingPlanEventArgs) diff(other *TrackingPlanEventArgs) bool {
 
 func (args *TrackingPlanEventArgs) propertyByID(propertyID string) *TrackingPlanPropertyArgs {
 	for _, prop := range args.Properties {
-		if prop.ID == propertyID {
+		if prop.ID.(string) == propertyID {
 			return prop
 		}
 	}
