@@ -139,13 +139,6 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      1,
-		"events": []map[string]interface{}{
-			{
-				"eventId": "upstream-event-id",
-				"localId": "event-id",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
@@ -186,10 +179,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	)
 
 	oldsState := defaultTrackingPlanStateFactory().
-		WithEvent(&state.TrackingPlanEventState{
-			LocalID: "event-id",
-			EventID: "upstream-event-id",
-		}).
 		WithTrackingPlanArgs(*oldsArgs).
 		Build()
 
@@ -233,13 +222,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
-		"events": []map[string]interface{}{
-			{
-				"eventId": "upstream-event-id",
-				"localId": "event-id",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
@@ -279,10 +261,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	)
 
 	oldsState := defaultTrackingPlanStateFactory().
-		WithEvent(&state.TrackingPlanEventState{
-			LocalID: "event-id",
-			EventID: "upstream-event-id",
-		}).
 		WithTrackingPlanArgs(*oldsArgs).
 		Build()
 
@@ -326,13 +304,6 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
-		"events": []map[string]interface{}{
-			{
-				"eventId": "upstream-event-id-1",
-				"localId": "event-id-1",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
@@ -554,12 +525,10 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "TestTP",
 				"description":  "desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
 				"updatedAt":    updated.String(),
-				"events":       []map[string]any(nil),
 				"trackingPlanArgs": map[string]any{
 					"localId":     "local-tp-id",
 					"name":        "TestTP",
@@ -651,12 +620,10 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "UpdatedTP",
 				"description":  "new desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
 				"updatedAt":    updated.String(),
-				"events":       []map[string]any(nil),
 				"trackingPlanArgs": map[string]any{
 					"localId":     "local-tp-id",
 					"name":        "UpdatedTP",

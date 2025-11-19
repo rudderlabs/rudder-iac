@@ -22,50 +22,11 @@ type TrackingPlanState struct {
 	ID           string
 	Name         string
 	Description  string
-	Version      int
 	CreationType string
 	WorkspaceID  string
 	CreatedAt    string
 	UpdatedAt    string
-	Events       []*TrackingPlanEventState
 }
-
-func (t *TrackingPlanState) LocalIDForCatalogEventID(eventID string) string {
-	for _, event := range t.Events {
-		if event.EventID == eventID {
-			return event.LocalID
-		}
-	}
-	return ""
-}
-
-func (t *TrackingPlanState) CatalogEventIDForLocalID(localID string) string {
-	for _, event := range t.Events {
-		if event.LocalID == localID {
-			return event.EventID
-		}
-	}
-	return ""
-}
-
-type TrackingPlanEventState struct {
-	LocalID string
-	EventID string
-}
-
-func (t *TrackingPlanEventState) GetLocalID() string {
-	return t.LocalID
-}
-
-func (t *TrackingPlanState) EventByID(eventID string) *TrackingPlanEventState {
-	for _, event := range t.Events {
-		if event.EventID == eventID {
-			return event
-		}
-	}
-	return nil
-}
-
 type TrackingPlanPropertyState struct {
 	Name        string
 	LocalID     string
@@ -87,28 +48,14 @@ func (t *TrackingPlanArgsDiff) isDiffed() bool {
 
 func (t *TrackingPlanState) ToResourceData() resources.ResourceData {
 
-	var (
-		events []map[string]interface{}
-	)
-
-	for _, event := range t.Events {
-
-		events = append(events, map[string]interface{}{
-			"eventId": event.EventID,
-			"localId": event.LocalID,
-		})
-	}
-
 	return resources.ResourceData{
 		"id":               t.ID,
 		"name":             t.Name,
 		"description":      t.Description,
-		"version":          t.Version,
 		"creationType":     t.CreationType,
 		"workspaceId":      t.WorkspaceID,
 		"createdAt":        t.CreatedAt,
 		"updatedAt":        t.UpdatedAt,
-		"events":           events,
 		"trackingPlanArgs": map[string]interface{}(t.TrackingPlanArgs.ToResourceData()),
 	}
 }
@@ -118,14 +65,6 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	t.ID = MustString(from, "id")
 	t.Name = MustString(from, "name")
 	t.Description = MustString(from, "description")
-	// version can be either an int or a float64
-	// in our old stateful approach, we used to get the version as a float64 as we used json.Unmarshall to decode the state api's response into a map[string]interface{}
-	// in the stateless approach, we derive the state from the remote TrackingPlan which is a strongly typed struct where the version field is of type int
-	t.Version = Int(from, "version", 0)
-	if t.Version == 0 {
-		t.Version = int(Float64(from, "version", 0))
-	}
-
 	t.CreationType = MustString(from, "creationType")
 	t.WorkspaceID = MustString(from, "workspaceId")
 	t.CreatedAt = MustString(from, "createdAt")
@@ -138,17 +77,6 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 	if len(events) == 0 {
 		return
 	}
-
-	tpEvents := make([]*TrackingPlanEventState, len(events))
-	for idx, event := range events {
-
-		tpEvents[idx] = &TrackingPlanEventState{
-			EventID: MustString(event, "eventId"),
-			LocalID: MustString(event, "localId"),
-		}
-	}
-
-	t.Events = tpEvents
 }
 
 // FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
@@ -156,22 +84,12 @@ func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.Trackin
 	t.ID = trackingPlan.ID
 	t.Name = trackingPlan.Name
 	t.WorkspaceID = trackingPlan.WorkspaceID
-	t.Version = trackingPlan.Version
 	t.CreationType = trackingPlan.CreationType
 	t.CreatedAt = trackingPlan.CreatedAt.String()
 	t.UpdatedAt = trackingPlan.UpdatedAt.String()
 	if trackingPlan.Description != nil {
 		t.Description = *trackingPlan.Description
 	}
-
-	events := make([]*TrackingPlanEventState, 0, len(trackingPlan.Events))
-	for _, event := range trackingPlan.Events {
-		events = append(events, &TrackingPlanEventState{
-			EventID: event.ID,
-			LocalID: event.ExternalID,
-		})
-	}
-	t.Events = events
 
 	tpArgs := TrackingPlanArgs{}
 	tpArgs.Name = trackingPlan.Name
