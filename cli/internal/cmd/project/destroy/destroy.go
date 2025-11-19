@@ -23,11 +23,10 @@ var (
 
 func NewCmdDestroy() *cobra.Command {
 	var (
-		deps        app.Deps
-		err         error
-		dryRun      bool
-		confirm     bool
-		concurrency int
+		deps    app.Deps
+		err     error
+		dryRun  bool
+		confirm bool
 	)
 
 	cmd := &cobra.Command{
@@ -50,11 +49,6 @@ func NewCmdDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			// Validate concurrency flag usage
-			if cmd.Flags().Changed("concurrency") && !config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				return fmt.Errorf("concurrency flag is only allowed when ConcurrentSyncs experimental feature is enabled")
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -68,20 +62,22 @@ func NewCmdDestroy() *cobra.Command {
 				}...)
 			}()
 
-			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{})
+			options := []syncer.Option{
+				syncer.WithDryRun(dryRun),
+				syncer.WithConfirmationPrompt(confirm),
+			}
+
+			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
+				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+			}
+
+			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{}, options...)
 			if err != nil {
-				return fmt.Errorf("creating syncer: %w", err)
+				return err
 			}
 
 			// Destroy all resources
-			errors := s.Destroy(
-				context.Background(),
-				syncer.SyncOptions{
-					DryRun:      dryRun,
-					Confirm:     confirm,
-					Concurrency: concurrency,
-				})
-
+			errors := s.Destroy(context.Background())
 			if len(errors) > 0 {
 				return fmt.Errorf("destroying resources: %w", errors[0])
 			}
@@ -98,6 +94,6 @@ func NewCmdDestroy() *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the resources that would be destroyed without actually destroying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm before destroying resources")
-	cmd.Flags().IntVar(&concurrency, "concurrency", 30, "Number of concurrent operations to run (only allowed when ConcurrentSyncs experimental feature is enabled)")
+
 	return cmd
 }

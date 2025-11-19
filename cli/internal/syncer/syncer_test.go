@@ -69,7 +69,7 @@ func TestSyncerCreate(t *testing.T) {
 	}
 
 	s, _ := syncer.New(provider, mockWorkspace())
-	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
+	err := s.Sync(context.Background(), targetGraph)
 	assert.Nil(t, err)
 
 	assert.Len(t, provider.OperationLog, 3)
@@ -150,7 +150,7 @@ func TestSyncerDelete(t *testing.T) {
 	targetGraph := resources.NewGraph()
 
 	s, _ := syncer.New(provider, mockWorkspace())
-	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
+	err := s.Sync(context.Background(), targetGraph)
 	assert.Nil(t, err)
 
 	assert.Len(t, provider.OperationLog, 3)
@@ -193,10 +193,10 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 		ReconstructedState: state.EmptyState(),
 	}
 
-	s, err := syncer.New(provider, mockWorkspace())
+	s, err := syncer.New(provider, mockWorkspace(), syncer.WithConcurrency(3))
 	assert.NoError(t, err)
 
-	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
+	err = s.Sync(context.Background(), targetGraph)
 	assert.NoError(t, err)
 
 	// We expect 6 creates
@@ -298,10 +298,10 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	// Create empty target graph (all resources should be deleted)
 	targetGraph := resources.NewGraph()
 
-	s, err := syncer.New(provider, mockWorkspace())
+	s, err := syncer.New(provider, mockWorkspace(), syncer.WithConcurrency(3))
 	assert.NoError(t, err)
 
-	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
+	err = s.Sync(context.Background(), targetGraph)
 	assert.NoError(t, err)
 
 	// We expect 12 deletes
@@ -399,11 +399,11 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2"},
 		}
 
-		s, err := syncer.New(failingProvider, mockWorkspace())
+		s, err := syncer.New(failingProvider, mockWorkspace(), syncer.WithConcurrency(2))
 		assert.NoError(t, err)
 
 		targetGraph := createGraphWithResources(events, properties, trackingPlans)
-		err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 2})
+		err = s.Sync(context.Background(), targetGraph)
 		assert.Error(t, err)
 
 		// Verify error messages
@@ -436,10 +436,10 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			failingResources:    []string{"event2", "property2"},
 		}
 
-		s, err := syncer.New(failingProvider, mockWorkspace())
+		s, err := syncer.New(failingProvider, mockWorkspace(), syncer.WithConcurrency(2))
 		assert.NoError(t, err)
 
-		errors := s.Destroy(context.Background(), syncer.SyncOptions{Concurrency: 2})
+		errors := s.Destroy(context.Background())
 
 		// Verify error count
 		assert.Len(t, errors, 2, "Should have expected number of errors")

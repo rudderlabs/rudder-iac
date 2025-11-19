@@ -49,15 +49,15 @@ func NewCmdTPDestroy() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog, &client.Workspace{})
+			s, err := syncer.New(deps.Providers().DataCatalog, &client.Workspace{},
+				syncer.WithDryRun(dryRun),
+				syncer.WithConfirmationPrompt(confirm),
+			)
 			if err != nil {
 				return err
 			}
 
-			errors := s.Destroy(context.Background(), syncer.SyncOptions{
-				DryRun:  dryRun,
-				Confirm: confirm,
-			})
+			errors := s.Destroy(context.Background())
 			if len(errors) > 0 {
 				return fmt.Errorf("destroying resources: %w", errors[0])
 			}
@@ -68,5 +68,6 @@ func NewCmdTPDestroy() *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
+
 	return cmd
 }

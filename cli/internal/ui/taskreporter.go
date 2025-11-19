@@ -12,6 +12,54 @@ import (
 
 var spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue))
 
+// TaskReporter manages and displays the progress of multiple tasks in the terminal
+type TaskReporter struct {
+	m model
+	p *tea.Program
+}
+
+func NewTaskReporter() *TaskReporter {
+	return &TaskReporter{
+		m: initialModel(),
+	}
+}
+
+// Run starts the TaskReporter UI.
+// This method blocks until the UI is finished, by calling Done() on the TaskReporter.
+func (t *TaskReporter) Run() error {
+	t.p = tea.NewProgram(t.m)
+	_, err := t.p.Run()
+	return err
+}
+
+// SetTotalTasks sets the total number of tasks to be tracked.
+// This affects the progress bar display.
+func (t *TaskReporter) SetTotalTasks(total int) {
+	t.m.total = total
+}
+
+// Start signals the start of a task with the given id and message.
+// For each started task, a spinner with the message will be displayed.
+func (t *TaskReporter) Start(id string, message string) {
+	t.m.tasksMsgChan <- taskStartMsg{id: id, message: message}
+}
+
+// Complete signals the completion of a task with the given id, message, and error status.
+// Spinners for completed tasks will be removed from the display,
+// and a success or failure message will be printed based on the error status.
+func (t *TaskReporter) Complete(id string, message string, err error) {
+	t.m.tasksMsgChan <- taskCompleteMsg{id: id, message: message, err: err}
+}
+
+// Done sends a signal to terminate the TaskReporter UI.
+// This will unblock the Run() method.
+func (t *TaskReporter) Done() {
+	t.m.tasksMsgChan <- tasksDoneMsg{}
+	if t.p != nil {
+		t.p.Wait()
+	}
+}
+
 type taskState struct {
 	id      string
 	message string
@@ -41,11 +89,11 @@ type model struct {
 	pr           progress.Model
 }
 
-func initialModel(totalTasks int) model {
+func initialModel() model {
 	return model{
 		tasksMsgChan: make(chan tea.Msg),
 		tasks:        make(map[string]*taskState),
-		total:        totalTasks,
+		total:        0,
 		sp:           spinner.New(spinner.WithSpinner(spinner.MiniDot), spinner.WithStyle(spinnerStyle)),
 		pr: progress.New(
 			progress.WithSolidFill(ColorWhite),
@@ -56,7 +104,7 @@ func initialModel(totalTasks int) model {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.sp.Tick, listenForTaskMessages(m.tasksMsgChan))
+	return tea.Sequence(m.sp.Tick, listenForTaskMessages(m.tasksMsgChan))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -82,7 +130,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			completionMsg = Success(msg.message)
 		}
 
-		return m, tea.Batch(
+		return m, tea.Sequence(
 			tea.Println(completionMsg),
 			listenForTaskMessages(m.tasksMsgChan),
 		)
@@ -106,7 +154,7 @@ func (m model) View() string {
 		output.WriteString(fmt.Sprintf("%s %s\n", m.sp.View(), task.message))
 	}
 
-	if len(m.tasks) > 0 {
+	if len(m.tasks) > 0 && m.total > 0 {
 		output.WriteString(fmt.Sprintf("[%s] %d/%d\n", m.pr.ViewAs(float64(m.completed)/float64(m.total)), m.completed, m.total))
 	}
 
@@ -118,33 +166,4 @@ func listenForTaskMessages(msgChan chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		return <-msgChan
 	}
-}
-
-type TaskReporter struct {
-	m model
-}
-
-func (t *TaskReporter) Run() error {
-	p := tea.NewProgram(t.m)
-
-	_, err := p.Run()
-	return err
-}
-
-func NewTaskReporter(totalTasks int) *TaskReporter {
-	return &TaskReporter{
-		m: initialModel(totalTasks),
-	}
-}
-
-func (t *TaskReporter) Start(id string, message string) {
-	t.m.tasksMsgChan <- taskStartMsg{id: id, message: message}
-}
-
-func (t *TaskReporter) Complete(id string, message string, err error) {
-	t.m.tasksMsgChan <- taskCompleteMsg{id: id, message: message, err: err}
-}
-
-func (t *TaskReporter) Done() {
-	t.m.tasksMsgChan <- tasksDoneMsg{}
 }
