@@ -17,6 +17,19 @@ func PrintError(err error) {
 	fmt.Fprintf(os.Stderr, "%s %s\n", style("Error:"), err.Error())
 }
 
+func Warning(message string) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorYellow)).
+		Bold(true).
+		Render
+
+	return fmt.Sprintf("%s %s", style("Warning:"), message)
+}
+
+func PrintWarning(message string) {
+	fmt.Println(Warning(message))
+}
+
 // Failure returns a failure message string in a styled format, including a red "x" symbol.
 func Failure(message string) string {
 	return fmt.Sprintf("%s %s", Color("x", ColorRed), message)
