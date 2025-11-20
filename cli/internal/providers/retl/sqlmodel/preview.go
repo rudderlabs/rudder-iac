@@ -6,7 +6,7 @@ import (
 	"time"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 const (

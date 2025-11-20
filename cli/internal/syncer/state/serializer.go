@@ -3,7 +3,7 @@ package state
 import (
 	"encoding/json"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 const RudderRef = "$__rudderRef"

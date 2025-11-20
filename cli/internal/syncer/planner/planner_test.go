@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 func TestPlanner_Plan(t *testing.T) {

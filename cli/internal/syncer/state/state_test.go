@@ -3,7 +3,7 @@ package state_test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	s "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 	"github.com/stretchr/testify/assert"
 )
