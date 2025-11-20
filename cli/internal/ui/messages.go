@@ -1,0 +1,38 @@
+package ui
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+// PrintError prints the given error message to stderr in a styled format.
+func PrintError(err error) {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorRed)).
+		Bold(true).
+		Render
+
+	fmt.Fprintf(os.Stderr, "%s %s\n", style("Error:"), err.Error())
+}
+
+// Failure returns a failure message string in a styled format, including a red "x" symbol.
+func Failure(message string) string {
+	return fmt.Sprintf("%s %s", Color("x", ColorRed), message)
+}
+
+// PrintFailure prints a failure message to stdout in a styled format, including a red "x" symbol.
+func PrintFailure(message string) {
+	fmt.Println(Failure(message))
+}
+
+// Success returns a success message string in a styled format, including a green checkmark symbol.
+func Success(message string) string {
+	return fmt.Sprintf("%s %s", Color("✔", ColorGreen), message)
+}
+
+// PrintSuccess prints a success message to stdout in a styled format, including a green checkmark symbol.
+func PrintSuccess(message string) {
+	fmt.Println(Success(message))
+}

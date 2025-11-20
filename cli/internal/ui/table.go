@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func RenderTable(columns []table.Column, rows []table.Row) {
+func PrintTable(columns []table.Column, rows []table.Row) {
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),

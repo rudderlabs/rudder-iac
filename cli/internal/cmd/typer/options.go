@@ -67,6 +67,6 @@ func printOptionsTable(defaults any) {
 	}
 
 	fmt.Println()
-	ui.RenderTable(columns, rows)
+	ui.PrintTable(columns, rows)
 	fmt.Println()
 }

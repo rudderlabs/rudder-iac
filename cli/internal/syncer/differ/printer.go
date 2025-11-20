@@ -27,9 +27,9 @@ func PrintDiff(diff *Diff) {
 			for _, d := range r.Diffs {
 				details += fmt.Sprintf(
 					"    - %s: %s %s %s\n",
-					ui.Color(d.Property, ui.White),
+					ui.Color(d.Property, ui.ColorWhite),
 					printable(d.SourceValue),
-					ui.Color("=>", ui.Yellow),
+					ui.Color("=>", ui.ColorYellow),
 					printable(d.TargetValue),
 				)
 			}
@@ -45,7 +45,7 @@ func PrintDiff(diff *Diff) {
 func listResources(label string, resources []string, detailFn func(string) string) {
 	fmt.Println(ui.Bold(label) + ":")
 	for _, urn := range resources {
-		fmt.Printf("  - %s\n", ui.Color(urn, ui.White))
+		fmt.Printf("  - %s\n", ui.Color(urn, ui.ColorWhite))
 		if detailFn != nil {
 			fmt.Printf("%s\n", detailFn(urn))
 		}
@@ -55,7 +55,7 @@ func listResources(label string, resources []string, detailFn func(string) strin
 
 func printable(val interface{}) string {
 	if val == nil {
-		return ui.Color("<nil>", ui.Blue)
+		return ui.Color("<nil>", ui.ColorBlue)
 	}
 
 	if reflect.ValueOf(val).Kind() == reflect.Pointer {

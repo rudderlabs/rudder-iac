@@ -64,7 +64,7 @@ func NewCmdValidate() *cobra.Command {
 			}
 
 			validateLog.Info("Project configuration is valid")
-			fmt.Println(ui.Color("✔", ui.Green), "Project configuration is valid")
+			ui.PrintSuccess("Project configuration is valid")
 			return nil
 		},
 	}

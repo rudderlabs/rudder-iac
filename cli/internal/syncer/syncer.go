@@ -3,7 +3,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -118,16 +117,6 @@ func StateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func removeStateForResourceTypes(state *state.State, resourceTypes []string) *state.State {
-	// loop over all resources in the state and remove a resource if it matches any of the resource types
-	for _, resource := range state.Resources {
-		if slices.Contains(resourceTypes, resource.Type) {
-			delete(state.Resources, resources.URN(resource.ID, resource.Type))
-		}
-	}
-	return state
-}
-
 type OperationError struct {
 	Operation *planner.Operation
 	Err       error
@@ -159,15 +148,14 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 		providerErr := s.providerOperation(ctx, o, state)
 		spinner.Stop()
 		if providerErr != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
+			ui.PrintFailure(operationString)
 			errors = append(errors, &OperationError{Operation: o, Err: providerErr})
 			if !continueOnFail {
 				return errors
 			}
 		}
-
 		if providerErr == nil {
-			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+			ui.PrintSuccess(operationString)
 		}
 	}
 
@@ -180,24 +168,35 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
 	}
-	return RunTasks(ctx, tasks, options.Concurrency, continueOnFail, func(task Task) error {
+
+	reporter := ui.NewTaskReporter(len(tasks))
+	go func() {
+		err := reporter.Run()
+		if err != nil {
+			ui.PrintError(err)
+		}
+	}()
+
+	taskErrors := RunTasks(ctx, tasks, options.Concurrency, continueOnFail, func(task Task) error {
 		opTask, ok := task.(*operationTask)
 		if !ok {
 			return fmt.Errorf("invalid task type: %T", task)
 		}
 		o := opTask.operation
 		operationString := o.String()
-		spinner := ui.NewSpinner(operationString)
-		spinner.Start()
+		reporter.Start(task.Id(), operationString)
 		providerErr := s.providerOperation(ctx, o, state)
-		spinner.Stop()
+		reporter.Complete(task.Id(), operationString, providerErr)
 		if providerErr != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
 			return &OperationError{Operation: o, Err: providerErr}
 		}
-		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+
 		return nil
 	})
+
+	reporter.Done()
+
+	return taskErrors
 }
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
