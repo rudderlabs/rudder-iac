@@ -114,7 +114,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			retlSourceImportLog.Info("Successfully imported RETL SQL Model", "localID", localID, "remoteID", remoteID)
-			ui.PrintSuccess(fmt.Sprintf("Successfully imported RETL SQL Model '%s' from remote ID '%s'\n", localID, remoteID))
+			ui.PrintSuccess(fmt.Sprintf("Successfully imported RETL SQL Model '%s' from remote ID '%s'", localID, remoteID))
 			fmt.Printf("Configuration saved to: %s/%s.yaml\n", location, localID)
 
 			return nil
