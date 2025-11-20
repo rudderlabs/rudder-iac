@@ -28,7 +28,6 @@ type DataCatalog interface {
 	EventStore
 	PropertyStore
 	TrackingPlanStore
-	StateStore
 	CustomTypeStore
 	CategoryStore
 }

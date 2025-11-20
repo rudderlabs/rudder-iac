@@ -47,59 +47,6 @@ type resourceProvider interface {
 	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
 }
 
-func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
-	var apistate *state.State = state.EmptyState()
-
-	cs, err := p.client.ReadState(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	apistate = &state.State{
-		Version:   cs.Version,
-		Resources: make(map[string]*state.ResourceState),
-	}
-
-	for id, rs := range cs.Resources {
-		decodedState := state.DecodeResourceState(&state.ResourceState{
-			ID:           rs.ID,
-			Type:         rs.Type,
-			Input:        rs.Input,
-			Output:       rs.Output,
-			Dependencies: rs.Dependencies,
-		})
-		apistate.Resources[id] = decodedState
-	}
-
-	return apistate, nil
-}
-
-func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	encodedState := state.EncodeResourceState(s)
-
-	remoteID := s.Output["id"].(string)
-	return p.client.PutResourceState(ctx, catalog.PutStateRequest{
-		Collection: resourceTypeCollection[s.Type],
-		ID:         remoteID,
-		URN:        URN,
-		State: catalog.ResourceState{
-			ID:           encodedState.ID,
-			Type:         encodedState.Type,
-			Input:        encodedState.Input,
-			Output:       encodedState.Output,
-			Dependencies: encodedState.Dependencies,
-		},
-	})
-}
-
-func (p *Provider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
-	remoteID := s.Output["id"].(string)
-	return p.client.DeleteResourceState(ctx, catalog.DeleteStateRequest{
-		Collection: resourceTypeCollection[s.Type],
-		ID:         remoteID,
-	})
-}
-
 func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {

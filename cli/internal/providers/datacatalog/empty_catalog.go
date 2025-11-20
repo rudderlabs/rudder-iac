@@ -112,18 +112,6 @@ func (m *EmptyCatalog) SetCustomTypeExternalId(ctx context.Context, id string, e
 	return nil
 }
 
-func (m *EmptyCatalog) ReadState(ctx context.Context) (*catalog.State, error) {
-	return nil, nil
-}
-
-func (m *EmptyCatalog) PutResourceState(ctx context.Context, _ catalog.PutStateRequest) error {
-	return nil
-}
-
-func (m *EmptyCatalog) DeleteResourceState(ctx context.Context, _ catalog.DeleteStateRequest) error {
-	return nil
-}
-
 func (m *EmptyCatalog) CreateCategory(ctx context.Context, categoryCreate catalog.CategoryCreate) (*catalog.Category, error) {
 	return nil, nil
 }

@@ -390,22 +390,6 @@ func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, 
 	return nil
 }
 
-func (h *Handler) LoadState(ctx context.Context) (*state.State, error) {
-	sources, err := h.client.GetSources(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting event stream sources: %w", err)
-	}
-	st := state.EmptyState()
-	for _, source := range sources {
-		resourceState, skip := mapRemoteToState(&source, nil)
-		if skip {
-			continue
-		}
-		st.AddResource(resourceState)
-	}
-	return st, nil
-}
-
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 	sources, err := h.client.GetSources(ctx)
