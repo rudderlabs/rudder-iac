@@ -63,6 +63,9 @@ type Option func(*ProjectSyncer) error
 
 func WithReporter(reporter SyncReporter) Option {
 	return func(s *ProjectSyncer) error {
+		if reporter == nil {
+			return fmt.Errorf("reporter cannot be nil")
+		}
 		s.reporter = reporter
 		return nil
 	}
