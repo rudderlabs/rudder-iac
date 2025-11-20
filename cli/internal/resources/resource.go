@@ -3,7 +3,7 @@ package resources
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources/internal"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/internal"
 )
 
 type Resource struct {

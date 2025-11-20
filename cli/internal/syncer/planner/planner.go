@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 type Planner struct {

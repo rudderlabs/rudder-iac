@@ -3,7 +3,7 @@ package state
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type State struct {
@@ -134,10 +134,10 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 // If the versions are incompatible it returns an ErrIncompatibleVersion error.
 // If there are URNs that exist in both states it returns an ErrURNAlreadyExists error.
 func (s *State) Merge(other *State) (*State, error) {
-	if (other == nil) {
+	if other == nil {
 		return s, nil
 	}
-	
+
 	newState := EmptyState()
 	newState.Version = s.Version
 
