@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -616,7 +617,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 	tests := []struct {
 		name           string
 		property       *state.TrackingPlanPropertyArgs
-		resourceStates []*sstate.ResourceState
+		resourceStates []*rstate.ResourceState
 	}{
 		{
 			name: "Simple property without nested properties",
@@ -625,7 +626,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 				LocalID:  "simple-property-id",
 				Required: true,
 			},
-			resourceStates: []*sstate.ResourceState{
+			resourceStates: []*rstate.ResourceState{
 				{
 					ID:   "simple-property-id",
 					Type: "property",
@@ -678,7 +679,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					},
 				},
 			},
-			resourceStates: []*sstate.ResourceState{
+			resourceStates: []*rstate.ResourceState{
 				{
 					ID:   "user-profile-id",
 					Type: "property",
@@ -744,7 +745,7 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					},
 				},
 			},
-			resourceStates: []*sstate.ResourceState{
+			resourceStates: []*rstate.ResourceState{
 				{
 					ID:   "user-data-id",
 					Type: "property",
@@ -780,11 +781,11 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 				assert.Len(t, nestedProps, len(tc.property.Properties))
 			}
 
-			mockedState := sstate.EmptyState()
+			mockedState := rstate.EmptyState()
 			for _, rs := range tc.resourceStates {
 				mockedState.AddResource(rs)
 			}
-			dereferencedResourceData, err := sstate.Dereference(resourceData, mockedState)
+			dereferencedResourceData, err := rstate.Dereference(resourceData, mockedState)
 			require.NoError(t, err)
 
 			// Test FromResourceData roundtrip

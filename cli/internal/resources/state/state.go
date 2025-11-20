@@ -7,15 +7,11 @@ import (
 )
 
 type State struct {
-	Version   string                    `json:"version"`
 	Resources map[string]*ResourceState `json:"resources"`
 }
 
-const LatestVersion = "1.0.0"
-
 func EmptyState() *State {
 	return &State{
-		Version:   LatestVersion,
 		Resources: make(map[string]*ResourceState),
 	}
 }
@@ -139,14 +135,9 @@ func (s *State) Merge(other *State) (*State, error) {
 	}
 
 	newState := EmptyState()
-	newState.Version = s.Version
 
 	for k, v := range s.Resources {
 		newState.Resources[k] = v
-	}
-
-	if s.Version != other.Version {
-		return nil, &ErrIncompatibleVersion{Version: other.Version}
 	}
 
 	for k, v := range other.Resources {

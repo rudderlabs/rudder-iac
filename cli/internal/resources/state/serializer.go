@@ -12,12 +12,7 @@ const RudderRefPtr = "$__rudderRefPtr"
 func ToJSON(state *State) (json.RawMessage, error) {
 	// Create a copy of state to avoid modifying the original
 	stateCopy := &State{
-		Version:   state.Version,
 		Resources: make(map[string]*ResourceState),
-	}
-
-	if stateCopy.Version == "" {
-		stateCopy.Version = LatestVersion
 	}
 
 	for urn, res := range state.Resources {

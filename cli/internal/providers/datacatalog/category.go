@@ -9,7 +9,7 @@ import (
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -186,8 +186,8 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	categories := collection.GetAll(state.CategoryResourceType)
 	for _, remoteCategory := range categories {
 		if remoteCategory.ExternalID == "" {
@@ -203,7 +203,7 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 		stateArgs := state.CategoryState{}
 		stateArgs.FromRemoteCategory(category, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.CategoryResourceType,
 			ID:           category.ExternalID,
 			Input:        args.ToResourceData(),

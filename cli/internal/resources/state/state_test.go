@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	s "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	s "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -137,7 +137,6 @@ func TestDereference(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	state1 := s.EmptyState()
-	state1.Version = "1.0.0"
 	resource1 := &s.ResourceState{
 		ID:   "source1",
 		Type: "source",
@@ -152,7 +151,6 @@ func TestMerge(t *testing.T) {
 	state1.AddResource(resource1)
 
 	state2 := s.EmptyState()
-	state2.Version = "1.0.0"
 	resource2 := &s.ResourceState{
 		ID:   "dest1",
 		Type: "destination",
@@ -169,7 +167,6 @@ func TestMerge(t *testing.T) {
 	mergedState, err := state1.Merge(state2)
 	assert.Nil(t, err)
 
-	assert.Equal(t, state1.Version, mergedState.Version)
 	assert.Equal(t, 2, len(mergedState.Resources))
 	assert.NotNil(t, mergedState.GetResource(resources.URN(resource1.ID, resource1.Type)))
 	assert.NotNil(t, mergedState.GetResource(resources.URN(resource2.ID, resource2.Type)))
@@ -181,19 +178,6 @@ func TestMerge(t *testing.T) {
 	assert.Equal(t, 1, len(state2.Resources))
 	assert.Equal(t, state1.Resources[resources.URN(resource1.ID, resource1.Type)].Data(), resource1.Data())
 	assert.Equal(t, state2.Resources[resources.URN(resource2.ID, resource2.Type)].Data(), resource2.Data())
-}
-
-func TestMergeIncompatibleVersion(t *testing.T) {
-	state1 := s.EmptyState()
-	state2 := s.EmptyState()
-	state2.Version = "incompatible_version"
-
-	mergedState, err := state1.Merge(state2)
-	assert.Nil(t, mergedState)
-	assert.NotNil(t, err)
-	assert.IsType(t, &s.ErrIncompatibleVersion{}, err)
-	assert.Equal(t, err.(*s.ErrIncompatibleVersion).Version, "incompatible_version")
-	assert.Equal(t, "incompatible state version: incompatible_version", err.Error())
 }
 
 func TestMergeURNAlreadyExists(t *testing.T) {

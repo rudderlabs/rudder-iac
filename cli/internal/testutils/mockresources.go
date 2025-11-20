@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 const (
