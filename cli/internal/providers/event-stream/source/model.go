@@ -1,6 +1,8 @@
 package source
 
 import (
+	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -40,7 +42,7 @@ const (
 	DropUnplannedEventsYAMLKey     = "drop_unplanned_events"
 
 	ResourceType = "event-stream-source"
-	ResourceKind = "event-stream-source"
+	SpecKind     = "event-stream-source"
 	MetadataName = "event-stream-source"
 	ImportPath   = "sources"
 )
@@ -64,7 +66,7 @@ var sourceDefinitions = []string{
 }
 
 // YAML structs
-type sourceSpec struct {
+type SourceSpec struct {
 	LocalId    string                `mapstructure:"id"`
 	Name       string                `mapstructure:"name"`
 	Type       string                `mapstructure:"type"`
@@ -103,10 +105,10 @@ type trackConfigSpec struct {
 // Resource structs
 type SourceResource struct {
 	ID         string
-	Name       string
-	Type       string
-	Enabled    bool
-	Governance *GovernanceResource
+	Name       string              `diff:"name"`
+	Type       string              `diff:"type"`
+	Enabled    bool                `diff:"enabled"`
+	Governance *GovernanceResource `diff:"governance"`
 }
 
 // GetTrackingPlanID returns the tracking plan ID from the governance config, or empty string if not set
@@ -131,34 +133,47 @@ type WorkspaceRemoteIDMapping struct {
 }
 
 type GovernanceResource struct {
-	Validations *ValidationsResource
+	Validations *ValidationsResource `diff:"validations"`
 }
 
 type ValidationsResource struct {
-	TrackingPlanRef *resources.PropertyRef
-	Config          *TrackingPlanConfigResource
+	TrackingPlanRef *resources.PropertyRef      `diff:"tracking_plan"`
+	Config          *TrackingPlanConfigResource `diff:"config"`
 }
 
 type TrackingPlanConfigResource struct {
-	Track    *TrackConfigResource
-	Identify *EventConfigResource
-	Group    *EventConfigResource
-	Page     *EventConfigResource
-	Screen   *EventConfigResource
+	Track    *TrackConfigResource `diff:"track"`
+	Identify *EventConfigResource `diff:"identify"`
+	Group    *EventConfigResource `diff:"group"`
+	Page     *EventConfigResource `diff:"page"`
+	Screen   *EventConfigResource `diff:"screen"`
 }
 
 type EventConfigResource struct {
-	PropagateViolations     *bool
-	DropUnplannedProperties *bool
-	DropOtherViolations     *bool
+	PropagateViolations     *bool `diff:"propagate_violations"`
+	DropUnplannedProperties *bool `diff:"drop_unplanned_properties"`
+	DropOtherViolations     *bool `diff:"drop_other_violations"`
 }
 
 type TrackConfigResource struct {
 	*EventConfigResource
-	DropUnplannedEvents *bool
+	DropUnplannedEvents *bool `diff:"drop_unplanned_events"`
 }
 
-type SourceStateRemote struct {
+type SourceState struct {
 	ID             string
 	TrackingPlanID string
+}
+
+type SourceRemote struct {
+	*sourceClient.EventStreamSource
+}
+
+func (sr SourceRemote) GetResourceMetadata() *provider.RemoteResourceMetadata {
+	return &provider.RemoteResourceMetadata{
+		ID:          sr.ID,
+		ExternalID:  sr.ExternalID,
+		WorkspaceID: sr.WorkspaceID,
+		Name:        sr.Name,
+	}
 }

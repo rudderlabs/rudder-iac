@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type EmptyProvider struct{}
+
+// CRUD Operations
 
 func (p *EmptyProvider) Create(_ context.Context, _ string, _ string, _ resources.ResourceData) (*resources.ResourceData, error) {
 	return nil, errNotImplemented
@@ -38,4 +41,14 @@ func (p *EmptyProvider) Delete(_ context.Context, _ string, _ string, _ resource
 
 func (p *EmptyProvider) DeleteRaw(_ context.Context, _ string, _ string, _ any, _ any) error {
 	return errNotImplemented
+}
+
+// State operations - deprecated
+
+func (p *BaseProvider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
+	return nil
+}
+
+func (p *BaseProvider) DeleteResourceState(ctx context.Context, st *state.ResourceState) error {
+	return nil
 }

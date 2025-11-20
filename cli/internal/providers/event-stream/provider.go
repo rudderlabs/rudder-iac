@@ -8,20 +8,9 @@ import (
 
 const importDir = "event-stream"
 
-type Provider struct {
-	*provider.BaseProvider
-}
-
-func New(client esClient.EventStreamStore) *Provider {
-	p := &Provider{
-		BaseProvider: provider.NewBaseProvider(
-			"event-stream",
-			map[string]provider.Handler{
-				sourceHandler.ResourceType: sourceHandler.NewHandler(client, importDir),
-			}, map[string]string{
-				"event-stream-source": sourceHandler.ResourceType,
-			},
-		),
-	}
-	return p
+func New(client esClient.EventStreamStore) *provider.BaseProvider {
+	return provider.NewBaseProvider(
+		"event-stream",
+		[]provider.Handler{sourceHandler.NewHandler(client, importDir)},
+	)
 }

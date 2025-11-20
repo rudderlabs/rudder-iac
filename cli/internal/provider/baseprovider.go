@@ -8,11 +8,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type Handler interface {
+	GetResourceType() string
+	GetSpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
@@ -39,12 +41,23 @@ type BaseProvider struct {
 	kindToType map[string]string
 }
 
-func NewBaseProvider(name string, handlers map[string]Handler, kindToType map[string]string) *BaseProvider {
+func NewBaseProvider(name string, handlers []Handler) *BaseProvider {
+	kindToType := map[string]string{}
+	for _, handler := range handlers {
+		kindToType[handler.GetResourceType()] = handler.GetSpecKind()
+	}
+
+	handlersMap := map[string]Handler{}
+	for _, handler := range handlers {
+		handlersMap[handler.GetResourceType()] = handler
+	}
+
 	return &BaseProvider{
 		name:       name,
-		handlers:   handlers,
+		handlers:   handlersMap,
 		kindToType: kindToType,
 	}
+
 }
 
 func (p *BaseProvider) GetName() string {

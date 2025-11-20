@@ -194,7 +194,7 @@ func TestProvider(t *testing.T) {
 
 			result, err := provider.CreateRaw(ctx, createData)
 			require.NoError(t, err)
-			assert.Equal(t, &source.SourceStateRemote{
+			assert.Equal(t, &source.SourceState{
 				ID: "remote-123",
 			}, result)
 		})
@@ -219,13 +219,13 @@ func TestProvider(t *testing.T) {
 				Type: "javascript",
 			}
 
-			oldOutput := &source.SourceStateRemote{
+			oldOutput := &source.SourceState{
 				ID: "test-source-id",
 			}
 
 			result, err := provider.UpdateRaw(ctx, updateData, oldInput, oldOutput)
 			require.NoError(t, err)
-			assert.Equal(t, &source.SourceStateRemote{
+			assert.Equal(t, &source.SourceState{
 				ID: "test-source-id",
 			}, result)
 		})
@@ -234,7 +234,7 @@ func TestProvider(t *testing.T) {
 			provider := eventstream.New(source.NewMockSourceClient())
 			ctx := context.Background()
 			oldInput := &source.SourceResource{}
-			oldOutput := &source.SourceStateRemote{
+			oldOutput := &source.SourceState{
 				ID: "test-source-id",
 			}
 			err := provider.DeleteRaw(ctx, "test-source", source.ResourceType, oldInput, oldOutput)
@@ -272,7 +272,7 @@ func TestProvider(t *testing.T) {
 
 		result, err := provider.ImportRaw(ctx, data, "remote-123")
 		require.NoError(t, err)
-		assert.Equal(t, &source.SourceStateRemote{
+		assert.Equal(t, &source.SourceState{
 			ID: "remote-123",
 		}, result)
 		assert.True(t, mockClient.GetSourcesCalled())
@@ -314,7 +314,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -325,7 +325,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
@@ -348,7 +348,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -359,7 +359,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
@@ -386,7 +386,7 @@ func TestProvider(t *testing.T) {
 				Type:    "javascript",
 				Enabled: true,
 			},
-			OutputRaw: &source.SourceStateRemote{
+			OutputRaw: &source.SourceState{
 				ID: "remote123",
 			},
 		}, rs1)
@@ -402,7 +402,7 @@ func TestProvider(t *testing.T) {
 				Type:    "python",
 				Enabled: false,
 			},
-			OutputRaw: &source.SourceStateRemote{
+			OutputRaw: &source.SourceState{
 				ID: "remote456",
 			},
 		}, rs2)

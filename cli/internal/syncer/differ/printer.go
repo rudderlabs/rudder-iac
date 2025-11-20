@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -58,8 +59,23 @@ func printable(val interface{}) string {
 		return ui.Color("<nil>", ui.Blue)
 	}
 
-	if reflect.ValueOf(val).Kind() == reflect.Pointer {
-		return fmt.Sprintf("%v", reflect.ValueOf(val).Elem())
+	// Handle PropertyRef specially - show only URN in green
+	if ref, ok := val.(*resources.PropertyRef); ok {
+		if ref == nil {
+			return ui.Color("<nil>", ui.Blue)
+		}
+		return ui.Color(ref.URN, ui.Green)
+	}
+	if ref, ok := val.(resources.PropertyRef); ok {
+		return ui.Color(ref.URN, ui.Green)
+	}
+
+	v := reflect.ValueOf(val)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return ui.Color("<nil>", ui.Blue)
+		}
+		return fmt.Sprintf("%v", v.Elem().Interface())
 	}
 
 	return fmt.Sprintf("%v", val)

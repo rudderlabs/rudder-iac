@@ -19,26 +19,30 @@ import (
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
 )
 
 type Handler struct {
-	*provider.BaseHandler[sourceSpec, SourceResource, SourceStateRemote]
+	*provider.BaseHandler[SourceSpec, SourceResource, SourceState, SourceRemote]
 	client    esClient.EventStreamStore
 	importDir string
 }
 
 func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 	return &Handler{
-		client:      client,
-		importDir:   filepath.Join(importDir, ImportPath),
-		BaseHandler: provider.NewHandler(ResourceType, &handlerImpl{client: client}),
+		client:    client,
+		importDir: filepath.Join(importDir, ImportPath),
+		BaseHandler: provider.NewHandler(
+			SpecKind,
+			ResourceType,
+			MetadataName,
+			&handlerImpl{client: client},
+		),
 	}
 }
 
 // CreateIDRef creates a PropertyRef that resolves to the remote ID of an event stream source
 func (h *Handler) CreateIDRef(urn string) *resources.PropertyRef {
-	return h.BaseHandler.CreatePropertyRef(urn, func(state *SourceStateRemote) (string, error) {
+	return h.BaseHandler.CreatePropertyRef(urn, func(state *SourceState) (string, error) {
 		return state.ID, nil
 	})
 }
@@ -47,15 +51,15 @@ type handlerImpl struct {
 	client esClient.EventStreamStore
 }
 
-func (h *handlerImpl) NewSpec() *sourceSpec {
-	return &sourceSpec{}
+func (h *handlerImpl) NewSpec() *SourceSpec {
+	return &SourceSpec{}
 }
 
-func (h *handlerImpl) ValidateSpec(spec *sourceSpec) error {
+func (h *handlerImpl) ValidateSpec(spec *SourceSpec) error {
 	return nil
 }
 
-func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *sourceSpec) (map[string]*SourceResource, error) {
+func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *SourceSpec) (map[string]*SourceResource, error) {
 	enabled := true
 	if spec.Enabled != nil {
 		enabled = *spec.Enabled
@@ -75,7 +79,7 @@ func (h *handlerImpl) ExtractResourcesFromSpec(path string, spec *sourceSpec) (m
 	}, nil
 }
 
-func (h *handlerImpl) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *SourceResource) error {
+func (h *handlerImpl) loadTrackingPlanSpec(spec *SourceSpec, sourceResource *SourceResource) error {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
 	}
@@ -168,7 +172,7 @@ func (h *handlerImpl) ValidateResource(source *SourceResource, graph *resources.
 	return nil
 }
 
-func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*SourceStateRemote, error) {
+func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*SourceState, error) {
 	createRequest := &sourceClient.CreateSourceRequest{
 		ExternalID: data.ID,
 		Name:       data.Name,
@@ -187,10 +191,10 @@ func (h *handlerImpl) Create(ctx context.Context, data *SourceResource) (*Source
 			return nil, fmt.Errorf("linking tracking plan to event stream source: %w", err)
 		}
 	}
-	return &SourceStateRemote{ID: resp.ID, TrackingPlanID: trackingPlanID}, nil
+	return &SourceState{ID: resp.ID, TrackingPlanID: trackingPlanID}, nil
 }
 
-func (h *handlerImpl) Update(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) (*SourceStateRemote, error) {
+func (h *handlerImpl) Update(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceState) (*SourceState, error) {
 	if oldData.Type != newData.Type {
 		return nil, fmt.Errorf("type cannot be changed")
 	}
@@ -202,10 +206,10 @@ func (h *handlerImpl) Update(ctx context.Context, newData *SourceResource, oldDa
 	if err := h.updateTrackingPlanConnection(ctx, newData, oldData, oldState); err != nil {
 		return nil, err
 	}
-	return &SourceStateRemote{ID: oldState.ID, TrackingPlanID: newData.GetTrackingPlanID()}, nil
+	return &SourceState{ID: oldState.ID, TrackingPlanID: newData.GetTrackingPlanID()}, nil
 }
 
-func (h *handlerImpl) updateSource(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+func (h *handlerImpl) updateSource(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceState) error {
 	needsUpdate := oldData.Name != newData.Name || oldData.Enabled != newData.Enabled
 	if !needsUpdate {
 		return nil
@@ -221,7 +225,7 @@ func (h *handlerImpl) updateSource(ctx context.Context, newData *SourceResource,
 	return nil
 }
 
-func (h *handlerImpl) updateTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+func (h *handlerImpl) updateTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceState) error {
 	newTPID := newData.GetTrackingPlanID()
 
 	if newTPID == "" && oldState.TrackingPlanID == "" {
@@ -264,7 +268,7 @@ func (h *handlerImpl) unlinkTrackingPlan(ctx context.Context, trackingPlanID, re
 	return nil
 }
 
-func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceState) error {
 	currentTrackingPlanID := oldState.TrackingPlanID
 	newTrackingPlanID := newData.GetTrackingPlanID()
 	remoteID := oldState.ID
@@ -284,7 +288,7 @@ func (h *handlerImpl) updateExistingTrackingPlanConnection(ctx context.Context, 
 	return nil
 }
 
-func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceStateRemote) error {
+func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, newData *SourceResource, oldData *SourceResource, oldState *SourceState) error {
 	trackingPlanID := newData.GetTrackingPlanID()
 	remoteID := oldState.ID
 	newConfig := newData.GetTrackingPlanConfig()
@@ -305,70 +309,56 @@ func (h *handlerImpl) updateTrackingPlanConfig(ctx context.Context, newData *Sou
 	return nil
 }
 
-func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *handlerImpl) LoadRemoteResources(ctx context.Context) ([]*SourceRemote, error) {
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
-	resourceMap := make(map[string]*resources.RemoteResource)
+
+	result := make([]*SourceRemote, 0, len(sources))
 	for _, source := range sources {
 		if source.ExternalID == "" {
 			// loop over the sources which have externalID not set
 			// as they are not anyway part of the state
 			continue
 		}
-		resourceMap[source.ID] = &resources.RemoteResource{
-			ID:         source.ID,
-			ExternalID: source.ExternalID,
-			Data:       source,
-		}
-	}
-	collection.Set(ResourceType, resourceMap)
-	return collection, nil
-}
-
-// TODO: Consider simplifying the handler interface once common patterns are identified across providers:
-//  1. ResourceType could be automatically added by BaseHandler instead of being repeated in each handler
-//  2. The response types could be made type-safe to ensure InputRaw and OutputRaw have the correct types
-//     (e.g., handler could return typed state directly instead of interface{})
-func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
-	s := state.EmptyState()
-	esResources := collection.GetAll(ResourceType)
-	for _, esResource := range esResources {
-		source, ok := esResource.Data.(sourceClient.EventStreamSource)
-		if !ok {
-			return nil, fmt.Errorf("unable to cast resource to event stream source")
-		}
-		var trackingPlanURN *string
-		if source.TrackingPlan != nil {
-			tpURN, err := collection.GetURNByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
-			if err == resources.ErrRemoteResourceExternalIdNotFound {
-				// ErrRemoteResourceExternalIdNotFound would happen if the source was created via CLI
-				// but the tracking plan was created and linked via the UI/API
-				trackingPlanURN = nil
-			} else if err != nil {
-				return nil, fmt.Errorf("get urn by id: %w", err)
-			} else {
-				trackingPlanURN = &tpURN
-			}
-		}
-		inputRaw, outputRaw, skip := mapRemoteToState(&source, trackingPlanURN)
-		if skip {
-			continue
-		}
-
-		s.AddResource(&state.ResourceState{
-			ID:        source.ExternalID,
-			Type:      ResourceType,
-			InputRaw:  inputRaw,
-			OutputRaw: outputRaw,
+		sourceCopy := source // Avoid loop variable capture
+		result = append(result, &SourceRemote{
+			EventStreamSource: &sourceCopy,
 		})
 	}
-	return s, nil
+
+	return result, nil
 }
 
-func (h *handlerImpl) Delete(ctx context.Context, id string, oldData *SourceResource, oldState *SourceStateRemote) error {
+func (h *handlerImpl) MapRemoteToState(
+	remote *SourceRemote,
+	urnResolver provider.URNResolver,
+) (*SourceResource, *SourceState, error) {
+	var trackingPlanURN *string
+	if remote.TrackingPlan != nil {
+		tpURN, err := urnResolver.GetURNByID(
+			dcstate.TrackingPlanResourceType,
+			remote.TrackingPlan.ID,
+		)
+		if err == resources.ErrRemoteResourceExternalIdNotFound {
+			trackingPlanURN = nil
+		} else if err != nil {
+			return nil, nil, fmt.Errorf("get urn by id: %w", err)
+		} else {
+			trackingPlanURN = &tpURN
+		}
+	}
+
+	// Use existing helper which handles skip logic
+	input, output, skip := mapRemoteToState(remote, trackingPlanURN)
+	if skip {
+		return nil, nil, nil
+	}
+	return input, output, nil
+}
+
+func (h *handlerImpl) Delete(ctx context.Context, id string, oldData *SourceResource, oldState *SourceState) error {
 	remoteID := oldState.ID
 	trackingPlanID := oldState.TrackingPlanID
 	if trackingPlanID != "" {
@@ -385,7 +375,7 @@ func (h *handlerImpl) Delete(ctx context.Context, id string, oldData *SourceReso
 	return nil
 }
 
-func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId string) (*SourceStateRemote, error) {
+func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId string) (*SourceState, error) {
 	// FIXME: Instead of fetching all sources, fetch the source with the matching remoteId
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
@@ -414,7 +404,7 @@ func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId
 	}
 
 	// Build old output state (remote metadata)
-	oldState := &SourceStateRemote{
+	oldState := &SourceState{
 		ID: remoteId,
 	}
 
@@ -441,34 +431,24 @@ func (h *handlerImpl) Import(ctx context.Context, data *SourceResource, remoteId
 	return result, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *handlerImpl) LoadImportableResources(ctx context.Context) ([]*SourceRemote, error) {
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
-	resourceMap := make(map[string]*resources.RemoteResource)
+
+	result := make([]*SourceRemote, 0)
 	for _, source := range sources {
 		if source.ExternalID != "" {
-			continue
+			continue // Skip resources that already have an external ID
 		}
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  source.Name,
-			Scope: ResourceType,
+
+		sourceCopy := source // Avoid loop variable capture
+		result = append(result, &SourceRemote{
+			EventStreamSource: &sourceCopy,
 		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
-		}
-		remoteResource := &resources.RemoteResource{
-			ID:         source.ID,
-			ExternalID: externalID,
-			Reference:  fmt.Sprintf("#/%s/%s/%s", ResourceKind, MetadataName, externalID),
-			Data:       &source,
-		}
-		resourceMap[source.ID] = remoteResource
 	}
-	collection.Set(ResourceType, resourceMap)
-	return collection, nil
+	return result, nil
 }
 
 func (h *Handler) FormatForExport(
@@ -486,7 +466,7 @@ func (h *Handler) FormatForExport(
 	}
 	var result []importremote.FormattableEntity
 	for _, source := range sources {
-		data, ok := source.Data.(*sourceClient.EventStreamSource)
+		data, ok := source.Data.(*SourceRemote)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
@@ -515,7 +495,7 @@ func (h *Handler) FormatForExport(
 }
 
 func (p *Handler) toImportSpec(
-	source *sourceClient.EventStreamSource,
+	source *SourceRemote,
 	externalID string,
 	workspaceMetadata importremote.WorkspaceImportMetadata,
 	resolver resolver.ReferenceResolver,
@@ -549,18 +529,18 @@ func (p *Handler) toImportSpec(
 		}
 
 		validations := map[string]any{
-			TrackingPlanRefYAMLKey:    tpRef,
-			TrackingPlanConfigYAMLKey: toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
+			"tracking_plan": tpRef,
+			"config":        toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
 		}
 
 		specMap[GovernanceYAMLKey] = map[string]any{
-			ValidationsYAMLKey: validations,
+			"validations": validations,
 		}
 	}
 
 	return &specs.Spec{
 		Version:  specs.SpecVersion,
-		Kind:     ResourceKind,
+		Kind:     SpecKind,
 		Metadata: metadataMap,
 		Spec:     specMap,
 	}, nil
@@ -631,7 +611,7 @@ func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]an
 	return result
 }
 
-func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*SourceResource, *SourceStateRemote, bool) {
+func mapRemoteToState(source *SourceRemote, trackingPlanURN *string) (*SourceResource, *SourceState, bool) {
 	if source.ExternalID == "" {
 		return nil, nil, true
 	}
@@ -643,7 +623,7 @@ func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *s
 		Name:    source.Name,
 	}
 
-	output := &SourceStateRemote{
+	output := &SourceState{
 		ID: source.ID,
 	}
 

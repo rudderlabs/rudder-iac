@@ -601,12 +601,12 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				assert.Equal(t, tc.expectedLinkTPCalled, mockClient.LinkTPCalled())
 
 				if tc.expectedLinkTPCalled {
-					assert.Equal(t, &source.SourceStateRemote{
+					assert.Equal(t, &source.SourceState{
 						ID:             "remote-123",
 						TrackingPlanID: "tp-123",
 					}, result)
 				} else {
-					assert.Equal(t, &source.SourceStateRemote{
+					assert.Equal(t, &source.SourceState{
 						ID:             "remote-123",
 						TrackingPlanID: "",
 					}, result)
@@ -629,7 +629,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			name                   string
 			data                   *source.SourceResource
 			oldData                *source.SourceResource
-			oldState               *source.SourceStateRemote
+			oldState               *source.SourceState
 			expectedUpdateCalled   bool
 			expectedLinkTPCalled   bool
 			expectedUnlinkTPCalled bool
@@ -648,7 +648,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Enabled: true,
 					Type:    "javascript",
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID: "remote123",
 				},
 				expectedUpdateCalled:   false,
@@ -669,7 +669,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Enabled: true,
 					Type:    "javascript",
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID: "remote123",
 				},
 				expectedUpdateCalled:   true,
@@ -707,7 +707,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID:             "remote123",
 					TrackingPlanID: "tp-123",
 				},
@@ -753,7 +753,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID:             "remote123",
 					TrackingPlanID: "tp-123",
 				},
@@ -792,7 +792,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID:             "remote123",
 					TrackingPlanID: "tp-123",
 				},
@@ -823,7 +823,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Enabled: true,
 					Type:    "javascript",
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID: "remote123",
 				},
 				expectedUpdateCalled:   true,
@@ -849,7 +849,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID:             "remote123",
 					TrackingPlanID: "tp-123",
 				},
@@ -874,7 +874,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					assert.Contains(t, err.Error(), tc.errorMessage)
 				} else {
 					assert.NoError(t, err)
-					assert.Equal(t, &source.SourceStateRemote{
+					assert.Equal(t, &source.SourceState{
 						ID:             "remote123",
 						TrackingPlanID: tc.expectedTPID,
 					}, result)
@@ -899,7 +899,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			expectedSetExternalIDCalled bool
 			expectedError               bool
 			errorMessage                string
-			expectedResult              *source.SourceStateRemote
+			expectedResult              *source.SourceState
 		}{
 			{
 				name:     "source not found",
@@ -945,7 +945,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
 				expectedError:               false,
-				expectedResult: &source.SourceStateRemote{
+				expectedResult: &source.SourceState{
 					ID: "remote123",
 				},
 			},
@@ -997,7 +997,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
 				expectedError:               false,
-				expectedResult: &source.SourceStateRemote{
+				expectedResult: &source.SourceState{
 					ID:             "remote456",
 					TrackingPlanID: "tp-456",
 				},
@@ -1038,7 +1038,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				expectedUpdateCalled:        true,
 				expectedSetExternalIDCalled: true,
 				expectedError:               false,
-				expectedResult: &source.SourceStateRemote{
+				expectedResult: &source.SourceState{
 					ID:             "remote789",
 					TrackingPlanID: "tp-999",
 				},
@@ -1075,13 +1075,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		testCases := []struct {
 			name                   string
 			oldData                *source.SourceResource
-			oldState               *source.SourceStateRemote
+			oldState               *source.SourceState
 			expectedUnlinkTPCalled bool
 		}{
 			{
 				name:    "without tracking plan",
 				oldData: &source.SourceResource{},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID: "remote123",
 				},
 				expectedUnlinkTPCalled: false,
@@ -1089,7 +1089,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			{
 				name:    "with tracking plan",
 				oldData: &source.SourceResource{},
-				oldState: &source.SourceStateRemote{
+				oldState: &source.SourceState{
 					ID:             "remote123",
 					TrackingPlanID: "tp-123",
 				},
@@ -1156,7 +1156,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote123",
 			ExternalID: "external-123",
-			Data: sourceClient.EventStreamSource{
+			Data: &sourceClient.EventStreamSource{
 				ID:         "remote123",
 				ExternalID: "external-123",
 				Name:       "Test Source 1",
@@ -1171,7 +1171,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote456",
 			ExternalID: "external-456",
-			Data: sourceClient.EventStreamSource{
+			Data: &sourceClient.EventStreamSource{
 				ID:         "remote456",
 				ExternalID: "external-456",
 				Name:       "Test Source 2",
@@ -1193,7 +1193,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote123": {
 					ID:         "remote123",
 					ExternalID: "external-123",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote123",
 						ExternalID: "external-123",
 						Name:       "Test Source 1",
@@ -1204,7 +1204,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote456": {
 					ID:         "remote456",
 					ExternalID: "external-456",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote456",
 						ExternalID: "",
 						Name:       "Test Source 2",
@@ -1215,7 +1215,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote789": {
 					ID:         "remote789",
 					ExternalID: "external-789",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote789",
 						ExternalID: "external-789",
 						Name:       "Test Source 3",
@@ -1262,7 +1262,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:    "javascript",
 					Enabled: true,
 				},
-				OutputRaw: &source.SourceStateRemote{
+				OutputRaw: &source.SourceState{
 					ID: "remote123",
 				},
 			}, resource123)
@@ -1293,7 +1293,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				OutputRaw: &source.SourceStateRemote{
+				OutputRaw: &source.SourceState{
 					ID:             "remote789",
 					TrackingPlanID: "remote-tp-789",
 				},
@@ -1310,7 +1310,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote123": {
 					ID:         "remote123",
 					ExternalID: "external-123",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote123",
 						ExternalID: "external-123",
 						Name:       "Test Source 1",
@@ -1354,7 +1354,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:    "javascript",
 					Enabled: true,
 				},
-				OutputRaw: &source.SourceStateRemote{
+				OutputRaw: &source.SourceState{
 					ID: "remote123",
 				},
 			}, resource123)
