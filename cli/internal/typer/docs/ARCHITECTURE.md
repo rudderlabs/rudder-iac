@@ -273,29 +273,47 @@ Platform generators (like the Kotlin generator) use the reference tracking plan 
 
 The Kotlin generator includes an additional layer of validation through a Docker-based runtime verification system:
 
-- **Location**: `cli/internal/typer/generator/platforms/kotlin/validator/`
-- **Purpose**: Validates that generated Kotlin code not only matches expected output but also compiles and executes correctly in a real Kotlin runtime environment
-- **Implementation**: Complete Docker-containerized Kotlin project with Gradle build system and RudderStack SDK integration
-- **Test Coverage**: Comprehensive validation scenarios covering all supported RudderTyper features including:
+- **Location**: `cli/internal/typer/generator/platforms/kotlin/testdata/validator/`
+- **Purpose**: Validates that generated Kotlin code compiles and integrates correctly with the actual RudderStack Kotlin SDK
+- **Implementation**:
+  - Docker-containerized Kotlin project with Gradle build system and RudderStack SDK integration
+  - JUnit 5 test suite that exercises generated RudderTyper code
+  - Custom `EventValidationPlugin` that intercepts SDK events for validation
+- **Testing Approach**: Uses the actual SDK with a plugin-based interception mechanism rather than mocks
+- **Test Coverage**: Comprehensive JUnit tests covering all supported RudderTyper features:
   - All RudderStack event types (Track, Identify, Page, Screen, Group)
   - Custom types and properties with various data types
-  - Enum handling and array support
+  - Enum handling, variant types, and array support
   - Edge cases with minimal and comprehensive data sets
+  - Serialization correctness validation
 
 **Key Benefits**:
 
+- **Real SDK Integration**: Uses the actual RudderStack Kotlin SDK instead of mocks, ensuring generated code works in production
+- **Event Interception**: Custom plugin captures events during test execution without sending them to servers
 - **Runtime Verification**: Ensures generated code compiles and executes without errors
-- **SDK Integration Testing**: Validates compatibility with actual RudderStack Kotlin SDK
+- **Serialization Validation**: Verifies that generated types serialize correctly to JSON as expected by RudderStack
 - **Environment Consistency**: Docker containerization provides consistent testing environment across different development machines
-- **End-to-End Validation**: Tests the complete pipeline from plan model to executable Kotlin code
+- **End-to-End Validation**: Tests the complete pipeline from plan model to executable Kotlin code integrated with the SDK
 
 **Usage**:
 
 ```bash
-make typer-validate-kotlin
+make typer-kotlin-validate
 ```
 
 The validator uses the same test data as the unit tests (`testdata/Main.kt`), ensuring consistency between static code generation tests and runtime validation tests.
+
+**Architecture**:
+
+The validator implements a plugin-based testing approach:
+1. Each test initializes the RudderStack SDK with an `EventValidationPlugin`
+2. Test calls RudderTyper methods (e.g., `typer.trackUserSignedUp(...)`)
+3. The plugin intercepts events during the SDK's `OnProcess` phase
+4. Plugin validates event type, properties, and serialization against expected values
+5. JUnit assertions ensure events match expectations
+
+This approach provides confidence that generated code not only compiles but also integrates correctly with the RudderStack SDK in real-world usage.
 
 ## Implementation Guidelines
 
