@@ -15,11 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-<<<<<<< HEAD
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
-=======
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
->>>>>>> be05409 (refactor: moved resources package outside syncer)
 )
 
 // Provider implements the provider interface for RETL resources
