@@ -2,9 +2,11 @@ package kotlin
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 // sectionToParamName converts an EventRuleSection to the appropriate parameter name
@@ -33,11 +35,42 @@ func buildPropertiesDescription(paramName string) string {
 	return fmt.Sprintf("The %s to include with this event", paramName)
 }
 
+func validateEventRuleSection(rule *plan.EventRule) bool {
+	switch rule.Event.EventType {
+	case plan.EventTypeTrack:
+		return rule.Section == plan.IdentitySectionProperties
+	case plan.EventTypeIdentify:
+		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+	case plan.EventTypeScreen:
+		return rule.Section == plan.IdentitySectionProperties
+	case plan.EventTypeGroup:
+		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+	case plan.EventTypePage:
+		return rule.Section == plan.IdentitySectionProperties
+	}
+
+	return false
+}
+
 // createRudderAnalyticsMethod creates a single RudderAnalyticsMethod from a plan.Event
 func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRegistry) (*RudderAnalyticsMethod, error) {
 	method := &RudderAnalyticsMethod{
 		Comment:   rule.Event.Description,
 		EventName: rule.Event.Name,
+	}
+
+	if !validateEventRuleSection(rule) {
+		// TODO: This is a temporary output until the generator has a proper warning system
+		// so that reporting is delegated to the caller for unified output handling
+
+		builder := strings.Builder{}
+		builder.WriteString(fmt.Sprintf("invalid section %q for event type %q", rule.Section, rule.Event.EventType))
+		if rule.Event.Name != "" {
+			builder.WriteString(fmt.Sprintf(" and event name %q", rule.Event.Name))
+		}
+		ui.PrintWarning(builder.String())
+
+		return nil, nil // Skip invalid event rules
 	}
 
 	var err error
@@ -51,6 +84,7 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 	case plan.EventTypeScreen:
 		err = buildScreenMethod(rule, method, nameRegistry)
 	default:
+		ui.PrintWarning(fmt.Sprintf("unsupported event type: %q", rule.Event.EventType))
 		return nil, nil // Skip page events
 	}
 

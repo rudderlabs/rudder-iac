@@ -23,22 +23,21 @@ func (m *MockDataCatalogClient) GetEvent(ctx context.Context, id string) (*catal
 	return m.event, nil
 }
 
+type MockUpstreamStateReader struct {
+	remoteIDs map[string]string
+}
+
+func (m *MockUpstreamStateReader) RemoteIDs(ctx context.Context) (map[string]string, error) {
+	return m.remoteIDs, nil
+}
+
 func TestUpstreamSnapshot(t *testing.T) {
 	t.Parallel()
 
-	mockState := map[string]any{
-		"version": "1.0.0",
-		"resources": map[string]any{
-			"event_product_viewed_1": map[string]any{
-				"id":   "product_viewed_1",
-				"type": "event",
-				"output": map[string]any{
-					"id": "ca94de47-123b-4dc2-9558-02c57bc289b7",
-				},
-			},
-		},
+	mockState := map[string]string{
+		"event:product_viewed_1": "ca94de47-123b-4dc2-9558-02c57bc289b7",
 	}
-	reader := &MockUpstreamStateReader{state: mockState}
+	reader := &MockUpstreamStateReader{remoteIDs: mockState}
 
 	fileManager, err := NewSnapshotFileManager("testdata/snapshot/expected/upstream")
 	require.NoError(t, err, "creating state file manager")

@@ -2,16 +2,17 @@ package helpers
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/samber/lo"
 )
 
 var _ UpstreamStateReader = &APIClientAdapter{}
 
 // UpstreamStateReader provides an interface for reading state in a raw format.
 type UpstreamStateReader interface {
-	RawState(ctx context.Context) (map[string]any, error)
+	RemoteIDs(ctx context.Context) (map[string]string, error)
 }
 
 // APIClientAdapter wraps the catalog.DataCatalog client
@@ -27,21 +28,52 @@ func NewAPIClientAdapter(client catalog.DataCatalog) *APIClientAdapter {
 	}
 }
 
-func (a *APIClientAdapter) RawState(ctx context.Context) (map[string]any, error) {
-	state, err := a.client.ReadState(ctx)
+func urn(t, id string) string {
+	return fmt.Sprintf("%s:%s", t, id)
+}
+
+func (a *APIClientAdapter) RemoteIDs(ctx context.Context) (map[string]string, error) {
+	resourceIDs := make(map[string]string)
+
+	categories, err := a.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
+	for _, category := range categories {
+		resourceIDs[urn("category", category.ExternalID)] = category.ID
+	}
 
-	stateBytes, err := json.Marshal(state)
+	events, err := a.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
-
-	var stateMap map[string]any
-	if err := json.Unmarshal(stateBytes, &stateMap); err != nil {
-		return nil, err
+	for _, event := range events {
+		resourceIDs[urn("event", event.ExternalID)] = event.ID
 	}
 
-	return stateMap, nil
+	properties, err := a.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
+	if err != nil {
+		return nil, err
+	}
+	for _, property := range properties {
+		resourceIDs[urn("property", property.ExternalID)] = property.ID
+	}
+
+	customTypes, err := a.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
+	if err != nil {
+		return nil, err
+	}
+	for _, customType := range customTypes {
+		resourceIDs[urn("custom-type", customType.ExternalID)] = customType.ID
+	}
+
+	trackingPlans, err := a.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
+	if err != nil {
+		return nil, err
+	}
+	for _, trackingPlan := range trackingPlans {
+		resourceIDs[urn("tracking-plan", trackingPlan.ExternalID)] = trackingPlan.ID
+	}
+
+	return resourceIDs, nil
 }

@@ -92,8 +92,7 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
 
-	typerCmd = typer.NewCmdTyper()
-	rootCmd.AddCommand(typerCmd)
+	rootCmd.AddCommand(typer.NewCmdTyper())
 }
 
 func initConfig() {
@@ -102,10 +101,6 @@ func initConfig() {
 	// only add debug command if enabled in config
 	if config.GetConfig().Debug {
 		debugCmd.Hidden = false
-	}
-
-	if config.GetConfig().ExperimentalFlags.RudderTyper {
-		typerCmd.Hidden = false
 	}
 
 	// reading this property from viper directly as it is not exposed in Config,
@@ -148,7 +143,7 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
-		ui.ShowError(err)
+		ui.PrintError(err)
 		os.Exit(1)
 	}
 }

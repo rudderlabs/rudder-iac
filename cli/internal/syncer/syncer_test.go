@@ -64,7 +64,7 @@ func TestSyncerCreate(t *testing.T) {
 	targetGraph.AddResource(trackingPlan)
 
 	provider := &testutils.DataCatalogProvider{
-		InitialState: state.EmptyState(),
+		InitialState:       state.EmptyState(),
 		ReconstructedState: state.EmptyState(),
 	}
 
@@ -72,28 +72,10 @@ func TestSyncerCreate(t *testing.T) {
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
-	assert.Len(t, provider.OperationLog, 6)
+	assert.Len(t, provider.OperationLog, 3)
 	assert.ElementsMatch(t, []testutils.OperationLogEntry{
 		{Operation: "Create", Args: []interface{}{event.ID(), event.Type(), event.Data()}},
-		{Operation: "PutResourceState", Args: []interface{}{event.URN(), &state.ResourceState{
-			ID:    event.ID(),
-			Type:  event.Type(),
-			Input: event.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-event-event1",
-			},
-			Dependencies: []string{},
-		}}},
 		{Operation: "Create", Args: []interface{}{property.ID(), property.Type(), property.Data()}},
-		{Operation: "PutResourceState", Args: []interface{}{property.URN(), &state.ResourceState{
-			ID:    property.ID(),
-			Type:  property.Type(),
-			Input: property.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-property-property1",
-			},
-			Dependencies: []string{},
-		}}},
 		{Operation: "Create", Args: []interface{}{trackingPlan.ID(), trackingPlan.Type(), resources.ResourceData{
 			"name":        "Test Tracking Plan",
 			"description": "This is a test tracking plan",
@@ -104,15 +86,6 @@ func TestSyncerCreate(t *testing.T) {
 					"property": "generated-property-property1",
 				},
 			},
-		}}},
-		{Operation: "PutResourceState", Args: []interface{}{trackingPlan.URN(), &state.ResourceState{
-			ID:    trackingPlan.ID(),
-			Type:  trackingPlan.Type(),
-			Input: trackingPlan.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-tracking-plan-trackingPlan1",
-			},
-			Dependencies: []string{},
 		}}},
 	}, provider.OperationLog)
 }
@@ -169,7 +142,7 @@ func TestSyncerDelete(t *testing.T) {
 	})
 
 	provider := &testutils.DataCatalogProvider{
-		InitialState: initialState,
+		InitialState:       initialState,
 		ReconstructedState: initialState,
 	}
 
@@ -180,15 +153,8 @@ func TestSyncerDelete(t *testing.T) {
 	err := s.Sync(context.Background(), targetGraph, syncer.SyncOptions{})
 	assert.Nil(t, err)
 
-	assert.Len(t, provider.OperationLog, 6)
+	assert.Len(t, provider.OperationLog, 3)
 	assert.ElementsMatch(t, []testutils.OperationLogEntry{
-		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
-			ID:    trackingPlan.ID(),
-			Type:  trackingPlan.Type(),
-			Input: trackingPlan.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-tracking-plan-trackingPlan1",
-			}}}},
 		{Operation: "Delete", Args: []interface{}{trackingPlan.ID(), trackingPlan.Type(), resources.ResourceData{
 			"name":        "Test Tracking Plan",
 			"description": "This is a test tracking plan",
@@ -201,25 +167,11 @@ func TestSyncerDelete(t *testing.T) {
 			},
 			"id": "generated-tracking-plan-trackingPlan1",
 		}}},
-		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
-			ID:    property.ID(),
-			Type:  property.Type(),
-			Input: property.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-property-property1",
-			}}}},
 		{Operation: "Delete", Args: []interface{}{property.ID(), property.Type(), resources.ResourceData{
 			"name":        "Test Property",
 			"description": "This is a test property",
 			"id":          "generated-property-property1",
 		}}},
-		{Operation: "DeleteResourceState", Args: []interface{}{&state.ResourceState{
-			ID:    event.ID(),
-			Type:  event.Type(),
-			Input: event.Data(),
-			Output: resources.ResourceData{
-				"id": "generated-event-event1",
-			}}}},
 		{Operation: "Delete", Args: []interface{}{event.ID(), event.Type(), resources.ResourceData{
 			"name":        "Test Event",
 			"description": "This is a test event",
@@ -237,7 +189,7 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 
 	// Create provider with empty initial state
 	provider := &testutils.DataCatalogProvider{
-		InitialState: state.EmptyState(),
+		InitialState:       state.EmptyState(),
 		ReconstructedState: state.EmptyState(),
 	}
 
@@ -247,8 +199,8 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
 	assert.NoError(t, err)
 
-	// We expect 12 operations: 6 creates + 6 put resource states
-	assert.Len(t, provider.OperationLog, 12)
+	// We expect 6 creates
+	assert.Len(t, provider.OperationLog, 6)
 	createOps := make([]testutils.OperationLogEntry, 0)
 	putStateOps := make([]testutils.OperationLogEntry, 0)
 
@@ -260,7 +212,7 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 		}
 	}
 	assert.Len(t, createOps, 6)
-	assert.Len(t, putStateOps, 6)
+	assert.Len(t, putStateOps, 0)
 
 	eventCreateCount := 0
 	propertyCreateCount := 0
@@ -341,7 +293,7 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 
 	// Create provider with initial state
 	provider := &testutils.DataCatalogProvider{
-		InitialState: initialState,
+		InitialState:       initialState,
 		ReconstructedState: reconstructedState,
 	}
 
@@ -354,20 +306,16 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	err = s.Sync(context.Background(), targetGraph, syncer.SyncOptions{Concurrency: 3})
 	assert.NoError(t, err)
 
-	// We expect 12 operations: 6 deletes + 6 delete resource states
-	assert.Len(t, provider.OperationLog, 12)
+	// We expect 12 deletes
+	assert.Len(t, provider.OperationLog, 6)
 	deleteOps := make([]testutils.OperationLogEntry, 0)
-	deleteStateOps := make([]testutils.OperationLogEntry, 0)
 
 	for _, op := range provider.OperationLog {
 		if op.Operation == "Delete" {
 			deleteOps = append(deleteOps, op)
-		} else if op.Operation == "DeleteResourceState" {
-			deleteStateOps = append(deleteStateOps, op)
 		}
 	}
 	assert.Len(t, deleteOps, 6)
-	assert.Len(t, deleteStateOps, 6)
 
 	// Verify that tracking plans were deleted before events and properties
 	// by checking the order of delete operations
@@ -443,7 +391,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 		trackingPlans := createTrackingPlans(events, properties)
 
 		provider := &testutils.DataCatalogProvider{
-			InitialState: state.EmptyState(),
+			InitialState:       state.EmptyState(),
 			ReconstructedState: state.EmptyState(),
 		}
 
@@ -480,7 +428,7 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 		trackingPlans := createTrackingPlans(events, properties)
 
 		provider := &testutils.DataCatalogProvider{
-			InitialState: createInitialStateWithResources(events, properties, trackingPlans),
+			InitialState:       createInitialStateWithResources(events, properties, trackingPlans),
 			ReconstructedState: createInitialStateWithResources(events, properties, trackingPlans),
 		}
 
@@ -499,12 +447,12 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 		assert.Len(t, errors, 2, "Should have expected number of errors")
 
 		// Verify operation count
-		assert.Len(t, failingProvider.OperationLog, 8, "Should have attempted operations for successful resources despite failures")
+		assert.Len(t, failingProvider.OperationLog, 4, "Should have attempted operations for successful resources despite failures")
 
 		// Verify error messages
 		expectedErrorContains := []string{
-			"failed to delete resource state: simulated delete resource state failure for event2",
-			"failed to delete resource state: simulated delete resource state failure for property2",
+			"simulated delete failure for property2",
+			"simulated delete failure for event2",
 		}
 		errorMessages := make([]string, len(errors))
 		for i, err := range errors {

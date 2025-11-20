@@ -43,14 +43,14 @@ func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer n
 	p.log.Debug("loading importable custom types from remote catalog")
 	collection := resources.NewResourceCollection()
 
-	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(false)})
+	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting custom types from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, customType := range customTypes {
-		if customType.ExternalId != "" {
+		if customType.ExternalID != "" {
 			continue
 		}
 		resourceMap[customType.ID] = &resources.RemoteResource{

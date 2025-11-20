@@ -35,7 +35,7 @@ type CustomType struct {
 	Type            string                 `json:"type"`
 	DataType        string                 `json:"dataType"`
 	WorkspaceId     string                 `json:"workspaceId"`
-	ExternalId      string                 `json:"externalId,omitempty"`
+	ExternalID      string                 `json:"externalId,omitempty"`
 	Config          map[string]interface{} `json:"config"`
 	Rules           map[string]interface{} `json:"rules"`
 	Properties      []CustomTypeProperty   `json:"properties"`
@@ -122,7 +122,12 @@ func (c *RudderDataCatalog) GetCustomType(ctx context.Context, id string) (*Cust
 }
 
 func (c *RudderDataCatalog) GetCustomTypes(ctx context.Context, options ListOptions) ([]*CustomType, error) {
-	return getAllResourcesWithPagination[*CustomType](ctx, c.client, fmt.Sprintf("v2/catalog/custom-types%s", options.ToQuery()))
+	return getAllResourcesPaginated[*CustomType](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/custom-types%s", options.ToQuery()),
+		c.concurrency,
+	)
 }
 
 func (c *RudderDataCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {

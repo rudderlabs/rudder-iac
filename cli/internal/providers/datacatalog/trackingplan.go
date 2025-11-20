@@ -311,7 +311,7 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 	p.log.Debug("loading tracking plans from remote catalog ")
 
 	collection := resources.NewResourceCollection()
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
+	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}

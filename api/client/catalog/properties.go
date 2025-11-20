@@ -31,7 +31,7 @@ type Property struct {
 	WorkspaceId      string                 `json:"workspaceId"`
 	DefinitionId     string                 `json:"definitionId"`
 	ItemDefinitionId string                 `json:"itemDefinitionId"`
-	ExternalId       string                 `json:"externalId,omitempty"`
+	ExternalID       string                 `json:"externalId,omitempty"`
 	Config           map[string]interface{} `json:"propConfig"`
 	CreatedAt        time.Time              `json:"createdAt"`
 	UpdatedAt        time.Time              `json:"updatedAt"`
@@ -109,7 +109,12 @@ func (c *RudderDataCatalog) GetProperty(ctx context.Context, id string) (*Proper
 }
 
 func (c *RudderDataCatalog) GetProperties(ctx context.Context, options ListOptions) ([]*Property, error) {
-	return getAllResourcesWithPagination[*Property](ctx, c.client, fmt.Sprintf("v2/catalog/properties%s", options.ToQuery()))
+	return getAllResourcesPaginated[*Property](
+		ctx,
+		c.client,
+		fmt.Sprintf("v2/catalog/properties%s", options.ToQuery()),
+		c.concurrency,
+	)
 }
 
 func (c *RudderDataCatalog) SetPropertyExternalId(ctx context.Context, id string, externalId string) error {

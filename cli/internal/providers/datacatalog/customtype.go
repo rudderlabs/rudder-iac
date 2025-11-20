@@ -255,7 +255,7 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	collection := resources.NewResourceCollection()
 
 	// fetch custom types from remote
-	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalId: lo.ToPtr(true)})
+	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	for _, customType := range customTypes {
 		resourceMap[customType.ID] = &resources.RemoteResource{
 			ID:         customType.ID,
-			ExternalID: customType.ExternalId,
+			ExternalID: customType.ExternalID,
 			Data:       customType,
 		}
 	}

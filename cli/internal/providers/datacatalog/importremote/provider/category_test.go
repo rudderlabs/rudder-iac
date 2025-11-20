@@ -31,7 +31,7 @@ func TestCategoryLoadImportable(t *testing.T) {
 		mockClient := &mockCategoryCatalog{
 			categories: []*catalog.Category{
 				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
-				{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1", ExternalId: "ecommerce"},
+				{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1", ExternalID: "ecommerce"},
 				{ID: "cat3", Name: "Analytics", WorkspaceID: "ws1"},
 			},
 		}
