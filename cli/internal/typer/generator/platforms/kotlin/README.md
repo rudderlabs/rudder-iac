@@ -287,9 +287,9 @@ make typer-kotlin-update-testdata
 
 ### Docker-Based Validation
 
-**Location:** `validator/`
+**Location:** `testdata/validator/`
 
-**Purpose:** Validates that generated code actually compiles and runs in a real Kotlin environment.
+**Purpose:** Validates that generated code compiles and integrates correctly with the actual RudderStack Kotlin SDK.
 
 **Run validation:**
 
@@ -299,30 +299,43 @@ make typer-kotlin-validate
 
 **What it does:**
 
-1. Builds a Docker image with Kotlin/Gradle/RudderStack SDK
-2. Copies generated `testdata/Main.kt` into a Kotlin project
-3. Runs `gradle build` to compile the code
-4. Runs test scenarios that exercise the generated code
-5. Validates runtime behavior
+1. Builds a Docker image with JDK 21, Gradle 8.4, and RudderStack SDK
+2. Copies generated `testdata/Main.kt` into the validator project
+3. Compiles the Kotlin code with `gradle build`
+4. Runs JUnit 5 tests that exercise the generated code with the actual SDK
+5. Validates event serialization and SDK integration
+
+**Testing Approach:**
+
+The validator uses a **plugin-based testing approach**:
+1. Each test initializes the real RudderStack SDK with an `EventValidationPlugin`
+2. Test calls RudderTyper methods (e.g., `typer.trackUserSignedUp(...)`)
+3. The plugin intercepts events during the SDK's `OnProcess` phase
+4. Plugin validates event type, properties, and serialization against expected values
+5. JUnit assertions ensure events match expectations
 
 **Benefits:**
 
-- Ensures generated code is syntactically valid Kotlin
-- Tests SDK integration
-- Catches issues that static tests might miss
-- Provides consistent environment across machines
+- **Real SDK Integration**: Uses actual RudderStack SDK instead of mocks
+- **Event Interception**: Custom plugin captures events without sending to servers
+- **Serialization Validation**: Verifies generated types serialize correctly to JSON
+- **Compilation Verification**: Ensures generated code is syntactically valid Kotlin
+- **Type Safety**: Confirms generated types work with the SDK's type system
+- **Consistent Environment**: Docker provides reproducible testing across machines
 
 **Structure:**
 
 ```
-validator/
-├── Dockerfile              # Kotlin/Gradle environment
-├── Makefile               # Build and run commands
-├── build.gradle.kts       # Gradle build config
+testdata/validator/
+├── Dockerfile                          # JDK 21 + Gradle 8.4 environment
+├── Makefile                           # Build and run commands
+├── build.gradle.kts                   # Gradle config with SDK + JUnit dependencies
 └── src/
-    └── main/kotlin/
-        ├── Main.kt        # Generated code (copied from testdata)
-        └── TestMain.kt    # Test scenarios
+    ├── main/kotlin/com/rudderstack/ruddertyper/
+    │   └── Main.kt                    # Generated code (copied from testdata)
+    └── test/kotlin/
+        ├── EventValidationPlugin.kt   # SDK plugin for event interception
+        └── RudderTyperKotlinTests.kt  # JUnit test suite
 ```
 
 ## Common Tasks

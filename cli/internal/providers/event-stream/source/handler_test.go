@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -112,6 +111,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name         string
 			spec         *specs.Spec
@@ -218,7 +219,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 				if tc.loadTwice {
@@ -233,6 +233,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Validate", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name                   string
 			externalGraphResources []*resources.Resource
@@ -381,7 +383,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
@@ -410,7 +411,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("GetResources", func(t *testing.T) {
-		enableStatelessCLI(t)
+		t.Parallel()
+
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
 
@@ -528,6 +530,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Create", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                 string
 			data                 resources.ResourceData
@@ -592,6 +595,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		t.Parallel()
 		tpConfig := map[string]interface{}{
 			"track": &source.TrackConfigResource{
 				EventConfigResource: &source.EventConfigResource{
@@ -814,6 +818,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Import", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                        string
 			id                          string
@@ -977,6 +982,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                   string
 			state                  resources.ResourceData
@@ -1014,6 +1020,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadState", func(t *testing.T) {
+		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
@@ -1112,6 +1119,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadResourcesFromRemote", func(t *testing.T) {
+		t.Parallel()
+
 		mockClient := source.NewMockSourceClient()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
@@ -1128,6 +1137,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Name:       "Test Source 2",
 					Type:       "python",
 					Enabled:    false,
+				},
+				{
+					ID:         "remote789",
+					ExternalID: "", // This should be skipped
+					Name:       "Test Source 3",
+					Type:       "Go",
+					Enabled:    true,
 				},
 			}, nil
 		})
@@ -1173,7 +1189,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadStateFromResources", func(t *testing.T) {
+		t.Parallel()
 		t.Run("success with valid resources", func(t *testing.T) {
+			t.Parallel()
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream sources
@@ -1281,8 +1299,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, resource789)
 		})
-
-		t.Run("tracking plan not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
+		t.Run("tracking plan externalID not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
+			t.Parallel()
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream source that has a tracking plan
@@ -1343,6 +1361,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
+		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
@@ -1412,6 +1431,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("FormatForExport", func(t *testing.T) {
+		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
 		ctx := context.Background()
@@ -1561,16 +1581,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, spec2.Metadata)
-	})
-}
-
-func enableStatelessCLI(t *testing.T) {
-	viper.Set("experimental", true)
-	viper.Set("flags.statelessCLI", true)
-
-	t.Cleanup(func() {
-		viper.Set("experimental", false)
-		viper.Set("flags.statelessCLI", false)
 	})
 }
 
