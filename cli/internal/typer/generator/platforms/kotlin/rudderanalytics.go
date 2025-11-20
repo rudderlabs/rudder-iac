@@ -68,7 +68,7 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 		if rule.Event.Name != "" {
 			builder.WriteString(fmt.Sprintf(" and event name %q", rule.Event.Name))
 		}
-		fmt.Printf("%s %s\n", ui.Color("Warning:", ui.Yellow), builder.String())
+		ui.PrintWarning(builder.String())
 
 		return nil, nil // Skip invalid event rules
 	}
@@ -84,7 +84,7 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 	case plan.EventTypeScreen:
 		err = buildScreenMethod(rule, method, nameRegistry)
 	default:
-		fmt.Printf("%s unsupported event type: %q\n", ui.Color("Warning:", ui.Yellow), rule.Event.EventType)
+		ui.PrintWarning(fmt.Sprintf("unsupported event type: %q", rule.Event.EventType))
 		return nil, nil // Skip page events
 	}
 
