@@ -20,7 +20,7 @@ func TestToJSON(t *testing.T) {
 			state: &State{
 				Resources: map[string]*ResourceState{},
 			},
-			expected: `{"resources":{}, "version": "1.0.0"}`,
+			expected: `{"resources":{}}`,
 		},
 		{
 			name: "basic resource",
@@ -39,7 +39,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"name":"test-resource"},"output":{"id":"123"},"dependencies":["test:dep1"]}}, "version": "1.0.0"}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"name":"test-resource"},"output":{"id":"123"},"dependencies":["test:dep1"]}}}`,
 		},
 		{
 			name: "with property references",
@@ -58,7 +58,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$__rudderRef":"test:dep1","property":"id"}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"ref":{"$__rudderRef":"test:dep1","property":"id"}},"output":{},"dependencies":null}}}`,
 		},
 		{
 			name: "with nested structures",
@@ -88,7 +88,7 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$__rudderRef":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$__rudderRef":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}, "version": "1.0.0"}`,
+			expected: `{"resources":{"test:resource":{"id":"123","type":"test","input":{"array":[{"ref":{"$__rudderRef":"test:dep2","property":"name"}},"simple-value"],"nested":{"ref":{"$__rudderRef":"test:dep1","property":"id"}}},"output":{},"dependencies":null}}}`,
 		},
 	}
 

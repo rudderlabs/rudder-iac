@@ -9,7 +9,7 @@ import (
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -200,8 +200,8 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	properties := collection.GetAll(state.PropertyResourceType)
 	for _, remoteProperty := range properties {
 		if remoteProperty.ExternalID == "" {
@@ -217,7 +217,7 @@ func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collectio
 		stateArgs := state.PropertyState{}
 		stateArgs.FromRemoteProperty(property, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.PropertyResourceType,
 			ID:           property.ExternalID,
 			Input:        args.ToResourceData(),
