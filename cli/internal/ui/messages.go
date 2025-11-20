@@ -26,7 +26,7 @@ func Warning(message string) string {
 }
 
 func PrintWarning(message string) {
-	fmt.Println(Warning(message))
+	fmt.Fprintln(uiWriter, Warning(message))
 }
 
 // Failure returns a failure message string in a styled format, including a red "x" symbol.
