@@ -73,7 +73,8 @@ func NewCmdTPApply() *cobra.Command {
 
 			s, err := syncer.New(deps.Providers().DataCatalog, workspace,
 				syncer.WithDryRun(dryRun),
-				syncer.WithConfirmationPrompt(confirm),
+				syncer.WithAskConfirmation(confirm),
+				syncer.WithReporter(app.SyncReporter()),
 			)
 			if err != nil {
 				return err

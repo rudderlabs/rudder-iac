@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 )
 
 type ProjectSyncer struct {
@@ -53,7 +54,7 @@ func New(p SyncProvider, workspace *client.Workspace, options ...Option) (*Proje
 	}
 
 	if syncer.reporter == nil {
-		syncer.reporter = NewDefaultSyncReporter()
+		syncer.reporter = &reporters.PlainSyncReporter{}
 	}
 
 	return syncer, nil
@@ -88,7 +89,7 @@ func WithDryRun(dryRun bool) Option {
 	}
 }
 
-func WithConfirmationPrompt(askConfirmation bool) Option {
+func WithAskConfirmation(askConfirmation bool) Option {
 	return func(s *ProjectSyncer) error {
 		s.askConfirmation = askConfirmation
 		return nil

@@ -14,6 +14,9 @@ import (
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 var (
@@ -98,6 +101,14 @@ func setupProviders(c *client.Client) *Providers {
 		EventStream: esp,
 		Workspace:   wsp,
 	}
+}
+
+func SyncReporter() syncer.SyncReporter {
+	if ui.IsTerminal() {
+		return &reporters.ProgressSyncReporter{}
+	}
+
+	return &reporters.PlainSyncReporter{}
 }
 
 func (d *deps) Client() *client.Client {

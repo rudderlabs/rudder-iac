@@ -18,9 +18,9 @@ type TaskReporter struct {
 	p *tea.Program
 }
 
-func NewTaskReporter() *TaskReporter {
+func NewTaskReporter(total int) *TaskReporter {
 	return &TaskReporter{
-		m: initialModel(),
+		m: initialModel(total),
 	}
 }
 
@@ -30,12 +30,6 @@ func (t *TaskReporter) Run() error {
 	t.p = tea.NewProgram(t.m)
 	_, err := t.p.Run()
 	return err
-}
-
-// SetTotalTasks sets the total number of tasks to be tracked.
-// This affects the progress bar display.
-func (t *TaskReporter) SetTotalTasks(total int) {
-	t.m.total = total
 }
 
 // Start signals the start of a task with the given id and message.
@@ -89,11 +83,11 @@ type model struct {
 	pr           progress.Model
 }
 
-func initialModel() model {
+func initialModel(total int) model {
 	return model{
 		tasksMsgChan: make(chan tea.Msg),
 		tasks:        make(map[string]*taskState),
-		total:        0,
+		total:        total,
 		sp:           spinner.New(spinner.WithSpinner(spinner.MiniDot), spinner.WithStyle(spinnerStyle)),
 		pr: progress.New(
 			progress.WithSolidFill(ColorWhite),
