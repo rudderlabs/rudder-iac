@@ -70,6 +70,9 @@ func WithReporter(reporter SyncReporter) Option {
 
 func WithConcurrency(concurrency int) Option {
 	return func(s *ProjectSyncer) error {
+		if concurrency < 1 {
+			return fmt.Errorf("concurrency must be at least 1, got %d", concurrency)
+		}
 		s.concurrency = concurrency
 		return nil
 	}
