@@ -46,7 +46,7 @@ func (t *TaskReporter) Complete(id string, message string, err error) {
 }
 
 // Done sends a signal to terminate the TaskReporter UI.
-// This will unblock the Run() method.
+// This blocks until the UI is finished.
 func (t *TaskReporter) Done() {
 	t.m.tasksMsgChan <- tasksDoneMsg{}
 	if t.p != nil {
@@ -148,7 +148,7 @@ func (m model) View() string {
 		output.WriteString(fmt.Sprintf("%s %s\n", m.sp.View(), task.message))
 	}
 
-	if len(m.tasks) > 0 && m.total > 0 {
+	if m.total > 0 && m.completed < m.total {
 		output.WriteString(fmt.Sprintf("[%s] %d/%d\n", m.pr.ViewAs(float64(m.completed)/float64(m.total)), m.completed, m.total))
 	}
 
