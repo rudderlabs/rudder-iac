@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -14,7 +13,7 @@ func PrintError(err error) {
 		Bold(true).
 		Render
 
-	fmt.Fprintf(os.Stderr, "%s %s\n", style("Error:"), err.Error())
+	fmt.Fprintf(uiErrWriter, "%s %s\n", style("Error:"), err.Error())
 }
 
 func Warning(message string) string {
@@ -37,7 +36,7 @@ func Failure(message string) string {
 
 // PrintFailure prints a failure message to stdout in a styled format, including a red "x" symbol.
 func PrintFailure(message string) {
-	fmt.Println(Failure(message))
+	fmt.Fprintln(uiWriter, Failure(message))
 }
 
 // Success returns a success message string in a styled format, including a green checkmark symbol.
@@ -47,5 +46,5 @@ func Success(message string) string {
 
 // PrintSuccess prints a success message to stdout in a styled format, including a green checkmark symbol.
 func PrintSuccess(message string) {
-	fmt.Println(Success(message))
+	fmt.Fprintln(uiWriter, Success(message))
 }

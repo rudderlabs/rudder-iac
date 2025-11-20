@@ -3,6 +3,8 @@ package reporters
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
@@ -12,16 +14,18 @@ import (
 type planReporter struct{}
 
 func (r *planReporter) ReportPlan(plan *planner.Plan) {
-	printDiff(plan.Diff)
+	ui.Print(renderDiff(plan.Diff))
 }
 
-func printDiff(diff *differ.Diff) {
+func renderDiff(diff *differ.Diff) string {
+	b := &strings.Builder{}
+
 	if len(diff.ImportableResources) > 0 {
-		listResources("Importable resources", diff.ImportableResources, nil)
+		listResources(b, "Importable resources", diff.ImportableResources, nil)
 	}
 
 	if len(diff.NewResources) > 0 {
-		listResources("New resources", diff.NewResources, nil)
+		listResources(b, "New resources", diff.NewResources, nil)
 	}
 
 	if len(diff.UpdatedResources) > 0 {
@@ -29,10 +33,16 @@ func printDiff(diff *differ.Diff) {
 		for _, r := range diff.UpdatedResources {
 			urns = append(urns, r.URN)
 		}
-		listResources("Updated resources", urns, func(urn string) string {
+		listResources(b, "Updated resources", urns, func(urn string) string {
 			r := diff.UpdatedResources[urn]
 			details := ""
-			for _, d := range r.Diffs {
+			diffKeys := []string{}
+			for k := range r.Diffs {
+				diffKeys = append(diffKeys, k)
+			}
+			sort.Strings(diffKeys)
+			for _, k := range diffKeys {
+				d := r.Diffs[k]
 				details += fmt.Sprintf(
 					"    - %s: %s %s %s\n",
 					ui.Color(d.Property, ui.ColorWhite),
@@ -46,22 +56,24 @@ func printDiff(diff *differ.Diff) {
 	}
 
 	if len(diff.RemovedResources) > 0 {
-		listResources("Removed resources", diff.RemovedResources, nil)
+		listResources(b, "Removed resources", diff.RemovedResources, nil)
 	}
+
+	return b.String()
 }
 
-func listResources(label string, resources []string, detailFn func(string) string) {
-	fmt.Println(ui.Bold(label) + ":")
+func listResources(b *strings.Builder, label string, resources []string, detailFn func(string) string) {
+	fmt.Fprintln(b, ui.Bold(label)+":")
 	for _, urn := range resources {
-		fmt.Printf("  - %s\n", ui.Color(urn, ui.ColorWhite))
+		fmt.Fprintf(b, "  - %s\n", ui.Color(urn, ui.ColorWhite))
 		if detailFn != nil {
-			fmt.Printf("%s\n", detailFn(urn))
+			fmt.Fprint(b, detailFn(urn))
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(b)
 }
 
-func printable(val interface{}) string {
+func printable(val any) string {
 	if val == nil {
 		return ui.Color("<nil>", ui.ColorBlue)
 	}

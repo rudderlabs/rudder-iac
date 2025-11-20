@@ -26,5 +26,5 @@ func PrintTable(columns []table.Column, rows []table.Row) {
 	t.SetStyles(s)
 
 	// Print the table
-	fmt.Println(t.View())
+	fmt.Fprintln(uiWriter, t.View())
 }
