@@ -109,7 +109,7 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 }
 
 func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceData, error) {
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tracking plans: %w", err)
 	}

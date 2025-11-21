@@ -31,9 +31,9 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 	t.Run("filters tracking plans with ExternalID set", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{ID: "tp1", Name: "Tracking Plan 1", WorkspaceID: "ws1"},
-				{ID: "tp2", Name: "Tracking Plan 2", WorkspaceID: "ws1", ExternalID: "tracking-plan-2"},
-				{ID: "tp3", Name: "Tracking Plan 3", WorkspaceID: "ws1"},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Tracking Plan 1", WorkspaceID: "ws1"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Tracking Plan 2", WorkspaceID: "ws1", ExternalID: "tracking-plan-2"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp3", Name: "Tracking Plan 3", WorkspaceID: "ws1"}},
 			},
 		}
 
@@ -62,8 +62,8 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 	t.Run("correctly assigns externalId and reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"},
-				{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"}},
 			},
 		}
 
@@ -112,9 +112,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{
-					ID:          "tp1",
-					Name:        "E-commerce Tracking",
-					WorkspaceID: "ws1",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:   "evt1",
@@ -218,9 +216,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{
-					ID:          "tp1",
-					Name:        "E-commerce Tracking",
-					WorkspaceID: "ws1",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:                   "evt1",
@@ -234,9 +230,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 					},
 				},
 				{
-					ID:          "tp2",
-					Name:        "User Analytics",
-					WorkspaceID: "ws2",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "User Analytics", WorkspaceID: "ws2"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:                   "evt2",
