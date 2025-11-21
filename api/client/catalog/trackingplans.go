@@ -447,7 +447,12 @@ func (c *RudderDataCatalog) updateTrackingPlanEventsBatch(
 		return nil, fmt.Errorf("marshalling input: %w", err)
 	}
 
-	resp, err := c.client.Do(ctx, "PUT", fmt.Sprintf("v2/catalog/tracking-plans/%s/events?rebuildSchemas=%t", id, rebuildSchemas), bytes.NewReader(byt))
+	resp, err := c.client.Do(
+		ctx,
+		"PUT",
+		fmt.Sprintf("v2/catalog/tracking-plans/%s/events?rebuildSchemas=%t", id, rebuildSchemas),
+		bytes.NewReader(byt),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
