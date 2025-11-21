@@ -139,28 +139,20 @@ func TestTrackingPlanProvider_Create(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      1,
-		"events": []map[string]interface{}{
-			{
-				"id":      "upstream-tracking-plan-event-id",
-				"eventId": "upsream-event-id",
-				"localId": "event-id",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
 			"description": "tracking-plan-description",
 			"events": []map[string]interface{}{
 				{
-					"id":              "",
+					"id":              "upstream-event-id",
 					"localId":         "event-id",
 					"allowUnplanned":  false,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
 							"localId":              "property-id",
-							"id":                   "",
+							"id":                   "upstream-property-id",
 							"required":             true,
 							"additionalProperties": false,
 						},
@@ -187,11 +179,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	)
 
 	oldsState := defaultTrackingPlanStateFactory().
-		WithEvent(&state.TrackingPlanEventState{
-			ID:      "upstream-tracking-plan-event-id",
-			LocalID: "event-id",
-			EventID: "upstream-event-id",
-		}).
 		WithTrackingPlanArgs(*oldsArgs).
 		Build()
 
@@ -212,10 +199,12 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "upstream-event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id",
 					LocalID:  "property-id",
 					Required: true,
 				},
@@ -234,14 +223,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
-		"events": []map[string]interface{}{
-			{
-				"id":      "upstream-tracking-plan-event-id",
-				"eventId": "upstream-event-id",
-				"localId": "event-id",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
@@ -249,12 +230,12 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 			"events": []map[string]interface{}{
 				{
 					"localId":         "event-id",
-					"id":              "",
+					"id":              "upstream-event-id",
 					"allowUnplanned":  false,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":                   "",
+							"id":                   "upstream-property-id",
 							"localId":              "property-id",
 							"required":             true,
 							"additionalProperties": false,
@@ -281,21 +262,18 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	)
 
 	oldsState := defaultTrackingPlanStateFactory().
-		WithEvent(&state.TrackingPlanEventState{
-			ID:      "upstream-tracking-plan-event-id",
-			LocalID: "event-id",
-			EventID: "upstream-event-id",
-		}).
 		WithTrackingPlanArgs(*oldsArgs).
 		Build()
 
 	toArgs := defaultTrackingPlanArgsFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithEvent(&state.TrackingPlanEventArgs{               // updated events under the trackingplan +1 Added -1 Removed
+			ID:             "upstream-event-id-1",
 			LocalID:        "event-id-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
+					ID:       "upstream-property-id-1",
 					LocalID:  "property-id-1",
 					Required: false,
 				},
@@ -328,27 +306,19 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 		"creationType": "backend",
 		"createdAt":    "2021-09-01 00:00:00 +0000 UTC",
 		"updatedAt":    "2021-09-02 00:00:00 +0000 UTC",
-		"version":      2,
-		"events": []map[string]interface{}{
-			{
-				"id":      "upstream-tracking-plan-event-id-1",
-				"eventId": "upsream-event-id-1",
-				"localId": "event-id-1",
-			},
-		},
 		"trackingPlanArgs": map[string]interface{}{
 			"name":        "tracking-plan",
 			"localId":     "tracking-plan-id",
 			"description": "tracking-plan-updated-description", // updated description
 			"events": []map[string]interface{}{
 				{
-					"id":              "",
+					"id":              "upstream-event-id-1",
 					"localId":         "event-id-1",
 					"allowUnplanned":  true,
 					"identitySection": "",
 					"properties": []map[string]interface{}{
 						{
-							"id":                   "",
+							"id":                   "upstream-property-id-1",
 							"localId":              "property-id-1",
 							"required":             false,
 							"additionalProperties": false,
@@ -368,6 +338,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	// 2 Added 1 Removed 1 Updated
 	oldArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -378,6 +349,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id-1",
 			LocalID:        "event-id-1",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -391,6 +363,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 
 	newArgs := defaultTrackingPlanArgsFactory().
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
 			LocalID:        "event-id",
 			AllowUnplanned: true, // updated
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -405,6 +378,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 			},
 		}).
 		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id-2",
 			LocalID:        "event-id-2",
 			AllowUnplanned: true,
 			Properties: []*state.TrackingPlanPropertyArgs{
@@ -421,6 +395,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	require.Equal(t, 1, len(diffed.Deleted))
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id-2",
 		LocalID:        "event-id-2",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
@@ -432,6 +407,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	}, diffed.Added[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id-1",
 		LocalID:        "event-id-1",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
@@ -443,6 +419,7 @@ func TestTrackingPlanProvider_Diff(t *testing.T) {
 	}, diffed.Deleted[0])
 
 	assert.Equal(t, &state.TrackingPlanEventArgs{
+		ID:             "event-id",
 		LocalID:        "event-id",
 		AllowUnplanned: true,
 		Properties: []*state.TrackingPlanPropertyArgs{
@@ -550,12 +527,10 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "TestTP",
 				"description":  "desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
 				"updatedAt":    updated.String(),
-				"events":       []map[string]any(nil),
 				"trackingPlanArgs": map[string]any{
 					"localId":     "local-tp-id",
 					"name":        "TestTP",
@@ -647,12 +622,10 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				"id":           "remote-tp-id",
 				"name":         "UpdatedTP",
 				"description":  "new desc",
-				"version":      1,
 				"creationType": "backend",
 				"workspaceId":  "ws-id",
 				"createdAt":    created.String(),
 				"updatedAt":    updated.String(),
-				"events":       []map[string]any(nil),
 				"trackingPlanArgs": map[string]any{
 					"localId":     "local-tp-id",
 					"name":        "UpdatedTP",
@@ -756,10 +729,12 @@ func getTrackingPlanArgs() *state.TrackingPlanArgs {
 
 	f := defaultTrackingPlanArgsFactory()
 	f = f.WithEvent(&state.TrackingPlanEventArgs{
+		ID:             "upstream-event-id",
 		LocalID:        "event-id",
 		AllowUnplanned: false,
 		Properties: []*state.TrackingPlanPropertyArgs{
 			{
+				ID:       "upstream-property-id",
 				LocalID:  "property-id",
 				Required: true,
 			},

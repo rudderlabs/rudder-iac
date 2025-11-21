@@ -62,11 +62,9 @@ func NewTrackingPlanStateFactory() *TrackingPlanStateFactory {
 		Name:         "tracking-plan-name",
 		Description:  "tracking-plan-description",
 		WorkspaceID:  "workspace-id",
-		Version:      1,
 		CreationType: "backend",
 		CreatedAt:    "2021-09-01T00:00:00Z",
 		UpdatedAt:    "2021-09-02T00:00:00Z",
-		Events:       nil,
 	}
 
 	return &TrackingPlanStateFactory{
@@ -106,15 +104,6 @@ func (f *TrackingPlanStateFactory) WithUpdatedAt(updatedAt string) *TrackingPlan
 
 func (f *TrackingPlanStateFactory) WithTrackingPlanArgs(args state.TrackingPlanArgs) *TrackingPlanStateFactory {
 	f.trackingplanState.TrackingPlanArgs = args
-	return f
-}
-
-func (f *TrackingPlanStateFactory) WithEvent(event *state.TrackingPlanEventState) *TrackingPlanStateFactory {
-	if f.trackingplanState.Events == nil {
-		f.trackingplanState.Events = make([]*state.TrackingPlanEventState, 0)
-	}
-
-	f.trackingplanState.Events = append(f.trackingplanState.Events, event)
 	return f
 }
 
