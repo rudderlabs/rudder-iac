@@ -296,7 +296,7 @@ func (c *RudderDataCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, 
 	events, err := getAllResourcesPaginated[*TrackingPlanEventResponse](
 		ctx,
 		c.client,
-		fmt.Sprintf("v2/catalog/tracking-plans/%s/events", id),
+		fmt.Sprintf("v2/catalog/tracking-plans/%s/events?rebuildSchemas=%t", id, rebuildSchemas),
 		c.concurrency,
 	)
 	if err != nil {
