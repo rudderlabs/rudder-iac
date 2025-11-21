@@ -54,6 +54,10 @@ func (m *MockTrackingPlanCatalog) DeleteTrackingPlan(ctx context.Context, tracki
 	return m.err
 }
 
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
 func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
 	m.deleteEventCalled = true
 	m.deleteEventCallCount++
@@ -76,10 +80,12 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
-	m.updateEventCalled = true
-	m.updateEventCallCount++
-	return m.tp, m.err
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail) error {
+	for range input {
+		m.updateEventCalled = true
+		m.updateEventCallCount++
+	}
+	return m.err
 }
 
 func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *catalog.TrackingPlan) {

@@ -23,7 +23,7 @@ type mockTrackingPlanDataCatalog struct {
 	err           error
 }
 
-func (m *mockTrackingPlanDataCatalog) GetTrackingPlans(ctx context.Context, options catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *mockTrackingPlanDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context, options catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.trackingPlans, m.err
 }
 

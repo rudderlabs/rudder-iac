@@ -67,11 +67,8 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		return nil, fmt.Errorf("creating tracking plan in catalog: %w", err)
 	}
 
-	if len(args.Events) > 0 {
-		_, err = p.client.UpdateTrackingPlanEvents(ctx, created.ID, getUpdateEventIdentifiers(args.Events))
-		if err != nil {
-			return nil, fmt.Errorf("updating tracking plan events during create: %w", err)
-		}
+	if err = p.client.UpdateTrackingPlanEvents(ctx, created.ID, getUpdateEventIdentifiers(args.Events)); err != nil {
+		return nil, fmt.Errorf("updating tracking plan events during create: %w", err)
 	}
 
 	tpState := state.TrackingPlanState{
@@ -79,10 +76,13 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 		ID:               created.ID,
 		Name:             created.Name,
 		CreationType:     created.CreationType,
-		Description:      *created.Description,
 		WorkspaceID:      created.WorkspaceID,
 		CreatedAt:        created.CreatedAt.String(),
 		UpdatedAt:        created.UpdatedAt.String(),
+	}
+
+	if created.Description != nil {
+		tpState.Description = *created.Description
 	}
 
 	resourceData := tpState.ToResourceData()
@@ -99,8 +99,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	toArgs.FromResourceData(input)
 
 	var (
-		updated *catalog.TrackingPlan
-		err     error
+		err error
 	)
 
 	if prevState.TrackingPlanArgs.Name != toArgs.Name || prevState.TrackingPlanArgs.Description != toArgs.Description {
@@ -121,46 +120,31 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		}
 	}
 
-	if len(diff.Added) > 0 {
-		updated, err = p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Added))
-		if err != nil {
-			return nil, fmt.Errorf("updating tracking plan events during update for added events: %w", err)
-		}
+	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Added)); err != nil {
+		return nil, fmt.Errorf("updating tracking plan events during update for added events: %w", err)
 	}
 
-	if len(diff.Updated) > 0 {
-		updated, err = p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Updated))
-		if err != nil {
-			return nil, fmt.Errorf("updating tracking plan events during update for updated events: %w", err)
-		}
+	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Updated)); err != nil {
+		return nil, fmt.Errorf("updating tracking plan events during update for updated events: %w", err)
 	}
 
-	var tpState state.TrackingPlanState
+	upstreamTP, err := p.client.GetTrackingPlan(ctx, prevState.ID)
+	if err != nil {
+		return nil, fmt.Errorf("getting tracking plan from catalog: %w", err)
+	}
 
-	if updated == nil {
-		// Copy from previous if anything isn't getting updated
-		// so we don't panic
-		tpState = state.TrackingPlanState{
-			TrackingPlanArgs: toArgs,
-			ID:               prevState.ID,
-			Name:             prevState.Name,
-			Description:      prevState.Description,
-			CreationType:     prevState.CreationType,
-			WorkspaceID:      prevState.WorkspaceID,
-			CreatedAt:        prevState.CreatedAt,
-			UpdatedAt:        prevState.UpdatedAt,
-		}
-	} else {
-		tpState = state.TrackingPlanState{
-			TrackingPlanArgs: toArgs,
-			ID:               updated.ID,
-			Name:             toArgs.Name,
-			Description:      toArgs.Description,
-			CreationType:     updated.CreationType,
-			WorkspaceID:      updated.WorkspaceID,
-			CreatedAt:        updated.CreatedAt.String(),
-			UpdatedAt:        updated.UpdatedAt.String(),
-		}
+	tpState := state.TrackingPlanState{
+		TrackingPlanArgs: toArgs,
+		ID:               upstreamTP.ID,
+		Name:             upstreamTP.Name,
+		CreationType:     upstreamTP.CreationType,
+		WorkspaceID:      upstreamTP.WorkspaceID,
+		CreatedAt:        upstreamTP.CreatedAt.String(),
+		UpdatedAt:        upstreamTP.UpdatedAt.String(),
+	}
+
+	if upstreamTP.Description != nil {
+		tpState.Description = *upstreamTP.Description
 	}
 
 	resourceData := tpState.ToResourceData()
@@ -204,18 +188,12 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 			}
 		}
 
-		if len(diffed.Added) > 0 {
-			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Added))
-			if err != nil {
-				return nil, fmt.Errorf("updating tracking plan events during import for added events: %w", err)
-			}
+		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Added)); err != nil {
+			return nil, fmt.Errorf("updating tracking plan events during import for added events: %w", err)
 		}
 
-		if len(diffed.Updated) > 0 {
-			_, err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Updated))
-			if err != nil {
-				return nil, fmt.Errorf("updating tracking plan events during import for updated events: %w", err)
-			}
+		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Updated)); err != nil {
+			return nil, fmt.Errorf("updating tracking plan events during import for updated events: %w", err)
 		}
 	}
 

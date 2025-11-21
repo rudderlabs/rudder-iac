@@ -170,7 +170,7 @@ type TrackingPlanStore interface {
 	GetTrackingPlansWithIdentifiers(ctx context.Context, options ListOptions) ([]*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
 	GetTrackingPlanEventWithIdentifiers(ctx context.Context, id, eventId string) (*TrackingPlanEventPropertyIdentifiers, error)
-	UpdateTrackingPlanEvents(ctx context.Context, id string, input []EventIdentifierDetail) (*TrackingPlan, error)
+	UpdateTrackingPlanEvents(ctx context.Context, id string, input []EventIdentifierDetail) error
 	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
 
@@ -412,23 +412,22 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 	return &schema, nil
 }
 
-func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, events []EventIdentifierDetail) (*TrackingPlan, error) {
+func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, events []EventIdentifierDetail) error {
 	var (
-		updated *TrackingPlan
-		err     error
-		batch   []EventIdentifierDetail
+		err   error
+		batch []EventIdentifierDetail
 	)
 
 	for i := 0; i < len(events); i += EVENT_UPDATE_BATCH_SIZE {
 		batch = events[i:min(i+EVENT_UPDATE_BATCH_SIZE, len(events))]
 
-		updated, err = c.updateTrackingPlanEventsBatch(ctx, id, batch)
+		_, err = c.updateTrackingPlanEventsBatch(ctx, id, batch)
 		if err != nil {
-			return nil, fmt.Errorf("updating batch of tracking plan events: %w", err)
+			return fmt.Errorf("updating batch of tracking plan events: %w", err)
 		}
 	}
 
-	return updated, nil
+	return nil
 }
 
 func (c *RudderDataCatalog) updateTrackingPlanEventsBatch(
