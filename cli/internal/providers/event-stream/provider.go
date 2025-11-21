@@ -20,7 +20,6 @@ type handler interface {
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
-	LoadState(ctx context.Context) (*state.State, error)
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
@@ -119,21 +118,6 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
-	result := state.EmptyState()
-	for _, handler := range p.handlers {
-		state, err := handler.LoadState(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading state for %s: %w", handler, err)
-		}
-		result, err = result.Merge(state)
-		if err != nil {
-			return nil, fmt.Errorf("merging state for %s: %w", handler, err)
-		}
-	}
-	return result, nil
-}
-
 func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	collection := resources.NewResourceCollection()
 	for resourceType, handler := range p.handlers {
@@ -162,16 +146,6 @@ func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resou
 		}
 	}
 	return s, nil
-}
-
-func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	// Not required with the stateless CLI approach
-	return nil
-}
-
-func (p *Provider) DeleteResourceState(ctx context.Context, st *state.ResourceState) error {
-	// Not required with the stateless CLI approach
-	return nil
 }
 
 func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {

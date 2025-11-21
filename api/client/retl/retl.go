@@ -8,18 +8,8 @@ import (
 
 // RETLStore is the interface for RETL operations
 type RETLStore interface {
-	StateStore
 	RETLSourceStore
 	PreviewStore
-}
-
-// StateStore is the interface for RETL state operations
-type StateStore interface {
-	// ReadState retrieves the complete RETL state
-	ReadState(ctx context.Context) (*State, error)
-
-	// PutResourceState saves a resource state record
-	PutResourceState(ctx context.Context, id string, req PutStateRequest) error
 }
 
 // RETLSourceStore is the interface for RETL source operations

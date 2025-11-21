@@ -104,44 +104,6 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-func (p *CompositeProvider) LoadState(ctx context.Context) (*state.State, error) {
-	var state *state.State = state.EmptyState()
-
-	for _, provider := range p.Providers {
-		s, err := provider.LoadState(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		if state == nil {
-			state = s
-		} else {
-			state, err = state.Merge(s)
-			if err != nil {
-				return nil, fmt.Errorf("error merging provider states: %s", err)
-			}
-		}
-	}
-
-	return state, nil
-}
-
-func (p *CompositeProvider) PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error {
-	provider := p.providerForType(state.Type)
-	if provider == nil {
-		return fmt.Errorf("no provider found for resource type %s", state.Type)
-	}
-	return provider.PutResourceState(ctx, URN, state)
-}
-
-func (p *CompositeProvider) DeleteResourceState(ctx context.Context, state *state.ResourceState) error {
-	provider := p.providerForType(state.Type)
-	if provider == nil {
-		return fmt.Errorf("no provider found for resource type %s", state.Type)
-	}
-	return provider.DeleteResourceState(ctx, state)
-}
-
 func (p *CompositeProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	provider := p.providerForType(resourceType)
 	if provider == nil {

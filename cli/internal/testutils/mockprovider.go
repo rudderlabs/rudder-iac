@@ -20,14 +20,10 @@ type MockProvider struct {
 	LoadSpecErr                error
 	GetResourceGraphVal        *resources.Graph
 	GetResourceGraphErr        error
-	LoadStateVal               *state.State
-	LoadStateErr               error
 	LoadResourcesFromRemoteVal *resources.ResourceCollection
 	LoadResourcesFromRemoteErr error
 	LoadStateFromResourcesVal  *state.State
 	LoadStateFromResourcesErr  error
-	PutResourceStateErr        error
-	DeleteResourceStateErr     error
 	CreateVal                  *resources.ResourceData
 	CreateErr                  error
 	UpdateVal                  *resources.ResourceData
@@ -43,11 +39,8 @@ type MockProvider struct {
 	LoadSpecCalledWithArgs             []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
-	LoadStateCalledCount               int
 	LoadResourcesFromRemoteCalledCount int
 	LoadStateFromResourcesCalledCount  int
-	PutResourceStateCalledWithArg      PutResourceStateArgs
-	DeleteResourceStateCalledWithArg   *state.ResourceState
 	CreateCalledWithArg                CreateArgs
 	UpdateCalledWithArg                UpdateArgs
 	DeleteCalledWithArg                DeleteArgs
@@ -64,12 +57,6 @@ type LoadSpecArgs struct {
 type ParseSpecArgs struct {
 	Path string
 	Spec *specs.Spec
-}
-
-// PutResourceStateArgs stores arguments for PutResourceState calls
-type PutResourceStateArgs struct {
-	URN   string
-	State *state.ResourceState
 }
 
 // CreateArgs stores arguments for Create calls
@@ -145,11 +132,6 @@ func (m *MockProvider) GetResourceGraph() (*resources.Graph, error) {
 	return m.GetResourceGraphVal, m.GetResourceGraphErr
 }
 
-func (m *MockProvider) LoadState(ctx context.Context) (*state.State, error) {
-	m.LoadStateCalledCount++
-	return m.LoadStateVal, m.LoadStateErr
-}
-
 func (m *MockProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
 	m.LoadResourcesFromRemoteCalledCount++
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
@@ -158,16 +140,6 @@ func (m *MockProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.
 func (m *MockProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	m.LoadStateFromResourcesCalledCount++
 	return m.LoadStateFromResourcesVal, m.LoadStateFromResourcesErr
-}
-
-func (m *MockProvider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	m.PutResourceStateCalledWithArg = PutResourceStateArgs{URN: URN, State: s}
-	return m.PutResourceStateErr
-}
-
-func (m *MockProvider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
-	m.DeleteResourceStateCalledWithArg = s
-	return m.DeleteResourceStateErr
 }
 
 func (m *MockProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
@@ -204,9 +176,6 @@ func (m *MockProvider) ResetCallCounters() {
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
 	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0
-	m.LoadStateCalledCount = 0
-	m.PutResourceStateCalledWithArg = PutResourceStateArgs{}
-	m.DeleteResourceStateCalledWithArg = nil
 	m.CreateCalledWithArg = CreateArgs{}
 	m.UpdateCalledWithArg = UpdateArgs{}
 	m.DeleteCalledWithArg = DeleteArgs{}
