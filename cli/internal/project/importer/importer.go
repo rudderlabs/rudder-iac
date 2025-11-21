@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -74,7 +75,7 @@ func WorkspaceImport(
 
 	formatters := formatter.Setup(formatter.DefaultYAML)
 
-	if err := Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
+	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 

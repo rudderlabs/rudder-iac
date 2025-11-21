@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -32,7 +32,7 @@ type handler interface {
 		collection *resources.ResourceCollection,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]importremote.FormattableEntity, error)
+	) ([]writer.FormattableEntity, error)
 }
 
 var _ project.Provider = &Provider{}
@@ -201,8 +201,8 @@ func (p *Provider) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
-	result := make([]importremote.FormattableEntity, 0)
+) ([]writer.FormattableEntity, error) {
+	result := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
 		entities, err := handler.FormatForExport(
 			ctx,

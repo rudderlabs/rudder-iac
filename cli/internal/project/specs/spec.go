@@ -11,10 +11,10 @@ const (
 )
 
 type Spec struct {
-	Version  string                 `yaml:"version"`
-	Kind     string                 `yaml:"kind"`
-	Metadata map[string]interface{} `yaml:"metadata"`
-	Spec     map[string]interface{} `yaml:"spec"`
+	Version  string         `yaml:"version"`
+	Kind     string         `yaml:"kind"`
+	Metadata map[string]any `yaml:"metadata"`
+	Spec     map[string]any `yaml:"spec"`
 }
 
 type ParsedSpec struct {

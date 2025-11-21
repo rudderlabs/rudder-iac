@@ -3,9 +3,9 @@ package retl
 import (
 	"context"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -54,11 +54,11 @@ type resourceHandler interface {
 	// dependency resolution and state management.
 	List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error)
 
-	// FetchImportData retrieves data for multiple resources to be imported.
-	// This method fetches remote resources based on the provided import arguments
-	// and prepares them for local import. It handles resource discovery and metadata collection.
-	// Returns a list of import data structures or an error if fetching fails.
-	FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error)
+	// FetchImportData retrieves a single resource formatted for import.
+	// This method fetches a remote resource based on the provided import IDs
+	// and prepares it as a FormattableEntity ready for writing.
+	// Returns a FormattableEntity or an error if fetching fails.
+	FetchImportData(ctx context.Context, importIDs specs.ImportIds) (writer.FormattableEntity, error)
 
 	// Import updates the remote state to match the resource defined in YAML projects.
 	// This method takes the local ID, resource data from YAML definitions, and import metadata
@@ -90,5 +90,5 @@ type resourceHandler interface {
 	// The idNamer is used to generate unique IDs for the resources.
 	// The inputResolver is used to resolve references to other resources.
 	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error)
+	FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
 }

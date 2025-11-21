@@ -12,9 +12,9 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -549,22 +549,22 @@ func (h *Handler) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
 		return nil, nil
 	}
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
-	var result []importremote.FormattableEntity
+	var result []writer.FormattableEntity
 	for _, source := range sources {
 		data, ok := source.Data.(*sourceClient.EventStreamSource)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
-		workspaceMetadata.Resources = []importremote.ImportIds{
+		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				LocalID:  source.ExternalID,
 				RemoteID: source.ID,
@@ -579,7 +579,7 @@ func (h *Handler) FormatForExport(
 		if err != nil {
 			return nil, fmt.Errorf("creating spec: %w", err)
 		}
-		result = append(result, importremote.FormattableEntity{
+		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
@@ -590,13 +590,13 @@ func (h *Handler) FormatForExport(
 func (p *Handler) toImportSpec(
 	source *sourceClient.EventStreamSource,
 	externalID string,
-	workspaceMetadata importremote.WorkspaceImportMetadata,
+	workspaceMetadata specs.WorkspaceImportMetadata,
 	resolver resolver.ReferenceResolver,
 ) (*specs.Spec, error) {
-	metadata := importremote.Metadata{
+	metadata := specs.Metadata{
 		Name: MetadataName,
-		Import: importremote.WorkspacesImportMetadata{
-			Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+		Import: specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}
 	metadataMap := make(map[string]any)
@@ -640,13 +640,13 @@ func (p *Handler) toImportSpec(
 }
 
 func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
-	metadata := importremote.Metadata{}
-	err := mapstructure.Decode(s.Metadata, &metadata)
+	metadata, err := s.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
+		return err
 	}
-	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
-		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
+
+	lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
 			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
 				WorkspaceId: workspace.WorkspaceID,
 				RemoteId:    resource.RemoteID,

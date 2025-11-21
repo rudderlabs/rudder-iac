@@ -7,10 +7,10 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -176,19 +176,19 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return handler.Import(ctx, ID, data, remoteId)
 }
 
-// Import imports a single remote RETL resource with local ID mapping
-func (p *Provider) FetchImportData(ctx context.Context, resourceType string, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+// FetchImportData fetches a single remote RETL resource formatted for import
+func (p *Provider) FetchImportData(ctx context.Context, resourceType string, importIDs specs.ImportIds) (writer.FormattableEntity, error) {
 	// Only support SQL models for import in this phase
 	if resourceType != sqlmodel.ResourceType {
-		return nil, fmt.Errorf("import is only supported for SQL models, got: %s", resourceType)
+		return writer.FormattableEntity{}, fmt.Errorf("import is only supported for SQL models, got: %s", resourceType)
 	}
 
 	handler, ok := p.handlers[resourceType]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return writer.FormattableEntity{}, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 
-	return handler.FetchImportData(ctx, args)
+	return handler.FetchImportData(ctx, importIDs)
 }
 
 // LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
@@ -248,8 +248,8 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
-	allEntities := make([]importremote.FormattableEntity, 0)
+func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+	allEntities := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
 		entities, err := handler.FormatForExport(ctx, collection, idNamer, inputResolver)
 		if err != nil {

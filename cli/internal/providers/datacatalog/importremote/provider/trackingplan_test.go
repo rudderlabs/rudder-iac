@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -164,10 +163,10 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
+					"workspaces": []specs.WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
+							Resources: []specs.ImportIds{
 								{
 									LocalID:  "e-commerce-tracking",
 									RemoteID: "tp1",
@@ -294,10 +293,10 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
+					"workspaces": []specs.WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
+							Resources: []specs.ImportIds{
 								{
 									LocalID:  "e-commerce-tracking",
 									RemoteID: "tp1",
@@ -336,10 +335,10 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "user-analytics",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
+					"workspaces": []specs.WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws2",
-							Resources: []importremote.ImportIds{
+							Resources: []specs.ImportIds{
 								{
 									LocalID:  "user-analytics",
 									RemoteID: "tp2",

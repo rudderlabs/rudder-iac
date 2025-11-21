@@ -1,4 +1,4 @@
-package importer
+package writer
 
 import (
 	"context"
@@ -6,13 +6,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 )
 
+// FormattableEntity represents an importable entity with content, path, and optional template.
+type FormattableEntity struct {
+	Content      any
+	RelativePath string
+}
+
 // Write is a helper function to write the files based on the formattable entities
 // using a list of available formatters.
-func Write(ctx context.Context, baseDir string, formatters formatter.Formatters, data []importremote.FormattableEntity) error {
+func Write(ctx context.Context, baseDir string, formatters formatter.Formatters, data []FormattableEntity) error {
 
 	for _, datum := range data {
 		path := filepath.Join(baseDir, datum.RelativePath)

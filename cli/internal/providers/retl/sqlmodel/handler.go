@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -98,15 +98,15 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SQL:              sqlStr,
 	}
 
-	return h.loadImportMetadata(s.Metadata)
+	return h.loadImportMetadata(s)
 }
 
-func (h *Handler) loadImportMetadata(fileMetadata map[string]interface{}) error {
-	metadata := importremote.Metadata{}
-	err := mapstructure.Decode(fileMetadata, &metadata)
+func (h *Handler) loadImportMetadata(s *specs.Spec) error {
+	metadata, err := s.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
+		return err
 	}
+
 	workspaces := metadata.Import.Workspaces
 	for _, workspaceMetadata := range workspaces {
 		workspaceId := workspaceMetadata.WorkspaceID
@@ -293,22 +293,22 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 	return result, nil
 }
 
-func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportArgs) ([]importremote.ImportData, error) {
+func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (writer.FormattableEntity, error) {
 	if args.LocalID == "" {
-		return nil, fmt.Errorf("local id is required")
+		return writer.FormattableEntity{}, fmt.Errorf("local id is required")
 	}
 	if args.RemoteID == "" {
-		return nil, fmt.Errorf("remote id is required")
+		return writer.FormattableEntity{}, fmt.Errorf("remote id is required")
 	}
 
 	// First, get all sources to find the one we want to import
 	source, err := h.client.GetRetlSource(ctx, args.RemoteID)
 	if err != nil {
-		return nil, fmt.Errorf("getting RETL source for import: %w", err)
+		return writer.FormattableEntity{}, fmt.Errorf("getting RETL source for import: %w", err)
 	}
 	// Validate that this is a SQL model source
 	if source.SourceType != retlClient.ModelSourceType {
-		return nil, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
+		return writer.FormattableEntity{}, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
 	}
 
 	// Create the base resource data structure for the imported source
@@ -323,13 +323,13 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		SQLKey:              source.Config.Sql,
 	}
 
-	importMetadata := importremote.Metadata{
+	importMetadata := specs.Metadata{
 		Name: args.LocalID,
-		Import: importremote.WorkspacesImportMetadata{
-			Workspaces: []importremote.WorkspaceImportMetadata{
+		Import: specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{
 				{
 					WorkspaceID: source.WorkspaceID,
-					Resources: []importremote.ImportIds{
+					Resources: []specs.ImportIds{
 						{
 							LocalID:  args.LocalID,
 							RemoteID: args.RemoteID,
@@ -340,12 +340,25 @@ func (h *Handler) FetchImportData(ctx context.Context, args importremote.ImportA
 		},
 	}
 
-	importData := importremote.ImportData{
-		ResourceData: &importedData,
-		Metadata:     importMetadata,
-		ResourceType: ResourceType,
+	// Convert metadata to map for spec
+	metadataMap, err := importMetadata.ToMap()
+	if err != nil {
+		return writer.FormattableEntity{}, fmt.Errorf("converting metadata to map: %w", err)
 	}
-	return []importremote.ImportData{importData}, nil
+
+	// Create the spec with the imported data
+	spec := &specs.Spec{
+		Version:  specs.SpecVersion,
+		Kind:     ResourceType,
+		Metadata: metadataMap,
+		Spec:     importedData,
+	}
+
+	// Return as FormattableEntity
+	return writer.FormattableEntity{
+		Content:      spec,
+		RelativePath: fmt.Sprintf("%s.yaml", args.LocalID),
+	}, nil
 }
 
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
@@ -427,32 +440,32 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	return collection, nil
 }
 
-func (h *Handler) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+func (h *Handler) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
 		return nil, nil
 	}
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
-	var result []importremote.FormattableEntity
+	var result []writer.FormattableEntity
 	for _, source := range sources {
 		sourceData, ok := source.Data.(*retlClient.RETLSource)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to retl source")
 		}
 		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
-		workspaceMetadata.Resources = []importremote.ImportIds{
+		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				LocalID:  source.ExternalID,
 				RemoteID: source.ID,
 			},
 		}
 
-		metadata := importremote.Metadata{
+		metadata := specs.Metadata{
 			Name: source.ExternalID,
-			Import: importremote.WorkspacesImportMetadata{
-				Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+			Import: specs.WorkspacesImportMetadata{
+				Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 			},
 		}
 		metadataMap := make(map[string]any)
@@ -475,7 +488,7 @@ func (h *Handler) FormatForExport(ctx context.Context, collection *resources.Res
 				IDKey:               source.ExternalID,
 			},
 		}
-		result = append(result, importremote.FormattableEntity{
+		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
