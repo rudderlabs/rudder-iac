@@ -1,9 +1,8 @@
 package syncer
 
 import (
-
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 )
 
 type operationTask struct {
@@ -21,9 +20,9 @@ func (t *operationTask) Id() string {
 }
 
 /*
-	Dependencies are currently defined at the resource level,
-	which means multiple operations for the same resource
-	may run concurrently. This behavior may not always be desirable.
+Dependencies are currently defined at the resource level,
+which means multiple operations for the same resource
+may run concurrently. This behavior may not always be desirable.
 */
 func (t *operationTask) Dependencies() []string {
 	// For delete operations, we need to invert the dependency order
@@ -35,4 +34,3 @@ func (t *operationTask) Dependencies() []string {
 	}
 	return t.targetGraph.GetDependencies(t.operation.Resource.URN())
 }
-

@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -225,8 +225,8 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	return collection, nil
 }
 
-func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {
 		if remoteEvent.ExternalID == "" {
@@ -242,7 +242,7 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		stateArgs := state.EventState{}
 		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.EventResourceType,
 			ID:           event.ExternalID,
 			Input:        args.ToResourceData(),
