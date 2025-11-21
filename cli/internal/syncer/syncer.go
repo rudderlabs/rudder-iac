@@ -3,7 +3,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -116,16 +115,6 @@ func StateToGraph(state *state.State) *resources.Graph {
 	}
 
 	return graph
-}
-
-func removeStateForResourceTypes(state *state.State, resourceTypes []string) *state.State {
-	// loop over all resources in the state and remove a resource if it matches any of the resource types
-	for _, resource := range state.Resources {
-		if slices.Contains(resourceTypes, resource.Type) {
-			delete(state.Resources, resources.URN(resource.ID, resource.Type))
-		}
-	}
-	return state
 }
 
 type OperationError struct {

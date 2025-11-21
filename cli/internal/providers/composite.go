@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -204,8 +204,8 @@ func (p *CompositeProvider) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
-	formattable := make([]importremote.FormattableEntity, 0)
+) ([]writer.FormattableEntity, error) {
+	formattable := make([]writer.FormattableEntity, 0)
 
 	for _, provider := range p.Providers {
 		entities, err := provider.FormatForExport(

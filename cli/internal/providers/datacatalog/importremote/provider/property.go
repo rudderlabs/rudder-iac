@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -23,7 +25,7 @@ const (
 )
 
 var (
-	_ importremote.WorkspaceImporter = &PropertyImportProvider{}
+	_ provider.WorkspaceImporter = &PropertyImportProvider{}
 )
 
 type PropertyImportProvider struct {
@@ -108,7 +110,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting properties for export to file")
 
 	properties := collection.GetAll(state.PropertyResourceType)
@@ -116,8 +118,8 @@ func (p *PropertyImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
 
 	formattedProps := make([]map[string]any, 0)
@@ -130,7 +132,7 @@ func (p *PropertyImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
-		workspaceMetadata.Resources = append(workspaceMetadata.Resources, importremote.ImportIds{
+		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			LocalID:  property.ExternalID,
 			RemoteID: property.ID,
 		})
@@ -154,7 +156,7 @@ func (p *PropertyImportProvider) FormatForExport(
 		return nil, fmt.Errorf("creating spec: %w", err)
 	}
 
-	return []importremote.FormattableEntity{
+	return []writer.FormattableEntity{
 		{
 			Content:      spec,
 			RelativePath: p.filepath,

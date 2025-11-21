@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -124,6 +124,7 @@ func newDefaultMockClient() *mockRETLStore {
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
 				IsEnabled:            true,
+				WorkspaceID:          "test-workspace-id",
 				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
 			}, nil
 		},
@@ -409,41 +410,61 @@ func TestProvider(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			provider := retl.New(newDefaultMockClient())
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.NoError(t, err)
-			assert.Len(t, results, 1)
-			imported := results[0]
-			assert.Equal(t, "local-id", (*imported.ResourceData)[sqlmodel.IDKey])
-			assert.Equal(t, "Imported Model", (*imported.ResourceData)[sqlmodel.DisplayNameKey])
-			assert.Equal(t, "desc", (*imported.ResourceData)[sqlmodel.DescriptionKey])
-			assert.Equal(t, "id", (*imported.ResourceData)[sqlmodel.PrimaryKeyKey])
-			assert.Equal(t, "SELECT * FROM t", (*imported.ResourceData)[sqlmodel.SQLKey])
-			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
-			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
-			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
-			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
+			assert.Equal(t, writer.FormattableEntity{
+				RelativePath: "local-id.yaml",
+				Content: &specs.Spec{
+					Version: "rudder/v0.1",
+					Kind:    "retl-source-sql-model",
+					Metadata: map[string]any{
+						"name": "local-id",
+						"import": map[string]any{
+							"workspaces": []any{
+								map[string]any{
+									"workspace_id": "test-workspace-id",
+									"resources": []any{
+										map[string]any{
+											"local_id":  "local-id",
+											"remote_id": "remote-id",
+										},
+									},
+								},
+							},
+						},
+					},
+					Spec: map[string]any{
+						"id":                "local-id",
+						"display_name":      "Imported Model",
+						"description":       "desc",
+						"primary_key":       "id",
+						"sql":               "SELECT * FROM t",
+						"source_definition": "postgres",
+						"enabled":           true,
+						"account_id":        "acc123",
+					},
+				},
+			}, results)
 		})
 
 		t.Run("Unsupported resource type", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), "unsupported-type", args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "import is only supported for SQL models")
 		})
 
 		t.Run("Handler error", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id-not-found", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
 		})
 	})

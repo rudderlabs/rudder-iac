@@ -8,8 +8,10 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -76,41 +78,44 @@ func NewCmdRetlSource() *cobra.Command {
 				return fmt.Errorf("failed to cast RETL provider")
 			}
 
-			resources, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, importremote.ImportArgs{
+			entity, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, specs.ImportIds{
 				RemoteID: remoteID,
 				LocalID:  localID,
 			})
 			if err != nil {
 				return fmt.Errorf("importing RETL SQL Model: %w", err)
 			}
-			// write the sql to the sqlLocation
+
+			// Handle SQL file separation if requested
 			if sqlLocation != "" {
-				for _, resource := range resources {
-					resourceData := *resource.ResourceData
-					err = writeSQLToFile(resourceData, sqlLocation, localID)
-					if err != nil {
-						return fmt.Errorf("writing SQL file: %w", err)
-					}
+				// Extract the spec from the entity
+				spec := entity.Content.(*specs.Spec)
 
-					// Create a relative path from spec location to SQL file location
-					relPath, err := filepath.Rel(location, sqlLocation)
-					if err != nil {
-						return fmt.Errorf("calculating relative path: %w", err)
-					}
-
-					// Always use forward slashes for consistency across OS
-					relPath = filepath.ToSlash(relPath)
-
-					// Generate the SQL file path relative to the spec file
-					resourceData[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relPath, localID)
-					delete(resourceData, sqlmodel.SQLKey)
+				// Write SQL to separate file
+				err = writeSQLToFile(spec.Spec, sqlLocation, localID)
+				if err != nil {
+					return fmt.Errorf("writing SQL file: %w", err)
 				}
+
+				// Create a relative path from spec location to SQL file location
+				relPath, err := filepath.Rel(location, sqlLocation)
+				if err != nil {
+					return fmt.Errorf("calculating relative path: %w", err)
+				}
+
+				// Always use forward slashes for consistency across OS
+				relPath = filepath.ToSlash(relPath)
+
+				// Modify the resource data to reference the SQL file instead of inline SQL
+				spec.Spec[sqlmodel.FileKey] = fmt.Sprintf("%s/%s.sql", relPath, localID)
+				delete(spec.Spec, sqlmodel.SQLKey)
 			}
 
-			// Perform the import
-			err = importremote.Import(cmd.Context(), resources, location)
+			// Write the entity using the new write function
+			formatters := formatter.Setup(formatter.DefaultYAML)
+			err = writer.Write(cmd.Context(), location, formatters, []writer.FormattableEntity{entity})
 			if err != nil {
-				return fmt.Errorf("importing RETL SQL Model: %w", err)
+				return fmt.Errorf("writing YAML files: %w", err)
 			}
 
 			retlSourceImportLog.Info("Successfully imported RETL SQL Model", "localID", localID, "remoteID", remoteID)

@@ -12,7 +12,6 @@ import (
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -1426,10 +1425,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{
 			"name": "event-stream-source",
 			"import": map[string]interface{}{
-				"workspaces": []importremote.WorkspaceImportMetadata{
+				"workspaces": []specs.WorkspaceImportMetadata{
 					{
 						WorkspaceID: "workspace-123",
-						Resources: []importremote.ImportIds{
+						Resources: []specs.ImportIds{
 							{
 								LocalID:  "test-source-1",
 								RemoteID: "remote123",
@@ -1469,10 +1468,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{
 			"name": "event-stream-source",
 			"import": map[string]interface{}{
-				"workspaces": []importremote.WorkspaceImportMetadata{
+				"workspaces": []specs.WorkspaceImportMetadata{
 					{
 						WorkspaceID: "workspace-123",
-						Resources: []importremote.ImportIds{
+						Resources: []specs.ImportIds{
 							{
 								LocalID:  "test-source-2",
 								RemoteID: "remote456",
