@@ -143,17 +143,17 @@ func newDefaultMockClient() *mockRETLStore {
 }
 
 func TestProvider(t *testing.T) {
-	t.Run("GetSupportedKinds", func(t *testing.T) {
+	t.Run("SupportedKinds", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		kinds := provider.GetSupportedKinds()
+		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "retl-source-sql-model")
 	})
 
-	t.Run("GetSupportedTypes", func(t *testing.T) {
+	t.Run("SupportedTypes", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		types := provider.GetSupportedTypes()
+		types := provider.SupportedTypes()
 		assert.Contains(t, types, sqlmodel.ResourceType)
 	})
 

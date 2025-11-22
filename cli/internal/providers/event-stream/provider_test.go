@@ -18,16 +18,16 @@ import (
 )
 
 func TestProvider(t *testing.T) {
-	t.Run("GetSupportedKinds", func(t *testing.T) {
+	t.Run("SupportedKinds", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
-		kinds := provider.GetSupportedKinds()
+		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "event-stream-source")
 		assert.Len(t, kinds, 1)
 	})
 
-	t.Run("GetSupportedTypes", func(t *testing.T) {
+	t.Run("SupportedTypes", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
-		types := provider.GetSupportedTypes()
+		types := provider.SupportedTypes()
 		assert.Contains(t, types, source.ResourceType)
 		assert.Len(t, types, 1)
 	})
@@ -245,7 +245,7 @@ func TestProvider(t *testing.T) {
 			"type":    "javascript",
 		}
 
-		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "workspace-123", "remote-123")
+		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "remote-123")
 		require.NoError(t, err)
 		assert.Equal(t, &resources.ResourceData{
 			"id": "remote-123",

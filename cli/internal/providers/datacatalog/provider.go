@@ -42,10 +42,6 @@ func New(client catalog.DataCatalog) *Provider {
 	}
 }
 
-func (p *Provider) GetName() string {
-	return "datacatalog"
-}
-
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	return p.dc.ParseSpec(path, s)
 }
@@ -54,7 +50,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.dc.LoadSpec(path, s)
 }
 
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	return []string{
 		localcatalog.KindProperties,
 		localcatalog.KindEvents,
@@ -64,7 +60,7 @@ func (p *Provider) GetSupportedKinds() []string {
 	}
 }
 
-func (p *Provider) GetSupportedTypes() []string {
+func (p *Provider) SupportedTypes() []string {
 	return []string{
 		pstate.PropertyResourceType,
 		pstate.EventResourceType,

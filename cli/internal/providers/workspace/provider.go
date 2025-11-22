@@ -49,10 +49,10 @@ func (p *Provider) listAccounts(ctx context.Context, filters map[string]string) 
 	return filteredAccounts, nil
 }
 
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	return []string{}
 }
 
-func (p *Provider) GetSupportedTypes() []string {
+func (p *Provider) SupportedTypes() []string {
 	return []string{AccountResourceType}
 }

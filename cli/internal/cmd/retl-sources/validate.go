@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
@@ -54,10 +53,7 @@ func newCmdValidate() *cobra.Command {
 			resourceData := resource.Data()
 
 			// Get the RETL provider
-			retlProvider, ok := d.Providers().RETL.(*retl.Provider)
-			if !ok {
-				return fmt.Errorf("failed to cast RETL provider")
-			}
+			retlProvider := d.Providers().RETL
 
 			// Validate by attempting to preview with limit=0
 			_, err = retlProvider.Preview(cmd.Context(), externalID, sqlmodel.ResourceType, resourceData, 0)

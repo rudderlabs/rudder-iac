@@ -61,7 +61,7 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, d
 	return provider.Delete(ctx, ID, data)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)

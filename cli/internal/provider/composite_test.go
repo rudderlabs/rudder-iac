@@ -1,4 +1,4 @@
-package providers_test
+package provider_test
 
 import (
 	"context"
@@ -9,88 +9,63 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
-	t.Run("successful creation with multiple providers", func(t *testing.T) {
-		p1 := testutils.NewMockProvider()
-		p1.SupportedKinds = []string{"kindA"}
-		p1.SupportedTypes = []string{"typeA"}
-		p2 := testutils.NewMockProvider()
-		p2.SupportedKinds = []string{"kindB"}
-		p2.SupportedTypes = []string{"typeB"}
-		cp, err := providers.NewCompositeProvider(p1, p2)
-
-		assert.NoError(t, err, "NewCompositeProvider returned an error")
-		assert.NotNil(t, cp, "NewCompositeProvider returned nil")
-		assert.Len(t, cp.Providers, 2, "Expected 2 providers")
-		assert.Equal(t, p1, cp.Providers[0], "Provider 1 not set correctly")
-		assert.Equal(t, p2, cp.Providers[1], "Provider 2 not set correctly")
-	})
-
 	t.Run("error when no providers are given", func(t *testing.T) {
-		cp, err := providers.NewCompositeProvider()
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{})
 		assert.Error(t, err, "NewCompositeProvider should return an error for no providers")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for no providers")
 		assert.EqualError(t, err, "at least one provider must be specified")
 	})
 
 	t.Run("error when providers support duplicate kinds", func(t *testing.T) {
-		p1 := testutils.NewMockProvider()
-		p1.SupportedKinds = []string{"kindA", "kindB"}
-		p2 := testutils.NewMockProvider()
-		p2.SupportedKinds = []string{"kindB", "kindC"} // kindB is duplicate
-		cp, err := providers.NewCompositeProvider(p1, p2)
+		p1 := testutils.NewMockProvider([]string{"kindA", "kindB"}, nil)
+		p2 := testutils.NewMockProvider([]string{"kindB", "kindC"}, nil) // kindB is duplicate
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
 		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate kinds")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate kinds")
 		assert.EqualError(t, err, "duplicate kind 'kindB' supported by multiple providers")
 	})
 
 	t.Run("error when providers support duplicate types", func(t *testing.T) {
-		p1 := testutils.NewMockProvider()
-		p1.SupportedTypes = []string{"typeA", "typeB"}
-		p2 := testutils.NewMockProvider()
-		p2.SupportedTypes = []string{"typeB", "typeC"} // typeB is duplicate
-		cp, err := providers.NewCompositeProvider(p1, p2)
+		p1 := testutils.NewMockProvider(nil, []string{"typeA", "typeB"})
+		p2 := testutils.NewMockProvider(nil, []string{"typeB", "typeC"}) // typeB is duplicate
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
 		assert.Error(t, err, "NewCompositeProvider should return an error for duplicate types")
 		assert.Nil(t, cp, "NewCompositeProvider should return nil for duplicate types")
 		assert.EqualError(t, err, "duplicate type 'typeB' supported by multiple providers")
 	})
-
-	t.Run("successful creation with one provider", func(t *testing.T) {
-		p1 := testutils.NewMockProvider()
-		p1.SupportedKinds = []string{"kindA"}
-		p1.SupportedTypes = []string{"typeA"}
-		cp, err := providers.NewCompositeProvider(p1)
-		assert.NoError(t, err)
-		assert.NotNil(t, cp)
-		assert.Len(t, cp.Providers, 1)
-	})
 }
 
-func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
+func TestCompositeProvider_SupportedKinds(t *testing.T) {
 	tests := []struct {
 		name      string
-		providers []project.Provider
+		providers map[string]provider.Provider
 		expected  []string
 	}{
 		{
 			name: "single provider",
-			providers: []project.Provider{
-				&testutils.MockProvider{SupportedKinds: []string{"kindA", "kindB"}},
+			providers: map[string]provider.Provider{
+				"p1": testutils.NewMockProvider([]string{"kindA", "kindB"}, nil),
 			},
 			expected: []string{"kindA", "kindB"},
 		},
 		{
 			name: "multiple providers with unique kinds",
-			providers: []project.Provider{
-				&testutils.MockProvider{SupportedKinds: []string{"kindA"}},
-				&testutils.MockProvider{SupportedKinds: []string{"kindB"}},
+			providers: map[string]provider.Provider{
+				"p1": testutils.NewMockProvider([]string{"kindA"}, nil),
+				"p2": testutils.NewMockProvider([]string{"kindB"}, nil),
 			},
 			expected: []string{"kindA", "kindB"},
 		},
@@ -98,10 +73,10 @@ func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp, err := providers.NewCompositeProvider(tt.providers...)
+			cp, err := provider.NewCompositeProvider(tt.providers)
 			assert.NoError(t, err)
 			assert.NotNil(t, cp)
-			actual := cp.GetSupportedKinds()
+			actual := cp.SupportedKinds()
 			sort.Strings(actual)
 			sort.Strings(tt.expected)
 			assert.Equal(t, tt.expected, actual, "Expected kinds do not match")
@@ -109,24 +84,24 @@ func TestCompositeProvider_GetSupportedKinds(t *testing.T) {
 	}
 }
 
-func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
+func TestCompositeProvider_SupportedTypes(t *testing.T) {
 	tests := []struct {
 		name      string
-		providers []project.Provider
+		providers map[string]provider.Provider
 		expected  []string
 	}{
 		{
 			name: "single provider",
-			providers: []project.Provider{
-				&testutils.MockProvider{SupportedTypes: []string{"typeA", "typeB"}},
+			providers: map[string]provider.Provider{
+				"p1": testutils.NewMockProvider(nil, []string{"typeA", "typeB"}),
 			},
 			expected: []string{"typeA", "typeB"},
 		},
 		{
 			name: "multiple providers with unique types",
-			providers: []project.Provider{
-				&testutils.MockProvider{SupportedTypes: []string{"typeA"}},
-				&testutils.MockProvider{SupportedTypes: []string{"typeB"}},
+			providers: map[string]provider.Provider{
+				"p1": testutils.NewMockProvider(nil, []string{"typeA"}),
+				"p2": testutils.NewMockProvider(nil, []string{"typeB"}),
 			},
 			expected: []string{"typeA", "typeB"},
 		},
@@ -134,10 +109,10 @@ func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cp, err := providers.NewCompositeProvider(tt.providers...)
+			cp, err := provider.NewCompositeProvider(tt.providers)
 			assert.NoError(t, err)
 			assert.NotNil(t, cp)
-			actual := cp.GetSupportedTypes()
+			actual := cp.SupportedTypes()
 			sort.Strings(actual)
 			sort.Strings(tt.expected)
 			assert.Equal(t, tt.expected, actual, "Expected types do not match")
@@ -147,81 +122,69 @@ func TestCompositeProvider_GetSupportedTypes(t *testing.T) {
 
 func TestCompositeProvider_Validate(t *testing.T) {
 	errTest := errors.New("test validation error")
-	errTest2 := errors.New("test validation error 2")
 
 	tests := []struct {
-		name        string
-		providers   []*testutils.MockProvider
-		expectedErr error
+		name          string
+		providerCount int
+		validateErr   error
+		expectedErr   error
 	}{
 		{
-			name: "single provider, no error",
-			providers: []*testutils.MockProvider{
-				testutils.NewMockProvider(),
-			},
-			expectedErr: nil,
+			name:          "single provider, no error",
+			providerCount: 1,
+			validateErr:   nil,
+			expectedErr:   nil,
 		},
 		{
-			name: "single provider, with error",
-			providers: []*testutils.MockProvider{
-				{ValidateErr: errTest},
-			},
-			expectedErr: errTest,
+			name:          "single provider, with error",
+			providerCount: 1,
+			validateErr:   errTest,
+			expectedErr:   errTest,
 		},
 		{
-			name: "multiple providers, no error",
-			providers: []*testutils.MockProvider{
-				testutils.NewMockProvider(),
-				testutils.NewMockProvider(),
-			},
-			expectedErr: nil,
+			name:          "multiple providers, no error",
+			providerCount: 3,
+			validateErr:   nil,
+			expectedErr:   nil,
 		},
 		{
-			name: "multiple providers, first errors",
-			providers: []*testutils.MockProvider{
-				{ValidateErr: errTest},
-				{ValidateErr: errTest2}, // This one won't be called
-			},
-			expectedErr: errTest,
-		},
-		{
-			name: "multiple providers, second errors",
-			providers: []*testutils.MockProvider{
-				testutils.NewMockProvider(),
-				{ValidateErr: errTest},
-			},
-			expectedErr: errTest,
+			name:          "multiple providers, with error",
+			providerCount: 3,
+			validateErr:   errTest,
+			expectedErr:   errTest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			providerInterfaces := make([]project.Provider, len(tt.providers))
-			for i, p := range tt.providers {
-				p.ResetCallCounters() // Reset for each test run
-				providerInterfaces[i] = p
+			// Use a single mock provider instance shared across all map entries
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.ValidateErr = tt.validateErr
+
+			providerInterfaces := make(map[string]provider.Provider, tt.providerCount)
+			for i := 0; i < tt.providerCount; i++ {
+				providerInterfaces[fmt.Sprintf("provider-%d", i)] = mockProvider
 			}
-			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
+
+			cp, errCp := provider.NewCompositeProvider(providerInterfaces)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 
 			graph := resources.NewGraph() // Empty graph for validation
 			err := cp.Validate(graph)
 
-			assert.ErrorIs(t, err, tt.expectedErr)
-
-			for i, p := range tt.providers {
-				assert.Equal(t, graph, p.ValidateArg, "Provider %d Validate() called with unexpected argument")
-				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.ValidateErr) {
-					assert.Equal(t, 1, p.ValidateCalledCount, "Provider %d Validate() not called once when it should have errored", i)
-					for j := i + 1; j < len(tt.providers); j++ {
-						assert.Equal(t, 0, tt.providers[j].ValidateCalledCount, "Provider %d Validate() called after a previous provider errored", j)
-					}
-					break
-				} else if tt.expectedErr == nil {
-					assert.Equal(t, 1, p.ValidateCalledCount, "Provider %d Validate() not called once when no error was expected", i)
-				}
+			// Verify the error behavior
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+				// Should return exactly one error (stops on first error)
+				assert.Equal(t, 1, mockProvider.ValidateErrorReturnedCount, "Should return error exactly once (stop on first error)")
+			} else {
+				assert.NoError(t, err)
+				// All providers should have been called (same mock instance, so count = providerCount)
+				assert.Equal(t, tt.providerCount, mockProvider.ValidateCalledCount, "Provider should have been called once per entry")
+				assert.Equal(t, 0, mockProvider.ValidateErrorReturnedCount, "Should not return any errors")
 			}
+			assert.Equal(t, graph, mockProvider.ValidateArg, "Provider Validate() called with unexpected argument")
 		})
 	}
 }
@@ -232,16 +195,14 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 	specUnknown := &specs.Spec{Kind: "unknownKind"}
 	errTest := errors.New("test loadspec error")
 
-	pA := testutils.NewMockProvider()
-	pA.SupportedKinds = []string{"kindA"}
+	pA := testutils.NewMockProvider([]string{"kindA"}, nil)
 
-	pB := testutils.NewMockProvider()
-	pB.SupportedKinds = []string{"kindB"}
+	pB := testutils.NewMockProvider([]string{"kindB"}, nil)
 	pB.LoadSpecErr = errTest
 
 	tests := []struct {
 		name         string
-		providers    []project.Provider
+		providers    map[string]provider.Provider
 		path         string
 		spec         *specs.Spec
 		expectedErr  error
@@ -251,7 +212,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 	}{
 		{
 			name:         "provider found, no error",
-			providers:    []project.Provider{pA, pB},
+			providers:    map[string]provider.Provider{"pA": pA, "pB": pB},
 			path:         "pathA.yaml",
 			spec:         specKindA,
 			expectedErr:  nil,
@@ -261,7 +222,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 		},
 		{
 			name:         "provider found, with error",
-			providers:    []project.Provider{pA, pB},
+			providers:    map[string]provider.Provider{"pA": pA, "pB": pB},
 			path:         "pathB.yaml",
 			spec:         specKindB,
 			expectedErr:  errTest,
@@ -271,7 +232,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 		},
 		{
 			name:        "provider not found for kind",
-			providers:   []project.Provider{pA, pB},
+			providers:   map[string]provider.Provider{"pA": pA, "pB": pB},
 			path:        "pathUnknown.yaml",
 			spec:        specUnknown,
 			expectedErr: fmt.Errorf("no provider found for kind %s", specUnknown.Kind),
@@ -283,7 +244,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 			pA.ResetCallCounters()
 			pB.ResetCallCounters()
 
-			cp, errCp := providers.NewCompositeProvider(tt.providers...)
+			cp, errCp := provider.NewCompositeProvider(tt.providers)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 
@@ -312,60 +273,63 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 	graph1 := resources.NewGraph()
 	graph1.AddResource(resources.NewResource("id1", "typeA", resources.ResourceData{"key": "val1"}, nil))
-	graph2 := resources.NewGraph()
-	graph2.AddResource(resources.NewResource("id2", "typeB", resources.ResourceData{"key": "val2"}, nil))
 	errTest := errors.New("test getresourcegraph error")
 
 	tests := []struct {
-		name         string
-		providers    []*testutils.MockProvider
-		expectedURNs []string // URNs in the final graph
-		expectedErr  error
+		name          string
+		providerCount int
+		returnGraph   *resources.Graph
+		returnErr     error
+		expectedURNs  []string // URNs in the final graph
+		expectedErr   error
 	}{
 		{
-			name: "single provider, no error",
-			providers: []*testutils.MockProvider{
-				{GetResourceGraphVal: graph1},
-			},
-			expectedURNs: []string{"typeA:id1"},
-			expectedErr:  nil,
+			name:          "single provider, no error",
+			providerCount: 1,
+			returnGraph:   graph1,
+			returnErr:     nil,
+			expectedURNs:  []string{"typeA:id1"},
+			expectedErr:   nil,
 		},
 		{
-			name: "single provider, with error",
-			providers: []*testutils.MockProvider{
-				{GetResourceGraphErr: errTest},
-			},
-			expectedURNs: nil,
-			expectedErr:  errTest,
+			name:          "single provider, with error",
+			providerCount: 1,
+			returnGraph:   nil,
+			returnErr:     errTest,
+			expectedURNs:  nil,
+			expectedErr:   errTest,
 		},
 		{
-			name: "multiple providers, no error, merged graph",
-			providers: []*testutils.MockProvider{
-				{GetResourceGraphVal: graph1},
-				{GetResourceGraphVal: graph2},
-			},
-			expectedURNs: []string{"typeA:id1", "typeB:id2"},
-			expectedErr:  nil,
+			name:          "multiple providers, no error, merged graph",
+			providerCount: 3,
+			returnGraph:   graph1,
+			returnErr:     nil,
+			expectedURNs:  []string{"typeA:id1"}, // Same graph returned 3 times, merges into one
+			expectedErr:   nil,
 		},
 		{
-			name: "multiple providers, first errors",
-			providers: []*testutils.MockProvider{
-				{GetResourceGraphErr: errTest},
-				{GetResourceGraphVal: graph2}, // This one won't be called
-			},
-			expectedURNs: nil,
-			expectedErr:  errTest,
+			name:          "multiple providers, with error",
+			providerCount: 3,
+			returnGraph:   nil,
+			returnErr:     errTest,
+			expectedURNs:  nil,
+			expectedErr:   errTest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			providerInterfaces := make([]project.Provider, len(tt.providers))
-			for i, p := range tt.providers {
-				p.ResetCallCounters()
-				providerInterfaces[i] = p
+			// Use a single mock provider instance shared across all map entries
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.GetResourceGraphVal = tt.returnGraph
+			mockProvider.GetResourceGraphErr = tt.returnErr
+
+			providerInterfaces := make(map[string]provider.Provider, tt.providerCount)
+			for i := 0; i < tt.providerCount; i++ {
+				providerInterfaces[fmt.Sprintf("provider-%d", i)] = mockProvider
 			}
-			cp, errCp := providers.NewCompositeProvider(providerInterfaces...)
+
+			cp, errCp := provider.NewCompositeProvider(providerInterfaces)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 			graph, err := cp.GetResourceGraph()
@@ -381,20 +345,12 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 				sort.Strings(actualURNs)
 				sort.Strings(tt.expectedURNs)
 				assert.Equal(t, tt.expectedURNs, actualURNs)
+				assert.Equal(t, tt.providerCount, mockProvider.GetResourceGraphCalledCount, "Provider should have been called once per entry")
+				assert.Equal(t, 0, mockProvider.GetResourceGraphErrorReturnedCount, "Should not return any errors")
 			} else {
 				assert.Nil(t, graph, "Expected nil graph on error")
-			}
-
-			for i, p := range tt.providers {
-				if tt.expectedErr != nil && errors.Is(tt.expectedErr, p.GetResourceGraphErr) {
-					assert.Equal(t, 1, p.GetResourceGraphCalledCount, "Provider %d GetResourceGraph() not called once when it should have errored", i)
-					for j := i + 1; j < len(tt.providers); j++ {
-						assert.Equal(t, 0, tt.providers[j].GetResourceGraphCalledCount, "Provider %d GetResourceGraph() called after a previous provider errored", j)
-					}
-					break
-				} else if tt.expectedErr == nil {
-					assert.Equal(t, 1, p.GetResourceGraphCalledCount, "Provider %d GetResourceGraph() not called once when no error was expected", i)
-				}
+				// Should return exactly one error (stops on first error)
+				assert.Equal(t, 1, mockProvider.GetResourceGraphErrorReturnedCount, "Should return error exactly once (stop on first error)")
 			}
 		})
 	}
@@ -406,11 +362,9 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	resDataB := resources.ResourceData{"key": "valB"}
 	errTest := errors.New("test resource op error")
 
-	pA := testutils.NewMockProvider()
-	pA.SupportedTypes = []string{"typeA"}
+	pA := testutils.NewMockProvider(nil, []string{"typeA"})
 
-	pB := testutils.NewMockProvider()
-	pB.SupportedTypes = []string{"typeB"}
+	pB := testutils.NewMockProvider(nil, []string{"typeB"})
 	pB.CreateErr = errTest
 	pB.UpdateErr = errTest
 	pB.DeleteErr = errTest
@@ -418,7 +372,7 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	tests := []struct {
 		name           string
 		op             string // "Create", "Update", "Delete"
-		providers      []project.Provider
+		providers      map[string]provider.Provider
 		urn            string
 		resourceType   string
 		data           resources.ResourceData
@@ -428,17 +382,17 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		expectedReturn any                     // for Create/Update
 	}{
 		// Create
-		{name: "Create no provider for type", op: "Create", providers: []project.Provider{pA}, resourceType: "typeUnknown", data: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
-		{name: "Create success", op: "Create", providers: []project.Provider{pA, pB}, resourceType: "typeA", data: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
-		{name: "Create error", op: "Create", providers: []project.Provider{pA, pB}, resourceType: "typeB", data: resDataB, expectedErr: errTest, expectCallOn: pB},
+		{name: "Create no provider for type", op: "Create", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
+		{name: "Create success", op: "Create", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", data: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
+		{name: "Create error", op: "Create", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", data: resDataB, expectedErr: errTest, expectCallOn: pB},
 		// Update
-		{name: "Update no provider for type", op: "Update", providers: []project.Provider{pA}, resourceType: "typeUnknown", data: resDataA, stateData: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
-		{name: "Update success", op: "Update", providers: []project.Provider{pA, pB}, resourceType: "typeA", data: resDataA, stateData: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
-		{name: "Update error", op: "Update", providers: []project.Provider{pA, pB}, resourceType: "typeB", data: resDataB, stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
+		{name: "Update no provider for type", op: "Update", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, stateData: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
+		{name: "Update success", op: "Update", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", data: resDataA, stateData: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
+		{name: "Update error", op: "Update", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", data: resDataB, stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
 		// Delete
-		{name: "Delete no provider for type", op: "Delete", providers: []project.Provider{pA}, resourceType: "typeUnknown", stateData: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
-		{name: "Delete success", op: "Delete", providers: []project.Provider{pA, pB}, resourceType: "typeA", stateData: resDataA, expectCallOn: pA},
-		{name: "Delete error", op: "Delete", providers: []project.Provider{pA, pB}, resourceType: "typeB", stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
+		{name: "Delete no provider for type", op: "Delete", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", stateData: resDataA, expectedErr: fmt.Errorf("no provider found for resource type typeUnknown")},
+		{name: "Delete success", op: "Delete", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", stateData: resDataA, expectCallOn: pA},
+		{name: "Delete error", op: "Delete", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
 	}
 
 	for _, tt := range tests {
@@ -461,7 +415,7 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			}
 			// pB already has error values set if it's the target for error cases
 
-			cp, errCp := providers.NewCompositeProvider(tt.providers...)
+			cp, errCp := provider.NewCompositeProvider(tt.providers)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
 

@@ -6,9 +6,9 @@ import (
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -35,7 +35,7 @@ type handler interface {
 	) ([]writer.FormattableEntity, error)
 }
 
-var _ project.Provider = &Provider{}
+var _ provider.Provider = &Provider{}
 
 const importDir = "event-stream"
 
@@ -55,7 +55,7 @@ func New(client esClient.EventStreamStore) *Provider {
 	return p
 }
 
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {
 		kinds = append(kinds, kind)
@@ -63,7 +63,7 @@ func (p *Provider) GetSupportedKinds() []string {
 	return kinds
 }
 
-func (p *Provider) GetSupportedTypes() []string {
+func (p *Provider) SupportedTypes() []string {
 	types := make([]string, 0, len(p.kindToType))
 	for _, t := range p.kindToType {
 		types = append(types, t)
@@ -173,7 +173,7 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 	return handler.Delete(ctx, ID, state)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
@@ -216,8 +216,4 @@ func (p *Provider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
-}
-
-func (p *Provider) GetName() string {
-	return "event-stream"
 }

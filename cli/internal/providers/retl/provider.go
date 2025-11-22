@@ -42,11 +42,7 @@ func New(client retlClient.RETLStore) *Provider {
 	return p
 }
 
-func (p *Provider) GetName() string {
-	return "retl"
-}
-
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {
 		kinds = append(kinds, kind)
@@ -54,8 +50,8 @@ func (p *Provider) GetSupportedKinds() []string {
 	return kinds
 }
 
-// GetSupportedTypes returns the list of supported resource types
-func (p *Provider) GetSupportedTypes() []string {
+// SupportedTypes returns the list of supported resource types
+func (p *Provider) SupportedTypes() []string {
 	types := make([]string, 0, len(p.handlers))
 	for resourceType := range p.handlers {
 		types = append(types, resourceType)
@@ -167,7 +163,7 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 	return handler.List(ctx, hasExternalId)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
