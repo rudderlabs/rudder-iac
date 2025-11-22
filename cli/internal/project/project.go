@@ -9,7 +9,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/samber/lo"
 )
 
@@ -20,22 +19,8 @@ type Loader interface {
 }
 
 type ProjectProvider interface {
-	GetName() string
-	GetSupportedKinds() []string
-	GetSupportedTypes() []string
-	// Validate makes provider specific validations on the resource graph.
-	// Providers are expected to validate their own resources only, but can leverage
-	// the full graph for cross-resource validations.
-	Validate(graph *resources.Graph) error
-	LoadSpec(path string, s *specs.Spec) error
-	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
-	GetResourceGraph() (*resources.Graph, error)
-}
-
-type Provider interface {
-	ProjectProvider
-	syncer.SyncProvider
-	provider.WorkspaceImporter
+	provider.SpecLoader
+	provider.Validator
 }
 
 type Project interface {
@@ -45,7 +30,7 @@ type Project interface {
 
 type project struct {
 	Location string
-	Provider Provider
+	Provider ProjectProvider
 	loader   Loader
 }
 
@@ -63,7 +48,7 @@ func WithLoader(l Loader) ProjectOption {
 
 // New creates a new Project instance.
 // By default, it uses a loader.Loader.
-func New(location string, provider Provider, opts ...ProjectOption) Project {
+func New(location string, provider provider.Provider, opts ...ProjectOption) Project {
 	p := &project{
 		Location: location,
 		Provider: provider,

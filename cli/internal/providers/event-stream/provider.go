@@ -6,9 +6,9 @@ import (
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -35,7 +35,7 @@ type handler interface {
 	) ([]writer.FormattableEntity, error)
 }
 
-var _ project.Provider = &Provider{}
+var _ provider.Provider = &Provider{}
 
 const importDir = "event-stream"
 
@@ -216,8 +216,4 @@ func (p *Provider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
-}
-
-func (p *Provider) GetName() string {
-	return "event-stream"
 }

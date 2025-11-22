@@ -7,6 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -21,12 +22,9 @@ type ProjectSyncer struct {
 }
 
 type SyncProvider interface {
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
-	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
-	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
+	provider.ManagedRemoteResourceLoader
+	provider.StateLoader
+	provider.LifecycleManager
 }
 
 func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {

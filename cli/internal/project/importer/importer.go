@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -22,10 +22,16 @@ const (
 
 var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 
+type WorkspaceImporter interface {
+	provider.RemoteResourceLoader
+	provider.StateLoader
+	provider.Exporter
+}
+
 func WorkspaceImport(
 	ctx context.Context,
 	location string,
-	p project.Provider) error {
+	p provider.Provider) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {

@@ -42,10 +42,6 @@ func New(client catalog.DataCatalog) *Provider {
 	}
 }
 
-func (p *Provider) GetName() string {
-	return "datacatalog"
-}
-
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	return p.dc.ParseSpec(path, s)
 }

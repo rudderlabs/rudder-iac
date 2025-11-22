@@ -11,7 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-// MockProvider is a mock implementation of the project.Provider interface for testing.
+// MockProvider is a mock implementation of the provider.Provider interface for testing.
 type MockProvider struct {
 	SupportedKinds             []string
 	SupportedTypes             []string
@@ -36,9 +36,11 @@ type MockProvider struct {
 
 	// Tracking calls
 	ValidateCalledCount                int
+	ValidateErrorReturnedCount         int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
+	GetResourceGraphErrorReturnedCount int
 	LoadResourcesFromRemoteCalledCount int
 	LoadStateFromResourcesCalledCount  int
 	CreateCalledWithArg                CreateArgs
@@ -99,10 +101,6 @@ func NewMockProvider() *MockProvider {
 	}
 }
 
-func (m *MockProvider) GetName() string {
-	return "mock"
-}
-
 func (m *MockProvider) GetSupportedKinds() []string {
 	return m.SupportedKinds
 }
@@ -114,6 +112,9 @@ func (m *MockProvider) GetSupportedTypes() []string {
 func (m *MockProvider) Validate(graph *resources.Graph) error {
 	m.ValidateArg = graph
 	m.ValidateCalledCount++
+	if m.ValidateErr != nil {
+		m.ValidateErrorReturnedCount++
+	}
 	return m.ValidateErr
 }
 
@@ -129,6 +130,9 @@ func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
 
 func (m *MockProvider) GetResourceGraph() (*resources.Graph, error) {
 	m.GetResourceGraphCalledCount++
+	if m.GetResourceGraphErr != nil {
+		m.GetResourceGraphErrorReturnedCount++
+	}
 	return m.GetResourceGraphVal, m.GetResourceGraphErr
 }
 
@@ -173,9 +177,11 @@ func (m *MockProvider) FormatForExport(ctx context.Context, collection *resource
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
+	m.ValidateErrorReturnedCount = 0
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
 	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0
+	m.GetResourceGraphErrorReturnedCount = 0
 	m.CreateCalledWithArg = CreateArgs{}
 	m.UpdateCalledWithArg = UpdateArgs{}
 	m.DeleteCalledWithArg = DeleteArgs{}

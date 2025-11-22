@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -24,7 +23,7 @@ const (
 )
 
 var (
-	_ provider.WorkspaceImporter = &CustomTypeImportProvider{}
+	_ WorkspaceImporter = &CustomTypeImportProvider{}
 )
 
 type CustomTypeImportProvider struct {

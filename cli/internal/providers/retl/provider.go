@@ -42,10 +42,6 @@ func New(client retlClient.RETLStore) *Provider {
 	return p
 }
 
-func (p *Provider) GetName() string {
-	return "retl"
-}
-
 func (p *Provider) GetSupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {

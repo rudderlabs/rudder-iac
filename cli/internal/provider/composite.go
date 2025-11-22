@@ -1,4 +1,4 @@
-package providers
+package provider
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -19,18 +18,18 @@ import (
 
 type CompositeProvider struct {
 	concurrency     int
-	Providers       []project.Provider
-	registeredKinds map[string]project.Provider
-	registeredTypes map[string]project.Provider
+	Providers       map[string]Provider
+	registeredKinds map[string]Provider
+	registeredTypes map[string]Provider
 }
 
-func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, error) {
+func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("at least one provider must be specified")
 	}
 
-	registeredKinds := make(map[string]project.Provider)
-	registeredTypes := make(map[string]project.Provider)
+	registeredKinds := make(map[string]Provider)
+	registeredTypes := make(map[string]Provider)
 
 	for _, provider := range providers {
 		for _, kind := range provider.GetSupportedKinds() {
@@ -53,10 +52,6 @@ func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, er
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
 	}, nil
-}
-
-func (p *CompositeProvider) GetName() string {
-	return "composite"
 }
 
 func (p *CompositeProvider) GetSupportedKinds() []string {
@@ -138,7 +133,7 @@ func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType 
 
 type compositeProviderTask struct {
 	name     string
-	provider project.Provider
+	provider Provider
 }
 
 func (t *compositeProviderTask) Id() string {
@@ -160,9 +155,9 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 	)
 
 	tasks := make([]tasker.Task, 0)
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		tasks = append(tasks, &compositeProviderTask{
-			name:     provider.GetName(),
+			name:     name,
 			provider: provider,
 		})
 	}
@@ -207,7 +202,7 @@ func (p *CompositeProvider) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	formattable := make([]writer.FormattableEntity, 0)
 
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		entities, err := provider.FormatForExport(
 			ctx,
 			collection,
@@ -215,7 +210,7 @@ func (p *CompositeProvider) FormatForExport(
 			resolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for provider %s: %w", provider.GetName(), err)
+			return nil, fmt.Errorf("formatting for export for provider %s: %w", name, err)
 		}
 		formattable = append(formattable, entities...)
 	}
@@ -224,11 +219,11 @@ func (p *CompositeProvider) FormatForExport(
 }
 
 // Helper methods
-func (p *CompositeProvider) providerForKind(kind string) project.Provider {
+func (p *CompositeProvider) providerForKind(kind string) Provider {
 	return p.registeredKinds[kind]
 }
 
-func (p *CompositeProvider) providerForType(resourceType string) project.Provider {
+func (p *CompositeProvider) providerForType(resourceType string) Provider {
 	return p.registeredTypes[resourceType]
 }
 
@@ -239,9 +234,9 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 	)
 
 	tasks := make([]tasker.Task, 0)
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		tasks = append(tasks, &compositeProviderTask{
-			name:     provider.GetName(),
+			name:     name,
 			provider: provider,
 		})
 	}
