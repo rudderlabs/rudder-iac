@@ -10,7 +10,7 @@ type Resource struct {
 	r *internal.Resource
 }
 
-type ResourceData map[string]interface{}
+type ResourceData map[string]any
 
 func URN(ID string, resourceType string) string {
 	return fmt.Sprintf("%s:%s", resourceType, ID)
@@ -32,6 +32,12 @@ func WithResourceImportMetadata(remoteId, workspaceId string) ResourceOpts {
 			RemoteId:    remoteId,
 			WorkspaceId: workspaceId,
 		}
+	}
+}
+
+func WithRawData(rawData any) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.RawData = rawData
 	}
 }
 
@@ -62,6 +68,10 @@ func (r *Resource) Type() string {
 
 func (r *Resource) Data() ResourceData {
 	return r.r.Data
+}
+
+func (r *Resource) RawData() any {
+	return r.r.RawData
 }
 
 func (r *Resource) URN() string {

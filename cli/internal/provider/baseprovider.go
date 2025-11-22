@@ -1,61 +1,70 @@
-package eventstream
+package provider
 
 import (
 	"context"
 	"fmt"
 
-	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-type handler interface {
+type Handler interface {
+	GetResourceType() string
+	GetSpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
-	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, state resources.ResourceData) error
-	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
-	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
-	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	Create(ctx context.Context, data any) (any, error)
+	Update(ctx context.Context, newData any, oldData any, oldState any) (any, error)
+	Delete(ctx context.Context, ID string, oldData any, oldState any) error
+	Import(ctx context.Context, data any, remoteId string) (any, error)
+	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
 	FormatForExport(
-		collection *resources.RemoteResources,
+		ctx context.Context,
+		collection *resources.ResourceCollection,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
 }
 
-var _ provider.Provider = &Provider{}
-
-const importDir = "event-stream"
-
-type Provider struct {
-	provider.EmptyProvider
+type BaseProvider struct {
+	EmptyProvider
+	name       string
+	handlers   map[string]Handler
 	kindToType map[string]string
-	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore) *Provider {
-	p := &Provider{
-		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
-		},
-		handlers: make(map[string]handler),
+func NewBaseProvider(name string, handlers []Handler) *BaseProvider {
+	kindToType := map[string]string{}
+	for _, handler := range handlers {
+		kindToType[handler.GetResourceType()] = handler.GetSpecKind()
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
-	return p
+
+	handlersMap := map[string]Handler{}
+	for _, handler := range handlers {
+		handlersMap[handler.GetResourceType()] = handler
+	}
+
+	return &BaseProvider{
+		name:       name,
+		handlers:   handlersMap,
+		kindToType: kindToType,
+	}
+
 }
 
-func (p *Provider) SupportedKinds() []string {
+func (p *BaseProvider) GetName() string {
+	return p.name
+}
+
+func (p *BaseProvider) GetSupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {
 		kinds = append(kinds, kind)
@@ -63,7 +72,7 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
-func (p *Provider) SupportedTypes() []string {
+func (p *BaseProvider) GetSupportedTypes() []string {
 	types := make([]string, 0, len(p.kindToType))
 	for _, t := range p.kindToType {
 		types = append(types, t)
@@ -71,7 +80,7 @@ func (p *Provider) SupportedTypes() []string {
 	return types
 }
 
-func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+func (p *BaseProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	resourceType, ok := p.kindToType[s.Kind]
 	if !ok {
 		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
@@ -83,7 +92,7 @@ func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, err
 	return handler.ParseSpec(path, s)
 }
 
-func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
+func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 	resourceType, ok := p.kindToType[s.Kind]
 	if !ok {
 		return fmt.Errorf("unsupported kind: %s", s.Kind)
@@ -95,7 +104,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
-func (p *Provider) Validate(graph *resources.Graph) error {
+func (p *BaseProvider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(graph); err != nil {
 			return fmt.Errorf("validating %s: %w", resourceType, err)
@@ -104,7 +113,7 @@ func (p *Provider) Validate(graph *resources.Graph) error {
 	return nil
 }
 
-func (p *Provider) ResourceGraph() (*resources.Graph, error) {
+func (p *BaseProvider) GetResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for resourceType, handler := range p.handlers {
 		resources, err := handler.GetResources()
@@ -118,8 +127,8 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
-	collection := resources.NewRemoteResources()
+func (p *BaseProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
 	for resourceType, handler := range p.handlers {
 		c, err := handler.LoadResourcesFromRemote(ctx)
 		if err != nil {
@@ -133,10 +142,10 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Remo
 	return collection, nil
 }
 
-func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+func (p *BaseProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	for resourceType, handler := range p.handlers {
-		providerState, err := handler.MapRemoteToState(collection)
+		providerState, err := handler.LoadStateFromResources(ctx, collection)
 		if err != nil {
 			return nil, fmt.Errorf("loading state from provider handler %s: %w", resourceType, err)
 		}
@@ -148,41 +157,40 @@ func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*sta
 	return s, nil
 }
 
-func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())
 	}
-	return handler.Create(ctx, ID, data)
+	return handler.Create(ctx, resource.RawData())
 }
 
-func (p *Provider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, oldData any, oldState any) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())
 	}
-
-	return handler.Update(ctx, ID, data, state)
+	return handler.Update(ctx, resource.RawData(), oldData, oldState)
 }
 
-func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *BaseProvider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
 		return fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
-	return handler.Delete(ctx, ID, state)
+	return handler.Delete(ctx, ID, oldData, oldState)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, fmt.Errorf("no handler for resource type: %s", resource.Type())
 	}
-	return handler.Import(ctx, ID, data, remoteId)
+	return handler.Import(ctx, resource.RawData(), remoteId)
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
-	collection := resources.NewRemoteResources()
+func (p *BaseProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+	collection := resources.NewResourceCollection()
 	for _, handler := range p.handlers {
 		resources, err := handler.LoadImportable(ctx, idNamer)
 		if err != nil {
@@ -196,14 +204,16 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(
-	collection *resources.RemoteResources,
+func (p *BaseProvider) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
 	result := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
 		entities, err := handler.FormatForExport(
+			ctx,
 			collection,
 			idNamer,
 			inputResolver,

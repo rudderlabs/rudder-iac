@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -13,6 +14,7 @@ import (
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
 type MockProvider struct {
+	provider.EmptyProvider
 	supportedKinds             []string
 	supportedTypes             []string
 	ValidateArg                *resources.Graph
