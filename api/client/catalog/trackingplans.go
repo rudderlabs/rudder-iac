@@ -166,6 +166,7 @@ type TrackingPlanStore interface {
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
 	GetTrackingPlanWithSchemas(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error)
+	GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlan, error)
 	GetTrackingPlanWithIdentifiers(ctx context.Context, id string) (*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlansWithIdentifiers(ctx context.Context, options ListOptions) ([]*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
@@ -253,6 +254,23 @@ func (c *RudderDataCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackin
 		return fmt.Errorf("sending delete request: %w", err)
 	}
 	return nil
+}
+
+func (c *RudderDataCatalog) GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlan, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans%s", options.ToQuery()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to fetch tracking plans: %w", err)
+	}
+
+	tps := struct {
+		TrackingPlans []*TrackingPlan `json:"trackingPlans"`
+	}{}
+
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&tps); err != nil {
+		return nil, fmt.Errorf("decoding tracking plans response: %w", err)
+	}
+
+	return tps.TrackingPlans, nil
 }
 
 func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error) {

@@ -72,6 +72,10 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
+func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context, _ catalog.ListOptions) ([]*catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
 func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
 	return nil, nil
 }
