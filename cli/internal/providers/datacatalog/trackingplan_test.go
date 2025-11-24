@@ -708,10 +708,6 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 	}
 }
 
-func TestGetUpdateEventIdentifiers(t *testing.T) {
-
-}
-
 func getTrackingPlanArgs() *state.TrackingPlanArgs {
 
 	f := defaultTrackingPlanArgsFactory()
