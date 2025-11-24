@@ -94,7 +94,6 @@ type mockRETLClient struct {
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc        func(ctx context.Context) (*retlClient.RETLSources, error)
 	getRetlSourceFunc          func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
-	readStateFunc              func(ctx context.Context) (*retlClient.State, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
 	setExternalIdFunc          func(ctx context.Context, sourceID string, externalId string) error
@@ -178,19 +177,6 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context, hasExternalID *boo
 			},
 		},
 	}, nil
-}
-
-func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, error) {
-	if m.readStateFunc != nil {
-		return m.readStateFunc(ctx)
-	}
-	return &retlClient.State{
-		Resources: map[string]retlClient.ResourceState{},
-	}, nil
-}
-
-func (m *mockRETLClient) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-	return nil
 }
 
 func (m *mockRETLClient) SubmitSourcePreview(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {

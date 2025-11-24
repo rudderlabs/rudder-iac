@@ -207,8 +207,6 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 	for _, op := range provider.OperationLog {
 		if op.Operation == "Create" {
 			createOps = append(createOps, op)
-		} else if op.Operation == "PutResourceState" {
-			putStateOps = append(putStateOps, op)
 		}
 	}
 	assert.Len(t, createOps, 6)
@@ -603,13 +601,4 @@ func (p *failingDataCatalogProvider) Delete(ctx context.Context, ID string, reso
 		}
 	}
 	return p.DataCatalogProvider.Delete(ctx, ID, resourceType, state)
-}
-
-func (p *failingDataCatalogProvider) DeleteResourceState(ctx context.Context, state *state.ResourceState) error {
-	for _, failingID := range p.failingResources {
-		if state.ID == failingID {
-			return fmt.Errorf("simulated delete resource state failure for %s", state.ID)
-		}
-	}
-	return p.DataCatalogProvider.DeleteResourceState(ctx, state)
 }

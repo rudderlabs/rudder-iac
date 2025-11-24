@@ -119,55 +119,6 @@ func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-// LoadState loads the current state of all resources
-func (p *Provider) LoadState(ctx context.Context) (*state.State, error) {
-	remoteState, err := p.client.ReadState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading remote state: %w", err)
-	}
-
-	s := state.EmptyState()
-
-	for _, rs := range remoteState.Resources {
-		s.AddResource(&state.ResourceState{
-			Type:         rs.Type,
-			ID:           rs.ID,
-			Input:        rs.Input,
-			Output:       rs.Output,
-			Dependencies: rs.Dependencies,
-		})
-	}
-
-	return s, nil
-}
-
-// PutResourceState saves the state of a resource
-func (p *Provider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	remoteID, ok := s.Output["id"].(string)
-	if !ok {
-		return fmt.Errorf("missing id in resource state")
-	}
-
-	req := retlClient.PutStateRequest{
-		URN: URN,
-		State: retlClient.ResourceState{
-			ID:           s.ID,
-			Type:         s.Type,
-			Input:        s.Input,
-			Output:       s.Output,
-			Dependencies: s.Dependencies,
-		},
-	}
-
-	return p.client.PutResourceState(ctx, remoteID, req)
-}
-
-// DeleteResourceState is deprecated as removing resource from the state
-// will be handled from the delete retl source endpoint
-func (p *Provider) DeleteResourceState(ctx context.Context, state *state.ResourceState) error {
-	return nil
-}
-
 // Create creates a new resource
 func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	handler, ok := p.handlers[resourceType]
