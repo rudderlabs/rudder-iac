@@ -9,8 +9,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/samber/lo"
 )
 

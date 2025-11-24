@@ -2,7 +2,7 @@ package workspace
 
 import (
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 const AccountResourceType = "account"

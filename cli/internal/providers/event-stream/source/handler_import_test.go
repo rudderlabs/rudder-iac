@@ -14,7 +14,7 @@ import (
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // TestFormatForExport_TrackingPlanReferences tests the bug fix for RUD-2580

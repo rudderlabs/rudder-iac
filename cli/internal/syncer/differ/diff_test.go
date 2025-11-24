@@ -3,8 +3,8 @@ package differ_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
 	"github.com/stretchr/testify/assert"
 )
 

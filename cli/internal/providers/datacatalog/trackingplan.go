@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -280,8 +280,8 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 	return collection, nil
 }
 
-func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
 	for _, remoteTP := range trackingPlans {
 		if remoteTP.ExternalID == "" {
@@ -297,7 +297,7 @@ func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, colle
 		stateArgs := state.TrackingPlanState{}
 		stateArgs.FromRemoteTrackingPlan(trackingPlan, collection)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.TrackingPlanResourceType,
 			ID:           remoteTP.ExternalID,
 			Input:        args.ToResourceData(),
