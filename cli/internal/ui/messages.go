@@ -6,14 +6,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// PrintError prints the given error message to stderr in a styled format.
-func PrintError(err error) {
+func Error(err error) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ColorRed)).
 		Bold(true).
 		Render
 
-	fmt.Fprintf(uiErrWriter, "%s %s\n", style("Error:"), err.Error())
+	return fmt.Sprintf("%s %s", style("Error:"), err.Error())
+}
+
+// PrintError prints the given error message to stderr in a styled format.
+func PrintError(err error) {
+	fmt.Fprintln(uiErrWriter, Error(err))
 }
 
 func Warning(message string) string {

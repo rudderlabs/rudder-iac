@@ -2,6 +2,8 @@ package reporters
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -11,10 +13,23 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
-type planReporter struct{}
+type planReporter struct {
+	Writer io.Writer
+}
+
+func (r *planReporter) SetWriter(writer io.Writer) {
+	r.Writer = writer
+}
+
+func (r *planReporter) getWriter() io.Writer {
+	if r.Writer == nil {
+		return os.Stdout
+	}
+	return r.Writer
+}
 
 func (r *planReporter) ReportPlan(plan *planner.Plan) {
-	ui.Print(renderDiff(plan.Diff))
+	fmt.Fprint(r.getWriter(), renderDiff(plan.Diff))
 }
 
 func renderDiff(diff *differ.Diff) string {

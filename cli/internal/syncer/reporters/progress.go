@@ -1,12 +1,30 @@
 package reporters
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/ui"
+import (
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+)
 
 // ProgressSyncReporter implements SyncReporter interface and provides progress reporting using a UI task reporter.
 // It displays spinners for running tasks as well as a progress bar for overall sync progress.
 type ProgressSyncReporter struct {
 	planReporter
-	reporter *ui.TaskReporter
+	reporter  *ui.TaskReporter
+	errWriter io.Writer
+}
+
+func (r *ProgressSyncReporter) SetErrWriter(errWriter io.Writer) {
+	r.errWriter = errWriter
+}
+
+func (r *ProgressSyncReporter) getErrWriter() io.Writer {
+	if r.errWriter == nil {
+		return os.Stderr
+	}
+	return r.errWriter
 }
 
 func (r *ProgressSyncReporter) AskConfirmation() (bool, error) {
@@ -18,7 +36,7 @@ func (r *ProgressSyncReporter) SyncStarted(totalTasks int) {
 	go func() {
 		err := r.reporter.Run()
 		if err != nil {
-			ui.PrintError(err)
+			fmt.Fprintln(r.getErrWriter(), ui.Error(err))
 		}
 	}()
 }

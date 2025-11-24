@@ -16,6 +16,8 @@ import (
 )
 
 func enableConcurrentSyncs(t *testing.T) {
+	t.Helper()
+
 	viper.Set("experimental", true)
 	viper.Set("flags.concurrentSyncs", true)
 
@@ -43,7 +45,7 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 	require.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect 6 creates
 	assert.Len(t, provider.OperationLog, 6)
@@ -187,7 +189,7 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect 12 deletes
 	assert.Len(t, provider.OperationLog, 6)

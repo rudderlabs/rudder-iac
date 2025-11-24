@@ -6,12 +6,14 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPlanReporter(t *testing.T) {
+	var buf bytes.Buffer
+
 	r := &planReporter{}
+	r.SetWriter(&buf)
 
 	diff := &differ.Diff{
 		ImportableResources: []string{"importable.resource1", "importable.resource2"},
@@ -35,10 +37,6 @@ func TestPlanReporter(t *testing.T) {
 		},
 		RemovedResources: []string{"removed.resource1"},
 	}
-
-	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.ResetWriter()
 
 	r.ReportPlan(&planner.Plan{Diff: diff})
 

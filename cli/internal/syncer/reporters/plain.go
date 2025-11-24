@@ -1,14 +1,13 @@
 package reporters
 
 import (
-	"io"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 type PlainSyncReporter struct {
 	planReporter
-	Writer io.Writer
 }
 
 // AskConfirmation in PlainSyncReporter is a no-op and always returns false, since in non-interactive environments we cannot prompt the user.
@@ -18,9 +17,9 @@ func (r *PlainSyncReporter) AskConfirmation() (bool, error) { return false, nil 
 
 func (r *PlainSyncReporter) TaskCompleted(_ string, description string, err error) {
 	if err != nil {
-		ui.PrintFailure(description)
+		fmt.Fprintln(r.getWriter(), ui.Failure(description))
 	} else {
-		ui.PrintSuccess(description)
+		fmt.Fprintln(r.getWriter(), ui.Success(description))
 	}
 }
 

@@ -2,6 +2,7 @@ package reporters_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
@@ -10,16 +11,15 @@ import (
 )
 
 func TestPlainSyncReporter(t *testing.T) {
-	r := &reporters.PlainSyncReporter{}
-
 	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.ResetWriter()
+	r := &reporters.PlainSyncReporter{}
+	r.SetWriter(&buf)
 
 	confirmed, err := r.AskConfirmation()
 	assert.NoError(t, err)
 	assert.False(t, confirmed)
 
 	r.TaskCompleted("task1", "Task 1", nil)
-	assert.Equal(t, buf.String(), ui.Success("Task 1")+"\n")
+	r.TaskCompleted("task2", "Task 2", fmt.Errorf("some error"))
+	assert.Equal(t, buf.String(), ui.Success("Task 1")+"\n"+ui.Failure("Task 2")+"\n")
 }
