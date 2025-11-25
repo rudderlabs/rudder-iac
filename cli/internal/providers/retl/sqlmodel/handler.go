@@ -325,7 +325,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 
 	importMetadata := specs.Metadata{
 		Name: args.LocalID,
-		Import: specs.WorkspacesImportMetadata{
+		Import: &specs.WorkspacesImportMetadata{
 			Workspaces: []specs.WorkspaceImportMetadata{
 				{
 					WorkspaceID: source.WorkspaceID,
@@ -464,7 +464,7 @@ func (h *Handler) FormatForExport(ctx context.Context, collection *resources.Res
 
 		metadata := specs.Metadata{
 			Name: source.ExternalID,
-			Import: specs.WorkspacesImportMetadata{
+			Import: &specs.WorkspacesImportMetadata{
 				Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 			},
 		}

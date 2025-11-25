@@ -595,7 +595,7 @@ func (p *Handler) toImportSpec(
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: MetadataName,
-		Import: specs.WorkspacesImportMetadata{
+		Import: &specs.WorkspacesImportMetadata{
 			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}

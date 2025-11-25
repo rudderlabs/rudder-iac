@@ -22,7 +22,7 @@ func toImportSpec(
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: metadataName,
-		Import: specs.WorkspacesImportMetadata{
+		Import: &specs.WorkspacesImportMetadata{
 			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}

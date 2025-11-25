@@ -47,7 +47,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws-123",
@@ -83,7 +83,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{},
 				},
 			},
@@ -113,7 +113,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws-123",
@@ -142,7 +142,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							Resources: []ImportIds{
@@ -174,7 +174,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws-123",
@@ -207,7 +207,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws-123",
@@ -244,7 +244,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			},
 			expected: Metadata{
 				Name: "test-project",
-				Import: WorkspacesImportMetadata{
+				Import: &WorkspacesImportMetadata{
 					Workspaces: []WorkspaceImportMetadata{
 						{
 							WorkspaceID: "ws-123",
@@ -301,12 +301,8 @@ func TestSpec_CommonMetadata(t *testing.T) {
 				},
 			},
 			expected: Metadata{
-				Name: "test-project",
-				Import: WorkspacesImportMetadata{
-					Workspaces: []WorkspaceImportMetadata{
-						{},
-					},
-				},
+				Name:   "test-project",
+				Import: nil,
 			},
 			expectError: true,
 			errorText:   "failed to decode metadata",
@@ -325,14 +321,8 @@ func TestSpec_CommonMetadata(t *testing.T) {
 				},
 			},
 			expected: Metadata{
-				Name: "test-project",
-				Import: WorkspacesImportMetadata{
-					Workspaces: []WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws-123",
-						},
-					},
-				},
+				Name:   "test-project",
+				Import: nil,
 			},
 			expectError: true,
 			errorText:   "failed to decode metadata",
@@ -341,6 +331,7 @@ func TestSpec_CommonMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			spec := &Spec{
 				Metadata: tt.metadata,
 			}
@@ -359,38 +350,63 @@ func TestSpec_CommonMetadata(t *testing.T) {
 }
 
 func TestMetadata_ToMap(t *testing.T) {
-	metadata := Metadata{
-		Name: "test-resource",
-		Import: WorkspacesImportMetadata{
-			Workspaces: []WorkspaceImportMetadata{
-				{
-					WorkspaceID: "ws-123",
-					Resources: []ImportIds{
-						{LocalID: "local-1", RemoteID: "remote-1"},
-						{LocalID: "local-2", RemoteID: "remote-2"},
+	t.Parallel()
+
+	tests := map[string]struct {
+		metadata Metadata
+		expected map[string]any
+	}{
+		"empty Metadata": {
+			metadata: Metadata{},
+			expected: map[string]any{},
+		},
+		"Metadata with only Name": {
+			metadata: Metadata{
+				Name: "example-name",
+			},
+			expected: map[string]any{
+				"name": "example-name",
+			},
+		},
+		"Metadata with Name, Import and Workspaces": {
+			metadata: Metadata{
+				Name: "test-resource",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{LocalID: "local-1", RemoteID: "remote-1"},
+								{LocalID: "local-2", RemoteID: "remote-2"},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]any{
+				"name": "test-resource",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{"local_id": "local-1", "remote_id": "remote-1"},
+								map[string]any{"local_id": "local-2", "remote_id": "remote-2"},
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	result, err := metadata.ToMap()
-	assert.NoError(t, err)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	expected := map[string]any{
-		"name": "test-resource",
-		"import": map[string]any{
-			"workspaces": []any{
-				map[string]any{
-					"workspace_id": "ws-123",
-					"resources": []any{
-						map[string]any{"local_id": "local-1", "remote_id": "remote-1"},
-						map[string]any{"local_id": "local-2", "remote_id": "remote-2"},
-					},
-				},
-			},
-		},
+			result, err := tt.metadata.ToMap()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
-
-	assert.Equal(t, expected, result)
 }

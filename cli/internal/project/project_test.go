@@ -27,6 +27,8 @@ func (m *MockLoader) Load(location string) (map[string]*specs.Spec, error) {
 }
 
 func TestNewProject_Load_Error(t *testing.T) {
+	t.Parallel()
+
 	provider := testutils.NewMockProvider()
 	mockLoader := &MockLoader{}
 	p := project.New("test_location", provider, project.WithLoader(mockLoader))
@@ -42,6 +44,8 @@ func TestNewProject_Load_Error(t *testing.T) {
 }
 
 func TestProject_Load_Success(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	mockLoader := &MockLoader{}
 
@@ -80,6 +84,8 @@ func TestProject_Load_Success(t *testing.T) {
 }
 
 func TestProject_Load_UnsupportedKind(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	mockLoader := &MockLoader{}
 
@@ -103,6 +109,8 @@ func TestProject_Load_UnsupportedKind(t *testing.T) {
 }
 
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	mockLoader := &MockLoader{}
 
@@ -127,6 +135,8 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 }
 
 func TestProject_Load_ProviderValidateError(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	mockLoader := &MockLoader{}
 
@@ -152,6 +162,8 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 }
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	proj := project.New("test_dir", mockProvider) // Loader doesn't matter for this test
 
@@ -166,6 +178,8 @@ func TestProject_GetResourceGraph_Success(t *testing.T) {
 }
 
 func TestProject_GetResourceGraph_Error(t *testing.T) {
+	t.Parallel()
+
 	mockProvider := testutils.NewMockProvider()
 	proj := project.New("test_dir", mockProvider)
 
@@ -191,7 +205,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "success - all metadata IDs match external IDs",
+			name: "success - all import metadata IDs match external IDs",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -220,7 +234,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "error - extra IDs in metadata not in spec",
+			name: "error - extra IDs in import metadata not in spec",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -251,10 +265,10 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1", "id2"},
 			},
 			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec: id3",
+			errorContains: "local_id from import metadata missing in spec: id3",
 		},
 		{
-			name: "success - missing IDs in metadata (not validated)",
+			name: "success - missing IDs in import metadata (created instead of imported)",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -279,7 +293,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "success - empty both external IDs and metadata",
+			name: "success - empty both external IDs and import metadata",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -294,33 +308,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "error - empty spec but metadata has resources",
-			spec: &specs.Spec{
-				Kind: "Source",
-				Metadata: map[string]any{
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "ws-123",
-								"resources": []any{
-									map[string]any{
-										"local_id":  "id1",
-										"remote_id": "remote1",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
-			},
-			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec: id1",
-		},
-		{
-			name: "error - invalid metadata structure",
+			name: "error - invalid import metadata structure",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -408,7 +396,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1"},
 			},
 			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec",
+			errorContains: "local_id from import metadata missing in spec: id2, id3",
 		},
 		{
 			name: "success - no import metadata key",
