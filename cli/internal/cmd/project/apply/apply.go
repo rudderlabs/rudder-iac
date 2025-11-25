@@ -23,13 +23,12 @@ var (
 
 func NewCmdApply() *cobra.Command {
 	var (
-		deps        app.Deps
-		p           project.Project
-		err         error
-		location    string
-		dryRun      bool
-		confirm     bool
-		concurrency int
+		deps     app.Deps
+		p        project.Project
+		err      error
+		location string
+		dryRun   bool
+		confirm  bool
 	)
 
 	cmd := &cobra.Command{
@@ -49,11 +48,6 @@ func NewCmdApply() *cobra.Command {
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
-			}
-
-			// Validate concurrency flag usage
-			if cmd.Flags().Changed("concurrency") && !config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				return fmt.Errorf("concurrency flag is only allowed when ConcurrentSyncs experimental feature is enabled")
 			}
 
 			p = project.New(location, deps.CompositeProvider())
@@ -88,24 +82,26 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
+			options := []syncer.Option{
+				syncer.WithDryRun(dryRun),
+				syncer.WithAskConfirmation(confirm),
+				syncer.WithReporter(app.SyncReporter()),
+			}
+
+			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
+				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+			}
+
 			// Create syncer to handle the changes
-			s, err := syncer.New(deps.CompositeProvider(), workspace)
+			s, err := syncer.New(deps.CompositeProvider(), workspace, options...)
 			if err != nil {
-				return fmt.Errorf("creating syncer: %w", err)
+				return err
 			}
 
 			// Apply the changes
-			err = s.Sync(
-				context.Background(),
-				graph,
-				syncer.SyncOptions{
-					DryRun:      dryRun,
-					Confirm:     confirm,
-					Concurrency: concurrency,
-				})
-
+			err = s.Sync(context.Background(), graph)
 			if err != nil {
-				return fmt.Errorf("syncing the state: %w", err)
+				return fmt.Errorf("syncing resources: %w", err)
 			}
 
 			if dryRun {
@@ -121,6 +117,6 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
-	cmd.Flags().IntVar(&concurrency, "concurrency", 30, "Number of concurrent operations to run (only allowed when ConcurrentSyncs experimental feature is enabled)")
+
 	return cmd
 }

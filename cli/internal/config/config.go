@@ -37,6 +37,7 @@ type Config = struct {
 	} `mapstructure:"telemetry"`
 	ExperimentalFlags ExperimentalConfig `mapstructure:"flags"`
 	Concurrency       struct {
+		Syncer            int `mapstructure:"syncer"`
 		CatalogClient     int `mapstructure:"catalogClient"`
 		CompositeProvider int `mapstructure:"compositeProvider"`
 		CatalogProvider   int `mapstructure:"catalogProvider"`
@@ -75,6 +76,7 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
+	viper.SetDefault("concurrency.syncer", 30)
 	viper.SetDefault("concurrency.catalogClient", 10)
 	viper.SetDefault("concurrency.compositeProvider", 2)
 	viper.SetDefault("concurrency.catalogProvider", 4)

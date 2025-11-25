@@ -9,6 +9,10 @@ import (
 
 const defaultTerminalWidth = 80
 
+func IsTerminal() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
 // GetTerminalWidth returns the current width of the terminal.
 func GetTerminalWidth() int {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))

@@ -57,7 +57,6 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
-	typerCmd        *cobra.Command
 )
 
 func init() {

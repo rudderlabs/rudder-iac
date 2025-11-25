@@ -71,19 +71,16 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
-			s, err := syncer.New(deps.Providers().DataCatalog, workspace)
+			s, err := syncer.New(deps.Providers().DataCatalog, workspace,
+				syncer.WithDryRun(dryRun),
+				syncer.WithAskConfirmation(confirm),
+				syncer.WithReporter(app.SyncReporter()),
+			)
 			if err != nil {
 				return err
 			}
 
-			err = s.Sync(
-				context.Background(),
-				graph,
-				syncer.SyncOptions{
-					DryRun:  dryRun,
-					Confirm: confirm,
-				})
-
+			err = s.Sync(context.Background(), graph)
 			if err != nil {
 				return fmt.Errorf("syncing the state: %w", err)
 			}
@@ -95,5 +92,6 @@ func NewCmdTPApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the catalog files  or catalog file itself")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes and not apply them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm the changes before applying")
+
 	return cmd
 }

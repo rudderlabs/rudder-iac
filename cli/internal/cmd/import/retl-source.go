@@ -40,7 +40,7 @@ func NewCmdRetlSource() *cobra.Command {
 			This command fetches the remote SQL Model using the provided remote ID,
 			creates a local YAML configuration with the specified local ID, and embeds
 			import metadata for tracking.
-			
+
 			Optionally, you can specify a separate location for SQL files using --sql-location.
 			When provided, the SQL content will be saved as a separate .sql file and the
 			YAML configuration will reference it using the 'file' field instead of inline 'sql'.
@@ -114,8 +114,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			retlSourceImportLog.Info("Successfully imported RETL SQL Model", "localID", localID, "remoteID", remoteID)
-			fmt.Printf("%s Successfully imported RETL SQL Model '%s' from remote ID '%s'\n",
-				ui.Color("✓", ui.Green), localID, remoteID)
+			ui.PrintSuccess(fmt.Sprintf("Successfully imported RETL SQL Model '%s' from remote ID '%s'", localID, remoteID))
 			fmt.Printf("Configuration saved to: %s/%s.yaml\n", location, localID)
 
 			return nil

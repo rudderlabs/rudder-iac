@@ -65,7 +65,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 
 			spinner.Stop()
 			if err == nil {
-				fmt.Printf("%s Done\n", ui.Color("✔", ui.Green))
+				ui.PrintSuccess("Done")
 			}
 
 			return err

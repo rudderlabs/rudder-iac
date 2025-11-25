@@ -87,7 +87,7 @@ func renderField(key string, value any, indentLevel int, maxKeyWidth int) string
 		}
 
 		if key == "id" {
-			valueStr = Color(valueStr, Yellow)
+			valueStr = Color(valueStr, ColorYellow)
 		}
 
 		b.WriteString(fmt.Sprintf("%s%s: %s%s\n", indent, keyStr, strings.Repeat(" ", padding), valueStr))

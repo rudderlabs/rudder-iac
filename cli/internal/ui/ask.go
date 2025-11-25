@@ -24,6 +24,7 @@ func AskSecret(question string) (string, error) {
 	return response, nil
 }
 
+// Confirm asks the user a yes/no question and returns their response as a boolean.
 func Confirm(question string) (bool, error) {
 	response := false
 	prompt := &survey.Confirm{
