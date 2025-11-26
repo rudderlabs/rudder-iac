@@ -125,7 +125,7 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	changed = append(changed, diff.Updated...)
 
 	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(changed)); err != nil {
-		return nil, fmt.Errorf("updating tracking plan events during for added and updated events: %w", err)
+		return nil, fmt.Errorf("updating tracking plan events which are added or updated: %w", err)
 	}
 
 	upstreamTP, err := p.client.GetTrackingPlan(ctx, prevState.ID)
