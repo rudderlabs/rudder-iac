@@ -55,12 +55,20 @@ type RudderDataCatalog struct {
 	eventUpdateBatchSize int
 }
 
-func NewRudderDataCatalog(client *client.Client, opts Options) DataCatalog {
+func NewRudderDataCatalog(client *client.Client, opts Options) (DataCatalog, error) {
+	if opts.EventUpdateBatchSize <= 0 {
+		return nil, fmt.Errorf("event update batch size must be greater than 0")
+	}
+
+	if opts.Concurrency <= 0 {
+		return nil, fmt.Errorf("concurrency must be greater than 0")
+	}
+
 	return &RudderDataCatalog{
 		client:               client,
 		concurrency:          opts.Concurrency,
 		eventUpdateBatchSize: opts.EventUpdateBatchSize,
-	}
+	}, nil
 }
 
 func IsCatalogNotFoundError(err error) bool {

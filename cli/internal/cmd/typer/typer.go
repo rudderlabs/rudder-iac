@@ -62,13 +62,17 @@ func newCmdGenerate() *cobra.Command {
 			client := deps.Client()
 
 			cfg := config.GetConfig()
-			dataCatalogClient := catalog.NewRudderDataCatalog(
+			dataCatalogClient, err := catalog.NewRudderDataCatalog(
 				client,
 				catalog.Options{
 					Concurrency:          cfg.Concurrency.CatalogClient,
 					EventUpdateBatchSize: 50,
 				},
 			)
+
+			if err != nil {
+				return fmt.Errorf("failed to initialize data catalog client: %w", err)
+			}
 
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)
