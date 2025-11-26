@@ -64,7 +64,10 @@ func newCmdGenerate() *cobra.Command {
 			cfg := config.GetConfig()
 			dataCatalogClient := catalog.NewRudderDataCatalog(
 				client,
-				cfg.Concurrency.CatalogClient,
+				catalog.Options{
+					Concurrency:          cfg.Concurrency.CatalogClient,
+					EventUpdateBatchSize: 50,
+				},
 			)
 
 			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)

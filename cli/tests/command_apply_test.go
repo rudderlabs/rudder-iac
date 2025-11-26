@@ -47,7 +47,10 @@ func verifyState(t *testing.T, dir string) {
 	)
 
 	require.NoError(t, err)
-	dataCatalog := catalog.NewRudderDataCatalog(apiClient, concurrencyForTest)
+	dataCatalog := catalog.NewRudderDataCatalog(apiClient, catalog.Options{
+		Concurrency:          concurrencyForTest,
+		EventUpdateBatchSize: 1,
+	})
 	reader := helpers.NewAPIClientAdapter(dataCatalog)
 
 	expectedStateDir := filepath.Join("testdata", "expected", "upstream", dir)

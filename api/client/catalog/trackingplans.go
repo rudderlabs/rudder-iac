@@ -12,10 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-const (
-	EVENT_UPDATE_BATCH_SIZE = 50
-)
-
 type TrackingPlanCreate struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -436,8 +432,8 @@ func (c *RudderDataCatalog) UpdateTrackingPlanEvents(ctx context.Context, id str
 		batch []EventIdentifierDetail
 	)
 
-	for i := 0; i < len(events); i += EVENT_UPDATE_BATCH_SIZE {
-		batch = events[i:min(i+EVENT_UPDATE_BATCH_SIZE, len(events))]
+	for i := 0; i < len(events); i += c.eventUpdateBatchSize {
+		batch = events[i:min(i+c.eventUpdateBatchSize, len(events))]
 
 		_, err = c.updateTrackingPlanEventsBatch(ctx, id, batch)
 		if err != nil {

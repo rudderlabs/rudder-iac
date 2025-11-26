@@ -120,12 +120,12 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 		}
 	}
 
-	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Added)); err != nil {
-		return nil, fmt.Errorf("updating tracking plan events during update for added events: %w", err)
-	}
+	var changed = make([]*state.TrackingPlanEventArgs, 0, len(diff.Added)+len(diff.Updated))
+	changed = append(changed, diff.Added...)
+	changed = append(changed, diff.Updated...)
 
-	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(diff.Updated)); err != nil {
-		return nil, fmt.Errorf("updating tracking plan events during update for updated events: %w", err)
+	if err := p.client.UpdateTrackingPlanEvents(ctx, prevState.ID, getUpdateEventIdentifiers(changed)); err != nil {
+		return nil, fmt.Errorf("updating tracking plan events during for added and updated events: %w", err)
 	}
 
 	upstreamTP, err := p.client.GetTrackingPlan(ctx, prevState.ID)

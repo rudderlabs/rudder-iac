@@ -44,15 +44,22 @@ func (o *ListOptions) ToQuery() string {
 	return query
 }
 
-type RudderDataCatalog struct {
-	client      *client.Client
-	concurrency int
+type Options struct {
+	Concurrency          int
+	EventUpdateBatchSize int
 }
 
-func NewRudderDataCatalog(client *client.Client, concurrency int) DataCatalog {
+type RudderDataCatalog struct {
+	client               *client.Client
+	concurrency          int
+	eventUpdateBatchSize int
+}
+
+func NewRudderDataCatalog(client *client.Client, opts Options) DataCatalog {
 	return &RudderDataCatalog{
-		client:      client,
-		concurrency: concurrency,
+		client:               client,
+		concurrency:          opts.Concurrency,
+		eventUpdateBatchSize: opts.EventUpdateBatchSize,
 	}
 }
 
