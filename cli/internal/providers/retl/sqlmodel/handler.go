@@ -107,17 +107,20 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 		return err
 	}
 
-	workspaces := metadata.Import.Workspaces
-	for _, workspaceMetadata := range workspaces {
-		workspaceId := workspaceMetadata.WorkspaceID
-		resources := workspaceMetadata.Resources
-		for _, resourceMetadata := range resources {
-			importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
-				WorkspaceId: workspaceId,
-				RemoteId:    resourceMetadata.RemoteID,
+	if metadata.Import != nil {
+		workspaces := metadata.Import.Workspaces
+		for _, workspaceMetadata := range workspaces {
+			workspaceId := workspaceMetadata.WorkspaceID
+			resources := workspaceMetadata.Resources
+			for _, resourceMetadata := range resources {
+				importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+					WorkspaceId: workspaceId,
+					RemoteId:    resourceMetadata.RemoteID,
+				}
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -468,11 +471,12 @@ func (h *Handler) FormatForExport(ctx context.Context, collection *resources.Res
 				Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 			},
 		}
-		metadataMap := make(map[string]any)
-		err := mapstructure.Decode(metadata, &metadataMap)
+
+		metadataMap, err := metadata.ToMap()
 		if err != nil {
-			return nil, fmt.Errorf("decoding metadata: %w", err)
+			return nil, err
 		}
+
 		spec := &specs.Spec{
 			Version:  specs.SpecVersion,
 			Kind:     ResourceKind,

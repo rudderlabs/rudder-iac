@@ -51,10 +51,15 @@ func (m *Metadata) Validate() error {
 	return nil
 }
 
-// CommonMetadata decodes and returns the common Metadata from the Spec
-// It will return an error if decoding fails or if required fields are missing
+// CommonMetadata decodes and returns the common Metadata from the Spec's Metadata map
+// It will return an error if decoding fails, but will not further validate the metadata fields.
+// If necessary, validation should be performed separately by calling [Metadata.Validate].
 func (s *Spec) CommonMetadata() (Metadata, error) {
 	var metadata Metadata
+	if s.Metadata == nil {
+		return metadata, nil
+	}
+
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		TagName: "yaml",
 		Result:  &metadata,

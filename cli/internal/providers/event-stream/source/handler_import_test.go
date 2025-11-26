@@ -110,13 +110,13 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Metadata: map[string]any{
 					"name": "event-stream-source",
 					"import": map[string]any{
-						"workspaces": []specs.WorkspaceImportMetadata{
-							{
-								WorkspaceID: "workspace-123",
-								Resources: []specs.ImportIds{
-									{
-										LocalID:  "test-source-1",
-										RemoteID: "remote123",
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "workspace-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "test-source-1",
+										"remote_id": "remote123",
 									},
 								},
 							},
@@ -197,13 +197,13 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Metadata: map[string]any{
 					"name": "event-stream-source",
 					"import": map[string]any{
-						"workspaces": []specs.WorkspaceImportMetadata{
-							{
-								WorkspaceID: "workspace-123",
-								Resources: []specs.ImportIds{
-									{
-										LocalID:  "test-source-1",
-										RemoteID: "remote123",
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "workspace-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "test-source-1",
+										"remote_id": "remote123",
 									},
 								},
 							},
@@ -252,13 +252,13 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Metadata: map[string]any{
 					"name": "event-stream-source",
 					"import": map[string]any{
-						"workspaces": []specs.WorkspaceImportMetadata{
-							{
-								WorkspaceID: "workspace-123",
-								Resources: []specs.ImportIds{
-									{
-										LocalID:  "test-source-1",
-										RemoteID: "remote123",
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "workspace-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "test-source-1",
+										"remote_id": "remote123",
 									},
 								},
 							},

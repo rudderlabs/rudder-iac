@@ -1422,16 +1422,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"enabled": true,
 			"type":    "javascript",
 		}, spec1.Spec)
-		assert.Equal(t, map[string]interface{}{
+		assert.Equal(t, map[string]any{
 			"name": "event-stream-source",
-			"import": map[string]interface{}{
-				"workspaces": []specs.WorkspaceImportMetadata{
-					{
-						WorkspaceID: "workspace-123",
-						Resources: []specs.ImportIds{
-							{
-								LocalID:  "test-source-1",
-								RemoteID: "remote123",
+			"import": map[string]any{
+				"workspaces": []any{
+					map[string]any{
+						"workspace_id": "workspace-123",
+						"resources": []any{
+							map[string]any{
+								"local_id":  "test-source-1",
+								"remote_id": "remote123",
 							},
 						},
 					},
@@ -1465,16 +1465,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, spec2.Spec)
-		assert.Equal(t, map[string]interface{}{
+		assert.Equal(t, map[string]any{
 			"name": "event-stream-source",
-			"import": map[string]interface{}{
-				"workspaces": []specs.WorkspaceImportMetadata{
-					{
-						WorkspaceID: "workspace-123",
-						Resources: []specs.ImportIds{
-							{
-								LocalID:  "test-source-2",
-								RemoteID: "remote456",
+			"import": map[string]any{
+				"workspaces": []any{
+					map[string]any{
+						"workspace_id": "workspace-123",
+						"resources": []any{
+							map[string]any{
+								"local_id":  "test-source-2",
+								"remote_id": "remote456",
 							},
 						},
 					},

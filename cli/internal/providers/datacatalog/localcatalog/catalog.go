@@ -209,16 +209,18 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 		return err
 	}
 
-	lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-		// For each resource within the workspace, load the import metadata
-		// which will be used during the creation of resourceGraph
-		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-			dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
-				WorkspaceID: workspace.WorkspaceID,
-				RemoteID:    resource.RemoteID,
-			}
+	if metadata.Import != nil {
+		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			// For each resource within the workspace, load the import metadata
+			// which will be used during the creation of resourceGraph
+			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+				dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+					WorkspaceID: workspace.WorkspaceID,
+					RemoteID:    resource.RemoteID,
+				}
+			})
 		})
-	})
+	}
 
 	return nil
 }

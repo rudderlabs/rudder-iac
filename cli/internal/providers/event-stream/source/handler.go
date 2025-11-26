@@ -599,10 +599,10 @@ func (p *Handler) toImportSpec(
 			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}
-	metadataMap := make(map[string]any)
-	err := mapstructure.Decode(metadata, &metadataMap)
+
+	metadataMap, err := metadata.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("decoding metadata: %w", err)
+		return nil, err
 	}
 
 	specMap := map[string]any{
@@ -645,14 +645,16 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 		return err
 	}
 
-	lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
-				WorkspaceId: workspace.WorkspaceID,
-				RemoteId:    resource.RemoteID,
-			}
+	if metadata.Import != nil {
+		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+					WorkspaceId: workspace.WorkspaceID,
+					RemoteId:    resource.RemoteID,
+				}
+			})
 		})
-	})
+	}
 	return nil
 }
 
