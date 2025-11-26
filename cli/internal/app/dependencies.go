@@ -65,7 +65,10 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
 
-	p := setupProviders(c)
+	p, err := setupProviders(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize providers: %w", err)
+	}
 
 	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL, p.EventStream)
 	if err != nil {
@@ -88,9 +91,18 @@ func setupClient(version string) (*client.Client, error) {
 	)
 }
 
-func setupProviders(c *client.Client) *Providers {
+func setupProviders(c *client.Client) (*Providers, error) {
 	cfg := config.GetConfig()
-	dcp := datacatalog.New(catalog.NewRudderDataCatalog(c, cfg.Concurrency.CatalogClient))
+
+	catalogClient, err := catalog.NewRudderDataCatalog(
+		c,
+		catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
+	}
+
+	dcp := datacatalog.New(catalogClient)
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	wsp := workspace.New(c)
@@ -100,7 +112,7 @@ func setupProviders(c *client.Client) *Providers {
 		RETL:        retlp,
 		EventStream: esp,
 		Workspace:   wsp,
-	}
+	}, nil
 }
 
 func SyncReporter() syncer.SyncReporter {
