@@ -188,15 +188,15 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 			}
 		}
 
-		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Added)); err != nil {
-			return nil, fmt.Errorf("updating tracking plan events during import for added events: %w", err)
+		changed := make([]*state.TrackingPlanEventArgs, 0, len(diffed.Added)+len(diffed.Updated))
+		changed = append(changed, diffed.Added...)
+		changed = append(changed, diffed.Updated...)
+
+		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(changed)); err != nil {
+			return nil, fmt.Errorf("updating tracking plan events which are added or updated during import: %w", err)
 		}
 
-		if err = p.client.UpdateTrackingPlanEvents(ctx, remoteId, getUpdateEventIdentifiers(diffed.Updated)); err != nil {
-			return nil, fmt.Errorf("updating tracking plan events during import for updated events: %w", err)
-		}
 	}
-
 	err = p.client.SetTrackingPlanExternalId(ctx, remoteId, ID)
 	if err != nil {
 		return nil, fmt.Errorf("setting tracking plan external id: %w", err)
