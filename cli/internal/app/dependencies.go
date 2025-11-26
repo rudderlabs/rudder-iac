@@ -91,10 +91,10 @@ func setupClient(version string) (*client.Client, error) {
 func setupProviders(c *client.Client) (*Providers, error) {
 	cfg := config.GetConfig()
 
-	catalogClient, err := catalog.NewRudderDataCatalog(c, catalog.Options{
-		Concurrency:          cfg.Concurrency.CatalogClient,
-		EventUpdateBatchSize: 50,
-	})
+	catalogClient, err := catalog.NewRudderDataCatalog(
+		c,
+		catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
 	}

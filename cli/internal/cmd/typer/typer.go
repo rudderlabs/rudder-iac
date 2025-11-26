@@ -64,12 +64,8 @@ func newCmdGenerate() *cobra.Command {
 			cfg := config.GetConfig()
 			dataCatalogClient, err := catalog.NewRudderDataCatalog(
 				client,
-				catalog.Options{
-					Concurrency:          cfg.Concurrency.CatalogClient,
-					EventUpdateBatchSize: 50,
-				},
+				catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
 			)
-
 			if err != nil {
 				return fmt.Errorf("failed to initialize data catalog client: %w", err)
 			}

@@ -81,10 +81,11 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.Options{
-			Concurrency:          1,
-			EventUpdateBatchSize: 2,
-		})
+		dataCatalog, err := catalog.NewRudderDataCatalog(
+			apiClient,
+			catalog.WithConcurrency(1),
+			catalog.WithEventUpdateBatchSize(2),
+		)
 		require.NoError(t, err)
 		events := createTestEvents(5)
 
@@ -102,10 +103,11 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.Options{
-			Concurrency:          1,
-			EventUpdateBatchSize: 2,
-		})
+		dataCatalog, err := catalog.NewRudderDataCatalog(
+			apiClient,
+			catalog.WithConcurrency(1),
+			catalog.WithEventUpdateBatchSize(2),
+		)
 		require.NoError(t, err)
 		events := createTestEvents(0)
 
@@ -134,10 +136,11 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.Options{
-			Concurrency:          1,
-			EventUpdateBatchSize: 2,
-		})
+		dataCatalog, err := catalog.NewRudderDataCatalog(
+			apiClient,
+			catalog.WithConcurrency(1),
+			catalog.WithEventUpdateBatchSize(2),
+		)
 		require.NoError(t, err)
 		events := createTestEvents(2)
 
@@ -171,10 +174,11 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.Options{
-			Concurrency:          1,
-			EventUpdateBatchSize: 2,
-		})
+		dataCatalog, err := catalog.NewRudderDataCatalog(
+			apiClient,
+			catalog.WithConcurrency(1),
+			catalog.WithEventUpdateBatchSize(2),
+		)
 		require.NoError(t, err)
 		events := createTestEvents(5)
 
