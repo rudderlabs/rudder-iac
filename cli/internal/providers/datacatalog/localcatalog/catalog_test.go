@@ -90,6 +90,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan entities are extracted from yaml successfully", func(t *testing.T) {
 
+		falseVal := false
 		byt := []byte(`
         version: rudder/0.1
         kind: events
@@ -179,6 +180,7 @@ func TestExtractCatalogEntity(t *testing.T) {
                     - $ref: "#/properties/base_mobile_props/remember_me_checkbox_clicked"
                       required: false
                     - $ref: "#/properties/base_mobile_props/captcha"
+                      additionalProperties: false
                       required: false
                       properties:
                         - $ref: "#/properties/base_mobile_props/captcha_solved"
@@ -225,6 +227,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 								},
 								{
 									Ref:      "#/properties/base_mobile_props/captcha",
+									AdditionalProperties: &falseVal,
 									Required: false,
 									Properties: []*TPRuleProperty{
 										{
