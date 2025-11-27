@@ -1,4 +1,4 @@
-package provider
+package handler
 
 import (
 	"context"
@@ -8,48 +8,11 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
-
-// ImportResourceInfo tracks metadata for resources that were imported from a remote system.
-// It associates a local resource with its workspace context and remote identifier,
-// enabling the system to maintain the relationship between local configuration and
-// remote resources during import operations.
-type ImportResourceInfo struct {
-	WorkspaceId string
-	RemoteId    string
-}
-
-// URNResolver provides URN (Uniform Resource Name) resolution from remote resource IDs.
-// Implementations (such as ResourceCollection) use this interface to resolve cross-resource
-// references by translating a resource type and ID into a URN that can be used to reference
-// the resource in configuration files and state. This enables resources to reference each
-// other using stable identifiers.
-type URNResolver interface {
-	GetURNByID(resourceType string, id string) (string, error)
-}
-
-// RemoteResourceMetadata contains the standard metadata fields for a resource fetched from
-// a remote API. The ID represents the remote system's internal identifier, ExternalID is the
-// user-facing identifier used in configuration files, WorkspaceID provides the workspace
-// context, and Name is a human-readable descriptor. This structure standardizes how remote
-// resources expose their identifying information across different resource types.
-type RemoteResourceMetadata struct {
-	ID          string
-	ExternalID  string
-	WorkspaceID string
-	Name        string
-}
-
-// RemoteResource defines the minimal interface that any remote resource type must implement
-// to be compatible with BaseHandler's generic type system. By requiring only metadata access,
-// this interface allows API client types (e.g., EventStreamSource, RETLSource) to work with
-// BaseHandler without extensive modification, while ensuring consistent access to identifying
-// information needed for resource management operations.
-type RemoteResource interface {
-	GetResourceMetadata() *RemoteResourceMetadata
-}
 
 // BaseHandler provides a generic, reusable foundation for implementing resource handlers
 // across different resource types. It abstracts common lifecycle operations (load, validate,
@@ -69,8 +32,13 @@ type BaseHandler[Spec any, Res any, State any, Remote RemoteResource] struct {
 	specKind           string
 	importMetadataName string
 	resources          map[string]*Res
-	importMetadata     map[string]*ImportResourceInfo
+	importMetadata     map[string]*importResourceInfo
 	Impl               HandlerImpl[Spec, Res, State, Remote]
+}
+
+type importResourceInfo struct {
+	WorkspaceId string
+	RemoteId    string
 }
 
 func NewHandler[Spec any, Res any, State any, Remote RemoteResource](
@@ -83,100 +51,9 @@ func NewHandler[Spec any, Res any, State any, Remote RemoteResource](
 		specKind:           specKind,
 		importMetadataName: importMetadataName,
 		resources:          make(map[string]*Res),
-		importMetadata:     make(map[string]*ImportResourceInfo),
+		importMetadata:     make(map[string]*importResourceInfo),
 		Impl:               impl,
 	}
-}
-
-// HandlerImpl defines the resource-specific operations that each handler implementation must
-// provide to work with BaseHandler. It separates resource-specific business logic from the
-// common handler infrastructure, following the strategy pattern.
-//
-// Implementations must provide:
-//   - Spec lifecycle: creation, validation, and resource extraction from configuration files
-//   - Resource validation: ensuring resources are valid within the dependency graph
-//   - Remote operations: loading resources from remote APIs, both for sync and import scenarios
-//   - State mapping: converting remote API responses to local resource and state representations
-//   - CRUD operations: creating, updating, importing, and deleting resources via API calls
-//
-// The MapRemoteToState method can return (nil, nil, nil) to skip resources that should not
-// be included in state (e.g., resources without external IDs). The urnResolver parameter
-// enables resolving cross-resource references during state mapping.
-type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface {
-	// NewSpec creates a new instance of the Spec type with zero values.
-	// This factory method enables BaseHandler to instantiate spec objects
-	// during configuration file parsing without knowing the concrete type.
-	NewSpec() *Spec
-
-	// ValidateSpec checks that the parsed specification contains valid values
-	// and required fields. It should return descriptive errors for any validation
-	// failures. This is called after decoding the YAML/JSON spec but before
-	// extracting resources from it.
-	ValidateSpec(spec *Spec) error
-
-	// ExtractResourcesFromSpec parses a validated spec and extracts individual
-	// resource instances from it, returning them as a map keyed by resource ID.
-	// The path parameter provides the file path for error reporting and context.
-	// Multiple resources may be extracted from a single spec file (e.g., a spec
-	// containing multiple event definitions).
-	//
-	// NOTE: path should be part of the spec
-	ExtractResourcesFromSpec(path string, spec *Spec) (map[string]*Res, error)
-
-	// ValidateResource performs validation on a single resource within the context
-	// of the full dependency graph. This enables cross-resource validation such as
-	// checking that referenced resources exist (e.g., verifying a tracking plan
-	// URN references an actual tracking plan resource). The graph provides access
-	// to all loaded resources across all types.
-	ValidateResource(resource *Res, graph *resources.Graph) error
-
-	// LoadRemoteResources fetches all resources of this type from the remote API
-	// that have external IDs (i.e., resources managed by this IaC system).
-	// This is used during sync operations to build the current remote state.
-	// Resources without external IDs should be filtered out as they are not
-	// managed by the configuration files.
-	LoadRemoteResources(ctx context.Context) ([]*Remote, error)
-
-	// LoadImportableResources fetches all resources of this type from the remote API,
-	// including those without external IDs. This is used during import operations
-	// to discover resources that can be brought under IaC management. The returned
-	// resources will be presented to users as candidates for import.
-	LoadImportableResources(ctx context.Context) ([]*Remote, error)
-
-	// MapRemoteToState converts a remote API resource into the corresponding Res
-	// (input/configuration) and State (output) representations used internally.
-	// The urnResolver enables resolving references to other resources by their IDs.
-	//
-	// Return (nil, nil, nil) to skip a resource (e.g., when it lacks required fields
-	// like external IDs). This is a convention for filtering resources during state
-	// loading without treating it as an error.
-	MapRemoteToState(remote *Remote, urnResolver URNResolver) (*Res, *State, error)
-
-	// Create provisions a new resource in the remote system using the provided
-	// configuration data. It returns the state (output) data from the API response,
-	// which typically includes server-assigned IDs, timestamps, and computed fields.
-	// This is called when a resource exists in configuration but not in remote state.
-	Create(ctx context.Context, data *Res) (*State, error)
-
-	// Update modifies an existing remote resource to match the new configuration.
-	// It receives both the new desired state (newData) and the current state
-	// (oldData, oldState) to enable delta-based updates or conditional logic.
-	// Returns the updated state from the API response.
-	Update(ctx context.Context, newData *Res, oldData *Res, oldState *State) (*State, error)
-
-	// Import associates an existing remote resource with a local configuration,
-	// bringing it under IaC management. The remoteId identifies the resource in
-	// the remote system. This typically sets the external ID on the remote resource
-	// and returns its state. Import is used when users want to manage pre-existing
-	// resources through configuration files.
-	Import(ctx context.Context, data *Res, remoteId string) (*State, error)
-
-	// Delete removes a resource from the remote system. It receives the resource ID,
-	// the last known configuration (oldData), and state (oldState) to enable cleanup
-	// operations that may depend on the resource's current configuration. Some
-	// implementations may need state information to properly delete dependent resources
-	// or perform cascading deletes.
-	Delete(ctx context.Context, id string, oldData *Res, oldState *State) error
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) GetResourceType() string {
@@ -231,7 +108,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(fileMetadata 
 		workspaceId := workspaceMetadata.WorkspaceID
 		resources := workspaceMetadata.Resources
 		for _, resourceMetadata := range resources {
-			h.importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+			h.importMetadata[resourceMetadata.LocalID] = &importResourceInfo{
 				WorkspaceId: workspaceId,
 				RemoteId:    resourceMetadata.RemoteID,
 			}
@@ -241,11 +118,33 @@ func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(fileMetadata 
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	id, ok := s.Spec["id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("id not found in event stream source spec")
+	// First, try to extract a single "id" field
+	if id, ok := s.Spec["id"].(string); ok {
+		return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
 	}
-	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+
+	// If the spec has a single field that is an array, extract IDs from array elements
+	if len(s.Spec) == 1 {
+		for _, value := range s.Spec {
+			if arr, ok := value.([]interface{}); ok {
+				externalIDs := make([]string, 0, len(arr))
+				for i, item := range arr {
+					if itemMap, ok := item.(map[string]interface{}); ok {
+						if id, ok := itemMap["id"].(string); ok {
+							externalIDs = append(externalIDs, id)
+						} else {
+							return nil, fmt.Errorf("array item at index %d does not have an 'id' field", i)
+						}
+					} else {
+						return nil, fmt.Errorf("array item at index %d is not a map", i)
+					}
+				}
+				return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("id not found in spec")
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.Spec) error {
@@ -406,7 +305,16 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Import(ctx context.Context, rawD
 	return h.Impl.Import(ctx, raw, remoteId)
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) CreatePropertyRef(
+func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
+	ctx context.Context,
+	collection *resources.ResourceCollection,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	return h.Impl.FormatForExport(ctx, collection, idNamer, inputResolver)
+}
+
+func CreatePropertyRef[State any](
 	urn string,
 	extractor func(*State) (string, error),
 ) *resources.PropertyRef {

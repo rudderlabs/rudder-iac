@@ -36,15 +36,14 @@ type Handler interface {
 
 type BaseProvider struct {
 	EmptyProvider
-	name       string
 	handlers   map[string]Handler
 	kindToType map[string]string
 }
 
-func NewBaseProvider(name string, handlers []Handler) *BaseProvider {
+func NewBaseProvider(handlers []Handler) *BaseProvider {
 	kindToType := map[string]string{}
 	for _, handler := range handlers {
-		kindToType[handler.GetResourceType()] = handler.GetSpecKind()
+		kindToType[handler.GetSpecKind()] = handler.GetResourceType()
 	}
 
 	handlersMap := map[string]Handler{}
@@ -53,18 +52,13 @@ func NewBaseProvider(name string, handlers []Handler) *BaseProvider {
 	}
 
 	return &BaseProvider{
-		name:       name,
 		handlers:   handlersMap,
 		kindToType: kindToType,
 	}
 
 }
 
-func (p *BaseProvider) GetName() string {
-	return p.name
-}
-
-func (p *BaseProvider) GetSupportedKinds() []string {
+func (p *BaseProvider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {
 		kinds = append(kinds, kind)
@@ -72,10 +66,10 @@ func (p *BaseProvider) GetSupportedKinds() []string {
 	return kinds
 }
 
-func (p *BaseProvider) GetSupportedTypes() []string {
+func (p *BaseProvider) SupportedTypes() []string {
 	types := make([]string, 0, len(p.kindToType))
-	for _, t := range p.kindToType {
-		types = append(types, t)
+	for _, resourceType := range p.kindToType {
+		types = append(types, resourceType)
 	}
 	return types
 }

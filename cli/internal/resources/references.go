@@ -71,7 +71,18 @@ func collectReferencesByReflection(v any) []*PropertyRef {
 			refs = append(refs, collectReferencesByReflection(val.MapIndex(key).Interface())...)
 		}
 		return refs
+	case reflect.Ptr:
+		// If v is a pointer, get the element it points to
+		if !val.IsNil() {
+			refs = append(refs, collectReferencesByReflection(val.Elem().Interface())...)
+		}
+		return refs
 	case reflect.Struct:
+		if ref, ok := val.Interface().(PropertyRef); ok {
+			refs = append(refs, &ref)
+			return refs
+		}
+
 		// Recursively collect references from the fields of the struct
 		for i := 0; i < val.NumField(); i++ {
 			field := val.Field(i)

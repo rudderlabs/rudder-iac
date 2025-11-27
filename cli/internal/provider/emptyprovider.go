@@ -28,7 +28,7 @@ func (p *EmptyProvider) UpdateRaw(_ context.Context, _ *resources.Resource, _ an
 	return nil, errNotImplemented
 }
 
-func (p *EmptyProvider) Import(_ context.Context, _ string, _ string, _ resources.ResourceData, _ string, _ string) (*resources.ResourceData, error) {
+func (p *EmptyProvider) Import(_ context.Context, _ string, _ string, _ resources.ResourceData, _ string) (*resources.ResourceData, error) {
 	return nil, errNotImplemented
 }
 
