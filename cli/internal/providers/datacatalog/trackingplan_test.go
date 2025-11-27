@@ -54,6 +54,10 @@ func (m *MockTrackingPlanCatalog) DeleteTrackingPlan(ctx context.Context, tracki
 	return m.err
 }
 
+func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+	return m.tp, m.err
+}
+
 func (m *MockTrackingPlanCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlanID string, eventID string) error {
 	m.deleteEventCalled = true
 	m.deleteEventCallCount++
@@ -64,7 +68,7 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.tpWithIdentifiers, m.err
 }
 
@@ -76,10 +80,12 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvent(ctx context.Context, id string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
-	m.updateEventCalled = true
-	m.updateEventCallCount++
-	return m.tp, m.err
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail) error {
+	for range input {
+		m.updateEventCalled = true
+		m.updateEventCallCount++
+	}
+	return m.err
 }
 
 func (m *MockTrackingPlanCatalog) SetTrackingPlan(tp *catalog.TrackingPlan) {
@@ -185,12 +191,6 @@ func TestTrackingPlanProvider_Update(t *testing.T) {
 	// // the default tracking plan with version
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
-		WithEvent(catalog.TrackingPlanEvent{
-			ID:             "upstream-tracking-plan-event-id",
-			TrackingPlanID: "tracking-plan-id",
-			SchemaID:       "upstream-schema-id",
-			EventID:        "upstream-event-id",
-		}).
 		WithVersion(2).
 		Build()
 
@@ -283,12 +283,7 @@ func TestTrackingPlanProvider_UpdateWithUpsertEvent(t *testing.T) {
 	updatedTP := defaultTrackingPlanFactory().
 		WithDescription("tracking-plan-updated-description"). // updated description
 		WithVersion(2).
-		WithEvent(catalog.TrackingPlanEvent{
-			ID:             "upstream-tracking-plan-event-id-1",
-			TrackingPlanID: "tracking-plan-id",
-			SchemaID:       "upstream-schema-id-1",
-			EventID:        "upsream-event-id-1",
-		}).Build()
+		Build()
 
 	mockCatalog.SetError(nil)
 	mockCatalog.SetTrackingPlan(&updatedTP)
@@ -498,14 +493,7 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				},
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
-				ID:           "remote-tp-id",
-				Name:         "TestTP",
-				Description:  strptr("desc"),
-				Version:      1,
-				CreationType: "backend",
-				WorkspaceID:  "ws-id",
-				CreatedAt:    created,
-				UpdatedAt:    updated,
+				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
 				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 					{
 						ID:                   "remote-event-1",
@@ -583,14 +571,7 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				},
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
-				ID:           "remote-tp-id",
-				Name:         "TestTP",
-				Description:  strptr("desc"),
-				Version:      1,
-				CreationType: "backend",
-				WorkspaceID:  "ws-id",
-				CreatedAt:    created,
-				UpdatedAt:    updated,
+				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
 				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 					{
 						// Event that will be updated
@@ -684,15 +665,17 @@ func TestTrackingPlanProvider_Import(t *testing.T) {
 				Description: "desc",
 			},
 			remoteTrackingPlan: &catalog.TrackingPlanWithIdentifiers{
-				ID:           "remote-tp-id",
-				Name:         "TestTP",
-				Description:  strptr("desc"),
-				Version:      1,
-				CreationType: "backend",
-				WorkspaceID:  "ws-id",
-				CreatedAt:    created,
-				UpdatedAt:    updated,
-				Events:       []*catalog.TrackingPlanEventPropertyIdentifiers{},
+				TrackingPlan: catalog.TrackingPlan{ID: "remote-tp-id", Name: "TestTP", Description: strptr("desc"), Version: 1, CreationType: "backend", WorkspaceID: "ws-id", CreatedAt: created, UpdatedAt: updated},
+				Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+					{
+						ID:                   "remote-event-1",
+						AdditionalProperties: false,
+						IdentitySection:      "",
+						Properties: []*catalog.TrackingPlanEventProperty{
+							{ID: "remote-prop-1", Required: true},
+						},
+					},
+				},
 			},
 			mockErr:        assert.AnError,
 			expectErr:      true,
@@ -780,13 +763,6 @@ func defaultTrackingPlanStateFactory() *factory.TrackingPlanStateFactory {
 
 func getTestTrackingPlan() *catalog.TrackingPlan {
 	f := defaultTrackingPlanFactory()
-	f.WithEvent(catalog.TrackingPlanEvent{
-		ID:             "upstream-tracking-plan-event-id",
-		TrackingPlanID: "tracking-plan-id",
-		SchemaID:       "upstream-schema-id",
-		EventID:        "upsream-event-id",
-	})
-
 	tp := f.Build()
 	return &tp
 }
