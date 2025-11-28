@@ -16,24 +16,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// ErrUnsupportedKind is returned when a provider does not support a given kind
-type ErrUnsupportedKind struct {
-	Kind string
-}
-
-func (e ErrUnsupportedKind) Error() string {
-	return fmt.Sprintf("no provider found for kind %s", e.Kind)
-}
-
-// ErrUnsupportedType is returned when a provider does not support a given type
-type ErrUnsupportedType struct {
-	Type string
-}
-
-func (e ErrUnsupportedType) Error() string {
-	return fmt.Sprintf("no provider found for resource type %s", e.Type)
-}
-
 type CompositeProvider struct {
 	concurrency     int
 	Providers       map[string]Provider
@@ -240,7 +222,7 @@ func (p *CompositeProvider) FormatForExport(
 func (p *CompositeProvider) providerForKind(kind string) (Provider, error) {
 	provider, ok := p.registeredKinds[kind]
 	if !ok {
-		return nil, ErrUnsupportedKind{Kind: kind}
+		return nil, &ErrUnsupportedSpecKind{Kind: kind}
 	}
 	return provider, nil
 }
@@ -248,7 +230,7 @@ func (p *CompositeProvider) providerForKind(kind string) (Provider, error) {
 func (p *CompositeProvider) providerForType(resourceType string) (Provider, error) {
 	provider, ok := p.registeredTypes[resourceType]
 	if !ok {
-		return nil, ErrUnsupportedType{Type: resourceType}
+		return nil, &ErrUnsupportedResourceType{ResourceType: resourceType}
 	}
 	return provider, nil
 }
