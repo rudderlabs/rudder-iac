@@ -1,7 +1,6 @@
 package source_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -273,8 +272,6 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := source.NewMockSourceClient()
 			handler := source.NewHandler(mockClient, importDir)
-			ctx := context.Background()
-
 			importable := tt.setupImportable()
 			remote := tt.setupRemote()
 			graph := tt.setupGraph()
@@ -285,7 +282,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Graph:      graph,
 			}
 
-			entities, err := handler.FormatForExport(ctx, importable, &mockNamer{}, resolverImpl)
+			entities, err := handler.FormatForExport(importable, &mockNamer{}, resolverImpl)
 
 			if tt.expectedErrContains != "" {
 				require.Error(t, err)

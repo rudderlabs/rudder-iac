@@ -129,7 +129,6 @@ func TestFormatForExport(t *testing.T) {
 		require.Nil(t, err)
 
 		result, err := provider.FormatForExport(
-			context.Background(),
 			collection,
 			externalIdNamer,
 			mockResolver,

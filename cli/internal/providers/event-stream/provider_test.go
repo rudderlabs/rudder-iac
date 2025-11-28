@@ -436,8 +436,6 @@ func TestProvider(t *testing.T) {
 	t.Run("FormatForExport", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
 		provider := eventstream.New(mockClient)
-		ctx := context.Background()
-
 		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
@@ -470,7 +468,7 @@ func TestProvider(t *testing.T) {
 		idNamer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, resolver)
+		entities, err := provider.FormatForExport(collection, idNamer, resolver)
 		require.NoError(t, err)
 		assert.Len(t, entities, 2)
 

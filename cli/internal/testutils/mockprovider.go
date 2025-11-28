@@ -171,7 +171,7 @@ func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*
 	return nil, nil
 }
 
-func (m *MockProvider) FormatForExport(_ context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	return nil, nil
 }
 

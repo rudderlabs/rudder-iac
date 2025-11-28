@@ -79,7 +79,7 @@ func WorkspaceImport(
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
-	entities, err := p.FormatForExport(ctx, importable, idNamer, resolver)
+	entities, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
 		return fmt.Errorf("normalizing for import: %w", err)
 	}

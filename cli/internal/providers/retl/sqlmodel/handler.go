@@ -443,7 +443,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	return collection, nil
 }
 
-func (h *Handler) FormatForExport(ctx context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
 		return nil, nil

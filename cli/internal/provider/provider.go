@@ -150,7 +150,6 @@ type Exporter interface {
 	//
 	// Returns a slice of entities that can be formatted and written to disk.
 	FormatForExport(
-		ctx context.Context,
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		resolver resolver.ReferenceResolver,

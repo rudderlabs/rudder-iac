@@ -1334,9 +1334,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
-		ctx := context.Background()
-
-		// Create a RemoteResources with test data
 		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
@@ -1393,7 +1390,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
+		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				return "#/tp/tracking-plan/test-tp-456", nil
 			},

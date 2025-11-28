@@ -106,7 +106,6 @@ func (p *TrackingPlanImportProvider) idResources(
 
 // FormatForExport formats the tracking plans for export to file
 func (p *TrackingPlanImportProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,

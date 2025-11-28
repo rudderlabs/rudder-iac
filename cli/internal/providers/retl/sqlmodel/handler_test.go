@@ -328,7 +328,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -365,7 +365,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := resources.NewRemoteResources()
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
 		})
@@ -378,7 +378,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")

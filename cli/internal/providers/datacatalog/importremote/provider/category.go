@@ -110,7 +110,6 @@ func (p *CategoryImportProvider) idResources(
 
 // FormatForExport formats the categories for export to file
 func (p *CategoryImportProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,

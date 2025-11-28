@@ -545,7 +545,6 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 }
 
 func (h *Handler) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,

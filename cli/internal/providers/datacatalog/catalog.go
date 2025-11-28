@@ -21,7 +21,6 @@ type entityProvider interface {
 type resourceImportProvider interface {
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 	FormatForExport(
-		ctx context.Context,
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,

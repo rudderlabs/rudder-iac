@@ -104,7 +104,6 @@ func (p *CustomTypeImportProvider) idResources(
 
 // FormatForExport formats custom types for export to file
 func (p *CustomTypeImportProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,

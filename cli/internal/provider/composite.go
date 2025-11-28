@@ -195,7 +195,6 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 }
 
 func (p *CompositeProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
@@ -204,7 +203,6 @@ func (p *CompositeProvider) FormatForExport(
 
 	for name, provider := range p.Providers {
 		entities, err := provider.FormatForExport(
-			ctx,
 			collection,
 			idNamer,
 			resolver,

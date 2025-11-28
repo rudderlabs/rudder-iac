@@ -112,7 +112,6 @@ func (p *EventImportProvider) idResources(
 
 // FormatForExport formats the events for export to file
 func (p *EventImportProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,

@@ -28,7 +28,6 @@ type handler interface {
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 	FormatForExport(
-		ctx context.Context,
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
@@ -197,7 +196,6 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 }
 
 func (p *Provider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
@@ -205,7 +203,6 @@ func (p *Provider) FormatForExport(
 	result := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
 		entities, err := handler.FormatForExport(
-			ctx,
 			collection,
 			idNamer,
 			inputResolver,

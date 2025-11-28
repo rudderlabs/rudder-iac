@@ -244,10 +244,10 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(ctx context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (p *Provider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	allEntities := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(ctx, collection, idNamer, inputResolver)
+		entities, err := handler.FormatForExport(collection, idNamer, inputResolver)
 		if err != nil {
 			return nil, fmt.Errorf("formatting for export for handler %w", err)
 		}

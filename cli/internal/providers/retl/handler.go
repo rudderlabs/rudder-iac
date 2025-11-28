@@ -90,5 +90,5 @@ type resourceHandler interface {
 	// The idNamer is used to generate unique IDs for the resources.
 	// The inputResolver is used to resolve references to other resources.
 	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(ctx context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
+	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
 }

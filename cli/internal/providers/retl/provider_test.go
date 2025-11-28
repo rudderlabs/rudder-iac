@@ -996,9 +996,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
 
@@ -1033,9 +1032,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.Error(t, err)
 		assert.Nil(t, entities)
 		assert.Contains(t, err.Error(), "formatting for export for handler")

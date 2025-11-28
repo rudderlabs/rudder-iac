@@ -105,7 +105,6 @@ func (p *PropertyImportProvider) idResources(
 
 // NormalizeForImport normalizes the properties for import
 func (p *PropertyImportProvider) FormatForExport(
-	ctx context.Context,
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
