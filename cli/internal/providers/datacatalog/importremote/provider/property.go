@@ -41,9 +41,9 @@ func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable properties from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -74,7 +74,7 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer nam
 }
 
 func (p *PropertyImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to properties")
@@ -106,7 +106,7 @@ func (p *PropertyImportProvider) idResources(
 // NormalizeForImport normalizes the properties for import
 func (p *PropertyImportProvider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

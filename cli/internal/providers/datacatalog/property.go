@@ -177,9 +177,9 @@ func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all properties from the remote catalog
-func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading properties from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch properties from remote
 	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -200,7 +200,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *PropertyProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *PropertyProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	properties := collection.GetAll(state.PropertyResourceType)
 	for _, remoteProperty := range properties {

@@ -188,8 +188,8 @@ func (p *Provider) FetchImportData(ctx context.Context, resourceType string, imp
 }
 
 // LoadResourcesFromRemote loads all RETL resources from remote (no-op implementation)
-func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	for resourceType, handler := range p.handlers {
 		c, err := handler.LoadResourcesFromRemote(ctx)
 		if err != nil {
@@ -204,7 +204,7 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 }
 
 // MapRemoteToState reconstructs RETL state from loaded resources (no-op implementation)
-func (p *Provider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for sqlmodelResourceType, handler := range p.handlers {
 		providerState, err := handler.MapRemoteToState(collection)
@@ -229,8 +229,8 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 	return handler.Preview(ctx, ID, data, limit)
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
 		resources, err := handler.LoadImportable(ctx, idNamer)
 		if err != nil {
@@ -244,7 +244,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (p *Provider) FormatForExport(ctx context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	allEntities := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {
 		entities, err := handler.FormatForExport(ctx, collection, idNamer, inputResolver)

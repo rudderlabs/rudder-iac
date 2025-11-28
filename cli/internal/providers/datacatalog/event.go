@@ -201,9 +201,9 @@ func (p *EventProvider) Import(ctx context.Context, ID string, data resources.Re
 }
 
 // LoadResourcesFromRemote loads all events from the remote catalog
-func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading events from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch events from remote
 	events, err := p.catalog.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -225,7 +225,7 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	return collection, nil
 }
 
-func (p *EventProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *EventProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {

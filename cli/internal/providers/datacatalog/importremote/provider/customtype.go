@@ -40,9 +40,9 @@ func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, 
 	}
 }
 
-func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable custom types from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -73,7 +73,7 @@ func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer n
 }
 
 func (p *CustomTypeImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to custom types")
@@ -105,7 +105,7 @@ func (p *CustomTypeImportProvider) idResources(
 // FormatForExport formats custom types for export to file
 func (p *CustomTypeImportProvider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

@@ -1095,7 +1095,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream sources
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1205,7 +1205,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 			// Create a resource collection with event stream source that has a tracking plan
 			// but the tracking plan is not in the collection (simulates tracking plan created via UI)
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1336,8 +1336,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		handler := source.NewHandler(mockClient, importDir)
 		ctx := context.Background()
 
-		// Create a ResourceCollection with test data
-		collection := resources.NewResourceCollection()
+		// Create a RemoteResources with test data
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",

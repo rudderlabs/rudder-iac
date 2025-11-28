@@ -297,8 +297,8 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mkPtr := func(s retlClient.RETLSource) *retlClient.RETLSource { return &s }
-		mkCollection := func(sources ...retlClient.RETLSource) *resources.ResourceCollection {
-			c := resources.NewResourceCollection()
+		mkCollection := func(sources ...retlClient.RETLSource) *resources.RemoteResources {
+			c := resources.NewRemoteResources()
 			m := make(map[string]*resources.RemoteResource)
 			for _, s := range sources {
 				ss := s // copy for address stability
@@ -364,7 +364,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
@@ -374,7 +374,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
@@ -1645,7 +1645,7 @@ func TestSQLModelHandler(t *testing.T) {
 			updatedAt := time.Now()
 
 			// Build a collection with two RETL sources having ExternalID set
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote-1": {
 					ID:         "remote-1",
@@ -1732,7 +1732,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 
 			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {
 					ID:         "bad",

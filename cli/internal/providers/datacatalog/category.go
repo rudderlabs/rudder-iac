@@ -162,9 +162,9 @@ func (p *CategoryProvider) Import(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all categories from the remote catalog
-func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading categories from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch categories from remote
 	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -186,7 +186,7 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *CategoryProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *CategoryProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	categories := collection.GetAll(state.CategoryResourceType)
 	for _, remoteCategory := range categories {

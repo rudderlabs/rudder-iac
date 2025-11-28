@@ -77,7 +77,7 @@ type ManagedRemoteResourceLoader interface {
 	// are used for drift detection and synchronization planning
 	// (by converting them into state and getting the resource graph),
 	// as well as for directly interacting with the remote backend, e.g for listing resources.
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 }
 
 // UnmanagedRemoteResourceLoader loads resources from a remote system that are not yet
@@ -88,7 +88,7 @@ type UnmanagedRemoteResourceLoader interface {
 	// the project's configuration.
 	// The idNamer is used to generate unique IDs for the importable resources,
 	// avoiding conflicts with existing resources.
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 }
 
 // RemoteResourceLoader combines the ability to load both managed and unmanaged resources
@@ -106,7 +106,7 @@ type RemoteResourceLoader interface {
 // State is used to track what resources are managed and their last known configuration.
 type StateLoader interface {
 	// MapRemoteToState transforms a collection of remote resources into a [state.State] format.
-	MapRemoteToState(resources *resources.ResourceCollection) (*state.State, error)
+	MapRemoteToState(resources *resources.RemoteResources) (*state.State, error)
 }
 
 // LifecycleManager handles the creation, modification, deletion, and import of resources
@@ -151,7 +151,7 @@ type Exporter interface {
 	// Returns a slice of entities that can be formatted and written to disk.
 	FormatForExport(
 		ctx context.Context,
-		collection *resources.ResourceCollection,
+		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		resolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)

@@ -41,9 +41,9 @@ func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, impor
 	}
 }
 
-func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable events from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -74,7 +74,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 }
 
 func (p *EventImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to events")
@@ -113,7 +113,7 @@ func (p *EventImportProvider) idResources(
 // FormatForExport formats the events for export to file
 func (p *EventImportProvider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

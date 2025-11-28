@@ -223,24 +223,22 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	args.Variants = variants
 
 	if len(customType.ItemDefinitions) != 0 {
-		for _, item := range customType.ItemDefinitions {
-			id := MustString(item.(map[string]interface{}), "id")
-			urn, err := getURNFromRemoteId(CustomTypeResourceType, id)
-			switch {
-			case err == nil:
-				args.Config["itemTypes"] = []any{
-					resources.PropertyRef{
-						URN:      urn,
-						Property: "name",
-					},
-				}
-			case err == resources.ErrRemoteResourceExternalIdNotFound:
-				args.Config["itemTypes"] = []any{nil}
-			default:
-				return err
+		// we only support one itemdefinition, so we dont need to loop over the whole array
+		item := customType.ItemDefinitions[0]
+		id := MustString(item.(map[string]interface{}), "id")
+		urn, err := getURNFromRemoteId(CustomTypeResourceType, id)
+		switch err {
+		case nil:
+			args.Config["itemTypes"] = []any{
+				resources.PropertyRef{
+					URN:      urn,
+					Property: "name",
+				},
 			}
-			// we only support one itemdefinition, so we dont need to loop over the whole array
-			break
+		case resources.ErrRemoteResourceExternalIdNotFound:
+			args.Config["itemTypes"] = []any{nil}
+		default:
+			return err
 		}
 	}
 
@@ -302,11 +300,7 @@ func (args *CustomTypeArgs) DiffUpstream(upstream *catalog.CustomType) bool {
 	var upstreamVariants Variants
 	upstreamVariants.FromCatalogVariants(upstream.Variants)
 
-	if args.Variants.Diff(upstreamVariants) {
-		return true
-	}
-
-	return false
+	return args.Variants.Diff(upstreamVariants)
 }
 
 // Diff compares two CustomTypeArgs instances and returns true if they differ
@@ -346,11 +340,7 @@ func (args *CustomTypeArgs) Diff(other *CustomTypeArgs) bool {
 		}
 	}
 
-	if args.Variants.Diff(other.Variants) {
-		return true
-	}
-
-	return false
+	return args.Variants.Diff(other.Variants)
 }
 
 type CustomTypeState struct {

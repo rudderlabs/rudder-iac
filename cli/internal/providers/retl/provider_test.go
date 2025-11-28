@@ -821,7 +821,7 @@ func TestProviderMapRemoteToState(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			source.ID: {
 				ID:         source.ID,
@@ -859,7 +859,7 @@ func TestProviderMapRemoteToState(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Insert a malformed resource (Data is wrong type)
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad-1": {
 				ID:         "bad-1",
@@ -987,7 +987,7 @@ func TestProviderFormatForExport(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			src.ID: {
 				ID:         src.ID,
@@ -1024,7 +1024,7 @@ func TestProviderFormatForExport(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Malformed data type inside collection
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad": {
 				ID:         "bad",

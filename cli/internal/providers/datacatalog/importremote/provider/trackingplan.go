@@ -42,9 +42,9 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 	}
 }
 
-func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable tracking plans from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -75,7 +75,7 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 }
 
 func (p *TrackingPlanImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to tracking plans")
@@ -107,7 +107,7 @@ func (p *TrackingPlanImportProvider) idResources(
 // FormatForExport formats the tracking plans for export to file
 func (p *TrackingPlanImportProvider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

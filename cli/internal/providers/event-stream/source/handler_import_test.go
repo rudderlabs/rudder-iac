@@ -22,16 +22,16 @@ import (
 func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 	tests := []struct {
 		name                string
-		setupImportable     func() *resources.ResourceCollection
-		setupRemote         func() *resources.ResourceCollection
+		setupImportable     func() *resources.RemoteResources
+		setupRemote         func() *resources.RemoteResources
 		setupGraph          func() *resources.Graph
 		expectedSpec        *specs.Spec
 		expectedErrContains string
 	}{
 		{
 			name: "source with tracking plan already managed by CLI",
-			setupImportable: func() *resources.ResourceCollection {
-				importable := resources.NewResourceCollection()
+			setupImportable: func() *resources.RemoteResources {
+				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
 					"remote123": {
 						ID:         "remote123",
@@ -62,8 +62,8 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				importable.Set(source.ResourceType, importableSourceMap)
 				return importable
 			},
-			setupRemote: func() *resources.ResourceCollection {
-				remote := resources.NewResourceCollection()
+			setupRemote: func() *resources.RemoteResources {
+				remote := resources.NewRemoteResources()
 				remoteTpMap := map[string]*resources.RemoteResource{
 					"remote-tp-456": {
 						ID:         "remote-tp-456",
@@ -127,8 +127,8 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 		},
 		{
 			name: "source with tracking plan being imported together",
-			setupImportable: func() *resources.ResourceCollection {
-				importable := resources.NewResourceCollection()
+			setupImportable: func() *resources.RemoteResources {
+				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
 					"remote123": {
 						ID:         "remote123",
@@ -168,8 +168,8 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				importable.Set(dcstate.TrackingPlanResourceType, importableTpMap)
 				return importable
 			},
-			setupRemote: func() *resources.ResourceCollection {
-				return resources.NewResourceCollection()
+			setupRemote: func() *resources.RemoteResources {
+				return resources.NewRemoteResources()
 			},
 			setupGraph: func() *resources.Graph {
 				return resources.NewGraph()
@@ -214,8 +214,8 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 		},
 		{
 			name: "source without tracking plan",
-			setupImportable: func() *resources.ResourceCollection {
-				importable := resources.NewResourceCollection()
+			setupImportable: func() *resources.RemoteResources {
+				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
 					"remote123": {
 						ID:         "remote123",
@@ -234,8 +234,8 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				importable.Set(source.ResourceType, importableSourceMap)
 				return importable
 			},
-			setupRemote: func() *resources.ResourceCollection {
-				return resources.NewResourceCollection()
+			setupRemote: func() *resources.RemoteResources {
+				return resources.NewRemoteResources()
 			},
 			setupGraph: func() *resources.Graph {
 				return resources.NewGraph()

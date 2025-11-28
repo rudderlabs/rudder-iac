@@ -24,12 +24,12 @@ type handler interface {
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error)
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
+	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 	FormatForExport(
 		ctx context.Context,
-		collection *resources.ResourceCollection,
+		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
@@ -118,8 +118,8 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	for resourceType, handler := range p.handlers {
 		c, err := handler.LoadResourcesFromRemote(ctx)
 		if err != nil {
@@ -133,7 +133,7 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-func (p *Provider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for resourceType, handler := range p.handlers {
 		providerState, err := handler.MapRemoteToState(collection)
@@ -181,8 +181,8 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return handler.Import(ctx, ID, data, remoteId)
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
 		resources, err := handler.LoadImportable(ctx, idNamer)
 		if err != nil {
@@ -198,7 +198,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 
 func (p *Provider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

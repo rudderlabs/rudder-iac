@@ -166,9 +166,9 @@ var _ tasker.Task = &compositeProviderTask{}
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
@@ -180,7 +180,7 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
@@ -214,7 +214,7 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 
 func (p *CompositeProvider) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
@@ -253,9 +253,9 @@ func (p *CompositeProvider) providerForType(resourceType string) (Provider, erro
 	return provider, nil
 }
 
-func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
@@ -267,7 +267,7 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
@@ -299,7 +299,7 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 	return collection, nil
 }
 
-func (p *CompositeProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	// Load and merge state from all providers
 	for _, provider := range p.Providers {

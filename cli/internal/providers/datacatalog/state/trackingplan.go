@@ -75,7 +75,7 @@ func (t *TrackingPlanState) FromResourceData(from resources.ResourceData) {
 }
 
 // FromRemoteTrackingPlan converts from catalog.TrackingPlan to TrackingPlanState
-func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.ResourceCollection) error {
+func (t *TrackingPlanState) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.RemoteResources) error {
 	t.ID = trackingPlan.ID
 	t.Name = trackingPlan.Name
 	t.WorkspaceID = trackingPlan.WorkspaceID
@@ -417,7 +417,7 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 // usePropertyRefsForDependencies is used to determine if the property ID should be converted to a propertyRef or not
 // for TrackingPlanArgs(which becomes the state's input field later) we need to convert propertyIDs into propertyRefs
 // for TrackingPlanState(which becomes the state's output field later), we use the propertyID as is
-func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp *catalog.TrackingPlanEventProperty, collection *resources.ResourceCollection, usePropertyRefsForDependencies bool) error {
+func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp *catalog.TrackingPlanEventProperty, collection *resources.RemoteResources, usePropertyRefsForDependencies bool) error {
 	if usePropertyRefsForDependencies {
 		urn, err := collection.GetURNByID(PropertyResourceType, remoteProp.ID)
 		if err != nil {
@@ -669,7 +669,7 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 	}
 }
 
-func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.ResourceCollection) error {
+func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.RemoteResources) error {
 	args.Name = trackingPlan.Name
 	args.LocalID = trackingPlan.ExternalID
 	if trackingPlan.Description != nil {

@@ -114,8 +114,8 @@ func initNamer(graph *resources.Graph) (namer.Namer, error) {
 }
 
 func initResolver(
-	remoteCollection *resources.ResourceCollection,
-	importable *resources.ResourceCollection,
+	remoteCollection *resources.RemoteResources,
+	importable *resources.RemoteResources,
 	graph *resources.Graph,
 ) (*resolver.ImportRefResolver, error) {
 

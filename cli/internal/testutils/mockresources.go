@@ -35,16 +35,16 @@ type OperationLogEntry struct {
 type DataCatalogProvider struct {
 	InitialState       *state.State
 	ReconstructedState *state.State
-	InitialResources   *resources.ResourceCollection
+	InitialResources   *resources.RemoteResources
 	OperationLog       []OperationLogEntry
 	operationMutex     sync.Mutex
 }
 
-func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.ResourceCollection, error) {
+func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
 	return p.InitialResources, nil
 }
 
-func (p *DataCatalogProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (p *DataCatalogProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	return p.ReconstructedState, nil
 }
 

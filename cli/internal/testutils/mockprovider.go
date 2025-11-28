@@ -20,7 +20,7 @@ type MockProvider struct {
 	LoadSpecErr                error
 	GetResourceGraphVal        *resources.Graph
 	GetResourceGraphErr        error
-	LoadResourcesFromRemoteVal *resources.ResourceCollection
+	LoadResourcesFromRemoteVal *resources.RemoteResources
 	LoadResourcesFromRemoteErr error
 	MapRemoteToStateVal        *state.State
 	MapRemoteToStateErr        error
@@ -137,12 +137,12 @@ func (m *MockProvider) ResourceGraph() (*resources.Graph, error) {
 	return m.GetResourceGraphVal, m.GetResourceGraphErr
 }
 
-func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.ResourceCollection, error) {
+func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
 	m.LoadResourcesFromRemoteCalledCount++
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
 }
 
-func (m *MockProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (m *MockProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	m.MapRemoteToStateCalledCount++
 	return m.MapRemoteToStateVal, m.MapRemoteToStateErr
 }
@@ -167,11 +167,11 @@ func (m *MockProvider) Import(_ context.Context, ID string, resourceType string,
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 
-func (m *MockProvider) FormatForExport(_ context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (m *MockProvider) FormatForExport(_ context.Context, collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	return nil, nil
 }
 

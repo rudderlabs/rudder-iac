@@ -390,8 +390,8 @@ func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, 
 	return nil
 }
 
-func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
@@ -413,7 +413,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
-func (p *Handler) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	esResources := collection.GetAll(ResourceType)
 	for _, esResource := range esResources {
@@ -514,8 +514,8 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	return result, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
@@ -546,7 +546,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 
 func (h *Handler) FormatForExport(
 	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

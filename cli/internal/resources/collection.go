@@ -7,7 +7,7 @@ import (
 
 // RemoteResource represents a resource that is fetched from the remote catalog
 // It contains the ID, ExternalID, and Data of the resource
-// ResourceCollection is type-agnostic and uses ID/ExternalID for framework operations like building the URN given the remoteID
+// RemoteResources is type-agnostic and uses ID/ExternalID for framework operations like building the URN given the remoteID
 type RemoteResource struct {
 	ID         string
 	ExternalID string
@@ -15,9 +15,9 @@ type RemoteResource struct {
 	Data       interface{}
 }
 
-// ResourceCollection provides a generic container for mixed resource types
+// RemoteResources provides a generic container for mixed resource types
 // with generic getters and efficient ID-based lookups
-type ResourceCollection struct {
+type RemoteResources struct {
 	resources map[string]map[string]*RemoteResource
 }
 
@@ -27,14 +27,14 @@ var (
 	ErrRemoteResourceExternalIdNotFound = errors.New("remote resource does not have externalId")
 )
 
-// NewResourceCollection creates a new empty ResourceCollection
-func NewResourceCollection() *ResourceCollection {
-	return &ResourceCollection{
+// NewRemoteResources creates a new empty RemoteResources
+func NewRemoteResources() *RemoteResources {
+	return &RemoteResources{
 		resources: make(map[string]map[string]*RemoteResource),
 	}
 }
 
-func (rc *ResourceCollection) Len() int {
+func (rc *RemoteResources) Len() int {
 	count := 0
 	for _, resources := range rc.resources {
 		count += len(resources)
@@ -43,12 +43,12 @@ func (rc *ResourceCollection) Len() int {
 }
 
 // Set stores a resource map for the given resource type
-func (rc *ResourceCollection) Set(resourceType string, resourceMap map[string]*RemoteResource) {
+func (rc *RemoteResources) Set(resourceType string, resourceMap map[string]*RemoteResource) {
 	rc.resources[resourceType] = resourceMap
 }
 
 // GetAll returns all resources of the given type as a slice
-func (rc *ResourceCollection) GetAll(resourceType string) map[string]*RemoteResource {
+func (rc *RemoteResources) GetAll(resourceType string) map[string]*RemoteResource {
 	resourceMap := rc.resources[resourceType]
 	if len(resourceMap) == 0 {
 		return nil
@@ -58,7 +58,7 @@ func (rc *ResourceCollection) GetAll(resourceType string) map[string]*RemoteReso
 }
 
 // GetByID returns a specific resource by ID and type
-func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteResource, bool) {
+func (rc *RemoteResources) GetByID(resourceType string, id string) (*RemoteResource, bool) {
 	resourceMap := rc.resources[resourceType]
 	if resourceMap == nil {
 		return nil, false
@@ -68,7 +68,7 @@ func (rc *ResourceCollection) GetByID(resourceType string, id string) (*RemoteRe
 	return resource, exists
 }
 
-func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string, error) {
+func (rc *RemoteResources) GetURNByID(resourceType string, id string) (string, error) {
 	resource, exists := rc.GetByID(resourceType, id)
 	if !exists {
 		return "", ErrRemoteResourceNotFound
@@ -81,13 +81,13 @@ func (rc *ResourceCollection) GetURNByID(resourceType string, id string) (string
 	return URN(resource.ExternalID, resourceType), nil
 }
 
-// Merge merges resources from another ResourceCollection into a new collection
-// Returns a new ResourceCollection or an error if there are any overlapping keys
-func (rc *ResourceCollection) Merge(other *ResourceCollection) (*ResourceCollection, error) {
+// Merge merges resources from another RemoteResources into a new collection
+// Returns a new RemoteResources or an error if there are any overlapping keys
+func (rc *RemoteResources) Merge(other *RemoteResources) (*RemoteResources, error) {
 	if other == nil {
 		return rc, nil
 	}
-	newCollection := NewResourceCollection()
+	newCollection := NewRemoteResources()
 
 	// First, copy all resources from current collection
 	for k1, v1 := range rc.resources {

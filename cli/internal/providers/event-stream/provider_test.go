@@ -315,8 +315,8 @@ func TestProvider(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
 		provider := eventstream.New(mockClient)
 
-		// Create a ResourceCollection with test data
-		collection := resources.NewResourceCollection()
+		// Create a RemoteResources with test data
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
@@ -438,7 +438,7 @@ func TestProvider(t *testing.T) {
 		provider := eventstream.New(mockClient)
 		ctx := context.Background()
 
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
