@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/backend"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func TestExamplesSync(t *testing.T) {
 		err := proj.Load()
 		require.NoError(t, err, "Failed to load project specs")
 		// Create syncer and sync the project resource graph to the backend
-		targetGraph, err := proj.GetResourceGraph()
+		targetGraph, err := proj.ResourceGraph()
 		require.NoError(t, err, "Failed to get resource graph")
 		s, err := syncer.New(provider, workspace)
 		require.NoError(t, err, "Failed to create syncer")

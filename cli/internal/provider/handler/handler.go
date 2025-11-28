@@ -100,15 +100,14 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	Delete(ctx context.Context, id string, oldData *Res, oldState *State) error
 
 	FormatForExport(
-		ctx context.Context,
-		collection *resources.ResourceCollection,
+		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
 }
 
 // URNResolver provides URN (Uniform Resource Name) resolution from remote resource IDs.
-// Implementations (such as ResourceCollection) use this interface to resolve cross-resource
+// Implementations (such as RemoteResources) use this interface to resolve cross-resource
 // references by translating a resource type and ID into a URN that can be used to reference
 // the resource in configuration files and state. This enables resources to reference each
 // other using stable identifiers.

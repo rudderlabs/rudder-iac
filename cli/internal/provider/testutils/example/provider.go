@@ -2,9 +2,9 @@ package example
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/backend"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/handlers/book"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/handlers/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/book"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 )
 
 // NewProvider creates a new example provider with all resource handlers

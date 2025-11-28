@@ -2,7 +2,7 @@ package writer
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/backend"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
 )
 
 // WriterSpec represents the configuration for a writer resource

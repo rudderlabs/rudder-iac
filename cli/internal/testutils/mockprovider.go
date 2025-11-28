@@ -144,7 +144,7 @@ func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.Re
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
 }
 
-func (m *MockProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+func (m *MockProvider) MapRemoteToState(_ *resources.RemoteResources) (*state.State, error) {
 	m.MapRemoteToStateCalledCount++
 	return m.MapRemoteToStateVal, m.MapRemoteToStateErr
 }
@@ -169,7 +169,7 @@ func (m *MockProvider) Import(_ context.Context, ID string, resourceType string,
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 

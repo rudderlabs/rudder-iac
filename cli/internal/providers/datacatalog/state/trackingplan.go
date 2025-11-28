@@ -434,7 +434,7 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 
 	prop, ok := collection.GetByID(PropertyResourceType, remoteProp.ID)
 	if !ok {
-		return fmt.Errorf("getting property %s from resourceCollection: %w", remoteProp.ID, resources.ErrRemoteResourceNotFound)
+		return fmt.Errorf("getting property %s from RemoteResources: %w", remoteProp.ID, resources.ErrRemoteResourceNotFound)
 	}
 	args.LocalID = prop.ExternalID
 	args.Required = remoteProp.Required

@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/backend"
-	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/providers/example/handlers/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
+	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -187,8 +187,7 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *BookResour
 }
 
 func (h *HandlerImpl) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

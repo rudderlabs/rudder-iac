@@ -2,7 +2,7 @@ package book
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/example/backend"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 

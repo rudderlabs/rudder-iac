@@ -56,16 +56,16 @@ func NewHandler[Spec any, Res any, State any, Remote RemoteResource](
 	}
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) GetResourceType() string {
+func (h *BaseHandler[Spec, Res, State, Remote]) ResourceType() string {
 	return h.resourceType
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) GetSpecKind() string {
+func (h *BaseHandler[Spec, Res, State, Remote]) SpecKind() string {
 	return h.specKind
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 
 	remoteResources, err := h.Impl.LoadImportableResources(ctx)
 	if err != nil {
@@ -182,7 +182,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Validate(graph *resources.Graph)
 	return nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) GetResources() ([]*resources.Resource, error) {
+func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for resourceId, s := range h.resources {
 		opts := []resources.ResourceOpts{
@@ -203,8 +203,8 @@ func (h *BaseHandler[Spec, Res, State, Remote]) GetResources() ([]*resources.Res
 	return result, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 
 	remoteResources, err := h.Impl.LoadRemoteResources(ctx)
 	if err != nil {
@@ -225,7 +225,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx cont
 	return collection, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	remoteResources := collection.GetAll(h.resourceType)
 
@@ -306,12 +306,11 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Import(ctx context.Context, rawD
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
-	return h.Impl.FormatForExport(ctx, collection, idNamer, inputResolver)
+	return h.Impl.FormatForExport(collection, idNamer, inputResolver)
 }
 
 func CreatePropertyRef[State any](
