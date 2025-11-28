@@ -1635,7 +1635,7 @@ func TestSQLModelHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		t.Run("Success with multiple resources", func(t *testing.T) {
 			t.Parallel()
 
@@ -1691,7 +1691,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, resourceMap)
 
 			// Execute
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 
 			// Verify
 			require.NoError(t, err)
@@ -1741,7 +1741,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 			})
 
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 			assert.Error(t, err)
 			assert.Nil(t, st)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")

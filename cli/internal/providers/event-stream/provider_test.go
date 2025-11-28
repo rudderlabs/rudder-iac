@@ -158,7 +158,7 @@ func TestProvider(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		graph, err := provider.GetResourceGraph()
+		graph, err := provider.ResourceGraph()
 		require.NoError(t, err)
 
 		// Verify both resources are in the graph
@@ -311,11 +311,9 @@ func TestProvider(t *testing.T) {
 		}, esResources)
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
 		provider := eventstream.New(mockClient)
-
-		ctx := context.Background()
 
 		// Create a ResourceCollection with test data
 		collection := resources.NewResourceCollection()
@@ -345,7 +343,7 @@ func TestProvider(t *testing.T) {
 		}
 		collection.Set(source.ResourceType, resourceMap)
 
-		loadedState, err := provider.LoadStateFromResources(ctx, collection)
+		loadedState, err := provider.MapRemoteToState(collection)
 		require.NoError(t, err)
 
 		assert.Len(t, loadedState.Resources, 2)

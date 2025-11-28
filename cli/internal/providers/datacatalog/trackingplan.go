@@ -239,7 +239,7 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 	return collection, nil
 }
 
-func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *TrackingPlanProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
 	for _, remoteTP := range trackingPlans {
@@ -248,7 +248,7 @@ func (p *TrackingPlanProvider) LoadStateFromResources(ctx context.Context, colle
 		}
 		trackingPlan, ok := remoteTP.Data.(*catalog.TrackingPlanWithIdentifiers)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.TrackingPlan")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.TrackingPlan")
 		}
 		args := &state.TrackingPlanArgs{}
 		args.FromRemoteTrackingPlan(trackingPlan, collection)

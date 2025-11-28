@@ -225,7 +225,7 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	return collection, nil
 }
 
-func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *EventProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {
@@ -234,7 +234,7 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		}
 		event, ok := remoteEvent.Data.(*catalog.Event)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Event")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Event")
 		}
 		args := &state.EventArgs{}
 		args.FromRemoteEvent(event, collection.GetURNByID)

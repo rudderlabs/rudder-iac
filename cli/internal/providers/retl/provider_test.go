@@ -219,7 +219,7 @@ func TestProvider(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			graph, err := provider.GetResourceGraph()
+			graph, err := provider.ResourceGraph()
 			require.NoError(t, err)
 			assert.NotNil(t, graph)
 
@@ -799,7 +799,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 	})
 }
 
-func TestProviderLoadStateFromResources(t *testing.T) {
+func TestProviderMapRemoteToState(t *testing.T) {
 	t.Run("Success reconstructs state from collection", func(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
@@ -830,8 +830,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
@@ -869,8 +868,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.Error(t, err)
 		assert.Nil(t, st)
 		// Wrapped error should mention provider handler and inner cast error

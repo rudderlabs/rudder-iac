@@ -200,7 +200,7 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *PropertyProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	properties := collection.GetAll(state.PropertyResourceType)
 	for _, remoteProperty := range properties {
@@ -209,7 +209,7 @@ func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collectio
 		}
 		property, ok := remoteProperty.Data.(*catalog.Property)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Property")
 		}
 		args := &state.PropertyArgs{}
 		args.FromRemoteProperty(property, collection.GetURNByID)

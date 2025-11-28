@@ -413,7 +413,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
-func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Handler) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	esResources := collection.GetAll(ResourceType)
 	for _, esResource := range esResources {

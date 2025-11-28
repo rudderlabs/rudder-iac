@@ -77,7 +77,7 @@ func NewCmdApply() *cobra.Command {
 			}
 
 			// Get resource graph to understand dependencies
-			graph, err := p.GetResourceGraph()
+			graph, err := p.ResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}

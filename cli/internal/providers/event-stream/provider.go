@@ -25,7 +25,7 @@ type handler interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
 	FormatForExport(
 		ctx context.Context,
@@ -104,7 +104,7 @@ func (p *Provider) Validate(graph *resources.Graph) error {
 	return nil
 }
 
-func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
+func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for resourceType, handler := range p.handlers {
 		resources, err := handler.GetResources()
@@ -133,10 +133,10 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Provider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	for resourceType, handler := range p.handlers {
-		providerState, err := handler.LoadStateFromResources(ctx, collection)
+		providerState, err := handler.MapRemoteToState(collection)
 		if err != nil {
 			return nil, fmt.Errorf("loading state from provider handler %s: %w", resourceType, err)
 		}

@@ -383,7 +383,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
-func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (h *Handler) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	sqlModelResources := collection.GetAll(ResourceType)
 	for _, resource := range sqlModelResources {

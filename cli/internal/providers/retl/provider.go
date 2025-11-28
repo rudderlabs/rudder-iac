@@ -98,7 +98,7 @@ func (p *Provider) Validate(_ *resources.Graph) error {
 }
 
 // GetResourceGraph returns a graph of all resources
-func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
+func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 
 	for resourceType, handler := range p.handlers {
@@ -203,11 +203,11 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-// LoadStateFromResources reconstructs RETL state from loaded resources (no-op implementation)
-func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+// MapRemoteToState reconstructs RETL state from loaded resources (no-op implementation)
+func (p *Provider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	for sqlmodelResourceType, handler := range p.handlers {
-		providerState, err := handler.LoadStateFromResources(ctx, collection)
+		providerState, err := handler.MapRemoteToState(collection)
 		if err != nil {
 			return nil, fmt.Errorf("loading state from provider handler %s: %w", sqlmodelResourceType, err)
 		}

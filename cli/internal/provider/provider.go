@@ -51,7 +51,7 @@ type SpecLoader interface {
 	// However, the current design allows for loading multiple specs before retrieving the full graph.
 	// An alternative approach would be for the [project.Project] to aggregate graphs from multiple providers,
 	// during the loading phase.
-	GetResourceGraph() (*resources.Graph, error)
+	ResourceGraph() (*resources.Graph, error)
 }
 
 // Validator performs provider-specific validation on a resource graph.
@@ -105,8 +105,8 @@ type RemoteResourceLoader interface {
 // StateLoader converts remote resources into a state representation.
 // State is used to track what resources are managed and their last known configuration.
 type StateLoader interface {
-	// LoadStateFromResources transforms a collection of remote resources into a [state.State] format.
-	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
+	// MapRemoteToState transforms a collection of remote resources into a [state.State] format.
+	MapRemoteToState(resources *resources.ResourceCollection) (*state.State, error)
 }
 
 // LifecycleManager handles the creation, modification, deletion, and import of resources

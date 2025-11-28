@@ -105,10 +105,10 @@ func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 	return provider.LoadSpec(path, s)
 }
 
-func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
+func (p *CompositeProvider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for _, provider := range p.Providers {
-		g, err := provider.GetResourceGraph()
+		g, err := provider.ResourceGraph()
 		if err != nil {
 			return nil, err
 		}
@@ -299,11 +299,11 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 	return collection, nil
 }
 
-func (p *CompositeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *CompositeProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	s := state.EmptyState()
 	// Load and merge state from all providers
 	for _, provider := range p.Providers {
-		state, err := provider.LoadStateFromResources(ctx, collection)
+		state, err := provider.MapRemoteToState(collection)
 		if err != nil {
 			return nil, err
 		}

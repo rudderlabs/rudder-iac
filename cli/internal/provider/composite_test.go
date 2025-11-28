@@ -270,7 +270,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 	}
 }
 
-func TestCompositeProvider_GetResourceGraph(t *testing.T) {
+func TestCompositeProvider_ResourceGraph(t *testing.T) {
 	graph1 := resources.NewGraph()
 	graph1.AddResource(resources.NewResource("id1", "typeA", resources.ResourceData{"key": "val1"}, nil))
 	errTest := errors.New("test getresourcegraph error")
@@ -332,7 +332,7 @@ func TestCompositeProvider_GetResourceGraph(t *testing.T) {
 			cp, errCp := provider.NewCompositeProvider(providerInterfaces)
 			assert.NoError(t, errCp)
 			assert.NotNil(t, cp)
-			graph, err := cp.GetResourceGraph()
+			graph, err := cp.ResourceGraph()
 
 			assert.ErrorIs(t, err, tt.expectedErr)
 

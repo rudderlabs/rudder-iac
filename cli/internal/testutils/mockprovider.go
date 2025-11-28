@@ -22,8 +22,8 @@ type MockProvider struct {
 	GetResourceGraphErr        error
 	LoadResourcesFromRemoteVal *resources.ResourceCollection
 	LoadResourcesFromRemoteErr error
-	LoadStateFromResourcesVal  *state.State
-	LoadStateFromResourcesErr  error
+	MapRemoteToStateVal        *state.State
+	MapRemoteToStateErr        error
 	CreateVal                  *resources.ResourceData
 	CreateErr                  error
 	UpdateVal                  *resources.ResourceData
@@ -42,7 +42,7 @@ type MockProvider struct {
 	GetResourceGraphCalledCount        int
 	GetResourceGraphErrorReturnedCount int
 	LoadResourcesFromRemoteCalledCount int
-	LoadStateFromResourcesCalledCount  int
+	MapRemoteToStateCalledCount        int
 	CreateCalledWithArg                CreateArgs
 	UpdateCalledWithArg                UpdateArgs
 	DeleteCalledWithArg                DeleteArgs
@@ -129,7 +129,7 @@ func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
 	return m.LoadSpecErr
 }
 
-func (m *MockProvider) GetResourceGraph() (*resources.Graph, error) {
+func (m *MockProvider) ResourceGraph() (*resources.Graph, error) {
 	m.GetResourceGraphCalledCount++
 	if m.GetResourceGraphErr != nil {
 		m.GetResourceGraphErrorReturnedCount++
@@ -142,9 +142,9 @@ func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.Re
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
 }
 
-func (m *MockProvider) LoadStateFromResources(_ context.Context, collection *resources.ResourceCollection) (*state.State, error) {
-	m.LoadStateFromResourcesCalledCount++
-	return m.LoadStateFromResourcesVal, m.LoadStateFromResourcesErr
+func (m *MockProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
+	m.MapRemoteToStateCalledCount++
+	return m.MapRemoteToStateVal, m.MapRemoteToStateErr
 }
 
 func (m *MockProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {

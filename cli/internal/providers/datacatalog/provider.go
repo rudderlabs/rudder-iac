@@ -87,7 +87,7 @@ func (p *Provider) Validate(_ *resources.Graph) error {
 	return fmt.Errorf("catalog is invalid: %s", err.Error())
 }
 
-func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
+func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	if err := inflateRefs(p.dc); err != nil {
 		return nil, fmt.Errorf("inflating refs: %w", err)
 	}

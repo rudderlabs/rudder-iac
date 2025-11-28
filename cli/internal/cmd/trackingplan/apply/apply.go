@@ -66,7 +66,7 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			graph, err := p.GetResourceGraph()
+			graph, err := p.ResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}

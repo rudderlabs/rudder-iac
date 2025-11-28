@@ -29,7 +29,7 @@ type ImportProvider interface {
 }
 
 type Project interface {
-	GetResourceGraph() (*resources.Graph, error)
+	ResourceGraph() (*resources.Graph, error)
 	Location() string
 }
 
@@ -43,13 +43,13 @@ func WorkspaceImport(
 		return fmt.Errorf("loading remote resources: %w", err)
 	}
 
-	pstate, err := p.LoadStateFromResources(ctx, remoteCollection)
+	pstate, err := p.MapRemoteToState(remoteCollection)
 	if err != nil {
 		return fmt.Errorf("loading state from resources: %w", err)
 	}
 
 	sourceGraph := syncer.StateToGraph(pstate)
-	targetGraph, err := project.GetResourceGraph()
+	targetGraph, err := project.ResourceGraph()
 	if err != nil {
 		return fmt.Errorf("getting resource graph: %w", err)
 	}

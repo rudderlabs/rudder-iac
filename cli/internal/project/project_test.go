@@ -142,7 +142,7 @@ func TestProject_GetResourceGraph_Success(t *testing.T) {
 	mockProvider.GetResourceGraphVal = expectedGraph
 	mockProvider.GetResourceGraphErr = nil
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.NoError(t, err)
 	assert.Same(t, expectedGraph, graph) // Check if it's the exact same instance
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
@@ -158,7 +158,7 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	mockProvider.GetResourceGraphVal = nil
 	mockProvider.GetResourceGraphErr = expectedErr
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.Error(t, err)
 	assert.Nil(t, graph)
 	assert.True(t, errors.Is(err, expectedErr))

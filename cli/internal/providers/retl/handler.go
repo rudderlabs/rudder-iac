@@ -77,9 +77,9 @@ type resourceHandler interface {
 	// Returns a collection of resources or an error if loading fails.
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
 
-	// LoadStateFromResources reconstructs RETL state from loaded resources
+	// MapRemoteToState reconstructs RETL state from loaded resources
 	// Returns a state or an error if loading fails.
-	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error)
 
 	// LoadImportable loads all importable resources from remote
 	// The idNamer is used to generate unique IDs for the resources.

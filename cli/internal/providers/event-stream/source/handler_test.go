@@ -1088,7 +1088,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}, resource456)
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		t.Parallel()
 		t.Run("success with valid resources", func(t *testing.T) {
 			t.Parallel()
@@ -1150,7 +1150,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)
@@ -1236,7 +1236,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)

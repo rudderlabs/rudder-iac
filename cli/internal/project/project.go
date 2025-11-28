@@ -25,7 +25,7 @@ type ProjectProvider interface {
 type Project interface {
 	Location() string
 	Load() error
-	GetResourceGraph() (*resources.Graph, error)
+	ResourceGraph() (*resources.Graph, error)
 }
 
 type project struct {
@@ -94,7 +94,7 @@ func (p *project) Load() error {
 		}
 	}
 
-	graph, err := p.provider.GetResourceGraph()
+	graph, err := p.provider.ResourceGraph()
 	if err != nil {
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
@@ -130,6 +130,6 @@ func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 	return nil
 }
 
-func (p *project) GetResourceGraph() (*resources.Graph, error) {
-	return p.provider.GetResourceGraph()
+func (p *project) ResourceGraph() (*resources.Graph, error) {
+	return p.provider.ResourceGraph()
 }

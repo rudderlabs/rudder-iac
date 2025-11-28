@@ -53,7 +53,7 @@ func newCmdPreview() *cobra.Command {
 				return fmt.Errorf("loading project: %w", err)
 			}
 
-			graph, err := p.GetResourceGraph()
+			graph, err := p.ResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}

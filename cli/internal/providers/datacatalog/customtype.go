@@ -274,7 +274,7 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	return collection, nil
 }
 
-func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*rstate.State, error) {
+func (p *CustomTypeProvider) MapRemoteToState(collection *resources.ResourceCollection) (*rstate.State, error) {
 	s := rstate.EmptyState()
 	customTypes := collection.GetAll(state.CustomTypeResourceType)
 	for _, remoteCustomType := range customTypes {
@@ -283,7 +283,7 @@ func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collect
 		}
 		customType, ok := remoteCustomType.Data.(*catalog.CustomType)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Property")
 		}
 		args := &state.CustomTypeArgs{}
 		args.FromRemoteCustomType(customType, collection.GetURNByID)

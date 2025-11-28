@@ -44,7 +44,7 @@ func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resou
 	return p.InitialResources, nil
 }
 
-func (p *DataCatalogProvider) LoadStateFromResources(_ context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *DataCatalogProvider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	return p.ReconstructedState, nil
 }
 

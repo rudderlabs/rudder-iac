@@ -121,7 +121,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		return []error{err}
 	}
 
-	state, err := s.provider.LoadStateFromResources(ctx, resources)
+	state, err := s.provider.MapRemoteToState(resources)
 	if err != nil {
 		return []error{err}
 	}

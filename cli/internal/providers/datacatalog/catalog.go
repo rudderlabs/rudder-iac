@@ -34,7 +34,7 @@ type resourceProvider interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error)
 }
 
 func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
@@ -135,21 +135,21 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-// LoadStateFromResources reconstructs CLI state from loaded remote resources
-func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+// MapRemoteToState reconstructs CLI state from loaded remote resources
+func (p *Provider) MapRemoteToState(collection *resources.ResourceCollection) (*state.State, error) {
 	log.Debug("reconstructing state from loaded resources")
 	s := state.EmptyState()
 
 	// loop over stateless resources and load state
 	for resourceType, provider := range p.providerStore {
-		providerState, err := provider.LoadStateFromResources(ctx, collection)
+		providerState, err := provider.MapRemoteToState(collection)
 		if err != nil {
-			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
+			return nil, fmt.Errorf("MapRemoteToState: error loading state from provider store %s: %w", resourceType, err)
 		}
 
 		s, err = s.Merge(providerState)
 		if err != nil {
-			return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
+			return nil, fmt.Errorf("MapRemoteToState: error merging provider states: %w", err)
 		}
 	}
 
