@@ -16,6 +16,8 @@ import (
 )
 
 func TestExamplesSync(t *testing.T) {
+	t.Parallel()
+
 	// Initialize an empty backend
 	b := backend.NewBackend()
 
@@ -84,13 +86,13 @@ spec:
 		})
 		require.NoError(t, err, "Failed to sync project specs")
 
-		verifyContents(t, b.GetAllBooks, []*backend.RemoteBook{
+		verifyContents(t, b.AllBooks, []*backend.RemoteBook{
 			{ID: "remote-book-lotr", ExternalID: "lotr", Name: "The Lord of the Rings", AuthorID: "remote-writer-tolkien"},
 			{ID: "remote-book-hobbit", ExternalID: "hobbit", Name: "The Hobbit (with wrong author)", AuthorID: "remote-writer-orwell"},
 			{ID: "remote-book-1984", ExternalID: "1984", Name: "1984", AuthorID: "remote-writer-orwell"},
 		})
 
-		verifyContents(t, b.GetAllWriters, []*backend.RemoteWriter{
+		verifyContents(t, b.AllWriters, []*backend.RemoteWriter{
 			{ID: "remote-writer-tolkien", ExternalID: "tolkien", Name: "J.R.R. Tolkien"},
 			{ID: "remote-writer-orwell", ExternalID: "orwell", Name: "George Orwell"},
 		})
@@ -123,12 +125,12 @@ spec:
 		})
 		require.NoError(t, err, "Failed to sync project specs")
 
-		verifyContents(t, b.GetAllBooks, []*backend.RemoteBook{
+		verifyContents(t, b.AllBooks, []*backend.RemoteBook{
 			{ID: "remote-book-lotr", ExternalID: "lotr", Name: "The Lord of the Rings", AuthorID: "remote-writer-tolkien"},
 			{ID: "remote-book-hobbit", ExternalID: "hobbit", Name: "The Hobbit", AuthorID: "remote-writer-tolkien"},
 		})
 
-		verifyContents(t, b.GetAllWriters, []*backend.RemoteWriter{
+		verifyContents(t, b.AllWriters, []*backend.RemoteWriter{
 			{ID: "remote-writer-tolkien", ExternalID: "tolkien", Name: "J.R.R. Tolkien"},
 		})
 	})
@@ -137,12 +139,6 @@ spec:
 
 type mockLoader struct {
 	specs map[string]string
-}
-
-func verifyContents[T any](t *testing.T, getAll func() []T, expectedContents []T) {
-	contents := getAll()
-	assert.Len(t, contents, len(expectedContents), "Unexpected number of contents in backend")
-	assert.ElementsMatch(t, expectedContents, contents, "Backend contents do not match expected")
 }
 
 func (m *mockLoader) Load(_ string) (map[string]*specs.Spec, error) {
@@ -155,4 +151,10 @@ func (m *mockLoader) Load(_ string) (map[string]*specs.Spec, error) {
 		s[p] = spec
 	}
 	return s, nil
+}
+
+func verifyContents[T any](t *testing.T, getAll func() []T, expectedContents []T) {
+	contents := getAll()
+	assert.Len(t, contents, len(expectedContents), "Unexpected number of contents in backend")
+	assert.ElementsMatch(t, expectedContents, contents, "Backend contents do not match expected")
 }

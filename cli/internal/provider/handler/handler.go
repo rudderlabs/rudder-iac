@@ -24,6 +24,8 @@ import (
 // be included in state (e.g., resources without external IDs). The urnResolver parameter
 // enables resolving cross-resource references during state mapping.
 type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface {
+	Metadata() HandlerMetadata
+
 	// NewSpec creates a new instance of the Spec type with zero values.
 	// This factory method enables BaseHandler to instantiate spec objects
 	// during configuration file parsing without knowing the concrete type.
@@ -100,10 +102,16 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	Delete(ctx context.Context, id string, oldData *Res, oldState *State) error
 
 	FormatForExport(
-		collection *resources.RemoteResources,
+		collection map[string]*Remote,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
+}
+
+type HandlerMetadata struct {
+	SpecKind         string
+	ResourceType     string
+	SpecMetadataName string
 }
 
 // URNResolver provides URN (Uniform Resource Name) resolution from remote resource IDs.
@@ -112,7 +120,7 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 // the resource in configuration files and state. This enables resources to reference each
 // other using stable identifiers.
 type URNResolver interface {
-	GetURNByID(resourceType string, id string) (string, error)
+	GetURNByID(resourceType string, remoteID string) (string, error)
 }
 
 // RemoteResourceMetadata contains the standard metadata fields for a resource fetched from
@@ -133,5 +141,5 @@ type RemoteResourceMetadata struct {
 // BaseHandler without extensive modification, while ensuring consistent access to identifying
 // information needed for resource management operations.
 type RemoteResource interface {
-	GetResourceMetadata() RemoteResourceMetadata
+	Metadata() RemoteResourceMetadata
 }

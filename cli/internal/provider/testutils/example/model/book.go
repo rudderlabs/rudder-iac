@@ -1,4 +1,4 @@
-package book
+package model
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
@@ -8,21 +8,21 @@ import (
 
 // BookItem represents a single book in the spec
 type BookItem struct {
-	ID     string `mapstructure:"id"`
-	Name   string `mapstructure:"name"`
-	Author string `mapstructure:"author"` // URN reference to a writer
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Author string `json:"author"` // URN reference to a writer
 }
 
 // BookSpec represents the configuration for books (can contain multiple)
 type BookSpec struct {
-	Books []BookItem `mapstructure:"books"`
+	Books []BookItem `json:"books"`
 }
 
 // BookResource represents the input data for a book
 type BookResource struct {
-	ID     string                 `mapstructure:"id"`
-	Name   string                 `mapstructure:"name"`
-	Author *resources.PropertyRef `mapstructure:"author"` // Reference to a writer
+	ID     string                 `json:"id"`
+	Name   string                 `json:"name"`
+	Author *resources.PropertyRef `json:"author"` // Reference to a writer
 }
 
 // BookState represents the output state of a book from the remote system
@@ -36,8 +36,8 @@ type RemoteBook struct {
 	*backend.RemoteBook
 }
 
-// GetResourceMetadata implements the RemoteResource interface
-func (r RemoteBook) GetResourceMetadata() handler.RemoteResourceMetadata {
+// Metadata implements the RemoteResource interface
+func (r RemoteBook) Metadata() handler.RemoteResourceMetadata {
 	return handler.RemoteResourceMetadata{
 		ID:         r.ID,
 		ExternalID: r.ExternalID,

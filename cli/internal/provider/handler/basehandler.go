@@ -28,12 +28,10 @@ import (
 // operations with runtime type assertions. It bridges the gap between the generic Handler
 // interface and strongly-typed implementations.
 type BaseHandler[Spec any, Res any, State any, Remote RemoteResource] struct {
-	resourceType       string
-	specKind           string
-	importMetadataName string
-	resources          map[string]*Res
-	importMetadata     map[string]*importResourceInfo
-	Impl               HandlerImpl[Spec, Res, State, Remote]
+	metadata       HandlerMetadata
+	resources      map[string]*Res
+	importMetadata map[string]*importResourceInfo
+	Impl           HandlerImpl[Spec, Res, State, Remote]
 }
 
 type importResourceInfo struct {
@@ -42,26 +40,23 @@ type importResourceInfo struct {
 }
 
 func NewHandler[Spec any, Res any, State any, Remote RemoteResource](
-	specKind string,
-	resourceType string,
-	importMetadataName string,
-	impl HandlerImpl[Spec, Res, State, Remote]) *BaseHandler[Spec, Res, State, Remote] {
+	impl HandlerImpl[Spec, Res, State, Remote],
+) *BaseHandler[Spec, Res, State, Remote] {
+	m := impl.Metadata()
 	return &BaseHandler[Spec, Res, State, Remote]{
-		resourceType:       resourceType,
-		specKind:           specKind,
-		importMetadataName: importMetadataName,
-		resources:          make(map[string]*Res),
-		importMetadata:     make(map[string]*importResourceInfo),
-		Impl:               impl,
+		metadata:       m,
+		resources:      make(map[string]*Res),
+		importMetadata: make(map[string]*importResourceInfo),
+		Impl:           impl,
 	}
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ResourceType() string {
-	return h.resourceType
+	return h.metadata.ResourceType
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) SpecKind() string {
-	return h.specKind
+	return h.metadata.SpecKind
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
@@ -74,13 +69,13 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, remoteData := range remoteResources {
-		metadata := (*remoteData).GetResourceMetadata()
+		metadata := (*remoteData).Metadata()
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  metadata.Name,
-			Scope: h.resourceType,
+			Scope: h.metadata.ResourceType,
 		})
 
-		reference := fmt.Sprintf("#/%s/%s/%s", h.specKind, h.importMetadataName, externalID)
+		reference := fmt.Sprintf("#/%s/%s/%s", h.metadata.SpecKind, h.metadata.SpecMetadataName, externalID)
 
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
@@ -93,17 +88,12 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 		}
 	}
 
-	collection.Set(h.resourceType, resourceMap)
+	collection.Set(h.metadata.ResourceType, resourceMap)
 	return collection, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(fileMetadata map[string]any) error {
-	metadata := specs.Metadata{}
-	err := mapstructure.Decode(fileMetadata, &metadata)
-	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
-	}
-	workspaces := metadata.Import.Workspaces
+func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) {
+	workspaces := m.Workspaces
 	for _, workspaceMetadata := range workspaces {
 		workspaceId := workspaceMetadata.WorkspaceID
 		resources := workspaceMetadata.Resources
@@ -114,7 +104,6 @@ func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(fileMetadata 
 			}
 		}
 	}
-	return nil
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -165,12 +154,21 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 	}
 	for id, r := range rs {
 		if _, ok := h.resources[id]; ok {
-			return fmt.Errorf("a resource of type '%s' with id '%s' already exists", h.resourceType, id)
+			return fmt.Errorf("a resource of type '%s' with id '%s' already exists", h.metadata.ResourceType, id)
 		}
 		h.resources[id] = r
 	}
 
-	return h.loadImportMetadata(s.Metadata)
+	commonMetadata, err := s.CommonMetadata()
+	if err != nil {
+		return fmt.Errorf("getting common metadata: %w", err)
+	}
+
+	if commonMetadata.Import != nil {
+		h.loadImportMetadata(commonMetadata.Import)
+	}
+
+	return nil
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) Validate(graph *resources.Graph) error {
@@ -193,7 +191,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resour
 		}
 		r := resources.NewResource(
 			resourceId,
-			h.resourceType,
+			h.metadata.ResourceType,
 			resources.ResourceData{}, // deprecated, will be removed
 			[]string{},
 			opts...,
@@ -213,7 +211,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx cont
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, remoteData := range remoteResources {
-		metadata := (*remoteData).GetResourceMetadata()
+		metadata := (*remoteData).Metadata()
 		resourceMap[metadata.ID] = &resources.RemoteResource{
 			ID:         metadata.ID,
 			ExternalID: metadata.ExternalID,
@@ -221,20 +219,22 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx cont
 		}
 	}
 
-	collection.Set(h.resourceType, resourceMap)
+	collection.Set(h.metadata.ResourceType, resourceMap)
 	return collection, nil
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
-	remoteResources := collection.GetAll(h.resourceType)
+	remoteResources := collection.GetAll(h.metadata.ResourceType)
 
 	for _, remoteResource := range remoteResources {
 		// Type-safe cast - Remote is known via generics
 		remote, ok := remoteResource.Data.(*Remote)
 		if !ok {
-			return nil, fmt.Errorf("invalid remote resource type for %s: expected %T, got %T",
-				h.resourceType, (*Remote)(nil), remoteResource.Data)
+			return nil, &ErrInvalidDataType{
+				Expected: (*Remote)(nil),
+				Actual:   remoteResource.Data,
+			}
 		}
 
 		// Call impl with typed remote
@@ -250,7 +250,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *res
 
 		s.AddResource(&state.ResourceState{
 			ID:        remoteResource.ExternalID,
-			Type:      h.resourceType,
+			Type:      h.metadata.ResourceType,
 			InputRaw:  inputRaw,  // Type: *Res
 			OutputRaw: outputRaw, // Type: *State
 		})
@@ -261,7 +261,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *res
 func (h *BaseHandler[Spec, Res, State, Remote]) Create(ctx context.Context, rawData any) (any, error) {
 	raw, ok := rawData.(*Res)
 	if !ok {
-		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+		return nil, &ErrInvalidDataType{Expected: (*Res)(nil), Actual: rawData}
 	}
 	return h.Impl.Create(ctx, raw)
 }
@@ -269,17 +269,17 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Create(ctx context.Context, rawD
 func (h *BaseHandler[Spec, Res, State, Remote]) Update(ctx context.Context, newData any, oldData any, oldState any) (any, error) {
 	newRaw, ok := newData.(*Res)
 	if !ok {
-		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(newData), reflect.TypeOf((*Res)(nil)))
+		return nil, &ErrInvalidDataType{Expected: (*Res)(nil), Actual: newData}
 	}
 
 	oldRaw, ok := oldData.(*Res)
 	if !ok {
-		return nil, fmt.Errorf("invalid old resource data type. Found %v, expected %v", reflect.TypeOf(oldData), reflect.TypeOf((*Res)(nil)))
+		return nil, &ErrInvalidDataType{Expected: (*Res)(nil), Actual: oldData}
 	}
 
 	oldRawState, ok := oldState.(*State)
 	if !ok {
-		return nil, fmt.Errorf("invalid old resource state data type. Found %v, expected %v", reflect.TypeOf(oldState), reflect.TypeOf((*State)(nil)))
+		return nil, &ErrInvalidDataType{Expected: (*State)(nil), Actual: oldState}
 	}
 	return h.Impl.Update(ctx, newRaw, oldRaw, oldRawState)
 }
@@ -287,12 +287,12 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Update(ctx context.Context, newD
 func (h *BaseHandler[Spec, Res, State, Remote]) Delete(ctx context.Context, ID string, oldData any, oldState any) error {
 	oldRaw, ok := oldData.(*Res)
 	if !ok {
-		return fmt.Errorf("invalid old resource data type. Found %v, expected %v", reflect.TypeOf(oldData), reflect.TypeOf((*Res)(nil)))
+		return &ErrInvalidDataType{Expected: (*Res)(nil), Actual: oldData}
 	}
 
 	oldRawState, ok := oldState.(*State)
 	if !ok {
-		return fmt.Errorf("invalid old resource state data type. Found %v, expected %v", reflect.TypeOf(oldState), reflect.TypeOf((*State)(nil)))
+		return &ErrInvalidDataType{Expected: (*State)(nil), Actual: oldState}
 	}
 	return h.Impl.Delete(ctx, ID, oldRaw, oldRawState)
 }
@@ -300,7 +300,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Delete(ctx context.Context, ID s
 func (h *BaseHandler[Spec, Res, State, Remote]) Import(ctx context.Context, rawData any, remoteId string) (any, error) {
 	raw, ok := rawData.(*Res)
 	if !ok {
-		return nil, fmt.Errorf("invalid resource data type. Found %v, expected %v", reflect.TypeOf(rawData), reflect.TypeOf((*Res)(nil)))
+		return nil, &ErrInvalidDataType{Expected: (*Res)(nil), Actual: rawData}
 	}
 	return h.Impl.Import(ctx, raw, remoteId)
 }
@@ -310,7 +310,22 @@ func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
-	return h.Impl.FormatForExport(collection, idNamer, inputResolver)
+	all := collection.GetAll(h.metadata.ResourceType)
+	if len(all) == 0 {
+		return nil, nil
+	}
+
+	remotes := make(map[string]*Remote, len(all))
+	for _, res := range all {
+		remote, ok := res.Data.(*Remote)
+		if !ok {
+			return nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
+		}
+
+		remotes[res.ExternalID] = remote
+	}
+
+	return h.Impl.FormatForExport(remotes, idNamer, inputResolver)
 }
 
 func CreatePropertyRef[State any](
@@ -322,15 +337,21 @@ func CreatePropertyRef[State any](
 		Resolve: func(outputRaw any) (string, error) {
 			typedState, ok := outputRaw.(*State)
 			if !ok {
-				expectedType := reflect.TypeOf((*State)(nil))
-				actualType := reflect.TypeOf(outputRaw)
-				return "", fmt.Errorf(
-					"invalid state type for %s: expected %v, got %v",
-					urn, expectedType, actualType,
-				)
+				return "", &ErrInvalidDataType{Expected: (*State)(nil), Actual: outputRaw}
 			}
 
 			return extractor(typedState)
 		},
 	}
+}
+
+type ErrInvalidDataType struct {
+	Expected any
+	Actual   any
+}
+
+func (e *ErrInvalidDataType) Error() string {
+	expectedType := reflect.TypeOf(e.Expected)
+	actualType := reflect.TypeOf(e.Actual)
+	return fmt.Sprintf("invalid resource data type. Found %v, expected %v", actualType, expectedType)
 }

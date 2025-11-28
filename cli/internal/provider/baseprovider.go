@@ -210,7 +210,7 @@ func (p *BaseProvider) FormatForExport(
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, fmt.Errorf("formatting for export for handler: %w", err)
 		}
 		result = append(result, entities...)
 	}

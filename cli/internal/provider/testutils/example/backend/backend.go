@@ -8,9 +8,10 @@ import (
 // Backend provides in-memory storage for the example provider
 // It uses maps with remote IDs as keys to simulate a remote system
 type Backend struct {
-	mu      sync.RWMutex
-	books   map[string]*RemoteBook
-	writers map[string]*RemoteWriter
+	mu              sync.RWMutex
+	remoteIdCounter int
+	books           map[string]*RemoteBook
+	writers         map[string]*RemoteWriter
 }
 
 // RemoteBook represents a book in the remote system
@@ -38,6 +39,11 @@ func NewBackend() *Backend {
 
 // remoteID returns a consistent remote ID so that it can be predicted in tests
 func (b *Backend) remoteID(resourceType string, externalID string) string {
+	if externalID == "" {
+		b.remoteIdCounter++
+		return fmt.Sprintf("remote-%s-%d", resourceType, b.remoteIdCounter)
+	}
+
 	return fmt.Sprintf("remote-%s-%s", resourceType, externalID)
 }
 
@@ -81,7 +87,7 @@ func (b *Backend) DeleteBook(id string) error {
 	return nil
 }
 
-func (b *Backend) GetBook(id string) (*RemoteBook, error) {
+func (b *Backend) Book(id string) (*RemoteBook, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -92,7 +98,7 @@ func (b *Backend) GetBook(id string) (*RemoteBook, error) {
 	return book, nil
 }
 
-func (b *Backend) GetAllBooks() []*RemoteBook {
+func (b *Backend) AllBooks() []*RemoteBook {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -153,7 +159,7 @@ func (b *Backend) DeleteWriter(id string) error {
 	return nil
 }
 
-func (b *Backend) GetWriter(id string) (*RemoteWriter, error) {
+func (b *Backend) Writer(id string) (*RemoteWriter, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -164,7 +170,7 @@ func (b *Backend) GetWriter(id string) (*RemoteWriter, error) {
 	return writer, nil
 }
 
-func (b *Backend) GetAllWriters() []*RemoteWriter {
+func (b *Backend) AllWriters() []*RemoteWriter {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
