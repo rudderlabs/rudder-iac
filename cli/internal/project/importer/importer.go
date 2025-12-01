@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -22,23 +22,34 @@ const (
 
 var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 
+type ImportProvider interface {
+	provider.RemoteResourceLoader
+	provider.StateLoader
+	provider.Exporter
+}
+
+type Project interface {
+	ResourceGraph() (*resources.Graph, error)
+	Location() string
+}
+
 func WorkspaceImport(
 	ctx context.Context,
-	location string,
-	p project.Provider) error {
+	project Project,
+	p ImportProvider) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return fmt.Errorf("loading remote resources: %w", err)
 	}
 
-	pstate, err := p.LoadStateFromResources(ctx, remoteCollection)
+	pstate, err := p.MapRemoteToState(remoteCollection)
 	if err != nil {
 		return fmt.Errorf("loading state from resources: %w", err)
 	}
 
 	sourceGraph := syncer.StateToGraph(pstate)
-	targetGraph, err := p.GetResourceGraph()
+	targetGraph, err := project.ResourceGraph()
 	if err != nil {
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
@@ -68,13 +79,14 @@ func WorkspaceImport(
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
-	entities, err := p.FormatForExport(ctx, importable, idNamer, resolver)
+	entities, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
 		return fmt.Errorf("normalizing for import: %w", err)
 	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML)
 
+	location := project.Location()
 	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
@@ -102,8 +114,8 @@ func initNamer(graph *resources.Graph) (namer.Namer, error) {
 }
 
 func initResolver(
-	remoteCollection *resources.ResourceCollection,
-	importable *resources.ResourceCollection,
+	remoteCollection *resources.RemoteResources,
+	importable *resources.RemoteResources,
 	graph *resources.Graph,
 ) (*resolver.ImportRefResolver, error) {
 

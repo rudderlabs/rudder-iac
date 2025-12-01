@@ -141,21 +141,21 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindProperties:
 		properties, ok := s.Spec["properties"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, properties not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, properties not found in spec", s.Kind)
 		}
 		idArray = properties
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, events not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, events not found in spec", s.Kind)
 		}
 		idArray = events
 
 	case KindTrackingPlans:
 		trackingPlans, ok := s.Spec["id"].(string)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, id not found in tracking plan spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
 		idArray = []any{map[string]any{
 			"id": trackingPlans,
@@ -164,14 +164,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, custom types not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, custom types not found in spec", s.Kind)
 		}
 		idArray = customTypes
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, categories not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, categories not found in spec", s.Kind)
 		}
 		idArray = categories
 	}

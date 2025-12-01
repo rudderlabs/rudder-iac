@@ -1088,14 +1088,14 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}, resource456)
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		t.Parallel()
 		t.Run("success with valid resources", func(t *testing.T) {
 			t.Parallel()
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream sources
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1150,7 +1150,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)
@@ -1205,7 +1205,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 			// Create a resource collection with event stream source that has a tracking plan
 			// but the tracking plan is not in the collection (simulates tracking plan created via UI)
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1236,7 +1236,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)
@@ -1334,10 +1334,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
-		ctx := context.Background()
-
-		// Create a ResourceCollection with test data
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
@@ -1393,7 +1390,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
+		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				return "#/tp/tracking-plan/test-tp-456", nil
 			},

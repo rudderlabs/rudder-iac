@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewResourceCollection(t *testing.T) {
+func TestNewRemoteResources(t *testing.T) {
 	t.Parallel()
 
-	collection := NewResourceCollection()
+	collection := NewRemoteResources()
 	require.NotNil(t, collection)
 	assert.NotNil(t, collection.resources)
 }
 
-func TestResourceCollection_BasicOperations(t *testing.T) {
+func TestRemoteResources_BasicOperations(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
@@ -115,7 +115,7 @@ func TestResourceCollection_BasicOperations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			collection := NewResourceCollection()
+			collection := NewRemoteResources()
 
 			// Test with no resources
 			assert.Nil(t, collection.GetAll(tc.resourceType))
@@ -149,10 +149,10 @@ func TestResourceCollection_BasicOperations(t *testing.T) {
 	}
 }
 
-func TestResourceCollection_EmptyMaps(t *testing.T) {
+func TestRemoteResources_EmptyMaps(t *testing.T) {
 	t.Parallel()
 
-	collection := NewResourceCollection()
+	collection := NewRemoteResources()
 
 	// Set empty maps
 	collection.Set("events", make(map[string]*RemoteResource))
@@ -175,10 +175,10 @@ func TestResourceCollection_EmptyMaps(t *testing.T) {
 	assert.False(t, propFound)
 }
 
-func TestResourceCollection_NonExistentResourceType(t *testing.T) {
+func TestRemoteResources_NonExistentResourceType(t *testing.T) {
 	t.Parallel()
 
-	collection := NewResourceCollection()
+	collection := NewRemoteResources()
 
 	// Test GetAll with non-existent resource type
 	resources := collection.GetAll("nonexistent")
@@ -190,10 +190,10 @@ func TestResourceCollection_NonExistentResourceType(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestResourceCollection_OverwriteResourceType(t *testing.T) {
+func TestRemoteResources_OverwriteResourceType(t *testing.T) {
 	t.Parallel()
 
-	collection := NewResourceCollection()
+	collection := NewRemoteResources()
 
 	// Set initial map
 	initialMap := map[string]*RemoteResource{
@@ -237,7 +237,7 @@ func TestResourceCollection_OverwriteResourceType(t *testing.T) {
 	assert.Equal(t, "new value", allResources["test-2"].Data)
 }
 
-func TestResourceCollection_Merge(t *testing.T) {
+func TestRemoteResources_Merge(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -338,12 +338,12 @@ func TestResourceCollection_Merge(t *testing.T) {
 			t.Parallel()
 
 			// Setup collections
-			collection1 := NewResourceCollection()
+			collection1 := NewRemoteResources()
 			for resourceType, resources := range tc.collection1 {
 				collection1.Set(resourceType, resources)
 			}
 
-			collection2 := NewResourceCollection()
+			collection2 := NewRemoteResources()
 			for resourceType, resources := range tc.collection2 {
 				collection2.Set(resourceType, resources)
 			}
@@ -385,7 +385,7 @@ func TestResourceCollection_Merge(t *testing.T) {
 	t.Run("MergeWithNil", func(t *testing.T) {
 		t.Parallel()
 
-		collection := NewResourceCollection()
+		collection := NewRemoteResources()
 		collection.Set("events", map[string]*RemoteResource{
 			"event-1": {
 				ID:         "event-1",
@@ -400,7 +400,7 @@ func TestResourceCollection_Merge(t *testing.T) {
 	})
 }
 
-func TestResourceCollection_GetURNByID(t *testing.T) {
+func TestRemoteResources_GetURNByID(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -410,7 +410,7 @@ func TestResourceCollection_GetURNByID(t *testing.T) {
 	)
 
 	t.Run("resource does not exist", func(t *testing.T) {
-		collection := NewResourceCollection()
+		collection := NewRemoteResources()
 
 		urn, err := collection.GetURNByID(resourceType, "non-existent-id")
 		assert.Empty(t, urn)
@@ -418,7 +418,7 @@ func TestResourceCollection_GetURNByID(t *testing.T) {
 	})
 
 	t.Run("resource exists but externalID missing", func(t *testing.T) {
-		collection := NewResourceCollection()
+		collection := NewRemoteResources()
 		resourceMap := map[string]*RemoteResource{
 			resourceID: {
 				ID:         resourceID,
@@ -434,7 +434,7 @@ func TestResourceCollection_GetURNByID(t *testing.T) {
 	})
 
 	t.Run("resource exists and has externalID", func(t *testing.T) {
-		collection := NewResourceCollection()
+		collection := NewRemoteResources()
 		resourceMap := map[string]*RemoteResource{
 			resourceID: {
 				ID:         resourceID,

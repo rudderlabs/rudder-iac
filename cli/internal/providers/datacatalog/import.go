@@ -12,9 +12,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
@@ -26,7 +26,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*entityProviderTask)
 		if !ok {
@@ -61,8 +61,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 }
 
 func (p *Provider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
@@ -70,7 +69,6 @@ func (p *Provider) FormatForExport(
 
 	for resourceType, provider := range p.providerStore {
 		entities, err := provider.FormatForExport(
-			ctx,
 			collection,
 			idNamer,
 			resolver,

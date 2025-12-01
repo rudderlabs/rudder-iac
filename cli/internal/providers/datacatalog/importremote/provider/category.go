@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -25,7 +24,7 @@ const (
 )
 
 var (
-	_ provider.WorkspaceImporter = &CategoryImportProvider{}
+	_ WorkspaceImporter = &CategoryImportProvider{}
 )
 
 type CategoryImportProvider struct {
@@ -42,9 +41,9 @@ func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable categories from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -80,7 +79,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 }
 
 func (p *CategoryImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to categories")
@@ -111,8 +110,7 @@ func (p *CategoryImportProvider) idResources(
 
 // FormatForExport formats the categories for export to file
 func (p *CategoryImportProvider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {

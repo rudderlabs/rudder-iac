@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/previewer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +53,7 @@ func newCmdPreview() *cobra.Command {
 				return fmt.Errorf("loading project: %w", err)
 			}
 
-			graph, err := p.GetResourceGraph()
+			graph, err := p.ResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
@@ -66,10 +65,7 @@ func newCmdPreview() *cobra.Command {
 			resourceType := resource.Type()
 
 			// Get the RETL provider
-			retlProvider, ok := d.Providers().RETL.(*retl.Provider)
-			if !ok {
-				return fmt.Errorf("failed to cast RETL provider")
-			}
+			retlProvider := d.Providers().RETL
 			opts := []previewer.PreviewerOpts{}
 			opts = append(opts, previewer.WithJson(jsonOutput))
 			opts = append(opts, previewer.WithLimit(limit))

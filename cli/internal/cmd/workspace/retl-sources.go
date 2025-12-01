@@ -1,12 +1,9 @@
 package workspace
 
 import (
-	"fmt"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
@@ -44,10 +41,7 @@ func newCmdListRetlSources() *cobra.Command {
 			}
 
 			// Cast the RETL provider to access the List method
-			retlProvider, ok := d.Providers().RETL.(*retl.Provider)
-			if !ok {
-				return fmt.Errorf("failed to cast RETL provider")
-			}
+			retlProvider := d.Providers().RETL
 
 			format := lister.TableFormat
 			if jsonOutput {

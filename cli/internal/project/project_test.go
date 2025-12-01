@@ -29,7 +29,7 @@ func (m *MockLoader) Load(location string) (map[string]*specs.Spec, error) {
 func TestNewProject_Load_Error(t *testing.T) {
 	t.Parallel()
 
-	provider := testutils.NewMockProvider()
+	provider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 	p := project.New("test_location", provider, project.WithLoader(mockLoader))
 
@@ -46,7 +46,7 @@ func TestNewProject_Load_Error(t *testing.T) {
 func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
 
-	mockProvider := testutils.NewMockProvider()
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -59,8 +59,6 @@ func TestProject_Load_Success(t *testing.T) {
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
 		return expectedSpecs, nil
 	}
-
-	mockProvider.SupportedKinds = []string{"Source", "Destination"}
 
 	err := proj.Load()
 	require.NoError(t, err)
@@ -83,35 +81,10 @@ func TestProject_Load_Success(t *testing.T) {
 	assert.Equal(t, 1, mockProvider.ValidateCalledCount, "Validate should be called once")
 }
 
-func TestProject_Load_UnsupportedKind(t *testing.T) {
-	t.Parallel()
-
-	mockProvider := testutils.NewMockProvider()
-	mockLoader := &MockLoader{}
-
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
-
-	specsWithUnsupportedKind := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "UnsupportedKind"},
-	}
-
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
-		return specsWithUnsupportedKind, nil
-	}
-
-	mockProvider.SupportedKinds = []string{"Source", "Destination"} // Does not include "UnsupportedKind"
-
-	err := proj.Load()
-	require.Error(t, err)
-	var unsupportedKindErr specs.ErrUnsupportedKind
-	require.True(t, errors.As(err, &unsupportedKindErr), "error should be of type specs.ErrUnsupportedKind")
-	assert.Equal(t, "UnsupportedKind", unsupportedKindErr.Kind)
-}
-
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	t.Parallel()
 
-	mockProvider := testutils.NewMockProvider()
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -124,7 +97,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 		return validSpecs, nil
 	}
 
-	mockProvider.SupportedKinds = []string{"Source"}
 	expectedErr := errors.New("provider LoadSpec failed")
 	mockProvider.LoadSpecErr = expectedErr
 
@@ -137,7 +109,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 func TestProject_Load_ProviderValidateError(t *testing.T) {
 	t.Parallel()
 
-	mockProvider := testutils.NewMockProvider()
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -150,7 +122,6 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 		return validSpecs, nil
 	}
 
-	mockProvider.SupportedKinds = []string{"Source"}
 	mockProvider.LoadSpecErr = nil
 	expectedErr := errors.New("provider Validate failed")
 	mockProvider.ValidateErr = expectedErr
@@ -164,14 +135,14 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
 
-	mockProvider := testutils.NewMockProvider()
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	proj := project.New("test_dir", mockProvider) // Loader doesn't matter for this test
 
 	expectedGraph := &resources.Graph{}
 	mockProvider.GetResourceGraphVal = expectedGraph
 	mockProvider.GetResourceGraphErr = nil
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.NoError(t, err)
 	assert.Same(t, expectedGraph, graph) // Check if it's the exact same instance
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
@@ -180,14 +151,14 @@ func TestProject_GetResourceGraph_Success(t *testing.T) {
 func TestProject_GetResourceGraph_Error(t *testing.T) {
 	t.Parallel()
 
-	mockProvider := testutils.NewMockProvider()
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	proj := project.New("test_dir", mockProvider)
 
 	expectedErr := errors.New("GetResourceGraph failed")
 	mockProvider.GetResourceGraphVal = nil
 	mockProvider.GetResourceGraphErr = expectedErr
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.Error(t, err)
 	assert.Nil(t, graph)
 	assert.True(t, errors.Is(err, expectedErr))

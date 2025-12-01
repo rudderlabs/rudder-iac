@@ -12,7 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -73,10 +72,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}
 
 			// Cast to RETL provider to access Import method
-			retlProvider, ok := deps.Providers().RETL.(*retl.Provider)
-			if !ok {
-				return fmt.Errorf("failed to cast RETL provider")
-			}
+			retlProvider := deps.Providers().RETL
 
 			entity, err := retlProvider.FetchImportData(cmd.Context(), sqlmodel.ResourceType, specs.ImportIds{
 				RemoteID: remoteID,

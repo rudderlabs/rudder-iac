@@ -278,11 +278,7 @@ func (v Variant) diffVariant(against Variant) bool {
 		}
 	}
 
-	if diffPropertyReferences(v.Default, against.Default) {
-		return true
-	}
-
-	return false
+	return diffPropertyReferences(v.Default, against.Default)
 }
 
 func (vc VariantCase) diffVariantCase(against VariantCase) bool {

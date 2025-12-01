@@ -364,8 +364,8 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 	}, nil
 }
 
-func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	hasExternalID := true
 	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
 	if err != nil {
@@ -383,7 +383,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
-func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	sqlModelResources := collection.GetAll(ResourceType)
 	for _, resource := range sqlModelResources {
@@ -412,8 +412,8 @@ func (h *Handler) LoadStateFromResources(ctx context.Context, collection *resour
 	return s, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	hasExternalID := false
 	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
 	if err != nil {
@@ -443,7 +443,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	return collection, nil
 }
 
-func (h *Handler) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
 		return nil, nil

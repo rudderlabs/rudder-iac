@@ -143,17 +143,17 @@ func newDefaultMockClient() *mockRETLStore {
 }
 
 func TestProvider(t *testing.T) {
-	t.Run("GetSupportedKinds", func(t *testing.T) {
+	t.Run("SupportedKinds", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		kinds := provider.GetSupportedKinds()
+		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "retl-source-sql-model")
 	})
 
-	t.Run("GetSupportedTypes", func(t *testing.T) {
+	t.Run("SupportedTypes", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		types := provider.GetSupportedTypes()
+		types := provider.SupportedTypes()
 		assert.Contains(t, types, sqlmodel.ResourceType)
 	})
 
@@ -219,7 +219,7 @@ func TestProvider(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			graph, err := provider.GetResourceGraph()
+			graph, err := provider.ResourceGraph()
 			require.NoError(t, err)
 			assert.NotNil(t, graph)
 
@@ -799,7 +799,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 	})
 }
 
-func TestProviderLoadStateFromResources(t *testing.T) {
+func TestProviderMapRemoteToState(t *testing.T) {
 	t.Run("Success reconstructs state from collection", func(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
@@ -821,7 +821,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			source.ID: {
 				ID:         source.ID,
@@ -830,8 +830,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
@@ -860,7 +859,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Insert a malformed resource (Data is wrong type)
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad-1": {
 				ID:         "bad-1",
@@ -869,8 +868,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.Error(t, err)
 		assert.Nil(t, st)
 		// Wrapped error should mention provider handler and inner cast error
@@ -989,7 +987,7 @@ func TestProviderFormatForExport(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			src.ID: {
 				ID:         src.ID,
@@ -998,9 +996,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
 
@@ -1026,7 +1023,7 @@ func TestProviderFormatForExport(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Malformed data type inside collection
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad": {
 				ID:         "bad",
@@ -1035,9 +1032,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.Error(t, err)
 		assert.Nil(t, entities)
 		assert.Contains(t, err.Error(), "formatting for export for handler")

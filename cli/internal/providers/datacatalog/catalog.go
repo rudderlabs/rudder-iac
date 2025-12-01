@@ -19,10 +19,9 @@ type entityProvider interface {
 }
 
 type resourceImportProvider interface {
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 	FormatForExport(
-		ctx context.Context,
-		collection *resources.ResourceCollection,
+		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
@@ -33,8 +32,8 @@ type resourceProvider interface {
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
+	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 }
 
 func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
@@ -61,7 +60,7 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, d
 	return provider.Delete(ctx, ID, data)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	provider, ok := p.providerStore[resourceType]
 	if !ok {
 		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
@@ -84,12 +83,12 @@ func (t *entityProviderTask) Dependencies() []string {
 
 var _ tasker.Task = &entityProviderTask{}
 
-// LoadResourcesFromRemote loads all resources from remote catalog into a ResourceCollection
-func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+// LoadResourcesFromRemote loads all resources from remote catalog into a RemoteResources
+func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	log.Debug("loading all resources from remote catalog")
 
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
@@ -101,7 +100,7 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*entityProviderTask)
 		if !ok {
@@ -135,21 +134,21 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Reso
 	return collection, nil
 }
 
-// LoadStateFromResources reconstructs CLI state from loaded remote resources
-func (p *Provider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+// MapRemoteToState reconstructs CLI state from loaded remote resources
+func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	log.Debug("reconstructing state from loaded resources")
 	s := state.EmptyState()
 
 	// loop over stateless resources and load state
 	for resourceType, provider := range p.providerStore {
-		providerState, err := provider.LoadStateFromResources(ctx, collection)
+		providerState, err := provider.MapRemoteToState(collection)
 		if err != nil {
-			return nil, fmt.Errorf("LoadStateFromResources: error loading state from provider store %s: %w", resourceType, err)
+			return nil, fmt.Errorf("MapRemoteToState: error loading state from provider store %s: %w", resourceType, err)
 		}
 
 		s, err = s.Merge(providerState)
 		if err != nil {
-			return nil, fmt.Errorf("LoadStateFromResources: error merging provider states: %w", err)
+			return nil, fmt.Errorf("MapRemoteToState: error merging provider states: %w", err)
 		}
 	}
 

@@ -75,20 +75,20 @@ type resourceHandler interface {
 
 	// LoadResourcesFromRemote loads all RETL resources from remote
 	// Returns a collection of resources or an error if loading fails.
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
+	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 
-	// LoadStateFromResources reconstructs RETL state from loaded resources
+	// MapRemoteToState reconstructs RETL state from loaded resources
 	// Returns a state or an error if loading fails.
-	LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error)
+	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 
 	// LoadImportable loads all importable resources from remote
 	// The idNamer is used to generate unique IDs for the resources.
 	// Returns a collection of resources or an error if loading fails.
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 
 	// FormatForExport formats the resources for export
 	// The idNamer is used to generate unique IDs for the resources.
 	// The inputResolver is used to resolve references to other resources.
 	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
+	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
 }

@@ -297,8 +297,8 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mkPtr := func(s retlClient.RETLSource) *retlClient.RETLSource { return &s }
-		mkCollection := func(sources ...retlClient.RETLSource) *resources.ResourceCollection {
-			c := resources.NewResourceCollection()
+		mkCollection := func(sources ...retlClient.RETLSource) *resources.RemoteResources {
+			c := resources.NewRemoteResources()
 			m := make(map[string]*resources.RemoteResource)
 			for _, s := range sources {
 				ss := s // copy for address stability
@@ -328,7 +328,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -364,8 +364,8 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			collection := resources.NewRemoteResources()
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
 		})
@@ -374,11 +374,11 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
@@ -1635,7 +1635,7 @@ func TestSQLModelHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		t.Run("Success with multiple resources", func(t *testing.T) {
 			t.Parallel()
 
@@ -1645,7 +1645,7 @@ func TestSQLModelHandler(t *testing.T) {
 			updatedAt := time.Now()
 
 			// Build a collection with two RETL sources having ExternalID set
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote-1": {
 					ID:         "remote-1",
@@ -1691,7 +1691,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, resourceMap)
 
 			// Execute
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 
 			// Verify
 			require.NoError(t, err)
@@ -1732,7 +1732,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 
 			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {
 					ID:         "bad",
@@ -1741,7 +1741,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 			})
 
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 			assert.Error(t, err)
 			assert.Nil(t, st)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")

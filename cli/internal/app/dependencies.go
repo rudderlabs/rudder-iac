@@ -8,8 +8,7 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -23,23 +22,35 @@ var (
 	v string
 )
 
+// Providers holds instances of all providers used in the application
+// Provider types are intentionally set to specific provider implementations
+// instead of the generic provider.Provider interface to allow access to
+// provider-specific methods if needed.
 type Providers struct {
-	DataCatalog project.Provider
-	RETL        project.Provider
-	EventStream project.Provider
+	DataCatalog *datacatalog.Provider
+	RETL        *retl.Provider
+	EventStream *esProvider.Provider
 	Workspace   *workspace.Provider
 }
 
 type deps struct {
 	client            *client.Client
 	providers         *Providers
-	compositeProvider project.Provider
+	compositeProvider provider.Provider
 }
 
+// Deps defines the dependencies initialized globally for Rudder CLI
 type Deps interface {
+	// Client returns the RudderStack API client instance, configured with authentication and base URL
 	Client() *client.Client
+
+	// Providers returns the initialized Providers struct containing all provider instances
+	// used in the application when individual provider access is needed.
 	Providers() *Providers
-	CompositeProvider() project.Provider
+
+	// CompositeProvider returns a composite provider aggregating all individual providers
+	// used by components that operate across multiple providers.
+	CompositeProvider() provider.Provider
 }
 
 func Initialise(version string) {
@@ -70,7 +81,11 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := providers.NewCompositeProvider(p.DataCatalog, p.RETL, p.EventStream)
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"datacatalog": p.DataCatalog,
+		"retl":        p.RETL,
+		"eventstream": p.EventStream,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -131,7 +146,7 @@ func (d *deps) Providers() *Providers {
 	return d.providers
 }
 
-func (d *deps) CompositeProvider() project.Provider {
+func (d *deps) CompositeProvider() provider.Provider {
 	return d.compositeProvider
 }
 

@@ -1,4 +1,4 @@
-package providers
+package provider
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -19,27 +18,27 @@ import (
 
 type CompositeProvider struct {
 	concurrency     int
-	Providers       []project.Provider
-	registeredKinds map[string]project.Provider
-	registeredTypes map[string]project.Provider
+	Providers       map[string]Provider
+	registeredKinds map[string]Provider
+	registeredTypes map[string]Provider
 }
 
-func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, error) {
+func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("at least one provider must be specified")
 	}
 
-	registeredKinds := make(map[string]project.Provider)
-	registeredTypes := make(map[string]project.Provider)
+	registeredKinds := make(map[string]Provider)
+	registeredTypes := make(map[string]Provider)
 
 	for _, provider := range providers {
-		for _, kind := range provider.GetSupportedKinds() {
+		for _, kind := range provider.SupportedKinds() {
 			if _, ok := registeredKinds[kind]; ok {
 				return nil, fmt.Errorf("duplicate kind '%s' supported by multiple providers", kind)
 			}
 			registeredKinds[kind] = provider
 		}
-		for _, t := range provider.GetSupportedTypes() {
+		for _, t := range provider.SupportedTypes() {
 			if _, ok := registeredTypes[t]; ok {
 				return nil, fmt.Errorf("duplicate type '%s' supported by multiple providers", t)
 			}
@@ -55,15 +54,11 @@ func NewCompositeProvider(providers ...project.Provider) (*CompositeProvider, er
 	}, nil
 }
 
-func (p *CompositeProvider) GetName() string {
-	return "composite"
-}
-
-func (p *CompositeProvider) GetSupportedKinds() []string {
+func (p *CompositeProvider) SupportedKinds() []string {
 	return maps.Keys(p.registeredKinds)
 }
 
-func (p *CompositeProvider) GetSupportedTypes() []string {
+func (p *CompositeProvider) SupportedTypes() []string {
 	return maps.Keys(p.registeredTypes)
 }
 
@@ -77,25 +72,25 @@ func (p *CompositeProvider) Validate(graph *resources.Graph) error {
 }
 
 func (p *CompositeProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	provider := p.providerForKind(s.Kind)
-	if provider == nil {
-		return nil, fmt.Errorf("no provider found for kind %s", s.Kind)
+	provider, err := p.providerForKind(s.Kind)
+	if err != nil {
+		return nil, err
 	}
 	return provider.ParseSpec(path, s)
 }
 
 func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
-	provider := p.providerForKind(s.Kind)
-	if provider == nil {
-		return fmt.Errorf("no provider found for kind %s", s.Kind)
+	provider, err := p.providerForKind(s.Kind)
+	if err != nil {
+		return err
 	}
 	return provider.LoadSpec(path, s)
 }
 
-func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
+func (p *CompositeProvider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for _, provider := range p.Providers {
-		g, err := provider.GetResourceGraph()
+		g, err := provider.ResourceGraph()
 		if err != nil {
 			return nil, err
 		}
@@ -105,40 +100,40 @@ func (p *CompositeProvider) GetResourceGraph() (*resources.Graph, error) {
 }
 
 func (p *CompositeProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	provider := p.providerForType(resourceType)
-	if provider == nil {
-		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
+	provider, err := p.providerForType(resourceType)
+	if err != nil {
+		return nil, err
 	}
 	return provider.Create(ctx, ID, resourceType, data)
 }
 
 func (p *CompositeProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	provider := p.providerForType(resourceType)
-	if provider == nil {
-		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
+	provider, err := p.providerForType(resourceType)
+	if err != nil {
+		return nil, err
 	}
 	return provider.Update(ctx, ID, resourceType, data, state)
 }
 
 func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
-	provider := p.providerForType(resourceType)
-	if provider == nil {
-		return fmt.Errorf("no provider found for resource type %s", resourceType)
+	provider, err := p.providerForType(resourceType)
+	if err != nil {
+		return err
 	}
 	return provider.Delete(ctx, ID, resourceType, state)
 }
 
-func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
-	provider := p.providerForType(resourceType)
-	if provider == nil {
-		return nil, fmt.Errorf("no provider found for resource type %s", resourceType)
+func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	provider, err := p.providerForType(resourceType)
+	if err != nil {
+		return nil, err
 	}
-	return provider.Import(ctx, ID, resourceType, data, workspaceId, remoteId)
+	return provider.Import(ctx, ID, resourceType, data, remoteId)
 }
 
 type compositeProviderTask struct {
 	name     string
-	provider project.Provider
+	provider Provider
 }
 
 func (t *compositeProviderTask) Id() string {
@@ -153,21 +148,21 @@ var _ tasker.Task = &compositeProviderTask{}
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
 	tasks := make([]tasker.Task, 0)
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		tasks = append(tasks, &compositeProviderTask{
-			name:     provider.GetName(),
+			name:     name,
 			provider: provider,
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
@@ -200,22 +195,20 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 }
 
 func (p *CompositeProvider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
 	formattable := make([]writer.FormattableEntity, 0)
 
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		entities, err := provider.FormatForExport(
-			ctx,
 			collection,
 			idNamer,
 			resolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for provider %s: %w", provider.GetName(), err)
+			return nil, fmt.Errorf("formatting for export for provider %s: %w", name, err)
 		}
 		formattable = append(formattable, entities...)
 	}
@@ -224,29 +217,37 @@ func (p *CompositeProvider) FormatForExport(
 }
 
 // Helper methods
-func (p *CompositeProvider) providerForKind(kind string) project.Provider {
-	return p.registeredKinds[kind]
+func (p *CompositeProvider) providerForKind(kind string) (Provider, error) {
+	provider, ok := p.registeredKinds[kind]
+	if !ok {
+		return nil, &ErrUnsupportedSpecKind{Kind: kind}
+	}
+	return provider, nil
 }
 
-func (p *CompositeProvider) providerForType(resourceType string) project.Provider {
-	return p.registeredTypes[resourceType]
+func (p *CompositeProvider) providerForType(resourceType string) (Provider, error) {
+	provider, ok := p.registeredTypes[resourceType]
+	if !ok {
+		return nil, &ErrUnsupportedResourceType{ResourceType: resourceType}
+	}
+	return provider, nil
 }
 
-func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	var (
-		collection = resources.NewResourceCollection()
+		collection = resources.NewRemoteResources()
 		err        error
 	)
 
 	tasks := make([]tasker.Task, 0)
-	for _, provider := range p.Providers {
+	for name, provider := range p.Providers {
 		tasks = append(tasks, &compositeProviderTask{
-			name:     provider.GetName(),
+			name:     name,
 			provider: provider,
 		})
 	}
 
-	results := tasker.NewResults[*resources.ResourceCollection]()
+	results := tasker.NewResults[*resources.RemoteResources]()
 	errs := tasker.RunTasks(ctx, tasks, p.concurrency, false, func(task tasker.Task) error {
 		t, ok := task.(*compositeProviderTask)
 		if !ok {
@@ -278,11 +279,11 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 	return collection, nil
 }
 
-func (p *CompositeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	// Load and merge state from all providers
 	for _, provider := range p.Providers {
-		state, err := provider.LoadStateFromResources(ctx, collection)
+		state, err := provider.MapRemoteToState(collection)
 		if err != nil {
 			return nil, err
 		}
