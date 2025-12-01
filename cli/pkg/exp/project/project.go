@@ -39,5 +39,5 @@ func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 		return nil, err
 	}
 
-	return p.GetResourceGraph()
+	return p.ResourceGraph()
 }
