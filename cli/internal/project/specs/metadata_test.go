@@ -7,6 +7,8 @@ import (
 )
 
 func TestSpec_CommonMetadata(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		metadata    map[string]any
