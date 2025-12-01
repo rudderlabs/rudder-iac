@@ -30,15 +30,17 @@ func RunTasks(ctx context.Context, tasks []Task, concurrency int, continueOnFail
 
 func newJob(tasks []Task, concurrency int, continueOnFail bool) *job {
 	semaphore := make(chan struct{}, concurrency)
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		semaphore <- struct{}{}
 	}
+
 	job := &job{
 		semaphore:      semaphore,
 		tasks:          tasks,
 		taskStatus:     make(taskStatusMap),
 		continueOnFail: continueOnFail,
 	}
+
 	for _, task := range job.tasks {
 		job.taskStatus[task.Id()] = make(chan struct{})
 	}
@@ -102,6 +104,16 @@ func (job *job) runTask(ctx context.Context, cancelCtx context.CancelFunc, task 
 			case <-job.taskStatus[depTaskId]:
 			case <-ctx.Done():
 				return ctx.Err()
+			}
+
+			// This double check is done because we can have race condition between
+			// close of channel vs context cancellation. The consequence is that the waiting task
+			// might run even though the continue on fail false setting is used.
+			// The below check doubly checks if the context is done ( in case of race condition again )
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
 			}
 		}
 	}
