@@ -1,4 +1,4 @@
-package importer
+package writer
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +39,7 @@ func TestWrite(t *testing.T) {
 
 		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("test-bytes")})
 
-		entities := []importremote.FormattableEntity{{
+		entities := []FormattableEntity{{
 			Content:      map[string]any{"k": "v"},
 			RelativePath: "out.yaml",
 		}}
@@ -71,7 +70,7 @@ func TestWrite(t *testing.T) {
 		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("ok")})
 
 		rel := filepath.Join("nested", "dir", "file.yaml")
-		entities := []importremote.FormattableEntity{{
+		entities := []FormattableEntity{{
 			Content:      map[string]any{"x": 1},
 			RelativePath: rel,
 		}}
@@ -97,7 +96,7 @@ func TestWrite(t *testing.T) {
 			stubFormatter{exts: []string{"txt"}, out: []byte("TXT-OUT")},
 		)
 
-		entities := []importremote.FormattableEntity{
+		entities := []FormattableEntity{
 			{Content: map[string]any{"a": 1}, RelativePath: "a.yaml"},
 			{Content: map[string]any{"b": 2}, RelativePath: "b.txt"},
 		}
@@ -123,7 +122,7 @@ func TestWrite(t *testing.T) {
 		)
 
 		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("YAML-OUT")})
-		entities := []importremote.FormattableEntity{
+		entities := []FormattableEntity{
 			{
 				Content:      map[string]any{"a": 1},
 				RelativePath: "object.json",
@@ -154,7 +153,7 @@ func TestWrite(t *testing.T) {
 			err:  formatterFail,
 		})
 
-		entities := []importremote.FormattableEntity{
+		entities := []FormattableEntity{
 			{Content: map[string]any{"a": 1}, RelativePath: "out.yaml"},
 		}
 

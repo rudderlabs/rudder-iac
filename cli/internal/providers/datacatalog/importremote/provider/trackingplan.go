@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
@@ -24,7 +26,7 @@ const (
 )
 
 var (
-	_ importremote.WorkspaceImporter = &TrackingPlanImportProvider{}
+	_ provider.WorkspaceImporter = &TrackingPlanImportProvider{}
 )
 
 type TrackingPlanImportProvider struct {
@@ -109,7 +111,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting tracking plans for export to file")
 
 	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
@@ -117,7 +119,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	formattables := make([]importremote.FormattableEntity, 0)
+	formattables := make([]writer.FormattableEntity, 0)
 	for _, trackingPlan := range trackingPlans {
 		p.log.Debug("formatting tracking plan", "remoteID", trackingPlan.ID, "externalID", trackingPlan.ExternalID)
 
@@ -126,9 +128,9 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
 		}
 
-		workspaceMetadata := importremote.WorkspaceImportMetadata{
+		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: data.WorkspaceID,
-			Resources: []importremote.ImportIds{
+			Resources: []specs.ImportIds{
 				{
 					LocalID:  trackingPlan.ExternalID,
 					RemoteID: trackingPlan.ID,
@@ -160,7 +162,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("generating file path for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
-		formattables = append(formattables, importremote.FormattableEntity{
+		formattables = append(formattables, writer.FormattableEntity{
 			Content: spec,
 			RelativePath: filepath.Join(
 				p.baseImportDir,

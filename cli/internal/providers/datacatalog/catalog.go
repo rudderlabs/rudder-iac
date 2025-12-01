@@ -5,23 +5,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
-
-var resourceTypeCollection = map[string]catalog.ResourceCollection{
-	dcstate.PropertyResourceType:     catalog.ResourceCollectionProperties,
-	dcstate.EventResourceType:        catalog.ResourceCollectionEvents,
-	dcstate.TrackingPlanResourceType: catalog.ResourceCollectionTrackingPlans,
-	dcstate.CustomTypeResourceType:   catalog.ResourceCollectionCustomTypes,
-	dcstate.CategoryResourceType:     catalog.ResourceCollectionCategories,
-}
 
 type entityProvider interface {
 	resourceProvider
@@ -35,7 +25,7 @@ type resourceImportProvider interface {
 		collection *resources.ResourceCollection,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]importremote.FormattableEntity, error)
+	) ([]writer.FormattableEntity, error)
 }
 
 type resourceProvider interface {

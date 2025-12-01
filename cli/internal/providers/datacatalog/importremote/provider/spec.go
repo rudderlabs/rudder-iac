@@ -1,10 +1,6 @@
 package provider
 
 import (
-	"fmt"
-
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 )
 
@@ -18,20 +14,19 @@ const (
 func toImportSpec(
 	kind string,
 	metadataName string,
-	workspaceMetadata importremote.WorkspaceImportMetadata,
+	workspaceMetadata specs.WorkspaceImportMetadata,
 	data map[string]any,
 ) (*specs.Spec, error) {
-	metadata := importremote.Metadata{
+	metadata := specs.Metadata{
 		Name: metadataName,
-		Import: importremote.WorkspacesImportMetadata{
-			Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+		Import: &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}
 
-	metadataMap := make(map[string]any)
-	err := mapstructure.Decode(metadata, &metadataMap)
+	metadataMap, err := metadata.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("decoding metadata: %w", err)
+		return nil, err
 	}
 
 	return &specs.Spec{

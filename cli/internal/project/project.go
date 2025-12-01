@@ -5,16 +5,15 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/samber/lo"
 )
 
-// SpecLoader defines the interface for loading project specifications.
+// Loader defines the interface for loading project specifications.
 type Loader interface {
 	// Load loads specifications from the specified location.
 	Load(location string) (map[string]*specs.Spec, error)
@@ -36,7 +35,7 @@ type ProjectProvider interface {
 type Provider interface {
 	ProjectProvider
 	syncer.SyncProvider
-	importremote.WorkspaceImporter
+	provider.WorkspaceImporter
 }
 
 type Project interface {
@@ -47,8 +46,7 @@ type Project interface {
 type project struct {
 	Location string
 	Provider Provider
-	loader   Loader // New field
-	// specs      []*specs.Spec // This seems to be handled by the provider internally via LoadSpec
+	loader   Loader
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -122,22 +120,27 @@ func (p *project) Load() error {
 
 func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 	var metadataIds []string
-
-	var metadata importremote.Metadata
-	err := mapstructure.Decode(spec.Metadata, &metadata)
+	metadata, err := spec.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
+		return err
 	}
 
-	for _, workspace := range metadata.Import.Workspaces {
-		for _, resource := range workspace.Resources {
-			metadataIds = append(metadataIds, resource.LocalID)
+	err = metadata.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid spec metadata: %w", err)
+	}
+
+	if metadata.Import != nil {
+		for _, workspace := range metadata.Import.Workspaces {
+			for _, resource := range workspace.Resources {
+				metadataIds = append(metadataIds, resource.LocalID)
+			}
 		}
-	}
 
-	_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
-	if len(missingInSpec) > 0 {
-		return fmt.Errorf("local_ids from metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
+		_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
+		if len(missingInSpec) > 0 {
+			return fmt.Errorf("local_id from import metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
+		}
 	}
 
 	return nil

@@ -3,8 +3,6 @@ package localcatalog
 import (
 	"fmt"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -206,23 +204,23 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
-	metadata := importremote.Metadata{}
-
-	err := mapstructure.Decode(s.Metadata, &metadata)
+	metadata, err := s.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
+		return err
 	}
 
-	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
-		// For each resource within the workspace, load the import metadata
-		// which will be used during the creation of resourceGraph
-		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
-			dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
-				WorkspaceID: workspace.WorkspaceID,
-				RemoteID:    resource.RemoteID,
-			}
+	if metadata.Import != nil {
+		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			// For each resource within the workspace, load the import metadata
+			// which will be used during the creation of resourceGraph
+			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+				dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+					WorkspaceID: workspace.WorkspaceID,
+					RemoteID:    resource.RemoteID,
+				}
+			})
 		})
-	})
+	}
 
 	return nil
 }

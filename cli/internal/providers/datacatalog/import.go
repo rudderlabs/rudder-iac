@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -65,8 +65,8 @@ func (p *Provider) FormatForExport(
 	collection *resources.ResourceCollection,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
-	normalized := make([]importremote.FormattableEntity, 0)
+) ([]writer.FormattableEntity, error) {
+	normalized := make([]writer.FormattableEntity, 0)
 
 	for resourceType, provider := range p.providerStore {
 		entities, err := provider.FormatForExport(

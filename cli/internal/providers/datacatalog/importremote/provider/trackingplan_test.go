@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -162,13 +161,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "e-commerce-tracking",
-									RemoteID: "tp1",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws1",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "e-commerce-tracking",
+									"remote_id": "tp1",
 								},
 							},
 						},
@@ -288,13 +287,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "e-commerce-tracking",
-									RemoteID: "tp1",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws1",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "e-commerce-tracking",
+									"remote_id": "tp1",
 								},
 							},
 						},
@@ -330,13 +329,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "user-analytics",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws2",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "user-analytics",
-									RemoteID: "tp2",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws2",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "user-analytics",
+									"remote_id": "tp2",
 								},
 							},
 						},
