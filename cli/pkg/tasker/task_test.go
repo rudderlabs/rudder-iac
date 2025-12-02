@@ -146,7 +146,7 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 		concurrency = 2
 	)
 
-	t.Run("tasks waiting on a failed task should always fail", func(t *testing.T) {
+	t.Run("tasks dependent on a failed task should always fail", func(t *testing.T) {
 		t.Parallel()
 
 		queue := &safeQueue{}
@@ -173,7 +173,7 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 		assert.Empty(t, items, "Queue should be empty as task-b and task-c should not execute")
 	})
 
-	t.Run("tasks not dependent on a failed task should execute successfully", func(t *testing.T) {
+	t.Run("tasks not dependent on a failed task should execute successfully when continueOnFail=true", func(t *testing.T) {
 		t.Parallel()
 
 		queue := &safeQueue{}
@@ -191,12 +191,39 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
+		errs := RunTasks(context.Background(), tasks, concurrency, true, command)
 		require.NotEmpty(t, errs, "Expected error from task-a")
 
 		items := queue.Items()
 		assert.Len(t, items, 1, "Queue should contain only task-c")
 		assert.Equal(t, "task-c", items[0], "Queue should contain task-c")
+	})
+
+	t.Run("tasks should fail when we have a failed task and when continueOnFail=false", func(t *testing.T) {
+		t.Parallel()
+
+		queue := &safeQueue{}
+		tasks := []Task{
+			&mockTask{id: "task-c", dependencies: []string{}}, // task-c is not dependent on any task
+			&mockTask{id: "task-b", dependencies: []string{"task-a"}},
+			&mockTask{id: "task-a", dependencies: []string{}},
+		}
+
+		command := func(task Task) error {
+			if true {
+				// always fail the task
+				return expectedErr
+			}
+			queue.Push(task.Id())
+			return nil
+		}
+
+		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
+		require.NotEmpty(t, errs, "Expected error from task-a")
+		require.Len(t, errs, 3, "Expected 3 errors from task-a, task-b, and task-c")
+
+		items := queue.Items()
+		assert.Empty(t, items, "Queue should be empty as all tasks should fail")
 	})
 
 }
