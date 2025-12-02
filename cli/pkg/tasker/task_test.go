@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,16 +141,19 @@ func TestRunTasks_Dependencies(t *testing.T) {
 func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := errors.New("task-a failed")
+	var (
+		expectedErr = errors.New("task-a failed")
+		concurrency = 2
+	)
 
-	t.Run("continueOnFail=false", func(t *testing.T) {
+	t.Run("tasks waiting on a failed task should always fail", func(t *testing.T) {
 		t.Parallel()
 
 		queue := &safeQueue{}
 
-		// task-A fails, task-B depends on task-A
 		tasks := []Task{
-			&mockTask{id: "task-b", dependencies: []string{"task-a"}},
+			&mockTask{id: "task-c", dependencies: []string{"task-b"}}, // task-c fails as it's dependent on task-b which failed
+			&mockTask{id: "task-b", dependencies: []string{"task-a"}}, // task-b fails as it's dependent on task-a which failed
 			&mockTask{id: "task-a", dependencies: []string{}},
 		}
 
@@ -161,21 +165,20 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(context.Background(), tasks, 1, false, command)
+		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
 		require.NotEmpty(t, errs, "Expected error from task-a")
 		assert.Contains(t, errs, expectedErr, "Error slice should contain expected error")
 
 		items := queue.Items()
-		assert.Empty(t, items, "Queue should be empty as task-b should not execute")
+		assert.Empty(t, items, "Queue should be empty as task-b and task-c should not execute")
 	})
 
-	t.Run("continueOnFail=true", func(t *testing.T) {
+	t.Run("tasks not dependent on a failed task should execute successfully", func(t *testing.T) {
 		t.Parallel()
 
 		queue := &safeQueue{}
-
-		// task-A fails, task-B depends on task-A
 		tasks := []Task{
+			&mockTask{id: "task-c", dependencies: []string{}}, // task-c is not dependent on any task
 			&mockTask{id: "task-b", dependencies: []string{"task-a"}},
 			&mockTask{id: "task-a", dependencies: []string{}},
 		}
@@ -188,13 +191,72 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(context.Background(), tasks, 1, true, command)
-
+		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
 		require.NotEmpty(t, errs, "Expected error from task-a")
-		assert.Contains(t, errs, expectedErr, "Error slice should contain expected error")
 
 		items := queue.Items()
-		require.Len(t, items, 1, "Queue should contain only task-b")
-		assert.Equal(t, "task-b", items[0], "Queue should contain task-b")
+		assert.Len(t, items, 1, "Queue should contain only task-c")
+		assert.Equal(t, "task-c", items[0], "Queue should contain task-c")
+	})
+
+}
+
+func TestRunTasks_WithDuplicateTasks(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate tasks added to the task list should return an error", func(t *testing.T) {
+		t.Parallel()
+
+		tasks := []Task{
+			&mockTask{id: "task-a", dependencies: []string{}},
+			&mockTask{id: "task-a", dependencies: []string{}},
+		}
+
+		errs := RunTasks(context.Background(), tasks, 1, false, func(task Task) error {
+			return nil
+		})
+
+		require.NotEmpty(t, errs, "Expected error from duplicate task")
+		assert.EqualError(t, errs[0], "duplicate tasks found: [task-a]")
+	})
+}
+
+func TestRunTasks_ContextCancel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("context cancellation should return error", func(t *testing.T) {
+		t.Parallel()
+		queue := &safeQueue{}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancelCtxChan := make(chan bool)
+
+		tasks := []Task{
+			&mockTask{id: "task-a", dependencies: []string{}},
+			&mockTask{id: "task-b", dependencies: []string{"task-a"}},
+			&mockTask{id: "task-c", dependencies: []string{}},
+		}
+
+		command := func(task Task) error {
+			cancelCtxChan <- true
+			// Simulate some work in which the context is cancelled
+			time.Sleep(100 * time.Millisecond)
+			queue.Push(task.Id())
+
+			return nil
+		}
+
+		go func() {
+			<-cancelCtxChan
+			cancel()
+		}()
+
+		errs := RunTasks(ctx, tasks, 1, false, command)
+		require.NotEmpty(t, errs, "Expected error from context cancellation")
+		require.Len(t, errs, 2, "Expected 2 errors from context cancellation")
+		assert.ErrorIs(t, errs[0], context.Canceled, "Error slice should contain context canceled error")
+
+		items := queue.Items()
+		assert.Len(t, items, 1, "Queue should contain only 1 task whichever ran first and cancelled the context")
 	})
 }
