@@ -1,11 +1,13 @@
 package provider
 
+import "fmt"
+
 type ErrUnsupportedSpecKind struct {
 	Kind string
 }
 
 func (e *ErrUnsupportedSpecKind) Error() string {
-	return "unsupported spec kind: " + e.Kind
+	return fmt.Sprintf("unsupported spec kind '%s'", e.Kind)
 }
 
 type ErrUnsupportedResourceType struct {
@@ -13,5 +15,5 @@ type ErrUnsupportedResourceType struct {
 }
 
 func (e *ErrUnsupportedResourceType) Error() string {
-	return "unsupported resource type: " + e.ResourceType
+	return fmt.Sprintf("unsupported resource type '%s'", e.ResourceType)
 }

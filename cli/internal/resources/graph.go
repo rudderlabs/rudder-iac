@@ -19,7 +19,12 @@ func (s *Graph) Resources() map[string]*Resource {
 }
 
 func (s *Graph) AddResource(r *Resource) {
-	refs := CollectReferences(r.Data())
+	refs := collectReferences(r.Data())
+
+	if r.RawData() != nil {
+		refs = append(refs, collectReferencesByReflection(r.RawData())...)
+	}
+
 	for _, ref := range refs {
 		s.AddDependency(r.URN(), ref.URN)
 	}

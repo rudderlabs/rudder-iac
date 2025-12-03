@@ -1,0 +1,76 @@
+package export
+
+import (
+	"fmt"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+)
+
+type MutliSpecExportHandler[Spec any, Remote handler.RemoteResource] interface {
+	Metadata() handler.HandlerMetadata
+	MapRemoteToSpec(localID string, data *Remote) (*SpecExportData[Spec], error)
+}
+
+type MultiSpecExportStrategy[Spec any, Remote handler.RemoteResource] struct {
+	Handler MutliSpecExportHandler[Spec, Remote]
+}
+
+func (s *MultiSpecExportStrategy[Spec, Remote]) FormatForExport(
+	remotes map[string]*Remote,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	var result []writer.FormattableEntity
+	for localID, remote := range remotes {
+		remoteMetadata := (*remote).Metadata()
+		metadata := specs.Metadata{
+			Name: s.Handler.Metadata().SpecMetadataName,
+			Import: &specs.WorkspacesImportMetadata{
+				Workspaces: []specs.WorkspaceImportMetadata{
+					{
+						WorkspaceID: remoteMetadata.WorkspaceID,
+						Resources: []specs.ImportIds{
+							{
+								LocalID:  localID,
+								RemoteID: remoteMetadata.ID,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		metadataMap, err := metadata.ToMap()
+		if err != nil {
+			return nil, fmt.Errorf("converting metadata to map: %w", err)
+		}
+
+		// Create spec content
+		exportData, err := s.Handler.MapRemoteToSpec(localID, remote)
+		if err != nil {
+			return nil, fmt.Errorf("mapping remote to spec: %w", err)
+		}
+		specData, err := exportData.ToMap()
+		if err != nil {
+			return nil, fmt.Errorf("converting spec data to map: %w", err)
+		}
+
+		spec := &specs.Spec{
+			Version:  specs.SpecVersion,
+			Kind:     s.Handler.Metadata().SpecKind,
+			Metadata: metadataMap,
+			Spec:     specData,
+		}
+
+		result = append(result, writer.FormattableEntity{
+			Content:      spec,
+			RelativePath: exportData.RelativePath,
+		})
+	}
+
+	return result, nil
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
@@ -21,6 +22,7 @@ var log = logger.New("datacatalogprovider")
 const importDir = "data-catalog"
 
 type Provider struct {
+	provider.EmptyProvider
 	concurrency   int
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog

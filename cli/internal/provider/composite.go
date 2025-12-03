@@ -76,6 +76,7 @@ func (p *CompositeProvider) ParseSpec(path string, s *specs.Spec) (*specs.Parsed
 	if err != nil {
 		return nil, err
 	}
+
 	return provider.ParseSpec(path, s)
 }
 
@@ -84,6 +85,7 @@ func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 	if err != nil {
 		return err
 	}
+
 	return provider.LoadSpec(path, s)
 }
 
@@ -107,12 +109,28 @@ func (p *CompositeProvider) Create(ctx context.Context, ID string, resourceType 
 	return provider.Create(ctx, ID, resourceType, data)
 }
 
+func (p *CompositeProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (any, error) {
+	provider, err := p.providerForType(resource.Type())
+	if err != nil {
+		return nil, err
+	}
+	return provider.CreateRaw(ctx, resource)
+}
+
 func (p *CompositeProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	provider, err := p.providerForType(resourceType)
 	if err != nil {
 		return nil, err
 	}
 	return provider.Update(ctx, ID, resourceType, data, state)
+}
+
+func (p *CompositeProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, oldData any, oldState any) (any, error) {
+	provider, err := p.providerForType(resource.Type())
+	if err != nil {
+		return nil, err
+	}
+	return provider.UpdateRaw(ctx, resource, oldData, oldState)
 }
 
 func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
@@ -123,12 +141,28 @@ func (p *CompositeProvider) Delete(ctx context.Context, ID string, resourceType 
 	return provider.Delete(ctx, ID, resourceType, state)
 }
 
+func (p *CompositeProvider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
+	provider, err := p.providerForType(resourceType)
+	if err != nil {
+		return err
+	}
+	return provider.DeleteRaw(ctx, ID, resourceType, oldData, oldState)
+}
+
 func (p *CompositeProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	provider, err := p.providerForType(resourceType)
 	if err != nil {
 		return nil, err
 	}
 	return provider.Import(ctx, ID, resourceType, data, remoteId)
+}
+
+func (p *CompositeProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (any, error) {
+	provider, err := p.providerForType(resource.Type())
+	if err != nil {
+		return nil, err
+	}
+	return provider.ImportRaw(ctx, resource, remoteId)
 }
 
 type compositeProviderTask struct {
