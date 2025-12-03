@@ -16,7 +16,6 @@ func NewTrackingPlanCatalogFactory() *TrackingPlanCatalogFactory {
 	tp := catalog.TrackingPlan{
 		ID:           uuid.New().String(),
 		Name:         "default-tracking-plan",
-		Version:      1,
 		CreationType: "backend",
 		WorkspaceID:  "workspace-id",
 		CreatedAt:    time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC),

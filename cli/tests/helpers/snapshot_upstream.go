@@ -107,7 +107,7 @@ func (u *UpstreamSnapshotTester) upstreamEntity(ctx context.Context, entityID, e
 		v = property
 
 	case state.TrackingPlanResourceType:
-		trackingPlan, err := u.dataCatalog.GetTrackingPlanWithIdentifiers(ctx, entityID)
+		trackingPlan, err := u.dataCatalog.GetTrackingPlanWithIdentifiers(ctx, entityID, false)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetTrackingPlan: %w", err)
 		}

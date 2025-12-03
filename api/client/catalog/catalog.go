@@ -38,7 +38,8 @@ type DataCatalog interface {
 }
 
 type ListOptions struct {
-	HasExternalID *bool
+	HasExternalID  *bool
+	RebuildSchemas bool
 }
 
 func (o *ListOptions) ToQuery() string {
