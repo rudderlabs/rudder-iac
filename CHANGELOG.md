@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.12.0](https://github.com/rudderlabs/rudder-iac/compare/v0.11.2...v0.12.0) (2025-12-03)
+
+
+### Features
+
+* batched trackingplan event update requests ([#308](https://github.com/rudderlabs/rudder-iac/issues/308)) ([b559f7e](https://github.com/rudderlabs/rudder-iac/commit/b559f7e469f8833e0a5c67b6945b391ea7a1e934))
+* experimental public package to expose project loading ([#309](https://github.com/rudderlabs/rudder-iac/issues/309)) ([640b323](https://github.com/rudderlabs/rudder-iac/commit/640b32340b71d94e80fdae12d3ed1d5473c187f3))
+* improved apply command with concurrent execution ([#298](https://github.com/rudderlabs/rudder-iac/issues/298)) ([e917a2f](https://github.com/rudderlabs/rudder-iac/commit/e917a2f742591867f4995a39dc4ea44939dc429e))
+* remove the constraints on the ordering of the event states ([#292](https://github.com/rudderlabs/rudder-iac/issues/292)) ([6343b6c](https://github.com/rudderlabs/rudder-iac/commit/6343b6c135f208e69e5a827c865ff95139ee1769))
+* use rebuildSchemas=false to fetch latest mappings ([#286](https://github.com/rudderlabs/rudder-iac/issues/286)) ([b493933](https://github.com/rudderlabs/rudder-iac/commit/b493933bddc690525879ece3f0044c775fe7662e))
+
+
+### Bug Fixes
+
+* add tests for skipping sources with no external state in load resources from remote ([#296](https://github.com/rudderlabs/rudder-iac/issues/296)) ([f902543](https://github.com/rudderlabs/rudder-iac/commit/f9025437856ea36f2879a6c94c76bd39986e3218))
+
+
+### Miscellaneous
+
+* clean up provider interfaces ([#306](https://github.com/rudderlabs/rudder-iac/issues/306)) ([a375541](https://github.com/rudderlabs/rudder-iac/commit/a3755415e53c511af52f3fe0ecc213924709afd0))
+* enable concurrent syncs e2e test ([#313](https://github.com/rudderlabs/rudder-iac/issues/313)) ([6bf74c3](https://github.com/rudderlabs/rudder-iac/commit/6bf74c321691021a16893a5ba2a7279239c0dfa0))
+* moved resources package outside syncer  ([#303](https://github.com/rudderlabs/rudder-iac/issues/303)) ([be4b08d](https://github.com/rudderlabs/rudder-iac/commit/be4b08d64af88fd8084d67080d86f568ef161876))
+* remove deprecated read/load/put/delete State operations ([#301](https://github.com/rudderlabs/rudder-iac/issues/301)) ([3dcda73](https://github.com/rudderlabs/rudder-iac/commit/3dcda73475ea4051885a84d5cd9af2d992de08f5))
+* **typer:** refactor kotlin tests to use the actual SDK for validations ([#253](https://github.com/rudderlabs/rudder-iac/issues/253)) ([332e9a2](https://github.com/rudderlabs/rudder-iac/commit/332e9a24d847299391aa8129726fe7ecfc29a431))
+* unify import implementations of bulk workspace import and single resource retl import ([#307](https://github.com/rudderlabs/rudder-iac/issues/307)) ([6d5842a](https://github.com/rudderlabs/rudder-iac/commit/6d5842aa792120217c379eb6fea53bb542deba8f))
+
 ## [0.11.2](https://github.com/rudderlabs/rudder-iac/compare/v0.11.1...v0.11.2) (2025-11-18)
 
 
