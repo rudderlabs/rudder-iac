@@ -269,7 +269,7 @@ func (c *RudderDataCatalog) GetTrackingPlans(ctx context.Context, options ListOp
 }
 
 func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s?rebuildSchemas=false", id), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan skeleton: %w", err)
 	}
@@ -283,7 +283,7 @@ func (c *RudderDataCatalog) GetTrackingPlan(ctx context.Context, id string) (*Tr
 }
 
 func (c *RudderDataCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s", id), nil)
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s?rebuildSchemas=%t", id, rebuildSchemas), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request to fetch tracking plan: %w", err)
 	}
@@ -388,7 +388,11 @@ func (c *RudderDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context,
 	result := make([]*TrackingPlanWithIdentifiers, len(trackingPlansResp.TrackingPlans))
 	for i := range trackingPlansResp.TrackingPlans {
 		// Get full tracking plan details with events
-		trackingPlan, err := c.GetTrackingPlanWithIdentifiers(ctx, trackingPlansResp.TrackingPlans[i].ID, options.RebuildSchemas)
+		trackingPlan, err := c.GetTrackingPlanWithIdentifiers(
+			ctx,
+			trackingPlansResp.TrackingPlans[i].ID,
+			options.RebuildSchemas,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("fetching tracking plan %s: %w", trackingPlansResp.TrackingPlans[i].ID, err)
 		}
