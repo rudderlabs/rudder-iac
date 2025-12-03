@@ -60,7 +60,7 @@ func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID st
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, input []catalog.EventIdentifierDetail) error {
+func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, input []catalog.EventIdentifierDetail, rebuildSchemas bool) error {
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *EmptyCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 

@@ -68,7 +68,7 @@ func (m *MockTrackingPlanCatalog) UpsertTrackingPlan(ctx context.Context, tracki
 	return m.tp, m.err
 }
 
-func (m *MockTrackingPlanCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *MockTrackingPlanCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.tpWithIdentifiers, m.err
 }
 
@@ -80,7 +80,7 @@ func (m *MockTrackingPlanCatalog) GetTrackingPlanEventSchema(ctx context.Context
 	return m.tpes, m.err
 }
 
-func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail) error {
+func (m *MockTrackingPlanCatalog) UpdateTrackingPlanEvents(ctx context.Context, id string, input []catalog.EventIdentifierDetail, rebuildSchemas bool) error {
 	for range input {
 		m.updateEventCalled = true
 		m.updateEventCallCount++
@@ -737,7 +737,6 @@ func defaultTrackingPlanFactory() *factory.TrackingPlanCatalogFactory {
 	f.WithCreationType("backend")
 	f.WithCreatedAt(time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC))
 	f.WithUpdatedAt(time.Date(2021, 9, 2, 0, 0, 0, 0, time.UTC))
-	f.WithVersion(1)
 	return f
 }
 

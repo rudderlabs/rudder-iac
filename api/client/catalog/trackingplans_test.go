@@ -89,7 +89,7 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		require.NoError(t, err)
 		events := createTestEvents(5)
 
-		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events)
+		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events, false)
 
 		require.NoError(t, err)
 		assert.Len(t, receivedBatches, 3)
@@ -111,7 +111,7 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		require.NoError(t, err)
 		events := createTestEvents(0)
 
-		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events)
+		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events, false)
 
 		require.NoError(t, err)
 		httpClient.AssertNumberOfCalls()
@@ -144,7 +144,7 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		require.NoError(t, err)
 		events := createTestEvents(2)
 
-		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events)
+		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events, false)
 
 		require.NoError(t, err)
 		httpClient.AssertNumberOfCalls()
@@ -182,7 +182,7 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 		require.NoError(t, err)
 		events := createTestEvents(5)
 
-		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events)
+		err = dataCatalog.UpdateTrackingPlanEvents(ctx, trackingPlanID, events, false)
 		require.Error(t, err)
 
 		httpClient.AssertNumberOfCalls()
