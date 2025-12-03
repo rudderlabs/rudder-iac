@@ -2,7 +2,7 @@ package auth
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/auth"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 

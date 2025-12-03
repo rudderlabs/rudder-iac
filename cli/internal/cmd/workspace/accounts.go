@@ -2,9 +2,9 @@ package workspace
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
+	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
