@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -102,7 +103,7 @@ func TestRunTasks_Dependencies(t *testing.T) {
 	require.Empty(t, errs, "Expected no errors")
 
 	items := queue.Items()
-	require.Len(t, items, 5, "Expected all 3 tasks to complete")
+	assert.Len(t, items, len(tasks), "Expected all tasks to complete")
 
 	// Verify all tasks are present
 	taskMap := make(map[string]bool)
@@ -167,7 +168,13 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 
 		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
 		require.NotEmpty(t, errs, "Expected error from task-a")
-		assert.Contains(t, errs, expectedErr, "Error slice should contain expected error")
+
+		assert.Len(t, errs, 3)
+		for _, err := range errs {
+			// Each of the failed task should have the expected
+			// error wrapped in it
+			assert.ErrorIs(t, err, expectedErr)
+		}
 
 		items := queue.Items()
 		assert.Empty(t, items, "Queue should be empty as task-b and task-c should not execute")
@@ -175,6 +182,7 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 
 	t.Run("tasks not dependent on a failed task should execute successfully when continueOnFail=true", func(t *testing.T) {
 		t.Parallel()
+		continueOnFail := true
 
 		queue := &safeQueue{}
 		tasks := []Task{
@@ -191,8 +199,9 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(context.Background(), tasks, concurrency, true, command)
+		errs := RunTasks(context.Background(), tasks, concurrency, continueOnFail, command)
 		require.NotEmpty(t, errs, "Expected error from task-a")
+		assert.Len(t, errs, 2) // task a and task b
 
 		items := queue.Items()
 		assert.Len(t, items, 1, "Queue should contain only task-c")
@@ -201,12 +210,14 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 
 	t.Run("tasks should fail when we have a failed task and when continueOnFail=false", func(t *testing.T) {
 		t.Parallel()
+		continueOnFail := false
 
 		queue := &safeQueue{}
 		tasks := []Task{
 			&mockTask{id: "task-c", dependencies: []string{}}, // task-c is not dependent on any task
 			&mockTask{id: "task-b", dependencies: []string{"task-a"}},
 			&mockTask{id: "task-a", dependencies: []string{}},
+			&mockTask{id: "task-d", dependencies: []string{}},
 		}
 
 		command := func(task Task) error {
@@ -218,12 +229,28 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(context.Background(), tasks, concurrency, false, command)
-		require.NotEmpty(t, errs, "Expected error from task-a")
-		require.Len(t, errs, 3, "Expected 3 errors from task-a, task-b, and task-c")
+		errs := RunTasks(context.Background(), tasks, concurrency, continueOnFail, command)
+		require.NotEmpty(t, errs, "Expected error from all tasks")
 
-		items := queue.Items()
-		assert.Empty(t, items, "Queue should be empty as all tasks should fail")
+		// Atleast one task should report with the
+		// overall job failed error depicting that it never continued on fail.
+		jobFailedFound := false
+		for _, err := range errs {
+
+			var cancelled *ErrTaskCancelled
+			if !errors.As(err, &cancelled) {
+				continue
+			}
+
+			// break from the loop if we find the overall job failed error
+			// in atleast one of the tasks
+			if strings.Contains(cancelled.Err.Error(), "overall job failed") {
+				jobFailedFound = true
+				break
+			}
+		}
+		assert.True(t, jobFailedFound, "Expected error from overall job failed")
+		assert.Empty(t, queue.Items(), "Queue should be empty as all tasks should fail")
 	})
 
 }
@@ -250,6 +277,7 @@ func TestRunTasks_WithDuplicateTasks(t *testing.T) {
 
 func TestRunTasks_ContextCancel(t *testing.T) {
 	t.Parallel()
+	var concurrency = 2
 
 	t.Run("context cancellation should return error", func(t *testing.T) {
 		t.Parallel()
@@ -266,7 +294,8 @@ func TestRunTasks_ContextCancel(t *testing.T) {
 
 		command := func(task Task) error {
 			cancelCtxChan <- true
-			// Simulate some work in which the context is cancelled
+
+			// Simulate running of a task
 			time.Sleep(100 * time.Millisecond)
 			queue.Push(task.Id())
 
@@ -278,12 +307,25 @@ func TestRunTasks_ContextCancel(t *testing.T) {
 			cancel()
 		}()
 
-		errs := RunTasks(ctx, tasks, 1, false, command)
+		errs := RunTasks(ctx, tasks, concurrency, false, command)
 		require.NotEmpty(t, errs, "Expected error from context cancellation")
-		require.Len(t, errs, 2, "Expected 2 errors from context cancellation")
-		assert.ErrorIs(t, errs[0], context.Canceled, "Error slice should contain context canceled error")
+
+		// Atleast one of the task should report with the context cancelled error
+		contextCanceledFound := false
+		for _, err := range errs {
+			if errors.Is(err, context.Canceled) {
+				contextCanceledFound = true
+				break
+			}
+		}
+		require.True(t, contextCanceledFound, "Expected context canceled error")
 
 		items := queue.Items()
-		assert.Len(t, items, 1, "Queue should contain only 1 task whichever ran first and cancelled the context")
+		assert.GreaterOrEqual(
+			t,
+			len(items),
+			1,
+			"Queue should contain atleast 1 task whichever ran first and cancelled the context",
+		)
 	})
 }

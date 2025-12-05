@@ -134,7 +134,7 @@ func (job *job) runTask(ctx context.Context, task Task, continueOnFail bool, com
 			<-result.done
 			if result.err != nil {
 				// If any one of my dependencies fail, I should fail.
-				return fmt.Errorf("dependency %s failed: %w", depTaskId, result.err)
+				return &ErrTaskCancelled{TaskID: task.Id(), Dependency: &depTaskId, Err: result.err}
 			}
 		}
 	}
@@ -146,14 +146,18 @@ func (job *job) runTask(ctx context.Context, task Task, continueOnFail bool, com
 	// 1. if the overall job has failed due to continueOnFail flag being false and failure happening.
 	// 2. if the caller context is done due to cancellation.
 	if job.failed.Load() {
-		return fmt.Errorf("returning early because overall job has failed")
+		return &ErrTaskCancelled{TaskID: task.Id(), Err: fmt.Errorf("overall job failed")}
 	}
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return &ErrTaskCancelled{TaskID: task.Id(), Err: fmt.Errorf("caller context cancelled: %w", ctx.Err())}
 	default:
 	}
 
-	return command(task)
+	if err := command(task); err != nil {
+		return &ErrTaskFailed{TaskID: task.Id(), Err: err}
+	}
+
+	return nil
 }

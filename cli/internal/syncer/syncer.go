@@ -238,6 +238,9 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 			return &OperationError{Operation: o, Err: providerErr}
 		}
 
+		// Task Failed -> Dependency was never run
+		// UI reporting 2
+
 		return nil
 	})
 
