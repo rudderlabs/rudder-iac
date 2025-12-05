@@ -3,6 +3,7 @@ package syncer_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -10,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/testutils"
 	internalTestutils "github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/samber/lo"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -395,7 +397,10 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 			errorMessages[i] = err.Error()
 		}
 		for _, expectedError := range expectedErrorContains {
-			assert.Contains(t, errorMessages, expectedError)
+			found := lo.ContainsBy(errorMessages, func(msg string) bool {
+				return strings.Contains(msg, expectedError)
+			})
+			assert.True(t, found, "expected error containing %q not found in %v", expectedError, errorMessages)
 		}
 
 		// Verify reporter recorded failures but still completed sync
