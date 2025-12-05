@@ -87,6 +87,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
+	viper.BindEnv("experimental", "RUDDERSTACK_CLI_EXPERIMENTAL")
 	viper.BindEnv("concurrency.catalogClient", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_CLIENT")
 	viper.BindEnv("concurrency.compositeProvider", "RUDDERSTACK_CLI_CONCURRENCY_COMPOSITE_PROVIDER")
 	viper.BindEnv("concurrency.catalogProvider", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_PROVIDER")
