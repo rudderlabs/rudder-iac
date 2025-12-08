@@ -277,14 +277,15 @@ func TestRunTasks_WithDuplicateTasks(t *testing.T) {
 
 func TestRunTasks_ContextCancel(t *testing.T) {
 	t.Parallel()
-	var concurrency = 2
 
 	t.Run("context cancellation should return error", func(t *testing.T) {
 		t.Parallel()
-		queue := &safeQueue{}
+
+		var (
+			queue = &safeQueue{}
+		)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		cancelCtxChan := make(chan bool)
 
 		tasks := []Task{
 			&mockTask{id: "task-a", dependencies: []string{}},
@@ -293,7 +294,9 @@ func TestRunTasks_ContextCancel(t *testing.T) {
 		}
 
 		command := func(task Task) error {
-			cancelCtxChan <- true
+			// Cancel the parent context
+			// that is sent to the RunTasks function
+			cancel()
 
 			// Simulate running of a task
 			time.Sleep(100 * time.Millisecond)
@@ -302,12 +305,7 @@ func TestRunTasks_ContextCancel(t *testing.T) {
 			return nil
 		}
 
-		go func() {
-			<-cancelCtxChan
-			cancel()
-		}()
-
-		errs := RunTasks(ctx, tasks, concurrency, false, command)
+		errs := RunTasks(ctx, tasks, 1, false, command)
 		require.NotEmpty(t, errs, "Expected error from context cancellation")
 
 		// Atleast one of the task should report with the context cancelled error
