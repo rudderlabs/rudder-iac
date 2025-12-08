@@ -144,7 +144,7 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 
 	var (
 		expectedErr = errors.New("task-a failed")
-		concurrency = 2
+		concurrency = 10
 	)
 
 	t.Run("tasks dependent on a failed task should always fail", func(t *testing.T) {
@@ -257,6 +257,7 @@ func TestRunTasks_ErrorWithDependentTask(t *testing.T) {
 
 func TestRunTasks_WithDuplicateTasks(t *testing.T) {
 	t.Parallel()
+	var concurrency = 10
 
 	t.Run("duplicate tasks added to the task list should return an error", func(t *testing.T) {
 		t.Parallel()
@@ -266,7 +267,7 @@ func TestRunTasks_WithDuplicateTasks(t *testing.T) {
 			&mockTask{id: "task-a", dependencies: []string{}},
 		}
 
-		errs := RunTasks(context.Background(), tasks, 1, false, func(task Task) error {
+		errs := RunTasks(context.Background(), tasks, concurrency, false, func(task Task) error {
 			return nil
 		})
 
@@ -277,6 +278,7 @@ func TestRunTasks_WithDuplicateTasks(t *testing.T) {
 
 func TestRunTasks_ContextCancel(t *testing.T) {
 	t.Parallel()
+	var concurrency = 10
 
 	t.Run("context cancellation should return error", func(t *testing.T) {
 		t.Parallel()
@@ -305,7 +307,7 @@ func TestRunTasks_ContextCancel(t *testing.T) {
 			return nil
 		}
 
-		errs := RunTasks(ctx, tasks, 1, false, command)
+		errs := RunTasks(ctx, tasks, concurrency, false, command)
 		require.NotEmpty(t, errs, "Expected error from context cancellation")
 
 		// Atleast one of the task should report with the context cancelled error
