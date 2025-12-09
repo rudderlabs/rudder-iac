@@ -196,13 +196,13 @@ func TestProvider(t *testing.T) {
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "retl-source-sql-model",
 				Spec: map[string]interface{}{
-					"id":                     "test-model",
-					"display_name":           "Test Model",
-					"description":            "Test Description",
-					"account_id":             "test-account",
-					"primary_key":            "id",
-					"sql":                    "SELECT * FROM users",
-					"source_definition_name": "postgres",
+					"id":                "test-model",
+					"display_name":      "Test Model",
+					"description":       "Test Description",
+					"account_id":        "test-account",
+					"primary_key":       "id",
+					"sql":               "SELECT * FROM users",
+					"source_definition": "postgres",
 				},
 			})
 			assert.NoError(t, err)
@@ -294,13 +294,13 @@ func TestProvider(t *testing.T) {
 			err := provider.LoadSpec("test1.yaml", &specs.Spec{
 				Kind: "retl-source-sql-model",
 				Spec: map[string]interface{}{
-					"id":                     "test-model-1",
-					"display_name":           "Test Model 1",
-					"description":            "Test Description 1",
-					"account_id":             "test-account",
-					"primary_key":            "id",
-					"sql":                    "SELECT * FROM users",
-					"source_definition_name": "postgres",
+					"id":                "test-model-1",
+					"display_name":      "Test Model 1",
+					"description":       "Test Description 1",
+					"account_id":        "test-account",
+					"primary_key":       "id",
+					"sql":               "SELECT * FROM users",
+					"source_definition": "postgres",
 				},
 			})
 			require.NoError(t, err)
@@ -308,13 +308,13 @@ func TestProvider(t *testing.T) {
 			err = provider.LoadSpec("test2.yaml", &specs.Spec{
 				Kind: "retl-source-sql-model",
 				Spec: map[string]interface{}{
-					"id":                     "test-model-2",
-					"display_name":           "Test Model 2",
-					"description":            "Test Description 2",
-					"account_id":             "test-account",
-					"primary_key":            "id",
-					"sql":                    "SELECT * FROM orders",
-					"source_definition_name": "postgres",
+					"id":                "test-model-2",
+					"display_name":      "Test Model 2",
+					"description":       "Test Description 2",
+					"account_id":        "test-account",
+					"primary_key":       "id",
+					"sql":               "SELECT * FROM orders",
+					"source_definition": "postgres",
 				},
 			})
 			require.NoError(t, err)
@@ -433,26 +433,26 @@ func TestProvider(t *testing.T) {
 
 			// Create complete test data for SQL model
 			createData := resources.ResourceData{
-				"id":                     "test-model",
-				"display_name":           "Test Model",
-				"description":            "Test Description",
-				"account_id":             "test-account",
-				"primary_key":            "id",
-				"sql":                    "SELECT * FROM users",
-				"source_definition_name": "postgres",
-				"enabled":                true,
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"description":       "Test Description",
+				"account_id":        "test-account",
+				"primary_key":       "id",
+				"sql":               "SELECT * FROM users",
+				"source_definition": "postgres",
+				"enabled":           true,
 			}
 
 			// For update, we need state data with a source_id
 			stateData := resources.ResourceData{
-				"display_name":           "Test Model",
-				"description":            "Test Description",
-				"account_id":             "test-account",
-				"primary_key":            "id",
-				"sql":                    "SELECT * FROM users",
-				"id":                     "test-source-id",
-				"source_definition_name": "postgres",
-				"enabled":                true,
+				"display_name":      "Test Model",
+				"description":       "Test Description",
+				"account_id":        "test-account",
+				"primary_key":       "id",
+				"sql":               "SELECT * FROM users",
+				"id":                "test-source-id",
+				"source_definition": "postgres",
+				"enabled":           true,
 			}
 
 			result, err := provider.Update(ctx, "test", sqlmodel.ResourceType, createData, stateData)

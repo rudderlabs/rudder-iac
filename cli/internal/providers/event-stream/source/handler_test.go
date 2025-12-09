@@ -1595,3 +1595,45 @@ func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (s
 	}
 	return "", fmt.Errorf("resolver not configured")
 }
+
+func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Rejects unknown field in event stream source spec", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		handler := source.NewHandler(mockClient, importDir)
+		spec := &specs.Spec{
+			Kind: "event-stream-source",
+			Spec: map[string]interface{}{
+				"id":                "test-source",
+				"name":              "Test Source",
+				"type": "javascript",
+				"unknown_field":     "should fail", // Unknown field
+			},
+		}
+
+		err := handler.LoadSpec("test.yaml", spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+	})
+
+	t.Run("Accepts valid event stream source spec", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		handler := source.NewHandler(mockClient, importDir)
+		spec := &specs.Spec{
+			Kind: "event-stream-source",
+			Spec: map[string]interface{}{
+				"id":                "test-source",
+				"name":              "Test Source",
+				"type": "javascript",
+			},
+		}
+
+		err := handler.LoadSpec("test.yaml", spec)
+		require.NoError(t, err)
+	})
+}

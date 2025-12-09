@@ -133,3 +133,37 @@ spec:
 		})
 	}
 }
+
+func TestNew_StrictValidation(t *testing.T) {
+	t.Run("Rejects unknown field at top level", func(t *testing.T) {
+		yamlWithUnknownField := `
+version: rudder/v0.1
+kind: datacatalog
+metadata:
+  name: TestSpec
+spec:
+  id: test-id
+unknown_field: "this should fail"
+`
+		spec, err := New([]byte(yamlWithUnknownField))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+		assert.Nil(t, spec)
+	})
+
+	t.Run("Accepts valid spec without unknown fields", func(t *testing.T) {
+		validYAML := `
+version: rudder/v0.1
+kind: datacatalog
+metadata:
+  name: TestSpec
+spec:
+  id: test-id
+  description: "valid spec"
+`
+		spec, err := New([]byte(validYAML))
+		require.NoError(t, err)
+		require.NotNil(t, spec)
+		assert.Equal(t, "datacatalog", spec.Kind)
+	})
+}

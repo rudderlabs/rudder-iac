@@ -1,11 +1,20 @@
 package localcatalog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 )
+
+// strictUnmarshal performs JSON unmarshaling with strict validation
+// It rejects unknown fields to catch configuration errors
+func strictUnmarshal(data []byte, v any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields() // Enable strict mode - reject unknown fields
+	return decoder.Decode(v)
+}
 
 type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id"`
@@ -28,7 +37,7 @@ func ExtractProperties(s *specs.Spec) ([]Property, error) {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
 
-	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+	if err := strictUnmarshal(jsonByt, &spec); err != nil {
 		return nil, fmt.Errorf("extracting the property spec: %w", err)
 	}
 
@@ -57,7 +66,7 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
 
-	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+	if err := strictUnmarshal(jsonByt, &spec); err != nil {
 		return nil, fmt.Errorf("extracting events spec: %w", err)
 	}
 
@@ -84,7 +93,7 @@ func ExtractCategories(s *specs.Spec) ([]Category, error) {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
 
-	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+	if err := strictUnmarshal(jsonByt, &spec); err != nil {
 		return nil, fmt.Errorf("extracting categories spec: %w", err)
 	}
 
@@ -122,7 +131,7 @@ func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
 		return nil, fmt.Errorf("marshalling the spec: %w", err)
 	}
 
-	if err := json.Unmarshal(jsonByt, &spec); err != nil {
+	if err := strictUnmarshal(jsonByt, &spec); err != nil {
 		return nil, fmt.Errorf("extracting custom types spec: %w", err)
 	}
 
