@@ -743,7 +743,7 @@ func TestSQLModelHandler(t *testing.T) {
 		err := handler.LoadSpec("test.yaml", invalidSpec)
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "converting spec")
+		assert.Contains(t, err.Error(), "decoding SQL model spec")
 	})
 
 	t.Run("Validate", func(t *testing.T) {
