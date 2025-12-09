@@ -9,7 +9,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
@@ -27,7 +27,9 @@ func (m *MockLoader) Load(location string) (map[string]*specs.Spec, error) {
 }
 
 func TestNewProject_Load_Error(t *testing.T) {
-	provider := testutils.NewMockProvider()
+	t.Parallel()
+
+	provider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 	p := project.New("test_location", provider, project.WithLoader(mockLoader))
 
@@ -42,7 +44,9 @@ func TestNewProject_Load_Error(t *testing.T) {
 }
 
 func TestProject_Load_Success(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -55,8 +59,6 @@ func TestProject_Load_Success(t *testing.T) {
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
 		return expectedSpecs, nil
 	}
-
-	mockProvider.SupportedKinds = []string{"Source", "Destination"}
 
 	err := proj.Load()
 	require.NoError(t, err)
@@ -79,31 +81,10 @@ func TestProject_Load_Success(t *testing.T) {
 	assert.Equal(t, 1, mockProvider.ValidateCalledCount, "Validate should be called once")
 }
 
-func TestProject_Load_UnsupportedKind(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
-	mockLoader := &MockLoader{}
-
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
-
-	specsWithUnsupportedKind := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "UnsupportedKind"},
-	}
-
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
-		return specsWithUnsupportedKind, nil
-	}
-
-	mockProvider.SupportedKinds = []string{"Source", "Destination"} // Does not include "UnsupportedKind"
-
-	err := proj.Load()
-	require.Error(t, err)
-	var unsupportedKindErr specs.ErrUnsupportedKind
-	require.True(t, errors.As(err, &unsupportedKindErr), "error should be of type specs.ErrUnsupportedKind")
-	assert.Equal(t, "UnsupportedKind", unsupportedKindErr.Kind)
-}
-
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -116,7 +97,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 		return validSpecs, nil
 	}
 
-	mockProvider.SupportedKinds = []string{"Source"}
 	expectedErr := errors.New("provider LoadSpec failed")
 	mockProvider.LoadSpecErr = expectedErr
 
@@ -127,7 +107,9 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 }
 
 func TestProject_Load_ProviderValidateError(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
@@ -140,7 +122,6 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 		return validSpecs, nil
 	}
 
-	mockProvider.SupportedKinds = []string{"Source"}
 	mockProvider.LoadSpecErr = nil
 	expectedErr := errors.New("provider Validate failed")
 	mockProvider.ValidateErr = expectedErr
@@ -152,28 +133,32 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 }
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	proj := project.New("test_dir", mockProvider) // Loader doesn't matter for this test
 
 	expectedGraph := &resources.Graph{}
 	mockProvider.GetResourceGraphVal = expectedGraph
 	mockProvider.GetResourceGraphErr = nil
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.NoError(t, err)
 	assert.Same(t, expectedGraph, graph) // Check if it's the exact same instance
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
 }
 
 func TestProject_GetResourceGraph_Error(t *testing.T) {
-	mockProvider := testutils.NewMockProvider()
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
 	proj := project.New("test_dir", mockProvider)
 
 	expectedErr := errors.New("GetResourceGraph failed")
 	mockProvider.GetResourceGraphVal = nil
 	mockProvider.GetResourceGraphErr = expectedErr
 
-	graph, err := proj.GetResourceGraph()
+	graph, err := proj.ResourceGraph()
 	require.Error(t, err)
 	assert.Nil(t, graph)
 	assert.True(t, errors.Is(err, expectedErr))
@@ -191,7 +176,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "success - all metadata IDs match external IDs",
+			name: "success - all import metadata IDs match external IDs",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -220,7 +205,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "error - extra IDs in metadata not in spec",
+			name: "error - extra IDs in import metadata not in spec",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -251,10 +236,10 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1", "id2"},
 			},
 			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec: id3",
+			errorContains: "local_id from import metadata missing in spec: id3",
 		},
 		{
-			name: "success - missing IDs in metadata (not validated)",
+			name: "success - missing IDs in import metadata (created instead of imported)",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -279,7 +264,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "success - empty both external IDs and metadata",
+			name: "success - empty both external IDs and import metadata",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -294,33 +279,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "error - empty spec but metadata has resources",
-			spec: &specs.Spec{
-				Kind: "Source",
-				Metadata: map[string]any{
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "ws-123",
-								"resources": []any{
-									map[string]any{
-										"local_id":  "id1",
-										"remote_id": "remote1",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
-			},
-			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec: id1",
-		},
-		{
-			name: "error - invalid metadata structure",
+			name: "error - invalid import metadata structure",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -408,7 +367,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1"},
 			},
 			expectedError: true,
-			errorContains: "local_ids from metadata missing in spec",
+			errorContains: "local_id from import metadata missing in spec: id2, id3",
 		},
 		{
 			name: "success - no import metadata key",

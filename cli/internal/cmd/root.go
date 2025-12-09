@@ -57,7 +57,6 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
-	typerCmd        *cobra.Command
 )
 
 func init() {
@@ -143,7 +142,7 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
-		ui.ShowError(err)
+		ui.PrintError(err)
 		os.Exit(1)
 	}
 }

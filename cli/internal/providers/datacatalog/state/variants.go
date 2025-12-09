@@ -7,7 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // Variants represents a slice of conditional variants for state management.
@@ -278,11 +278,7 @@ func (v Variant) diffVariant(against Variant) bool {
 		}
 	}
 
-	if diffPropertyReferences(v.Default, against.Default) {
-		return true
-	}
-
-	return false
+	return diffPropertyReferences(v.Default, against.Default)
 }
 
 func (vc VariantCase) diffVariantCase(against VariantCase) bool {

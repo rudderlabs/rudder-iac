@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
@@ -23,7 +24,7 @@ const (
 )
 
 var (
-	_ importremote.WorkspaceImporter = &EventImportProvider{}
+	_ WorkspaceImporter = &EventImportProvider{}
 )
 
 type EventImportProvider struct {
@@ -40,9 +41,9 @@ func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, impor
 	}
 }
 
-func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable events from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -73,7 +74,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 }
 
 func (p *EventImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to events")
@@ -111,11 +112,10 @@ func (p *EventImportProvider) idResources(
 
 // FormatForExport formats the events for export to file
 func (p *EventImportProvider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting events for export to file")
 
 	events := collection.GetAll(state.EventResourceType)
@@ -123,8 +123,8 @@ func (p *EventImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
 
 	formattedEvents := make([]map[string]any, 0)
@@ -137,7 +137,7 @@ func (p *EventImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the events
-		workspaceMetadata.Resources = append(workspaceMetadata.Resources, importremote.ImportIds{
+		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			LocalID:  event.ExternalID,
 			RemoteID: event.ID,
 		})
@@ -161,7 +161,7 @@ func (p *EventImportProvider) FormatForExport(
 		return nil, fmt.Errorf("creating spec: %w", err)
 	}
 
-	return []importremote.FormattableEntity{
+	return []writer.FormattableEntity{
 		{
 			Content:      spec,
 			RelativePath: p.filepath,

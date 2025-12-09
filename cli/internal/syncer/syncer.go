@@ -3,37 +3,33 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 )
 
 type ProjectSyncer struct {
-	provider   SyncProvider
-	workspace  *client.Workspace
-	stateMutex sync.RWMutex
+	provider        SyncProvider
+	reporter        SyncReporter
+	workspace       *client.Workspace
+	stateMutex      sync.RWMutex
+	concurrency     int
+	dryRun          bool
+	askConfirmation bool
 }
 
 type SyncProvider interface {
-	LoadState(ctx context.Context) (*state.State, error)
-	PutResourceState(ctx context.Context, URN string, state *state.ResourceState) error
-	DeleteResourceState(ctx context.Context, state *state.ResourceState) error
-	LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error)
-	LoadStateFromResources(ctx context.Context, resources *resources.ResourceCollection) (*state.State, error)
-	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error
-	Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error)
+	provider.ManagedRemoteResourceLoader
+	provider.StateLoader
+	provider.LifecycleManager
 }
 
-func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
+func New(p SyncProvider, workspace *client.Workspace, options ...Option) (*ProjectSyncer, error) {
 	if p == nil {
 		return nil, fmt.Errorf("provider is required")
 	}
@@ -41,40 +37,91 @@ func New(p SyncProvider, workspace *client.Workspace) (*ProjectSyncer, error) {
 		return nil, fmt.Errorf("workspace is required")
 	}
 
-	return &ProjectSyncer{
-		provider:  p,
-		workspace: workspace,
-	}, nil
+	syncer := &ProjectSyncer{
+		provider:        p,
+		workspace:       workspace,
+		concurrency:     1,
+		dryRun:          false,
+		askConfirmation: false,
+	}
+
+	for _, option := range options {
+		if err := option(syncer); err != nil {
+			return nil, err
+		}
+	}
+
+	if syncer.reporter == nil {
+		syncer.reporter = &reporters.PlainSyncReporter{}
+	}
+
+	return syncer, nil
 }
 
-type SyncOptions struct {
-	// DryRun is a flag to indicate if the syncer should only plan the changes, without applying them
-	DryRun bool
-	// Confirm is a flag to indicate if the syncer should ask for confirmation before applying the changes
-	Confirm bool
-	// Concurrency is the number of concurrent operations to run
-	Concurrency int
+type Option func(*ProjectSyncer) error
+
+func WithReporter(reporter SyncReporter) Option {
+	return func(s *ProjectSyncer) error {
+		if reporter == nil {
+			return fmt.Errorf("reporter cannot be nil")
+		}
+		s.reporter = reporter
+		return nil
+	}
 }
 
-func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph, options SyncOptions) error {
-	errs := s.apply(ctx, target, options, false)
+func WithConcurrency(concurrency int) Option {
+	return func(s *ProjectSyncer) error {
+		if concurrency < 1 {
+			return fmt.Errorf("concurrency must be at least 1, got %d", concurrency)
+		}
+		s.concurrency = concurrency
+		return nil
+	}
+}
+
+func WithDryRun(dryRun bool) Option {
+	return func(s *ProjectSyncer) error {
+		s.dryRun = dryRun
+		return nil
+	}
+}
+
+func WithAskConfirmation(askConfirmation bool) Option {
+	return func(s *ProjectSyncer) error {
+		s.askConfirmation = askConfirmation
+		return nil
+	}
+}
+
+type SyncReporter interface {
+	ReportPlan(plan *planner.Plan)
+	AskConfirmation() (bool, error)
+	SyncStarted(totalTasks int)
+	SyncCompleted()
+	TaskStarted(taskId string, description string)
+	TaskCompleted(taskId string, description string, err error)
+}
+
+func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error {
+	errs := s.apply(ctx, target, false)
 	if len(errs) > 0 {
 		return errs[0]
 	}
 	return nil
 }
 
-func (s *ProjectSyncer) Destroy(ctx context.Context, options SyncOptions) []error {
-	return s.apply(ctx, resources.NewGraph(), options, true)
+func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
+	return s.apply(ctx, resources.NewGraph(), true)
 }
 
-func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, options SyncOptions, continueOnFail bool) []error {
+func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
 	}
 
-	state, err := s.provider.LoadStateFromResources(ctx, resources)
+	state, err := s.provider.MapRemoteToState(resources)
 	if err != nil {
 		return []error{err}
 	}
@@ -83,9 +130,9 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
-	differ.PrintDiff(plan.Diff)
+	s.reporter.ReportPlan(plan)
 
-	if options.DryRun {
+	if s.dryRun {
 		return nil
 	}
 
@@ -94,8 +141,8 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 		return nil
 	}
 
-	if options.Confirm {
-		confirm, err := ui.Confirm("Do you want to apply these changes?")
+	if s.askConfirmation {
+		confirm, err := s.reporter.AskConfirmation()
 		if err != nil {
 			return []error{err}
 		}
@@ -105,7 +152,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, opti
 		}
 	}
 
-	return s.executePlan(ctx, state, plan, target, continueOnFail, options)
+	return s.executePlan(ctx, state, plan, target, continueOnFail)
 }
 
 func StateToGraph(state *state.State) *resources.Graph {
@@ -121,16 +168,6 @@ func StateToGraph(state *state.State) *resources.Graph {
 	return graph
 }
 
-func removeStateForResourceTypes(state *state.State, resourceTypes []string) *state.State {
-	// loop over all resources in the state and remove a resource if it matches any of the resource types
-	for _, resource := range state.Resources {
-		if slices.Contains(resourceTypes, resource.Type) {
-			delete(state.Resources, resources.URN(resource.ID, resource.Type))
-		}
-	}
-	return state
-}
-
 type OperationError struct {
 	Operation *planner.Operation
 	Err       error
@@ -144,63 +181,67 @@ func (e *OperationError) Unwrap() error {
 	return e.Err
 }
 
-func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
-	if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-		return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail, options)
+func (s *ProjectSyncer) executePlan(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool) []error {
+	if s.concurrency > 1 {
+		return s.executePlanConcurrently(ctx, state, plan, target, continueOnFail)
+	} else {
+		return s.executePlanSequentially(ctx, state, plan, continueOnFail)
 	}
-	return s.executePlanSequentially(ctx, state, plan, continueOnFail)
 }
 
 func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *state.State, plan *planner.Plan, continueOnFail bool) []error {
 	var errors []error
 
+	s.reporter.SyncStarted(len(plan.Operations))
+
 	for _, o := range plan.Operations {
 		operationString := o.String()
-		spinner := ui.NewSpinner(operationString)
-		spinner.Start()
 
+		s.reporter.TaskStarted(o.Resource.URN(), operationString)
 		providerErr := s.providerOperation(ctx, o, state)
-		spinner.Stop()
+		s.reporter.TaskCompleted(o.Resource.URN(), operationString, providerErr)
 		if providerErr != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
 			errors = append(errors, &OperationError{Operation: o, Err: providerErr})
 			if !continueOnFail {
 				return errors
 			}
 		}
-
-		if providerErr == nil {
-			fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
-		}
 	}
+
+	s.reporter.SyncCompleted()
 
 	return errors
 }
 
-func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool, options SyncOptions) []error {
+func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool) []error {
 	tasks := make([]Task, 0, len(plan.Operations))
 	sourceGraph := StateToGraph(state)
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
 	}
-	return RunTasks(ctx, tasks, options.Concurrency, continueOnFail, func(task Task) error {
+
+	s.reporter.SyncStarted(len(tasks))
+
+	taskErrors := RunTasks(ctx, tasks, s.concurrency, continueOnFail, func(task Task) error {
 		opTask, ok := task.(*operationTask)
 		if !ok {
 			return fmt.Errorf("invalid task type: %T", task)
 		}
 		o := opTask.operation
 		operationString := o.String()
-		spinner := ui.NewSpinner(operationString)
-		spinner.Start()
+		s.reporter.TaskStarted(task.Id(), operationString)
 		providerErr := s.providerOperation(ctx, o, state)
-		spinner.Stop()
+		s.reporter.TaskCompleted(task.Id(), operationString, providerErr)
 		if providerErr != nil {
-			fmt.Printf("%s %s\n", ui.Color("x", ui.Red), operationString)
 			return &OperationError{Operation: o, Err: providerErr}
 		}
-		fmt.Printf("%s %s\n", ui.Color("✔", ui.Green), operationString)
+
 		return nil
 	})
+
+	s.reporter.SyncCompleted()
+
+	return taskErrors
 }
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
@@ -240,7 +281,7 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 		return err
 	}
 
-	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().WorkspaceId, r.ImportMetadata().RemoteId)
+	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().RemoteId)
 	if err != nil {
 		return err
 	}

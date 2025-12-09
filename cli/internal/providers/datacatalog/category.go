@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -162,9 +162,9 @@ func (p *CategoryProvider) Import(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all categories from the remote catalog
-func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading categories from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch categories from remote
 	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -186,8 +186,8 @@ func (p *CategoryProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *CategoryProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	categories := collection.GetAll(state.CategoryResourceType)
 	for _, remoteCategory := range categories {
 		if remoteCategory.ExternalID == "" {
@@ -195,7 +195,7 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 		}
 		category, ok := remoteCategory.Data.(*catalog.Category)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Category")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Category")
 		}
 		args := &state.CategoryArgs{}
 		args.FromRemoteCategory(category, collection.GetURNByID)
@@ -203,7 +203,7 @@ func (p *CategoryProvider) LoadStateFromResources(ctx context.Context, collectio
 		stateArgs := state.CategoryState{}
 		stateArgs.FromRemoteCategory(category, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.CategoryResourceType,
 			ID:           category.ExternalID,
 			Input:        args.ToResourceData(),

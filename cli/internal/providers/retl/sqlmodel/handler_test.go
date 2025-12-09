@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // createTestRETLSourceWithConfig creates a test RETL source with custom config
@@ -94,7 +94,6 @@ type mockRETLClient struct {
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc        func(ctx context.Context) (*retlClient.RETLSources, error)
 	getRetlSourceFunc          func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
-	readStateFunc              func(ctx context.Context) (*retlClient.State, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
 	setExternalIdFunc          func(ctx context.Context, sourceID string, externalId string) error
@@ -178,19 +177,6 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context, hasExternalID *boo
 			},
 		},
 	}, nil
-}
-
-func (m *mockRETLClient) ReadState(ctx context.Context) (*retlClient.State, error) {
-	if m.readStateFunc != nil {
-		return m.readStateFunc(ctx)
-	}
-	return &retlClient.State{
-		Resources: map[string]retlClient.ResourceState{},
-	}, nil
-}
-
-func (m *mockRETLClient) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-	return nil
 }
 
 func (m *mockRETLClient) SubmitSourcePreview(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
@@ -311,8 +297,8 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		mkPtr := func(s retlClient.RETLSource) *retlClient.RETLSource { return &s }
-		mkCollection := func(sources ...retlClient.RETLSource) *resources.ResourceCollection {
-			c := resources.NewResourceCollection()
+		mkCollection := func(sources ...retlClient.RETLSource) *resources.RemoteResources {
+			c := resources.NewRemoteResources()
 			m := make(map[string]*resources.RemoteResource)
 			for _, s := range sources {
 				ss := s // copy for address stability
@@ -342,7 +328,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -378,8 +364,8 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			collection := resources.NewRemoteResources()
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
 		})
@@ -388,11 +374,11 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
-			entities, err := h.FormatForExport(context.Background(), collection, idNamer, nil)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
@@ -1391,29 +1377,50 @@ func TestSQLModelHandler(t *testing.T) {
 					SourceType:           retlClient.ModelSourceType,
 					SourceDefinitionName: "postgres",
 					AccountID:            "acc123",
+					WorkspaceID:          "ws123",
 					IsEnabled:            true,
 				}, nil
 			}
 
-			args := importremote.ImportArgs{
+			args := specs.ImportIds{
 				RemoteID: "remote-id",
 				LocalID:  "local-id",
 			}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.NoError(t, err)
-			assert.Len(t, results, 1)
-			imported := results[0]
-			assert.Equal(t, "local-id", (*imported.ResourceData)[sqlmodel.IDKey])
-			assert.Equal(t, "Imported Model", (*imported.ResourceData)[sqlmodel.DisplayNameKey])
-			assert.Equal(t, "desc", (*imported.ResourceData)[sqlmodel.DescriptionKey])
-			assert.Equal(t, "id", (*imported.ResourceData)[sqlmodel.PrimaryKeyKey])
-			assert.Equal(t, "SELECT * FROM t", (*imported.ResourceData)[sqlmodel.SQLKey])
-			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
-			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
-			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
-			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
+			assert.Equal(t, writer.FormattableEntity{
+				RelativePath: "local-id.yaml",
+				Content: &specs.Spec{
+					Version: "rudder/v0.1",
+					Kind:    "retl-source-sql-model",
+					Metadata: map[string]any{
+						"name": "local-id",
+						"import": map[string]any{
+							"workspaces": []any{
+								map[string]any{
+									"workspace_id": "ws123",
+									"resources": []any{
+										map[string]any{
+											"remote_id": "remote-id",
+											"local_id":  "local-id",
+										},
+									},
+								},
+							},
+						},
+					},
+					Spec: map[string]any{
+						"id":                "local-id",
+						"display_name":      "Imported Model",
+						"description":       "desc",
+						"primary_key":       "id",
+						"sql":               "SELECT * FROM t",
+						"source_definition": "postgres",
+						"enabled":           true,
+						"account_id":        "acc123",
+					},
+				},
+			}, results)
 		})
 
 		t.Run("Non-SQL-model type", func(t *testing.T) {
@@ -1428,10 +1435,10 @@ func TestSQLModelHandler(t *testing.T) {
 				}, nil
 			}
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "is not a SQL model")
 		})
 
@@ -1444,30 +1451,30 @@ func TestSQLModelHandler(t *testing.T) {
 				return nil, fmt.Errorf("api error")
 			}
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
 		})
 
 		t.Run("Missing local id", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			handler := sqlmodel.NewHandler(mockClient, "retl")
-			args := importremote.ImportArgs{RemoteID: "remote-id"}
+			args := specs.ImportIds{RemoteID: "remote-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "local id is required")
 		})
 
 		t.Run("Missing remote id", func(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			handler := sqlmodel.NewHandler(mockClient, "retl")
-			args := importremote.ImportArgs{LocalID: "local-id"}
+			args := specs.ImportIds{LocalID: "local-id"}
 			results, err := handler.FetchImportData(context.Background(), args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "remote id is required")
 		})
 	})
@@ -1628,7 +1635,7 @@ func TestSQLModelHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		t.Run("Success with multiple resources", func(t *testing.T) {
 			t.Parallel()
 
@@ -1638,7 +1645,7 @@ func TestSQLModelHandler(t *testing.T) {
 			updatedAt := time.Now()
 
 			// Build a collection with two RETL sources having ExternalID set
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote-1": {
 					ID:         "remote-1",
@@ -1684,7 +1691,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, resourceMap)
 
 			// Execute
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 
 			// Verify
 			require.NoError(t, err)
@@ -1725,7 +1732,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 
 			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {
 					ID:         "bad",
@@ -1734,7 +1741,7 @@ func TestSQLModelHandler(t *testing.T) {
 				},
 			})
 
-			st, err := h.LoadStateFromResources(context.Background(), collection)
+			st, err := h.MapRemoteToState(collection)
 			assert.Error(t, err)
 			assert.Nil(t, st)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")

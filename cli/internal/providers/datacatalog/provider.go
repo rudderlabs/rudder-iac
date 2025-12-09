@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -42,10 +42,6 @@ func New(client catalog.DataCatalog) *Provider {
 	}
 }
 
-func (p *Provider) GetName() string {
-	return "datacatalog"
-}
-
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	return p.dc.ParseSpec(path, s)
 }
@@ -54,7 +50,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.dc.LoadSpec(path, s)
 }
 
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	return []string{
 		localcatalog.KindProperties,
 		localcatalog.KindEvents,
@@ -64,7 +60,7 @@ func (p *Provider) GetSupportedKinds() []string {
 	}
 }
 
-func (p *Provider) GetSupportedTypes() []string {
+func (p *Provider) SupportedTypes() []string {
 	return []string{
 		pstate.PropertyResourceType,
 		pstate.EventResourceType,
@@ -91,7 +87,7 @@ func (p *Provider) Validate(_ *resources.Graph) error {
 	return fmt.Errorf("catalog is invalid: %s", err.Error())
 }
 
-func (p *Provider) GetResourceGraph() (*resources.Graph, error) {
+func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	if err := inflateRefs(p.dc); err != nil {
 		return nil, fmt.Errorf("inflating refs: %w", err)
 	}
@@ -109,7 +105,7 @@ func (p *Provider) List(ctx context.Context, resourceType string, filters lister
 }
 
 func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceData, error) {
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tracking plans: %w", err)
 	}

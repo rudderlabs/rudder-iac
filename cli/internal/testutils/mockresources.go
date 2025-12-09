@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 const (
@@ -33,33 +33,19 @@ type OperationLogEntry struct {
 }
 
 type DataCatalogProvider struct {
-	InitialState *state.State
+	InitialState       *state.State
 	ReconstructedState *state.State
-	InitialResources *resources.ResourceCollection
-	OperationLog []OperationLogEntry
-	operationMutex sync.Mutex
+	InitialResources   *resources.RemoteResources
+	OperationLog       []OperationLogEntry
+	operationMutex     sync.Mutex
 }
 
-func (p *DataCatalogProvider) LoadState(_ context.Context) (*state.State, error) {
-	return p.InitialState, nil
-}
-
-func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.ResourceCollection, error) {
+func (p *DataCatalogProvider) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
 	return p.InitialResources, nil
 }
 
-func (p *DataCatalogProvider) LoadStateFromResources(_ context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *DataCatalogProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	return p.ReconstructedState, nil
-}
-
-func (p *DataCatalogProvider) PutResourceState(_ context.Context, ID string, state *state.ResourceState) error {
-	p.logOperation("PutResourceState", ID, state)
-	return nil
-}
-
-func (p *DataCatalogProvider) DeleteResourceState(_ context.Context, state *state.ResourceState) error {
-	p.logOperation("DeleteResourceState", state)
-	return nil
 }
 
 func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
@@ -71,11 +57,11 @@ func (p *DataCatalogProvider) Create(_ context.Context, ID string, resourceType 
 	return &payload, nil
 }
 
-func (p *DataCatalogProvider) Import(_ context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
+func (p *DataCatalogProvider) Import(_ context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	payload := make(resources.ResourceData)
 	payload["id"] = fmt.Sprintf("generated-%s-%s", resourceType, ID)
 
-	p.logOperation("Import", ID, resourceType, data, workspaceId, remoteId)
+	p.logOperation("Import", ID, resourceType, data, remoteId)
 
 	return &payload, nil
 }

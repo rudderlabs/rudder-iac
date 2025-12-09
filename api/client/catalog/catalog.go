@@ -16,6 +16,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
+const (
+	DEFAULT_CLIENT_CONCURRENCY      = 1
+	DEFAULT_EVENT_UPDATE_BATCH_SIZE = 50
+)
+
 // PaginatedResponse defines the generic structure for all paginated API responses
 type PaginatedResponse[T any] struct {
 	Data        []T `json:"data"`
@@ -28,13 +33,13 @@ type DataCatalog interface {
 	EventStore
 	PropertyStore
 	TrackingPlanStore
-	StateStore
 	CustomTypeStore
 	CategoryStore
 }
 
 type ListOptions struct {
-	HasExternalID *bool
+	HasExternalID  *bool
+	RebuildSchemas bool
 }
 
 func (o *ListOptions) ToQuery() string {
@@ -45,16 +50,53 @@ func (o *ListOptions) ToQuery() string {
 	return query
 }
 
-type RudderDataCatalog struct {
-	client      *client.Client
-	concurrency int
+type Options struct {
+	Concurrency          int
+	EventUpdateBatchSize int
 }
 
-func NewRudderDataCatalog(client *client.Client, concurrency int) DataCatalog {
-	return &RudderDataCatalog{
-		client:      client,
-		concurrency: concurrency,
+type Opts func(*RudderDataCatalog) error
+
+func WithConcurrency(concurrency int) Opts {
+	return func(r *RudderDataCatalog) error {
+		if concurrency <= 0 {
+			return fmt.Errorf("concurrency must be greater than 0")
+		}
+		r.concurrency = concurrency
+		return nil
 	}
+}
+
+func WithEventUpdateBatchSize(eventUpdateBatchSize int) Opts {
+	return func(r *RudderDataCatalog) error {
+		if eventUpdateBatchSize <= 0 {
+			return fmt.Errorf("event update batch size must be greater than 0")
+		}
+		r.eventUpdateBatchSize = eventUpdateBatchSize
+		return nil
+	}
+}
+
+type RudderDataCatalog struct {
+	client               *client.Client
+	concurrency          int
+	eventUpdateBatchSize int
+}
+
+func NewRudderDataCatalog(client *client.Client, opts ...Opts) (DataCatalog, error) {
+	r := &RudderDataCatalog{
+		client:               client,
+		concurrency:          DEFAULT_CLIENT_CONCURRENCY,
+		eventUpdateBatchSize: DEFAULT_EVENT_UPDATE_BATCH_SIZE,
+	}
+
+	for _, opt := range opts {
+		if err := opt(r); err != nil {
+			return nil, fmt.Errorf("applying option: %w", err)
+		}
+	}
+
+	return r, nil
 }
 
 func IsCatalogNotFoundError(err error) bool {

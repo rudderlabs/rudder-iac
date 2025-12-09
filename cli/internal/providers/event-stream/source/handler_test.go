@@ -7,19 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 // Helper function to convert boolean to pointer
@@ -112,6 +110,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name         string
 			spec         *specs.Spec
@@ -218,7 +218,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 				if tc.loadTwice {
@@ -233,6 +232,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Validate", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name                   string
 			externalGraphResources []*resources.Resource
@@ -381,7 +382,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				enableStatelessCLI(t)
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
@@ -410,7 +410,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("GetResources", func(t *testing.T) {
-		enableStatelessCLI(t)
+		t.Parallel()
+
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
 
@@ -528,6 +529,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Create", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                 string
 			data                 resources.ResourceData
@@ -592,6 +594,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		t.Parallel()
 		tpConfig := map[string]interface{}{
 			"track": &source.TrackConfigResource{
 				EventConfigResource: &source.EventConfigResource{
@@ -814,6 +817,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Import", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                        string
 			id                          string
@@ -977,6 +981,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                   string
 			state                  resources.ResourceData
@@ -1013,7 +1018,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("LoadState", func(t *testing.T) {
+	t.Run("LoadResourcesFromRemote", func(t *testing.T) {
+		t.Parallel()
+
 		mockClient := source.NewMockSourceClient()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
@@ -1023,34 +1030,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Name:       "Test Source 1",
 					Type:       "javascript",
 					Enabled:    true,
-					TrackingPlan: &sourceClient.TrackingPlan{
-						ID: "remote-tp-123",
-						Config: &sourceClient.TrackingPlanConfig{
-							Track: &sourceClient.TrackConfig{
-								DropUnplannedEvents: boolPtr(true),
-							},
-							Identify: &sourceClient.EventTypeConfig{
-								PropagateViolations:     boolPtr(false),
-								DropUnplannedProperties: boolPtr(true),
-								DropOtherViolations:     boolPtr(false),
-							},
-							Group: &sourceClient.EventTypeConfig{
-								PropagateViolations:     boolPtr(true),
-								DropUnplannedProperties: boolPtr(false),
-								DropOtherViolations:     boolPtr(false),
-							},
-							Page: &sourceClient.EventTypeConfig{
-								PropagateViolations:     boolPtr(false),
-								DropUnplannedProperties: boolPtr(false),
-								DropOtherViolations:     boolPtr(true),
-							},
-							Screen: &sourceClient.EventTypeConfig{
-								PropagateViolations:     boolPtr(true),
-								DropUnplannedProperties: boolPtr(false),
-								DropOtherViolations:     boolPtr(false),
-							},
-						},
-					},
 				},
 				{
 					ID:         "remote456",
@@ -1065,69 +1044,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Name:       "Test Source 3",
 					Type:       "Go",
 					Enabled:    true,
-				},
-			}, nil
-		})
-		handler := source.NewHandler(mockClient, importDir)
-
-		st, err := handler.LoadState(context.Background())
-
-		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
-
-		// Assert that we have exactly 2 resources (external-456 and external-123, external-789 is skipped due to empty ExternalID)
-		assert.Len(t, st.Resources, 2)
-
-		// Assert external-123 resource
-		resource123, exists := st.Resources["event-stream-source:external-123"]
-		require.True(t, exists, "event-stream-source:external-123 should exist in resources")
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-123",
-			Type: "event-stream-source",
-			Input: resources.ResourceData{
-				"name":    "Test Source 1",
-				"enabled": true,
-				"type":    "javascript",
-			},
-			Output: resources.ResourceData{
-				"id": "remote123",
-			},
-		}, resource123)
-
-		// Assert external-456 resource
-		resource456, exists := st.Resources["event-stream-source:external-456"]
-		require.True(t, exists, "event-stream-source:external-456 should exist in resources")
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-456",
-			Type: "event-stream-source",
-			Input: resources.ResourceData{
-				"name":    "Test Source 2",
-				"enabled": false,
-				"type":    "python",
-			},
-			Output: resources.ResourceData{
-				"id": "remote456",
-			},
-		}, resource456)
-	})
-
-	t.Run("LoadResourcesFromRemote", func(t *testing.T) {
-		mockClient := source.NewMockSourceClient()
-		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
-			return []sourceClient.EventStreamSource{
-				{
-					ID:         "remote123",
-					ExternalID: "external-123",
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
-				},
-				{
-					ID:         "remote456",
-					ExternalID: "external-456",
-					Name:       "Test Source 2",
-					Type:       "python",
-					Enabled:    false,
 				},
 			}, nil
 		})
@@ -1172,12 +1088,14 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}, resource456)
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
+		t.Parallel()
 		t.Run("success with valid resources", func(t *testing.T) {
+			t.Parallel()
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream sources
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1232,7 +1150,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)
@@ -1281,13 +1199,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, resource789)
 		})
-
-		t.Run("tracking plan not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
+		t.Run("tracking plan externalID not found - ErrRemoteResourceExternalIdNotFound", func(t *testing.T) {
+			t.Parallel()
 			handler := source.NewHandler(nil, importDir)
 
 			// Create a resource collection with event stream source that has a tracking plan
 			// but the tracking plan is not in the collection (simulates tracking plan created via UI)
-			collection := resources.NewResourceCollection()
+			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
 					ID:         "remote123",
@@ -1318,7 +1236,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-			st, err := handler.LoadStateFromResources(context.Background(), collection)
+			st, err := handler.MapRemoteToState(collection)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, st)
@@ -1343,6 +1261,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
+		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
@@ -1412,12 +1331,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 	})
 
 	t.Run("FormatForExport", func(t *testing.T) {
+		t.Parallel()
 		mockClient := source.NewMockSourceClient()
 		handler := source.NewHandler(mockClient, importDir)
-		ctx := context.Background()
-
-		// Create a ResourceCollection with test data
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
@@ -1473,7 +1390,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(ctx, collection, &mockNamer{}, &mockResolver{
+		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				return "#/tp/tracking-plan/test-tp-456", nil
 			},
@@ -1502,16 +1419,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"enabled": true,
 			"type":    "javascript",
 		}, spec1.Spec)
-		assert.Equal(t, map[string]interface{}{
+		assert.Equal(t, map[string]any{
 			"name": "event-stream-source",
-			"import": map[string]interface{}{
-				"workspaces": []importremote.WorkspaceImportMetadata{
-					{
-						WorkspaceID: "workspace-123",
-						Resources: []importremote.ImportIds{
-							{
-								LocalID:  "test-source-1",
-								RemoteID: "remote123",
+			"import": map[string]any{
+				"workspaces": []any{
+					map[string]any{
+						"workspace_id": "workspace-123",
+						"resources": []any{
+							map[string]any{
+								"local_id":  "test-source-1",
+								"remote_id": "remote123",
 							},
 						},
 					},
@@ -1545,32 +1462,22 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, spec2.Spec)
-		assert.Equal(t, map[string]interface{}{
+		assert.Equal(t, map[string]any{
 			"name": "event-stream-source",
-			"import": map[string]interface{}{
-				"workspaces": []importremote.WorkspaceImportMetadata{
-					{
-						WorkspaceID: "workspace-123",
-						Resources: []importremote.ImportIds{
-							{
-								LocalID:  "test-source-2",
-								RemoteID: "remote456",
+			"import": map[string]any{
+				"workspaces": []any{
+					map[string]any{
+						"workspace_id": "workspace-123",
+						"resources": []any{
+							map[string]any{
+								"local_id":  "test-source-2",
+								"remote_id": "remote456",
 							},
 						},
 					},
 				},
 			},
 		}, spec2.Metadata)
-	})
-}
-
-func enableStatelessCLI(t *testing.T) {
-	viper.Set("experimental", true)
-	viper.Set("flags.statelessCLI", true)
-
-	t.Cleanup(func() {
-		viper.Set("experimental", false)
-		viper.Set("flags.statelessCLI", false)
 	})
 }
 

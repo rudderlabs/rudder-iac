@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,9 +123,10 @@ func TestFromCatalogCustomType(t *testing.T) {
 
 	// Create a mock function to return URNs
 	getURN := func(ref string) string {
-		if ref == "#/properties/group/prop1" {
+		switch ref {
+		case "#/properties/group/prop1":
 			return "property:prop1"
-		} else if ref == "#/properties/group/prop2" {
+		case "#/properties/group/prop2":
 			return "property:prop2"
 		}
 		return ""

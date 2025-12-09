@@ -45,7 +45,7 @@ func NewCmdList() *cobra.Command {
 				// Convert boolean to string
 				status := "false"
 				if value.Bool() {
-					status = ui.Color("true", ui.Yellow)
+					status = ui.Color("true", ui.ColorYellow)
 				}
 
 				// Get the environment variable name
@@ -54,7 +54,7 @@ func NewCmdList() *cobra.Command {
 				rows = append(rows, table.Row{flagName, status, envVarName})
 			}
 
-			ui.RenderTable(columns, rows)
+			ui.PrintTable(columns, rows)
 
 			return nil
 		},

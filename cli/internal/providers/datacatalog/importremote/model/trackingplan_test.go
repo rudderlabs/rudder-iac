@@ -46,8 +46,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 	t.Run("creates tracking plan with event rules and properties", func(t *testing.T) {
 		desc := "Main tracking plan for e-commerce"
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name:        "E-commerce Tracking",
-			Description: &desc,
+			TrackingPlan: catalog.TrackingPlan{Name: "E-commerce Tracking", Description: &desc},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:                   "evt_product_viewed",
@@ -123,7 +122,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("creates tracking plan with nested properties in rules", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Nested Properties Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Nested Properties Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:                   "evt_checkout",
@@ -208,7 +207,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("creates tracking plan with multiple events", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Multi Event Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Multi Event Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:                   "evt_page_viewed",
@@ -300,8 +299,8 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("omits description when not provided", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name:   "Simple Plan",
-			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{},
+			TrackingPlan: catalog.TrackingPlan{Name: "Simple Plan"},
+			Events:       []*catalog.TrackingPlanEventPropertyIdentifiers{},
 		}
 
 		mockRes := &mockTPResolver{}
@@ -319,7 +318,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when event reference resolution fails", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Error Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Error Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_invalid",
@@ -346,7 +345,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when event reference is empty", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Empty Ref Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Empty Ref Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_empty",
@@ -373,7 +372,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when property reference resolution fails", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Property Error Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Property Error Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_test",
@@ -410,7 +409,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when property reference is empty", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Property Empty Ref Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Property Empty Ref Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_test",
@@ -447,7 +446,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when nested property reference resolution fails", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Nested Error Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Nested Error Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_nested",
@@ -493,7 +492,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 	t.Run("errors when namer fails to generate rule ID", func(t *testing.T) {
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name: "Namer Error Plan",
+			TrackingPlan: catalog.TrackingPlan{Name: "Namer Error Plan"},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:   "evt_namer_error",
@@ -525,8 +524,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 	t.Run("creates tracking plan with variants including discriminator in properties", func(t *testing.T) {
 		desc := "Tracking plan with conditional variants"
 		upstream := &catalog.TrackingPlanWithIdentifiers{
-			Name:        "Variant Based Tracking",
-			Description: &desc,
+			TrackingPlan: catalog.TrackingPlan{Name: "Variant Based Tracking", Description: &desc},
 			Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 				{
 					ID:                   "evt_user_action",

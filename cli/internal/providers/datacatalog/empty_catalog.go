@@ -60,8 +60,8 @@ func (m *EmptyCatalog) UpdateTrackingPlan(ctx context.Context, trackingPlanID st
 	return nil, nil
 }
 
-func (m *EmptyCatalog) UpdateTrackingPlanEvent(ctx context.Context, trackingPlanID string, input catalog.EventIdentifierDetail) (*catalog.TrackingPlan, error) {
-	return nil, nil
+func (m *EmptyCatalog) UpdateTrackingPlanEvents(ctx context.Context, trackingPlanID string, input []catalog.EventIdentifierDetail, rebuildSchemas bool) error {
+	return nil
 }
 
 func (m *EmptyCatalog) DeleteTrackingPlan(ctx context.Context, trackingPlanID string) error {
@@ -72,7 +72,15 @@ func (m *EmptyCatalog) DeleteTrackingPlanEvent(ctx context.Context, trackingPlan
 	return nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context, _ catalog.ListOptions) ([]*catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlan(ctx context.Context, id string) (*catalog.TrackingPlan, error) {
+	return nil, nil
+}
+
+func (m *EmptyCatalog) GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
@@ -80,7 +88,7 @@ func (m *EmptyCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id string
 	return nil, nil
 }
 
-func (m *EmptyCatalog) GetTrackingPlans(ctx context.Context, _ catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *EmptyCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context, _ catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return nil, nil
 }
 
@@ -109,18 +117,6 @@ func (m *EmptyCatalog) DeleteCustomType(ctx context.Context, customTypeID string
 }
 
 func (m *EmptyCatalog) SetCustomTypeExternalId(ctx context.Context, id string, externalId string) error {
-	return nil
-}
-
-func (m *EmptyCatalog) ReadState(ctx context.Context) (*catalog.State, error) {
-	return nil, nil
-}
-
-func (m *EmptyCatalog) PutResourceState(ctx context.Context, _ catalog.PutStateRequest) error {
-	return nil
-}
-
-func (m *EmptyCatalog) DeleteResourceState(ctx context.Context, _ catalog.DeleteStateRequest) error {
 	return nil
 }
 

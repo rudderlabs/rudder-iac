@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -177,9 +177,9 @@ func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources
 }
 
 // LoadResourcesFromRemote loads all properties from the remote catalog
-func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading properties from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch properties from remote
 	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -200,8 +200,8 @@ func (p *PropertyProvider) LoadResourcesFromRemote(ctx context.Context) (*resour
 	return collection, nil
 }
 
-func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *PropertyProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	properties := collection.GetAll(state.PropertyResourceType)
 	for _, remoteProperty := range properties {
 		if remoteProperty.ExternalID == "" {
@@ -209,7 +209,7 @@ func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collectio
 		}
 		property, ok := remoteProperty.Data.(*catalog.Property)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Property")
 		}
 		args := &state.PropertyArgs{}
 		args.FromRemoteProperty(property, collection.GetURNByID)
@@ -217,7 +217,7 @@ func (p *PropertyProvider) LoadStateFromResources(ctx context.Context, collectio
 		stateArgs := state.PropertyState{}
 		stateArgs.FromRemoteProperty(property, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.PropertyResourceType,
 			ID:           property.ExternalID,
 			Input:        args.ToResourceData(),

@@ -12,13 +12,13 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -399,24 +399,8 @@ func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, 
 	return nil
 }
 
-func (h *Handler) LoadState(ctx context.Context) (*state.State, error) {
-	sources, err := h.client.GetSources(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting event stream sources: %w", err)
-	}
-	st := state.EmptyState()
-	for _, source := range sources {
-		resourceState, skip := mapRemoteToState(&source, nil)
-		if skip {
-			continue
-		}
-		st.AddResource(resourceState)
-	}
-	return st, nil
-}
-
-func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
@@ -438,7 +422,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Resou
 	return collection, nil
 }
 
-func (p *Handler) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
+func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	esResources := collection.GetAll(ResourceType)
 	for _, esResource := range esResources {
@@ -539,8 +523,8 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	return result, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
-	collection := resources.NewResourceCollection()
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
@@ -570,26 +554,25 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 }
 
 func (h *Handler) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
 		return nil, nil
 	}
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
-	var result []importremote.FormattableEntity
+	var result []writer.FormattableEntity
 	for _, source := range sources {
 		data, ok := source.Data.(*sourceClient.EventStreamSource)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
-		workspaceMetadata.Resources = []importremote.ImportIds{
+		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				LocalID:  source.ExternalID,
 				RemoteID: source.ID,
@@ -604,7 +587,7 @@ func (h *Handler) FormatForExport(
 		if err != nil {
 			return nil, fmt.Errorf("creating spec: %w", err)
 		}
-		result = append(result, importremote.FormattableEntity{
+		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
@@ -615,19 +598,19 @@ func (h *Handler) FormatForExport(
 func (p *Handler) toImportSpec(
 	source *sourceClient.EventStreamSource,
 	externalID string,
-	workspaceMetadata importremote.WorkspaceImportMetadata,
+	workspaceMetadata specs.WorkspaceImportMetadata,
 	resolver resolver.ReferenceResolver,
 ) (*specs.Spec, error) {
-	metadata := importremote.Metadata{
+	metadata := specs.Metadata{
 		Name: MetadataName,
-		Import: importremote.WorkspacesImportMetadata{
-			Workspaces: []importremote.WorkspaceImportMetadata{workspaceMetadata},
+		Import: &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
 		},
 	}
-	metadataMap := make(map[string]any)
-	err := mapstructure.Decode(metadata, &metadataMap)
+
+	metadataMap, err := metadata.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("decoding metadata: %w", err)
+		return nil, err
 	}
 
 	specMap := map[string]any{
@@ -665,19 +648,21 @@ func (p *Handler) toImportSpec(
 }
 
 func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
-	metadata := importremote.Metadata{}
-	err := mapstructure.Decode(s.Metadata, &metadata)
+	metadata, err := s.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
+		return err
 	}
-	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
-		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
-			srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
-				WorkspaceId: workspace.WorkspaceID,
-				RemoteId:    resource.RemoteID,
-			}
+
+	if metadata.Import != nil {
+		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+					WorkspaceId: workspace.WorkspaceID,
+					RemoteId:    resource.RemoteID,
+				}
+			})
 		})
-	})
+	}
 	return nil
 }
 

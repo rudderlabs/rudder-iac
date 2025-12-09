@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -201,9 +201,9 @@ func (p *EventProvider) Import(ctx context.Context, ID string, data resources.Re
 }
 
 // LoadResourcesFromRemote loads all events from the remote catalog
-func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading events from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch events from remote
 	events, err := p.catalog.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -225,8 +225,8 @@ func (p *EventProvider) LoadResourcesFromRemote(ctx context.Context) (*resources
 	return collection, nil
 }
 
-func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *EventProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	events := collection.GetAll(state.EventResourceType)
 	for _, remoteEvent := range events {
 		if remoteEvent.ExternalID == "" {
@@ -234,7 +234,7 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		}
 		event, ok := remoteEvent.Data.(*catalog.Event)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Event")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Event")
 		}
 		args := &state.EventArgs{}
 		args.FromRemoteEvent(event, collection.GetURNByID)
@@ -242,7 +242,7 @@ func (p *EventProvider) LoadStateFromResources(ctx context.Context, collection *
 		stateArgs := state.EventState{}
 		stateArgs.FromRemoteEvent(event, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.EventResourceType,
 			ID:           event.ExternalID,
 			Input:        args.ToResourceData(),

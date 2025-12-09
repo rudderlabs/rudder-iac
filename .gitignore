@@ -39,3 +39,9 @@ memory-bank
 
 
 **/linear-task-**.mdc
+
+# Rudder typer platform specific
+.gradle
+.idea
+cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
+cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle

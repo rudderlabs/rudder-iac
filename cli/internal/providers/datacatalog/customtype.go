@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	syncerstate "github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
 )
 
@@ -250,9 +250,9 @@ func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resourc
 }
 
 // LoadResourcesFromRemote loads all custom types from the remote catalog
-func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	p.log.Debug("loading custom types from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	// fetch custom types from remote
 	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(true)})
@@ -274,8 +274,8 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 	return collection, nil
 }
 
-func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*syncerstate.State, error) {
-	s := syncerstate.EmptyState()
+func (p *CustomTypeProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
+	s := rstate.EmptyState()
 	customTypes := collection.GetAll(state.CustomTypeResourceType)
 	for _, remoteCustomType := range customTypes {
 		if remoteCustomType.ExternalID == "" {
@@ -283,7 +283,7 @@ func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collect
 		}
 		customType, ok := remoteCustomType.Data.(*catalog.CustomType)
 		if !ok {
-			return nil, fmt.Errorf("LoadStateFromResources: unable to cast remote resource to catalog.Property")
+			return nil, fmt.Errorf("MapRemoteToState: unable to cast remote resource to catalog.Property")
 		}
 		args := &state.CustomTypeArgs{}
 		args.FromRemoteCustomType(customType, collection.GetURNByID)
@@ -291,7 +291,7 @@ func (p *CustomTypeProvider) LoadStateFromResources(ctx context.Context, collect
 		stateArgs := state.CustomTypeState{}
 		stateArgs.FromRemoteCustomType(customType, collection.GetURNByID)
 
-		resourceState := &syncerstate.ResourceState{
+		resourceState := &rstate.ResourceState{
 			Type:         state.CustomTypeResourceType,
 			ID:           remoteCustomType.ExternalID,
 			Input:        args.ToResourceData(),

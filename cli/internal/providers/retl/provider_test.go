@@ -10,22 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // mockRETLStore mocks the RETL client for testing
 type mockRETLStore struct {
 	retlClient.RETLStore
-	sourceID        string
-	readStateFunc   func(ctx context.Context) (*retlClient.State, error)
-	putStateFunc    func(ctx context.Context, id string, req retlClient.PutStateRequest) error
-	deleteStateFunc func(ctx context.Context, ID string) error
+	sourceID string
 	// Adding mock functions for RETL source operations
 	createRetlSourceFunc func(ctx context.Context, source *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
@@ -35,27 +31,6 @@ type mockRETLStore struct {
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
-}
-
-func (m *mockRETLStore) ReadState(ctx context.Context) (*retlClient.State, error) {
-	if m.readStateFunc != nil {
-		return m.readStateFunc(ctx)
-	}
-	return nil, nil
-}
-
-func (m *mockRETLStore) PutResourceState(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-	if m.putStateFunc != nil {
-		return m.putStateFunc(ctx, id, req)
-	}
-	return nil
-}
-
-func (m *mockRETLStore) DeleteResourceState(ctx context.Context, ID string) error {
-	if m.deleteStateFunc != nil {
-		return m.deleteStateFunc(ctx, ID)
-	}
-	return nil
 }
 
 // Mock RETL source operations
@@ -149,6 +124,7 @@ func newDefaultMockClient() *mockRETLStore {
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
 				IsEnabled:            true,
+				WorkspaceID:          "test-workspace-id",
 				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
 			}, nil
 		},
@@ -167,17 +143,17 @@ func newDefaultMockClient() *mockRETLStore {
 }
 
 func TestProvider(t *testing.T) {
-	t.Run("GetSupportedKinds", func(t *testing.T) {
+	t.Run("SupportedKinds", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		kinds := provider.GetSupportedKinds()
+		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "retl-source-sql-model")
 	})
 
-	t.Run("GetSupportedTypes", func(t *testing.T) {
+	t.Run("SupportedTypes", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
-		types := provider.GetSupportedTypes()
+		types := provider.SupportedTypes()
 		assert.Contains(t, types, sqlmodel.ResourceType)
 	})
 
@@ -206,82 +182,6 @@ func TestProvider(t *testing.T) {
 				},
 			})
 			assert.NoError(t, err)
-		})
-	})
-
-	t.Run("LoadState", func(t *testing.T) {
-		t.Run("Success with multiple resources", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			ctx := context.Background()
-			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
-				return &retlClient.State{
-					Resources: map[string]retlClient.ResourceState{
-						"retl-source-sql-model:test1": {
-							ID:   "test1",
-							Type: "retl-source-sql-model",
-							Input: map[string]interface{}{
-								"name": "test1",
-							},
-							Output: map[string]interface{}{
-								"source_id": "src1",
-							},
-							Dependencies: []string{"dep1"},
-						},
-						"retl-source-sql-model:test2": {
-							ID:   "test2",
-							Type: "retl-source-sql-model",
-							Input: map[string]interface{}{
-								"name": "test2",
-							},
-							Output: map[string]interface{}{
-								"source_id": "src2",
-							},
-							Dependencies: []string{"dep2"},
-						},
-					},
-				}, nil
-			}
-
-			s, err := provider.LoadState(ctx)
-			require.NoError(t, err)
-			assert.NotNil(t, s)
-
-			// Check first resource
-			rs1 := s.GetResource("retl-source-sql-model:test1")
-			require.NotNil(t, rs1)
-			assert.Equal(t, "test1", rs1.ID)
-			assert.Equal(t, "retl-source-sql-model", rs1.Type)
-			assert.Equal(t, "test1", rs1.Input["name"])
-			assert.Equal(t, "src1", rs1.Output["source_id"])
-			assert.Equal(t, []string{"dep1"}, rs1.Dependencies)
-
-			// Check second resource
-			rs2 := s.GetResource("retl-source-sql-model:test2")
-			require.NotNil(t, rs2)
-			assert.Equal(t, "test2", rs2.ID)
-			assert.Equal(t, "retl-source-sql-model", rs2.Type)
-			assert.Equal(t, "test2", rs2.Input["name"])
-			assert.Equal(t, "src2", rs2.Output["source_id"])
-			assert.Equal(t, []string{"dep2"}, rs2.Dependencies)
-		})
-
-		t.Run("Error reading state", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			ctx := context.Background()
-			mockClient.readStateFunc = func(ctx context.Context) (*retlClient.State, error) {
-				return nil, fmt.Errorf("failed to read state")
-			}
-
-			s, err := provider.LoadState(ctx)
-			assert.Error(t, err)
-			assert.Nil(t, s)
-			assert.Contains(t, err.Error(), "reading remote state")
 		})
 	})
 
@@ -319,7 +219,7 @@ func TestProvider(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			graph, err := provider.GetResourceGraph()
+			graph, err := provider.ResourceGraph()
 			require.NoError(t, err)
 			assert.NotNil(t, graph)
 
@@ -335,68 +235,6 @@ func TestProvider(t *testing.T) {
 			assert.Contains(t, resourceIDs, "test-model-1")
 			assert.Contains(t, resourceIDs, "test-model-2")
 		})
-	})
-
-	t.Run("PutResourceState", func(t *testing.T) {
-		t.Run("Success case", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			ctx := context.Background()
-			called := false
-			mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-				called = true
-				assert.Equal(t, "test", id)
-				assert.Equal(t, "test:resource", req.URN)
-				return nil
-			}
-
-			rs := &state.ResourceState{
-				ID:   "test",
-				Type: sqlmodel.ResourceType,
-				Output: map[string]interface{}{
-					sqlmodel.IDKey: "test",
-				},
-			}
-
-			err := provider.PutResourceState(ctx, "test:resource", rs)
-			require.NoError(t, err)
-			assert.True(t, called)
-		})
-
-		t.Run("Error case - client error", func(t *testing.T) {
-			t.Parallel()
-			mockClient := newDefaultMockClient()
-			provider := retl.New(mockClient)
-
-			ctx := context.Background()
-			mockClient.putStateFunc = func(ctx context.Context, id string, req retlClient.PutStateRequest) error {
-				return fmt.Errorf("failed to put state")
-			}
-
-			rs := &state.ResourceState{
-				ID:   "test",
-				Type: sqlmodel.ResourceType,
-				Output: map[string]interface{}{
-					sqlmodel.IDKey: "test",
-				},
-			}
-
-			err := provider.PutResourceState(ctx, "test:resource", rs)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to put state")
-		})
-	})
-
-	t.Run("DeleteResourceState", func(t *testing.T) {
-		t.Parallel()
-		provider := retl.New(newDefaultMockClient())
-
-		// DeleteResourceState is now a no-op, so just check that it returns nil
-		ctx := context.Background()
-		err := provider.DeleteResourceState(ctx, &state.ResourceState{ID: "test"})
-		require.NoError(t, err)
 	})
 
 	t.Run("CRUD Operations", func(t *testing.T) {
@@ -572,41 +410,61 @@ func TestProvider(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			provider := retl.New(newDefaultMockClient())
 
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.NoError(t, err)
-			assert.Len(t, results, 1)
-			imported := results[0]
-			assert.Equal(t, "local-id", (*imported.ResourceData)[sqlmodel.IDKey])
-			assert.Equal(t, "Imported Model", (*imported.ResourceData)[sqlmodel.DisplayNameKey])
-			assert.Equal(t, "desc", (*imported.ResourceData)[sqlmodel.DescriptionKey])
-			assert.Equal(t, "id", (*imported.ResourceData)[sqlmodel.PrimaryKeyKey])
-			assert.Equal(t, "SELECT * FROM t", (*imported.ResourceData)[sqlmodel.SQLKey])
-			assert.Equal(t, "postgres", (*imported.ResourceData)[sqlmodel.SourceDefinitionKey])
-			assert.Equal(t, true, (*imported.ResourceData)[sqlmodel.EnabledKey])
-			assert.Equal(t, "acc123", (*imported.ResourceData)[sqlmodel.AccountIDKey])
-			assert.Equal(t, "local-id", imported.Metadata.Name)
-			assert.Equal(t, "remote-id", imported.Metadata.Import.Workspaces[0].Resources[0].RemoteID)
-			assert.Equal(t, "local-id", imported.Metadata.Import.Workspaces[0].Resources[0].LocalID)
+			assert.Equal(t, writer.FormattableEntity{
+				RelativePath: "local-id.yaml",
+				Content: &specs.Spec{
+					Version: "rudder/v0.1",
+					Kind:    "retl-source-sql-model",
+					Metadata: map[string]any{
+						"name": "local-id",
+						"import": map[string]any{
+							"workspaces": []any{
+								map[string]any{
+									"workspace_id": "test-workspace-id",
+									"resources": []any{
+										map[string]any{
+											"local_id":  "local-id",
+											"remote_id": "remote-id",
+										},
+									},
+								},
+							},
+						},
+					},
+					Spec: map[string]any{
+						"id":                "local-id",
+						"display_name":      "Imported Model",
+						"description":       "desc",
+						"primary_key":       "id",
+						"sql":               "SELECT * FROM t",
+						"source_definition": "postgres",
+						"enabled":           true,
+						"account_id":        "acc123",
+					},
+				},
+			}, results)
 		})
 
 		t.Run("Unsupported resource type", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), "unsupported-type", args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "import is only supported for SQL models")
 		})
 
 		t.Run("Handler error", func(t *testing.T) {
 			mockClient := newDefaultMockClient()
 			provider := retl.New(mockClient)
-			args := importremote.ImportArgs{RemoteID: "remote-id-not-found", LocalID: "local-id"}
+			args := specs.ImportIds{RemoteID: "remote-id-not-found", LocalID: "local-id"}
 			results, err := provider.FetchImportData(context.Background(), sqlmodel.ResourceType, args)
 			assert.Error(t, err)
-			assert.Nil(t, results)
+			assert.Equal(t, writer.FormattableEntity{}, results)
 			assert.Contains(t, err.Error(), "getting RETL source for import")
 		})
 	})
@@ -941,7 +799,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 	})
 }
 
-func TestProviderLoadStateFromResources(t *testing.T) {
+func TestProviderMapRemoteToState(t *testing.T) {
 	t.Run("Success reconstructs state from collection", func(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
@@ -963,7 +821,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			source.ID: {
 				ID:         source.ID,
@@ -972,8 +830,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
@@ -1002,7 +859,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Insert a malformed resource (Data is wrong type)
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad-1": {
 				ID:         "bad-1",
@@ -1011,8 +868,7 @@ func TestProviderLoadStateFromResources(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
-		st, err := provider.LoadStateFromResources(ctx, collection)
+		st, err := provider.MapRemoteToState(collection)
 		require.Error(t, err)
 		assert.Nil(t, st)
 		// Wrapped error should mention provider handler and inner cast error
@@ -1131,7 +987,7 @@ func TestProviderFormatForExport(t *testing.T) {
 				Sql:         "SELECT 1",
 			},
 		}
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			src.ID: {
 				ID:         src.ID,
@@ -1140,9 +996,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
 
@@ -1168,7 +1023,7 @@ func TestProviderFormatForExport(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Malformed data type inside collection
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 			"bad": {
 				ID:         "bad",
@@ -1177,9 +1032,8 @@ func TestProviderFormatForExport(t *testing.T) {
 			},
 		})
 
-		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, noopResolver{})
+		entities, err := provider.FormatForExport(collection, idNamer, noopResolver{})
 		require.Error(t, err)
 		assert.Nil(t, entities)
 		assert.Contains(t, err.Error(), "formatting for export for handler")

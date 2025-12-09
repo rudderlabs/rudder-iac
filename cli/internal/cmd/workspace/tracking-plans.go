@@ -1,12 +1,9 @@
 package workspace
 
 import (
-	"fmt"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/spf13/cobra"
 )
@@ -44,10 +41,7 @@ func newCmdListTrackingPlans() *cobra.Command {
 			}
 
 			// Cast the DataCatalog provider to access the List method
-			dcProvider, ok := d.Providers().DataCatalog.(*datacatalog.Provider)
-			if !ok {
-				return fmt.Errorf("failed to cast DataCatalog provider")
-			}
+			dcProvider := d.Providers().DataCatalog
 
 			format := lister.TableFormat
 			if jsonOutput {

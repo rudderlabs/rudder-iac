@@ -61,11 +61,11 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			spinner := ui.NewSpinner("Importing ...")
 			spinner.Start()
 
-			err = importer.WorkspaceImport(cmd.Context(), location, deps.CompositeProvider())
+			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider())
 
 			spinner.Stop()
 			if err == nil {
-				fmt.Printf("%s Done\n", ui.Color("✔", ui.Green))
+				ui.PrintSuccess("Done")
 			}
 
 			return err

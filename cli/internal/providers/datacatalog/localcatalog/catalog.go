@@ -3,11 +3,9 @@ package localcatalog
 import (
 	"fmt"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
@@ -143,21 +141,21 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindProperties:
 		properties, ok := s.Spec["properties"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, properties not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, properties not found in spec", s.Kind)
 		}
 		idArray = properties
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, events not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, events not found in spec", s.Kind)
 		}
 		idArray = events
 
 	case KindTrackingPlans:
 		trackingPlans, ok := s.Spec["id"].(string)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, id not found in tracking plan spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
 		idArray = []any{map[string]any{
 			"id": trackingPlans,
@@ -166,14 +164,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, custom types not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, custom types not found in spec", s.Kind)
 		}
 		idArray = customTypes
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
 		if !ok {
-			return nil, fmt.Errorf("Kind: %s, categories not found in spec", s.Kind)
+			return nil, fmt.Errorf("kind: %s, categories not found in spec", s.Kind)
 		}
 		idArray = categories
 	}
@@ -206,23 +204,23 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
-	metadata := importremote.Metadata{}
-
-	err := mapstructure.Decode(s.Metadata, &metadata)
+	metadata, err := s.CommonMetadata()
 	if err != nil {
-		return fmt.Errorf("decoding import metadata: %w", err)
+		return err
 	}
 
-	lo.ForEach(metadata.Import.Workspaces, func(workspace importremote.WorkspaceImportMetadata, _ int) {
-		// For each resource within the workspace, load the import metadata
-		// which will be used during the creation of resourceGraph
-		lo.ForEach(workspace.Resources, func(resource importremote.ImportIds, _ int) {
-			dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
-				WorkspaceID: workspace.WorkspaceID,
-				RemoteID:    resource.RemoteID,
-			}
+	if metadata.Import != nil {
+		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			// For each resource within the workspace, load the import metadata
+			// which will be used during the creation of resourceGraph
+			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+				dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+					WorkspaceID: workspace.WorkspaceID,
+					RemoteID:    resource.RemoteID,
+				}
+			})
 		})
-	})
+	}
 
 	return nil
 }

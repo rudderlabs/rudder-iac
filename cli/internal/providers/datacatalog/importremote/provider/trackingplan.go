@@ -6,15 +6,16 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
@@ -24,7 +25,7 @@ const (
 )
 
 var (
-	_ importremote.WorkspaceImporter = &TrackingPlanImportProvider{}
+	_ WorkspaceImporter = &TrackingPlanImportProvider{}
 )
 
 type TrackingPlanImportProvider struct {
@@ -41,11 +42,11 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 	}
 }
 
-func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable tracking plans from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
-	trackingPlans, err := p.client.GetTrackingPlans(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plans from remote catalog: %w", err)
 	}
@@ -74,7 +75,7 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 }
 
 func (p *TrackingPlanImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to tracking plans")
@@ -105,11 +106,10 @@ func (p *TrackingPlanImportProvider) idResources(
 
 // FormatForExport formats the tracking plans for export to file
 func (p *TrackingPlanImportProvider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting tracking plans for export to file")
 
 	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
@@ -117,7 +117,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	formattables := make([]importremote.FormattableEntity, 0)
+	formattables := make([]writer.FormattableEntity, 0)
 	for _, trackingPlan := range trackingPlans {
 		p.log.Debug("formatting tracking plan", "remoteID", trackingPlan.ID, "externalID", trackingPlan.ExternalID)
 
@@ -126,9 +126,9 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
 		}
 
-		workspaceMetadata := importremote.WorkspaceImportMetadata{
+		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: data.WorkspaceID,
-			Resources: []importremote.ImportIds{
+			Resources: []specs.ImportIds{
 				{
 					LocalID:  trackingPlan.ExternalID,
 					RemoteID: trackingPlan.ID,
@@ -160,7 +160,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("generating file path for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
-		formattables = append(formattables, importremote.FormattableEntity{
+		formattables = append(formattables, writer.FormattableEntity{
 			Content: spec,
 			RelativePath: filepath.Join(
 				p.baseImportDir,

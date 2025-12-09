@@ -3,31 +3,27 @@ package testutils
 import (
 	"context"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-// MockProvider is a mock implementation of the project.Provider interface for testing.
+// MockProvider is a mock implementation of the provider.Provider interface for testing.
 type MockProvider struct {
-	SupportedKinds             []string
-	SupportedTypes             []string
+	supportedKinds             []string
+	supportedTypes             []string
 	ValidateArg                *resources.Graph
 	ValidateErr                error
 	LoadSpecErr                error
 	GetResourceGraphVal        *resources.Graph
 	GetResourceGraphErr        error
-	LoadStateVal               *state.State
-	LoadStateErr               error
-	LoadResourcesFromRemoteVal *resources.ResourceCollection
+	LoadResourcesFromRemoteVal *resources.RemoteResources
 	LoadResourcesFromRemoteErr error
-	LoadStateFromResourcesVal  *state.State
-	LoadStateFromResourcesErr  error
-	PutResourceStateErr        error
-	DeleteResourceStateErr     error
+	MapRemoteToStateVal        *state.State
+	MapRemoteToStateErr        error
 	CreateVal                  *resources.ResourceData
 	CreateErr                  error
 	UpdateVal                  *resources.ResourceData
@@ -40,14 +36,13 @@ type MockProvider struct {
 
 	// Tracking calls
 	ValidateCalledCount                int
+	ValidateErrorReturnedCount         int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
-	LoadStateCalledCount               int
+	GetResourceGraphErrorReturnedCount int
 	LoadResourcesFromRemoteCalledCount int
-	LoadStateFromResourcesCalledCount  int
-	PutResourceStateCalledWithArg      PutResourceStateArgs
-	DeleteResourceStateCalledWithArg   *state.ResourceState
+	MapRemoteToStateCalledCount        int
 	CreateCalledWithArg                CreateArgs
 	UpdateCalledWithArg                UpdateArgs
 	DeleteCalledWithArg                DeleteArgs
@@ -64,12 +59,6 @@ type LoadSpecArgs struct {
 type ParseSpecArgs struct {
 	Path string
 	Spec *specs.Spec
-}
-
-// PutResourceStateArgs stores arguments for PutResourceState calls
-type PutResourceStateArgs struct {
-	URN   string
-	State *state.ResourceState
 }
 
 // CreateArgs stores arguments for Create calls
@@ -99,34 +88,34 @@ type ImportArgs struct {
 	ID           string
 	ResourceType string
 	Data         resources.ResourceData
-	WorkspaceId  string
 	RemoteId     string
 }
 
 // NewMockProvider creates a new MockProvider with initialized tracking fields.
-func NewMockProvider() *MockProvider {
+func NewMockProvider(supportedKinds, supportedTypes []string) *MockProvider {
 	return &MockProvider{
+		supportedKinds:          supportedKinds,
+		supportedTypes:          supportedTypes,
 		ParseSpecVal:            &specs.ParsedSpec{ExternalIDs: []string{}},
 		LoadSpecCalledWithArgs:  make([]LoadSpecArgs, 0),
 		ParseSpecCalledWithArgs: make([]ParseSpecArgs, 0),
 	}
 }
 
-func (m *MockProvider) GetName() string {
-	return "mock"
+func (m *MockProvider) SupportedKinds() []string {
+	return m.supportedKinds
 }
 
-func (m *MockProvider) GetSupportedKinds() []string {
-	return m.SupportedKinds
-}
-
-func (m *MockProvider) GetSupportedTypes() []string {
-	return m.SupportedTypes
+func (m *MockProvider) SupportedTypes() []string {
+	return m.supportedTypes
 }
 
 func (m *MockProvider) Validate(graph *resources.Graph) error {
 	m.ValidateArg = graph
 	m.ValidateCalledCount++
+	if m.ValidateErr != nil {
+		m.ValidateErrorReturnedCount++
+	}
 	return m.ValidateErr
 }
 
@@ -140,73 +129,60 @@ func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
 	return m.LoadSpecErr
 }
 
-func (m *MockProvider) GetResourceGraph() (*resources.Graph, error) {
+func (m *MockProvider) ResourceGraph() (*resources.Graph, error) {
 	m.GetResourceGraphCalledCount++
+	if m.GetResourceGraphErr != nil {
+		m.GetResourceGraphErrorReturnedCount++
+	}
 	return m.GetResourceGraphVal, m.GetResourceGraphErr
 }
 
-func (m *MockProvider) LoadState(ctx context.Context) (*state.State, error) {
-	m.LoadStateCalledCount++
-	return m.LoadStateVal, m.LoadStateErr
-}
-
-func (m *MockProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.ResourceCollection, error) {
+func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
 	m.LoadResourcesFromRemoteCalledCount++
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
 }
 
-func (m *MockProvider) LoadStateFromResources(ctx context.Context, collection *resources.ResourceCollection) (*state.State, error) {
-	m.LoadStateFromResourcesCalledCount++
-	return m.LoadStateFromResourcesVal, m.LoadStateFromResourcesErr
+func (m *MockProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+	m.MapRemoteToStateCalledCount++
+	return m.MapRemoteToStateVal, m.MapRemoteToStateErr
 }
 
-func (m *MockProvider) PutResourceState(ctx context.Context, URN string, s *state.ResourceState) error {
-	m.PutResourceStateCalledWithArg = PutResourceStateArgs{URN: URN, State: s}
-	return m.PutResourceStateErr
-}
-
-func (m *MockProvider) DeleteResourceState(ctx context.Context, s *state.ResourceState) error {
-	m.DeleteResourceStateCalledWithArg = s
-	return m.DeleteResourceStateErr
-}
-
-func (m *MockProvider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
+func (m *MockProvider) Create(_ context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
 	m.CreateCalledWithArg = CreateArgs{ID: ID, ResourceType: resourceType, Data: data}
 	return m.CreateVal, m.CreateErr
 }
 
-func (m *MockProvider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, s resources.ResourceData) (*resources.ResourceData, error) {
+func (m *MockProvider) Update(_ context.Context, ID string, resourceType string, data resources.ResourceData, s resources.ResourceData) (*resources.ResourceData, error) {
 	m.UpdateCalledWithArg = UpdateArgs{ID: ID, ResourceType: resourceType, Data: data, State: s}
 	return m.UpdateVal, m.UpdateErr
 }
 
-func (m *MockProvider) Delete(ctx context.Context, ID string, resourceType string, s resources.ResourceData) error {
+func (m *MockProvider) Delete(_ context.Context, ID string, resourceType string, s resources.ResourceData) error {
 	m.DeleteCalledWithArg = DeleteArgs{ID: ID, ResourceType: resourceType, State: s}
 	return m.DeleteErr
 }
 
-func (m *MockProvider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, workspaceId, remoteId string) (*resources.ResourceData, error) {
-	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, WorkspaceId: workspaceId, RemoteId: remoteId}
+func (m *MockProvider) Import(_ context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	m.ImportCalledWithArg = ImportArgs{ID: ID, ResourceType: resourceType, Data: data, RemoteId: remoteId}
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 
-func (m *MockProvider) FormatForExport(ctx context.Context, collection *resources.ResourceCollection, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]importremote.FormattableEntity, error) {
+func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	return nil, nil
 }
 
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
+	m.ValidateErrorReturnedCount = 0
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
 	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0
-	m.LoadStateCalledCount = 0
-	m.PutResourceStateCalledWithArg = PutResourceStateArgs{}
-	m.DeleteResourceStateCalledWithArg = nil
+	m.GetResourceGraphErrorReturnedCount = 0
 	m.CreateCalledWithArg = CreateArgs{}
 	m.UpdateCalledWithArg = UpdateArgs{}
 	m.DeleteCalledWithArg = DeleteArgs{}

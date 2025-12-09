@@ -6,7 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type Provider struct {
@@ -49,10 +49,10 @@ func (p *Provider) listAccounts(ctx context.Context, filters map[string]string) 
 	return filteredAccounts, nil
 }
 
-func (p *Provider) GetSupportedKinds() []string {
+func (p *Provider) SupportedKinds() []string {
 	return []string{}
 }
 
-func (p *Provider) GetSupportedTypes() []string {
+func (p *Provider) SupportedTypes() []string {
 	return []string{AccountResourceType}
 }

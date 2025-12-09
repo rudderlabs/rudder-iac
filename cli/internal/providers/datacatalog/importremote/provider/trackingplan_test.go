@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -23,7 +22,7 @@ type mockTrackingPlanDataCatalog struct {
 	err           error
 }
 
-func (m *mockTrackingPlanDataCatalog) GetTrackingPlans(ctx context.Context, options catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
+func (m *mockTrackingPlanDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context, options catalog.ListOptions) ([]*catalog.TrackingPlanWithIdentifiers, error) {
 	return m.trackingPlans, m.err
 }
 
@@ -31,9 +30,9 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 	t.Run("filters tracking plans with ExternalID set", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{ID: "tp1", Name: "Tracking Plan 1", WorkspaceID: "ws1"},
-				{ID: "tp2", Name: "Tracking Plan 2", WorkspaceID: "ws1", ExternalID: "tracking-plan-2"},
-				{ID: "tp3", Name: "Tracking Plan 3", WorkspaceID: "ws1"},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Tracking Plan 1", WorkspaceID: "ws1"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Tracking Plan 2", WorkspaceID: "ws1", ExternalID: "tracking-plan-2"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp3", Name: "Tracking Plan 3", WorkspaceID: "ws1"}},
 			},
 		}
 
@@ -62,8 +61,8 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 	t.Run("correctly assigns externalId and reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"},
-				{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"}},
 			},
 		}
 
@@ -112,9 +111,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{
-					ID:          "tp1",
-					Name:        "E-commerce Tracking",
-					WorkspaceID: "ws1",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:   "evt1",
@@ -144,7 +141,6 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		require.Nil(t, err)
 
 		result, err := provider.FormatForExport(
-			context.Background(),
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -164,13 +160,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "e-commerce-tracking",
-									RemoteID: "tp1",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws1",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "e-commerce-tracking",
+									"remote_id": "tp1",
 								},
 							},
 						},
@@ -218,9 +214,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{
-					ID:          "tp1",
-					Name:        "E-commerce Tracking",
-					WorkspaceID: "ws1",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:                   "evt1",
@@ -234,9 +228,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 					},
 				},
 				{
-					ID:          "tp2",
-					Name:        "User Analytics",
-					WorkspaceID: "ws2",
+					TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "User Analytics", WorkspaceID: "ws2"},
 					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
 						{
 							ID:                   "evt2",
@@ -263,7 +255,6 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		require.Nil(t, err)
 
 		result, err := provider.FormatForExport(
-			context.Background(),
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -294,13 +285,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws1",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "e-commerce-tracking",
-									RemoteID: "tp1",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws1",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "e-commerce-tracking",
+									"remote_id": "tp1",
 								},
 							},
 						},
@@ -336,13 +327,13 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			Metadata: map[string]any{
 				"name": "user-analytics",
 				"import": map[string]any{
-					"workspaces": []importremote.WorkspaceImportMetadata{
-						{
-							WorkspaceID: "ws2",
-							Resources: []importremote.ImportIds{
-								{
-									LocalID:  "user-analytics",
-									RemoteID: "tp2",
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws2",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "user-analytics",
+									"remote_id": "tp2",
 								},
 							},
 						},
@@ -394,7 +385,6 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		require.Nil(t, err)
 
 		result, err := provider.FormatForExport(
-			context.Background(),
 			collection,
 			externalIdNamer,
 			mockResolver,

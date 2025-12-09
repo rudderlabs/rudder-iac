@@ -16,13 +16,11 @@ func NewTrackingPlanCatalogFactory() *TrackingPlanCatalogFactory {
 	tp := catalog.TrackingPlan{
 		ID:           uuid.New().String(),
 		Name:         "default-tracking-plan",
-		Version:      1,
 		CreationType: "backend",
 		WorkspaceID:  "workspace-id",
 		CreatedAt:    time.Date(2021, 9, 1, 0, 0, 0, 0, time.UTC),
 		UpdatedAt:    time.Date(2021, 9, 2, 0, 0, 0, 0, time.UTC),
 		Description:  strptr("default-tracking-plan-description"),
-		Events:       nil,
 	}
 	return &TrackingPlanCatalogFactory{
 		trackingplan: tp,
@@ -66,14 +64,6 @@ func (f *TrackingPlanCatalogFactory) WithUpdatedAt(updatedAt time.Time) *Trackin
 
 func (f *TrackingPlanCatalogFactory) WithVersion(version int) *TrackingPlanCatalogFactory {
 	f.trackingplan.Version = version
-	return f
-}
-
-func (f *TrackingPlanCatalogFactory) WithEvent(event catalog.TrackingPlanEvent) *TrackingPlanCatalogFactory {
-	if f.trackingplan.Events == nil {
-		f.trackingplan.Events = make([]catalog.TrackingPlanEvent, 0)
-	}
-	f.trackingplan.Events = append(f.trackingplan.Events, event)
 	return f
 }
 

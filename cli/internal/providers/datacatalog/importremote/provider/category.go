@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/importremote"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
@@ -23,7 +24,7 @@ const (
 )
 
 var (
-	_ importremote.WorkspaceImporter = &CategoryImportProvider{}
+	_ WorkspaceImporter = &CategoryImportProvider{}
 )
 
 type CategoryImportProvider struct {
@@ -40,9 +41,9 @@ func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.ResourceCollection, error) {
+func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable categories from remote catalog")
-	collection := resources.NewResourceCollection()
+	collection := resources.NewRemoteResources()
 
 	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
 	if err != nil {
@@ -78,7 +79,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 }
 
 func (p *CategoryImportProvider) idResources(
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to categories")
@@ -109,11 +110,10 @@ func (p *CategoryImportProvider) idResources(
 
 // FormatForExport formats the categories for export to file
 func (p *CategoryImportProvider) FormatForExport(
-	ctx context.Context,
-	collection *resources.ResourceCollection,
+	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]importremote.FormattableEntity, error) {
+) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting categories for export to file")
 
 	categories := collection.GetAll(state.CategoryResourceType)
@@ -121,8 +121,8 @@ func (p *CategoryImportProvider) FormatForExport(
 		return nil, nil
 	}
 
-	workspaceMetadata := importremote.WorkspaceImportMetadata{
-		Resources: make([]importremote.ImportIds, 0),
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0),
 	}
 
 	formattedCategories := make([]map[string]any, 0)
@@ -135,7 +135,7 @@ func (p *CategoryImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
-		workspaceMetadata.Resources = append(workspaceMetadata.Resources, importremote.ImportIds{
+		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			LocalID:  category.ExternalID,
 			RemoteID: category.ID,
 		})
@@ -159,7 +159,7 @@ func (p *CategoryImportProvider) FormatForExport(
 		return nil, fmt.Errorf("creating spec: %w", err)
 	}
 
-	return []importremote.FormattableEntity{
+	return []writer.FormattableEntity{
 		{
 			Content:      spec,
 			RelativePath: p.filepath,

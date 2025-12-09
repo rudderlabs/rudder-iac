@@ -13,21 +13,21 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 func TestProvider(t *testing.T) {
-	t.Run("GetSupportedKinds", func(t *testing.T) {
+	t.Run("SupportedKinds", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
-		kinds := provider.GetSupportedKinds()
+		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "event-stream-source")
 		assert.Len(t, kinds, 1)
 	})
 
-	t.Run("GetSupportedTypes", func(t *testing.T) {
+	t.Run("SupportedTypes", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
-		types := provider.GetSupportedTypes()
+		types := provider.SupportedTypes()
 		assert.Contains(t, types, source.ResourceType)
 		assert.Len(t, types, 1)
 	})
@@ -158,7 +158,7 @@ func TestProvider(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		graph, err := provider.GetResourceGraph()
+		graph, err := provider.ResourceGraph()
 		require.NoError(t, err)
 
 		// Verify both resources are in the graph
@@ -172,68 +172,6 @@ func TestProvider(t *testing.T) {
 		}
 		assert.Contains(t, resourceIDs, "test-source-1")
 		assert.Contains(t, resourceIDs, "test-source-2")
-	})
-
-	t.Run("LoadState", func(t *testing.T) {
-		mockClient := source.NewMockSourceClient()
-		provider := eventstream.New(mockClient)
-
-		ctx := context.Background()
-		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
-			return []sourceClient.EventStreamSource{
-				{
-					ID:         "remote123",
-					ExternalID: "external-123",
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
-				},
-				{
-					ID:         "remote456",
-					ExternalID: "external-456",
-					Name:       "Test Source 2",
-					Type:       "python",
-					Enabled:    false,
-				},
-			}, nil
-		})
-
-		s, err := provider.LoadState(ctx)
-		require.NoError(t, err)
-
-		// Check that both resources are loaded
-		assert.Len(t, s.Resources, 2)
-
-		// Check first resource
-		urn1 := resources.URN("external-123", source.ResourceType)
-		rs1 := s.GetResource(urn1)
-		require.NotNil(t, rs1)
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-123",
-			Type: source.ResourceType,
-			Input: resources.ResourceData{
-				"name":    "Test Source 1",
-				"enabled": true,
-				"type":    "javascript",
-			},
-			Output: resources.ResourceData{
-				"id": "remote123",
-			},
-		}, rs1)
-
-		rs2 := s.GetResource("event-stream-source:external-456")
-		assert.Equal(t, &state.ResourceState{
-			ID:   "external-456",
-			Type: source.ResourceType,
-			Input: resources.ResourceData{
-				"name":    "Test Source 2",
-				"enabled": false,
-				"type":    "python",
-			},
-			Output: resources.ResourceData{
-				"id": "remote456",
-			},
-		}, rs2)
 	})
 
 	t.Run("CRUD Operations", func(t *testing.T) {
@@ -307,7 +245,7 @@ func TestProvider(t *testing.T) {
 			"type":    "javascript",
 		}
 
-		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "workspace-123", "remote-123")
+		result, err := provider.Import(ctx, "test-source", source.ResourceType, data, "remote-123")
 		require.NoError(t, err)
 		assert.Equal(t, &resources.ResourceData{
 			"id": "remote-123",
@@ -373,14 +311,12 @@ func TestProvider(t *testing.T) {
 		}, esResources)
 	})
 
-	t.Run("LoadStateFromResources", func(t *testing.T) {
+	t.Run("MapRemoteToState", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
 		provider := eventstream.New(mockClient)
 
-		ctx := context.Background()
-
-		// Create a ResourceCollection with test data
-		collection := resources.NewResourceCollection()
+		// Create a RemoteResources with test data
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
@@ -407,7 +343,7 @@ func TestProvider(t *testing.T) {
 		}
 		collection.Set(source.ResourceType, resourceMap)
 
-		loadedState, err := provider.LoadStateFromResources(ctx, collection)
+		loadedState, err := provider.MapRemoteToState(collection)
 		require.NoError(t, err)
 
 		assert.Len(t, loadedState.Resources, 2)
@@ -449,16 +385,16 @@ func TestProvider(t *testing.T) {
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
 				{
-					ID:         "remote456",
-					Name:       "Test Source 2",
-					Type:       "python",
-					Enabled:    false,
+					ID:      "remote456",
+					Name:    "Test Source 2",
+					Type:    "python",
+					Enabled: false,
 				},
 				{
-					ID:         "remote789",
-					Name:       "Test Source 3",
-					Type:       "javascript",
-					Enabled:    true,
+					ID:      "remote789",
+					Name:    "Test Source 3",
+					Type:    "javascript",
+					Enabled: true,
 				},
 			}, nil
 		})
@@ -477,10 +413,10 @@ func TestProvider(t *testing.T) {
 			ExternalID: "test-source-2",
 			Reference:  "#/event-stream-source/event-stream-source/test-source-2",
 			Data: &sourceClient.EventStreamSource{
-				ID:         "remote456",
-				Name:       "Test Source 2",
-				Type:       "python",
-				Enabled:    false,
+				ID:      "remote456",
+				Name:    "Test Source 2",
+				Type:    "python",
+				Enabled: false,
 			},
 		}, esResources["remote456"])
 
@@ -489,10 +425,10 @@ func TestProvider(t *testing.T) {
 			ExternalID: "test-source-3",
 			Reference:  "#/event-stream-source/event-stream-source/test-source-3",
 			Data: &sourceClient.EventStreamSource{
-				ID:         "remote789",
-				Name:       "Test Source 3",
-				Type:       "javascript",
-				Enabled:    true,
+				ID:      "remote789",
+				Name:    "Test Source 3",
+				Type:    "javascript",
+				Enabled: true,
 			},
 		}, esResources["remote789"])
 	})
@@ -500,9 +436,7 @@ func TestProvider(t *testing.T) {
 	t.Run("FormatForExport", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
 		provider := eventstream.New(mockClient)
-		ctx := context.Background()
-
-		collection := resources.NewResourceCollection()
+		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
 				ID:         "remote123",
@@ -534,7 +468,7 @@ func TestProvider(t *testing.T) {
 		idNamer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		entities, err := provider.FormatForExport(ctx, collection, idNamer, resolver)
+		entities, err := provider.FormatForExport(collection, idNamer, resolver)
 		require.NoError(t, err)
 		assert.Len(t, entities, 2)
 
@@ -551,20 +485,20 @@ func TestProvider(t *testing.T) {
 		require.NotNil(t, spec1)
 		assert.Equal(t, "event-stream-source", spec1.Kind)
 		assert.Equal(t, map[string]interface{}{
-			"id":                "test-source-1",
-			"name":              "Test Source 1",
-			"enabled":           true,
-			"type": "javascript",
+			"id":      "test-source-1",
+			"name":    "Test Source 1",
+			"enabled": true,
+			"type":    "javascript",
 		}, spec1.Spec)
 
 		spec2 := entityMap["test-source-2"]
 		require.NotNil(t, spec2)
 		assert.Equal(t, "event-stream-source", spec2.Kind)
 		assert.Equal(t, map[string]interface{}{
-			"id":                "test-source-2",
-			"name":              "Test Source 2",
-			"enabled":           false,
-			"type": "python",
+			"id":      "test-source-2",
+			"name":    "Test Source 2",
+			"enabled": false,
+			"type":    "python",
 		}, spec2.Spec)
 	})
 }
