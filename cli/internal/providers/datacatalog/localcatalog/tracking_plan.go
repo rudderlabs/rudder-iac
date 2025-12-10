@@ -58,14 +58,15 @@ func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
 }
 
 type TPEventProperty struct {
-	Name        string                 `json:"name"`
-	Ref         string                 `json:"$ref"`
-	LocalID     string                 `json:"id"`
-	Description string                 `json:"description"`
-	Type        string                 `json:"type"`
-	Config      map[string]interface{} `json:"config"`
-	Required    bool                   `json:"required"`
-	Properties  []*TPEventProperty     `json:"properties,omitempty"` // NEW: Nested properties
+	Name                 string                 `json:"name"`
+	Ref                  string                 `json:"$ref"`
+	LocalID              string                 `json:"id"`
+	Description          string                 `json:"description"`
+	Type                 string                 `json:"type"`
+	Config               map[string]interface{} `json:"config"`
+	Required             bool                   `json:"required"`
+	AdditionalProperties *bool                  `json:"additionalProperties,omitempty"`
+	Properties           []*TPEventProperty     `json:"properties,omitempty"`
 }
 
 type TPRule struct {
@@ -84,9 +85,10 @@ type TPRuleEvent struct {
 }
 
 type TPRuleProperty struct {
-	Ref        string            `json:"$ref"`
-	Required   bool              `json:"required"`
-	Properties []*TPRuleProperty `json:"properties,omitempty"`
+	Ref                  string            `json:"$ref"`
+	Required             bool              `json:"required"`
+	AdditionalProperties *bool             `json:"additionalProperties,omitempty"`
+	Properties           []*TPRuleProperty `json:"properties,omitempty"`
 }
 
 type TPRuleIncludes struct {
@@ -226,14 +228,15 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 		}
 
 		toReturn.Properties = append(toReturn.Properties, &TPEventProperty{
-			Name:        property.Name,
-			Ref:         prop.Ref,
-			LocalID:     property.LocalID,
-			Properties:  property.Properties,
-			Description: property.Description,
-			Type:        property.Type,
-			Required:    prop.Required,
-			Config:      shallowCopy(property.Config),
+			Name:                 property.Name,
+			Ref:                  prop.Ref,
+			LocalID:              property.LocalID,
+			Properties:           property.Properties,
+			AdditionalProperties: property.AdditionalProperties,
+			Description:          property.Description,
+			Type:                 property.Type,
+			Required:             prop.Required,
+			Config:               shallowCopy(property.Config),
 		})
 	}
 
@@ -264,14 +267,15 @@ func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*
 	}
 
 	return &TPEventProperty{
-		Name:        property.Name,
-		Ref:         prop.Ref,
-		Properties:  properties,
-		LocalID:     property.LocalID,
-		Description: property.Description,
-		Type:        property.Type,
-		Required:    prop.Required,
-		Config:      shallowCopy(property.Config),
+		Name:                 property.Name,
+		Ref:                  prop.Ref,
+		Properties:           properties,
+		LocalID:              property.LocalID,
+		Description:          property.Description,
+		Type:                 property.Type,
+		Required:             prop.Required,
+		AdditionalProperties: prop.AdditionalProperties,
+		Config:               shallowCopy(property.Config),
 	}, nil
 }
 

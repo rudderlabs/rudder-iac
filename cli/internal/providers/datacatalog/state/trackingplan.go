@@ -279,6 +279,10 @@ func diffPropertyArgs(localProps []*TrackingPlanPropertyArgs, upstreamProps []*c
 			return true
 		}
 
+		if localProp.AdditionalProperties != upstreamProp.AdditionalProperties {
+			return true
+		}
+
 		if diffPropertyArgs(localProp.Properties, upstreamProp.Properties) {
 			return true
 		}
@@ -350,6 +354,10 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 		return true
 	}
 
+	if args.AdditionalProperties != other.AdditionalProperties {
+		return true
+	}
+
 	// Compare nested properties
 	if len(args.Properties) != len(other.Properties) {
 		return true
@@ -393,6 +401,11 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
 
+	// set additionalProperties from YAML if specified
+	if prop.AdditionalProperties != nil {
+		args.AdditionalProperties = *prop.AdditionalProperties
+	}
+
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
 		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(prop.Properties))
@@ -406,8 +419,10 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
+		// default additionalProperties to true if there are nested properties and not explicitly set
+		if prop.AdditionalProperties == nil {
+			args.AdditionalProperties = true
+		}
 	}
 
 	return nil
@@ -438,6 +453,7 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 	}
 	args.LocalID = prop.ExternalID
 	args.Required = remoteProp.Required
+	args.AdditionalProperties = remoteProp.AdditionalProperties
 
 	// Handle nested properties recursively
 	if len(remoteProp.Properties) > 0 {
@@ -452,8 +468,6 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
 	}
 
 	return nil
