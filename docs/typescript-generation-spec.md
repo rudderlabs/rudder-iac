@@ -379,6 +379,19 @@ export interface SomeTrackEventSomeNestedObject {
 
 ## Variants (Discriminated Unions)
 
+TypeScript discriminated unions map directly from Kotlin sealed classes. Each variant case becomes an interface with a literal type for the discriminator property.
+
+### Kotlin → TypeScript Mapping
+
+| Kotlin Concept | TypeScript Equivalent |
+|----------------|----------------------|
+| Sealed class | Union type (`type T = A \| B \| C`) |
+| Sealed subclass | Interface with literal discriminator |
+| Abstract discriminator property | Discriminator with literal type per case |
+| Default subclass | Interface with `string` discriminator type |
+
+### Custom Type with Variants
+
 **Input (custom-types.yaml):**
 
 ```yaml
@@ -415,14 +428,183 @@ export interface SomeTrackEventSomeNestedObject {
 **Output (index.ts):**
 
 ```typescript
-export interface CustomTypeDefsSomeVariantType {
-  someInteger?: number;
-  someString: string; // discriminator
+// Case 1: someString === "case_1"
+export interface SomeVariantTypeCase1 {
+  someString: "case_1";           // literal type
+  someInteger: number;            // required in this case
 }
 
-export interface CustomTypeDefs {
-  SomeVariantType?: CustomTypeDefsSomeVariantType;
+// Case 2: someString === "case_2_a" or "case_2_b"
+export interface SomeVariantTypeCase2A {
+  someString: "case_2_a";         // literal type
+  someInteger?: number;           // optional (from base)
+  someNumber: number;             // required in this case
 }
+
+export interface SomeVariantTypeCase2B {
+  someString: "case_2_b";         // literal type
+  someInteger?: number;           // optional (from base)
+  someNumber: number;             // required in this case
+}
+
+// Default case: any other someString value
+export interface SomeVariantTypeDefault {
+  someString: string;             // any string (catches all other values)
+  someInteger?: number;           // optional (from base)
+  someBoolean?: boolean;          // from default schema
+}
+
+// Union type combining all cases
+export type SomeVariantType =
+  | SomeVariantTypeCase1
+  | SomeVariantTypeCase2A
+  | SomeVariantTypeCase2B
+  | SomeVariantTypeDefault;
+
+// Reference in CustomTypeDefs
+export interface CustomTypeDefs {
+  SomeVariantType?: SomeVariantType;
+}
+```
+
+### Event Rule with Variants
+
+**Input (tracking-plan.yaml):**
+
+```yaml
+- type: "event_rule"
+  id: "device_event_rule"
+  event:
+    $ref: "#/events/typer-test/device_event"
+  properties:
+    - $ref: "#/properties/typer-test/device-type"
+      required: true
+  variants:
+    - type: "discriminator"
+      discriminator: "#/properties/typer-test/device-type"
+      cases:
+        - display_name: "Mobile"
+          match:
+            - "mobile"
+          properties:
+            - $ref: "#/properties/typer-test/os-version"
+              required: true
+            - $ref: "#/properties/typer-test/app-version"
+              required: true
+        - display_name: "Desktop"
+          match:
+            - "desktop"
+          properties:
+            - $ref: "#/properties/typer-test/browser"
+              required: true
+```
+
+**Output (index.ts):**
+
+```typescript
+// Mobile device case
+export interface DeviceEventMobile {
+  deviceType: "mobile";
+  osVersion: string;
+  appVersion: string;
+}
+
+// Desktop device case
+export interface DeviceEventDesktop {
+  deviceType: "desktop";
+  browser: string;
+}
+
+// Default case
+export interface DeviceEventDefault {
+  deviceType: string;
+}
+
+// Union type
+export type DeviceEvent =
+  | DeviceEventMobile
+  | DeviceEventDesktop
+  | DeviceEventDefault;
+
+// Function uses union type
+export function deviceEvent(
+  props: DeviceEvent,
+  options?: ApiOptions,
+  callback?: apiCallback
+): void {
+  // ...
+}
+```
+
+### Naming Convention for Variant Interfaces
+
+| Component | Pattern | Example |
+|-----------|---------|---------|
+| Case interface | `{TypeName}{CaseName}` | `SomeVariantTypeCase1` |
+| Multi-match interface | `{TypeName}{MatchValue}` | `SomeVariantTypeCase2A`, `SomeVariantTypeCase2B` |
+| Default interface | `{TypeName}Default` | `SomeVariantTypeDefault` |
+| Union type | `{TypeName}` | `SomeVariantType` |
+
+### Type Narrowing Usage
+
+```typescript
+function handleVariant(data: SomeVariantType) {
+  // TypeScript narrows type based on discriminator
+  if (data.someString === "case_1") {
+    // data is SomeVariantTypeCase1
+    console.log(data.someInteger); // number (required)
+  } else if (data.someString === "case_2_a" || data.someString === "case_2_b") {
+    // data is SomeVariantTypeCase2A | SomeVariantTypeCase2B
+    console.log(data.someNumber);  // number (required)
+  } else {
+    // data is SomeVariantTypeDefault
+    console.log(data.someBoolean); // boolean | undefined
+  }
+}
+```
+
+### Enum Discriminator
+
+When the discriminator property has an enum type:
+
+**Input:**
+
+```yaml
+variants:
+  - type: "discriminator"
+    discriminator: "#/properties/typer-test/status-enum"  # enum: ["pending", "active", "completed"]
+    cases:
+      - match: ["pending"]
+        properties: [...]
+      - match: ["active"]
+        properties: [...]
+```
+
+**Output:**
+
+```typescript
+export enum Status_String {
+  S_PENDING = "pending",
+  S_ACTIVE = "active",
+  S_COMPLETED = "completed",
+}
+
+export interface TaskPending {
+  status: Status_String.S_PENDING;  // enum literal
+  // ... pending-specific properties
+}
+
+export interface TaskActive {
+  status: Status_String.S_ACTIVE;   // enum literal
+  // ... active-specific properties
+}
+
+export interface TaskDefault {
+  status: Status_String;            // full enum type for default
+  // ... default properties
+}
+
+export type Task = TaskPending | TaskActive | TaskDefault;
 ```
 
 ---
@@ -878,3 +1060,7 @@ group(traits?: GroupTraits, options?: ApiOptions, callback?: apiCallback): void;
 - [ ] Reserved words prefixed with underscore
 - [ ] Null type supported
 - [ ] Deeply nested objects work correctly
+- [ ] Variants generate discriminated unions (not flat interfaces)
+- [ ] Variant cases use literal types for discriminator
+- [ ] Variant default case uses base type for discriminator
+- [ ] Enum discriminators use enum literal types
