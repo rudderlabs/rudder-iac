@@ -156,6 +156,10 @@ func ResetExperimentalFlags() {
 
 func updateConfig(f func(data []byte) ([]byte, error)) {
 	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		return
+	}
+
 	data, err := os.ReadFile(configFile)
 	cobra.CheckErr(err)
 

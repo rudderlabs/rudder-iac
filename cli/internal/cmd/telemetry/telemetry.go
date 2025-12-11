@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +33,7 @@ var telemetryEnableCmd = &cobra.Command{
 	Short: "Enable telemetry",
 	Long:  "Enable telemetry collection to help improve the CLI",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		telemetry.EnableTelemetry()
+		config.SetTelemetryDisabled(false)
 		log.Info("telemetry has been enabled")
 		return nil
 	},
@@ -45,7 +44,7 @@ var telemetryDisableCmd = &cobra.Command{
 	Short: "Disable telemetry",
 	Long:  "Disable telemetry collection",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		telemetry.DisableTelemetry()
+		config.SetTelemetryDisabled(true)
 		log.Info("telemetry has been disabled")
 		return nil
 	},

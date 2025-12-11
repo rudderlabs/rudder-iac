@@ -10,7 +10,7 @@ import (
 // CLI deals with only the internal logger interface
 // so we need to write an adapter to make sure analytics client
 // can log using our logger
-var _ analytics.Logger = NewTelemetryLogger()
+var log analytics.Logger = NewTelemetryLogger()
 
 type TelemetryLogger struct {
 	log *logger.Logger
