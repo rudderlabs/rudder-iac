@@ -99,6 +99,12 @@ func (p *project) Load() error {
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
 
+	// Detect circular dependencies
+	_, err = graph.DetectCycles()
+	if err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
 	return p.provider.Validate(graph)
 }
 
