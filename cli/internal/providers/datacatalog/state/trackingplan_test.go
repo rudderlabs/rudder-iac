@@ -270,6 +270,35 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			},
 		},
 		{
+			name: "Array property with object type in itemTypes",
+			prop: &localcatalog.TPEventProperty{
+				Name:        "test-array",
+				LocalID:     "test-array-id",
+				Ref:         "#/properties/mypropertygroup/test-array-id",
+				Description: "Test array property",
+				Type:        "array",
+				Required:    false,
+				Config: map[string]interface{}{
+					"itemTypes": []any{"string", "object"},
+				},
+			},
+			urnFromRef: func(ref string) string {
+				if ref == "#/custom-types/group/type-id" {
+					return "urn:custom-type:type-id"
+				}
+				if ref == "#/properties/mypropertygroup/test-array-id" {
+					return "property:test-array-id"
+				}
+				return ""
+			},
+			expected: &state.TrackingPlanPropertyArgs{
+				LocalID:              "test-array-id",
+				ID:                   resources.PropertyRef{URN: "property:test-array-id", Property: "id"},
+				Required:             false,
+				AdditionalProperties: true,
+			},
+		},
+		{
 			name: "Array property with custom type reference in itemTypes",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
