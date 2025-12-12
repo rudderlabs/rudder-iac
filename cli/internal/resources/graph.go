@@ -91,6 +91,10 @@ func (s *Graph) Merge(g *Graph) {
 // - alreadyVisited: tracks all nodes we've explored (prevents revisiting completed branches)
 // - visitedPath: the current path from root to current node (used to detect and report cycles)
 func (g *Graph) DetectCycles() ([]string, error) {
+	if g == nil {
+		return nil, nil
+	}
+
 	// Track all nodes we've visited during the entire DFS traversal
 	alreadyVisited := make(map[string]bool)
 
