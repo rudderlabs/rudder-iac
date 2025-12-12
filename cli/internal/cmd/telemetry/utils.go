@@ -42,9 +42,6 @@ func getCIPlatform() string {
 		"TF_BUILD":               "azure-pipelines",
 		"JENKINS_URL":            "jenkins",
 		"TRAVIS":                 "travis-ci",
-		"BUILDKITE":              "buildkite",
-		"TEAMCITY_VERSION":       "teamcity",
-		"BITBUCKET_BUILD_NUMBER": "bitbucket-pipelines",
 	}
 
 	for envVar, platform := range ciPlatforms {
