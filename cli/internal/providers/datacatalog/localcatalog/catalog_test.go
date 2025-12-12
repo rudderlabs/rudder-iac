@@ -162,7 +162,6 @@ func TestExtractCatalogEntity(t *testing.T) {
           id: my_first_tp
           display_name: "Rudderstack First Tracking Plan"
           description: "This is my first tracking plan"
-          allow_unplanned: false
           rules:
             - type: event_rule
               id: rule_01
@@ -226,9 +225,9 @@ func TestExtractCatalogEntity(t *testing.T) {
 									Required: false,
 								},
 								{
-									Ref:      "#/properties/base_mobile_props/captcha",
+									Ref:                  "#/properties/base_mobile_props/captcha",
 									AdditionalProperties: &falseVal,
-									Required: false,
+									Required:             false,
 									Properties: []*TPRuleProperty{
 										{
 											Ref:      "#/properties/base_mobile_props/captcha_solved",
@@ -249,7 +248,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 		byt = []byte(`
         version: rudder/0.1
-        kind: tp
+        kind: events
         metadata:
           description: "This is my first tracking plan"
         spec:
@@ -848,11 +847,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name           string
-		spec           *specs.Spec
-		expectedIDs    []string
-		expectedError  bool
-		errorContains  string
+		name          string
+		spec          *specs.Spec
+		expectedIDs   []string
+		expectedError bool
+		errorContains string
 	}{
 		{
 			name: "success - parse properties spec with multiple IDs",
@@ -1138,4 +1137,146 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStrictSpecUnmarshal(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Rejects unknown field in tracking plan", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "tp",
+			Metadata: map[string]interface{}{
+				"name": "test-tp",
+			},
+			Spec: map[string]interface{}{
+				"id":           "test-tp",
+				"display_name": "Test Tracking Plan",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"type": "event_rule",
+						"id":   "rule_01",
+						"event": map[string]interface{}{
+							"$ref": "#/events/general/application_backgrounded",
+						},
+						"allow_unplanned": true, // Wrong level - should be inside 'event'
+					},
+				},
+			},
+		}
+
+		tp, err := ExtractTrackingPlan(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "allow_unplanned")
+		assert.Equal(t, "", tp.LocalID)
+	})
+
+	t.Run("Rejects unknown field in event definition", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "events",
+			Metadata: map[string]interface{}{
+				"name": "test-events",
+			},
+			Spec: map[string]interface{}{
+				"events": []interface{}{
+					map[string]interface{}{
+						"id":            "test-event",
+						"name":          "Test Event",
+						"event_type":    "track",
+						"unknown_field": "should fail",
+					},
+				},
+			},
+		}
+
+		events, err := ExtractEvents(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+		assert.Empty(t, events)
+	})
+
+	t.Run("Rejects unknown field in property definition", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "test-props",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":            "test-prop",
+						"name":          "Test Property",
+						"type":          "string",
+						"unknown_field": "should fail",
+					},
+				},
+			},
+		}
+
+		props, err := ExtractProperties(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+		assert.Empty(t, props)
+	})
+
+	t.Run("Rejects unknown field in category definition", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "categories",
+			Metadata: map[string]interface{}{
+				"name": "test-cats",
+			},
+			Spec: map[string]interface{}{
+				"categories": []interface{}{
+					map[string]interface{}{
+						"id":            "test-cat",
+						"name":          "Test Category",
+						"unknown_field": "should fail",
+					},
+				},
+			},
+		}
+
+		cats, err := ExtractCategories(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+		assert.Empty(t, cats)
+	})
+
+	t.Run("Rejects unknown field in custom type definition", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "custom-types",
+			Metadata: map[string]interface{}{
+				"name": "test-types",
+			},
+			Spec: map[string]interface{}{
+				"types": []interface{}{
+					map[string]interface{}{
+						"id":            "test-type",
+						"name":          "Test Type",
+						"type":          "string",
+						"unknown_field": "should fail",
+					},
+				},
+			},
+		}
+
+		types, err := ExtractCustomTypes(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+		assert.Empty(t, types)
+	})
 }

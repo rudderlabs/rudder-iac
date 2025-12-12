@@ -300,8 +300,8 @@ func ExtractTrackingPlan(s *specs.Spec) (TrackingPlan, error) {
 		return TrackingPlan{}, fmt.Errorf("marshalling the spec")
 	}
 
-	if err := json.Unmarshal(byt, &tp); err != nil {
-		return TrackingPlan{}, fmt.Errorf("unmarshalling the spec into tracking plan")
+	if err := strictUnmarshal(byt, &tp); err != nil {
+		return TrackingPlan{}, fmt.Errorf("unmarshalling the spec into tracking plan: %w", err)
 	}
 
 	return tp, nil

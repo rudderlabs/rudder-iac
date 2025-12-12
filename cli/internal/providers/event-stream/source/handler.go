@@ -42,8 +42,17 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	spec := &sourceSpec{}
-	if err := mapstructure.Decode(s.Spec, spec); err != nil {
-		return fmt.Errorf("decoding spec: %w", err)
+	// Use strict decoding to reject unknown fields
+	decoderConfig := &mapstructure.DecoderConfig{
+		ErrorUnused: true, // Reject unknown fields
+		Result:      spec,
+	}
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return fmt.Errorf("creating decoder: %w", err)
+	}
+	if err := decoder.Decode(s.Spec); err != nil {
+		return fmt.Errorf("decoding event stream source spec: %w", err)
 	}
 	if _, exists := h.resources[spec.LocalId]; exists {
 		return fmt.Errorf("event stream source with id %s already exists", spec.LocalId)
