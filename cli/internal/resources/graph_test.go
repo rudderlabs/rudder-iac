@@ -141,3 +141,100 @@ func TestDependents(t *testing.T) {
 	assert.Empty(t, g.GetDependents(r4.URN()))
 	assert.Empty(t, g.GetDependents("non:existent"))
 }
+
+func TestDetectCycles(t *testing.T) {
+	t.Run("No Cycle - Linear Chain", func(t *testing.T) {
+		t.Parallel()
+		g := NewGraph()
+
+		r1 := NewResource("test:r1", "test", map[string]any{}, []string{})
+		r2 := NewResource("test:r2", "test", map[string]any{}, []string{})
+		r3 := NewResource("test:r3", "test", map[string]any{}, []string{})
+
+		g.AddResource(r1)
+		g.AddResource(r2)
+		g.AddResource(r3)
+
+		// Linear: r1 -> r2 -> r3
+		g.AddDependency(r1.URN(), r2.URN())
+		g.AddDependency(r2.URN(), r3.URN())
+
+		cycle, err := g.DetectCycles()
+		assert.NoError(t, err)
+		assert.Nil(t, cycle)
+	})
+
+	t.Run("No Cycle - Empty Graph", func(t *testing.T) {
+		t.Parallel()
+		g := NewGraph()
+
+		cycle, err := g.DetectCycles()
+		assert.NoError(t, err)
+		assert.Nil(t, cycle)
+	})
+
+	t.Run("6-Node Cycle - Properties and Custom Types", func(t *testing.T) {
+		t.Parallel()
+		g := NewGraph()
+
+		// Simulate the circular-test scenario
+		propE := NewResource("property:prop_e", "property", map[string]any{}, []string{})
+		c1 := NewResource("custom-type:c1", "custom-type", map[string]any{}, []string{})
+		propB := NewResource("property:prop_b", "property", map[string]any{}, []string{})
+		c2 := NewResource("custom-type:c2", "custom-type", map[string]any{}, []string{})
+		propD := NewResource("property:prop_d", "property", map[string]any{}, []string{})
+		c3 := NewResource("custom-type:c3", "custom-type", map[string]any{}, []string{})
+
+		g.AddResource(propE)
+		g.AddResource(c1)
+		g.AddResource(propB)
+		g.AddResource(c2)
+		g.AddResource(propD)
+		g.AddResource(c3)
+
+		// Create the 6-node cycle: prop_e -> c1 -> prop_b -> c2 -> prop_d -> c3 -> prop_e
+		g.AddDependency(propE.URN(), c1.URN())
+		g.AddDependency(c1.URN(), propB.URN())
+		g.AddDependency(propB.URN(), c2.URN())
+		g.AddDependency(c2.URN(), propD.URN())
+		g.AddDependency(propD.URN(), c3.URN())
+		g.AddDependency(c3.URN(), propE.URN())
+
+		cycle, err := g.DetectCycles()
+		assert.Error(t, err)
+		assert.NotNil(t, cycle)
+		assert.Contains(t, err.Error(), "circular dependency detected")
+		// Should contain all 6 resources in the cycle
+		assert.GreaterOrEqual(t, len(cycle), 6)
+	})
+
+	t.Run("Cycle with Additional Non-Cyclic Resources", func(t *testing.T) {
+		t.Parallel()
+		g := NewGraph()
+
+		// Non-cyclic resources
+		r1 := NewResource("test:r1", "test", map[string]any{}, []string{})
+		r2 := NewResource("test:r2", "test", map[string]any{}, []string{})
+
+		// Cyclic resources
+		r3 := NewResource("test:r3", "test", map[string]any{}, []string{})
+		r4 := NewResource("test:r4", "test", map[string]any{}, []string{})
+
+		g.AddResource(r1)
+		g.AddResource(r2)
+		g.AddResource(r3)
+		g.AddResource(r4)
+
+		// r1 -> r2 (non-cyclic)
+		g.AddDependency(r1.URN(), r2.URN())
+
+		// r3 -> r4 -> r3 (cyclic)
+		g.AddDependency(r3.URN(), r4.URN())
+		g.AddDependency(r4.URN(), r3.URN())
+
+		cycle, err := g.DetectCycles()
+		assert.Error(t, err)
+		assert.NotNil(t, cycle)
+		assert.Contains(t, err.Error(), "circular dependency detected")
+	})
+}

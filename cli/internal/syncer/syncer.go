@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 type ProjectSyncer struct {
@@ -214,7 +215,8 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 }
 
 func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool) []error {
-	tasks := make([]Task, 0, len(plan.Operations))
+	tasks := make([]tasker.Task, 0, len(plan.Operations))
+
 	sourceGraph := StateToGraph(state)
 	for _, o := range plan.Operations {
 		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
@@ -222,7 +224,7 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 
 	s.reporter.SyncStarted(len(tasks))
 
-	taskErrors := RunTasks(ctx, tasks, s.concurrency, continueOnFail, func(task Task) error {
+	taskErrors := tasker.RunTasks(ctx, tasks, s.concurrency, continueOnFail, func(task tasker.Task) error {
 		opTask, ok := task.(*operationTask)
 		if !ok {
 			return fmt.Errorf("invalid task type: %T", task)

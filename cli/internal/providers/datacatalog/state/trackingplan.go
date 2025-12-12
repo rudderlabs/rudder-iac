@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -379,6 +380,55 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 	return nil
 }
 
+// getAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
+// the default value for additional properties is true for the following cases -
+// 1. Object type properties
+// 2. Multi-type properties with one of them "object" and no "array" type included
+// 3. Array properties with no item types defined
+// 4. Array properties where item type is object
+// 5. Array properties with multiple item types where at least one is object
+func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
+	hasObject := strings.Contains(prop.Type, "object")
+	hasArray := strings.Contains(prop.Type, "array")
+
+	// If both array and object types exist, additional properties must be true by default 
+	if hasArray && hasObject {
+		return true
+	}
+
+	// Case 1 & 2: Object type properties (multi-type with "object" but no "array")
+	if hasObject && !hasArray {
+		return true
+	}
+
+	// Cases 3, 4, 5: Array-specific cases
+	if hasArray {
+		itemTypes, ok := prop.Config["itemTypes"]
+		if !ok {
+			// Case 3: Array properties with no item types defined
+			return true
+		}
+
+		itemTypesSlice, ok := itemTypes.([]any)
+		if !ok {
+			return false
+		}
+		if len(itemTypesSlice) == 0 {
+			// Case 3: Empty itemTypes array
+			return true
+		}
+
+		// Cases 4 & 5: Check if any itemType is "object"
+		for _, it := range itemTypesSlice {
+			if itStr, ok := it.(string); ok && itStr == "object" {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
 
 	urn := urnFromRef(prop.Ref)
@@ -392,6 +442,7 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
+	additionalPropertiesDefaultVal := getAdditionalPropertiesDefaultVal(prop)
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
@@ -406,8 +457,13 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
+		// set additional properties to true by default if there are nested properties
+		additionalPropertiesDefaultVal = true
+	}
+
+	args.AdditionalProperties = additionalPropertiesDefaultVal
+	if prop.AdditionalProperties != nil {
+		args.AdditionalProperties = *prop.AdditionalProperties
 	}
 
 	return nil
@@ -438,6 +494,8 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 	}
 	args.LocalID = prop.ExternalID
 	args.Required = remoteProp.Required
+	// when creating args from a remote tp property, set additionalProperties to the value from the remote property
+	args.AdditionalProperties = remoteProp.AdditionalProperties
 
 	// Handle nested properties recursively
 	if len(remoteProp.Properties) > 0 {
@@ -452,8 +510,6 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
-		// set additionalProperties to true if there are nested properties
-		args.AdditionalProperties = true
 	}
 
 	return nil
