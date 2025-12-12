@@ -20,17 +20,7 @@ type KV struct {
 // isRunningInCI detects whether the CLI is running in a CI/CD environment.
 // It checks for common CI/CD environment variables across multiple platforms.
 func isRunningInCI() bool {
-	// Generic CI check (catches GitHub Actions, GitLab CI, CircleCI, Travis CI, etc.)
-	if os.Getenv("CI") == "true" {
-		return true
-	}
-
-	// Azure Pipelines uses TF_BUILD instead of CI
-	if os.Getenv("TF_BUILD") == "true" {
-		return true
-	}
-
-	return false
+	return os.Getenv("CI") == "true" || os.Getenv("TF_BUILD") == "true"
 }
 
 // getCIPlatform returns the name of the CI/CD platform if running in CI.
@@ -50,8 +40,7 @@ func getCIPlatform() string {
 		}
 	}
 
-	// Fallback to generic CI
-	return "generic-ci"
+	return "unknown"
 }
 
 func TrackCommand(command string, err error, extras ...KV) {
