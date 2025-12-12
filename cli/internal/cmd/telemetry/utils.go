@@ -38,7 +38,7 @@ func getCIPlatform() string {
 	ciPlatforms := map[string]string{
 		"GITHUB_ACTIONS":         "github-actions",
 		"GITLAB_CI":              "gitlab-ci",
-		"CIRCLECI":               "circleci",
+		"CIRCLECI":               "circle-ci",
 		"TF_BUILD":               "azure-pipelines",
 		"JENKINS_URL":            "jenkins",
 		"TRAVIS":                 "travis-ci",
