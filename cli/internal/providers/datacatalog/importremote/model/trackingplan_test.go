@@ -133,6 +133,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 						{
 							ID:       "prop_cart",
 							Required: true,
+							AdditionalProperties: false,
 							Properties: []*catalog.TrackingPlanEventProperty{
 								{ID: "prop_cart_id", Required: true},
 								{ID: "prop_total", Required: false},
@@ -188,6 +189,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 						map[string]any{
 							"$ref":     "#/properties/cart/cart-object",
 							"required": true,
+							"additionalProperties": false,
 							"properties": []any{
 								map[string]any{
 									"$ref":     "#/properties/cart/cart-id",
