@@ -88,9 +88,9 @@ func (p *Provider) Validate(_ *resources.Graph) error {
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {
-	if err := inflateRefs(p.dc); err != nil {
-		return nil, fmt.Errorf("inflating refs: %w", err)
-	}
+	// if err := inflateRefs(p.dc); err != nil {
+	// 	return nil, fmt.Errorf("inflating refs: %w", err)
+	// }
 
 	return createResourceGraph(p.dc)
 }
@@ -364,35 +364,4 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 	}
 
 	return graph, nil
-}
-
-// // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
-// // of the properties and events that are used in the tracking plan
-// func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) []string {
-// 	dependencies := make([]string, 0)
-
-// 	for _, event := range tp.EventProps {
-// 		if urn, ok := eventIDToURN[event.LocalID]; ok {
-// 			dependencies = append(dependencies, urn)
-// 		}
-
-// 		for _, prop := range event.Properties {
-// 			if urn, ok := propIDToURN[prop.LocalID]; ok {
-// 				dependencies = append(dependencies, urn)
-// 			}
-// 		}
-// 	}
-
-// 	return dependencies
-// }
-
-func inflateRefs(catalog *localcatalog.DataCatalog) error {
-	log.Debug("inflating all the references in the catalog")
-
-	for _, tp := range catalog.TrackingPlans {
-		if err := tp.ExpandRefs(catalog); err != nil {
-			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
-		}
-	}
-	return nil
 }
