@@ -232,25 +232,30 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 	falseVal := false
 	tests := []struct {
 		name           string
-		prop           *localcatalog.TPEventProperty
+		prop           *localcatalog.TPRuleProperty
 		urnFromRef     func(string) string
+		entityFromRef  func(string) any
 		expected       *state.TrackingPlanPropertyArgs
 		expectedErrMsg string
 	}{
 		{
 			name: "Regular string type property",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-property",
-				LocalID:     "test-property-id",
-				Ref:         "#/properties/mypropertygroup/test-property-id",
-				Description: "Test property description",
-				Type:        "string",
-				Required:    true,
-				Config: map[string]interface{}{
-					"enum": []string{"value1", "value2"},
-				},
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-property-id",
+				Required: true,
 			},
 			urnFromRef: func(ref string) string { return "property:test-property-id" },
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-property",
+					LocalID:     "test-property-id",
+					Description: "Test property description",
+					Type:        "string",
+					Config: map[string]interface{}{
+						"enum": []string{"value1", "value2"},
+					},
+				}
+			},
 			expected: &state.TrackingPlanPropertyArgs{
 				LocalID:              "test-property-id",
 				ID:                   resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
@@ -260,13 +265,9 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Custom type reference in Type",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-property",
-				LocalID:     "test-property-id",
-				Ref:         "#/properties/mypropertygroup/test-property-id",
-				Description: "Test property description",
-				Type:        "#/custom-types/group/type-id",
-				Required:    true,
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-property-id",
+				Required: true,
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/custom-types/group/type-id" {
@@ -277,6 +278,14 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				}
 				return ""
 			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-property",
+					LocalID:     "test-property-id",
+					Description: "Test property description",
+					Type:        "#/custom-types/group/type-id",
+				}
+			},
 			expected: &state.TrackingPlanPropertyArgs{
 				LocalID:              "test-property-id",
 				ID:                   resources.PropertyRef{URN: "property:test-property-id", Property: "id"},
@@ -286,16 +295,9 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Array property with object type in itemTypes",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-array",
-				LocalID:     "test-array-id",
-				Ref:         "#/properties/mypropertygroup/test-array-id",
-				Description: "Test array property",
-				Type:        "array",
-				Required:    false,
-				Config: map[string]interface{}{
-					"itemTypes": []any{"string", "object"},
-				},
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-array-id",
+				Required: false,
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/custom-types/group/type-id" {
@@ -306,6 +308,17 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				}
 				return ""
 			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-array",
+					LocalID:     "test-array-id",
+					Description: "Test array property",
+					Type:        "array",
+					Config: map[string]interface{}{
+						"itemTypes": []any{"string", "object"},
+					},
+				}
+			},
 			expected: &state.TrackingPlanPropertyArgs{
 				LocalID:              "test-array-id",
 				ID:                   resources.PropertyRef{URN: "property:test-array-id", Property: "id"},
@@ -315,16 +328,20 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Array property with custom type reference in itemTypes",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-array",
-				LocalID:     "test-array-id",
-				Ref:         "#/properties/mypropertygroup/test-array-id",
-				Description: "Test array property",
-				Type:        "array",
-				Required:    false,
-				Config: map[string]interface{}{
-					"itemTypes": []any{"#/custom-types/group/type-id"},
-				},
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-array-id",
+				Required: false,
+			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-array",
+					LocalID:     "test-array-id",
+					Description: "Test array property",
+					Type:        "array",
+					Config: map[string]interface{}{
+						"itemTypes": []any{"#/custom-types/group/type-id"},
+					},
+				}
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/custom-types/group/type-id" {
@@ -344,19 +361,23 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Invalid custom type reference in Type", // this test does not throw an error anymore as we only store the propId now and not the whole inflated property definition
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-property",
-				LocalID:     "test-property-id",
-				Ref:         "#/properties/mypropertygroup/test-property-id",
-				Description: "Test property description",
-				Type:        "#/custom-types/group/invalid-id",
-				Required:    true,
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-property-id",
+				Required: true,
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/properties/mypropertygroup/test-property-id" {
 					return "property:test-property-id"
 				}
 				return "" // Simulate not finding the custom type
+			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-property",
+					LocalID:     "test-property-id",
+					Description: "Test property description",
+					Type:        "#/custom-types/group/invalid-id",
+				}
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				LocalID:              "test-property-id",
@@ -367,16 +388,20 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Invalid custom type reference in itemTypes",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "test-array",
-				LocalID:     "test-array-id",
-				Ref:         "#/properties/mypropertygroup/test-array-id",
-				Description: "Test array property",
-				Type:        "array",
-				Required:    false,
-				Config: map[string]interface{}{
-					"itemTypes": []any{"#/custom-types/group/invalid-id"},
-				},
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/test-array-id",
+				Required: false,
+			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "test-array",
+					LocalID:     "test-array-id",
+					Description: "Test array property",
+					Config: map[string]interface{}{
+						"itemTypes": []any{"#/custom-types/group/invalid-id"},
+					},
+					Type: "array",
+				}
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/properties/mypropertygroup/test-array-id" {
@@ -393,30 +418,18 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Property with nested properties (2 levels)",
-			prop: &localcatalog.TPEventProperty{
-				Name:                 "user-profile",
+			prop: &localcatalog.TPRuleProperty{
 				Ref:                  "#/properties/mypropertygroup/user-profile-id",
-				LocalID:              "user-profile-id",
-				Description:          "User profile object",
-				Type:                 "object",
 				Required:             true,
 				AdditionalProperties: &falseVal,
-				Properties: []*localcatalog.TPEventProperty{
+				Properties: []*localcatalog.TPRuleProperty{
 					{
-						Name:        "profile-name",
-						Ref:         "#/properties/mypropertygroup/profile-name-id",
-						LocalID:     "profile-name-id",
-						Description: "User's profile name",
-						Type:        "string",
-						Required:    true,
+						Ref:      "#/properties/mypropertygroup/profile-name-id",
+						Required: true,
 					},
 					{
-						Name:        "profile-email",
-						Ref:         "#/properties/mypropertygroup/profile-email-id",
-						LocalID:     "profile-email-id",
-						Description: "User's profile email",
-						Type:        "string",
-						Required:    false,
+						Ref:      "#/properties/mypropertygroup/profile-email-id",
+						Required: false,
 					},
 				},
 			},
@@ -431,6 +444,38 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 					return "property:profile-email-id"
 				}
 				return ""
+			},
+			entityFromRef: func(ref string) any {
+
+				if ref == "#/properties/mypropertygroup/user-profile-id" {
+					return &localcatalog.Property{
+						Name:        "user-profile",
+						LocalID:     "user-profile-id",
+						Description: "User profile object",
+						Type:        "object",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/profile-name-id" {
+					return &localcatalog.Property{
+						Name:        "profile-name",
+						LocalID:     "profile-name-id",
+						Description: "User's profile name",
+						Type:        "string",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/profile-email-id" {
+					return &localcatalog.Property{
+						Name:        "profile-email",
+						LocalID:     "profile-email-id",
+						Description: "User's profile email",
+						Type:        "string",
+					}
+
+				}
+
+				return nil
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
@@ -455,48 +500,25 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Property with deeply nested properties (3 levels)",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "user-profile",
-				Ref:         "#/properties/mypropertygroup/user-profile-id",
-				LocalID:     "user-profile-id",
-				Description: "User profile object",
-				Type:        "object",
-				Required:    true,
-				Properties: []*localcatalog.TPEventProperty{
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/user-profile-id",
+				Required: true,
+				Properties: []*localcatalog.TPRuleProperty{
 					{
-						Name:        "profile-settings",
-						Ref:         "#/properties/mypropertygroup/profile-settings-id",
-						LocalID:     "profile-settings-id",
-						Description: "User's profile settings",
-						Type:        "object",
-						Required:    false,
-						Properties: []*localcatalog.TPEventProperty{
+						Ref:      "#/properties/mypropertygroup/profile-settings-id",
+						Required: false,
+						Properties: []*localcatalog.TPRuleProperty{
 							{
-								Name:        "theme-preference",
-								Ref:         "#/properties/mypropertygroup/theme-preference-id",
-								LocalID:     "theme-preference-id",
-								Description: "User's theme preference",
-								Type:        "string",
-								Required:    false,
-								Config: map[string]interface{}{
-									"enum": []string{"light", "dark"},
-								},
+								Ref:      "#/properties/mypropertygroup/theme-preference-id",
+								Required: false,
 							},
 							{
-								Name:        "notifications",
-								Ref:         "#/properties/mypropertygroup/notifications-id",
-								LocalID:     "notifications-id",
-								Description: "Notification preferences",
-								Type:        "object",
-								Required:    true,
-								Properties: []*localcatalog.TPEventProperty{
+								Ref:      "#/properties/mypropertygroup/notifications-id",
+								Required: true,
+								Properties: []*localcatalog.TPRuleProperty{
 									{
-										Name:        "email-enabled",
-										Ref:         "#/properties/mypropertygroup/email-enabled-id",
-										LocalID:     "email-enabled-id",
-										Description: "Email notifications enabled",
-										Type:        "boolean",
-										Required:    true,
+										Ref:      "#/properties/mypropertygroup/email-enabled-id",
+										Required: true,
 									},
 								},
 							},
@@ -521,6 +543,58 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 					return "property:email-enabled-id"
 				}
 				return ""
+			},
+
+			entityFromRef: func(ref string) any {
+				if ref == "#/properties/mypropertygroup/user-profile-id" {
+					return &localcatalog.Property{
+						Name:        "user-profile",
+						LocalID:     "user-profile-id",
+						Description: "User profile object",
+						Type:        "object",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/profile-settings-id" {
+					return &localcatalog.Property{
+						Name:        "profile-settings",
+						LocalID:     "profile-settings-id",
+						Description: "User's profile settings",
+						Type:        "object",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/theme-preference-id" {
+					return &localcatalog.Property{
+						Name:        "theme-preference",
+						LocalID:     "theme-preference-id",
+						Description: "User's theme preference",
+						Type:        "string",
+						Config: map[string]interface{}{
+							"enum": []string{"light", "dark"},
+						},
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/notifications-id" {
+					return &localcatalog.Property{
+						Name:        "notifications",
+						LocalID:     "notifications-id",
+						Description: "Notification preferences",
+						Type:        "object",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/email-enabled-id" {
+					return &localcatalog.Property{
+						Name:        "email-enabled",
+						LocalID:     "email-enabled-id",
+						Description: "Email notifications enabled",
+						Type:        "boolean",
+					}
+				}
+
+				return nil
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
@@ -561,21 +635,13 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Nested property with custom type reference",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "user-profile",
-				Ref:         "#/properties/mypropertygroup/user-profile-id",
-				LocalID:     "user-profile-id",
-				Description: "User profile object",
-				Type:        "object",
-				Required:    true,
-				Properties: []*localcatalog.TPEventProperty{
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/user-profile-id",
+				Required: true,
+				Properties: []*localcatalog.TPRuleProperty{
 					{
-						Name:        "email-address",
-						Ref:         "#/properties/mypropertygroup/email-address-id",
-						LocalID:     "email-address-id",
-						Description: "User's email address",
-						Type:        "#/custom-types/user-types/email-type",
-						Required:    true,
+						Ref:      "#/properties/mypropertygroup/email-address-id",
+						Required: true,
 					},
 				},
 			},
@@ -590,6 +656,27 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 					return "property:email-address-id"
 				}
 				return ""
+			},
+			entityFromRef: func(ref string) any {
+				if ref == "#/properties/mypropertygroup/user-profile-id" {
+					return &localcatalog.Property{
+						Name:        "user-profile",
+						LocalID:     "user-profile-id",
+						Description: "User profile object",
+						Type:        "object",
+					}
+				}
+
+				if ref == "#/properties/mypropertygroup/email-address-id" {
+					return &localcatalog.Property{
+						Name:        "email-address",
+						LocalID:     "email-address-id",
+						Description: "User's email address",
+						Type:        "#/custom-types/user-types/email-type",
+					}
+				}
+
+				return nil
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
@@ -608,21 +695,13 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		},
 		{
 			name: "Invalid property reference in nested property",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "user-profile",
-				LocalID:     "user-profile-id",
-				Ref:         "#/properties/mypropertygroup/user-profile-id",
-				Description: "User profile object",
-				Type:        "object",
-				Required:    true,
-				Properties: []*localcatalog.TPEventProperty{
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/user-profile-id",
+				Required: true,
+				Properties: []*localcatalog.TPRuleProperty{
 					{
-						Name:        "invalid-nested",
-						LocalID:     "invalid-nested-id",
-						Ref:         "#/properties/mypropertygroup/invalid-nested-id",
-						Description: "Nested property with invalid custom type",
-						Type:        "string",
-						Required:    true,
+						Ref:      "#/properties/mypropertygroup/invalid-nested-id",
+						Required: true,
 					},
 				},
 			},
@@ -632,23 +711,35 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				}
 				return "" // Simulate not finding the custom type
 			},
-			expectedErrMsg: "processing nested property invalid-nested-id: unable to resolve ref to the property urn: #/properties/mypropertygroup/invalid-nested-id",
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "user-profile",
+					LocalID:     "user-profile-id",
+					Description: "User profile object",
+					Type:        "object",
+				}
+			},
+			expectedErrMsg: "processing nested property #/properties/mypropertygroup/invalid-nested-id: unable to resolve ref to the property",
 		},
 		{
 			name: "Object type property without nested properties",
-			prop: &localcatalog.TPEventProperty{
-				Name:        "user-profile",
-				LocalID:     "user-profile-id",
-				Ref:         "#/properties/mypropertygroup/user-profile-id",
-				Description: "User profile object",
-				Type:        "object",
-				Required:    true,
+			prop: &localcatalog.TPRuleProperty{
+				Ref:      "#/properties/mypropertygroup/user-profile-id",
+				Required: true,
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#/properties/mypropertygroup/user-profile-id" {
 					return "property:user-profile-id"
 				}
 				return "" // Simulate not finding the custom type
+			},
+			entityFromRef: func(ref string) any {
+				return &localcatalog.Property{
+					Name:        "user-profile",
+					LocalID:     "user-profile-id",
+					Description: "User profile object",
+					Type:        "object",
+				}
 			},
 			expected: &state.TrackingPlanPropertyArgs{
 				ID:                   resources.PropertyRef{URN: "property:user-profile-id", Property: "id"},
@@ -663,7 +754,11 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			args := &state.TrackingPlanPropertyArgs{}
 
-			err := args.FromCatalogTrackingPlanEventProperty(tc.prop, tc.urnFromRef)
+			err := args.FromCatalogTrackingPlanEventProperty(
+				tc.prop,
+				tc.urnFromRef,
+				tc.entityFromRef,
+			)
 
 			if tc.expectedErrMsg != "" {
 				require.Error(t, err)
