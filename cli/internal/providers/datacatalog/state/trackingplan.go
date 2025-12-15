@@ -387,11 +387,11 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 // 3. Array properties with no item types defined
 // 4. Array properties where item type is object
 // 5. Array properties with multiple item types where at least one is object
-func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
+func getAdditionalPropertiesDefaultVal(prop *localcatalog.Property) bool {
 	hasObject := strings.Contains(prop.Type, "object")
 	hasArray := strings.Contains(prop.Type, "array")
 
-	// If both array and object types exist, additional properties must be true by default 
+	// If both array and object types exist, additional properties must be true by default
 	if hasArray && hasObject {
 		return true
 	}
@@ -429,34 +429,56 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 	return false
 }
 
-func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop *localcatalog.TPEventProperty, urnFromRef func(string) string) error {
+func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(
+	prop *localcatalog.TPRuleProperty,
+	urnFromRef func(string) string,
+	entityFromRef func(string) any,
+) error {
 
 	urn := urnFromRef(prop.Ref)
 	if urn == "" {
-		return fmt.Errorf("unable to resolve ref to the property urn: %s", prop.Ref)
+		return fmt.Errorf("unable to resolve ref to the property")
 	}
 
 	args.ID = resources.PropertyRef{
 		URN:      urn,
 		Property: "id",
 	}
-	args.LocalID = prop.LocalID
 	args.Required = prop.Required
-	additionalPropertiesDefaultVal := getAdditionalPropertiesDefaultVal(prop)
+
+	data := entityFromRef(prop.Ref)
+	if data == nil {
+		return fmt.Errorf("unable to get property from reference")
+	}
+
+	property, ok := data.(*localcatalog.Property)
+	if !ok {
+		return fmt.Errorf("data is not not of type *localcatalog.Property: %T", data)
+	}
+
+	args.LocalID = property.LocalID
+	additionalPropertiesDefaultVal := getAdditionalPropertiesDefaultVal(property)
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
-		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(prop.Properties))
+		nestedProperties := make(
+			[]*TrackingPlanPropertyArgs,
+			0,
+			len(prop.Properties),
+		)
+
 		for _, nestedProp := range prop.Properties {
 			nestedArgs := &TrackingPlanPropertyArgs{}
-			if err := nestedArgs.FromCatalogTrackingPlanEventProperty(nestedProp, urnFromRef); err != nil {
-				return fmt.Errorf("processing nested property %s: %w", nestedProp.LocalID, err)
+			if err := nestedArgs.FromCatalogTrackingPlanEventProperty(nestedProp, urnFromRef, entityFromRef); err != nil {
+				return fmt.Errorf("processing nested property %s: %w", nestedProp.Ref, err)
 			}
 			nestedProperties = append(nestedProperties, nestedArgs)
 		}
+
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
+
 		// set additional properties to true by default if there are nested properties
 		additionalPropertiesDefaultVal = true
 	}
@@ -473,13 +495,16 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 // usePropertyRefsForDependencies is used to determine if the property ID should be converted to a propertyRef or not
 // for TrackingPlanArgs(which becomes the state's input field later) we need to convert propertyIDs into propertyRefs
 // for TrackingPlanState(which becomes the state's output field later), we use the propertyID as is
-func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp *catalog.TrackingPlanEventProperty, collection *resources.RemoteResources, usePropertyRefsForDependencies bool) error {
+func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(
+	remoteProp *catalog.TrackingPlanEventProperty,
+	collection *resources.RemoteResources,
+	usePropertyRefsForDependencies bool,
+) error {
 	if usePropertyRefsForDependencies {
 		urn, err := collection.GetURNByID(PropertyResourceType, remoteProp.ID)
 		if err != nil {
 			return fmt.Errorf("getting URN for property %s: %w", remoteProp.ID, err)
 		}
-
 		args.ID = resources.PropertyRef{
 			URN:      urn,
 			Property: "id",
@@ -497,16 +522,21 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 	// when creating args from a remote tp property, set additionalProperties to the value from the remote property
 	args.AdditionalProperties = remoteProp.AdditionalProperties
 
-	// Handle nested properties recursively
 	if len(remoteProp.Properties) > 0 {
 		nestedProperties := make([]*TrackingPlanPropertyArgs, 0, len(remoteProp.Properties))
 		for _, nestedProp := range remoteProp.Properties {
 			nestedArgs := &TrackingPlanPropertyArgs{}
-			if err := nestedArgs.FromRemoteTrackingPlanProperty(nestedProp, collection, usePropertyRefsForDependencies); err != nil {
+
+			if err := nestedArgs.FromRemoteTrackingPlanProperty(
+				nestedProp,
+				collection,
+				usePropertyRefsForDependencies,
+			); err != nil {
 				return fmt.Errorf("processing nested property %s: %w", nestedProp.ID, err)
 			}
 			nestedProperties = append(nestedProperties, nestedArgs)
 		}
+
 		// sort the nested properties array by the localID
 		utils.SortByLocalID(nestedProperties)
 		args.Properties = nestedProperties
@@ -557,56 +587,76 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	}
 }
 
-func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan, urnFromRef func(string) string) error {
+func (args *TrackingPlanArgs) FromCatalogTrackingPlan(
+	from *localcatalog.TrackingPlan,
+	urnFromRef func(string) string,
+	entityFromRef func(string) any,
+) error {
 	args.Name = from.Name
 	args.LocalID = from.LocalID
 	args.Description = from.Description
 
-	events := make([]*TrackingPlanEventArgs, 0, len(from.EventProps))
-	for _, event := range from.EventProps {
-		properties := make([]*TrackingPlanPropertyArgs, 0, len(event.Properties))
+	events := make([]*TrackingPlanEventArgs, 0, len(from.Rules))
+	for _, eventRule := range from.Rules {
+		properties := make([]*TrackingPlanPropertyArgs, 0, len(eventRule.Properties))
 
-		for _, prop := range event.Properties {
+		for _, prop := range eventRule.Properties {
 			tpProperty := &TrackingPlanPropertyArgs{}
 
 			if err := tpProperty.FromCatalogTrackingPlanEventProperty(
 				prop,
 				urnFromRef,
+				entityFromRef,
 			); err != nil {
-				return fmt.Errorf("processing property %s: %w", prop.LocalID, err)
+				return fmt.Errorf("processing property %s in rule %s: %w", prop.Ref, eventRule.LocalID, err)
 			}
 
 			properties = append(properties, tpProperty)
 		}
+
 		// sort the properties array by the localID
 		utils.SortByLocalID(properties)
 
 		var variants Variants
-		for _, localVariant := range event.Variants {
+		for _, localVariant := range eventRule.Variants {
 			variant := &Variant{}
 
 			if err := variant.FromLocalCatalogVariant(
 				localVariant,
 				urnFromRef,
 			); err != nil {
-				return fmt.Errorf("converting variant for event %s: %w", event.LocalID, err)
+				return fmt.Errorf("converting variant for event rule %s: %w", eventRule.LocalID, err)
 			}
 			variants = append(variants, *variant)
 		}
 
+		if eventRule.Event == nil {
+			return fmt.Errorf("event rule %s has no event", eventRule.LocalID)
+		}
+
 		// set the identity section to its default value 'properties' if it is not set
-		identitySection := event.IdentitySection
+		identitySection := eventRule.Event.IdentitySection
 		if identitySection == "" {
 			identitySection = PropertiesIdentity
 		}
 
+		data := entityFromRef(eventRule.Event.Ref)
+		if data == nil {
+			return fmt.Errorf("unable to get event from ref: %s", eventRule.Event.Ref)
+		}
+
+		event, ok := data.(*localcatalog.Event)
+		if !ok {
+			return fmt.Errorf("event data is not an event: %T", data)
+		}
+
 		events = append(events, &TrackingPlanEventArgs{
 			ID: resources.PropertyRef{
-				URN:      urnFromRef(event.Ref),
+				URN:      urnFromRef(eventRule.Event.Ref),
 				Property: "id",
 			},
 			LocalID:         event.LocalID,
-			AllowUnplanned:  event.AllowUnplanned,
+			AllowUnplanned:  eventRule.Event.AllowUnplanned,
 			IdentitySection: identitySection,
 			Properties:      properties,
 			Variants:        variants,
@@ -616,16 +666,6 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 	// sort the events array by the localID
 	utils.SortByLocalID(events)
 	args.Events = events
-	return nil
-}
-
-func (args *TrackingPlanArgs) EventByLocalID(id string) *TrackingPlanEventArgs {
-
-	for _, event := range args.Events {
-		if event.LocalID == id {
-			return event
-		}
-	}
 	return nil
 }
 
@@ -725,7 +765,11 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 	}
 }
 
-func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.TrackingPlanWithIdentifiers, collection *resources.RemoteResources) error {
+func (args *TrackingPlanArgs) FromRemoteTrackingPlan(
+	trackingPlan *catalog.TrackingPlanWithIdentifiers,
+	collection *resources.RemoteResources,
+) error {
+
 	args.Name = trackingPlan.Name
 	args.LocalID = trackingPlan.ExternalID
 	if trackingPlan.Description != nil {
@@ -754,6 +798,7 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.Track
 			tpProperty.FromRemoteTrackingPlanProperty(prop, collection, true)
 			properties = append(properties, tpProperty)
 		}
+
 		// sort the properties array by the localID
 		utils.SortByLocalID(properties)
 		eventArgs.Properties = properties
@@ -767,6 +812,7 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.Track
 		eventArgs.Variants = variants
 		events = append(events, eventArgs)
 	}
+
 	// sort the events array by the localID
 	utils.SortByLocalID(events)
 	args.Events = events

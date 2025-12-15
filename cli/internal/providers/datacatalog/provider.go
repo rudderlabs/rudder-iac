@@ -88,9 +88,9 @@ func (p *Provider) Validate(_ *resources.Graph) error {
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {
-	if err := inflateRefs(p.dc); err != nil {
-		return nil, fmt.Errorf("inflating refs: %w", err)
-	}
+	// if err := inflateRefs(p.dc); err != nil {
+	// 	return nil, fmt.Errorf("inflating refs: %w", err)
+	// }
 
 	return createResourceGraph(p.dc)
 }
@@ -138,17 +138,26 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 	graph := resources.NewGraph()
 
 	// First, pre-calculate all URNs to use for references
-	propIDToURN := make(map[string]string)
+	var (
+		propIDToURN      = make(map[string]string)
+		propIDToProperty = make(map[string]*localcatalog.Property)
+	)
+
 	for _, props := range catalog.Properties {
 		for _, prop := range props {
 			propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, pstate.PropertyResourceType)
+			propIDToProperty[prop.LocalID] = &prop
 		}
 	}
 
-	eventIDToURN := make(map[string]string)
+	var (
+		eventIDToURN   = make(map[string]string)
+		eventIDToEvent = make(map[string]*localcatalog.Event)
+	)
 	for _, events := range catalog.Events {
 		for _, event := range events {
 			eventIDToURN[event.LocalID] = resources.URN(event.LocalID, pstate.EventResourceType)
+			eventIDToEvent[event.LocalID] = &event
 		}
 	}
 
@@ -205,6 +214,30 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		}
 	}
 
+	getEntityFromRef := func(ref string) any {
+		parts := strings.Split(ref, "/")
+		if len(parts) < 4 {
+			return nil
+		}
+
+		var (
+			// #/events/group/id => events = parts[1], group = parts[2], id = parts[3]
+			entityType = parts[1]
+			id         = parts[3]
+		)
+
+		switch entityType {
+		case localcatalog.KindProperties:
+			return propIDToProperty[id]
+
+		case localcatalog.KindEvents:
+			return eventIDToEvent[id]
+
+		default:
+			return nil
+		}
+	}
+
 	// Add properties to the graph
 	for group, props := range catalog.Properties {
 		for _, prop := range props {
@@ -228,8 +261,6 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				)),
 			)
 			graph.AddResource(resource)
-
-			propIDToURN[prop.LocalID] = resource.URN()
 		}
 	}
 
@@ -252,10 +283,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 					event.LocalID,
 				)),
 			)
-			graph.AddResource(resource)
 
 			graph.AddResource(resource)
-			eventIDToURN[event.LocalID] = resource.URN()
 		}
 	}
 
@@ -311,7 +340,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
 
 		args := pstate.TrackingPlanArgs{}
-		if err := args.FromCatalogTrackingPlan(tp, getURNFromRef); err != nil {
+		if err := args.FromCatalogTrackingPlan(
+			tp,
+			getURNFromRef,
+			getEntityFromRef,
+		); err != nil {
 			return nil, fmt.Errorf("creating tracking plan args: %w", err)
 		}
 
@@ -328,39 +361,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			)),
 		)
 		graph.AddResource(resource)
-		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
 	}
 
 	return graph, nil
-}
-
-// getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
-// of the properties and events that are used in the tracking plan
-func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) []string {
-	dependencies := make([]string, 0)
-
-	for _, event := range tp.EventProps {
-		if urn, ok := eventIDToURN[event.LocalID]; ok {
-			dependencies = append(dependencies, urn)
-		}
-
-		for _, prop := range event.Properties {
-			if urn, ok := propIDToURN[prop.LocalID]; ok {
-				dependencies = append(dependencies, urn)
-			}
-		}
-	}
-
-	return dependencies
-}
-
-func inflateRefs(catalog *localcatalog.DataCatalog) error {
-	log.Debug("inflating all the references in the catalog")
-
-	for _, tp := range catalog.TrackingPlans {
-		if err := tp.ExpandRefs(catalog); err != nil {
-			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
-		}
-	}
-	return nil
 }
