@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"encoding/json"
+	"maps"
+	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
@@ -14,6 +16,24 @@ const (
 type KV struct {
 	K string
 	V interface{}
+}
+
+// getCIExecutionContext returns the execution context of the CLI if running in CI.
+func getCIExecutionContext() map[string]interface{} {
+	executionContext := make(map[string]interface{})
+	envMap := map[string]string{
+		"RUDDERSTACK_CLI_WORKFLOW_VERSION": "cli_workflow_version",
+		"RUDDERSTACK_CLI_CI_PLATFORM":      "ci_platform",
+	}
+
+	for envVar, key := range envMap {
+		envValue := os.Getenv(envVar)
+		if envValue != "" {
+			executionContext[key] = envValue
+		}
+	}
+
+	return executionContext
 }
 
 func TrackCommand(command string, err error, extras ...KV) {
@@ -33,6 +53,9 @@ func TrackCommand(command string, err error, extras ...KV) {
 	var experimental map[string]interface{}
 	json.Unmarshal(experimentalData, &experimental)
 	props["experimental"] = experimental
+
+	// Automatically add execution context (CI)
+	maps.Copy(props, getCIExecutionContext())
 
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
