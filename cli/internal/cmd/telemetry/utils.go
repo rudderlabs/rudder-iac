@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -17,30 +18,21 @@ type KV struct {
 	V interface{}
 }
 
-// isRunningInCI detects whether the CLI is running in a CI/CD environment.
-// It checks for common CI/CD environment variables across multiple platforms.
-func isRunningInCI() bool {
-	return os.Getenv("CI") == "true" || os.Getenv("TF_BUILD") == "true"
-}
+// getCIExecutionContext returns the execution context of the CLI if running in CI.
+func getCIExecutionContext() map[string]interface{} {
+	envs := []string{"RUDDERSTACK_CLI_VERSION", "RUDDERSTACK_CLI_RUNNER_VERSION", "CI_PLATFORM"}
+	executionContext := make(map[string]interface{})
+	isCI := false
 
-// getCIPlatform returns the name of the CI/CD platform if running in CI.
-func getCIPlatform() string {
-	ciPlatforms := map[string]string{
-		"GITHUB_ACTIONS":         "github-actions",
-		"GITLAB_CI":              "gitlab-ci",
-		"CIRCLECI":               "circle-ci",
-		"TF_BUILD":               "azure-pipelines",
-		"JENKINS_URL":            "jenkins",
-		"TRAVIS":                 "travis-ci",
-	}
-
-	for envVar, platform := range ciPlatforms {
+	for _, envVar := range envs {
 		if os.Getenv(envVar) != "" {
-			return platform
+			isCI = true
+			executionContext[envVar] = os.Getenv(envVar)
 		}
 	}
 
-	return "unknown"
+	executionContext["IS_CI"] = isCI
+	return executionContext
 }
 
 func TrackCommand(command string, err error, extras ...KV) {
@@ -62,10 +54,7 @@ func TrackCommand(command string, err error, extras ...KV) {
 	props["experimental"] = experimental
 
 	// Automatically add execution context (CI)
-	if isRunningInCI() {
-		props["is_ci"] = true
-		props["ci_platform"] = getCIPlatform()
-	}
+	maps.Copy(props, getCIExecutionContext())
 
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
