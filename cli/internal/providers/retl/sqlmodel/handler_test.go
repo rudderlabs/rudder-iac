@@ -729,7 +729,7 @@ func TestSQLModelHandler(t *testing.T) {
 		err := handler.LoadSpec("test.yaml", invalidSpec)
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "converting spec")
+		assert.Contains(t, err.Error(), "decoding SQL model spec")
 	})
 
 	t.Run("Validate", func(t *testing.T) {
@@ -2050,4 +2050,51 @@ func TestSQLModelResource_DiffUpstream(t *testing.T) {
 			assert.Equal(t, tc.expected, got)
 		})
 	}
+}
+
+func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Rejects unknown field in SQL model spec", func(t *testing.T) {
+		t.Parallel()
+
+		handler := sqlmodel.NewHandler(&mockRETLClient{}, "")
+		spec := &specs.Spec{
+			Kind: "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+				"unknown_field":     "should fail", // Unknown field
+			},
+		}
+
+		err := handler.LoadSpec("test.yaml", spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown_field")
+	})
+
+	t.Run("Accepts valid SQL model spec", func(t *testing.T) {
+		t.Parallel()
+
+		handler := sqlmodel.NewHandler(&mockRETLClient{}, "")
+		spec := &specs.Spec{
+			Kind: "retl-source-sql-model",
+			Spec: map[string]interface{}{
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"description":       "A test model",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		}
+
+		err := handler.LoadSpec("test.yaml", spec)
+		require.NoError(t, err)
+	})
 }

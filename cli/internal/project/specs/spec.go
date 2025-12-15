@@ -1,6 +1,7 @@
 package specs
 
 import (
+	"bytes"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -22,9 +23,13 @@ type ParsedSpec struct {
 }
 
 // New creates and validates a Spec from YAML data
+// It enforces strict validation and rejects unknown fields
 func New(data []byte) (*Spec, error) {
 	var spec Spec
-	if err := yaml.Unmarshal(data, &spec); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true) // Enable strict mode - reject unknown fields
+
+	if err := decoder.Decode(&spec); err != nil {
 		return nil, fmt.Errorf("unmarshaling yaml: %w", err)
 	}
 

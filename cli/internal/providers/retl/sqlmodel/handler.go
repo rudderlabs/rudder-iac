@@ -45,9 +45,17 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	spec := &SQLModelSpec{}
 
-	// Convert spec map to struct using mapstructure
-	if err := mapstructure.Decode(s.Spec, spec); err != nil {
-		return fmt.Errorf("converting spec: %w", err)
+	// Convert spec map to struct using mapstructure with strict validation
+	decoderConfig := &mapstructure.DecoderConfig{
+		ErrorUnused: true, // Reject unknown fields
+		Result:      spec,
+	}
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return fmt.Errorf("creating decoder: %w", err)
+	}
+	if err := decoder.Decode(s.Spec); err != nil {
+		return fmt.Errorf("decoding SQL model spec: %w", err)
 	}
 
 	if _, ok := h.resources[spec.ID]; ok {
