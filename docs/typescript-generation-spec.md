@@ -779,7 +779,7 @@ function withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
 
 ## Edge Cases
 
-### Other Event Types (Identify, Page, Screen, Group)
+### Other Event Types (Identify, Page, Group)
 
 **Identify Event:**
 
@@ -807,22 +807,13 @@ export function identify(
 
 **Page Event:**
 
+> **Note:** The JavaScript SDK uses `page()` for page view tracking. The `screen()` method is not supported in the JS SDK - it is only available in mobile SDKs (Kotlin, Swift, etc.) for screen view tracking.
+
 ```typescript
 export function page(
   category?: string,
   name?: string,
   properties?: PageProperties,
-  options?: ApiOptions,
-  callback?: apiCallback,
-): void { ... }
-```
-
-**Screen Event:**
-
-```typescript
-export function screen(
-  name?: string,
-  properties?: ScreenProperties,
   options?: ApiOptions,
   callback?: apiCallback,
 ): void { ... }
@@ -1011,6 +1002,8 @@ identify(traits?: IdentifyTraits, options?: ApiOptions, callback?: apiCallback):
 
 ### Page
 
+> **Note:** The JS SDK does not support `screen()`. Use `page()` for page view tracking.
+
 ```typescript
 // Full signature
 page(category: string, name: string, properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
@@ -1018,15 +1011,6 @@ page(category: string, name: string, properties?: PageProperties, options?: ApiO
 page(name: string, properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
 // Properties only
 page(properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
-```
-
-### Screen
-
-```typescript
-// With name
-screen(name: string, properties?: ScreenProperties, options?: ApiOptions, callback?: apiCallback): void;
-// Properties only
-screen(properties?: ScreenProperties, options?: ApiOptions, callback?: apiCallback): void;
 ```
 
 ### Group
@@ -1053,7 +1037,7 @@ group(traits?: GroupTraits, options?: ApiOptions, callback?: apiCallback): void;
 - [ ] Event names preserved exactly in track calls
 - [ ] RudderTyper context included in all calls
 - [ ] `allow_unplanned: true` results in `Record<string, any>`
-- [ ] Identify/Page/Screen/Group events handled
+- [ ] Identify/Page/Group events handled (Note: Screen is not supported in JS SDK)
 - [ ] Function overloads for non-track events
 - [ ] Special characters in names sanitized
 - [ ] Name collisions resolved with numeric suffix
