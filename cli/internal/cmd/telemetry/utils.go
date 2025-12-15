@@ -20,11 +20,11 @@ type KV struct {
 
 // getCIExecutionContext returns the execution context of the CLI if running in CI.
 func getCIExecutionContext() map[string]interface{} {
+	executionContext := make(map[string]interface{})
 	envMap := map[string]string{
 		"RUDDERSTACK_CLI_WORKFLOW_VERSION": "cli_workflow_version",
 		"RUDDERSTACK_CLI_CI_PLATFORM":      "ci_platform",
 	}
-	executionContext := make(map[string]interface{})
 
 	for envVar, key := range envMap {
 		envValue := os.Getenv(envVar)
@@ -32,6 +32,7 @@ func getCIExecutionContext() map[string]interface{} {
 			executionContext[key] = envValue
 		}
 	}
+
 	return executionContext
 }
 
