@@ -613,6 +613,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(
 
 			properties = append(properties, tpProperty)
 		}
+
 		// sort the properties array by the localID
 		utils.SortByLocalID(properties)
 
@@ -627,6 +628,10 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(
 				return fmt.Errorf("converting variant for event rule %s: %w", eventRule.LocalID, err)
 			}
 			variants = append(variants, *variant)
+		}
+
+		if eventRule.Event == nil {
+			return fmt.Errorf("event rule %s has no event", eventRule.LocalID)
 		}
 
 		// set the identity section to its default value 'properties' if it is not set
@@ -782,6 +787,7 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(
 				URN:      eventURN,
 				Property: "id",
 			},
+			LocalID:         event.ExternalID,
 			AllowUnplanned:  event.AdditionalProperties,
 			IdentitySection: event.IdentitySection,
 		}
