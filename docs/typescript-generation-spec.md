@@ -4,6 +4,8 @@
 
 This document defines the mapping rules for generating TypeScript code from RudderStack tracking plan YAML definitions. It serves as the specification for implementing TypeScript support in RudderTyper 2.0.
 
+This specification follows the same conventions as the Kotlin generator for consistency across platforms.
+
 ---
 
 ## Test Data Location
@@ -66,19 +68,49 @@ Defines reusable custom types.
 **Output (index.ts):**
 
 ```typescript
-someMultiType?: any[] | boolean | number | Record<string, any> | string | null;
+type PropertySomeMultiType = any[] | boolean | number | Record<string, any> | string | null;
 ```
 
 ---
 
 ## Naming Conventions
 
-| Source             | Target         | Convention         | Example                                 |
-| ------------------ | -------------- | ------------------ | --------------------------------------- |
-| Event `name`       | Function name  | camelCase          | `"Some Track Event"` → `someTrackEvent` |
-| Event `name`       | Interface name | PascalCase         | `"Some Track Event"` → `SomeTrackEvent` |
-| Property `name`    | Property name  | As-is (camelCase)  | `someString` → `someString`             |
-| Custom type `name` | Type name      | As-is (PascalCase) | `SomeStringType` → `SomeStringType`     |
+| Source             | Target         | Convention         | Example                                              |
+| ------------------ | -------------- | ------------------ | ---------------------------------------------------- |
+| Event `name`       | Function name  | camelCase + prefix | `"Some Track Event"` → `trackSomeTrackEvent`         |
+| Event `name`       | Interface name | PascalCase + prefix| `"Some Track Event"` → `TrackSomeTrackEventProperties` |
+| Property `name`    | Type alias     | Property prefix    | `someString` → `PropertySomeString`                  |
+| Custom type `name` | Type alias     | CustomType prefix  | `SomeStringType` → `CustomTypeSomeStringType`        |
+
+---
+
+## Property Types
+
+For every property, generate a type alias. This enables reuse and consistent typing across the codebase.
+
+**Input (properties.yaml):**
+
+```yaml
+- id: "some-string"
+  name: "someString"
+  type: "string"
+  description: "some string property"
+```
+
+**Output (index.ts):**
+
+```typescript
+/** some string property */
+type PropertySomeString = string;
+```
+
+**Usage in event properties:**
+
+```typescript
+interface TrackSomeTrackEventProperties {
+  someString?: PropertySomeString;
+}
+```
 
 ---
 
@@ -99,20 +131,17 @@ someMultiType?: any[] | boolean | number | Record<string, any> | string | null;
 /**
  * This is a track event for testing.
  */
-export function someTrackEvent(
-  props: SomeTrackEvent,
+trackSomeTrackEvent(
+  props: TrackSomeTrackEventProperties,
   options?: ApiOptions,
   callback?: apiCallback
 ): void {
-  const a = analytics();
-  if (a) {
-    a.track(
-      "Some Track Event",
-      props || {},
-      withRudderTyperContext(options),
-      callback
-    );
-  }
+  this.analytics.track(
+    'Some Track Event',
+    props,
+    this.withRudderTyperContext(options),
+    callback
+  );
 }
 ```
 
@@ -142,8 +171,11 @@ properties:
 **Output (index.ts):**
 
 ```typescript
-export interface SomeTrackEvent {
-  someString: string; // required - no ?
+/** some string property */
+type PropertySomeString = string;
+
+interface TrackSomeTrackEventProperties {
+  someString: PropertySomeString; // required - no ?
 }
 ```
 
@@ -160,8 +192,8 @@ properties:
 **Output (index.ts):**
 
 ```typescript
-export interface SomeTrackEvent {
-  someString?: string; // optional - has ?
+interface TrackSomeTrackEventProperties {
+  someString?: PropertySomeString; // optional - has ?
 }
 ```
 
@@ -185,7 +217,7 @@ export interface SomeTrackEvent {
 **Output (index.ts):**
 
 ```typescript
-someArrayOfStrings?: string[];
+type PropertySomeArrayOfStrings = string[];
 ```
 
 ### Array with Multiple Item Types
@@ -207,12 +239,14 @@ someArrayOfStrings?: string[];
 **Output (index.ts):**
 
 ```typescript
-someArrayOfMultipleTypes?: (boolean | number | string)[];
+type PropertySomeArrayOfMultipleTypes = (boolean | number | string)[];
 ```
 
 ---
 
-## Enums
+## Enums (Union Types)
+
+Instead of using TypeScript enums with `S_` and `N_` prefixes, use union types that list the exact values. This provides better type safety and cleaner code.
 
 ### String Enum
 
@@ -234,13 +268,7 @@ someArrayOfMultipleTypes?: (boolean | number | string)[];
 **Output (index.ts):**
 
 ```typescript
-export enum Somestringwithenum_String {
-  S_GET = "GET",
-  S_PUT = "PUT",
-  S_POST = "POST",
-  S_DELETE = "DELETE",
-  S_PATCH = "PATCH",
-}
+type PropertySomeStringWithEnum = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'PATCH';
 ```
 
 ### Integer Enum
@@ -262,17 +290,22 @@ export enum Somestringwithenum_String {
 **Output (index.ts):**
 
 ```typescript
-export enum Someintegerwithenum_Integer {
-  N_200 = 200,
-  N_201 = 201,
-  N_400 = 400,
-  N_500 = 500,
-}
+type PropertySomeIntegerWithEnum = 200 | 201 | 400 | 500;
+```
+
+### Mixed Type Enum
+
+When an enum contains both strings and numbers:
+
+```typescript
+type PropertyMixedEnum = 'GET' | 'POST' | 200 | 404;
 ```
 
 ---
 
 ## Custom Types
+
+Custom types use a `CustomType` prefix and are defined as type aliases (not wrapped in an interface).
 
 ### Primitive Custom Type
 
@@ -288,9 +321,8 @@ export enum Someintegerwithenum_Integer {
 **Output (index.ts):**
 
 ```typescript
-export interface CustomTypeDefs {
-  SomeStringType?: string;
-}
+/** some string custom type */
+type CustomTypeSomeStringType = string;
 ```
 
 ### Object Custom Type
@@ -312,13 +344,10 @@ export interface CustomTypeDefs {
 **Output (index.ts):**
 
 ```typescript
-export interface CustomTypeDefsSomeObjectType {
-  someCustomString: CustomTypeDefs["SomeStringType"]; // required
-  someInteger?: number; // optional
-}
-
-export interface CustomTypeDefs {
-  SomeObjectType?: CustomTypeDefsSomeObjectType;
+/** some object custom type */
+interface CustomTypeSomeObjectType {
+  someCustomString: PropertySomeCustomString; // required
+  someInteger?: PropertySomeInteger;          // optional
 }
 ```
 
@@ -335,12 +364,14 @@ export interface CustomTypeDefs {
 **Output (index.ts):**
 
 ```typescript
-someCustomString?: CustomTypeDefs['SomeStringType'];
+type PropertySomeCustomString = CustomTypeSomeStringType;
 ```
 
 ---
 
 ## Nested Objects
+
+Use inline nested object types instead of separate interfaces. This keeps the type definition local to the event rule and avoids name conflicts.
 
 **Input (tracking-plan.yaml):**
 
@@ -359,21 +390,17 @@ properties:
 **Output (index.ts):**
 
 ```typescript
-export interface SomeTrackEventSomeNestedLevel2 {
-  someString?: string;
-  someInteger?: number;
-}
-
-export interface SomeTrackEventSomeNestedLevel1 {
-  someNestedLevel2?: SomeTrackEventSomeNestedLevel2;
-}
-
-export interface SomeTrackEventSomeNestedObject {
-  someNestedLevel1?: SomeTrackEventSomeNestedLevel1;
+interface TrackSomeTrackEventProperties {
+  someNestedObject?: {
+    someNestedLevel1?: {
+      someNestedLevel2?: {
+        someString?: PropertySomeString;
+        someInteger?: PropertySomeInteger;
+      };
+    };
+  };
 }
 ```
-
-**Naming Pattern:** `{EventName}{PropertyPath}`
 
 ---
 
@@ -388,7 +415,7 @@ TypeScript discriminated unions map directly from Kotlin sealed classes. Each va
 | Sealed class | Union type (`type T = A \| B \| C`) |
 | Sealed subclass | Interface with literal discriminator |
 | Abstract discriminator property | Discriminator with literal type per case |
-| Default subclass | Interface with `string` discriminator type |
+| Default subclass | Interface with `Exclude<>` discriminator type |
 
 ### Custom Type with Variants
 
@@ -429,42 +456,37 @@ TypeScript discriminated unions map directly from Kotlin sealed classes. Each va
 
 ```typescript
 // Case 1: someString === "case_1"
-export interface SomeVariantTypeCase1 {
-  someString: "case_1";           // literal type
-  someInteger: number;            // required in this case
+interface CustomTypeSomeVariantTypeCase1 {
+  someString: 'case_1';           // literal type
+  someInteger: PropertySomeInteger; // required in this case
 }
 
 // Case 2: someString === "case_2_a" or "case_2_b"
-export interface SomeVariantTypeCase2A {
-  someString: "case_2_a";         // literal type
-  someInteger?: number;           // optional (from base)
-  someNumber: number;             // required in this case
+interface CustomTypeSomeVariantTypeCase2A {
+  someString: 'case_2_a';             // literal type
+  someInteger?: PropertySomeInteger;  // optional (from base)
+  someNumber: PropertySomeNumber;     // required in this case
 }
 
-export interface SomeVariantTypeCase2B {
-  someString: "case_2_b";         // literal type
-  someInteger?: number;           // optional (from base)
-  someNumber: number;             // required in this case
+interface CustomTypeSomeVariantTypeCase2B {
+  someString: 'case_2_b';             // literal type
+  someInteger?: PropertySomeInteger;  // optional (from base)
+  someNumber: PropertySomeNumber;     // required in this case
 }
 
-// Default case: any other someString value
-export interface SomeVariantTypeDefault {
-  someString: string;             // any string (catches all other values)
-  someInteger?: number;           // optional (from base)
-  someBoolean?: boolean;          // from default schema
+// Default case: any string except the defined cases
+interface CustomTypeSomeVariantTypeDefault {
+  someString: Exclude<string, 'case_1' | 'case_2_a' | 'case_2_b'>; // excludes defined cases
+  someInteger?: PropertySomeInteger;  // optional (from base)
+  someBoolean?: PropertySomeBoolean;  // from default schema
 }
 
 // Union type combining all cases
-export type SomeVariantType =
-  | SomeVariantTypeCase1
-  | SomeVariantTypeCase2A
-  | SomeVariantTypeCase2B
-  | SomeVariantTypeDefault;
-
-// Reference in CustomTypeDefs
-export interface CustomTypeDefs {
-  SomeVariantType?: SomeVariantType;
-}
+type CustomTypeSomeVariantType =
+  | CustomTypeSomeVariantTypeCase1
+  | CustomTypeSomeVariantTypeCase2A
+  | CustomTypeSomeVariantTypeCase2B
+  | CustomTypeSomeVariantTypeDefault;
 ```
 
 ### Event Rule with Variants
@@ -503,36 +525,36 @@ export interface CustomTypeDefs {
 
 ```typescript
 // Mobile device case
-export interface DeviceEventMobile {
-  deviceType: "mobile";
-  osVersion: string;
-  appVersion: string;
+interface TrackDeviceEventPropertiesMobile {
+  deviceType: 'mobile';
+  osVersion: PropertyOsVersion;
+  appVersion: PropertyAppVersion;
 }
 
 // Desktop device case
-export interface DeviceEventDesktop {
-  deviceType: "desktop";
-  browser: string;
+interface TrackDeviceEventPropertiesDesktop {
+  deviceType: 'desktop';
+  browser: PropertyBrowser;
 }
 
 // Default case
-export interface DeviceEventDefault {
-  deviceType: string;
+interface TrackDeviceEventPropertiesDefault {
+  deviceType: Exclude<string, 'mobile' | 'desktop'>;
 }
 
 // Union type
-export type DeviceEvent =
-  | DeviceEventMobile
-  | DeviceEventDesktop
-  | DeviceEventDefault;
+type TrackDeviceEventProperties =
+  | TrackDeviceEventPropertiesMobile
+  | TrackDeviceEventPropertiesDesktop
+  | TrackDeviceEventPropertiesDefault;
 
-// Function uses union type
-export function deviceEvent(
-  props: DeviceEvent,
+// Method uses union type
+trackDeviceEvent(
+  props: TrackDeviceEventProperties,
   options?: ApiOptions,
   callback?: apiCallback
 ): void {
-  // ...
+  this.analytics.track('Device Event', props, this.withRudderTyperContext(options), callback);
 }
 ```
 
@@ -540,24 +562,24 @@ export function deviceEvent(
 
 | Component | Pattern | Example |
 |-----------|---------|---------|
-| Case interface | `{TypeName}{CaseName}` | `SomeVariantTypeCase1` |
-| Multi-match interface | `{TypeName}{MatchValue}` | `SomeVariantTypeCase2A`, `SomeVariantTypeCase2B` |
-| Default interface | `{TypeName}Default` | `SomeVariantTypeDefault` |
-| Union type | `{TypeName}` | `SomeVariantType` |
+| Case interface | `{TypeName}{CaseName}` | `CustomTypeSomeVariantTypeCase1` |
+| Multi-match interface | `{TypeName}{MatchValue}` | `CustomTypeSomeVariantTypeCase2A` |
+| Default interface | `{TypeName}Default` | `CustomTypeSomeVariantTypeDefault` |
+| Union type | `{TypeName}` | `CustomTypeSomeVariantType` |
 
 ### Type Narrowing Usage
 
 ```typescript
-function handleVariant(data: SomeVariantType) {
+function handleVariant(data: CustomTypeSomeVariantType) {
   // TypeScript narrows type based on discriminator
-  if (data.someString === "case_1") {
-    // data is SomeVariantTypeCase1
+  if (data.someString === 'case_1') {
+    // data is CustomTypeSomeVariantTypeCase1
     console.log(data.someInteger); // number (required)
-  } else if (data.someString === "case_2_a" || data.someString === "case_2_b") {
-    // data is SomeVariantTypeCase2A | SomeVariantTypeCase2B
+  } else if (data.someString === 'case_2_a' || data.someString === 'case_2_b') {
+    // data is CustomTypeSomeVariantTypeCase2A | CustomTypeSomeVariantTypeCase2B
     console.log(data.someNumber);  // number (required)
   } else {
-    // data is SomeVariantTypeDefault
+    // data is CustomTypeSomeVariantTypeDefault
     console.log(data.someBoolean); // boolean | undefined
   }
 }
@@ -583,28 +605,27 @@ variants:
 **Output:**
 
 ```typescript
-export enum Status_String {
-  S_PENDING = "pending",
-  S_ACTIVE = "active",
-  S_COMPLETED = "completed",
-}
+type PropertyStatusEnum = 'pending' | 'active' | 'completed';
 
-export interface TaskPending {
-  status: Status_String.S_PENDING;  // enum literal
+interface TrackTaskEventPropertiesPending {
+  status: 'pending';  // literal from union
   // ... pending-specific properties
 }
 
-export interface TaskActive {
-  status: Status_String.S_ACTIVE;   // enum literal
+interface TrackTaskEventPropertiesActive {
+  status: 'active';   // literal from union
   // ... active-specific properties
 }
 
-export interface TaskDefault {
-  status: Status_String;            // full enum type for default
+interface TrackTaskEventPropertiesDefault {
+  status: Exclude<PropertyStatusEnum, 'pending' | 'active'>;  // 'completed' only
   // ... default properties
 }
 
-export type Task = TaskPending | TaskActive | TaskDefault;
+type TrackTaskEventProperties =
+  | TrackTaskEventPropertiesPending
+  | TrackTaskEventPropertiesActive
+  | TrackTaskEventPropertiesDefault;
 ```
 
 ---
@@ -633,18 +654,19 @@ export type Task = TaskPending | TaskActive | TaskDefault;
 **Output (index.ts):**
 
 ```typescript
-export interface SomeTrackEvent {
-  someString: string; // required
-  someInteger: number; // required
-  someBoolean?: boolean; // optional
+interface TrackSomeTrackEventProperties {
+  someString: PropertySomeString;   // required
+  someInteger: PropertySomeInteger; // required
+  someBoolean?: PropertySomeBoolean; // optional
 }
 
-export function someTrackEvent(
-  props: SomeTrackEvent,
+// Method in RudderTyperAnalytics class
+trackSomeTrackEvent(
+  props: TrackSomeTrackEventProperties,
   options?: ApiOptions,
   callback?: apiCallback
 ): void {
-  // ...
+  this.analytics.track('Some Track Event', props, this.withRudderTyperContext(options), callback);
 }
 ```
 
@@ -663,12 +685,12 @@ export function someTrackEvent(
 **Output (index.ts):**
 
 ```typescript
-export function someEmptyTrackEvent(
-  props?: Record<string, any>,
+// Method in RudderTyperAnalytics class
+trackSomeEmptyTrackEvent(
   options?: ApiOptions,
   callback?: apiCallback
 ): void {
-  // ...
+  this.analytics.track('Some Empty Track Event', {}, this.withRudderTyperContext(options), callback);
 }
 ```
 
@@ -686,12 +708,15 @@ export function someEmptyTrackEvent(
 **Output (index.ts):**
 
 ```typescript
-export function someEmptyTrackEventWithAdditionalProperties(
-  props?: Record<string, any>, // generic - accepts any properties
+type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = Record<string, any>;
+
+// Method in RudderTyperAnalytics class
+trackSomeEmptyTrackEventWithAdditionalProperties(
+  props?: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
   options?: ApiOptions,
   callback?: apiCallback
 ): void {
-  // ...
+  this.analytics.track('Some Empty Track Event With Additional Properties', props || {}, this.withRudderTyperContext(options), callback);
 }
 ```
 
@@ -708,47 +733,99 @@ export function someEmptyTrackEventWithAdditionalProperties(
 // 2. Imports
 import type { RudderAnalytics, ApiOptions, ApiObject } from '@rudderstack/analytics-js';
 
-// 3. Global declaration
-declare global {
-  interface Window {
-    rudderanalytics: RudderAnalytics | undefined;
-  }
-}
-
-// 4. Callback type
+// 3. Callback type
 type apiCallback = (data?: any) => void;
 
-// 5. Enums
-export enum Somestringwithenum_String { ... }
-export enum Someintegerwithenum_Integer { ... }
+// 4. Custom Types (type aliases)
+/** some string custom type */
+type CustomTypeSomeStringType = string;
 
-// 6. Nested interfaces (deepest first)
-export interface SomeTrackEventSomeNestedLevel2 { ... }
-export interface SomeTrackEventSomeNestedLevel1 { ... }
+/** some object custom type */
+interface CustomTypeSomeObjectType {
+  someCustomString: PropertySomeCustomString;
+  someInteger?: PropertySomeInteger;
+}
 
-// 7. Event interfaces
-export interface SomeTrackEvent { ... }
+// 5. Property Types (type aliases)
+/** some string property */
+type PropertySomeString = string;
 
-// 8. Custom type interfaces
-export interface CustomTypeDefsSomeObjectType { ... }
-export interface CustomTypeDefs { ... }
+/** some integer property */
+type PropertySomeInteger = number;
 
-// 9. Configuration
-export interface RudderTyperOptions { ... }
-export function setRudderTyperOptions(options: RudderTyperOptions) { ... }
+// 6. Event Properties Interfaces
+interface TrackSomeTrackEventProperties {
+  someString: PropertySomeString;
+  someNestedObject?: {
+    someNestedLevel1?: {
+      someNestedLevel2?: {
+        someString?: PropertySomeString;
+        someInteger?: PropertySomeInteger;
+      };
+    };
+  };
+}
 
-// 10. Context helper
-function withRudderTyperContext(message: ApiOptions = {}): ApiOptions { ... }
+interface IdentifyTraits {
+  userName?: PropertyUserName;
+  email?: PropertyEmail;
+}
 
-// 11. Track functions
-export function someTrackEvent(...) { ... }
-export function someEmptyTrackEvent(...) { ... }
+// 7. Configuration
+export interface RudderTyperOptions {
+  analytics?: RudderAnalytics;
+  onViolation?: ViolationHandler;
+}
 
-// 12. Client API
-const clientAPI = { setRudderTyperOptions, someTrackEvent, ... };
+// 8. RudderTyper Analytics Class
+export class RudderTyperAnalytics {
+  private analytics: RudderAnalytics;
 
-// 13. Proxy export
-export const RudderTyperAnalytics = new Proxy<typeof clientAPI>(clientAPI, { ... });
+  constructor(analytics: RudderAnalytics) {
+    this.analytics = analytics;
+  }
+
+  // 9. Track functions
+  trackSomeTrackEvent(
+    props: TrackSomeTrackEventProperties,
+    options?: ApiOptions,
+    callback?: apiCallback
+  ): void {
+    this.analytics.track(
+      'Some Track Event',
+      props,
+      this.withRudderTyperContext(options),
+      callback
+    );
+  }
+
+  // 10. Identify function
+  identify(
+    userId: string,
+    traits?: IdentifyTraits,
+    options?: ApiOptions,
+    callback?: apiCallback
+  ): void {
+    this.analytics.identify(userId, traits, this.withRudderTyperContext(options), callback);
+  }
+
+  // 11. Context helper (private)
+  private withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
+    return {
+      ...message,
+      context: {
+        ...(message.context || {}),
+        ruddertyper: {
+          sdk: 'analytics.js',
+          language: 'typescript',
+          rudderTyperVersion: '2.0.0',
+          trackingPlanId: 'tp_xxxxx',
+          trackingPlanVersion: 1,
+        },
+      },
+    };
+  }
+}
 ```
 
 ---
@@ -758,16 +835,16 @@ export const RudderTyperAnalytics = new Proxy<typeof clientAPI>(clientAPI, { ...
 Every analytics call includes metadata for attribution.
 
 ```typescript
-function withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
+private withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
   return {
     ...message,
     context: {
       ...(message.context || {}),
       ruddertyper: {
-        sdk: "analytics.js",
-        language: "typescript",
-        rudderTyperVersion: "2.0.0",
-        trackingPlanId: "tp_xxxxx",
+        sdk: 'analytics.js',
+        language: 'typescript',
+        rudderTyperVersion: '2.0.0',
+        trackingPlanId: 'tp_xxxxx',
         trackingPlanVersion: 1,
       },
     },
@@ -792,12 +869,12 @@ function withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
 **Expected Output:**
 
 ```typescript
-export interface IdentifyTraits {
-  userName?: string;
-  email?: string;
+interface IdentifyTraits {
+  userName?: PropertyUserName;
+  email?: PropertyEmail;
 }
 
-export function identify(
+identify(
   userId: string,
   traits?: IdentifyTraits,
   options?: ApiOptions,
@@ -810,7 +887,11 @@ export function identify(
 > **Note:** The JavaScript SDK uses `page()` for page view tracking. The `screen()` method is not supported in the JS SDK - it is only available in mobile SDKs (Kotlin, Swift, etc.) for screen view tracking.
 
 ```typescript
-export function page(
+interface PageProperties {
+  pageType?: PropertyPageType;
+}
+
+page(
   category?: string,
   name?: string,
   properties?: PageProperties,
@@ -822,7 +903,11 @@ export function page(
 **Group Event:**
 
 ```typescript
-export function group(
+interface GroupTraits {
+  groupName?: PropertyGroupName;
+}
+
+group(
   groupId: string,
   traits?: GroupTraits,
   options?: ApiOptions,
@@ -841,9 +926,9 @@ export function group(
 ```
 
 ```typescript
-// Function name sanitized, original preserved in track call
-export function productPremiumClicked(...): void {
-  a.track('Product "Premium" Clicked', ...);
+// Method name sanitized, original preserved in track call
+trackProductPremiumClicked(props: TrackProductPremiumClickedProperties, ...): void {
+  this.analytics.track('Product "Premium" Clicked', props, ...);
 }
 ```
 
@@ -854,8 +939,8 @@ export function productPremiumClicked(...): void {
 ```
 
 ```typescript
-export function variableString(...): void {
-  a.track('$Variable$String', ...);
+trackVariableString(props: TrackVariableStringProperties, ...): void {
+  this.analytics.track('$Variable$String', props, ...);
 }
 ```
 
@@ -863,7 +948,7 @@ export function variableString(...): void {
 
 ### Name Collision Handling
 
-When two events sanitize to the same function name:
+When two events sanitize to the same method name:
 
 ```yaml
 - name: "eventWithNameCamelCase"
@@ -871,8 +956,8 @@ When two events sanitize to the same function name:
 ```
 
 ```typescript
-export function eventWithNameCamelCase(...): void { ... }
-export function eventWithNameCamelCase2(...): void { ... }  // Suffix added
+trackEventWithNameCamelCase(props: TrackEventWithNameCamelCaseProperties, ...): void { ... }
+trackEventWithNameCamelCase1(props: TrackEventWithNameCamelCaseProperties1, ...): void { ... }  // Suffix added
 ```
 
 ---
@@ -887,8 +972,8 @@ Property names that are TypeScript reserved words:
 ```
 
 ```typescript
-export interface SomeEvent {
-  _class?: string; // Prefixed with underscore
+interface TrackSomeEventProperties {
+  _class?: PropertyClass; // Prefixed with underscore
 }
 ```
 
@@ -905,7 +990,7 @@ export interface SomeEvent {
 ```
 
 ```typescript
-someNull?: null;
+type PropertySomeNull = null;
 ```
 
 ---
@@ -915,13 +1000,13 @@ someNull?: null;
 **With additional properties allowed:**
 
 ```typescript
-someObject?: Record<string, any>;
+type PropertySomeObject = Record<string, any>;
 ```
 
 **Without additional properties:**
 
 ```typescript
-someObject?: Record<string, never>;  // Or {}
+type PropertySomeObject = Record<string, never>;  // Or {}
 ```
 
 ---
@@ -937,27 +1022,24 @@ someObject?: Record<string, never>;  // Or {}
 ```
 
 ```typescript
-items?: CustomTypeDefs['SomeObjectType'][];
+type PropertyItems = CustomTypeSomeObjectType[];
 ```
 
 ---
 
 ### Deeply Nested Objects (3+ levels)
 
-Each level gets its own interface:
+Use inline types for all nesting levels:
 
 ```typescript
-export interface EventLevel3 {
-  value?: string;
-}
-export interface EventLevel2 {
-  level3?: EventLevel3;
-}
-export interface EventLevel1 {
-  level2?: EventLevel2;
-}
-export interface EventNested {
-  level1?: EventLevel1;
+interface TrackEventProperties {
+  level1?: {
+    level2?: {
+      level3?: {
+        value?: PropertyValue;
+      };
+    };
+  };
 }
 ```
 
@@ -978,11 +1060,15 @@ Event and property with same name:
 ```
 
 ```typescript
-// No collision - different namespaces
-export interface User {
-  user?: string;
+// No collision - different namespaces with prefixes
+type PropertyUser = string;
+
+interface TrackUserProperties {
+  user?: PropertyUser;
 }
-export function user(...): void { ... }
+
+// Method in RudderTyperAnalytics class
+trackUser(props: TrackUserProperties, ...): void { ... }
 ```
 
 ---
@@ -1026,25 +1112,27 @@ group(traits?: GroupTraits, options?: ApiOptions, callback?: apiCallback): void;
 
 ## Validation Checklist
 
+- [ ] Class-based approach: `RudderTyperAnalytics` class with constructor accepting `RudderAnalytics` (named differently from SDK to avoid confusion)
+- [ ] No global declaration (`declare global`) - use dependency injection via constructor
 - [ ] Primitive types map correctly
 - [ ] Required properties have no `?` modifier
 - [ ] Optional properties have `?` modifier
-- [ ] Enums generate with correct prefix (`S_` for strings, `N_` for numbers)
-- [ ] Custom types reference via `CustomTypeDefs['TypeName']`
-- [ ] Nested objects generate separate interfaces with hierarchical names
-- [ ] Function names are camelCase
-- [ ] Interface names are PascalCase
+- [ ] Enums generate as union types (not TypeScript enums with `S_`/`N_` prefixes)
+- [ ] Custom types use `CustomType` prefix as type aliases
+- [ ] Property types use `Property` prefix as type aliases
+- [ ] Nested objects use inline types (not separate interfaces)
+- [ ] Method names are camelCase with event type prefix (e.g., `trackSomeEvent`)
+- [ ] Interface names are PascalCase with prefix (e.g., `TrackSomeEventProperties`)
 - [ ] Event names preserved exactly in track calls
-- [ ] RudderTyper context included in all calls
+- [ ] RudderTyper context included in all calls via `this.withRudderTyperContext()`
 - [ ] `allow_unplanned: true` results in `Record<string, any>`
 - [ ] Identify/Page/Group events handled (Note: Screen is not supported in JS SDK)
-- [ ] Function overloads for non-track events
+- [ ] Method overloads for non-track events
 - [ ] Special characters in names sanitized
 - [ ] Name collisions resolved with numeric suffix
 - [ ] Reserved words prefixed with underscore
 - [ ] Null type supported
-- [ ] Deeply nested objects work correctly
-- [ ] Variants generate discriminated unions (not flat interfaces)
+- [ ] Deeply nested objects use inline types
+- [ ] Variants generate discriminated unions
 - [ ] Variant cases use literal types for discriminator
-- [ ] Variant default case uses base type for discriminator
-- [ ] Enum discriminators use enum literal types
+- [ ] Variant default case uses `Exclude<>` type for discriminator
