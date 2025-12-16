@@ -215,7 +215,15 @@
                 },
                 "someMultiType": {
                   "additionalProperties": false,
-                  "type": ["array", "boolean", "integer", "null", "number", "object", "string"]
+                  "type": [
+                    "array",
+                    "boolean",
+                    "integer",
+                    "null",
+                    "number",
+                    "object",
+                    "string"
+                  ]
                 },
                 "someNestedObject": {
                   "additionalProperties": true,
@@ -272,7 +280,13 @@
                   "$ref": "#/$defs/SomeVariantType"
                 }
               },
-              "required": ["someObject", "someInteger", "someString", "someNumber", "someBoolean"],
+              "required": [
+                "someObject",
+                "someInteger",
+                "someString",
+                "someNumber",
+                "someBoolean"
+              ],
               "type": "object",
               "unevaluatedProperties": false
             }

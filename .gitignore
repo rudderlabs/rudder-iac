@@ -45,3 +45,6 @@ memory-bank
 .idea
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle
+
+# Node.js
+node_modules/

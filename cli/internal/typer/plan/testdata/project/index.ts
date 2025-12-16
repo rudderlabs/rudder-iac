@@ -7,7 +7,7 @@ import type {
   ApiOptions,
   ApiObject,
   ApiCallback,
-} from '@rudderstack/analytics-js';
+} from "@rudderstack/analytics-js";
 
 // =============================================================================
 // Custom Types
@@ -36,27 +36,27 @@ interface CustomTypeSomeObjectType {
 
 // Variant type: Case 1
 interface CustomTypeSomeVariantTypeCase1 {
-  someString: 'case_1';
+  someString: "case_1";
   someInteger: number;
 }
 
 // Variant type: Case 2a
 interface CustomTypeSomeVariantTypeCase2A {
-  someString: 'case_2_a';
+  someString: "case_2_a";
   someInteger?: number;
   someNumber: number;
 }
 
 // Variant type: Case 2b
 interface CustomTypeSomeVariantTypeCase2B {
-  someString: 'case_2_b';
+  someString: "case_2_b";
   someInteger?: number;
   someNumber: number;
 }
 
 // Variant type: Default case
 interface CustomTypeSomeVariantTypeDefault {
-  someString: Exclude<string, 'case_1' | 'case_2_a' | 'case_2_b'>;
+  someString: Exclude<string, "case_1" | "case_2_a" | "case_2_b">;
   someInteger?: number;
   someBoolean?: boolean;
 }
@@ -85,12 +85,26 @@ type PropertySomeCustomNumber = CustomTypeSomeNumberType;
 type PropertySomeCustomObject = CustomTypeSomeObjectType;
 type PropertySomeCustomString = CustomTypeSomeStringType;
 type PropertySomeInteger = number;
-type PropertySomeIntegerWithEnum = 200 | 201 | 204 | 400 | 401 | 403 | 404 | 500;
-type PropertySomeMultiType = any[] | boolean | number | Record<string, any> | string | null;
+type PropertySomeIntegerWithEnum =
+  | 200
+  | 201
+  | 204
+  | 400
+  | 401
+  | 403
+  | 404
+  | 500;
+type PropertySomeMultiType =
+  | any[]
+  | boolean
+  | number
+  | Record<string, any>
+  | string
+  | null;
 type PropertySomeNumber = number;
 type PropertySomeObject = Record<string, never>;
 type PropertySomeString = string;
-type PropertySomeStringWithEnum = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'PATCH';
+type PropertySomeStringWithEnum = "GET" | "PUT" | "POST" | "DELETE" | "PATCH";
 type PropertySomeVariantType = CustomTypeSomeVariantType;
 
 // =============================================================================
@@ -135,24 +149,24 @@ interface TrackSomeTrackEventProperties {
 
 // Variant properties for Some Track Event With Variants
 interface TrackSomeTrackEventWithVariantsPropertiesCase1 {
-  someString: 'case_1';
+  someString: "case_1";
   someInteger: number;
 }
 
 interface TrackSomeTrackEventWithVariantsPropertiesCase2A {
-  someString: 'case_2_a';
+  someString: "case_2_a";
   someInteger?: number;
   someNumber?: number;
 }
 
 interface TrackSomeTrackEventWithVariantsPropertiesCase2B {
-  someString: 'case_2_b';
+  someString: "case_2_b";
   someInteger?: number;
   someNumber?: number;
 }
 
 interface TrackSomeTrackEventWithVariantsPropertiesDefault {
-  someString: Exclude<string, 'case_1' | 'case_2_a' | 'case_2_b'>;
+  someString: Exclude<string, "case_1" | "case_2_a" | "case_2_b">;
   someInteger?: number;
   someBoolean?: boolean;
 }
@@ -164,7 +178,10 @@ type TrackSomeTrackEventWithVariantsProperties =
   | TrackSomeTrackEventWithVariantsPropertiesDefault;
 
 /** Properties for empty track event with additional properties */
-type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = Record<string, any>;
+type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = Record<
+  string,
+  any
+>;
 
 // =============================================================================
 // RudderTyper Analytics Class
@@ -202,10 +219,10 @@ export class RudderTyperAnalytics {
       context: {
         ...((message.context as ApiObject) || {}),
         ruddertyper: {
-          sdk: 'analytics.js',
-          language: 'typescript',
-          rudderTyperVersion: '2.0.0',
-          trackingPlanId: 'tp_36gukfnRQ95IMVzwvFx2qcASpd3',
+          sdk: "analytics.js",
+          language: "typescript",
+          rudderTyperVersion: "2.0.0",
+          trackingPlanId: "tp_36gukfnRQ95IMVzwvFx2qcASpd3",
           trackingPlanVersion: 2,
         },
       },
@@ -223,23 +240,23 @@ export class RudderTyperAnalytics {
   trackSomeEmptyTrackEvent(options: ApiOptions, callback?: ApiCallback): void;
   trackSomeEmptyTrackEvent(
     optionsOrCallback?: ApiOptions | ApiCallback,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void {
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof optionsOrCallback === 'function') {
-      cb = optionsOrCallback;
+    if (typeof optionsOrCallback === "function") {
+      cb = optionsOrCallback as ApiCallback;
     } else {
       options = optionsOrCallback;
       cb = callback;
     }
 
     this.analytics.track(
-      'Some Empty Track Event',
+      "Some Empty Track Event",
       {},
       this.withRudderTyperContext(options),
-      cb,
+      cb
     );
   }
 
@@ -253,34 +270,34 @@ export class RudderTyperAnalytics {
   trackSomeEmptyTrackEventWithAdditionalProperties(): void;
   trackSomeEmptyTrackEventWithAdditionalProperties(callback: ApiCallback): void;
   trackSomeEmptyTrackEventWithAdditionalProperties(
-    props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
+    props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties
   ): void;
   trackSomeEmptyTrackEventWithAdditionalProperties(
     props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
-    callback: ApiCallback,
+    callback: ApiCallback
   ): void;
   trackSomeEmptyTrackEventWithAdditionalProperties(
     props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
     options: ApiOptions,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void;
   trackSomeEmptyTrackEventWithAdditionalProperties(
     propsOrCallback?:
       | TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties
       | ApiCallback,
     optionsOrCallback?: ApiOptions | ApiCallback,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void {
     let props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = {};
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof propsOrCallback === 'function') {
-      cb = propsOrCallback;
+    if (typeof propsOrCallback === "function") {
+      cb = propsOrCallback as ApiCallback;
     } else if (propsOrCallback !== undefined) {
       props = propsOrCallback;
-      if (typeof optionsOrCallback === 'function') {
-        cb = optionsOrCallback;
+      if (typeof optionsOrCallback === "function") {
+        cb = optionsOrCallback as ApiCallback;
       } else {
         options = optionsOrCallback;
         cb = callback;
@@ -288,10 +305,10 @@ export class RudderTyperAnalytics {
     }
 
     this.analytics.track(
-      'Some Empty Track Event With Additional Properties',
-      props,
+      "Some Empty Track Event With Additional Properties",
+      props as ApiObject,
       this.withRudderTyperContext(options),
-      cb,
+      cb
     );
   }
 
@@ -305,33 +322,33 @@ export class RudderTyperAnalytics {
   trackSomeTrackEvent(props: TrackSomeTrackEventProperties): void;
   trackSomeTrackEvent(
     props: TrackSomeTrackEventProperties,
-    callback: ApiCallback,
+    callback: ApiCallback
   ): void;
   trackSomeTrackEvent(
     props: TrackSomeTrackEventProperties,
     options: ApiOptions,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void;
   trackSomeTrackEvent(
     props: TrackSomeTrackEventProperties,
     optionsOrCallback?: ApiOptions | ApiCallback,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void {
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof optionsOrCallback === 'function') {
-      cb = optionsOrCallback;
+    if (typeof optionsOrCallback === "function") {
+      cb = optionsOrCallback as ApiCallback;
     } else {
       options = optionsOrCallback;
       cb = callback;
     }
 
     this.analytics.track(
-      'Some Track Event',
-      props,
+      "Some Track Event",
+      props as unknown as ApiObject,
       this.withRudderTyperContext(options),
-      cb,
+      cb
     );
   }
 
@@ -343,37 +360,37 @@ export class RudderTyperAnalytics {
    * @param callback - An optional callback called after a short timeout after the analytics call is fired.
    */
   trackSomeTrackEventWithVariants(
-    props: TrackSomeTrackEventWithVariantsProperties,
+    props: TrackSomeTrackEventWithVariantsProperties
   ): void;
   trackSomeTrackEventWithVariants(
     props: TrackSomeTrackEventWithVariantsProperties,
-    callback: ApiCallback,
+    callback: ApiCallback
   ): void;
   trackSomeTrackEventWithVariants(
     props: TrackSomeTrackEventWithVariantsProperties,
     options: ApiOptions,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void;
   trackSomeTrackEventWithVariants(
     props: TrackSomeTrackEventWithVariantsProperties,
     optionsOrCallback?: ApiOptions | ApiCallback,
-    callback?: ApiCallback,
+    callback?: ApiCallback
   ): void {
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof optionsOrCallback === 'function') {
-      cb = optionsOrCallback;
+    if (typeof optionsOrCallback === "function") {
+      cb = optionsOrCallback as ApiCallback;
     } else {
       options = optionsOrCallback;
       cb = callback;
     }
 
     this.analytics.track(
-      'Some Track Event With Variants',
-      props,
+      "Some Track Event With Variants",
+      props as unknown as ApiObject,
       this.withRudderTyperContext(options),
-      cb,
+      cb
     );
   }
 }

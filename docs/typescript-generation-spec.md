@@ -42,57 +42,62 @@ This specification follows the same conventions as the Kotlin generator for cons
 ## Quick Reference
 
 ### Architecture
-| Rule | Example |
-|------|---------|
+
+| Rule                    | Example                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------- |
 | Class-based, not global | `export class RudderTyperAnalytics { constructor(analytics: RudderAnalytics) }` |
-| Dependency injection | Pass `RudderAnalytics` instance to constructor |
-| Context helper | `this.withRudderTyperContext(options)` on all calls |
+| Dependency injection    | Pass `RudderAnalytics` instance to constructor                                  |
+| Context helper          | `this.withRudderTyperContext(options)` on all calls                             |
 
 ### Naming Conventions
-| Source | Pattern | Example |
-|--------|---------|---------|
-| Track event | `track{EventName}` | `trackUserSignedUp` |
-| Page event | `page{EventName}` | `pageProductViewed` |
-| Identify event | `identify` | `identify` |
-| Group event | `group` | `group` |
-| Alias event | `alias` | `alias` |
+
+| Source                     | Pattern                      | Example                       |
+| -------------------------- | ---------------------------- | ----------------------------- |
+| Track event                | `track{EventName}`           | `trackUserSignedUp`           |
+| Page event                 | `page{EventName}`            | `pageProductViewed`           |
+| Identify event             | `identify`                   | `identify`                    |
+| Group event                | `group`                      | `group`                       |
+| Alias event                | `alias`                      | `alias`                       |
 | Track properties interface | `Track{EventName}Properties` | `TrackUserSignedUpProperties` |
-| Page properties interface | `Page{EventName}Properties` | `PageProductViewedProperties` |
-| Identify traits interface | `Identify{EventName}Traits` | `IdentifyUserTraits` |
-| Group traits interface | `Group{EventName}Traits` | `GroupCompanyTraits` |
-| Property type alias | `Property{PropertyName}` | `PropertySomeString` |
-| Custom type alias | `CustomType{TypeName}` | `CustomTypeSomeStringType` |
+| Page properties interface  | `Page{EventName}Properties`  | `PageProductViewedProperties` |
+| Identify traits interface  | `Identify{EventName}Traits`  | `IdentifyUserTraits`          |
+| Group traits interface     | `Group{EventName}Traits`     | `GroupCompanyTraits`          |
+| Property type alias        | `Property{PropertyName}`     | `PropertySomeString`          |
+| Custom type alias          | `CustomType{TypeName}`       | `CustomTypeSomeStringType`    |
 
 ### Type Mappings
-| YAML | TypeScript |
-|------|------------|
-| `string` | `string` |
-| `integer` | `number` |
-| `number` | `number` |
-| `boolean` | `boolean` |
-| `array` | `any[]` or `T[]` |
-| `object` | `Record<string, any>` |
-| `null` | `null` |
+
+| YAML      | TypeScript            |
+| --------- | --------------------- |
+| `string`  | `string`              |
+| `integer` | `number`              |
+| `number`  | `number`              |
+| `boolean` | `boolean`             |
+| `array`   | `any[]` or `T[]`      |
+| `object`  | `Record<string, any>` |
+| `null`    | `null`                |
 
 ### Key Rules
-| Rule | Do | Don't |
-|------|-----|-------|
-| Enums | `'GET' \| 'POST'` (union types) | `enum { S_GET = 'GET' }` |
-| Nested objects | Inline types | Separate interfaces |
-| Variant default | `Exclude<string, 'a' \| 'b'>` | Just `string` |
-| Required props | `propName: Type` | `propName?: Type` |
-| Optional props | `propName?: Type` | `propName: Type` |
+
+| Rule               | Do                                  | Don't                             |
+| ------------------ | ----------------------------------- | --------------------------------- |
+| Enums              | `'GET' \| 'POST'` (union types)     | `enum { S_GET = 'GET' }`          |
+| Nested objects     | Inline types                        | Separate interfaces               |
+| Variant default    | `Exclude<string, 'a' \| 'b'>`       | Just `string`                     |
+| Required props     | `propName: Type`                    | `propName?: Type`                 |
+| Optional props     | `propName?: Type`                   | `propName: Type`                  |
 | Function overloads | Support `(props, callback)` pattern | Only `(props, options, callback)` |
 
 ### Event Type Support (JS SDK)
-| Event Type | Supported | Notes |
-|------------|-----------|-------|
-| `track` | ✅ | `track(event, properties, options, callback)` |
-| `identify` | ✅ | `identify(userId, traits, options, callback)` |
-| `page` | ✅ | `page(category, name, properties, options, callback)` |
-| `group` | ✅ | `group(groupId, traits, options, callback)` |
-| `alias` | ✅ | `alias(to, from, options, callback)` |
-| `screen` | ❌ | Mobile SDK only - use `page` for web |
+
+| Event Type | Supported | Notes                                                 |
+| ---------- | --------- | ----------------------------------------------------- |
+| `track`    | ✅        | `track(event, properties, options, callback)`         |
+| `identify` | ✅        | `identify(userId, traits, options, callback)`         |
+| `page`     | ✅        | `page(category, name, properties, options, callback)` |
+| `group`    | ✅        | `group(groupId, traits, options, callback)`           |
+| `alias`    | ✅        | `alias(to, from, options, callback)`                  |
+| `screen`   | ❌        | Mobile SDK only - use `page` for web                  |
 
 ---
 
@@ -156,7 +161,13 @@ Defines reusable custom types.
 **Output (index.ts):**
 
 ```typescript
-type PropertySomeMultiType = any[] | boolean | number | Record<string, any> | string | null;
+type PropertySomeMultiType =
+  | any[]
+  | boolean
+  | number
+  | Record<string, any>
+  | string
+  | null;
 ```
 
 ---
@@ -165,31 +176,31 @@ type PropertySomeMultiType = any[] | boolean | number | Record<string, any> | st
 
 ### Event Type Prefixes
 
-| Event Type | Method Prefix | Interface Prefix | Example Method | Example Interface |
-|------------|---------------|------------------|----------------|-------------------|
+| Event Type | Method Prefix | Interface Prefix | Example Method      | Example Interface             |
+| ---------- | ------------- | ---------------- | ------------------- | ----------------------------- |
 | `track`    | `track`       | `Track`          | `trackUserSignedUp` | `TrackUserSignedUpProperties` |
-| `identify` | `identify`    | `Identify`       | `identify` | `IdentifyUserTraits` |
+| `identify` | `identify`    | `Identify`       | `identify`          | `IdentifyUserTraits`          |
 | `page`     | `page`        | `Page`           | `pageProductViewed` | `PageProductViewedProperties` |
-| `group`    | `group`       | `Group`          | `group` | `GroupCompanyTraits` |
-| `alias`    | `alias`       | N/A              | `alias` | N/A (no properties) |
+| `group`    | `group`       | `Group`          | `group`             | `GroupCompanyTraits`          |
+| `alias`    | `alias`       | N/A              | `alias`             | N/A (no properties)           |
 
 ### General Naming Rules
 
-| Source             | Target         | Convention         | Example                                              |
-| ------------------ | -------------- | ------------------ | ---------------------------------------------------- |
-| Event `name`       | Function name  | camelCase + prefix | `"Some Track Event"` → `trackSomeTrackEvent`         |
-| Event `name`       | Interface name | PascalCase + prefix| `"Some Track Event"` → `TrackSomeTrackEventProperties` |
-| Property `name`    | Type alias     | Property prefix    | `someString` → `PropertySomeString`                  |
-| Custom type `name` | Type alias     | CustomType prefix  | `SomeStringType` → `CustomTypeSomeStringType`        |
+| Source             | Target         | Convention          | Example                                                |
+| ------------------ | -------------- | ------------------- | ------------------------------------------------------ |
+| Event `name`       | Function name  | camelCase + prefix  | `"Some Track Event"` → `trackSomeTrackEvent`           |
+| Event `name`       | Interface name | PascalCase + prefix | `"Some Track Event"` → `TrackSomeTrackEventProperties` |
+| Property `name`    | Type alias     | Property prefix     | `someString` → `PropertySomeString`                    |
+| Custom type `name` | Type alias     | CustomType prefix   | `SomeStringType` → `CustomTypeSomeStringType`          |
 
 ### Interface Suffixes by Event Type
 
-| Event Type | Suffix       | Example                          |
-|------------|--------------|----------------------------------|
-| `track`    | `Properties` | `TrackUserSignedUpProperties`    |
-| `identify` | `Traits`     | `IdentifyUserTraits`             |
-| `page`     | `Properties` | `PageProductViewedProperties`    |
-| `group`    | `Traits`     | `GroupCompanyTraits`             |
+| Event Type | Suffix       | Example                       |
+| ---------- | ------------ | ----------------------------- |
+| `track`    | `Properties` | `TrackUserSignedUpProperties` |
+| `identify` | `Traits`     | `IdentifyUserTraits`          |
+| `page`     | `Properties` | `PageProductViewedProperties` |
+| `group`    | `Traits`     | `GroupCompanyTraits`          |
 
 ---
 
@@ -272,6 +283,7 @@ trackSomeTrackEvent(
 ```
 
 This enables all these invocation patterns:
+
 ```typescript
 // Just properties
 rudderTyper.trackSomeTrackEvent({ someString: 'hello', ... });
@@ -409,7 +421,7 @@ Instead of using TypeScript enums with `S_` and `N_` prefixes, use union types t
 **Output (index.ts):**
 
 ```typescript
-type PropertySomeStringWithEnum = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'PATCH';
+type PropertySomeStringWithEnum = "GET" | "PUT" | "POST" | "DELETE" | "PATCH";
 ```
 
 ### Integer Enum
@@ -439,7 +451,7 @@ type PropertySomeIntegerWithEnum = 200 | 201 | 400 | 500;
 When an enum contains both strings and numbers:
 
 ```typescript
-type PropertyMixedEnum = 'GET' | 'POST' | 200 | 404;
+type PropertyMixedEnum = "GET" | "POST" | 200 | 404;
 ```
 
 ---
@@ -488,7 +500,7 @@ type CustomTypeSomeStringType = string;
 /** some object custom type */
 interface CustomTypeSomeObjectType {
   someCustomString: PropertySomeCustomString; // required
-  someInteger?: PropertySomeInteger;          // optional
+  someInteger?: PropertySomeInteger; // optional
 }
 ```
 
@@ -551,12 +563,12 @@ TypeScript discriminated unions map directly from Kotlin sealed classes. Each va
 
 ### Kotlin → TypeScript Mapping
 
-| Kotlin Concept | TypeScript Equivalent |
-|----------------|----------------------|
-| Sealed class | Union type (`type T = A \| B \| C`) |
-| Sealed subclass | Interface with literal discriminator |
-| Abstract discriminator property | Discriminator with literal type per case |
-| Default subclass | Interface with `Exclude<>` discriminator type |
+| Kotlin Concept                  | TypeScript Equivalent                         |
+| ------------------------------- | --------------------------------------------- |
+| Sealed class                    | Union type (`type T = A \| B \| C`)           |
+| Sealed subclass                 | Interface with literal discriminator          |
+| Abstract discriminator property | Discriminator with literal type per case      |
+| Default subclass                | Interface with `Exclude<>` discriminator type |
 
 ### Custom Type with Variants
 
@@ -598,28 +610,28 @@ TypeScript discriminated unions map directly from Kotlin sealed classes. Each va
 ```typescript
 // Case 1: someString === "case_1"
 interface CustomTypeSomeVariantTypeCase1 {
-  someString: 'case_1';           // literal type
+  someString: "case_1"; // literal type
   someInteger: PropertySomeInteger; // required in this case
 }
 
 // Case 2: someString === "case_2_a" or "case_2_b"
 interface CustomTypeSomeVariantTypeCase2A {
-  someString: 'case_2_a';             // literal type
-  someInteger?: PropertySomeInteger;  // optional (from base)
-  someNumber: PropertySomeNumber;     // required in this case
+  someString: "case_2_a"; // literal type
+  someInteger?: PropertySomeInteger; // optional (from base)
+  someNumber: PropertySomeNumber; // required in this case
 }
 
 interface CustomTypeSomeVariantTypeCase2B {
-  someString: 'case_2_b';             // literal type
-  someInteger?: PropertySomeInteger;  // optional (from base)
-  someNumber: PropertySomeNumber;     // required in this case
+  someString: "case_2_b"; // literal type
+  someInteger?: PropertySomeInteger; // optional (from base)
+  someNumber: PropertySomeNumber; // required in this case
 }
 
 // Default case: any string except the defined cases
 interface CustomTypeSomeVariantTypeDefault {
-  someString: Exclude<string, 'case_1' | 'case_2_a' | 'case_2_b'>; // excludes defined cases
-  someInteger?: PropertySomeInteger;  // optional (from base)
-  someBoolean?: PropertySomeBoolean;  // from default schema
+  someString: Exclude<string, "case_1" | "case_2_a" | "case_2_b">; // excludes defined cases
+  someInteger?: PropertySomeInteger; // optional (from base)
+  someBoolean?: PropertySomeBoolean; // from default schema
 }
 
 // Union type combining all cases
@@ -701,24 +713,24 @@ trackDeviceEvent(
 
 ### Naming Convention for Variant Interfaces
 
-| Component | Pattern | Example |
-|-----------|---------|---------|
-| Case interface | `{TypeName}{CaseName}` | `CustomTypeSomeVariantTypeCase1` |
-| Multi-match interface | `{TypeName}{MatchValue}` | `CustomTypeSomeVariantTypeCase2A` |
-| Default interface | `{TypeName}Default` | `CustomTypeSomeVariantTypeDefault` |
-| Union type | `{TypeName}` | `CustomTypeSomeVariantType` |
+| Component             | Pattern                  | Example                            |
+| --------------------- | ------------------------ | ---------------------------------- |
+| Case interface        | `{TypeName}{CaseName}`   | `CustomTypeSomeVariantTypeCase1`   |
+| Multi-match interface | `{TypeName}{MatchValue}` | `CustomTypeSomeVariantTypeCase2A`  |
+| Default interface     | `{TypeName}Default`      | `CustomTypeSomeVariantTypeDefault` |
+| Union type            | `{TypeName}`             | `CustomTypeSomeVariantType`        |
 
 ### Type Narrowing Usage
 
 ```typescript
 function handleVariant(data: CustomTypeSomeVariantType) {
   // TypeScript narrows type based on discriminator
-  if (data.someString === 'case_1') {
+  if (data.someString === "case_1") {
     // data is CustomTypeSomeVariantTypeCase1
     console.log(data.someInteger); // number (required)
-  } else if (data.someString === 'case_2_a' || data.someString === 'case_2_b') {
+  } else if (data.someString === "case_2_a" || data.someString === "case_2_b") {
     // data is CustomTypeSomeVariantTypeCase2A | CustomTypeSomeVariantTypeCase2B
-    console.log(data.someNumber);  // number (required)
+    console.log(data.someNumber); // number (required)
   } else {
     // data is CustomTypeSomeVariantTypeDefault
     console.log(data.someBoolean); // boolean | undefined
@@ -735,7 +747,7 @@ When the discriminator property has an enum type:
 ```yaml
 variants:
   - type: "discriminator"
-    discriminator: "#/properties/typer-test/status-enum"  # enum: ["pending", "active", "completed"]
+    discriminator: "#/properties/typer-test/status-enum" # enum: ["pending", "active", "completed"]
     cases:
       - match: ["pending"]
         properties: [...]
@@ -746,20 +758,20 @@ variants:
 **Output:**
 
 ```typescript
-type PropertyStatusEnum = 'pending' | 'active' | 'completed';
+type PropertyStatusEnum = "pending" | "active" | "completed";
 
 interface TrackTaskEventPropertiesPending {
-  status: 'pending';  // literal from union
+  status: "pending"; // literal from union
   // ... pending-specific properties
 }
 
 interface TrackTaskEventPropertiesActive {
-  status: 'active';   // literal from union
+  status: "active"; // literal from union
   // ... active-specific properties
 }
 
 interface TrackTaskEventPropertiesDefault {
-  status: Exclude<PropertyStatusEnum, 'pending' | 'active'>;  // 'completed' only
+  status: Exclude<PropertyStatusEnum, "pending" | "active">; // 'completed' only
   // ... default properties
 }
 
@@ -927,7 +939,7 @@ import type {
   ApiOptions,
   ApiObject,
   ApiCallback,
-} from '@rudderstack/analytics-js';
+} from "@rudderstack/analytics-js";
 
 // 3. Custom Types (type aliases)
 /** some string custom type */
@@ -980,8 +992,15 @@ export class RudderTyperAnalytics {
 
   // 8. Track functions with overloads for alternate invocations
   trackSomeTrackEvent(props: TrackSomeTrackEventProperties): void;
-  trackSomeTrackEvent(props: TrackSomeTrackEventProperties, callback: ApiCallback): void;
-  trackSomeTrackEvent(props: TrackSomeTrackEventProperties, options: ApiOptions, callback?: ApiCallback): void;
+  trackSomeTrackEvent(
+    props: TrackSomeTrackEventProperties,
+    callback: ApiCallback
+  ): void;
+  trackSomeTrackEvent(
+    props: TrackSomeTrackEventProperties,
+    options: ApiOptions,
+    callback?: ApiCallback
+  ): void;
   trackSomeTrackEvent(
     props: TrackSomeTrackEventProperties,
     optionsOrCallback?: ApiOptions | ApiCallback,
@@ -990,20 +1009,30 @@ export class RudderTyperAnalytics {
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof optionsOrCallback === 'function') {
+    if (typeof optionsOrCallback === "function") {
       cb = optionsOrCallback;
     } else {
       options = optionsOrCallback;
       cb = callback;
     }
 
-    this.analytics.track('Some Track Event', props, this.withRudderTyperContext(options), cb);
+    this.analytics.track(
+      "Some Track Event",
+      props,
+      this.withRudderTyperContext(options),
+      cb
+    );
   }
 
   // 9. Identify function with overloads
   identify(userId: string, traits?: IdentifyTraits): void;
   identify(userId: string, traits: IdentifyTraits, callback: ApiCallback): void;
-  identify(userId: string, traits: IdentifyTraits, options: ApiOptions, callback?: ApiCallback): void;
+  identify(
+    userId: string,
+    traits: IdentifyTraits,
+    options: ApiOptions,
+    callback?: ApiCallback
+  ): void;
   identify(
     userId: string,
     traits?: IdentifyTraits,
@@ -1013,14 +1042,19 @@ export class RudderTyperAnalytics {
     let options: ApiOptions | undefined;
     let cb: ApiCallback | undefined;
 
-    if (typeof optionsOrCallback === 'function') {
+    if (typeof optionsOrCallback === "function") {
       cb = optionsOrCallback;
     } else {
       options = optionsOrCallback;
       cb = callback;
     }
 
-    this.analytics.identify(userId, traits, this.withRudderTyperContext(options), cb);
+    this.analytics.identify(
+      userId,
+      traits,
+      this.withRudderTyperContext(options),
+      cb
+    );
   }
 
   // 10. Context helper (private)
@@ -1030,10 +1064,10 @@ export class RudderTyperAnalytics {
       context: {
         ...(message.context || {}),
         ruddertyper: {
-          sdk: 'analytics.js',
-          language: 'typescript',
-          rudderTyperVersion: '2.0.0',
-          trackingPlanId: 'tp_xxxxx',
+          sdk: "analytics.js",
+          language: "typescript",
+          rudderTyperVersion: "2.0.0",
+          trackingPlanId: "tp_xxxxx",
           trackingPlanVersion: 1,
         },
       },
@@ -1092,6 +1126,7 @@ RudderTyper generates type-safe methods for all supported event types. Each even
 ### Track Events
 
 Track events are covered in the [Events](#events) and [Event Rules](#event-rules) sections above. They support:
+
 - Events with required properties
 - Events with no properties (empty)
 - Events with optional properties (allow_unplanned)
@@ -1175,16 +1210,23 @@ identify(
 
 ```typescript
 // Just userId
-rudderTyper.identify('user-123');
+rudderTyper.identify("user-123");
 
 // userId + traits
-rudderTyper.identify('user-123', { email: 'user@example.com' });
+rudderTyper.identify("user-123", { email: "user@example.com" });
 
 // userId + traits + callback
-rudderTyper.identify('user-123', { email: 'user@example.com' }, () => console.log('identified'));
+rudderTyper.identify("user-123", { email: "user@example.com" }, () =>
+  console.log("identified")
+);
 
 // Full: userId + traits + options + callback
-rudderTyper.identify('user-123', { email: 'user@example.com' }, { integrations: { All: false } }, () => {});
+rudderTyper.identify(
+  "user-123",
+  { email: "user@example.com" },
+  { integrations: { All: false } },
+  () => {}
+);
 ```
 
 ---
@@ -1196,6 +1238,7 @@ Page events record page views in web applications.
 > **Note:** The JavaScript SDK uses `page()` for page view tracking. The `screen()` method is **not supported** in the JS SDK - it is only available in mobile SDKs (Kotlin, Swift, etc.) for screen view tracking.
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 // Default invocation
 page([category], [name], [properties], [apiOptions], [callback]);
@@ -1339,27 +1382,67 @@ pageProductPageViewed(
 ```typescript
 // page([callback])
 rudderTyper.pageProductPageViewed();
-rudderTyper.pageProductPageViewed(() => console.log('done'));
+rudderTyper.pageProductPageViewed(() => console.log("done"));
 
 // page(properties, [apiOptions], [callback])
-rudderTyper.pageProductPageViewed({ productId: 'prod-123' });
-rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, () => console.log('done'));
-rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, { integrations: { All: false } });
-rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, { integrations: { All: false } }, () => {});
+rudderTyper.pageProductPageViewed({ productId: "prod-123" });
+rudderTyper.pageProductPageViewed({ productId: "prod-123" }, () =>
+  console.log("done")
+);
+rudderTyper.pageProductPageViewed(
+  { productId: "prod-123" },
+  { integrations: { All: false } }
+);
+rudderTyper.pageProductPageViewed(
+  { productId: "prod-123" },
+  { integrations: { All: false } },
+  () => {}
+);
 
 // page(name, [properties], [apiOptions], [callback])
-rudderTyper.pageProductPageViewed('Product Detail');
-rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' });
-rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, () => {});
-rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, { integrations: {} });
-rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, { integrations: {} }, () => {});
+rudderTyper.pageProductPageViewed("Product Detail");
+rudderTyper.pageProductPageViewed("Product Detail", { productId: "prod-123" });
+rudderTyper.pageProductPageViewed(
+  "Product Detail",
+  { productId: "prod-123" },
+  () => {}
+);
+rudderTyper.pageProductPageViewed(
+  "Product Detail",
+  { productId: "prod-123" },
+  { integrations: {} }
+);
+rudderTyper.pageProductPageViewed(
+  "Product Detail",
+  { productId: "prod-123" },
+  { integrations: {} },
+  () => {}
+);
 
 // page([category], [name], [properties], [apiOptions], [callback])
-rudderTyper.pageProductPageViewed('Products', 'Product Detail');
-rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' });
-rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, () => {});
-rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, { integrations: {} });
-rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, { integrations: {} }, () => {});
+rudderTyper.pageProductPageViewed("Products", "Product Detail");
+rudderTyper.pageProductPageViewed("Products", "Product Detail", {
+  productId: "prod-123",
+});
+rudderTyper.pageProductPageViewed(
+  "Products",
+  "Product Detail",
+  { productId: "prod-123" },
+  () => {}
+);
+rudderTyper.pageProductPageViewed(
+  "Products",
+  "Product Detail",
+  { productId: "prod-123" },
+  { integrations: {} }
+);
+rudderTyper.pageProductPageViewed(
+  "Products",
+  "Product Detail",
+  { productId: "prod-123" },
+  { integrations: {} },
+  () => {}
+);
 ```
 
 ---
@@ -1436,16 +1519,23 @@ group(
 
 ```typescript
 // Just groupId
-rudderTyper.group('company-456');
+rudderTyper.group("company-456");
 
 // groupId + traits
-rudderTyper.group('company-456', { companyName: 'Acme Inc' });
+rudderTyper.group("company-456", { companyName: "Acme Inc" });
 
 // groupId + traits + callback
-rudderTyper.group('company-456', { companyName: 'Acme Inc' }, () => console.log('grouped'));
+rudderTyper.group("company-456", { companyName: "Acme Inc" }, () =>
+  console.log("grouped")
+);
 
 // Full: groupId + traits + options + callback
-rudderTyper.group('company-456', { companyName: 'Acme Inc', industry: 'Tech' }, { integrations: {} }, () => {});
+rudderTyper.group(
+  "company-456",
+  { companyName: "Acme Inc", industry: "Tech" },
+  { integrations: {} },
+  () => {}
+);
 ```
 
 ---
@@ -1499,16 +1589,23 @@ alias(
 
 ```typescript
 // Just new userId (from is automatically set to current anonymousId)
-rudderTyper.alias('new-user-id');
+rudderTyper.alias("new-user-id");
 
 // Explicit from and to
-rudderTyper.alias('new-user-id', 'old-anonymous-id');
+rudderTyper.alias("new-user-id", "old-anonymous-id");
 
 // With callback
-rudderTyper.alias('new-user-id', 'old-anonymous-id', () => console.log('aliased'));
+rudderTyper.alias("new-user-id", "old-anonymous-id", () =>
+  console.log("aliased")
+);
 
 // Full with options
-rudderTyper.alias('new-user-id', 'old-anonymous-id', { integrations: { All: true } }, () => {});
+rudderTyper.alias(
+  "new-user-id",
+  "old-anonymous-id",
+  { integrations: { All: true } },
+  () => {}
+);
 ```
 
 ---
@@ -1516,6 +1613,7 @@ rudderTyper.alias('new-user-id', 'old-anonymous-id', { integrations: { All: true
 ### Screen Events (Mobile Only)
 
 > **Important:** The `screen()` method is **NOT supported** in the JavaScript SDK. Screen events are only available in mobile SDKs:
+>
 > - Kotlin/Android SDK
 > - Swift/iOS SDK
 > - React Native SDK
@@ -1524,6 +1622,7 @@ rudderTyper.alias('new-user-id', 'old-anonymous-id', { integrations: { All: true
 > For web applications, use `page()` events instead.
 
 If a tracking plan contains screen events and TypeScript generation is requested, RudderTyper should either:
+
 1. Skip screen events with a warning, or
 2. Generate them as page events with a comment noting the conversion
 
@@ -1620,7 +1719,7 @@ type PropertySomeObject = Record<string, any>;
 **Without additional properties:**
 
 ```typescript
-type PropertySomeObject = Record<string, never>;  // Or {}
+type PropertySomeObject = Record<string, never>; // Or {}
 ```
 
 ---
@@ -1694,6 +1793,7 @@ All generated methods include function overloads to support alternate invocation
 ### Track Events
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 track(event, [properties], [apiOptions], [callback]);
 track(event, properties, callback);
@@ -1703,6 +1803,7 @@ track(event);
 ```
 
 For track events with **required properties**:
+
 ```typescript
 trackSomeEvent(props: TrackSomeEventProperties): void;
 trackSomeEvent(props: TrackSomeEventProperties, callback: ApiCallback): void;
@@ -1716,6 +1817,7 @@ trackSomeEvent(
 ```
 
 For track events with **no properties**:
+
 ```typescript
 trackSomeEmptyEvent(): void;
 trackSomeEmptyEvent(callback: ApiCallback): void;
@@ -1727,6 +1829,7 @@ trackSomeEmptyEvent(
 ```
 
 For track events with **optional properties** (allow_unplanned):
+
 ```typescript
 trackSomeEvent(): void;
 trackSomeEvent(callback: ApiCallback): void;
@@ -1743,6 +1846,7 @@ trackSomeEvent(
 ### Identify
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 identify([userId], [traits], [apiOptions], [callback]);
 identify(userId, traits, callback);
@@ -1773,6 +1877,7 @@ identify(
 > **Note:** The JS SDK does not support `screen()`. Use `page()` for page view tracking.
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 page([category], [name], [properties], [apiOptions], [callback]);
 page(name, [properties], [apiOptions], [callback]);
@@ -1818,6 +1923,7 @@ pageEventName(
 ### Group
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 group(groupId, [traits], [apiOptions], [callback]);
 group(groupId, traits, callback);
@@ -1845,6 +1951,7 @@ group(
 ### Alias
 
 **JS SDK Supported Invocations:**
+
 ```javascript
 alias(to, [from], [apiOptions], [callback]);
 alias(to, from, callback);
@@ -1872,12 +1979,14 @@ alias(
 ## Validation Checklist
 
 ### Architecture
+
 - [ ] Class-based approach: `RudderTyperAnalytics` class with constructor accepting `RudderAnalytics`
 - [ ] No global declaration (`declare global`) - use dependency injection via constructor
 - [ ] RudderTyper context included in all calls via `this.withRudderTyperContext()`
 - [ ] **Function overloads for all methods** to support alternate invocations (props, callback) pattern
 
 ### Type System
+
 - [ ] Primitive types map correctly (string, number, boolean, null)
 - [ ] Required properties have no `?` modifier
 - [ ] Optional properties have `?` modifier
@@ -1890,6 +1999,7 @@ alias(
 - [ ] Deeply nested objects use inline types
 
 ### Naming Conventions
+
 - [ ] Method names are camelCase with event type prefix (e.g., `trackSomeEvent`, `pageProductViewed`)
 - [ ] Interface names are PascalCase with prefix (e.g., `TrackSomeEventProperties`, `IdentifyUserTraits`)
 - [ ] Track/Page use `Properties` suffix, Identify/Group use `Traits` suffix
@@ -1899,6 +2009,7 @@ alias(
 - [ ] Reserved words prefixed with underscore
 
 ### Event Types
+
 - [ ] **Track events** - `trackEventName(props, options?, callback?)` with typed properties
 - [ ] **Identify events** - `identify(userId, traits?, options?, callback?)` with typed traits
 - [ ] **Page events** - `pageEventName(category?, name?, properties?, options?, callback?)` with typed properties
@@ -1907,11 +2018,13 @@ alias(
 - [ ] **Screen events** - NOT supported in JS SDK (skip or convert to page with warning)
 
 ### Variants
+
 - [ ] Variants generate discriminated unions
 - [ ] Variant cases use literal types for discriminator
 - [ ] Variant default case uses `Exclude<>` type for discriminator
 
 ### Exports
+
 - [ ] Export `RudderTyperAnalytics` class
 - [ ] Export all custom types (`CustomType*`)
 - [ ] Export all property types (`Property*`)
