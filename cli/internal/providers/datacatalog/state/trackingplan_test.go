@@ -122,6 +122,44 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 
 	})
 
+	t.Run("property diff - additionalProperties changed", func(t *testing.T) {
+		t.Parallel()
+
+		toArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
+			LocalID:        "event-local-id",
+			AllowUnplanned: false,
+			Properties: []*state.TrackingPlanPropertyArgs{
+				{
+					ID:       "upstream-property-id",
+					LocalID:  "property-local-id",
+					Required: false,
+					AdditionalProperties: true,
+				},
+			},
+		}).Build()
+
+		fromArgs := factory.NewTrackingPlanArgsFactory().WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
+			LocalID:        "event-local-id",
+			AllowUnplanned: false,
+			Properties: []*state.TrackingPlanPropertyArgs{
+				{
+					ID:       "upstream-property-id",
+					LocalID:  "property-local-id",
+					Required: false,
+					AdditionalProperties: false,
+				},
+			},
+		}).Build()
+
+		diffed := fromArgs.Diff(toArgs)
+		assert.Equal(t, 0, len(diffed.Added))
+		assert.Equal(t, 1, len(diffed.Updated))
+		assert.Equal(t, 0, len(diffed.Deleted))
+
+	})
+
 	t.Run("nested property diff - nested property changed", func(t *testing.T) {
 		t.Parallel()
 

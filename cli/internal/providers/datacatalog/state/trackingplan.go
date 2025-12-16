@@ -280,6 +280,10 @@ func diffPropertyArgs(localProps []*TrackingPlanPropertyArgs, upstreamProps []*c
 			return true
 		}
 
+		if localProp.AdditionalProperties != upstreamProp.AdditionalProperties {
+			return true
+		}
+
 		if diffPropertyArgs(localProp.Properties, upstreamProp.Properties) {
 			return true
 		}
@@ -348,6 +352,10 @@ func (args *TrackingPlanPropertyArgs) Diff(other *TrackingPlanPropertyArgs) bool
 	}
 
 	if args.Required != other.Required {
+		return true
+	}
+
+	if args.AdditionalProperties != other.AdditionalProperties {
 		return true
 	}
 
