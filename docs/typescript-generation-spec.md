@@ -8,6 +8,94 @@ This specification follows the same conventions as the Kotlin generator for cons
 
 ---
 
+## Table of Contents
+
+- [Quick Reference](#quick-reference)
+- [Test Data Location](#test-data-location)
+- [Input Files Structure](#input-files-structure)
+- [Type Mapping](#type-mapping)
+- [Naming Conventions](#naming-conventions)
+- [Property Types](#property-types)
+- [Events](#events)
+- [Properties](#properties)
+- [Arrays](#arrays)
+- [Enums (Union Types)](#enums-union-types)
+- [Custom Types](#custom-types)
+- [Nested Objects](#nested-objects)
+- [Variants (Discriminated Unions)](#variants-discriminated-unions)
+- [Event Rules](#event-rules)
+- [Generated File Structure](#generated-file-structure)
+- [RudderTyper Context](#ruddertyper-context)
+- [Event Types](#event-types)
+  - [Track Events](#track-events)
+  - [Identify Events](#identify-events)
+  - [Page Events](#page-events)
+  - [Group Events](#group-events)
+  - [Alias Events](#alias-events)
+  - [Screen Events (Mobile Only)](#screen-events-mobile-only)
+- [Edge Cases](#edge-cases)
+- [Function Overloads](#function-overloads)
+- [Validation Checklist](#validation-checklist)
+
+---
+
+## Quick Reference
+
+### Architecture
+| Rule | Example |
+|------|---------|
+| Class-based, not global | `export class RudderTyperAnalytics { constructor(analytics: RudderAnalytics) }` |
+| Dependency injection | Pass `RudderAnalytics` instance to constructor |
+| Context helper | `this.withRudderTyperContext(options)` on all calls |
+
+### Naming Conventions
+| Source | Pattern | Example |
+|--------|---------|---------|
+| Track event | `track{EventName}` | `trackUserSignedUp` |
+| Page event | `page{EventName}` | `pageProductViewed` |
+| Identify event | `identify` | `identify` |
+| Group event | `group` | `group` |
+| Alias event | `alias` | `alias` |
+| Track properties interface | `Track{EventName}Properties` | `TrackUserSignedUpProperties` |
+| Page properties interface | `Page{EventName}Properties` | `PageProductViewedProperties` |
+| Identify traits interface | `Identify{EventName}Traits` | `IdentifyUserTraits` |
+| Group traits interface | `Group{EventName}Traits` | `GroupCompanyTraits` |
+| Property type alias | `Property{PropertyName}` | `PropertySomeString` |
+| Custom type alias | `CustomType{TypeName}` | `CustomTypeSomeStringType` |
+
+### Type Mappings
+| YAML | TypeScript |
+|------|------------|
+| `string` | `string` |
+| `integer` | `number` |
+| `number` | `number` |
+| `boolean` | `boolean` |
+| `array` | `any[]` or `T[]` |
+| `object` | `Record<string, any>` |
+| `null` | `null` |
+
+### Key Rules
+| Rule | Do | Don't |
+|------|-----|-------|
+| Enums | `'GET' \| 'POST'` (union types) | `enum { S_GET = 'GET' }` |
+| Nested objects | Inline types | Separate interfaces |
+| Variant default | `Exclude<string, 'a' \| 'b'>` | Just `string` |
+| Required props | `propName: Type` | `propName?: Type` |
+| Optional props | `propName?: Type` | `propName: Type` |
+| Function overloads | Support `(props, callback)` pattern | Only `(props, options, callback)` |
+
+### Event Type Support (JS SDK)
+| Event Type | Supported | Notes |
+|------------|-----------|-------|
+| `track` | ✅ | `track(event, properties, options, callback)` |
+| `identify` | ✅ | `identify(userId, traits, options, callback)` |
+| `page` | ✅ | `page(category, name, properties, options, callback)` |
+| `group` | ✅ | `group(groupId, traits, options, callback)` |
+| `alias` | ✅ | `alias(to, from, options, callback)` |
+| `screen` | ❌ | Mobile SDK only - use `page` for web |
+
+---
+
 ## Test Data Location
 
 ```
@@ -75,12 +163,33 @@ type PropertySomeMultiType = any[] | boolean | number | Record<string, any> | st
 
 ## Naming Conventions
 
+### Event Type Prefixes
+
+| Event Type | Method Prefix | Interface Prefix | Example Method | Example Interface |
+|------------|---------------|------------------|----------------|-------------------|
+| `track`    | `track`       | `Track`          | `trackUserSignedUp` | `TrackUserSignedUpProperties` |
+| `identify` | `identify`    | `Identify`       | `identify` | `IdentifyUserTraits` |
+| `page`     | `page`        | `Page`           | `pageProductViewed` | `PageProductViewedProperties` |
+| `group`    | `group`       | `Group`          | `group` | `GroupCompanyTraits` |
+| `alias`    | `alias`       | N/A              | `alias` | N/A (no properties) |
+
+### General Naming Rules
+
 | Source             | Target         | Convention         | Example                                              |
 | ------------------ | -------------- | ------------------ | ---------------------------------------------------- |
 | Event `name`       | Function name  | camelCase + prefix | `"Some Track Event"` → `trackSomeTrackEvent`         |
 | Event `name`       | Interface name | PascalCase + prefix| `"Some Track Event"` → `TrackSomeTrackEventProperties` |
 | Property `name`    | Type alias     | Property prefix    | `someString` → `PropertySomeString`                  |
 | Custom type `name` | Type alias     | CustomType prefix  | `SomeStringType` → `CustomTypeSomeStringType`        |
+
+### Interface Suffixes by Event Type
+
+| Event Type | Suffix       | Example                          |
+|------------|--------------|----------------------------------|
+| `track`    | `Properties` | `TrackUserSignedUpProperties`    |
+| `identify` | `Traits`     | `IdentifyUserTraits`             |
+| `page`     | `Properties` | `PageProductViewedProperties`    |
+| `group`    | `Traits`     | `GroupCompanyTraits`             |
 
 ---
 
@@ -127,22 +236,54 @@ interface TrackSomeTrackEventProperties {
 
 **Output (index.ts):**
 
+Generated methods include function overloads to support alternate invocations matching the JS SDK's flexibility:
+
 ```typescript
 /**
  * This is a track event for testing.
  */
+// Overload signatures for alternate invocations
+trackSomeTrackEvent(props: TrackSomeTrackEventProperties): void;
+trackSomeTrackEvent(props: TrackSomeTrackEventProperties, callback: ApiCallback): void;
+trackSomeTrackEvent(props: TrackSomeTrackEventProperties, options: ApiOptions, callback?: ApiCallback): void;
+// Implementation signature
 trackSomeTrackEvent(
   props: TrackSomeTrackEventProperties,
-  options?: ApiOptions,
-  callback?: apiCallback
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
 ): void {
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof optionsOrCallback === 'function') {
+    cb = optionsOrCallback;
+  } else {
+    options = optionsOrCallback;
+    cb = callback;
+  }
+
   this.analytics.track(
     'Some Track Event',
     props,
     this.withRudderTyperContext(options),
-    callback
+    cb
   );
 }
+```
+
+This enables all these invocation patterns:
+```typescript
+// Just properties
+rudderTyper.trackSomeTrackEvent({ someString: 'hello', ... });
+
+// Properties + callback (skip options)
+rudderTyper.trackSomeTrackEvent({ someString: 'hello', ... }, () => console.log('done'));
+
+// Properties + options
+rudderTyper.trackSomeTrackEvent({ someString: 'hello', ... }, { integrations: { All: false } });
+
+// Full: properties + options + callback
+rudderTyper.trackSomeTrackEvent({ someString: 'hello', ... }, { integrations: { All: false } }, () => console.log('done'));
 ```
 
 ---
@@ -552,7 +693,7 @@ type TrackDeviceEventProperties =
 trackDeviceEvent(
   props: TrackDeviceEventProperties,
   options?: ApiOptions,
-  callback?: apiCallback
+  callback?: ApiCallback
 ): void {
   this.analytics.track('Device Event', props, this.withRudderTyperContext(options), callback);
 }
@@ -664,7 +805,7 @@ interface TrackSomeTrackEventProperties {
 trackSomeTrackEvent(
   props: TrackSomeTrackEventProperties,
   options?: ApiOptions,
-  callback?: apiCallback
+  callback?: ApiCallback
 ): void {
   this.analytics.track('Some Track Event', props, this.withRudderTyperContext(options), callback);
 }
@@ -685,12 +826,26 @@ trackSomeTrackEvent(
 **Output (index.ts):**
 
 ```typescript
-// Method in RudderTyperAnalytics class
+// Overload signatures
+trackSomeEmptyTrackEvent(): void;
+trackSomeEmptyTrackEvent(callback: ApiCallback): void;
+trackSomeEmptyTrackEvent(options: ApiOptions, callback?: ApiCallback): void;
+// Implementation
 trackSomeEmptyTrackEvent(
-  options?: ApiOptions,
-  callback?: apiCallback
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
 ): void {
-  this.analytics.track('Some Empty Track Event', {}, this.withRudderTyperContext(options), callback);
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof optionsOrCallback === 'function') {
+    cb = optionsOrCallback;
+  } else {
+    options = optionsOrCallback;
+    cb = callback;
+  }
+
+  this.analytics.track('Some Empty Track Event', {}, this.withRudderTyperContext(options), cb);
 }
 ```
 
@@ -710,13 +865,49 @@ trackSomeEmptyTrackEvent(
 ```typescript
 type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = Record<string, any>;
 
-// Method in RudderTyperAnalytics class
+// Overload signatures - properties are optional
+trackSomeEmptyTrackEventWithAdditionalProperties(): void;
+trackSomeEmptyTrackEventWithAdditionalProperties(callback: ApiCallback): void;
 trackSomeEmptyTrackEventWithAdditionalProperties(
-  props?: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
-  options?: ApiOptions,
-  callback?: apiCallback
+  props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
+): void;
+trackSomeEmptyTrackEventWithAdditionalProperties(
+  props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
+  callback: ApiCallback,
+): void;
+trackSomeEmptyTrackEventWithAdditionalProperties(
+  props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties,
+  options: ApiOptions,
+  callback?: ApiCallback,
+): void;
+// Implementation
+trackSomeEmptyTrackEventWithAdditionalProperties(
+  propsOrCallback?: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties | ApiCallback,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
 ): void {
-  this.analytics.track('Some Empty Track Event With Additional Properties', props || {}, this.withRudderTyperContext(options), callback);
+  let props: TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = {};
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof propsOrCallback === 'function') {
+    cb = propsOrCallback;
+  } else if (propsOrCallback !== undefined) {
+    props = propsOrCallback;
+    if (typeof optionsOrCallback === 'function') {
+      cb = optionsOrCallback;
+    } else {
+      options = optionsOrCallback;
+      cb = callback;
+    }
+  }
+
+  this.analytics.track(
+    'Some Empty Track Event With Additional Properties',
+    props,
+    this.withRudderTyperContext(options),
+    cb
+  );
 }
 ```
 
@@ -731,12 +922,14 @@ trackSomeEmptyTrackEventWithAdditionalProperties(
  */
 
 // 2. Imports
-import type { RudderAnalytics, ApiOptions, ApiObject } from '@rudderstack/analytics-js';
+import type {
+  RudderAnalytics,
+  ApiOptions,
+  ApiObject,
+  ApiCallback,
+} from '@rudderstack/analytics-js';
 
-// 3. Callback type
-type apiCallback = (data?: any) => void;
-
-// 4. Custom Types (type aliases)
+// 3. Custom Types (type aliases)
 /** some string custom type */
 type CustomTypeSomeStringType = string;
 
@@ -746,14 +939,14 @@ interface CustomTypeSomeObjectType {
   someInteger?: PropertySomeInteger;
 }
 
-// 5. Property Types (type aliases)
+// 4. Property Types (type aliases)
 /** some string property */
 type PropertySomeString = string;
 
 /** some integer property */
 type PropertySomeInteger = number;
 
-// 6. Event Properties Interfaces
+// 5. Event Properties Interfaces
 interface TrackSomeTrackEventProperties {
   someString: PropertySomeString;
   someNestedObject?: {
@@ -771,13 +964,13 @@ interface IdentifyTraits {
   email?: PropertyEmail;
 }
 
-// 7. Configuration
-export interface RudderTyperOptions {
-  analytics?: RudderAnalytics;
-  onViolation?: ViolationHandler;
-}
+// 6. Configuration (optional - for future violation handling)
+// export interface RudderTyperOptions {
+//   analytics?: RudderAnalytics;
+//   onViolation?: ViolationHandler;
+// }
 
-// 8. RudderTyper Analytics Class
+// 7. RudderTyper Analytics Class
 export class RudderTyperAnalytics {
   private analytics: RudderAnalytics;
 
@@ -785,31 +978,52 @@ export class RudderTyperAnalytics {
     this.analytics = analytics;
   }
 
-  // 9. Track functions
+  // 8. Track functions with overloads for alternate invocations
+  trackSomeTrackEvent(props: TrackSomeTrackEventProperties): void;
+  trackSomeTrackEvent(props: TrackSomeTrackEventProperties, callback: ApiCallback): void;
+  trackSomeTrackEvent(props: TrackSomeTrackEventProperties, options: ApiOptions, callback?: ApiCallback): void;
   trackSomeTrackEvent(
     props: TrackSomeTrackEventProperties,
-    options?: ApiOptions,
-    callback?: apiCallback
+    optionsOrCallback?: ApiOptions | ApiCallback,
+    callback?: ApiCallback
   ): void {
-    this.analytics.track(
-      'Some Track Event',
-      props,
-      this.withRudderTyperContext(options),
-      callback
-    );
+    let options: ApiOptions | undefined;
+    let cb: ApiCallback | undefined;
+
+    if (typeof optionsOrCallback === 'function') {
+      cb = optionsOrCallback;
+    } else {
+      options = optionsOrCallback;
+      cb = callback;
+    }
+
+    this.analytics.track('Some Track Event', props, this.withRudderTyperContext(options), cb);
   }
 
-  // 10. Identify function
+  // 9. Identify function with overloads
+  identify(userId: string, traits?: IdentifyTraits): void;
+  identify(userId: string, traits: IdentifyTraits, callback: ApiCallback): void;
+  identify(userId: string, traits: IdentifyTraits, options: ApiOptions, callback?: ApiCallback): void;
   identify(
     userId: string,
     traits?: IdentifyTraits,
-    options?: ApiOptions,
-    callback?: apiCallback
+    optionsOrCallback?: ApiOptions | ApiCallback,
+    callback?: ApiCallback
   ): void {
-    this.analytics.identify(userId, traits, this.withRudderTyperContext(options), callback);
+    let options: ApiOptions | undefined;
+    let cb: ApiCallback | undefined;
+
+    if (typeof optionsOrCallback === 'function') {
+      cb = optionsOrCallback;
+    } else {
+      options = optionsOrCallback;
+      cb = callback;
+    }
+
+    this.analytics.identify(userId, traits, this.withRudderTyperContext(options), cb);
   }
 
-  // 11. Context helper (private)
+  // 10. Context helper (private)
   private withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
     return {
       ...message,
@@ -826,6 +1040,19 @@ export class RudderTyperAnalytics {
     };
   }
 }
+
+// 11. Exported Types
+export type {
+  // Custom Types
+  CustomTypeSomeStringType,
+  CustomTypeSomeObjectType,
+  // Property Types
+  PropertySomeString,
+  PropertySomeInteger,
+  // Event Properties
+  TrackSomeTrackEventProperties,
+  IdentifyTraits,
+};
 ```
 
 ---
@@ -854,68 +1081,455 @@ private withRudderTyperContext(message: ApiOptions = {}): ApiOptions {
 
 ---
 
-## Edge Cases
+## Event Types
 
-### Other Event Types (Identify, Page, Group)
+RudderTyper generates type-safe methods for all supported event types. Each event type has its own method signature with function overloads to support alternate invocations matching the JS SDK's flexibility.
 
-**Identify Event:**
+> **Reference:** See [JS SDK Supported APIs](https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-javascript-sdk/supported-api/) for all supported invocation patterns.
+
+---
+
+### Track Events
+
+Track events are covered in the [Events](#events) and [Event Rules](#event-rules) sections above. They support:
+- Events with required properties
+- Events with no properties (empty)
+- Events with optional properties (allow_unplanned)
+- Events with variants (discriminated unions)
+
+**Method Naming:** `track{EventName}` (e.g., `trackUserSignedUp`)
+
+**Interface Naming:** `Track{EventName}Properties` (e.g., `TrackUserSignedUpProperties`)
+
+---
+
+### Identify Events
+
+Identify events associate a user with their actions and record traits about them.
+
+**Input (events.yaml):**
 
 ```yaml
-# events.yaml
-- id: "identify_event"
+- id: "user_identify"
+  name: "User Identify"
   event_type: "identify"
+  description: "Identifies a user with their traits."
 ```
 
-**Expected Output:**
+**Input (tracking-plan.yaml):**
+
+```yaml
+- type: "event_rule"
+  id: "user_identify_rule"
+  event:
+    $ref: "#/events/typer-test/user_identify"
+  properties:
+    - $ref: "#/properties/typer-test/user-name"
+      required: false
+    - $ref: "#/properties/typer-test/email"
+      required: true
+    - $ref: "#/properties/typer-test/plan"
+      required: false
+```
+
+**Output (index.ts):**
 
 ```typescript
-interface IdentifyTraits {
+/** Traits for User Identify */
+interface IdentifyUserIdentifyTraits {
   userName?: PropertyUserName;
-  email?: PropertyEmail;
+  email: PropertyEmail;
+  plan?: PropertyPlan;
 }
 
+/**
+ * Identifies a user with their traits.
+ */
+// Overload signatures
+identify(userId: string): void;
+identify(userId: string, traits: IdentifyUserIdentifyTraits): void;
+identify(userId: string, traits: IdentifyUserIdentifyTraits, callback: ApiCallback): void;
+identify(userId: string, traits: IdentifyUserIdentifyTraits, options: ApiOptions, callback?: ApiCallback): void;
+// Implementation
 identify(
   userId: string,
-  traits?: IdentifyTraits,
-  options?: ApiOptions,
-  callback?: apiCallback,
-): void { ... }
+  traits?: IdentifyUserIdentifyTraits,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback,
+): void {
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof optionsOrCallback === 'function') {
+    cb = optionsOrCallback;
+  } else {
+    options = optionsOrCallback;
+    cb = callback;
+  }
+
+  this.analytics.identify(userId, traits, this.withRudderTyperContext(options), cb);
+}
 ```
 
-**Page Event:**
-
-> **Note:** The JavaScript SDK uses `page()` for page view tracking. The `screen()` method is not supported in the JS SDK - it is only available in mobile SDKs (Kotlin, Swift, etc.) for screen view tracking.
+**Usage Examples:**
 
 ```typescript
-interface PageProperties {
-  pageType?: PropertyPageType;
-}
+// Just userId
+rudderTyper.identify('user-123');
 
-page(
-  category?: string,
-  name?: string,
-  properties?: PageProperties,
-  options?: ApiOptions,
-  callback?: apiCallback,
-): void { ... }
-```
+// userId + traits
+rudderTyper.identify('user-123', { email: 'user@example.com' });
 
-**Group Event:**
+// userId + traits + callback
+rudderTyper.identify('user-123', { email: 'user@example.com' }, () => console.log('identified'));
 
-```typescript
-interface GroupTraits {
-  groupName?: PropertyGroupName;
-}
-
-group(
-  groupId: string,
-  traits?: GroupTraits,
-  options?: ApiOptions,
-  callback?: apiCallback,
-): void { ... }
+// Full: userId + traits + options + callback
+rudderTyper.identify('user-123', { email: 'user@example.com' }, { integrations: { All: false } }, () => {});
 ```
 
 ---
+
+### Page Events
+
+Page events record page views in web applications.
+
+> **Note:** The JavaScript SDK uses `page()` for page view tracking. The `screen()` method is **not supported** in the JS SDK - it is only available in mobile SDKs (Kotlin, Swift, etc.) for screen view tracking.
+
+**JS SDK Supported Invocations:**
+```javascript
+// Default invocation
+page([category], [name], [properties], [apiOptions], [callback]);
+
+// Alternate invocations
+page(name, [properties], [apiOptions], [callback]);
+page(properties, [apiOptions], [callback]);
+page([callback]);
+```
+
+**Input (events.yaml):**
+
+```yaml
+- id: "product_page_viewed"
+  name: "Product Page Viewed"
+  event_type: "page"
+  description: "User viewed a product page."
+```
+
+**Input (tracking-plan.yaml):**
+
+```yaml
+- type: "event_rule"
+  id: "product_page_rule"
+  event:
+    $ref: "#/events/typer-test/product_page_viewed"
+  properties:
+    - $ref: "#/properties/typer-test/product-id"
+      required: true
+    - $ref: "#/properties/typer-test/product-name"
+      required: false
+    - $ref: "#/properties/typer-test/price"
+      required: false
+```
+
+**Output (index.ts):**
+
+```typescript
+/** Properties for Product Page Viewed */
+interface PageProductPageViewedProperties {
+  productId: PropertyProductId;
+  productName?: PropertyProductName;
+  price?: PropertyPrice;
+}
+
+/**
+ * User viewed a product page.
+ */
+// Overload signatures - matching ALL JS SDK alternate invocations
+
+// page([callback])
+pageProductPageViewed(): void;
+pageProductPageViewed(callback: ApiCallback): void;
+
+// page(properties, [apiOptions], [callback])
+pageProductPageViewed(properties: PageProductPageViewedProperties): void;
+pageProductPageViewed(properties: PageProductPageViewedProperties, callback: ApiCallback): void;
+pageProductPageViewed(properties: PageProductPageViewedProperties, options: ApiOptions): void;
+pageProductPageViewed(properties: PageProductPageViewedProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// page(name, [properties], [apiOptions], [callback])
+pageProductPageViewed(name: string): void;
+pageProductPageViewed(name: string, properties: PageProductPageViewedProperties): void;
+pageProductPageViewed(name: string, properties: PageProductPageViewedProperties, callback: ApiCallback): void;
+pageProductPageViewed(name: string, properties: PageProductPageViewedProperties, options: ApiOptions): void;
+pageProductPageViewed(name: string, properties: PageProductPageViewedProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// page([category], [name], [properties], [apiOptions], [callback])
+pageProductPageViewed(category: string, name: string): void;
+pageProductPageViewed(category: string, name: string, properties: PageProductPageViewedProperties): void;
+pageProductPageViewed(category: string, name: string, properties: PageProductPageViewedProperties, callback: ApiCallback): void;
+pageProductPageViewed(category: string, name: string, properties: PageProductPageViewedProperties, options: ApiOptions): void;
+pageProductPageViewed(category: string, name: string, properties: PageProductPageViewedProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// Implementation with parameter detection
+pageProductPageViewed(
+  categoryOrNameOrPropertiesOrCallback?: string | PageProductPageViewedProperties | ApiCallback,
+  nameOrPropertiesOrOptionsOrCallback?: string | PageProductPageViewedProperties | ApiOptions | ApiCallback,
+  propertiesOrOptionsOrCallback?: PageProductPageViewedProperties | ApiOptions | ApiCallback,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback,
+): void {
+  let category: string | undefined;
+  let name: string | undefined;
+  let properties: PageProductPageViewedProperties | undefined;
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  // Parameter detection logic matching JS SDK behavior
+  if (typeof categoryOrNameOrPropertiesOrCallback === 'function') {
+    // page(callback)
+    cb = categoryOrNameOrPropertiesOrCallback;
+  } else if (typeof categoryOrNameOrPropertiesOrCallback === 'object') {
+    // page(properties, ...)
+    properties = categoryOrNameOrPropertiesOrCallback;
+    if (typeof nameOrPropertiesOrOptionsOrCallback === 'function') {
+      cb = nameOrPropertiesOrOptionsOrCallback;
+    } else if (typeof nameOrPropertiesOrOptionsOrCallback === 'object') {
+      options = nameOrPropertiesOrOptionsOrCallback as ApiOptions;
+      cb = propertiesOrOptionsOrCallback as ApiCallback;
+    }
+  } else if (typeof categoryOrNameOrPropertiesOrCallback === 'string') {
+    if (typeof nameOrPropertiesOrOptionsOrCallback === 'string') {
+      // page(category, name, ...)
+      category = categoryOrNameOrPropertiesOrCallback;
+      name = nameOrPropertiesOrOptionsOrCallback;
+      if (typeof propertiesOrOptionsOrCallback === 'object') {
+        properties = propertiesOrOptionsOrCallback as PageProductPageViewedProperties;
+        if (typeof optionsOrCallback === 'function') {
+          cb = optionsOrCallback;
+        } else if (optionsOrCallback !== undefined) {
+          options = optionsOrCallback;
+          cb = callback;
+        }
+      } else if (typeof propertiesOrOptionsOrCallback === 'function') {
+        cb = propertiesOrOptionsOrCallback;
+      }
+    } else {
+      // page(name, ...)
+      name = categoryOrNameOrPropertiesOrCallback;
+      if (typeof nameOrPropertiesOrOptionsOrCallback === 'object') {
+        properties = nameOrPropertiesOrOptionsOrCallback as PageProductPageViewedProperties;
+        if (typeof propertiesOrOptionsOrCallback === 'function') {
+          cb = propertiesOrOptionsOrCallback;
+        } else if (typeof propertiesOrOptionsOrCallback === 'object') {
+          options = propertiesOrOptionsOrCallback as ApiOptions;
+          cb = optionsOrCallback as ApiCallback;
+        }
+      } else if (typeof nameOrPropertiesOrOptionsOrCallback === 'function') {
+        cb = nameOrPropertiesOrOptionsOrCallback;
+      }
+    }
+  }
+
+  this.analytics.page(category, name, properties, this.withRudderTyperContext(options), cb);
+}
+```
+
+**Usage Examples:**
+
+```typescript
+// page([callback])
+rudderTyper.pageProductPageViewed();
+rudderTyper.pageProductPageViewed(() => console.log('done'));
+
+// page(properties, [apiOptions], [callback])
+rudderTyper.pageProductPageViewed({ productId: 'prod-123' });
+rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, () => console.log('done'));
+rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, { integrations: { All: false } });
+rudderTyper.pageProductPageViewed({ productId: 'prod-123' }, { integrations: { All: false } }, () => {});
+
+// page(name, [properties], [apiOptions], [callback])
+rudderTyper.pageProductPageViewed('Product Detail');
+rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' });
+rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, () => {});
+rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, { integrations: {} });
+rudderTyper.pageProductPageViewed('Product Detail', { productId: 'prod-123' }, { integrations: {} }, () => {});
+
+// page([category], [name], [properties], [apiOptions], [callback])
+rudderTyper.pageProductPageViewed('Products', 'Product Detail');
+rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' });
+rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, () => {});
+rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, { integrations: {} });
+rudderTyper.pageProductPageViewed('Products', 'Product Detail', { productId: 'prod-123' }, { integrations: {} }, () => {});
+```
+
+---
+
+### Group Events
+
+Group events associate a user with a group (company, organization, account, etc.).
+
+**Input (events.yaml):**
+
+```yaml
+- id: "company_group"
+  name: "Company Group"
+  event_type: "group"
+  description: "Associates user with their company."
+```
+
+**Input (tracking-plan.yaml):**
+
+```yaml
+- type: "event_rule"
+  id: "company_group_rule"
+  event:
+    $ref: "#/events/typer-test/company_group"
+  properties:
+    - $ref: "#/properties/typer-test/company-name"
+      required: true
+    - $ref: "#/properties/typer-test/industry"
+      required: false
+    - $ref: "#/properties/typer-test/employee-count"
+      required: false
+```
+
+**Output (index.ts):**
+
+```typescript
+/** Traits for Company Group */
+interface GroupCompanyGroupTraits {
+  companyName: PropertyCompanyName;
+  industry?: PropertyIndustry;
+  employeeCount?: PropertyEmployeeCount;
+}
+
+/**
+ * Associates user with their company.
+ */
+// Overload signatures
+group(groupId: string): void;
+group(groupId: string, traits: GroupCompanyGroupTraits): void;
+group(groupId: string, traits: GroupCompanyGroupTraits, callback: ApiCallback): void;
+group(groupId: string, traits: GroupCompanyGroupTraits, options: ApiOptions, callback?: ApiCallback): void;
+// Implementation
+group(
+  groupId: string,
+  traits?: GroupCompanyGroupTraits,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback,
+): void {
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof optionsOrCallback === 'function') {
+    cb = optionsOrCallback;
+  } else {
+    options = optionsOrCallback;
+    cb = callback;
+  }
+
+  this.analytics.group(groupId, traits, this.withRudderTyperContext(options), cb);
+}
+```
+
+**Usage Examples:**
+
+```typescript
+// Just groupId
+rudderTyper.group('company-456');
+
+// groupId + traits
+rudderTyper.group('company-456', { companyName: 'Acme Inc' });
+
+// groupId + traits + callback
+rudderTyper.group('company-456', { companyName: 'Acme Inc' }, () => console.log('grouped'));
+
+// Full: groupId + traits + options + callback
+rudderTyper.group('company-456', { companyName: 'Acme Inc', industry: 'Tech' }, { integrations: {} }, () => {});
+```
+
+---
+
+### Alias Events
+
+Alias events merge two user identities, connecting a known userId to a previous anonymous id.
+
+**Input (events.yaml):**
+
+```yaml
+- id: "user_alias"
+  name: "User Alias"
+  event_type: "alias"
+  description: "Merges user identities."
+```
+
+**Output (index.ts):**
+
+```typescript
+/**
+ * Merges user identities.
+ */
+// Overload signatures
+alias(to: string): void;
+alias(to: string, from: string): void;
+alias(to: string, from: string, callback: ApiCallback): void;
+alias(to: string, from: string, options: ApiOptions, callback?: ApiCallback): void;
+// Implementation
+alias(
+  to: string,
+  from?: string,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback,
+): void {
+  let options: ApiOptions | undefined;
+  let cb: ApiCallback | undefined;
+
+  if (typeof optionsOrCallback === 'function') {
+    cb = optionsOrCallback;
+  } else {
+    options = optionsOrCallback;
+    cb = callback;
+  }
+
+  this.analytics.alias(to, from, this.withRudderTyperContext(options), cb);
+}
+```
+
+**Usage Examples:**
+
+```typescript
+// Just new userId (from is automatically set to current anonymousId)
+rudderTyper.alias('new-user-id');
+
+// Explicit from and to
+rudderTyper.alias('new-user-id', 'old-anonymous-id');
+
+// With callback
+rudderTyper.alias('new-user-id', 'old-anonymous-id', () => console.log('aliased'));
+
+// Full with options
+rudderTyper.alias('new-user-id', 'old-anonymous-id', { integrations: { All: true } }, () => {});
+```
+
+---
+
+### Screen Events (Mobile Only)
+
+> **Important:** The `screen()` method is **NOT supported** in the JavaScript SDK. Screen events are only available in mobile SDKs:
+> - Kotlin/Android SDK
+> - Swift/iOS SDK
+> - React Native SDK
+> - Flutter SDK
+>
+> For web applications, use `page()` events instead.
+
+If a tracking plan contains screen events and TypeScript generation is requested, RudderTyper should either:
+1. Skip screen events with a warning, or
+2. Generate them as page events with a comment noting the conversion
+
+---
+
+## Edge Cases
 
 ### Special Characters in Names
 
@@ -1075,64 +1689,230 @@ trackUser(props: TrackUserProperties, ...): void { ... }
 
 ## Function Overloads
 
-For non-track events, generate multiple function signatures:
+All generated methods include function overloads to support alternate invocations matching the JS SDK's flexibility. This allows users to skip optional parameters like `options` and pass `callback` directly.
+
+### Track Events
+
+**JS SDK Supported Invocations:**
+```javascript
+track(event, [properties], [apiOptions], [callback]);
+track(event, properties, callback);
+track(event, callback);
+track(event, properties);
+track(event);
+```
+
+For track events with **required properties**:
+```typescript
+trackSomeEvent(props: TrackSomeEventProperties): void;
+trackSomeEvent(props: TrackSomeEventProperties, callback: ApiCallback): void;
+trackSomeEvent(props: TrackSomeEventProperties, options: ApiOptions, callback?: ApiCallback): void;
+// Implementation handles parameter detection
+trackSomeEvent(
+  props: TrackSomeEventProperties,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
+```
+
+For track events with **no properties**:
+```typescript
+trackSomeEmptyEvent(): void;
+trackSomeEmptyEvent(callback: ApiCallback): void;
+trackSomeEmptyEvent(options: ApiOptions, callback?: ApiCallback): void;
+trackSomeEmptyEvent(
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
+```
+
+For track events with **optional properties** (allow_unplanned):
+```typescript
+trackSomeEvent(): void;
+trackSomeEvent(callback: ApiCallback): void;
+trackSomeEvent(props: TrackSomeEventProperties): void;
+trackSomeEvent(props: TrackSomeEventProperties, callback: ApiCallback): void;
+trackSomeEvent(props: TrackSomeEventProperties, options: ApiOptions, callback?: ApiCallback): void;
+trackSomeEvent(
+  propsOrCallback?: TrackSomeEventProperties | ApiCallback,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
+```
 
 ### Identify
 
+**JS SDK Supported Invocations:**
+```javascript
+identify([userId], [traits], [apiOptions], [callback]);
+identify(userId, traits, callback);
+identify(userId, callback);
+identify(userId, traits);
+identify(userId);
+identify(traits, apiOptions, callback);
+identify(traits, callback);
+identify(traits);
+```
+
 ```typescript
-// With userId
-identify(userId: string, traits?: IdentifyTraits, options?: ApiOptions, callback?: apiCallback): void;
-// Without userId (anonymous)
-identify(traits?: IdentifyTraits, options?: ApiOptions, callback?: apiCallback): void;
+identify(userId: string): void;
+identify(userId: string, traits: IdentifyTraits): void;
+identify(userId: string, traits: IdentifyTraits, callback: ApiCallback): void;
+identify(userId: string, traits: IdentifyTraits, options: ApiOptions): void;
+identify(userId: string, traits: IdentifyTraits, options: ApiOptions, callback: ApiCallback): void;
+identify(
+  userId: string,
+  traits?: IdentifyTraits,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
 ```
 
 ### Page
 
 > **Note:** The JS SDK does not support `screen()`. Use `page()` for page view tracking.
 
+**JS SDK Supported Invocations:**
+```javascript
+page([category], [name], [properties], [apiOptions], [callback]);
+page(name, [properties], [apiOptions], [callback]);
+page(properties, [apiOptions], [callback]);
+page([callback]);
+```
+
 ```typescript
-// Full signature
-page(category: string, name: string, properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
-// Without category
-page(name: string, properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
-// Properties only
-page(properties?: PageProperties, options?: ApiOptions, callback?: apiCallback): void;
+// page([callback])
+pageEventName(): void;
+pageEventName(callback: ApiCallback): void;
+
+// page(properties, [apiOptions], [callback])
+pageEventName(properties: PageEventNameProperties): void;
+pageEventName(properties: PageEventNameProperties, callback: ApiCallback): void;
+pageEventName(properties: PageEventNameProperties, options: ApiOptions): void;
+pageEventName(properties: PageEventNameProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// page(name, [properties], [apiOptions], [callback])
+pageEventName(name: string): void;
+pageEventName(name: string, properties: PageEventNameProperties): void;
+pageEventName(name: string, properties: PageEventNameProperties, callback: ApiCallback): void;
+pageEventName(name: string, properties: PageEventNameProperties, options: ApiOptions): void;
+pageEventName(name: string, properties: PageEventNameProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// page([category], [name], [properties], [apiOptions], [callback])
+pageEventName(category: string, name: string): void;
+pageEventName(category: string, name: string, properties: PageEventNameProperties): void;
+pageEventName(category: string, name: string, properties: PageEventNameProperties, callback: ApiCallback): void;
+pageEventName(category: string, name: string, properties: PageEventNameProperties, options: ApiOptions): void;
+pageEventName(category: string, name: string, properties: PageEventNameProperties, options: ApiOptions, callback: ApiCallback): void;
+
+// Implementation with parameter detection
+pageEventName(
+  categoryOrNameOrPropertiesOrCallback?: string | PageEventNameProperties | ApiCallback,
+  nameOrPropertiesOrOptionsOrCallback?: string | PageEventNameProperties | ApiOptions | ApiCallback,
+  propertiesOrOptionsOrCallback?: PageEventNameProperties | ApiOptions | ApiCallback,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback,
+): void { ... }
 ```
 
 ### Group
 
+**JS SDK Supported Invocations:**
+```javascript
+group(groupId, [traits], [apiOptions], [callback]);
+group(groupId, traits, callback);
+group(groupId, callback);
+group(groupId, traits);
+group(groupId);
+group(traits, apiOptions, callback);
+group(traits, callback);
+```
+
 ```typescript
-// With groupId
-group(groupId: string, traits?: GroupTraits, options?: ApiOptions, callback?: apiCallback): void;
-// Without groupId
-group(traits?: GroupTraits, options?: ApiOptions, callback?: apiCallback): void;
+group(groupId: string): void;
+group(groupId: string, traits: GroupTraits): void;
+group(groupId: string, traits: GroupTraits, callback: ApiCallback): void;
+group(groupId: string, traits: GroupTraits, options: ApiOptions): void;
+group(groupId: string, traits: GroupTraits, options: ApiOptions, callback: ApiCallback): void;
+group(
+  groupId: string,
+  traits?: GroupTraits,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
+```
+
+### Alias
+
+**JS SDK Supported Invocations:**
+```javascript
+alias(to, [from], [apiOptions], [callback]);
+alias(to, from, callback);
+alias(to, callback);
+alias(to, from);
+alias(to);
+```
+
+```typescript
+alias(to: string): void;
+alias(to: string, from: string): void;
+alias(to: string, from: string, callback: ApiCallback): void;
+alias(to: string, from: string, options: ApiOptions): void;
+alias(to: string, from: string, options: ApiOptions, callback: ApiCallback): void;
+alias(
+  to: string,
+  from?: string,
+  optionsOrCallback?: ApiOptions | ApiCallback,
+  callback?: ApiCallback
+): void { ... }
 ```
 
 ---
 
 ## Validation Checklist
 
-- [ ] Class-based approach: `RudderTyperAnalytics` class with constructor accepting `RudderAnalytics` (named differently from SDK to avoid confusion)
+### Architecture
+- [ ] Class-based approach: `RudderTyperAnalytics` class with constructor accepting `RudderAnalytics`
 - [ ] No global declaration (`declare global`) - use dependency injection via constructor
-- [ ] Primitive types map correctly
+- [ ] RudderTyper context included in all calls via `this.withRudderTyperContext()`
+- [ ] **Function overloads for all methods** to support alternate invocations (props, callback) pattern
+
+### Type System
+- [ ] Primitive types map correctly (string, number, boolean, null)
 - [ ] Required properties have no `?` modifier
 - [ ] Optional properties have `?` modifier
 - [ ] Enums generate as union types (not TypeScript enums with `S_`/`N_` prefixes)
 - [ ] Custom types use `CustomType` prefix as type aliases
 - [ ] Property types use `Property` prefix as type aliases
 - [ ] Nested objects use inline types (not separate interfaces)
-- [ ] Method names are camelCase with event type prefix (e.g., `trackSomeEvent`)
-- [ ] Interface names are PascalCase with prefix (e.g., `TrackSomeEventProperties`)
-- [ ] Event names preserved exactly in track calls
-- [ ] RudderTyper context included in all calls via `this.withRudderTyperContext()`
 - [ ] `allow_unplanned: true` results in `Record<string, any>`
-- [ ] Identify/Page/Group events handled (Note: Screen is not supported in JS SDK)
-- [ ] Method overloads for non-track events
+- [ ] Null type supported
+- [ ] Deeply nested objects use inline types
+
+### Naming Conventions
+- [ ] Method names are camelCase with event type prefix (e.g., `trackSomeEvent`, `pageProductViewed`)
+- [ ] Interface names are PascalCase with prefix (e.g., `TrackSomeEventProperties`, `IdentifyUserTraits`)
+- [ ] Track/Page use `Properties` suffix, Identify/Group use `Traits` suffix
+- [ ] Event names preserved exactly in SDK calls
 - [ ] Special characters in names sanitized
 - [ ] Name collisions resolved with numeric suffix
 - [ ] Reserved words prefixed with underscore
-- [ ] Null type supported
-- [ ] Deeply nested objects use inline types
+
+### Event Types
+- [ ] **Track events** - `trackEventName(props, options?, callback?)` with typed properties
+- [ ] **Identify events** - `identify(userId, traits?, options?, callback?)` with typed traits
+- [ ] **Page events** - `pageEventName(category?, name?, properties?, options?, callback?)` with typed properties
+- [ ] **Group events** - `group(groupId, traits?, options?, callback?)` with typed traits
+- [ ] **Alias events** - `alias(to, from?, options?, callback?)`
+- [ ] **Screen events** - NOT supported in JS SDK (skip or convert to page with warning)
+
+### Variants
 - [ ] Variants generate discriminated unions
 - [ ] Variant cases use literal types for discriminator
 - [ ] Variant default case uses `Exclude<>` type for discriminator
+
+### Exports
+- [ ] Export `RudderTyperAnalytics` class
+- [ ] Export all custom types (`CustomType*`)
+- [ ] Export all property types (`Property*`)
+- [ ] Export all event property/trait interfaces (`Track*Properties`, `Identify*Traits`, etc.)
