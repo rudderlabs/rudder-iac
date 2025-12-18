@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/rudderlabs/rudder-iac/compare/v0.12.0...v0.12.1) (2025-12-18)
+
+
+### Miscellaneous
+
+* additionalProperties for custom type props should default to false ([#323](https://github.com/rudderlabs/rudder-iac/issues/323)) ([698f30d](https://github.com/rudderlabs/rudder-iac/commit/698f30dd0d78fdadb0a215cb91325f070cb81bb0))
+* take additionalProps into account when diffing TPE props ([#321](https://github.com/rudderlabs/rudder-iac/issues/321)) ([9d256c2](https://github.com/rudderlabs/rudder-iac/commit/9d256c23cfbfcb77fd4d9379153dcb86c295af21))
+
 ## [0.12.0](https://github.com/rudderlabs/rudder-iac/compare/v0.11.2...v0.12.0) (2025-12-15)
 
 
