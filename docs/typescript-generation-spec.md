@@ -8,6 +8,34 @@ This specification follows the same conventions as the Kotlin generator for cons
 
 ---
 
+## Task Breakdown
+
+### Phase 1: Basic E2E (Track Events MVP)
+
+| #   | Task               | Description                                                                                 | Dev Estimate |
+| --- | ------------------ | ------------------------------------------------------------------------------------------- | ------------ |
+| 1   | Foundation & Types | Generator setup, YAML parsing, primitive type mapping (string, number, boolean, null) | 1-2d         |
+| 2   | Track Events       | Event rule → Properties interface + `trackXxx()` method with overloads                      | 1-2d         |
+| 3   | Class & Polish     | `RudderTyperAnalytics` class, `withRudderTyperContext`, exports                             | 1-2d         |
+| 4   | Testing            | Golden file snapshot test + `tsc --noEmit` compilation check                                | 1-2d         |
+
+### Phase 2: Complete Type System
+
+| #   | Task           | Description                                        | Dev Estimate |
+| --- | -------------- | -------------------------------------------------- | ------------ |
+| 5   | Enums & Arrays | Union types for enums, array types with item types | 1-2d         |
+| 6   | Custom Types   | `CustomType{Name}` primitives and object types     | 1-2d         |
+| 7   | Nesting        | Inline nested objects in event properties          | 1-2d         |
+
+### Phase 3: Advanced Features
+
+| #   | Task         | Description                                                 | Dev Estimate |
+| --- | ------------ | ----------------------------------------------------------- | ------------ |
+| 8   | Variants     | Discriminated unions with cases + default using `Exclude<>` | 1-2d         |
+| 9   | Other Events | identify, group, page, alias (same patterns as track)       | 1-2d         |
+
+---
+
 ## Table of Contents
 
 - [Quick Reference](#quick-reference)

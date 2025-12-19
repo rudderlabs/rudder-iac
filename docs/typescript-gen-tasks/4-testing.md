@@ -6,7 +6,10 @@
 
 ---
 
+docker based testing, snapshot e2e then unit test.
+
 ## Goal
+
 Ensure the TypeScript generator produces correct, compilable output that works with the RudderStack JS SDK.
 
 ---
@@ -14,6 +17,7 @@ Ensure the TypeScript generator produces correct, compilable output that works w
 ## What to Build
 
 ### 1. Unit Tests
+
 Test individual components:
 
 ```go
@@ -50,6 +54,7 @@ func TestMultiTypeGeneration(t *testing.T) { ... }
 ```
 
 ### 2. Integration Tests
+
 Test full generation against test data:
 
 ```go
@@ -75,6 +80,7 @@ func TestGenerateFromTestData(t *testing.T) {
 ```
 
 ### 3. Golden File Tests
+
 Compare output against expected reference files:
 
 ```go
@@ -94,6 +100,7 @@ func TestGoldenOutput(t *testing.T) {
 ```
 
 ### 4. TypeScript Compilation Test
+
 Verify generated code compiles:
 
 ```go
@@ -114,12 +121,13 @@ func TestTypeScriptCompiles(t *testing.T) {
 ```
 
 ### 5. SDK Compatibility Test
+
 Verify types work with actual SDK:
 
 ```typescript
 // test/sdk-compat.ts
-import type { RudderAnalytics } from '@rudderstack/analytics-js';
-import { RudderTyperAnalytics, TrackSomeEventProperties } from '../index';
+import type { RudderAnalytics } from "@rudderstack/analytics-js";
+import { RudderTyperAnalytics, TrackSomeEventProperties } from "../index";
 
 // This file should compile without errors
 
@@ -127,12 +135,12 @@ declare const analytics: RudderAnalytics;
 const rudderTyper = new RudderTyperAnalytics(analytics);
 
 // Test track
-rudderTyper.trackSomeEvent({ someString: 'hello' });
-rudderTyper.trackSomeEvent({ someString: 'hello' }, () => {});
-rudderTyper.trackSomeEvent({ someString: 'hello' }, {}, () => {});
+rudderTyper.trackSomeEvent({ someString: "hello" });
+rudderTyper.trackSomeEvent({ someString: "hello" }, () => {});
+rudderTyper.trackSomeEvent({ someString: "hello" }, {}, () => {});
 
 // Test identify
-rudderTyper.identify('user-123', { email: 'test@test.com' });
+rudderTyper.identify("user-123", { email: "test@test.com" });
 
 // Test type safety (these should cause compile errors if uncommented)
 // rudderTyper.trackSomeEvent({ wrongProp: 'hello' }); // Error!
@@ -164,6 +172,7 @@ npx tsc --noEmit --strict index.ts
 ## Test Data
 
 ### Required Test Events (add to events.yaml if missing)
+
 Ensure test data includes ALL event types:
 
 ```yaml
@@ -190,6 +199,7 @@ Ensure test data includes ALL event types:
 ```
 
 ### Required Event Rules (add to tracking-plan.yaml if missing)
+
 ```yaml
 # tracking-plan.yaml - should have rules for each event type:
 - type: "event_rule"
@@ -219,6 +229,7 @@ Ensure test data includes ALL event types:
 ```
 
 ### Test Data Location
+
 ```
 cli/internal/typer/plan/testdata/project/
 ├── tracking-plan.yaml    # Event rules for ALL event types
@@ -236,6 +247,7 @@ cli/internal/typer/generator/platforms/typescript/testdata/
 ---
 
 ## Acceptance Criteria
+
 - [ ] Test data includes all event types (track, identify, page, group, alias)
 - [ ] Unit tests for naming utilities (camelCase, PascalCase, sanitize, reserved words)
 - [ ] Unit tests for type mapping (primitives, enums, arrays, multi-type)
