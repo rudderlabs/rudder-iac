@@ -1,16 +1,12 @@
-# 07: Testing & Validation
+# Task 4: Testing
 
-**Priority:** P1
-**Depends on:** 01-06
-**Complexity:** Medium
+**Depends on:** Task 1, 2, 3
 
 ---
 
-docker based testing, snapshot e2e then unit test.
-
 ## Goal
 
-Ensure the TypeScript generator produces correct, compilable output that works with the RudderStack JS SDK.
+Golden file snapshot test + `tsc --noEmit` compilation check (like Kotlin generator).
 
 ---
 

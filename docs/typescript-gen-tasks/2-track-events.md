@@ -1,13 +1,12 @@
-# 04: Track Events
+# Task 2: Track Events
 
-**Priority:** P0 (Core)
-**Depends on:** 01, 02
-**Complexity:** Medium
+**Depends on:** Task 1
 
 ---
 
 ## Goal
-Generate track event interfaces and methods with function overloads matching JS SDK flexibility.
+
+Event rule → Properties interface + `trackXxx()` method with overloads.
 
 ---
 

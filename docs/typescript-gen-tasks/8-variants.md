@@ -1,13 +1,12 @@
-# 03: Variants (Discriminated Unions)
+# Task 8: Variants
 
-**Priority:** P2 (Advanced)
-**Depends on:** 01, 02
-**Complexity:** High
+**Depends on:** Task 1-7
 
 ---
 
 ## Goal
-Generate TypeScript discriminated unions from variant definitions.
+
+Discriminated unions with cases + default using `Exclude<>`.
 
 ---
 

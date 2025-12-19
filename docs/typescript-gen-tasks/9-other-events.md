@@ -1,13 +1,12 @@
-# 05: Other Event Types
+# Task 9: Other Events
 
-**Priority:** P1
-**Depends on:** 01, 02, 04
-**Complexity:** Medium (Page is High)
+**Depends on:** Task 1-4
 
 ---
 
 ## Goal
-Generate identify, page, group, alias, and screen event methods.
+
+identify, group, page, alias (same patterns as track).
 
 ---
 

@@ -1,13 +1,12 @@
-# 06: Analytics Class & Polish
+# Task 3: Class & Polish
 
-**Priority:** P1
-**Depends on:** 01-05
-**Complexity:** Medium
+**Depends on:** Task 1, 2
 
 ---
 
 ## Goal
-Generate the RudderTyperAnalytics class wrapper, exports, handle edge cases, and ensure everything works together.
+
+`RudderTyperAnalytics` class, `withRudderTyperContext`, exports.
 
 ---
 
