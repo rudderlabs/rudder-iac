@@ -160,7 +160,13 @@ func StateToGraph(state *state.State) *resources.Graph {
 	graph := resources.NewGraph()
 
 	for _, stateResource := range state.Resources {
-		resource := resources.NewResource(stateResource.ID, stateResource.Type, stateResource.Input, stateResource.Dependencies)
+		resource := resources.NewResource(
+			stateResource.ID,
+			stateResource.Type,
+			stateResource.Input,
+			stateResource.Dependencies,
+			resources.WithRawData(stateResource.InputRaw),
+		)
 		graph.AddResource(resource)
 		// add any explicit dependencies, not mentioned through references
 		graph.AddDependencies(resource.URN(), stateResource.Dependencies)
@@ -248,52 +254,105 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 
 func (s *ProjectSyncer) createOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
+	var output *resources.ResourceData
+	var sr *state.ResourceState
 
-	output, err := s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
-	if err != nil {
-		return err
-	}
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
 
-	sr := &state.ResourceState{
-		ID:           r.ID(),
-		Type:         r.Type(),
-		Input:        input,
-		Output:       *output,
-		Dependencies: r.Dependencies(),
+		outputRaw, err := s.provider.CreateRaw(ctx, r)
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           r.ID(),
+			Type:         r.Type(),
+			Input:        input,
+			InputRaw:     r.RawData(),
+			OutputRaw:    outputRaw,
+			Dependencies: r.Dependencies(),
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.Create(ctx, r.ID(), r.Type(), dereferenced)
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           r.ID(),
+			Type:         r.Type(),
+			Input:        input,
+			Output:       *output,
+			Dependencies: r.Dependencies(),
+		}
 	}
 
 	s.stateMutex.Lock()
 	st.AddResource(sr)
 	s.stateMutex.Unlock()
 	return nil
+
 }
 
 func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
+	var output *resources.ResourceData
+	var sr *state.ResourceState
 
-	output, err := s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().RemoteId)
-	if err != nil {
-		return err
-	}
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
 
-	sr := &state.ResourceState{
-		ID:           r.ID(),
-		Type:         r.Type(),
-		Input:        input,
-		Output:       *output,
-		Dependencies: r.Dependencies(),
+		outputRaw, err := s.provider.ImportRaw(ctx, r, r.ImportMetadata().RemoteId)
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           r.ID(),
+			Type:         r.Type(),
+			Input:        input,
+			InputRaw:     r.RawData(),
+			OutputRaw:    outputRaw,
+			Dependencies: r.Dependencies(),
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		output, err = s.provider.Import(ctx, r.ID(), r.Type(), dereferenced, r.ImportMetadata().RemoteId)
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           r.ID(),
+			Type:         r.Type(),
+			Input:        input,
+			Output:       *output,
+			Dependencies: r.Dependencies(),
+		}
 	}
 
 	s.stateMutex.Lock()
@@ -304,29 +363,53 @@ func (s *ProjectSyncer) importOperation(ctx context.Context, r *resources.Resour
 
 func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resource, st *state.State) error {
 	input := r.Data()
-	s.stateMutex.RLock()
-	dereferenced, err := state.Dereference(input, st)
-	s.stateMutex.RUnlock()
-	if err != nil {
-		return err
-	}
+	var output *resources.ResourceData
 
 	sr := st.GetResource(r.URN())
 	if sr == nil {
 		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
-	output, err := s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
-	if err != nil {
-		return err
-	}
+	if r.RawData() != nil {
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(r.RawData(), st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
 
-	sr = &state.ResourceState{
-		ID:           sr.ID,
-		Type:         sr.Type,
-		Input:        input,
-		Output:       *output,
-		Dependencies: r.Dependencies(),
+		outputRaw, err := s.provider.UpdateRaw(ctx, r, sr.InputRaw, sr.OutputRaw)
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           sr.ID,
+			Type:         sr.Type,
+			Input:        input,
+			InputRaw:     r.RawData(),
+			OutputRaw:    outputRaw,
+			Dependencies: r.Dependencies(),
+		}
+	} else {
+		s.stateMutex.RLock()
+		dereferenced, err := state.Dereference(input, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+		output, err = s.provider.Update(ctx, r.ID(), r.Type(), dereferenced, sr.Data())
+		if err != nil {
+			return err
+		}
+
+		sr = &state.ResourceState{
+			ID:           sr.ID,
+			Type:         sr.Type,
+			Input:        input,
+			Output:       *output,
+			Dependencies: r.Dependencies(),
+		}
 	}
 
 	s.stateMutex.Lock()
@@ -344,10 +427,18 @@ func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resour
 		return fmt.Errorf("resource not found in state: %s", r.URN())
 	}
 
-	err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())
-	if err != nil {
-		return err
+	if r.RawData() != nil {
+		err := s.provider.DeleteRaw(ctx, r.ID(), r.Type(), sr.InputRaw, sr.OutputRaw)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := s.provider.Delete(ctx, r.ID(), r.Type(), sr.Data())
+		if err != nil {
+			return err
+		}
 	}
+
 	s.stateMutex.Lock()
 	st.RemoveResource(r.URN())
 	s.stateMutex.Unlock()

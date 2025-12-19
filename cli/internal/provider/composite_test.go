@@ -235,7 +235,7 @@ func TestCompositeProvider_LoadSpec(t *testing.T) {
 			providers:   map[string]provider.Provider{"pA": pA, "pB": pB},
 			path:        "pathUnknown.yaml",
 			spec:        specUnknown,
-			expectedErr: fmt.Errorf("unsupported spec kind: %s", specUnknown.Kind),
+			expectedErr: fmt.Errorf("unsupported spec kind '%s'", specUnknown.Kind),
 		},
 	}
 
@@ -382,15 +382,15 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		expectedReturn any                     // for Create/Update
 	}{
 		// Create
-		{name: "Create no provider for type", op: "Create", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, expectedErr: fmt.Errorf("unsupported resource type: typeUnknown")},
+		{name: "Create no provider for type", op: "Create", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, expectedErr: fmt.Errorf("unsupported resource type 'typeUnknown'")},
 		{name: "Create success", op: "Create", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", data: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
 		{name: "Create error", op: "Create", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", data: resDataB, expectedErr: errTest, expectCallOn: pB},
 		// Update
-		{name: "Update no provider for type", op: "Update", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, stateData: resDataA, expectedErr: fmt.Errorf("unsupported resource type: typeUnknown")},
+		{name: "Update no provider for type", op: "Update", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", data: resDataA, stateData: resDataA, expectedErr: fmt.Errorf("unsupported resource type 'typeUnknown'")},
 		{name: "Update success", op: "Update", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", data: resDataA, stateData: resDataA, expectCallOn: pA, expectedReturn: &resDataA},
 		{name: "Update error", op: "Update", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", data: resDataB, stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
 		// Delete
-		{name: "Delete no provider for type", op: "Delete", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", stateData: resDataA, expectedErr: fmt.Errorf("unsupported resource type: typeUnknown")},
+		{name: "Delete no provider for type", op: "Delete", providers: map[string]provider.Provider{"pA": pA}, resourceType: "typeUnknown", stateData: resDataA, expectedErr: fmt.Errorf("unsupported resource type 'typeUnknown'")},
 		{name: "Delete success", op: "Delete", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeA", stateData: resDataA, expectCallOn: pA},
 		{name: "Delete error", op: "Delete", providers: map[string]provider.Provider{"pA": pA, "pB": pB}, resourceType: "typeB", stateData: resDataB, expectedErr: errTest, expectCallOn: pB},
 	}

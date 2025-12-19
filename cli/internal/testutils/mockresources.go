@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
@@ -29,10 +30,11 @@ func NewMockTrackingPlan(ID string, data resources.ResourceData) *resources.Reso
 
 type OperationLogEntry struct {
 	Operation string
-	Args      []interface{}
+	Args      []any
 }
 
 type DataCatalogProvider struct {
+	provider.EmptyProvider
 	InitialState       *state.State
 	ReconstructedState *state.State
 	InitialResources   *resources.RemoteResources
@@ -79,7 +81,7 @@ func (p *DataCatalogProvider) Delete(_ context.Context, ID string, resourceType 
 	return nil
 }
 
-func (p *DataCatalogProvider) logOperation(operation string, args ...interface{}) {
+func (p *DataCatalogProvider) logOperation(operation string, args ...any) {
 	p.operationMutex.Lock()
 	defer p.operationMutex.Unlock()
 	p.OperationLog = append(p.OperationLog, OperationLogEntry{
