@@ -1,0 +1,6 @@
+# Invalid YAML file (missing proper rudder version)
+someOtherField: value
+version: other/v1.0
+kind: events
+metadata:
+  name: test

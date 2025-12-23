@@ -1,0 +1,10 @@
+# Valid Rudder CLI YAML file
+version: rudder/v0.1
+kind: events
+metadata:
+  name: test-events
+spec:
+  events:
+    - id: "user_signed_up"
+      name: "User Signed Up"
+      event_type: "track"

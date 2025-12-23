@@ -1,0 +1,48 @@
+{
+  "name": "rudder-yaml",
+  "displayName": "Rudder YAML",
+  "description": "Language support for Rudder CLI YAML files",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages", "Linters"],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "workspaceContains:**/*.yaml",
+    "workspaceContains:**/*.yml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Rudder YAML",
+      "properties": {
+        "rudder.lsp.serverPath": {
+          "type": "string",
+          "default": "rudder-cli",
+          "description": "Path to rudder-cli binary"
+        },
+        "rudder.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable the language server"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "build-server": "cd .. && go build -o vscode-extension/bin/rudder-cli ./cli/cmd/rudder-cli",
+    "test": "npm run build-server && npm run compile"
+  }
+}
