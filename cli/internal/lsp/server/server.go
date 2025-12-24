@@ -19,6 +19,7 @@ type RudderLSPServer struct {
 	diagnosticMgr *diagnostic.Manager
 	handler       protocol.Handler
 	server        *server.Server
+	workspaceRoot string
 }
 
 // NewRudderLSPServer creates a new LSP server instance
@@ -63,8 +64,11 @@ var globalServer *RudderLSPServer
 func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	// Set the GLSP context for diagnostic publishing
 	globalServer.diagnosticMgr.SetContext(context)
-
 	capabilities := globalServer.handler.CreateServerCapabilities()
+
+	if params.RootURI != nil {
+		globalServer.workspaceRoot = *params.RootURI
+	}
 
 	// Configure text document synchronization
 	openClose := true
@@ -172,4 +176,24 @@ func (s *RudderLSPServer) validateDocument(uri string) {
 
 	// Publish diagnostics
 	s.diagnosticMgr.PublishDiagnostics(uri, diagnostics)
+}
+
+func (s *RudderLSPServer) getWorkspaceRoot() string {
+	if s.workspaceRoot == "" {
+		return "."
+	}
+	return s.workspaceRoot
+}
+
+func (s *RudderLSPServer) validateDocumentUpdated(uri string) {
+	content, exists := s.documentStore.GetContent(uri)
+	if !exists {
+		return
+	}
+
+	// Only validate if the file is a rudder file
+	if !document.IsRudderFile(content) {
+		return
+	}
+
 }
