@@ -7,11 +7,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	transformationsClient "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
@@ -27,10 +29,11 @@ var (
 // instead of the generic provider.Provider interface to allow access to
 // provider-specific methods if needed.
 type Providers struct {
-	DataCatalog *datacatalog.Provider
-	RETL        *retl.Provider
-	EventStream *esProvider.Provider
-	Workspace   *workspace.Provider
+	DataCatalog     *datacatalog.Provider
+	RETL            *retl.Provider
+	EventStream     *esProvider.Provider
+	Workspace       *workspace.Provider
+	Transformations *transformations.Provider
 }
 
 type deps struct {
@@ -82,9 +85,10 @@ func NewDeps() (Deps, error) {
 	}
 
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-		"datacatalog": p.DataCatalog,
-		"retl":        p.RETL,
-		"eventstream": p.EventStream,
+		"datacatalog":     p.DataCatalog,
+		"retl":            p.RETL,
+		"eventstream":     p.EventStream,
+		"transformations": p.Transformations,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
@@ -121,12 +125,14 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	wsp := workspace.New(c)
+	trp := transformations.New(transformationsClient.NewRudderTransformationStore(c))
 
 	return &Providers{
-		DataCatalog: dcp,
-		RETL:        retlp,
-		EventStream: esp,
-		Workspace:   wsp,
+		DataCatalog:     dcp,
+		RETL:            retlp,
+		EventStream:     esp,
+		Workspace:       wsp,
+		Transformations: trp,
 	}, nil
 }
 
