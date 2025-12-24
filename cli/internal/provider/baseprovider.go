@@ -216,3 +216,10 @@ func (p *BaseProvider) FormatForExport(
 	}
 	return result, nil
 }
+
+// ConsolidateSync default implementation (no-op)
+// Providers that need post-sync consolidation should override this method
+func (p *BaseProvider) ConsolidateSync(ctx context.Context, state *state.State) error {
+	// Default: no consolidation needed
+	return nil
+}
