@@ -2,6 +2,7 @@ package datacatalog
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
@@ -13,7 +14,7 @@ type RequiredFieldsRule struct{}
 
 // ID returns the rule identifier
 func (r *RequiredFieldsRule) ID() string {
-	return "datacatalog/required-fields"
+	return "datacatalog/events/required-ids"
 }
 
 // Severity returns the severity of this rule
@@ -48,6 +49,10 @@ func (r *RequiredFieldsRule) AppliesTo() []string {
 }
 
 // Validate executes the validation logic
+// Two pass approach => resourceGraph
+//
+//	Files1 id-> abc ()
+//	Files2 id-> abc () -> position_1 -> position_0
 func (r *RequiredFieldsRule) Validate(ctx *validation.ValidationContext, graph *resources.Graph) []validation.ValidationError {
 	var errors []validation.ValidationError
 
@@ -98,21 +103,34 @@ func (r *RequiredFieldsRule) Validate(ctx *validation.ValidationContext, graph *
 				if id, ok := event["id"].(string); !ok || id == "" {
 					path := fmt.Sprintf("/spec/events/%d/id", i)
 					errors = append(errors, validation.ValidationError{
-						Msg:      "event 'id' is mandatory",
+						Msg:      "event 'id' is mandatory and must be a string",
 						Fragment: "id",
 						Pos:      r.getPosition(ctx, path, i),
 					})
 				}
 
 				// Check Event Type
-				if eventType, ok := event["event_type"].(string); !ok || eventType == "" {
+				eventType, ok := event["event_type"].(string)
+				if !ok || eventType == "" {
 					path := fmt.Sprintf("/spec/events/%d/event_type", i)
 					errors = append(errors, validation.ValidationError{
-						Msg:      "event 'event_type' is mandatory",
+						Msg:      "event 'event_type' is mandatory and must be a string",
 						Fragment: "event_type",
 						Pos:      r.getPosition(ctx, path, i),
 					})
 				}
+
+				if eventType == "track" {
+					if name, ok := event["name"].(string); !ok || name == "" {
+						path := fmt.Sprintf("/spec/events/%d/name", i)
+						errors = append(errors, validation.ValidationError{
+							Msg:      "event 'name' is mandatory for track events",
+							Fragment: "name",
+							Pos:      r.getPosition(ctx, path, i),
+						})
+					}
+				}
+
 			}
 		}
 	}
@@ -122,8 +140,17 @@ func (r *RequiredFieldsRule) Validate(ctx *validation.ValidationContext, graph *
 
 func (r *RequiredFieldsRule) getPosition(ctx *validation.ValidationContext, path string, index int) location.Position {
 	if ctx.PathIndex != nil {
+		// First try the exact field path
 		if pos := ctx.PathIndex.Lookup(path); pos != nil {
 			return *pos
+		}
+		// Fall back to parent path (the array item) for missing fields
+		// Derive parent by removing last path segment
+		if lastSlash := strings.LastIndex(path, "/"); lastSlash > 0 {
+			parentPath := path[:lastSlash]
+			if pos := ctx.PathIndex.Lookup(parentPath); pos != nil {
+				return *pos
+			}
 		}
 	}
 	return location.Position{}

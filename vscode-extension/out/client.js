@@ -62,10 +62,6 @@ function createLanguageClient(context) {
             { scheme: 'file', language: 'yaml' },
             { scheme: 'file', pattern: '**/*.yml' }
         ],
-        synchronize: {
-            // Notify the server about file changes to '.yaml' and '.yml' files
-            fileEvents: vscode_1.workspace.createFileSystemWatcher('**/*.{yaml,yml}')
-        },
         outputChannelName: 'Rudder LSP'
     };
     // Create the language client

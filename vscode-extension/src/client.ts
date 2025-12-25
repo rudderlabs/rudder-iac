@@ -41,10 +41,6 @@ export function createLanguageClient(context: ExtensionContext): LanguageClient 
             { scheme: 'file', language: 'yaml' },
             { scheme: 'file', pattern: '**/*.yml' }
         ],
-        synchronize: {
-            // Notify the server about file changes to '.yaml' and '.yml' files
-            fileEvents: workspace.createFileSystemWatcher('**/*.{yaml,yml}')
-        },
         outputChannelName: 'Rudder LSP'
     };
 

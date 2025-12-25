@@ -2,6 +2,8 @@
 package document
 
 import (
+	"fmt"
+	"os"
 	"sync"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -102,10 +104,33 @@ func (ds *DocumentStore) UpdateFromDidChange(params protocol.DidChangeTextDocume
 	// For this minimal implementation, we assume full content sync (change = 1)
 	// In a full implementation, we'd handle incremental changes
 	if len(params.ContentChanges) > 0 {
-		if change, ok := params.ContentChanges[0].(protocol.TextDocumentContentChangeEvent); ok {
-			content := []byte(change.Text)
+		change := params.ContentChanges[0]
+
+		// Try TextDocumentContentChangeEventWhole (full document sync)
+		if tce, ok := change.(protocol.TextDocumentContentChangeEventWhole); ok {
+			content := []byte(tce.Text)
 			ds.Update(params.TextDocument.URI, content, int(params.TextDocument.Version))
+			return
 		}
+
+		// Try TextDocumentContentChangeEvent (incremental sync)
+		if tce, ok := change.(protocol.TextDocumentContentChangeEvent); ok {
+			content := []byte(tce.Text)
+			ds.Update(params.TextDocument.URI, content, int(params.TextDocument.Version))
+			return
+		}
+
+		// Try as a map (some clients send it this way)
+		if m, ok := change.(map[string]any); ok {
+			if text, ok := m["text"].(string); ok {
+				content := []byte(text)
+				ds.Update(params.TextDocument.URI, content, int(params.TextDocument.Version))
+				return
+			}
+		}
+
+		// Log unknown type for debugging
+		fmt.Fprintf(os.Stderr, "[document] UpdateFromDidChange: unknown change type %T\n", change)
 	}
 }
 

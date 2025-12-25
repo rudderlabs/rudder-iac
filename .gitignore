@@ -46,4 +46,4 @@ memory-bank
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle
 
-vscode-extensions/node_modules
+vscode-extension/node_modules/

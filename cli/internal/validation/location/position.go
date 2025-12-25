@@ -9,13 +9,15 @@ import (
 
 // Position represents a position in a YAML file
 type Position struct {
-	Line   int
-	Column int
+	Line    int
+	Column  int
+	Content string // The actual line content from the source file
 }
 
 // PathIndex maintains a mapping from YAML paths to positions
 type PathIndex struct {
 	pathLookup map[string]*Position
+	lines      []string // Source file lines for content extraction
 }
 
 // YAMLDataIndex builds a PathIndex from YAML data
@@ -25,8 +27,12 @@ func YAMLDataIndex(data []byte) (*PathIndex, error) {
 		return nil, fmt.Errorf("parsing yaml: %w", err)
 	}
 
+	// Split source into lines for content extraction
+	lines := strings.Split(string(data), "\n")
+
 	index := &PathIndex{
 		pathLookup: make(map[string]*Position),
+		lines:      lines,
 	}
 
 	if len(node.Content) > 0 {
@@ -40,8 +46,9 @@ func YAMLDataIndex(data []byte) (*PathIndex, error) {
 func (idx *PathIndex) walk(node *yaml.Node, currentPath string) {
 	// Store position for the current path
 	idx.pathLookup[currentPath] = &Position{
-		Line:   node.Line,
-		Column: node.Column,
+		Line:    node.Line,
+		Column:  node.Column,
+		Content: idx.getLineContent(node.Line),
 	}
 
 	switch node.Kind {
@@ -56,8 +63,9 @@ func (idx *PathIndex) walk(node *yaml.Node, currentPath string) {
 			path := currentPath + "/" + keyNode.Value
 			// Also index the key itself
 			idx.pathLookup[path] = &Position{
-				Line:   keyNode.Line,
-				Column: keyNode.Column,
+				Line:    keyNode.Line,
+				Column:  keyNode.Column,
+				Content: idx.getLineContent(keyNode.Line),
 			}
 			idx.walk(valueNode, path)
 		}
@@ -67,6 +75,14 @@ func (idx *PathIndex) walk(node *yaml.Node, currentPath string) {
 			idx.walk(child, path)
 		}
 	}
+}
+
+// getLineContent returns the content of a specific line (1-indexed)
+func (idx *PathIndex) getLineContent(lineNum int) string {
+	if lineNum <= 0 || lineNum > len(idx.lines) {
+		return ""
+	}
+	return strings.TrimRight(idx.lines[lineNum-1], "\r\n")
 }
 
 // Lookup returns the position information at the specified path

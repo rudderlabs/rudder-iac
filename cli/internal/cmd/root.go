@@ -16,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
+	validaterevamped "github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate-revamped"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
@@ -84,6 +85,7 @@ func init() {
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
+	rootCmd.AddCommand(validaterevamped.NewCmdValidateRevamped())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(lsp.NewCmdLSP())
 

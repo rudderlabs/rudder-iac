@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
@@ -42,6 +43,8 @@ func (r *RuleRegistry) Register(rule validation.Rule) error {
 	for _, kind := range kinds {
 		r.rules[kind] = append(r.rules[kind], rule)
 	}
+
+	log.Printf("[registry] Registered rule %s for kinds %v", rule.ID(), kinds)
 
 	return nil
 }
