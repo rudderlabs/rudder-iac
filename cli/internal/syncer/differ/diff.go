@@ -3,6 +3,7 @@ package differ
 import (
 	"reflect"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
@@ -73,8 +74,20 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffO
 				newResources = append(newResources, urn)
 			}
 		} else {
+			var sData map[string]interface{}
+			var tData map[string]interface{}
+
+			if sourceResource.RawData() != nil && r.RawData() != nil {
+				_ = mapstructure.Decode(sourceResource.RawData(), &sData)
+				_ = mapstructure.Decode(r.RawData(), &tData)
+
+			} else {
+				sData = sourceResource.Data()
+				tData = r.Data()
+			}
+
 			// Check if resource is updated or unmodified
-			propertyDiffs := CompareData(sourceResource.Data(), r.Data())
+			propertyDiffs := CompareData(sData, tData)
 			if len(propertyDiffs) > 0 {
 				updatedResources[urn] = ResourceDiff{URN: urn, Diffs: propertyDiffs}
 			} else {
@@ -133,6 +146,17 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 		}
 
 		switch v1Typed := v1.(type) {
+
+		case *resources.PropertyRef:
+			v2Typed := v2.(*resources.PropertyRef)
+			if !comparePropertyRefs(v1Typed, v2Typed) {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			}
+		case resources.PropertyRef:
+			v2Typed := v2.(resources.PropertyRef)
+			if !comparePropertyRefs(&v1Typed, &v2Typed) {
+				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			}
 
 		case []map[string]interface{}:
 			v2Typed := v2.([]map[string]interface{})
@@ -216,4 +240,19 @@ func isNil(val interface{}) bool {
 	}
 
 	return false
+}
+
+// comparePropertyRefs compares two PropertyRef objects by their comparable fields
+// (excludes the Resolve function field which cannot be compared)
+func comparePropertyRefs(r1, r2 *resources.PropertyRef) bool {
+	if r1 == nil && r2 == nil {
+		return true
+	}
+	if r1 == nil || r2 == nil {
+		return false
+	}
+	return r1.URN == r2.URN &&
+		r1.Property == r2.Property &&
+		r1.IsResolved == r2.IsResolved &&
+		r1.Value == r2.Value
 }

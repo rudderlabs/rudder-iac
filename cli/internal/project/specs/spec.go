@@ -3,6 +3,7 @@ package specs
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -47,4 +48,37 @@ func New(data []byte) (*Spec, error) {
 	}
 
 	return &spec, nil
+}
+
+type SpecReference struct {
+	Kind  string
+	Group string
+	ID    string
+	URN   string
+}
+
+// ParseSpecReference parses a spec reference string and returns a SpecReference
+// which includes the kind, group, id, and URN. URNs are constructed using the provided kindMap.
+// to associate kinds with the corresponding resource types.
+func ParseSpecReference(ref string, kindMap map[string]string) (SpecReference, error) {
+	parts := strings.Split(strings.TrimPrefix(ref, "#/"), "/")
+	if len(parts) != 3 {
+		return SpecReference{}, fmt.Errorf("reference must have format #/{kind}/{group}/{id}, got: %s", ref)
+	}
+
+	kind, group, id := parts[0], parts[1], parts[2]
+
+	if _, ok := kindMap[kind]; !ok {
+		// TODO: this error could be ErrUnsupportedKind from composite provider, check for a better place.
+		return SpecReference{}, fmt.Errorf("unkown kind: %s", kind)
+	}
+
+	urn := fmt.Sprintf("%s:%s", kindMap[kind], id)
+
+	return SpecReference{
+		Kind:  kind,
+		Group: group,
+		ID:    id,
+		URN:   urn,
+	}, nil
 }

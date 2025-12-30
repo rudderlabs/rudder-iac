@@ -17,11 +17,13 @@ func EmptyState() *State {
 }
 
 type ResourceState struct {
-	ID           string                 `json:"id"`
-	Type         string                 `json:"type"`
-	Input        map[string]interface{} `json:"input"`
-	Output       map[string]interface{} `json:"output"`
-	Dependencies []string               `json:"dependencies"`
+	ID           string         `json:"id"`
+	Type         string         `json:"type"`
+	Input        map[string]any `json:"input"`
+	Output       map[string]any `json:"output"`
+	InputRaw     any            `json:"-"` // Strongly-typed input (e.g., *SourceResource)
+	OutputRaw    any            `json:"-"` // Strongly-typed output (e.g., *SourceStateRemote)
+	Dependencies []string       `json:"dependencies"`
 }
 
 func (sr *ResourceState) Data() resources.ResourceData {
@@ -61,7 +63,7 @@ func Dereference(data resources.ResourceData, state *State) (resources.ResourceD
 	return dereferenced.(resources.ResourceData), nil
 }
 
-func dereferenceValue(v interface{}, state *State) (interface{}, error) {
+func dereferenceValue(v any, state *State) (any, error) {
 	switch val := v.(type) {
 	case resources.PropertyRef:
 		resource := state.GetResource(val.URN)
@@ -89,8 +91,8 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 			result[k] = dereferenced
 		}
 		return result, nil
-	case map[string]interface{}:
-		result := make(map[string]interface{})
+	case map[string]any:
+		result := make(map[string]any)
 		for k, v := range val {
 			dereferenced, err := dereferenceValue(v, state)
 			if err != nil {
@@ -99,8 +101,8 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 			result[k] = dereferenced
 		}
 		return result, nil
-	case []interface{}:
-		result := make([]interface{}, len(val))
+	case []any:
+		result := make([]any, len(val))
 		for i, v := range val {
 			dereferenced, err := dereferenceValue(v, state)
 			if err != nil {
@@ -110,14 +112,14 @@ func dereferenceValue(v interface{}, state *State) (interface{}, error) {
 		}
 		return result, nil
 
-	case []map[string]interface{}:
-		result := make([]map[string]interface{}, len(val))
+	case []map[string]any:
+		result := make([]map[string]any, len(val))
 		for i, v := range val {
 			deferenced, err := dereferenceValue(v, state)
 			if err != nil {
 				return nil, err
 			}
-			result[i] = deferenced.(map[string]interface{})
+			result[i] = deferenced.(map[string]any)
 		}
 		return result, nil
 
