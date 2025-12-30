@@ -156,6 +156,15 @@ type Exporter interface {
 	) ([]writer.FormattableEntity, error)
 }
 
+// SpecMigrator handles migration of project specifications from one version to another.
+type SpecMigrator interface {
+	// MigrateSpec migrates project specifications from rudder/0.1 to rudder/1.
+	// This method transforms the existing project configuration to the new spec version.
+	// The path parameter indicates the file to migrate, and s contains the spec metadata.
+	// Returns the migrated spec or an error.
+	MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error)
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -166,6 +175,7 @@ type Exporter interface {
 //   - State management: Converting remote resources into state format for tracking
 //   - Lifecycle: Creating, updating, deleting, and importing resources in the remote system
 //   - Export: Generating configuration files from existing remote resources
+//   - Migration: Migrating project specifications from one version to another
 //
 // Providers act as adapters between the generic infrastructure management framework
 // and specific resource types or backend systems.
@@ -177,4 +187,5 @@ type Provider interface {
 	StateLoader
 	LifecycleManager
 	Exporter
+	SpecMigrator
 }

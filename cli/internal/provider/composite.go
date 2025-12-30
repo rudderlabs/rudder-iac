@@ -298,3 +298,11 @@ func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResourc
 	}
 	return s, nil
 }
+
+func (p *CompositeProvider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
+	provider, err := p.providerForKind(s.Kind)
+	if err != nil {
+		return nil, err
+	}
+	return provider.MigrateSpec(path, s)
+}

@@ -244,6 +244,10 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
+func (p *Provider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (p *Provider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	allEntities := make([]writer.FormattableEntity, 0)
 	for _, handler := range p.handlers {

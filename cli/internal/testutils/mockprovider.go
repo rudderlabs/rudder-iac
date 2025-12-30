@@ -175,6 +175,10 @@ func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, id
 	return nil, nil
 }
 
+func (m *MockProvider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
+	return s, nil
+}
+
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
 	m.ValidateCalledCount = 0
