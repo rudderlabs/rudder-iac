@@ -125,7 +125,13 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	wsp := workspace.New(c)
-	trp := transformations.New(transformationsClient.NewRudderTransformationStore(c))
+
+	// Create transformations store with basic auth
+	transformationsStore, err := transformationsClient.NewRudderTransformationStore(c, cfg.Auth.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize transformations client: %w", err)
+	}
+	trp := transformations.New(transformationsStore)
 
 	return &Providers{
 		DataCatalog:     dcp,

@@ -65,12 +65,12 @@ type BatchPublishRequest struct {
 }
 
 type TransformationVersionInput struct {
-	VersionID string `json:"versionID"`
+	VersionID string `json:"versionId"`
 	TestInput []any  `json:"testInput,omitempty"`
 }
 
 type LibraryVersionInput struct {
-	VersionID string `json:"versionID"`
+	VersionID string `json:"versionId"`
 }
 
 // BatchPublishResponse from batch publish API
@@ -108,8 +108,22 @@ type rudderTransformationStore struct {
 	client *client.Client
 }
 
-func NewRudderTransformationStore(c *client.Client) TransformationStore {
-	return &rudderTransformationStore{client: c}
+// NewRudderTransformationStore creates a transformation store with basic auth
+// It takes the base client for configuration (baseURL, userAgent) and an access token for basic auth
+func NewRudderTransformationStore(baseClient *client.Client, accessToken string) (TransformationStore, error) {
+	// Create basic auth HTTP client
+	basicAuthHTTP := NewBasicAuthHTTPClient(accessToken)
+
+	// Create new client with basic auth HTTP client, inheriting baseURL and userAgent from base client
+	transformationClient, err := client.New(
+		accessToken,
+		client.WithHTTPClient(basicAuthHTTP),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rudderTransformationStore{client: transformationClient}, nil
 }
 
 // Transformation CRUD methods
