@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/rudderlabs/rudder-iac/compare/v0.12.1...v0.13.0) (2025-12-30)
+
+
+### Features
+
+* new generic provider and example provider to demonstrate the new framework ([#310](https://github.com/rudderlabs/rudder-iac/issues/310)) ([38f2176](https://github.com/rudderlabs/rudder-iac/commit/38f2176acec032e75c5848ee1539df1e20020fe9))
+
 ## [0.12.1](https://github.com/rudderlabs/rudder-iac/compare/v0.12.0...v0.12.1) (2025-12-18)
 
 
