@@ -19,11 +19,13 @@ type Client struct {
 	userAgent   string
 	httpClient  HTTPClient
 
-	Sources      *sources
-	Destinations *destinations
-	Connections  *connections
-	Accounts     *accounts
-	Workspaces   *workspaces
+	Sources                  *sources
+	Destinations             *destinations
+	Connections              *connections
+	Accounts                 *accounts
+	Workspaces               *workspaces
+	Transformations          *transformations
+	TransformationLibraries  *transformationLibraries
 }
 
 const BASE_URL = "https://api.rudderstack.com"
@@ -47,6 +49,8 @@ func New(accessToken string, options ...Option) (*Client, error) {
 	client.Connections = &connections{service: client.service("/v2/connections")}
 	client.Accounts = &accounts{service: client.service("/v2/accounts")}
 	client.Workspaces = &workspaces{client: client}
+	client.Transformations = &transformations{service: client.service("/transformations")}
+	client.TransformationLibraries = &transformationLibraries{service: client.service("/transformationLibraries")}
 
 	for _, o := range options {
 		if err := o(client); err != nil {
