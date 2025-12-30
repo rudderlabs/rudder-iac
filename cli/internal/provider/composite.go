@@ -332,3 +332,13 @@ func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResourc
 	}
 	return s, nil
 }
+
+// ConsolidateSync calls ConsolidateSync on all registered providers
+func (p *CompositeProvider) ConsolidateSync(ctx context.Context, state *state.State) error {
+	for _, provider := range p.Providers {
+		if err := provider.ConsolidateSync(ctx, state); err != nil {
+			return fmt.Errorf("provider consolidate sync failed: %w", err)
+		}
+	}
+	return nil
+}
