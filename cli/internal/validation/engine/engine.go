@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -159,7 +158,7 @@ func (e *Engine) validateWithRules(specs map[string]*specs.Spec) []Diagnostic {
 		// Get applicable rules for this kind
 		// and apply them to the validation context sequentially
 		rules := e.registry.RulesForKind(spec.Kind)
-		log.Printf("[engine] Validating with rules: %v", rules)
+		// log.Printf("[engine] Validating with rules: %v", rules)
 
 		for _, rule := range rules {
 			errors := rule.Validate(vCtx, e.resourceGraph)

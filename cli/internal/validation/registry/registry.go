@@ -2,7 +2,7 @@ package registry
 
 import (
 	"fmt"
-	"log"
+	"sort"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
@@ -44,7 +44,7 @@ func (r *RuleRegistry) Register(rule validation.Rule) error {
 		r.rules[kind] = append(r.rules[kind], rule)
 	}
 
-	log.Printf("[registry] Registered rule %s for kinds %v", rule.ID(), kinds)
+	// log.Printf("[registry] Registered rule %s for kinds %v", rule.ID(), kinds)
 
 	return nil
 }
@@ -82,4 +82,17 @@ func (r *RuleRegistry) AllRules() []validation.Rule {
 		all = append(all, rule)
 	}
 	return all
+}
+
+// AllKinds returns all unique resource kinds in the registry, sorted alphabetically
+func (r *RuleRegistry) AllKinds() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	kinds := make([]string, 0, len(r.rules))
+	for kind := range r.rules {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	return kinds
 }

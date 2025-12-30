@@ -2,7 +2,6 @@ package datacatalog
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -81,7 +80,7 @@ func (r *CategoryNameRule) Validate(ctx *validation.ValidationContext, graph *re
 			continue
 		}
 
-		log.Printf("[category_name] Validating category name: %s", name)
+		// log.Printf("[category_name] Validating category name: %s", name)
 
 		// Check for leading/trailing whitespace
 		if name != strings.TrimSpace(name) {
@@ -94,7 +93,7 @@ func (r *CategoryNameRule) Validate(ctx *validation.ValidationContext, graph *re
 			continue
 		}
 
-		log.Printf("[category_name] Category name matches regex: %v", categoryNameRegex.MatchString(name))
+		// log.Printf("[category_name] Category name matches regex: %v", categoryNameRegex.MatchString(name))
 		// Check regex format
 		if !categoryNameRegex.MatchString(name) {
 			path := fmt.Sprintf("/spec/categories/%d/name", i)

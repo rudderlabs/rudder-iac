@@ -3,6 +3,7 @@ package validaterevamped
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -29,6 +30,8 @@ func NewCmdValidateRevamped() *cobra.Command {
 	var (
 		deps     app.Deps
 		location string
+		genDocs  bool
+		output   string
 		err      error
 	)
 
@@ -44,10 +47,14 @@ func NewCmdValidateRevamped() *cobra.Command {
 			- Code fragments showing the problematic content
 			- Squiggly underlines highlighting the issue
 			- Summary of all issues found
+
+			Additionally, you can generate markdown documentation for all
+			validation rules using the --gen-docs flag.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli validate-revamped --location /path/to/project
 			$ rudder-cli validate-revamped -l ./my-catalog
+			$ rudder-cli validate-revamped --gen-docs --output ./docs/validation-rules.md
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -57,11 +64,12 @@ func NewCmdValidateRevamped() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			validateLog.Debug("validate-revamped", "location", location)
+			validateLog.Debug("validate-revamped", "location", location, "genDocs", genDocs)
 
 			defer func() {
 				telemetry.TrackCommand("validate-revamped", err, []telemetry.KV{
 					{K: "location", V: location},
+					{K: "genDocs", V: genDocs},
 				}...)
 			}()
 
@@ -70,6 +78,11 @@ func NewCmdValidateRevamped() *cobra.Command {
 			if regErr != nil {
 				err = fmt.Errorf("creating validation registry: %w", regErr)
 				return err
+			}
+
+			// Handle documentation generation mode
+			if genDocs {
+				return runGenDocs(reg, output)
 			}
 
 			// Create validation engine
@@ -90,9 +103,9 @@ func NewCmdValidateRevamped() *cobra.Command {
 			renderer := ui.NewDiagnosticsRenderer(diagnostics)
 
 			// Print all diagnostics
-			output := renderer.Render()
-			if output != "" {
-				fmt.Println(output)
+			rendered := renderer.Render()
+			if rendered != "" {
+				fmt.Println(rendered)
 				fmt.Println() // Blank line before summary
 			}
 
@@ -111,6 +124,30 @@ func NewCmdValidateRevamped() *cobra.Command {
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".",
 		"Path to the directory containing the project files")
+	cmd.Flags().BoolVar(&genDocs, "gen-docs", false,
+		"Generate markdown documentation for all validation rules")
+	cmd.Flags().StringVarP(&output, "output", "o", "",
+		"Output file path for generated documentation (default: stdout)")
 
 	return cmd
+}
+
+// runGenDocs generates markdown documentation for all validation rules
+func runGenDocs(reg *registry.RuleRegistry, outputPath string) error {
+	generator := ui.NewRuleDocGenerator(reg)
+	markdown := generator.Generate()
+
+	if outputPath == "" {
+		// Print to stdout
+		fmt.Println(markdown)
+		return nil
+	}
+
+	// Write to file
+	if err := os.WriteFile(outputPath, []byte(markdown), 0644); err != nil {
+		return fmt.Errorf("writing documentation to %s: %w", outputPath, err)
+	}
+
+	fmt.Printf("Documentation generated successfully at: %s\n", outputPath)
+	return nil
 }
