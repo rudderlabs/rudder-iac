@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -55,4 +56,8 @@ func (p *Provider) SupportedKinds() []string {
 
 func (p *Provider) SupportedTypes() []string {
 	return []string{AccountResourceType}
+}
+
+func (p *Provider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
+	return nil, fmt.Errorf("not implemented")
 }
