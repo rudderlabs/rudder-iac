@@ -1,29 +1,28 @@
-package eventstream
+package provider
 
 import (
 	"context"
 	"fmt"
 
-	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-type handler interface {
+type Handler interface {
+	ResourceType() string
+	SpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
-	GetResources() ([]*resources.Resource, error)
-	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
-	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
-	Delete(ctx context.Context, ID string, state resources.ResourceData) error
-	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
+	Resources() ([]*resources.Resource, error)
+	Create(ctx context.Context, data any) (any, error)
+	Update(ctx context.Context, newData any, oldData any, oldState any) (any, error)
+	Delete(ctx context.Context, ID string, oldData any, oldState any) error
+	Import(ctx context.Context, data any, remoteId string) (any, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
@@ -34,28 +33,31 @@ type handler interface {
 	) ([]writer.FormattableEntity, error)
 }
 
-var _ provider.Provider = &Provider{}
-
-const importDir = "event-stream"
-
-type Provider struct {
-	provider.EmptyProvider
+type BaseProvider struct {
+	EmptyProvider
+	handlers   map[string]Handler
 	kindToType map[string]string
-	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore) *Provider {
-	p := &Provider{
-		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
-		},
-		handlers: make(map[string]handler),
+func NewBaseProvider(handlers []Handler) *BaseProvider {
+	kindToType := map[string]string{}
+	for _, handler := range handlers {
+		kindToType[handler.SpecKind()] = handler.ResourceType()
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
-	return p
+
+	handlersMap := map[string]Handler{}
+	for _, handler := range handlers {
+		handlersMap[handler.ResourceType()] = handler
+	}
+
+	return &BaseProvider{
+		handlers:   handlersMap,
+		kindToType: kindToType,
+	}
+
 }
 
-func (p *Provider) SupportedKinds() []string {
+func (p *BaseProvider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {
 		kinds = append(kinds, kind)
@@ -63,39 +65,39 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
-func (p *Provider) SupportedTypes() []string {
+func (p *BaseProvider) SupportedTypes() []string {
 	types := make([]string, 0, len(p.kindToType))
-	for _, t := range p.kindToType {
-		types = append(types, t)
+	for _, resourceType := range p.kindToType {
+		types = append(types, resourceType)
 	}
 	return types
 }
 
-func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+func (p *BaseProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	resourceType, ok := p.kindToType[s.Kind]
 	if !ok {
-		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+		return nil, &ErrUnsupportedSpecKind{Kind: s.Kind}
 	}
 	handler, ok := p.handlers[resourceType]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, &ErrUnsupportedResourceType{ResourceType: resourceType}
 	}
 	return handler.ParseSpec(path, s)
 }
 
-func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
+func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 	resourceType, ok := p.kindToType[s.Kind]
 	if !ok {
-		return fmt.Errorf("unsupported kind: %s", s.Kind)
+		return &ErrUnsupportedSpecKind{Kind: s.Kind}
 	}
 	handler, ok := p.handlers[resourceType]
 	if !ok {
-		return fmt.Errorf("no handler for resource type: %s", resourceType)
+		return &ErrUnsupportedResourceType{ResourceType: resourceType}
 	}
 	return handler.LoadSpec(path, s)
 }
 
-func (p *Provider) Validate(graph *resources.Graph) error {
+func (p *BaseProvider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(graph); err != nil {
 			return fmt.Errorf("validating %s: %w", resourceType, err)
@@ -104,10 +106,10 @@ func (p *Provider) Validate(graph *resources.Graph) error {
 	return nil
 }
 
-func (p *Provider) ResourceGraph() (*resources.Graph, error) {
+func (p *BaseProvider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for resourceType, handler := range p.handlers {
-		resources, err := handler.GetResources()
+		resources, err := handler.Resources()
 		if err != nil {
 			return nil, fmt.Errorf("getting resources for %s: %w", resourceType, err)
 		}
@@ -118,7 +120,7 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
-func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+func (p *BaseProvider) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for resourceType, handler := range p.handlers {
 		c, err := handler.LoadResourcesFromRemote(ctx)
@@ -133,7 +135,7 @@ func (p *Provider) LoadResourcesFromRemote(ctx context.Context) (*resources.Remo
 	return collection, nil
 }
 
-func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+func (p *BaseProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for resourceType, handler := range p.handlers {
 		providerState, err := handler.MapRemoteToState(collection)
@@ -148,40 +150,39 @@ func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*sta
 	return s, nil
 }
 
-func (p *Provider) Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) CreateRaw(ctx context.Context, resource *resources.Resource) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, &ErrUnsupportedResourceType{ResourceType: resource.Type()}
 	}
-	return handler.Create(ctx, ID, data)
+	return handler.Create(ctx, resource.RawData())
 }
 
-func (p *Provider) Update(ctx context.Context, ID string, resourceType string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) UpdateRaw(ctx context.Context, resource *resources.Resource, oldData any, oldState any) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, &ErrUnsupportedResourceType{ResourceType: resource.Type()}
 	}
-
-	return handler.Update(ctx, ID, data, state)
+	return handler.Update(ctx, resource.RawData(), oldData, oldState)
 }
 
-func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, state resources.ResourceData) error {
+func (p *BaseProvider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
-		return fmt.Errorf("no handler for resource type: %s", resourceType)
+		return &ErrUnsupportedResourceType{ResourceType: resourceType}
 	}
-	return handler.Delete(ctx, ID, state)
+	return handler.Delete(ctx, ID, oldData, oldState)
 }
 
-func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
-	handler, ok := p.handlers[resourceType]
+func (p *BaseProvider) ImportRaw(ctx context.Context, resource *resources.Resource, remoteId string) (any, error) {
+	handler, ok := p.handlers[resource.Type()]
 	if !ok {
-		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+		return nil, &ErrUnsupportedResourceType{ResourceType: resource.Type()}
 	}
-	return handler.Import(ctx, ID, data, remoteId)
+	return handler.Import(ctx, resource.RawData(), remoteId)
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *BaseProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
 		resources, err := handler.LoadImportable(ctx, idNamer)
@@ -196,7 +197,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(
+func (p *BaseProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
@@ -209,7 +210,7 @@ func (p *Provider) FormatForExport(
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, fmt.Errorf("formatting for export for handler: %w", err)
 		}
 		result = append(result, entities...)
 	}

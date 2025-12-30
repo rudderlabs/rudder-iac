@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -13,6 +14,7 @@ import (
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
 type MockProvider struct {
+	provider.EmptyProvider
 	supportedKinds             []string
 	supportedTypes             []string
 	ValidateArg                *resources.Graph
@@ -142,7 +144,7 @@ func (m *MockProvider) LoadResourcesFromRemote(_ context.Context) (*resources.Re
 	return m.LoadResourcesFromRemoteVal, m.LoadResourcesFromRemoteErr
 }
 
-func (m *MockProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+func (m *MockProvider) MapRemoteToState(_ *resources.RemoteResources) (*state.State, error) {
 	m.MapRemoteToStateCalledCount++
 	return m.MapRemoteToStateVal, m.MapRemoteToStateErr
 }
@@ -167,7 +169,7 @@ func (m *MockProvider) Import(_ context.Context, ID string, resourceType string,
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportable(_ context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 

@@ -112,7 +112,12 @@ type StateLoader interface {
 // LifecycleManager handles the creation, modification, deletion, and import of resources
 // in the remote backend.
 type LifecycleManager interface {
-	// Create provisions a new resource in the remote backend.
+	CreateRaw(ctx context.Context, data *resources.Resource) (any, error)
+	UpdateRaw(ctx context.Context, data *resources.Resource, oldData any, oldState any) (any, error)
+	DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error
+	ImportRaw(ctx context.Context, data *resources.Resource, remoteId string) (any, error)
+
+	// Create provisions a new resource in the remote system.
 	// Returns the actual resource data after creation, which may include system-generated
 	// fields such as timestamps or auto-assigned identifiers.
 	Create(ctx context.Context, ID string, resourceType string, data resources.ResourceData) (*resources.ResourceData, error)
