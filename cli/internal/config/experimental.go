@@ -14,6 +14,9 @@ import (
 type ExperimentalConfig struct {
 	// ConcurrentSyncs enables concurrent sync operations when applying changes
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
+
+	// NestedDiffs enables detailed diff reports for nested structures
+	NestedDiffs bool `mapstructure:"nestedDiffs"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
