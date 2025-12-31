@@ -40,8 +40,8 @@ type ResourceDiff struct {
 
 type PropertyDiff struct {
 	Property    string
-	SourceValue interface{}
-	TargetValue interface{}
+	SourceValue any
+	TargetValue any
 }
 
 type DiffOptions struct {
@@ -74,8 +74,8 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffO
 				newResources = append(newResources, urn)
 			}
 		} else {
-			var sData map[string]interface{}
-			var tData map[string]interface{}
+			var sData map[string]any
+			var tData map[string]any
 
 			if sourceResource.RawData() != nil && r.RawData() != nil {
 				_ = mapstructure.Decode(sourceResource.RawData(), &sData)
@@ -118,8 +118,8 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	diffs := make(map[string]PropertyDiff)
 
 	// Helper function to compare values recursively
-	var compareValues func(key string, v1, v2 interface{})
-	compareValues = func(key string, v1, v2 interface{}) {
+	var compareValues func(key string, v1, v2 any)
+	compareValues = func(key string, v1, v2 any) {
 
 		if isNil(v1) && isNil(v2) {
 			return
@@ -158,30 +158,22 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			}
 
-		case []map[string]interface{}:
-			v2Typed := v2.([]map[string]interface{})
-			if len(v1Typed) != len(v2Typed) {
+		case []map[string]any:
+			v2Typed := v2.([]map[string]any)
+			if !reflect.DeepEqual(v1Typed, v2Typed) {
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
-				return
-			}
-			for i := range v1Typed {
-				compareValues(key, v1Typed[i], v2Typed[i])
 			}
 
-		case map[string]interface{}:
-			v2Typed := v2.(map[string]interface{})
+		case map[string]any:
+			v2Typed := v2.(map[string]any)
 			subDiffs := CompareData(v1Typed, v2Typed)
 			if len(subDiffs) > 0 {
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
 			}
-		case []interface{}:
-			v2Typed := v2.([]interface{})
-			if len(v1Typed) != len(v2Typed) {
+		case []any:
+			v2Typed := v2.([]any)
+			if !reflect.DeepEqual(v1Typed, v2Typed) {
 				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
-				return
-			}
-			for i := range v1Typed {
-				compareValues(key, v1Typed[i], v2Typed[i])
 			}
 		default:
 			if v1 != v2 {
@@ -209,28 +201,28 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	return diffs
 }
 
-// rewrite []interface{} ->  map[string]interface{} if possible
+// rewrite []any ->  map[string]any if possible
 // and return back the response.
-func rewriteCompatibleType(input interface{}) (interface{}, bool) {
+func rewriteCompatibleType(input any) (any, bool) {
 
-	if _, ok := input.([]interface{}); !ok {
+	if _, ok := input.([]any); !ok {
 		return nil, false
 	}
 
-	slice := input.([]interface{})
+	slice := input.([]any)
 
-	output := make([]map[string]interface{}, len(slice))
+	output := make([]map[string]any, len(slice))
 	for i, item := range slice {
-		if _, ok := item.(map[string]interface{}); !ok {
+		if _, ok := item.(map[string]any); !ok {
 			return nil, false
 		}
-		output[i] = item.(map[string]interface{})
+		output[i] = item.(map[string]any)
 	}
 
 	return output, true
 }
 
-func isNil(val interface{}) bool {
+func isNil(val any) bool {
 	if val == nil {
 		return true
 	}
