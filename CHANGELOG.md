@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/rudderlabs/rudder-iac/compare/v0.12.1...v0.13.0) (2026-01-06)
+
+
+### Features
+
+* new generic provider and example provider to demonstrate the new framework ([#310](https://github.com/rudderlabs/rudder-iac/issues/310)) ([38f2176](https://github.com/rudderlabs/rudder-iac/commit/38f2176acec032e75c5848ee1539df1e20020fe9))
+
+
+### Miscellaneous
+
+* add CLAUDE.md for the repository as a starting point ([#330](https://github.com/rudderlabs/rudder-iac/issues/330)) ([723ccbb](https://github.com/rudderlabs/rudder-iac/commit/723ccbb0216335ed5725b770ea0abc5f8d01bad1))
+
 ## [0.12.1](https://github.com/rudderlabs/rudder-iac/compare/v0.12.0...v0.12.1) (2025-12-18)
 
 
