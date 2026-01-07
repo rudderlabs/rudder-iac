@@ -58,3 +58,18 @@ func writeFile(path string, content []byte) error {
 	}
 	return nil
 }
+
+// OverwriteFile writes a FormattableEntity to a file, overwriting it if it already exists.
+// This is used for operations like migration where we intentionally want to replace existing files.
+func OverwriteFile(formatters formatter.Formatters, entity FormattableEntity) error {
+	formatted, err := formatters.Format(entity.Content, filepath.Ext(entity.RelativePath))
+	if err != nil {
+		return fmt.Errorf("formatting %s: %w", entity.RelativePath, err)
+	}
+
+	if err := os.WriteFile(entity.RelativePath, formatted, 0644); err != nil {
+		return fmt.Errorf("writing file %s: %w", entity.RelativePath, err)
+	}
+
+	return nil
+}
