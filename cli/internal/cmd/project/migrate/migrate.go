@@ -20,8 +20,9 @@ func NewCmdMigrate() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "migrate",
-		Short: "Migrate project from spec rudder/0.1 to rudder/1",
+		Use:    "migrate",
+		Short:  "Migrate project from spec rudder/0.1 to rudder/1",
+		Hidden: true, // Hidden until ready for general availability
 		Long: heredoc.Doc(`
 			Migrates project configuration from spec rudder/0.1 to rudder/1.
 			This command transforms your existing project files to the new spec version.
