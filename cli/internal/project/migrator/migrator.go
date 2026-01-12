@@ -74,7 +74,7 @@ func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]
 		fmt.Printf("Migrating file: %s (kind: %s)\n", path, spec.Kind)
 		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind)
 
-		migratedSpec, err := m.provider.MigrateSpec(path, spec)
+		migratedSpec, err := m.provider.MigrateSpec(spec)
 		if err != nil {
 			return nil, fmt.Errorf("migrating file %s: %w", path, err)
 		}

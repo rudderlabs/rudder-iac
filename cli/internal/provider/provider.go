@@ -169,10 +169,9 @@ type Exporter interface {
 // SpecMigrator handles migration of project specifications from one version to another.
 type SpecMigrator interface {
 	// MigrateSpec migrates project specifications from rudder/0.1 to rudder/1.
-	// This method transforms the existing project configuration to the new spec version.
-	// The path parameter indicates the file to migrate, and s contains the spec metadata.
+	// This method transforms the existing project configuration to the new spec version. s contains the spec to migrate.
 	// Returns the migrated spec or an error.
-	MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error)
+	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 }
 
 // Provider is the complete interface that all providers must implement.

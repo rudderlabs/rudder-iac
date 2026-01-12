@@ -49,7 +49,7 @@ func (p *EmptyProvider) LoadLegacySpec(_ string, _ *specs.Spec) error {
 	return errNotImplemented
 }
 
-func (p *EmptyProvider) MigrateSpec(_ string, _ *specs.Spec) (*specs.Spec, error) {
+func (p *EmptyProvider) MigrateSpec(_ *specs.Spec) (*specs.Spec, error) {
 	return nil, errNotImplemented
 }
 

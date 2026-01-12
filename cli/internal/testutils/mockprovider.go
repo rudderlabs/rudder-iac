@@ -184,7 +184,7 @@ func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, id
 	return nil, nil
 }
 
-func (m *MockProvider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
+func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
