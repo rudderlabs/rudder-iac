@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -43,3 +44,13 @@ func (p *EmptyProvider) Delete(_ context.Context, _ string, _ string, _ resource
 func (p *EmptyProvider) DeleteRaw(_ context.Context, _ string, _ string, _ any, _ any) error {
 	return errNotImplemented
 }
+
+func (p *EmptyProvider) LoadLegacySpec(_ string, _ *specs.Spec) error {
+	return errNotImplemented
+}
+
+func (p *EmptyProvider) MigrateSpec(_ string, _ *specs.Spec) (*specs.Spec, error) {
+	return nil, errNotImplemented
+}
+
+

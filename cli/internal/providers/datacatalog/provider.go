@@ -101,10 +101,6 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return createResourceGraph(p.dc)
 }
 
-func (p *Provider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
 	switch resourceType {
 	case pstate.TrackingPlanResourceType:

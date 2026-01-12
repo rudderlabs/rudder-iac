@@ -102,10 +102,6 @@ func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (p *BaseProvider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 func (p *BaseProvider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(graph); err != nil {

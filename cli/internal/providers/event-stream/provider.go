@@ -201,10 +201,6 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
