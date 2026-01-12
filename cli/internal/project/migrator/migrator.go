@@ -42,7 +42,7 @@ func (m *Migrator) DisplayFilesToMigrate(loadedSpecs map[string]*specs.Spec) {
 	rows := make([]table.Row, 0, len(loadedSpecs))
 	for path, spec := range loadedSpecs {
 		willMigrate := "Yes"
-		if spec.Version != specs.SpecVersionV0_1 {
+		if !spec.IsLegacyVersion() {
 			willMigrate = "No"
 		}
 		rows = append(rows, table.Row{path, spec.Version, willMigrate})
@@ -70,7 +70,11 @@ func (m *Migrator) ConfirmMigration() (bool, error) {
 func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]*specs.Spec, error) {
 	migratedSpecs := make(map[string]*specs.Spec)
 	for path, spec := range loadedSpecs {
-		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind)
+		if !spec.IsLegacyVersion() {
+			migratorLog.Debug("skipping migration", "path", path, "version", spec.Version)
+			continue
+		}
+		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind, "version", spec.Version)
 
 		migratedSpec, err := m.provider.MigrateSpec(spec)
 		if err != nil {

@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	SpecVersionV0_1 = "rudder/0.1"
-	SpecVersionV1   = "rudder/v1"
+	SpecVersionV0_1        = "rudder/0.1"
+	SpecVersionV0_1Variant = "rudder/v0.1" // Legacy variant with 'v' prefix
+	SpecVersionV1          = "rudder/v1"
 )
 
 type Spec struct {
@@ -18,6 +19,11 @@ type Spec struct {
 	Kind     string         `yaml:"kind"`
 	Metadata map[string]any `yaml:"metadata"`
 	Spec     map[string]any `yaml:"spec"`
+}
+
+// IsLegacyVersion returns true if the spec version is a legacy version (rudder/0.1 or rudder/v0.1)
+func (s *Spec) IsLegacyVersion() bool {
+	return s.Version == SpecVersionV0_1 || s.Version == SpecVersionV0_1Variant
 }
 
 type ParsedSpec struct {

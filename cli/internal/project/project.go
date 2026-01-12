@@ -85,13 +85,13 @@ func (p *project) Specs() map[string]*specs.Spec {
 }
 
 func (p *project) loadSpec(path string, spec *specs.Spec) error {
-	switch spec.Version {
-	case specs.SpecVersionV0_1:
+	switch {
+	case spec.IsLegacyVersion():
 		if !p.loadLegacySpecs {
 			return fmt.Errorf("spec version %s is no longer supported. Please migrate to version %s using the migrate project command", specs.SpecVersionV0_1, specs.SpecVersionV1)
 		}
 		return p.provider.LoadLegacySpec(path, spec)
-	case specs.SpecVersionV1:
+	case spec.Version == specs.SpecVersionV1:
 		return p.provider.LoadSpec(path, spec)
 	default:
 		return fmt.Errorf("unsupported spec version: %s", spec.Version)
