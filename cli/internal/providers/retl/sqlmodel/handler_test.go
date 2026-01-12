@@ -343,7 +343,7 @@ func TestSQLModelHandler(t *testing.T) {
 			ordersSpec, _ := entities[idx].Content.(*specs.Spec)
 			require.NotNil(t, ordersSpec)
 			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
-			assert.Equal(t, specs.SpecVersion, ordersSpec.Version)
+			assert.Equal(t, specs.SpecVersionV0_1, ordersSpec.Version)
 			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
 			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
 			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])

@@ -20,6 +20,7 @@ type MockProvider struct {
 	ValidateArg                *resources.Graph
 	ValidateErr                error
 	LoadSpecErr                error
+	LoadLegacySpecErr          error
 	GetResourceGraphVal        *resources.Graph
 	GetResourceGraphErr        error
 	LoadResourcesFromRemoteVal *resources.RemoteResources
@@ -40,6 +41,7 @@ type MockProvider struct {
 	ValidateCalledCount                int
 	ValidateErrorReturnedCount         int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
+	LoadLegacySpecCalledWithArgs       []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
 	GetResourceGraphErrorReturnedCount int
@@ -129,6 +131,11 @@ func (m *MockProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
 	m.LoadSpecCalledWithArgs = append(m.LoadSpecCalledWithArgs, LoadSpecArgs{Path: path, Spec: s})
 	return m.LoadSpecErr
+}
+
+func (m *MockProvider) LoadLegacySpec(path string, s *specs.Spec) error {
+	m.LoadLegacySpecCalledWithArgs = append(m.LoadLegacySpecCalledWithArgs, LoadSpecArgs{Path: path, Spec: s})
+	return m.LoadLegacySpecErr
 }
 
 func (m *MockProvider) ResourceGraph() (*resources.Graph, error) {

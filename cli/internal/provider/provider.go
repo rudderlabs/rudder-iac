@@ -36,6 +36,11 @@ type SpecLoader interface {
 	// that these are all steps of the same load spec process.
 	LoadSpec(path string, s *specs.Spec) error
 
+	// LoadLegacySpec loads and processes a legacy YAML spec (rudder/0.1) from the given path.
+	// It populates the provider's internal state with the resource definitions from the legacy spec.
+	// This is used during migration to load old specs before converting them.
+	LoadLegacySpec(path string, s *specs.Spec) error
+
 	// ParseSpec parses a specification without fully loading it into the provider's state.
 	// It extracts metadata such as external IDs that may be referenced by other specs.
 	// This allows for two-phase loading where references can be validated before full processing.

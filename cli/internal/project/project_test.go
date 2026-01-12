@@ -165,6 +165,123 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
 }
 
+func TestProject_LoadSpec_WithLegacySpecSupport(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                       string
+		specVersion                string
+		useLegacySupport           bool
+		expectError                bool
+		expectLoadSpecCalled       bool
+		expectLoadLegacySpecCalled bool
+		errorContains              string
+	}{
+		{
+			name:                       "rudder/v1 spec without legacy support - calls LoadSpec",
+			specVersion:                "rudder/v1",
+			useLegacySupport:           false,
+			expectError:                false,
+			expectLoadSpecCalled:       true,
+			expectLoadLegacySpecCalled: false,
+		},
+		{
+			name:                       "rudder/v1 spec with legacy support - calls LoadSpec",
+			specVersion:                "rudder/v1",
+			useLegacySupport:           true,
+			expectError:                false,
+			expectLoadSpecCalled:       true,
+			expectLoadLegacySpecCalled: false,
+		},
+		{
+			name:                       "rudder/0.1 spec without legacy support - returns error",
+			specVersion:                "rudder/0.1",
+			useLegacySupport:           false,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "rudder/0.1 is no longer supported",
+		},
+		{
+			name:                       "rudder/0.1 spec with legacy support - calls LoadLegacySpec",
+			specVersion:                "rudder/0.1",
+			useLegacySupport:           true,
+			expectError:                false,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: true,
+		},
+		{
+			name:                       "unsupported version without legacy support - returns error",
+			specVersion:                "rudder/v2.0",
+			useLegacySupport:           false,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "unsupported spec version: rudder/v2.0",
+		},
+		{
+			name:                       "unsupported version with legacy support - returns error",
+			specVersion:                "rudder/v2.0",
+			useLegacySupport:           true,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "unsupported spec version: rudder/v2.0",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockLoader := &MockLoader{}
+
+			var opts []project.ProjectOption
+			opts = append(opts, project.WithLoader(mockLoader))
+			if tc.useLegacySupport {
+				opts = append(opts, project.WithLegacySpecSupport())
+			}
+
+			proj := project.New("test_dir", mockProvider, opts...)
+
+			testSpec := &specs.Spec{
+				Kind:    "Source",
+				Version: tc.specVersion,
+			}
+			specsMap := map[string]*specs.Spec{
+				"path/to/spec.yaml": testSpec,
+			}
+
+			mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+				return specsMap, nil
+			}
+
+			err := proj.Load()
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Verify LoadSpec was called (or not)
+			loadSpecCalled := len(mockProvider.LoadSpecCalledWithArgs) > 0
+			assert.Equal(t, tc.expectLoadSpecCalled, loadSpecCalled,
+				"LoadSpec called mismatch: expected %v, got %v", tc.expectLoadSpecCalled, loadSpecCalled)
+
+			// Verify LoadLegacySpec was called (or not)
+			loadLegacySpecCalled := len(mockProvider.LoadLegacySpecCalledWithArgs) > 0
+			assert.Equal(t, tc.expectLoadLegacySpecCalled, loadLegacySpecCalled,
+				"LoadLegacySpec called mismatch: expected %v, got %v", tc.expectLoadLegacySpecCalled, loadLegacySpecCalled)
+		})
+	}
+}
+
 func TestProject_ValidateSpec(t *testing.T) {
 	t.Parallel()
 

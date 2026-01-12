@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	SpecVersion = "rudder/v0.1"
+	SpecVersionV0_1 = "rudder/0.1"
+	SpecVersionV1   = "rudder/v1"
 )
 
 type Spec struct {

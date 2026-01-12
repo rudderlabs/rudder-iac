@@ -97,6 +97,11 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
+func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
+	// Empty implementation for now
+	return fmt.Errorf("not implemented")
+}
+
 func (p *BaseProvider) MigrateSpec(path string, s *specs.Spec) (*specs.Spec, error) {
 	return nil, fmt.Errorf("not implemented")
 }

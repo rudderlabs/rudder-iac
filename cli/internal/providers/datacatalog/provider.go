@@ -52,6 +52,10 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.dc.LoadSpec(path, s)
 }
 
+func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
+	return p.dc.LoadLegacySpec(path, s)
+}
+
 func (p *Provider) SupportedKinds() []string {
 	return []string{
 		localcatalog.KindProperties,
