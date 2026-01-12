@@ -43,19 +43,19 @@ func (m *Migrator) DisplayFilesToMigrate(loadedSpecs map[string]*specs.Spec) {
 	for path, spec := range loadedSpecs {
 		willMigrate := "Yes"
 		if spec.Version != specs.SpecVersionV0_1 {
-			willMigrate = "No (already rudder/1)"
+			willMigrate = "No"
 		}
 		rows = append(rows, table.Row{path, spec.Version, willMigrate})
 	}
 
-	fmt.Println("The following files will be processed:")
+	ui.Println("The following files will be processed:")
 	ui.PrintTable(columns, rows)
-	fmt.Println()
+	ui.Println()
 }
 
 // ConfirmMigration asks the user to confirm the migration
 func (m *Migrator) ConfirmMigration() (bool, error) {
-	fmt.Println("⚠️  WARNING: This will modify your files in place!")
+	ui.PrintWarning("⚠️ This will modify your files in place!")
 	proceed, err := ui.Confirm("Do you want to proceed with the migration?")
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation: %w", err)
@@ -63,7 +63,6 @@ func (m *Migrator) ConfirmMigration() (bool, error) {
 	if !proceed {
 		return false, nil
 	}
-	fmt.Println()
 	return true, nil
 }
 
@@ -71,7 +70,6 @@ func (m *Migrator) ConfirmMigration() (bool, error) {
 func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]*specs.Spec, error) {
 	migratedSpecs := make(map[string]*specs.Spec)
 	for path, spec := range loadedSpecs {
-		fmt.Printf("Migrating file: %s (kind: %s)\n", path, spec.Kind)
 		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind)
 
 		migratedSpec, err := m.provider.MigrateSpec(spec)
@@ -85,7 +83,7 @@ func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]
 
 // WriteSpecs writes the migrated specs back to files
 func (m *Migrator) WriteSpecs(migratedSpecs map[string]*specs.Spec) error {
-	fmt.Println("\nWriting migrated specs to files...")
+	ui.Println("Writing migrated specs to files...")
 	formatters := formatter.Setup(&formatter.YAMLFormatter{})
 	for path, migratedSpec := range migratedSpecs {
 		migratorLog.Info("writing migrated file", "path", path)
@@ -118,7 +116,8 @@ func (m *Migrator) Migrate(confirm bool) error {
 			return err
 		}
 		if !proceed {
-			return fmt.Errorf("migration cancelled by user")
+			// migration cancelled by user
+			return nil
 		}
 	}
 
@@ -133,7 +132,7 @@ func (m *Migrator) Migrate(confirm bool) error {
 		return err
 	}
 
-	fmt.Println("\n✅ Migration completed successfully")
+	ui.PrintSuccess("✅ Migration completed successfully")
 	migratorLog.Info("migration completed")
 	return nil
 }
