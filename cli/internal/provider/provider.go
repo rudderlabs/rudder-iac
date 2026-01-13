@@ -161,6 +161,14 @@ type Exporter interface {
 	) ([]writer.FormattableEntity, error)
 }
 
+// ConsolidateSyncer performs post-sync consolidation operations
+type ConsolidateSyncer interface {
+	// ConsolidateSync is called after executePlan completes successfully
+	// For transformations: batch publishes all modified resources
+	// For other providers: no-op (return nil)
+	ConsolidateSync(ctx context.Context, state *state.State) error
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -171,6 +179,7 @@ type Exporter interface {
 //   - State management: Converting remote resources into state format for tracking
 //   - Lifecycle: Creating, updating, deleting, and importing resources in the remote system
 //   - Export: Generating configuration files from existing remote resources
+//   - Consolidation: Post-sync operations like batch publishing
 //
 // Providers act as adapters between the generic infrastructure management framework
 // and specific resource types or backend systems.
@@ -182,4 +191,5 @@ type Provider interface {
 	StateLoader
 	LifecycleManager
 	Exporter
+	ConsolidateSyncer
 }
