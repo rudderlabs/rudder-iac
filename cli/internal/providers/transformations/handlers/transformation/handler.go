@@ -176,11 +176,12 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.TransformationReso
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.TransformationResource, oldData *model.TransformationResource, oldState *model.TransformationState) (*model.TransformationState, error) {
-	req := &transformations.UpdateTransformationRequest{
+	req := &transformations.CreateTransformationRequest{
 		Name:        newData.Name,
 		Description: newData.Description,
 		Code:        newData.Code,
 		Language:    newData.Language,
+		ExternalID:  newData.ID,
 	}
 
 	// Always use publish=false, batch publish happens later

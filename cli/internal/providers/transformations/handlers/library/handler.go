@@ -147,7 +147,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 		Description: remote.Description,
 		Language:    remote.Language,
 		Code:        remote.Code,
-		ImportName:  remote.ImportName,
+		ImportName:  remote.HandleName,
 	}
 
 	state := &model.LibraryState{
@@ -180,11 +180,12 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.LibraryResource) (
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource, oldData *model.LibraryResource, oldState *model.LibraryState) (*model.LibraryState, error) {
-	req := &transformations.UpdateLibraryRequest{
+	req := &transformations.CreateLibraryRequest{
 		Name:        newData.Name,
 		Description: newData.Description,
 		Code:        newData.Code,
 		Language:    newData.Language,
+		ExternalID:  newData.ID,
 	}
 
 	// Always use publish=false, batch publish happens later
