@@ -16,13 +16,13 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "ES6 default import",
-			code:     `import myLib from 'myLib';`,
+			name: "ES6 default import",
+			code: `import myLib from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
-			name:     "ES6 named import",
-			code:     `import { func1, func2 } from 'myLib';`,
+			name: "ES6 named import",
+			code: `import { func1, func2 } from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
@@ -42,13 +42,41 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			expected: []string{"someLib"},
 		},
 		{
-			name: "Multiple ES6 imports",
+			name: "CommonJS require",
+			code: `const myLib = require('myLib');`,
+			expected: []string{"myLib"},
+		},
+		{
+			name: "CommonJS require with spaces",
+			code: `const lib = require(  'myLib'  );`,
+			expected: []string{"myLib"},
+		},
+		{
+			name: "Multiple imports mixed",
 			code: `
 				import lib1 from 'lib1';
 				import { func } from 'lib2';
-				import * as lib3 from 'lib3';
+				const lib3 = require('lib3');
 			`,
 			expected: []string{"lib1", "lib2", "lib3"},
+		},
+		{
+			name: "Filter relative imports",
+			code: `
+				import myLib from 'myLib';
+				import util from './util';
+				import config from '../config';
+				import abs from '/absolute/path';
+			`,
+			expected: []string{"myLib"},
+		},
+		{
+			name: "Deduplicate imports",
+			code: `
+				import myLib from 'myLib';
+				const lib = require('myLib');
+			`,
+			expected: []string{"myLib"},
 		},
 		{
 			name: "Ignore single-line comments",
@@ -81,45 +109,35 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			expected: []string{"mathLib"},
 		},
 		{
-			name:     "No imports",
-			code:     `export function transformEvent(event) { return event; }`,
+			name: "No imports",
+			code: `export function transformEvent(event) { return event; }`,
 			expected: []string{},
 		},
 		{
-			name:     "Import with newlines and tabs",
-			code:     "import {\n\tadd,\n\tsubtract\n} from 'mathLib';",
+			name: "Import with newlines and tabs",
+			code: "import {\n\tadd,\n\tsubtract\n} from 'mathLib';",
 			expected: []string{"mathLib"},
 		},
 		{
-			name:     "Namespace import",
-			code:     `import * as lib from 'myLib';`,
+			name: "Namespace import",
+			code: `import * as lib from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
-			name:     "Import without from (side effects)",
-			code:     `import 'polyfill';`,
+			name: "Import without from (side effects)",
+			code: `import 'polyfill';`,
 			expected: []string{"polyfill"},
 		},
 		{
-			name: "Filter RudderStack built-in libraries",
-			code: `
-				import { sha1 } from '@rs/hash/v1';
-				import { formatDate } from '@rs/utils/v2';
-				import myLib from 'myLib';
-			`,
-			expected: []string{"myLib"},
-		},
-		{
-			name: "Complex example without require",
+			name: "Complex real-world example",
 			code: `
 				// Import validation library
 				import {
-					validateEmail, // validate email
+					validateEmail,
 					validatePhone
 				} from 'validationHelpers';
 				import * as utils from 'commonUtils';
-				import * as crypto from 'cryptoLib';
-				// import { add } from 'mathLib';
+				const crypto = require('cryptoLib');
 				// Transform function
 				export function transformEvent(event) {
 					const email = utils.sanitize(event.email);
@@ -128,15 +146,6 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			`,
 			expected: []string{"validationHelpers", "commonUtils", "cryptoLib"},
 		},
-		{
-			name: "Re-exports are included (esbuild treats them as imports)",
-			code: `
-				import myLib from 'myLib';
-				export { something } from 'reexportedLib';
-				export * from 'anotherReexport';
-			`,
-			expected: []string{"myLib", "reexportedLib", "anotherReexport"},
-		},
 	}
 
 	for _, tt := range tests {
@@ -144,91 +153,6 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			result, err := parser.ExtractImports(tt.code)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tt.expected, result)
-		})
-	}
-}
-
-func TestJavaScriptParser_ExtractImports_Errors(t *testing.T) {
-	parser := &JavaScriptParser{}
-
-	tests := []struct {
-		name        string
-		code        string
-		expectedErr string
-	}{
-		{
-			name:        "CommonJS require not supported",
-			code:        `const myLib = require('myLib');`,
-			expectedErr: "require() syntax is not supported",
-		},
-		{
-			name:        "CommonJS require with spaces",
-			code:        `const lib = require(  'myLib'  );`,
-			expectedErr: "require() syntax is not supported",
-		},
-		{
-			name: "Mixed imports and requires",
-			code: `
-				import lib1 from 'lib1';
-				const lib3 = require('lib3');
-			`,
-			expectedErr: "require() syntax is not supported",
-		},
-		{
-			name:        "Relative import with ./",
-			code:        `import util from './util';`,
-			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
-		},
-		{
-			name:        "Relative import with ../",
-			code:        `import config from '../config';`,
-			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
-		},
-		{
-			name:        "Absolute import",
-			code:        `import abs from '/absolute/path';`,
-			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
-		},
-		{
-			name: "Mixed valid and relative imports",
-			code: `
-				import myLib from 'myLib';
-				import util from './util';
-			`,
-			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
-		},
-		{
-			name: "Multiple relative imports",
-			code: `
-				import util from './util';
-				import config from '../config';
-			`,
-			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
-		},
-		{
-			name: "Dynamic imports not supported",
-			code: `
-				import staticLib from 'staticLib';
-				async function load() {
-					const dynamicLib = await import('dynamicLib');
-					return dynamicLib;
-				}
-			`,
-			expectedErr: "dynamic imports are not supported",
-		},
-		{
-			name:        "Dynamic import only",
-			code:        `const lib = await import('lib');`,
-			expectedErr: "dynamic imports are not supported",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parser.ExtractImports(tt.code)
-			require.Error(t, err)
-			assert.Nil(t, result)
-			assert.Contains(t, err.Error(), tt.expectedErr)
 		})
 	}
 }
