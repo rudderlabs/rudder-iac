@@ -14,6 +14,8 @@ import (
 type ExperimentalConfig struct {
 	// ConcurrentSyncs enables concurrent sync operations when applying changes
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
+	// V1SpecSupport enables support for v1 specs (rudder/v1)
+	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

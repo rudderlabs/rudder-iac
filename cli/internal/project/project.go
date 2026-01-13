@@ -30,11 +30,11 @@ type Project interface {
 }
 
 type project struct {
-	location        string
-	provider        ProjectProvider
-	loader          Loader
-	specs           map[string]*specs.Spec
-	loadLegacySpecs bool
+	location    string
+	provider    ProjectProvider
+	loader      Loader
+	specs       map[string]*specs.Spec
+	loadV1Specs bool
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -49,10 +49,10 @@ func WithLoader(l Loader) ProjectOption {
 	}
 }
 
-// WithLegacySpecSupport enables loading legacy specs (rudder/0.1).
-func WithLegacySpecSupport() ProjectOption {
+// WithV1SpecSupport enables loading v1 specs (rudder/v1).
+func WithV1SpecSupport() ProjectOption {
 	return func(p *project) {
-		p.loadLegacySpecs = true
+		p.loadV1Specs = true
 	}
 }
 
@@ -87,11 +87,8 @@ func (p *project) Specs() map[string]*specs.Spec {
 func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	switch {
 	case spec.IsLegacyVersion():
-		if !p.loadLegacySpecs {
-			return fmt.Errorf("spec version %s is no longer supported. Please migrate to version %s using the migrate project command", specs.SpecVersionV0_1, specs.SpecVersionV1)
-		}
 		return p.provider.LoadLegacySpec(path, spec)
-	case spec.Version == specs.SpecVersionV1:
+	case spec.Version == specs.SpecVersionV1 && p.loadV1Specs:
 		return p.provider.LoadSpec(path, spec)
 	default:
 		return fmt.Errorf("unsupported spec version: %s", spec.Version)
@@ -119,7 +116,7 @@ func (p *project) Load() error {
 		}
 
 		if err := p.loadSpec(path, spec); err != nil {
-			return fmt.Errorf("failed to load spec from path %s: %w", path, err)
+			return fmt.Errorf("provider failed to load spec from path %s: %w", path, err)
 		}
 	}
 

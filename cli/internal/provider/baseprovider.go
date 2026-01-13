@@ -98,8 +98,8 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
-	// Empty implementation for now
-	return fmt.Errorf("not implemented")
+	// fallback to LoadSpec for now till we implement legacy spec loading for all providers
+	return p.LoadSpec(path, s)
 }
 
 func (p *BaseProvider) Validate(graph *resources.Graph) error {

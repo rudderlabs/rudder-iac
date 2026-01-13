@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -44,7 +45,11 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = project.New(location, deps.CompositeProvider())
+			opts := []project.ProjectOption{}
+			if config.GetConfig().ExperimentalFlags.V1SpecSupport {
+				opts = append(opts, project.WithV1SpecSupport())
+			}
+			p = project.New(location, deps.CompositeProvider(), opts...)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
