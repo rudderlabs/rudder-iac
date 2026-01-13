@@ -1,11 +1,11 @@
-package transformations
+package client
 
 // Transformation represents a transformation resource from the API
 type Transformation struct {
 	ID          string   `json:"id"`
 	VersionID   string   `json:"versionId"`
 	Name        string   `json:"name"`
-	Description string   `json:"description"`
+	Description string   `json:"description,omitempty"`
 	Code        string   `json:"code"`
 	Language    string   `json:"language"`
 	Imports     []string `json:"imports"`
@@ -18,46 +18,31 @@ type TransformationLibrary struct {
 	ID          string `json:"id"`
 	VersionID   string `json:"versionId"`
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
-	ImportName  string `json:"importName"`
+	HandleName  string `json:"handleName"`
 	WorkspaceID string `json:"workspaceId"`
 	ExternalID  string `json:"externalId,omitempty"`
 }
 
-// CreateTransformationRequest is the request body for creating a transformation
+// CreateTransformationRequest is the request body for creating/updating transformations
 type CreateTransformationRequest struct {
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
-	ExternalID  string `json:"externalId"`
+	TestEvents  []any  `json:"testEvents,omitempty"`
+	ExternalID  string `json:"externalId,omitempty"`
 }
 
-// UpdateTransformationRequest is the request body for updating a transformation
-type UpdateTransformationRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Code        string `json:"code"`
-	Language    string `json:"language"`
-}
-
-// CreateLibraryRequest is the request body for creating a library
+// CreateLibraryRequest is the request body for creating/updating libraries
 type CreateLibraryRequest struct {
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
-	ExternalID  string `json:"externalId"`
-}
-
-// UpdateLibraryRequest is the request body for updating a library
-type UpdateLibraryRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Code        string `json:"code"`
-	Language    string `json:"language"`
+	ExternalID  string `json:"externalId,omitempty"`
 }
 
 // BatchPublishRequest is the request body for batch publishing transformations and libraries
@@ -66,13 +51,16 @@ type BatchPublishRequest struct {
 	Libraries       []BatchPublishLibrary        `json:"libraries,omitempty"`
 }
 
-// BatchPublishTransformation represents a transformation to publish
 type BatchPublishTransformation struct {
 	VersionID string `json:"versionId"`
 	TestInput []any  `json:"testInput,omitempty"`
 }
 
-// BatchPublishLibrary represents a library to publish
 type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
+}
+
+// BatchPublishResponse is the response from batch publish
+type BatchPublishResponse struct {
+	Published bool `json:"published"`
 }
