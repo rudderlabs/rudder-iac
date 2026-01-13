@@ -19,15 +19,17 @@ var (
 
 // Migrator handles the migration of project specs from rudder/0.1 to rudder/1
 type Migrator struct {
-	project  project.Project
-	provider provider.Provider
+	project          project.Project
+	provider         provider.Provider
+	commonMigrations CommonMigrations
 }
 
-// New creates a new Migrator instance
+// New creates a new Migrator instance with common migrations
 func New(proj project.Project, p provider.Provider) *Migrator {
 	return &Migrator{
-		project:  proj,
-		provider: p,
+		project:          proj,
+		provider:         p,
+		commonMigrations: GetCommonMigrations(),
 	}
 }
 
@@ -66,7 +68,18 @@ func (m *Migrator) ConfirmMigration() (bool, error) {
 	return true, nil
 }
 
+// ApplyCommonMigrations applies all common migrations to a spec in order
+func (m *Migrator) applyCommonMigrations(spec *specs.Spec) error {
+	for _, migration := range m.commonMigrations {
+		if err := migration.Apply(spec); err != nil {
+			return fmt.Errorf("applying common migration %s: %w", migration.Name(), err)
+		}
+	}
+	return nil
+}
+
 // MigrateSpecs migrates all loaded specs to rudder/1
+// Applies common migrations, provider-specific migrations
 func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]*specs.Spec, error) {
 	migratedSpecs := make(map[string]*specs.Spec)
 	for path, spec := range loadedSpecs {
@@ -74,8 +87,14 @@ func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]
 			migratorLog.Debug("skipping migration", "path", path, "version", spec.Version)
 			continue
 		}
-		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind, "version", spec.Version)
 
+		migratorLog.Info("migrating file", "path", path, "kind", spec.Kind, "version", spec.Version)
+		// Phase 1: Apply common migrations
+		if err := m.applyCommonMigrations(spec); err != nil {
+			return nil, fmt.Errorf("applying common migrations to spec %s: %w", path, err)
+		}
+
+		// Phase 2: Apply provider-specific migrations
 		migratedSpec, err := m.provider.MigrateSpec(spec)
 		if err != nil {
 			return nil, fmt.Errorf("migrating file %s: %w", path, err)
