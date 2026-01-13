@@ -216,3 +216,9 @@ func (p *BaseProvider) FormatForExport(
 	}
 	return result, nil
 }
+
+// GetHandler returns the handler for a given resource type
+func (p *BaseProvider) GetHandler(resourceType string) (Handler, bool) {
+	handler, ok := p.handlers[resourceType]
+	return handler, ok
+}
