@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 type EmptyProvider struct{}
@@ -41,5 +42,9 @@ func (p *EmptyProvider) Delete(_ context.Context, _ string, _ string, _ resource
 }
 
 func (p *EmptyProvider) DeleteRaw(_ context.Context, _ string, _ string, _ any, _ any) error {
+	return errNotImplemented
+}
+
+func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *state.State) error {
 	return errNotImplemented
 }

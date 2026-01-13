@@ -62,7 +62,6 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	plan := &Plan{
 		Diff: diff,
 	}
-
 	// Handle importable resources (will be imported from remote)
 	sortedImportable := sortByDependencies(diff.ImportableResources, target)
 	for _, urn := range sortedImportable {

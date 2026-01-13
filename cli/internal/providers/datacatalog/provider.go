@@ -15,6 +15,7 @@ import (
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -364,5 +365,11 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 			return fmt.Errorf("expanding refs on tp: %s err: %w", tp.LocalID, err)
 		}
 	}
+	return nil
+}
+
+// ConsolidateSync performs post-execution consolidation
+// No consolidation needed for DataCatalog resources
+func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
 	return nil
 }

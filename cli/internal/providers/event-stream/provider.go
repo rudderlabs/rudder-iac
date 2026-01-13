@@ -215,3 +215,9 @@ func (p *Provider) FormatForExport(
 	}
 	return result, nil
 }
+
+// ConsolidateSync performs post-execution consolidation
+// No consolidation needed for EventStream resources
+func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
+	return nil
+}

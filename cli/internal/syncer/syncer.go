@@ -28,6 +28,7 @@ type SyncProvider interface {
 	provider.ManagedRemoteResourceLoader
 	provider.StateLoader
 	provider.LifecycleManager
+	provider.ConsolidateSyncer
 }
 
 func New(p SyncProvider, workspace *client.Workspace, options ...Option) (*ProjectSyncer, error) {
@@ -121,16 +122,13 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	if err != nil {
 		return []error{err}
 	}
-
 	state, err := s.provider.MapRemoteToState(resources)
 	if err != nil {
 		return []error{err}
 	}
 	source := StateToGraph(state)
-
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
-
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
@@ -153,7 +151,21 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		}
 	}
 
-	return s.executePlan(ctx, state, plan, target, continueOnFail)
+	// Execute the plan (create/update/delete operations)
+	errors := s.executePlan(ctx, state, plan, target, continueOnFail)
+
+	// If plan execution failed, don't proceed with consolidation
+	if len(errors) > 0 {
+		return errors
+	}
+
+	// Consolidate sync: providers can perform batch operations or multi-resource
+	// coordination after all individual resources have been processed
+	if err := s.provider.ConsolidateSync(ctx, state); err != nil {
+		return []error{fmt.Errorf("consolidate sync failed: %w", err)}
+	}
+
+	return nil
 }
 
 func StateToGraph(state *state.State) *resources.Graph {
