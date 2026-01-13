@@ -18,7 +18,7 @@ type TransformationSpec struct {
 	Name string `json:"name" mapstructure:"name"`
 
 	// Description provides additional context about what this transformation does
-	Description string `json:"description" mapstructure:"description"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
 
 	// Language specifies the programming language of the transformation code.
 	// Valid values: "javascript", "python"
@@ -74,7 +74,7 @@ type TransformationLibrarySpec struct {
 	Name string `json:"name" mapstructure:"name"`
 
 	// Description provides additional context about what this library provides
-	Description string `json:"description" mapstructure:"description"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
 
 	// Language specifies the programming language of the library code.
 	// Valid values: "javascript", "python"
