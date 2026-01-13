@@ -118,27 +118,22 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
-	fmt.Println("0")
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
 	}
-	fmt.Println("1")
 	state, err := s.provider.MapRemoteToState(resources)
 	if err != nil {
 		return []error{err}
 	}
 	source := StateToGraph(state)
-	fmt.Println("2")
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
-	fmt.Println("3")
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
 		return nil
 	}
-	fmt.Println("4")
 
 	if len(plan.Operations) == 0 {
 		fmt.Println("No changes to apply")
