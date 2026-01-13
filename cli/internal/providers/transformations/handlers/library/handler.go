@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -104,12 +105,34 @@ func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *r
 	if resource.Code == "" {
 		return fmt.Errorf("code is required")
 	}
+
+	// Validate code syntax
+	codeParser, err := parser.NewParser(resource.Language)
+	if err != nil {
+		return fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
+	}
+
+	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
+		return fmt.Errorf("validating code syntax: %w", err)
+	}
+
 	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteLibrary, error) {
-	// TODO: Implement when we add List operation to the store
-	return []*model.RemoteLibrary{}, nil
+	libraries, err := h.store.ListLibraries(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing libraries: %w", err)
+	}
+
+	// Filter only managed resources (those with external IDs)
+	result := make([]*model.RemoteLibrary, 0)
+	for _, l := range libraries {
+		if l.ExternalID != "" {
+			result = append(result, &model.RemoteLibrary{TransformationLibrary: l})
+		}
+	}
+	return result, nil
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteLibrary, error) {
@@ -157,8 +180,24 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.LibraryResource) (
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource, oldData *model.LibraryResource, oldState *model.LibraryState) (*model.LibraryState, error) {
-	// TODO: Implement when we add Update operation to the store
-	return nil, fmt.Errorf("update not implemented yet")
+	req := &transformations.CreateLibraryRequest{
+		Name:        newData.Name,
+		Description: newData.Description,
+		Code:        newData.Code,
+		Language:    newData.Language,
+		ExternalID:  newData.ID,
+	}
+
+	// Always use publish=false, batch publish happens later
+	updated, err := h.store.UpdateLibrary(ctx, oldState.ID, req, false)
+	if err != nil {
+		return nil, fmt.Errorf("updating library: %w", err)
+	}
+
+	return &model.LibraryState{
+		ID:        updated.ID,
+		VersionID: updated.VersionID,
+	}, nil
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, remoteId string) (*model.LibraryState, error) {
@@ -167,8 +206,10 @@ func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, r
 }
 
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.LibraryResource, oldState *model.LibraryState) error {
-	// TODO: Implement when we add Delete operation to the store
-	return fmt.Errorf("delete not implemented yet")
+	if err := h.store.DeleteLibrary(ctx, oldState.ID); err != nil {
+		return fmt.Errorf("deleting library: %w", err)
+	}
+	return nil
 }
 
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteLibrary) (*export.SpecExportData[model.LibrarySpec], error) {

@@ -216,3 +216,16 @@ func (p *BaseProvider) FormatForExport(
 	}
 	return result, nil
 }
+
+// ConsolidateSync default implementation (no-op)
+// Providers that need post-execution consolidation should override this method
+func (p *BaseProvider) ConsolidateSync(ctx context.Context, st *state.State) error {
+	// Default: no consolidation needed
+	return nil
+}
+
+// GetHandler returns the handler for a given resource type
+func (p *BaseProvider) GetHandler(resourceType string) (Handler, bool) {
+	handler, ok := p.handlers[resourceType]
+	return handler, ok
+}

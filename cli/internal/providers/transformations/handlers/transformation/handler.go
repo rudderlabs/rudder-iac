@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -101,12 +102,34 @@ func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, g
 	if resource.Code == "" {
 		return fmt.Errorf("code is required")
 	}
+
+	// Validate code syntax
+	codeParser, err := parser.NewParser(resource.Language)
+	if err != nil {
+		return fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
+	}
+
+	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
+		return fmt.Errorf("validating code syntax: %w", err)
+	}
+
 	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteTransformation, error) {
-	// TODO: Implement when we add List operation to the store
-	return []*model.RemoteTransformation{}, nil
+	transformations, err := h.store.ListTransformations(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing transformations: %w", err)
+	}
+
+	// Filter only managed resources (those with external IDs)
+	result := make([]*model.RemoteTransformation, 0)
+	for _, t := range transformations {
+		if t.ExternalID != "" {
+			result = append(result, &model.RemoteTransformation{Transformation: t})
+		}
+	}
+	return result, nil
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteTransformation, error) {
@@ -153,8 +176,24 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.TransformationReso
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.TransformationResource, oldData *model.TransformationResource, oldState *model.TransformationState) (*model.TransformationState, error) {
-	// TODO: Implement when we add Update operation to the store
-	return nil, fmt.Errorf("update not implemented yet")
+	req := &transformations.CreateTransformationRequest{
+		Name:        newData.Name,
+		Description: newData.Description,
+		Code:        newData.Code,
+		Language:    newData.Language,
+		ExternalID:  newData.ID,
+	}
+
+	// Always use publish=false, batch publish happens later
+	updated, err := h.store.UpdateTransformation(ctx, oldState.ID, req, false)
+	if err != nil {
+		return nil, fmt.Errorf("updating transformation: %w", err)
+	}
+
+	return &model.TransformationState{
+		ID:        updated.ID,
+		VersionID: updated.VersionID,
+	}, nil
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.TransformationResource, remoteId string) (*model.TransformationState, error) {
@@ -163,8 +202,10 @@ func (h *HandlerImpl) Import(ctx context.Context, data *model.TransformationReso
 }
 
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.TransformationResource, oldState *model.TransformationState) error {
-	// TODO: Implement when we add Delete operation to the store
-	return fmt.Errorf("delete not implemented yet")
+	if err := h.store.DeleteTransformation(ctx, oldState.ID); err != nil {
+		return fmt.Errorf("deleting transformation: %w", err)
+	}
+	return nil
 }
 
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteTransformation) (*export.SpecExportData[model.TransformationSpec], error) {

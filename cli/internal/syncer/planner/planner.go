@@ -58,11 +58,13 @@ func New(workspaceId string) *Planner {
 }
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
+	fmt.Println("Plan.0")
 	diff := differ.ComputeDiff(source, target, differ.DiffOptions{WorkspaceID: p.workspaceId})
+	fmt.Println("Plan.1")
 	plan := &Plan{
 		Diff: diff,
 	}
-
+	fmt.Println("Plan.2")
 	// Handle importable resources (will be imported from remote)
 	sortedImportable := sortByDependencies(diff.ImportableResources, target)
 	for _, urn := range sortedImportable {

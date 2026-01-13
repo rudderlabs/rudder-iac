@@ -15,8 +15,8 @@ type TransformationResource struct {
 	Name        string
 	Description string
 	Language    string
-	Code        string // Resolved from inline or file
-	Tests       []specs.TransformationTest
+	Code        string                     // Resolved from inline or file
+	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"` // Excluded from state comparison (local test-only field)
 }
 
 // TransformationState represents the output state from the remote system

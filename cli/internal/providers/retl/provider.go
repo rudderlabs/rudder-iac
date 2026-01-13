@@ -257,3 +257,9 @@ func (p *Provider) FormatForExport(collection *resources.RemoteResources, idName
 	}
 	return allEntities, nil
 }
+
+// ConsolidateSync performs post-execution consolidation
+// No consolidation needed for RETL resources
+func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
+	return nil
+}

@@ -10,17 +10,19 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 // Provider wraps BaseProvider and adds transformations-specific functionality
 type Provider struct {
-	provider.Provider
+	*provider.BaseProvider
 	store transformations.TransformationStore
 }
 
 // NewProvider creates a new transformations provider with all resource handlers
-func NewProvider(client *client.Client) provider.Provider {
+func NewProvider(client *client.Client) *Provider {
 	// Create the transformation store
 	store := transformations.NewRudderTransformationStore(client)
 
@@ -31,8 +33,8 @@ func NewProvider(client *client.Client) provider.Provider {
 	}
 
 	return &Provider{
-		Provider: provider.NewBaseProvider(handlers),
-		store:    store,
+		BaseProvider: provider.NewBaseProvider(handlers),
+		store:        store,
 	}
 }
 
@@ -97,4 +99,81 @@ func (p *Provider) buildBatchPublishRequest(st *state.State) (*transformations.B
 	}
 
 	return req, nil
+}
+
+// ResourceGraph overrides BaseProvider.ResourceGraph to add transformation→library dependencies
+// by parsing transformation code to extract library imports
+func (p *Provider) ResourceGraph() (*resources.Graph, error) {
+	graph := resources.NewGraph()
+
+	// libraries
+	libraryHandler, ok := p.BaseProvider.GetHandler(library.HandlerMetadata.ResourceType)
+	if !ok {
+		return nil, fmt.Errorf("library handler not found")
+	}
+
+	libraryResources, err := libraryHandler.Resources()
+	if err != nil {
+		return nil, fmt.Errorf("getting library resources: %w", err)
+	}
+
+	// Build handleName → URN mapping
+	handleNameToURN := make(map[string]string)
+
+	for _, r := range libraryResources {
+		lib, ok := r.RawData().(*model.LibraryResource)
+		if !ok {
+			return nil, fmt.Errorf("invalid RawData type for library %s: expected *model.LibraryResource", r.URN())
+		}
+
+		handleNameToURN[lib.ImportName] = r.URN()
+		graph.AddResource(r)
+	}
+	
+	// transformations
+	transformationHandler, ok := p.BaseProvider.GetHandler(transformation.HandlerMetadata.ResourceType)
+	if !ok {
+		return nil, fmt.Errorf("transformation handler not found")
+	}
+
+	transformationResources, err := transformationHandler.Resources()
+	if err != nil {
+		return nil, fmt.Errorf("getting transformation resources: %w", err)
+	}
+
+	for _, r := range transformationResources {
+		tf, ok := r.RawData().(*model.TransformationResource)
+		if !ok {
+			return nil, fmt.Errorf("invalid RawData type for transformation %s: expected *model.TransformationResource", r.URN())
+		}
+
+		codeParser, err := parser.NewParser(tf.Language)
+		if err != nil {
+			return nil, fmt.Errorf("creating parser for %s: %w", r.URN(), err)
+		}
+
+		handleNames, err := codeParser.ExtractImports(tf.Code)
+		if err != nil {
+			return nil, fmt.Errorf("parsing imports for %s: %w", r.URN(), err)
+		}
+		
+		// Resolve handleNames to library URNs and add dependencies
+		for _, handleName := range handleNames {
+			libraryURN, exists := handleNameToURN[handleName]
+			if !exists {
+				return nil, fmt.Errorf(
+					"transformation %s imports library '%s' which is not found in the project. "+
+						"Ensure you have a transformation-library spec with import_name: '%s'",
+					r.ID(),
+					handleName,
+					handleName,
+				)
+			}
+
+			graph.AddDependency(r.URN(), libraryURN)
+		}
+		graph.AddResource(r)
+	}
+	
+	return graph, nil
 }
