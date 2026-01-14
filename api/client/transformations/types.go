@@ -1,4 +1,4 @@
-package client
+package transformations
 
 // Transformation represents a transformation resource from the API
 type Transformation struct {
