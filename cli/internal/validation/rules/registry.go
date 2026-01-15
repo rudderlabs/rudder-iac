@@ -10,6 +10,8 @@ var (
 	// ErrDuplicateRule is returned when attempting to register a rule with an ID that already exists
 	ErrDuplicateRule = fmt.Errorf("rule with id already registered")
 
+	ErrDuplicateKinds = fmt.Errorf("duplicate kinds found in a rule")
+
 	// ErrNoRuleForKind is returned when no rules are found for a given kind
 	ErrNoRuleForKind = fmt.Errorf("no rule found for kind")
 )
@@ -95,7 +97,8 @@ func (r *defaultRegistry) RegisterSyntactic(rule Rule) error {
 	if lo.Contains(kinds, "*") {
 		r.wildcardSyntacticRules = append(r.wildcardSyntacticRules, rule)
 	} else {
-		for _, kind := range kinds {
+		for _, kind := range lo.Uniq(kinds) {
+			// Filter out duplicate kinds if any
 			r.syntacticRulesByKind[kind] = append(r.syntacticRulesByKind[kind], rule)
 		}
 	}
@@ -123,7 +126,7 @@ func (r *defaultRegistry) RegisterSemantic(rule Rule) error {
 	if lo.Contains(kinds, "*") {
 		r.wildcardSemanticRules = append(r.wildcardSemanticRules, rule)
 	} else {
-		for _, kind := range kinds {
+		for _, kind := range lo.Uniq(kinds) {
 			r.semanticRulesByKind[kind] = append(r.semanticRulesByKind[kind], rule)
 		}
 	}
