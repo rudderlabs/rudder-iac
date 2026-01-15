@@ -107,12 +107,6 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 	case yaml.ScalarNode:
 		// Terminal node - record its position
 		pi.recordPosition(path, node, key)
-
-		// 	case yaml.AliasNode:
-		// 		// For alias nodes, use the aliased node's position
-		// 		if node.Alias != nil && path != "" {
-		// 			pi.walkNode(node.Alias, path, key)
-		// 		}
 	}
 }
 
@@ -136,7 +130,13 @@ func (pi *PathIndex) recordPosition(
 
 	// If the key is not nil, we are in a situation
 	// where the node is mapping node or a scalar node.
-	// In case it's one of the sequence values, we use the node's line and column.
+	// In case it's one of the sequence values, we use the node's line and column. For example:
+	// abc:
+	// - 1
+	// - 2
+	// For abc sequence node, when we are processing the first item aka `1`,
+	// we will have only the value node, so we will skip the below condition
+	// as will have key as nil.
 	if key != nil {
 		line = key.Line
 		column = key.Column
