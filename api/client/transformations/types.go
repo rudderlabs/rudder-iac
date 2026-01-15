@@ -28,21 +28,21 @@ type TransformationLibrary struct {
 
 // CreateTransformationRequest is the request body for creating/updating transformations
 type CreateTransformationRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Code        string `json:"code"`
-	Language    string `json:"language"`
-	TestEvents  []any  `json:"testEvents,omitempty"`
-	ExternalID  string `json:"externalId,omitempty"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Code        string  `json:"code"`
+	Language    string  `json:"language"`
+	TestEvents  []any   `json:"testEvents,omitempty"`
+	ExternalID  *string `json:"externalId,omitempty"`
 }
 
 // CreateLibraryRequest is the request body for creating/updating libraries
 type CreateLibraryRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Code        string `json:"code"`
-	Language    string `json:"language"`
-	ExternalID  string `json:"externalId,omitempty"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Code        string  `json:"code"`
+	Language    string  `json:"language"`
+	ExternalID  *string `json:"externalId,omitempty"`
 }
 
 // BatchPublishRequest is the request body for batch publishing transformations and libraries

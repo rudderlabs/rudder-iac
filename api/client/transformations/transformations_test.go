@@ -12,6 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper to convert string to *string
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestCreateTransformation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -72,11 +77,11 @@ func TestCreateTransformation(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateTransformationRequest{
 				Name:        "test-transformation",
-				Description: "Test transformation description",
+				Description: strPtr("Test transformation description"),
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
 				TestEvents:  []any{map[string]string{"event": "test"}},
-				ExternalID:  "ext-123",
+				ExternalID:  strPtr("ext-123"),
 			}
 
 			result, err := store.CreateTransformation(ctx, req, tt.publish)
@@ -156,10 +161,10 @@ func TestUpdateTransformation(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateTransformationRequest{
 				Name:        "updated-transformation",
-				Description: "Updated description",
+				Description: strPtr("Updated description"),
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
-				ExternalID:  "ext-123",
+				ExternalID:  strPtr("ext-123"),
 			}
 
 			result, err := store.UpdateTransformation(ctx, "trans-123", req, tt.publish)
@@ -347,10 +352,10 @@ func TestCreateLibrary(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateLibraryRequest{
 				Name:        "test-library",
-				Description: "Test library description",
+				Description: strPtr("Test library description"),
 				Code:        "function helper() { return true; }",
 				Language:    "javascript",
-				ExternalID:  "lib-ext-123",
+				ExternalID:  strPtr("lib-ext-123"),
 			}
 
 			result, err := store.CreateLibrary(ctx, req, tt.publish)
@@ -430,10 +435,10 @@ func TestUpdateLibrary(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateLibraryRequest{
 				Name:        "updated-library",
-				Description: "Updated library description",
+				Description: strPtr("Updated library description"),
 				Code:        "function helper() { return false; }",
 				Language:    "javascript",
-				ExternalID:  "lib-ext-123",
+				ExternalID:  strPtr("lib-ext-123"),
 			}
 
 			result, err := store.UpdateLibrary(ctx, "lib-123", req, tt.publish)
@@ -627,6 +632,112 @@ func TestBatchPublish(t *testing.T) {
 
 	err = store.BatchPublish(ctx, req)
 	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateTransformationClearDescription(t *testing.T) {
+	// This test proves we can explicitly set description to empty string
+	// which is different from omitting the field entirely
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				// Verify that description is included in JSON as empty string
+				expectedURL := "https://api.rudderstack.com/transformations/trans-123?publish=false"
+				if req.URL.String() != expectedURL {
+					return false
+				}
+				return testutils.ValidateRequest(t, req, "POST", expectedURL, `{
+					"name": "transformation",
+					"description": "",
+					"code": "function transform(event) { return event; }",
+					"language": "javascript"
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"id": "trans-123",
+				"versionId": "ver-new",
+				"name": "transformation",
+				"description": "",
+				"code": "function transform(event) { return event; }",
+				"language": "javascript",
+				"imports": [],
+				"workspaceId": "ws-789"
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	req := &transformations.CreateTransformationRequest{
+		Name:        "transformation",
+		Description: strPtr(""), // Explicitly set to empty - this clears the description!
+		Code:        "function transform(event) { return event; }",
+		Language:    "javascript",
+	}
+
+	result, err := store.UpdateTransformation(ctx, "trans-123", req, false)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "", result.Description)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateTransformationOmitDescription(t *testing.T) {
+	// This test proves we can omit description entirely (nil = don't update)
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				// Verify that description is NOT included in JSON
+				expectedURL := "https://api.rudderstack.com/transformations/trans-123?publish=false"
+				if req.URL.String() != expectedURL {
+					return false
+				}
+				return testutils.ValidateRequest(t, req, "POST", expectedURL, `{
+					"name": "transformation",
+					"code": "function transform(event) { return event; }",
+					"language": "javascript"
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"id": "trans-123",
+				"versionId": "ver-new",
+				"name": "transformation",
+				"description": "Original description kept",
+				"code": "function transform(event) { return event; }",
+				"language": "javascript",
+				"imports": [],
+				"workspaceId": "ws-789"
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	req := &transformations.CreateTransformationRequest{
+		Name:        "transformation",
+		Description: nil, // nil = omit from JSON, don't update this field
+		Code:        "function transform(event) { return event; }",
+		Language:    "javascript",
+	}
+
+	result, err := store.UpdateTransformation(ctx, "trans-123", req, false)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "Original description kept", result.Description)
 
 	httpClient.AssertNumberOfCalls()
 }
