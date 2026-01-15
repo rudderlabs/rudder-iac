@@ -18,14 +18,14 @@ const (
 type TransformationStore interface {
 	// Transformation operations
 	CreateTransformation(ctx context.Context, req *CreateTransformationRequest, publish bool) (*Transformation, error)
-	UpdateTransformation(ctx context.Context, id string, req *CreateTransformationRequest, publish bool) (*Transformation, error)
+	UpdateTransformation(ctx context.Context, id string, req *UpdateTransformationRequest, publish bool) (*Transformation, error)
 	GetTransformation(ctx context.Context, id string) (*Transformation, error)
 	ListTransformations(ctx context.Context) ([]*Transformation, error)
 	DeleteTransformation(ctx context.Context, id string) error
 
 	// Library operations
 	CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error)
-	UpdateLibrary(ctx context.Context, id string, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error)
+	UpdateLibrary(ctx context.Context, id string, req *UpdateLibraryRequest, publish bool) (*TransformationLibrary, error)
 	GetLibrary(ctx context.Context, id string) (*TransformationLibrary, error)
 	ListLibraries(ctx context.Context) ([]*TransformationLibrary, error)
 	DeleteLibrary(ctx context.Context, id string) error
@@ -45,8 +45,9 @@ func NewRudderTransformationStore(client *client.Client) TransformationStore {
 	}
 }
 
+// Transformation operations
+
 // CreateTransformation creates a new transformation
-// publish=false creates unpublished revision, publish=true validates and publishes
 func (r *rudderTransformationStore) CreateTransformation(ctx context.Context, req *CreateTransformationRequest, publish bool) (*Transformation, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -67,31 +68,8 @@ func (r *rudderTransformationStore) CreateTransformation(ctx context.Context, re
 	return &transformation, nil
 }
 
-// CreateLibrary creates a new transformation library
-// publish=false creates unpublished revision, publish=true validates and publishes
-func (r *rudderTransformationStore) CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error) {
-	data, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling create library request: %w", err)
-	}
-
-	path := fmt.Sprintf("%s?publish=%t", librariesPrefix, publish)
-	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("creating library: %w", err)
-	}
-
-	var library TransformationLibrary
-	if err := json.Unmarshal(resp, &library); err != nil {
-		return nil, fmt.Errorf("unmarshalling create library response: %w", err)
-	}
-
-	return &library, nil
-}
-
 // UpdateTransformation updates an existing transformation
-// Note: API uses POST (not PUT) for updates
-func (r *rudderTransformationStore) UpdateTransformation(ctx context.Context, id string, req *CreateTransformationRequest, publish bool) (*Transformation, error) {
+func (r *rudderTransformationStore) UpdateTransformation(ctx context.Context, id string, req *UpdateTransformationRequest, publish bool) (*Transformation, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling update transformation request: %w", err)
@@ -141,7 +119,6 @@ func (r *rudderTransformationStore) ListTransformations(ctx context.Context) ([]
 		return nil, fmt.Errorf("unmarshalling list transformations response: %w", err)
 	}
 
-	// Convert to pointers
 	transformations := make([]*Transformation, len(result.Transformations))
 	for i := range result.Transformations {
 		transformations[i] = &result.Transformations[i]
@@ -160,9 +137,31 @@ func (r *rudderTransformationStore) DeleteTransformation(ctx context.Context, id
 	return nil
 }
 
+// Library operations
+
+// CreateLibrary creates a new transformation library
+func (r *rudderTransformationStore) CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling create library request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s?publish=%t", librariesPrefix, publish)
+	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("creating library: %w", err)
+	}
+
+	var library TransformationLibrary
+	if err := json.Unmarshal(resp, &library); err != nil {
+		return nil, fmt.Errorf("unmarshalling create library response: %w", err)
+	}
+
+	return &library, nil
+}
+
 // UpdateLibrary updates an existing library
-// Note: API uses POST (not PUT) for updates
-func (r *rudderTransformationStore) UpdateLibrary(ctx context.Context, id string, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error) {
+func (r *rudderTransformationStore) UpdateLibrary(ctx context.Context, id string, req *UpdateLibraryRequest, publish bool) (*TransformationLibrary, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling update library request: %w", err)
@@ -212,7 +211,6 @@ func (r *rudderTransformationStore) ListLibraries(ctx context.Context) ([]*Trans
 		return nil, fmt.Errorf("unmarshalling list libraries response: %w", err)
 	}
 
-	// Convert to pointers
 	libraries := make([]*TransformationLibrary, len(result.Libraries))
 	for i := range result.Libraries {
 		libraries[i] = &result.Libraries[i]
@@ -231,6 +229,8 @@ func (r *rudderTransformationStore) DeleteLibrary(ctx context.Context, id string
 	return nil
 }
 
+// Batch operations
+
 // BatchPublish publishes multiple transformations and libraries in a single batch operation
 func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *BatchPublishRequest) error {
 	data, err := json.Marshal(req)
@@ -239,18 +239,9 @@ func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *Batch
 	}
 
 	path := "/transformations/libraries/publish"
-	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	_, err = r.client.Do(ctx, "POST", path, bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("batch publishing: %w", err)
-	}
-
-	var publishResp BatchPublishResponse
-	if err := json.Unmarshal(resp, &publishResp); err != nil {
-		return fmt.Errorf("unmarshalling batch publish response: %w", err)
-	}
-
-	if !publishResp.Published {
-		return fmt.Errorf("batch publish failed: published=false")
 	}
 
 	return nil

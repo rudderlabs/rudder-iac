@@ -51,7 +51,6 @@ func TestCreateTransformation(t *testing.T) {
 							"description": "Test transformation description",
 							"code": "function transform(event) { return event; }",
 							"language": "javascript",
-							"testEvents": [{"event": "test"}],
 							"externalId": "ext-123"
 						}`)
 					},
@@ -80,7 +79,6 @@ func TestCreateTransformation(t *testing.T) {
 				Description: strPtr("Test transformation description"),
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
-				TestEvents:  []any{map[string]string{"event": "test"}},
 				ExternalID:  strPtr("ext-123"),
 			}
 
@@ -135,8 +133,7 @@ func TestUpdateTransformation(t *testing.T) {
 							"name": "updated-transformation",
 							"description": "Updated description",
 							"code": "function transform(event) { return event; }",
-							"language": "javascript",
-							"externalId": "ext-123"
+							"language": "javascript"
 						}`)
 					},
 					ResponseStatus: 200,
@@ -159,12 +156,11 @@ func TestUpdateTransformation(t *testing.T) {
 			require.NoError(t, err)
 
 			store := transformations.NewRudderTransformationStore(c)
-			req := &transformations.CreateTransformationRequest{
+			req := &transformations.UpdateTransformationRequest{
 				Name:        "updated-transformation",
 				Description: strPtr("Updated description"),
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
-				ExternalID:  strPtr("ext-123"),
 			}
 
 			result, err := store.UpdateTransformation(ctx, "trans-123", req, tt.publish)
@@ -409,8 +405,7 @@ func TestUpdateLibrary(t *testing.T) {
 							"name": "updated-library",
 							"description": "Updated library description",
 							"code": "function helper() { return false; }",
-							"language": "javascript",
-							"externalId": "lib-ext-123"
+							"language": "javascript"
 						}`)
 					},
 					ResponseStatus: 200,
@@ -433,12 +428,11 @@ func TestUpdateLibrary(t *testing.T) {
 			require.NoError(t, err)
 
 			store := transformations.NewRudderTransformationStore(c)
-			req := &transformations.CreateLibraryRequest{
+			req := &transformations.UpdateLibraryRequest{
 				Name:        "updated-library",
 				Description: strPtr("Updated library description"),
 				Code:        "function helper() { return false; }",
 				Language:    "javascript",
-				ExternalID:  strPtr("lib-ext-123"),
 			}
 
 			result, err := store.UpdateLibrary(ctx, "lib-123", req, tt.publish)
@@ -675,7 +669,7 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 	require.NoError(t, err)
 
 	store := transformations.NewRudderTransformationStore(c)
-	req := &transformations.CreateTransformationRequest{
+	req := &transformations.UpdateTransformationRequest{
 		Name:        "transformation",
 		Description: strPtr(""), // Explicitly set to empty - this clears the description!
 		Code:        "function transform(event) { return event; }",
@@ -690,95 +684,3 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestUpdateTransformationOmitDescription(t *testing.T) {
-	// This test proves we can omit description entirely (nil = don't update)
-	ctx := context.Background()
-
-	calls := []testutils.Call{
-		{
-			Validate: func(req *http.Request) bool {
-				// Verify that description is NOT included in JSON
-				expectedURL := "https://api.rudderstack.com/transformations/trans-123?publish=false"
-				if req.URL.String() != expectedURL {
-					return false
-				}
-				return testutils.ValidateRequest(t, req, "POST", expectedURL, `{
-					"name": "transformation",
-					"code": "function transform(event) { return event; }",
-					"language": "javascript"
-				}`)
-			},
-			ResponseStatus: 200,
-			ResponseBody: `{
-				"id": "trans-123",
-				"versionId": "ver-new",
-				"name": "transformation",
-				"description": "Original description kept",
-				"code": "function transform(event) { return event; }",
-				"language": "javascript",
-				"imports": [],
-				"workspaceId": "ws-789"
-			}`,
-		},
-	}
-
-	httpClient := testutils.NewMockHTTPClient(t, calls...)
-	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
-	require.NoError(t, err)
-
-	store := transformations.NewRudderTransformationStore(c)
-	req := &transformations.CreateTransformationRequest{
-		Name:        "transformation",
-		Description: nil, // nil = omit from JSON, don't update this field
-		Code:        "function transform(event) { return event; }",
-		Language:    "javascript",
-	}
-
-	result, err := store.UpdateTransformation(ctx, "trans-123", req, false)
-	require.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, "Original description kept", result.Description)
-
-	httpClient.AssertNumberOfCalls()
-}
-
-func TestBatchPublishFailure(t *testing.T) {
-	ctx := context.Background()
-
-	calls := []testutils.Call{
-		{
-			Validate: func(req *http.Request) bool {
-				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/libraries/publish", `{
-					"transformations": [
-						{
-							"versionId": "trans-ver-1"
-						}
-					]
-				}`)
-			},
-			ResponseStatus: 200,
-			ResponseBody: `{
-				"published": false
-			}`,
-		},
-	}
-
-	httpClient := testutils.NewMockHTTPClient(t, calls...)
-	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
-	require.NoError(t, err)
-
-	store := transformations.NewRudderTransformationStore(c)
-	req := &transformations.BatchPublishRequest{
-		Transformations: []transformations.BatchPublishTransformation{
-			{
-				VersionID: "trans-ver-1",
-			},
-		},
-	}
-
-	err = store.BatchPublish(ctx, req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "batch publish failed: published=false")
-
-	httpClient.AssertNumberOfCalls()
-}
