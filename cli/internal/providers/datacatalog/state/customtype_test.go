@@ -16,9 +16,9 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 		Description: "Custom type for email validation",
 		Type:        "string",
 		Config: map[string]any{
-			"format":    "email",
-			"minLength": 5,
-			"maxLength": 255,
+			"format":     "email",
+			"min_length": 5,
+			"max_length": 255,
 		},
 		Properties: []*CustomTypeProperty{
 			{

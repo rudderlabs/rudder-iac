@@ -125,9 +125,9 @@ func TestCustomTypeForExport(t *testing.T) {
 			"description": "Array of products",
 			"type":        "array",
 			"config": map[string]any{
-				"minItems":  float64(1),
-				"maxItems":  float64(5),
-				"itemTypes": []any{expectedRef},
+				"min_items":  float64(1),
+				"max_items":  float64(5),
+				"item_types": []any{expectedRef},
 			},
 		}, result)
 	})
@@ -344,7 +344,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved reference is empty for itemTypes")
+		assert.Contains(t, err.Error(), "resolved reference is empty for item_types")
 	})
 
 	t.Run("errors when variant discriminator resolver fails", func(t *testing.T) {

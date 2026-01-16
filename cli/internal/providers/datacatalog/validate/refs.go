@@ -124,7 +124,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 								if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
 									errs = append(errs, ValidationError{
 										Reference: reference,
-										error:     fmt.Errorf("custom type reference '%s' in itemTypes at idx: %d not found in catalog", itemTypeStr, idx),
+										error:     fmt.Errorf("custom type reference '%s' in item_types at idx: %d not found in catalog", itemTypeStr, idx),
 									})
 								}
 							}

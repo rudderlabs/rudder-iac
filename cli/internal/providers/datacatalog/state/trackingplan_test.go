@@ -131,9 +131,9 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:       "upstream-property-id",
-					LocalID:  "property-local-id",
-					Required: false,
+					ID:                   "upstream-property-id",
+					LocalID:              "property-local-id",
+					Required:             false,
 					AdditionalProperties: true,
 				},
 			},
@@ -145,9 +145,9 @@ func TestTrackingPlanArgs_Diff(t *testing.T) {
 			AllowUnplanned: false,
 			Properties: []*state.TrackingPlanPropertyArgs{
 				{
-					ID:       "upstream-property-id",
-					LocalID:  "property-local-id",
-					Required: false,
+					ID:                   "upstream-property-id",
+					LocalID:              "property-local-id",
+					Required:             false,
 					AdditionalProperties: false,
 				},
 			},
@@ -387,7 +387,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Type:        "array",
 				Required:    false,
 				Config: map[string]interface{}{
-					"itemTypes": []any{"#/custom-types/group/type-id"},
+					"item_types": []any{"#/custom-types/group/type-id"},
 				},
 			},
 			urnFromRef: func(ref string) string {
@@ -439,7 +439,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Type:        "array",
 				Required:    false,
 				Config: map[string]interface{}{
-					"itemTypes": []any{"#/custom-types/group/invalid-id"},
+					"item_types": []any{"#/custom-types/group/invalid-id"},
 				},
 			},
 			urnFromRef: func(ref string) string {

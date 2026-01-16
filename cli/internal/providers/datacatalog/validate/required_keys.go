@@ -70,13 +70,13 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			}
 
-			// Validate array type properties with custom type references in itemTypes
+			// Validate array type properties with custom type references in item_types
 			if prop.Type == "array" && prop.Config != nil {
-				if itemTypes, ok := prop.Config["itemTypes"]; ok {
+				if itemTypes, ok := prop.Config["item_types"]; ok {
 					itemTypesArray, ok := itemTypes.([]any)
 					if !ok {
 						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("itemTypes must be an array"),
+							error:     fmt.Errorf("item_types must be an array"),
 							Reference: reference,
 						})
 						continue
@@ -86,7 +86,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 						val, ok := itemType.(string)
 						if !ok {
 							errors = append(errors, ValidationError{
-								error:     fmt.Errorf("itemTypes at idx: %d must be string value", idx),
+								error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
 								Reference: reference,
 							})
 							continue
@@ -95,7 +95,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 						if catalog.CustomTypeRegex.Match([]byte(val)) {
 							if len(itemTypesArray) != 1 {
 								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("itemTypes containing custom type at idx: %d cannot be paired with other types", idx),
+									error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
 									Reference: reference,
 								})
 							}
@@ -463,7 +463,7 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 
 			if !slices.Contains(ValidTypes, val) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
+					error:     fmt.Errorf("item_types at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
 					Reference: reference,
 				})
 			}

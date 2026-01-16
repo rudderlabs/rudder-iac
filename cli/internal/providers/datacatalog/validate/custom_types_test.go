@@ -113,13 +113,13 @@ func TestCustomTypeValidation(t *testing.T) {
 							Description: "Test custom type",
 							Type:        "string",
 							Config: map[string]any{
-								"minLength": "not-a-number", // Should be a number
+								"min_length": "not-a-number", // Should be a number
 							},
 						},
 					},
 				},
 				expectedErrs:  1,
-				errorContains: []string{"minLength must be a number"},
+				errorContains: []string{"min_length must be a number"},
 			},
 			{
 				name: "number type with invalid config",
@@ -149,13 +149,13 @@ func TestCustomTypeValidation(t *testing.T) {
 							Description: "Test custom type",
 							Type:        "array",
 							Config: map[string]any{
-								"itemTypes": "not-an-array", // Should be an array
+								"item_types": "not-an-array", // Should be an array
 							},
 						},
 					},
 				},
 				expectedErrs:  1,
-				errorContains: []string{"itemTypes must be an array"},
+				errorContains: []string{"item_types must be an array"},
 			},
 		}
 

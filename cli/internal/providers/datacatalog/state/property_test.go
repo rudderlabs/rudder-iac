@@ -132,7 +132,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Description: "A list of emails",
 			Type:        "array",
 			Config: map[string]interface{}{
-				"itemTypes": []interface{}{"#/custom-types/email-types/EmailType"},
+				"item_types": []interface{}{"#/custom-types/email-types/EmailType"},
 			},
 		}
 
@@ -170,7 +170,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Description: "A list of emails",
 			Type:        "array",
 			Config: map[string]interface{}{
-				"itemTypes": []interface{}{"#/custom-types/email-types/NonExistentType"},
+				"item_types": []interface{}{"#/custom-types/email-types/NonExistentType"},
 			},
 		}
 

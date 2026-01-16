@@ -3,12 +3,12 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type ImportableCustomType struct {
@@ -50,10 +50,11 @@ func (ct *ImportableCustomType) fromUpstream(
 	ct.CustomType.Type = upstream.Type
 
 	ct.CustomType.Config = make(map[string]any)
-	maps.Copy(
-		ct.CustomType.Config,
-		upstream.Config,
-	)
+	// Convert camelCase keys to snake_case when copying from upstream
+	for key, value := range upstream.Config {
+		snakeKey := utils.ToSnakeCase(key)
+		ct.CustomType.Config[snakeKey] = value
+	}
 
 	ct.CustomType.Properties = make(
 		[]localcatalog.CustomTypeProperty,

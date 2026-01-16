@@ -42,14 +42,14 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, len(emptyCatalog.Properties), 1)
 		assert.Equal(t, len(emptyCatalog.Properties["base_props"]), 1)
-		assert.Equal(t, Property{
+		assert.Equal(t, PropertyV1{
 			LocalID:     "write_key",
 			Name:        "Write Key",
 			Type:        "string",
 			Description: "KSUID identifier for the source embedded in the SDKs",
 			Config: map[string]interface{}{
-				"minLength": float64(24),
-				"maxLength": float64(28),
+				"min_length": float64(24),
+				"max_length": float64(28),
 			},
 		}, emptyCatalog.Properties["base_props"][0])
 	})

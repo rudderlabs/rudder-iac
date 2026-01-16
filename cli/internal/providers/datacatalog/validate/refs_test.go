@@ -41,7 +41,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Description: "List of user emails",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{"#/custom-types/email-types/EmailType"},
+							"item_types": []interface{}{"#/custom-types/email-types/EmailType"},
 						},
 					},
 				},
@@ -61,7 +61,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Description: "List of user emails",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{"#/custom-types/email-types"}, // Missing type ID
+							"item_types": []interface{}{"#/custom-types/email-types"}, // Missing type ID
 						},
 					},
 				},
@@ -70,7 +70,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 				"email-types": {testCustomType},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference in itemTypes at idx: 0 has invalid format"},
+			errorContains: []string{"custom type reference in item_types at idx: 0 has invalid format"},
 		},
 		{
 			name: "reference to non-existent custom type in property itemTypes",
@@ -82,7 +82,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Description: "List of user emails",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{"#/custom-types/email-types/NonExistentType"},
+							"item_types": []interface{}{"#/custom-types/email-types/NonExistentType"},
 						},
 					},
 				},
@@ -91,7 +91,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 				"email-types": {testCustomType},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' in itemTypes at idx: 0 not found in catalog"},
+			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' in item_types at idx: 0 not found in catalog"},
 		},
 	}
 
