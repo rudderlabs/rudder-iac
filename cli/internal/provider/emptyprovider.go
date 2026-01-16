@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type EmptyProvider struct{}
@@ -53,4 +54,10 @@ func (p *EmptyProvider) MigrateSpec(_ *specs.Spec) (*specs.Spec, error) {
 	return nil, errNotImplemented
 }
 
+func (p *EmptyProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{}
+}
 
+func (p *EmptyProvider) SemanticRules() []rules.Rule {
+	return []rules.Rule{}
+}

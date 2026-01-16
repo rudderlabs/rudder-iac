@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // TypeProvider defines the interface for providers to declare what resource types
@@ -174,6 +175,31 @@ type SpecMigrator interface {
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 }
 
+// RuleProvider is an optional interface that providers can implement
+// to contribute validation rules. Providers aggregate rules from their
+// handlers (if using BaseProvider pattern) or define them directly.
+//
+// Rules are collected from providers and registered in the global Registry
+// by the validation engine. Syntactic rules run before resource graph
+// construction, while semantic rules run after.
+type RuleProvider interface {
+	// SyntacticRules returns rules that validate spec structure and format
+	// before resource graph construction. These rules receive ValidationContext
+	// with Graph set to nil.
+	//
+	// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
+	// Example: "datacatalog/properties/unique-name"
+	SyntacticRules() []rules.Rule
+
+	// SemanticRules returns rules that validate cross-resource relationships
+	// and business logic after resource graph construction. These rules receive
+	// ValidationContext with Graph populated.
+	//
+	// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
+	// Example: "datacatalog/events/valid-property-ref"
+	SemanticRules() []rules.Rule
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -185,6 +211,7 @@ type SpecMigrator interface {
 //   - Lifecycle: Creating, updating, deleting, and importing resources in the remote system
 //   - Export: Generating configuration files from existing remote resources
 //   - Migration: Migrating project specifications from one version to another
+//   - Rules: Providing syntactic and semantic validation rules for resources
 //
 // Providers act as adapters between the generic infrastructure management framework
 // and specific resource types or backend systems.
@@ -197,4 +224,5 @@ type Provider interface {
 	LifecycleManager
 	Exporter
 	SpecMigrator
+	RuleProvider
 }
