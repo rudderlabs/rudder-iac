@@ -5,7 +5,7 @@ type Transformation struct {
 	ID          string   `json:"id"`
 	VersionID   string   `json:"versionId"`
 	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
+	Description string   `json:"description"`
 	Code        string   `json:"code"`
 	Language    string   `json:"language"`
 	Imports     []string `json:"imports"`
@@ -18,7 +18,7 @@ type TransformationLibrary struct {
 	ID          string `json:"id"`
 	VersionID   string `json:"versionId"`
 	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	Description string `json:"description"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
 	HandleName  string `json:"handleName"`
