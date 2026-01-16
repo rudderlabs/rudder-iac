@@ -144,7 +144,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 	resource := &model.LibraryResource{
 		ID:          remote.ExternalID,
 		Name:        remote.Name,
-		Description: remote.Description,
+		Description: StringPtr(remote.Description),
 		Language:    remote.Language,
 		Code:        remote.Code,
 		ImportName:  remote.HandleName,
@@ -180,12 +180,11 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.LibraryResource) (
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource, oldData *model.LibraryResource, oldState *model.LibraryState) (*model.LibraryState, error) {
-	req := &transformations.CreateLibraryRequest{
+	req := &transformations.UpdateLibraryRequest{
 		Name:        newData.Name,
 		Description: newData.Description,
 		Code:        newData.Code,
 		Language:    newData.Language,
-		ExternalID:  newData.ID,
 	}
 
 	// Always use publish=false, batch publish happens later
@@ -215,4 +214,11 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Libr
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteLibrary) (*export.SpecExportData[model.LibrarySpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
+}
+
+func StringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

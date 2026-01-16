@@ -141,7 +141,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteTransformation, urnRe
 	resource := &model.TransformationResource{
 		ID:          remote.ExternalID,
 		Name:        remote.Name,
-		Description: remote.Description,
+		Description: StringPtr(remote.Description),
 		Language:    remote.Language,
 		Code:        remote.Code,
 	}
@@ -176,12 +176,11 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.TransformationReso
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.TransformationResource, oldData *model.TransformationResource, oldState *model.TransformationState) (*model.TransformationState, error) {
-	req := &transformations.CreateTransformationRequest{
+	req := &transformations.UpdateTransformationRequest{
 		Name:        newData.Name,
 		Description: newData.Description,
 		Code:        newData.Code,
 		Language:    newData.Language,
-		ExternalID:  newData.ID,
 	}
 
 	// Always use publish=false, batch publish happens later
@@ -211,4 +210,11 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Tran
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteTransformation) (*export.SpecExportData[model.TransformationSpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
+}
+
+func StringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
