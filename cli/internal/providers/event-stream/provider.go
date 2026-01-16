@@ -95,6 +95,11 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
+func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
+	// Empty implementation for now
+	return fmt.Errorf("not implemented")
+}
+
 func (p *Provider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(graph); err != nil {

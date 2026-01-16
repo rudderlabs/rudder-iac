@@ -191,6 +191,18 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 	return &parsedSpec, nil
 }
 
+func (dc *DataCatalog) LoadLegacySpec(path string, s *specs.Spec) error {
+	if err := extractEntities(s, dc); err != nil {
+		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
+	}
+
+	if err := addImportMetadata(s, dc); err != nil {
+		return fmt.Errorf("adding import metadata: %w", err)
+	}
+
+	return nil
+}
+
 func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 	if err := extractEntities(s, dc); err != nil {
 		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)

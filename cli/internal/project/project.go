@@ -26,12 +26,15 @@ type Project interface {
 	Location() string
 	Load() error
 	ResourceGraph() (*resources.Graph, error)
+	Specs() map[string]*specs.Spec
 }
 
 type project struct {
-	location string
-	provider ProjectProvider
-	loader   Loader
+	location    string
+	provider    ProjectProvider
+	loader      Loader
+	specs       map[string]*specs.Spec
+	loadV1Specs bool
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -43,6 +46,13 @@ func WithLoader(l Loader) ProjectOption {
 		if l != nil {
 			p.loader = l
 		}
+	}
+}
+
+// WithV1SpecSupport enables loading v1 specs (rudder/v1).
+func WithV1SpecSupport() ProjectOption {
+	return func(p *project) {
+		p.loadV1Specs = true
 	}
 }
 
@@ -70,16 +80,32 @@ func (p *project) Location() string {
 	return p.location
 }
 
+func (p *project) Specs() map[string]*specs.Spec {
+	return p.specs
+}
+
+func (p *project) loadSpec(path string, spec *specs.Spec) error {
+	switch {
+	case spec.IsLegacyVersion():
+		return p.provider.LoadLegacySpec(path, spec)
+	case spec.Version == specs.SpecVersionV1 && p.loadV1Specs:
+		return p.provider.LoadSpec(path, spec)
+	default:
+		return fmt.Errorf("unsupported spec version: %s", spec.Version)
+	}
+}
+
 // Load loads the project specifications using the configured SpecLoader
 // and then validates them with the provider.
 func (p *project) Load() error {
-	loadedSpecs, err := p.loader.Load(p.location) // Use the specLoader
+	var err error
+	p.specs, err = p.loader.Load(p.location) // Use the specLoader
 	if err != nil {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
 	}
 
 	// The rest of the logic from old loadSpecs
-	for path, spec := range loadedSpecs {
+	for path, spec := range p.specs {
 		parsed, err := p.provider.ParseSpec(path, spec)
 		if err != nil {
 			return fmt.Errorf("provider failed to parse spec from path %s: %w", path, err)
@@ -89,7 +115,7 @@ func (p *project) Load() error {
 			return fmt.Errorf("provider failed to validate spec from path %s: %w", path, err)
 		}
 
-		if err := p.provider.LoadSpec(path, spec); err != nil {
+		if err := p.loadSpec(path, spec); err != nil {
 			return fmt.Errorf("provider failed to load spec from path %s: %w", path, err)
 		}
 	}

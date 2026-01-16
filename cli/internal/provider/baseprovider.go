@@ -97,6 +97,11 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
+func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
+	// fallback to LoadSpec for now till we implement legacy spec loading for all providers
+	return p.LoadSpec(path, s)
+}
+
 func (p *BaseProvider) Validate(graph *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
 		if err := handler.Validate(graph); err != nil {
