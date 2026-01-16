@@ -13,7 +13,7 @@ type LibrarySpec = specs.TransformationLibrarySpec
 type LibraryResource struct {
 	ID          string
 	Name        string
-	Description string
+	Description *string
 	Language    string
 	Code        string // Resolved from inline or file
 	ImportName  string

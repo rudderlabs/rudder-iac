@@ -42,41 +42,13 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			expected: []string{"someLib"},
 		},
 		{
-			name: "CommonJS require",
-			code: `const myLib = require('myLib');`,
-			expected: []string{"myLib"},
-		},
-		{
-			name: "CommonJS require with spaces",
-			code: `const lib = require(  'myLib'  );`,
-			expected: []string{"myLib"},
-		},
-		{
-			name: "Multiple imports mixed",
+			name: "Multiple ES6 imports",
 			code: `
 				import lib1 from 'lib1';
 				import { func } from 'lib2';
-				const lib3 = require('lib3');
+				import * as lib3 from 'lib3';
 			`,
 			expected: []string{"lib1", "lib2", "lib3"},
-		},
-		{
-			name: "Filter relative imports",
-			code: `
-				import myLib from 'myLib';
-				import util from './util';
-				import config from '../config';
-				import abs from '/absolute/path';
-			`,
-			expected: []string{"myLib"},
-		},
-		{
-			name: "Deduplicate imports",
-			code: `
-				import myLib from 'myLib';
-				const lib = require('myLib');
-			`,
-			expected: []string{"myLib"},
 		},
 		{
 			name: "Ignore single-line comments",
@@ -129,15 +101,25 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			expected: []string{"polyfill"},
 		},
 		{
-			name: "Complex real-world example",
+			name: "Filter RudderStack built-in libraries",
+			code: `
+				import { sha1 } from '@rs/hash/v1';
+				import { formatDate } from '@rs/utils/v2';
+				import myLib from 'myLib';
+			`,
+			expected: []string{"myLib"},
+		},
+		{
+			name: "Complex example without require",
 			code: `
 				// Import validation library
 				import {
-					validateEmail,
+					validateEmail, // validate email
 					validatePhone
 				} from 'validationHelpers';
 				import * as utils from 'commonUtils';
-				const crypto = require('cryptoLib');
+				import * as crypto from 'cryptoLib';
+				// import { add } from 'mathLib';
 				// Transform function
 				export function transformEvent(event) {
 					const email = utils.sanitize(event.email);
@@ -153,6 +135,75 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			result, err := parser.ExtractImports(tt.code)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tt.expected, result)
+		})
+	}
+}
+
+func TestJavaScriptParser_ExtractImports_Errors(t *testing.T) {
+	parser := &JavaScriptParser{}
+
+	tests := []struct {
+		name        string
+		code        string
+		expectedErr string
+	}{
+		{
+			name: "CommonJS require not supported",
+			code: `const myLib = require('myLib');`,
+			expectedErr: "require() syntax is not supported",
+		},
+		{
+			name: "CommonJS require with spaces",
+			code: `const lib = require(  'myLib'  );`,
+			expectedErr: "require() syntax is not supported",
+		},
+		{
+			name: "Mixed imports and requires",
+			code: `
+				import lib1 from 'lib1';
+				const lib3 = require('lib3');
+			`,
+			expectedErr: "require() syntax is not supported",
+		},
+		{
+			name: "Relative import with ./",
+			code: `import util from './util';`,
+			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+		{
+			name: "Relative import with ../",
+			code: `import config from '../config';`,
+			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+		{
+			name: "Absolute import",
+			code: `import abs from '/absolute/path';`,
+			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+		{
+			name: "Mixed valid and relative imports",
+			code: `
+				import myLib from 'myLib';
+				import util from './util';
+			`,
+			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+		{
+			name: "Multiple relative imports",
+			code: `
+				import util from './util';
+				import config from '../config';
+			`,
+			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parser.ExtractImports(tt.code)
+			require.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), tt.expectedErr)
 		})
 	}
 }
