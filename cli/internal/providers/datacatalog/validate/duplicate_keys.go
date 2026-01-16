@@ -17,8 +17,8 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	var errors []ValidationError
 
 	var (
-		propName = make(map[string]*localcatalog.Property)
-		propID   = make(map[string]*localcatalog.Property)
+		propName = make(map[string]*localcatalog.PropertyV1)
+		propID   = make(map[string]*localcatalog.PropertyV1)
 	)
 
 	// Checking duplicate id and name keys in properties
@@ -29,7 +29,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 				var lookupArrayItemType []any
 				var propArrayItemType []any
 				if lookup.Type == "array" && lookup.Config != nil {
-					if itemTypes, ok := lookup.Config["itemTypes"]; ok {
+					if itemTypes, ok := lookup.Config["item_types"]; ok {
 						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
 							utils.SortLexicographically(arr)
 							lookupArrayItemType = arr
@@ -37,7 +37,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 					}
 				}
 				if prop.Type == "array" && prop.Config != nil {
-					if itemTypes, ok := prop.Config["itemTypes"]; ok {
+					if itemTypes, ok := prop.Config["item_types"]; ok {
 						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
 							utils.SortLexicographically(arr)
 							propArrayItemType = arr
@@ -48,7 +48,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 				// If name, type and arrayItemType on the property are the same, then it's a duplicate
 				if lookup.Type == prop.Type {
 					switch {
-					// the property is a duplicate if - 
+					// the property is a duplicate if -
 					// 1. lookupArrayItemType and propArrayItemType are both nil
 					// 2. lookupArrayItemType and propArrayItemType are not nil and identical
 					case lookupArrayItemType == nil && propArrayItemType == nil:

@@ -70,13 +70,13 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			}
 
-			// Validate array type properties with custom type references in itemTypes
+			// Validate array type properties with custom type references in item_types
 			if prop.Type == "array" && prop.Config != nil {
-				if itemTypes, ok := prop.Config["itemTypes"]; ok {
+				if itemTypes, ok := prop.Config["item_types"]; ok {
 					itemTypesArray, ok := itemTypes.([]any)
 					if !ok {
 						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("itemTypes must be an array"),
+							error:     fmt.Errorf("item_types must be an array"),
 							Reference: reference,
 						})
 						continue
@@ -86,7 +86,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 						val, ok := itemType.(string)
 						if !ok {
 							errors = append(errors, ValidationError{
-								error:     fmt.Errorf("itemTypes at idx: %d must be string value", idx),
+								error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
 								Reference: reference,
 							})
 							continue
@@ -95,7 +95,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 						if catalog.CustomTypeRegex.Match([]byte(val)) {
 							if len(itemTypesArray) != 1 {
 								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("itemTypes containing custom type at idx: %d cannot be paired with other types", idx),
+									error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
 									Reference: reference,
 								})
 							}
@@ -326,21 +326,21 @@ func (rk *RequiredKeysValidator) validateStringConfig(config map[string]any, ref
 		}
 	}
 
-	// Check minLength is a number
-	if minLength, ok := config["minLength"]; ok {
+	// Check min_length is a number
+	if minLength, ok := config["min_length"]; ok {
 		if !isInteger(minLength) {
 			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("minLength must be a number"),
+				error:     fmt.Errorf("min_length must be a number"),
 				Reference: reference,
 			})
 		}
 	}
 
-	// Check maxLength is a number
-	if maxLength, ok := config["maxLength"]; ok {
+	// Check max_length is a number
+	if maxLength, ok := config["max_length"]; ok {
 		if !isInteger(maxLength) {
 			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("maxLength must be a number"),
+				error:     fmt.Errorf("max_length must be a number"),
 				Reference: reference,
 			})
 		}
@@ -410,7 +410,7 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 	}
 
 	// Check numeric fields are numbers
-	numericFields := []string{"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
+	numericFields := []string{"minimum", "maximum", "exclusive_minimum", "exclusive_maximum", "multiple_of"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
 			if !typeCheck(val) {
@@ -429,12 +429,12 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, reference string) []ValidationError {
 	var errors []ValidationError
 
-	// Check itemTypes is an array with a single item
-	if itemTypes, ok := config["itemTypes"]; ok {
+	// Check item_types is an array with a single item
+	if itemTypes, ok := config["item_types"]; ok {
 		itemTypesArray, ok := itemTypes.([]any)
 		if !ok {
 			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("itemTypes must be an array"),
+				error:     fmt.Errorf("item_types must be an array"),
 				Reference: reference,
 			})
 		}
@@ -443,7 +443,7 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 			val, ok := itemType.(string)
 			if !ok {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes at idx: %d must be string value", idx),
+					error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
 					Reference: reference,
 				})
 
@@ -453,7 +453,7 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 			if catalog.CustomTypeRegex.Match([]byte(val)) {
 				if len(itemTypesArray) != 1 {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("itemTypes containing custom type at idx: %d cannot be paired with other types", idx),
+						error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
 						Reference: reference,
 					})
 				}
@@ -463,7 +463,7 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 
 			if !slices.Contains(ValidTypes, val) {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("itemTypes at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
+					error:     fmt.Errorf("item_types at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
 					Reference: reference,
 				})
 			}
@@ -729,21 +729,21 @@ func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, 
 	}
 
 	if strings.Contains(propertyType, "array") {
-		itemTypes, itemTypesOk := config["itemTypes"]
+		itemTypes, itemTypesOk := config["item_types"]
 		if !itemTypesOk {
 			return true, nil
 		}
 
 		itemTypesArray, ok := itemTypes.([]any)
 		if !ok {
-			return false, fmt.Errorf("itemTypes must be an array")
+			return false, fmt.Errorf("item_types must be an array")
 		}
 
 		found := false
 		for i, itemType := range itemTypesArray {
 			val, ok := itemType.(string)
 			if !ok {
-				return false, fmt.Errorf("itemTypes at index %d must be a string value", i)
+				return false, fmt.Errorf("item_types at index %d must be a string value", i)
 			}
 			if val == "object" {
 				found = true

@@ -98,9 +98,9 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				}
 			}
 
-			// Check for custom type references in itemTypes when property is of type array
+			// Check for custom type references in item_types when property is of type array
 			if prop.Type == "array" && prop.Config != nil {
-				if itemTypes, ok := prop.Config["itemTypes"]; ok {
+				if itemTypes, ok := prop.Config["item_types"]; ok {
 					if itemTypesArray, ok := itemTypes.([]any); ok {
 						for idx, itemType := range itemTypesArray {
 							itemTypeStr, ok := itemType.(string)
@@ -114,7 +114,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 								if len(matches) != 3 {
 									errs = append(errs, ValidationError{
 										Reference: reference,
-										error:     fmt.Errorf("custom type reference in itemTypes at idx: %d has invalid format. Should be '#/custom-types/<group>/<id>'", idx),
+										error:     fmt.Errorf("custom type reference in item_types at idx: %d has invalid format. Should be '#/custom-types/<group>/<id>'", idx),
 									})
 									continue
 								}
@@ -124,7 +124,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 								if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
 									errs = append(errs, ValidationError{
 										Reference: reference,
-										error:     fmt.Errorf("custom type reference '%s' in itemTypes at idx: %d not found in catalog", itemTypeStr, idx),
+										error:     fmt.Errorf("custom type reference '%s' in item_types at idx: %d not found in catalog", itemTypeStr, idx),
 									})
 								}
 							}
