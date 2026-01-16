@@ -11,7 +11,7 @@ import (
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:        make(map[EntityGroup][]Event),
-		Properties:    make(map[EntityGroup][]Property),
+		Properties:    make(map[EntityGroup][]PropertyV1),
 		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 		CustomTypes:   make(map[EntityGroup][]CustomType),
 		Categories:    make(map[EntityGroup][]Category),
@@ -557,7 +557,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -625,7 +625,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -683,7 +683,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -735,7 +735,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -793,7 +793,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -1278,5 +1278,214 @@ func TestStrictSpecUnmarshal(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown_field")
 		assert.Empty(t, types)
+	})
+}
+
+func TestDataCatalog_MigrateSpec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Migrates properties spec to v1 spec", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "api_tracking",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":          "api_method",
+						"name":        "API Method",
+						"type":        "string",
+						"description": "http method of the api called",
+						"propConfig": map[string]interface{}{
+							"enum": []interface{}{"GET", "PUT", "POST", "DELETE", "PATCH"},
+						},
+					},
+					map[string]interface{}{
+						"id":          "http_retry_count",
+						"name":        "HTTP Retry Count",
+						"type":        "integer",
+						"description": "Number of times to retry the API call",
+						"propConfig": map[string]interface{}{
+							"minimum":    0,
+							"maximum":    10,
+							"multipleOf": 2,
+						},
+					},
+					map[string]interface{}{
+						"id":          "api_path",
+						"name":        "API Path",
+						"type":        "string",
+						"description": "subpath of the api requested",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.Nil(t, err)
+		require.NotNil(t, migratedSpec)
+
+		// Verify basic metadata is preserved
+		assert.Equal(t, spec.Kind, migratedSpec.Kind)
+		assert.Equal(t, spec.Version, migratedSpec.Version)
+		assert.Equal(t, "api_tracking", migratedSpec.Metadata["name"])
+
+		// Extract migrated properties
+		propertiesSpec, ok := migratedSpec.Spec["properties"].([]interface{})
+		require.True(t, ok, "properties should be an array")
+		require.Len(t, propertiesSpec, 3)
+
+		// Verify first property: api_method (has propConfig -> should have config)
+		prop1, ok := propertiesSpec[0].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "api_method", prop1["id"])
+		assert.Equal(t, "API Method", prop1["name"])
+		assert.Equal(t, "string", prop1["type"])
+		assert.Equal(t, "http method of the api called", prop1["description"])
+
+		// Verify propConfig is renamed to config
+		assert.NotContains(t, prop1, "propConfig", "propConfig should not exist in migrated spec")
+		config1, ok := prop1["config"].(map[string]interface{})
+		require.True(t, ok, "config should exist for property with propConfig")
+		enum, ok := config1["enum"].([]interface{})
+		require.True(t, ok)
+		assert.Equal(t, []interface{}{"GET", "PUT", "POST", "DELETE", "PATCH"}, enum)
+
+		// Verify second property: http_retry_count (has propConfig -> should have config)
+		prop2, ok := propertiesSpec[1].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "http_retry_count", prop2["id"])
+		assert.Equal(t, "HTTP Retry Count", prop2["name"])
+		assert.Equal(t, "integer", prop2["type"])
+		assert.Equal(t, "Number of times to retry the API call", prop2["description"])
+
+		// Verify propConfig is renamed to config and keys are converted to snake_case
+		assert.NotContains(t, prop2, "propConfig", "propConfig should not exist in migrated spec")
+		config2, ok := prop2["config"].(map[string]interface{})
+		require.True(t, ok, "config should exist for property with propConfig")
+		assert.Equal(t, float64(0), config2["minimum"])
+		assert.Equal(t, float64(10), config2["maximum"])
+		// Verify camelCase multipleOf is converted to snake_case multiple_of
+		assert.NotContains(t, config2, "multipleOf", "camelCase multipleOf should be converted to snake_case")
+		assert.Equal(t, float64(2), config2["multiple_of"], "multipleOf should be converted to multiple_of")
+
+		// Verify third property: api_path (NO propConfig -> should NOT have config)
+		prop3, ok := propertiesSpec[2].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "api_path", prop3["id"])
+		assert.Equal(t, "API Path", prop3["name"])
+		assert.Equal(t, "string", prop3["type"])
+		assert.Equal(t, "subpath of the api requested", prop3["description"])
+
+		// Verify NO config exists for property without propConfig
+		assert.NotContains(t, prop3, "propConfig", "propConfig should not exist in migrated spec")
+		assert.NotContains(t, prop3, "config", "config should not exist for property without propConfig")
+	})
+
+	t.Run("Converts all camelCase config keys to snake_case", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "config_test",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":   "string_prop",
+						"name": "String Property",
+						"type": "string",
+						"propConfig": map[string]interface{}{
+							"minLength": 5,
+							"maxLength": 50,
+							"pattern":   "^[a-z]+$",
+						},
+					},
+					map[string]interface{}{
+						"id":   "number_prop",
+						"name": "Number Property",
+						"type": "number",
+						"propConfig": map[string]interface{}{
+							"minimum":    0,
+							"maximum":    100,
+							"multipleOf": 5,
+						},
+					},
+					map[string]interface{}{
+						"id":   "array_prop",
+						"name": "Array Property",
+						"type": "array",
+						"propConfig": map[string]interface{}{
+							"itemTypes": []interface{}{"string", "integer"},
+						},
+					},
+					map[string]interface{}{
+						"id":   "enum_prop",
+						"name": "Enum Property",
+						"type": "string",
+						"propConfig": map[string]interface{}{
+							"enum": []interface{}{"value1", "value2"},
+						},
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.Nil(t, err)
+		require.NotNil(t, migratedSpec)
+
+		// Extract migrated properties
+		propertiesSpec, ok := migratedSpec.Spec["properties"].([]interface{})
+		require.True(t, ok)
+		require.Len(t, propertiesSpec, 4)
+
+		// Verify string property config keys are converted
+		stringProp, ok := propertiesSpec[0].(map[string]interface{})
+		require.True(t, ok)
+		config1, ok := stringProp["config"].(map[string]interface{})
+		require.True(t, ok)
+		assert.NotContains(t, config1, "minLength", "camelCase minLength should be converted")
+		assert.NotContains(t, config1, "maxLength", "camelCase maxLength should be converted")
+		assert.Equal(t, float64(5), config1["min_length"], "minLength should be converted to min_length")
+		assert.Equal(t, float64(50), config1["max_length"], "maxLength should be converted to max_length")
+		assert.Equal(t, "^[a-z]+$", config1["pattern"], "pattern should remain unchanged")
+
+		// Verify number property config keys are converted
+		numberProp, ok := propertiesSpec[1].(map[string]interface{})
+		require.True(t, ok)
+		config2, ok := numberProp["config"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, float64(0), config2["minimum"], "minimum should remain unchanged")
+		assert.Equal(t, float64(100), config2["maximum"], "maximum should remain unchanged")
+		assert.NotContains(t, config2, "multipleOf", "camelCase multipleOf should be converted")
+		assert.Equal(t, float64(5), config2["multiple_of"], "multipleOf should be converted to multiple_of")
+
+		// Verify array property config keys are converted
+		arrayProp, ok := propertiesSpec[2].(map[string]interface{})
+		require.True(t, ok)
+		config3, ok := arrayProp["config"].(map[string]interface{})
+		require.True(t, ok)
+		assert.NotContains(t, config3, "itemTypes", "camelCase itemTypes should be converted")
+		itemTypes, ok := config3["item_types"].([]interface{})
+		require.True(t, ok, "itemTypes should be converted to item_types")
+		assert.Equal(t, []interface{}{"string", "integer"}, itemTypes)
+
+		// Verify enum property config keys remain unchanged
+		enumProp, ok := propertiesSpec[3].(map[string]interface{})
+		require.True(t, ok)
+		config4, ok := enumProp["config"].(map[string]interface{})
+		require.True(t, ok)
+		enum, ok := config4["enum"].([]interface{})
+		require.True(t, ok, "enum should remain unchanged")
+		assert.Equal(t, []interface{}{"value1", "value2"}, enum)
 	})
 }

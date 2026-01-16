@@ -68,7 +68,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("standard property", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-prop",
 			Name:        "Test Property",
 			Description: "A test property",
@@ -95,7 +95,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("custom type reference in type field", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email",
 			Name:        "Test Email",
 			Description: "A test email property",
@@ -126,7 +126,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("custom type reference in itemTypes", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email-list",
 			Name:        "Test Email List",
 			Description: "A list of emails",
@@ -150,13 +150,13 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		assert.Equal(t, "A list of emails", args.Description)
 		assert.Equal(t, "array", args.Type)
 
-		// Check that the itemTypes field is correctly converted to contain a PropertyRef
-		itemTypes, ok := args.Config["itemTypes"].([]interface{})
-		assert.True(t, ok, "itemTypes should be an array")
+		// Check that the item_types field is correctly converted to contain a PropertyRef
+		itemTypes, ok := args.Config["item_types"].([]interface{})
+		assert.True(t, ok, "item_types should be an array")
 		assert.Len(t, itemTypes, 1)
 
 		propRef, ok := itemTypes[0].(resources.PropertyRef)
-		assert.True(t, ok, "itemTypes[0] should be a PropertyRef")
+		assert.True(t, ok, "item_types[0] should be a PropertyRef")
 		assert.Equal(t, "custom-type:EmailType", propRef.URN)
 		assert.Equal(t, "name", propRef.Property)
 	})
@@ -164,7 +164,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("itemTypes reference resolution error", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email-list",
 			Name:        "Test Email List",
 			Description: "A list of emails",

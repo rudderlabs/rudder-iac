@@ -15,13 +15,13 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     map[catalog.EntityGroup][]catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "valid property with single custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -38,7 +38,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property with multiple types including custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -59,7 +59,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property with non-array itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -77,7 +77,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property with non-string item in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -364,13 +364,13 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     map[catalog.EntityGroup][]catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "property with empty type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID: "prop-without-type",
@@ -382,7 +382,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "valid property name without whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "valid-prop",
@@ -396,7 +396,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with leading whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "leading-space-prop",
@@ -411,7 +411,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "trailing-space-prop",
@@ -426,7 +426,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with both leading and trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "both-space-prop",
@@ -441,7 +441,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with internal spaces (should be valid)",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "internal-space-prop",
@@ -455,7 +455,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "empty property name should trigger mandatory field error, not whitespace error",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "empty-name-prop",
@@ -956,7 +956,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	falseVal := false
 	// Setup test data catalog
 	dc := &catalog.DataCatalog{
-		Properties: map[catalog.EntityGroup][]catalog.Property{
+		Properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 			"test_props": {
 				{
 					LocalID:     "user_id",

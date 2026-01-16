@@ -21,7 +21,7 @@ type Property struct {
 	Name        string                 `mapstructure:"name" json:"name"`
 	Description string                 `mapstructure:"description,omitempty" json:"description"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type"`
-	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig"`
+	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`
 }
 
 type PropertySpec struct {
@@ -29,7 +29,7 @@ type PropertySpec struct {
 }
 
 // This method is used to extract the entity from the byte representation of it
-func ExtractProperties(s *specs.Spec) ([]Property, error) {
+func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 	spec := PropertySpec{}
 
 	jsonByt, err := json.Marshal(s.Spec)
@@ -41,8 +41,20 @@ func ExtractProperties(s *specs.Spec) ([]Property, error) {
 		return nil, fmt.Errorf("extracting the property spec: %w", err)
 	}
 
-	return spec.Properties, nil
+	v1Properties := make([]PropertyV1, 0, len(spec.Properties))
+	for _, property := range spec.Properties {
+		v1Property := PropertyV1{}
+		err := v1Property.FromV0(property)
+		if err != nil {
+			return nil, fmt.Errorf("converting property to v1: %w", err)
+		}
+		v1Properties = append(v1Properties, v1Property)
+	}
+
+	return v1Properties, nil
 }
+
+
 
 type Event struct {
 	LocalID     string  `json:"id" mapstructure:"id"`

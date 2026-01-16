@@ -26,14 +26,14 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		properties    map[catalog.EntityGroup][]catalog.Property
+		properties    map[catalog.EntityGroup][]catalog.PropertyV1
 		customTypes   map[catalog.EntityGroup][]catalog.CustomType
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid custom type reference in property itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "emailList",
@@ -53,7 +53,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 		},
 		{
 			name: "invalid custom type reference format in property itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "emailList",
@@ -74,7 +74,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 		},
 		{
 			name: "reference to non-existent custom type in property itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "emailList",
@@ -251,7 +251,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create test properties for reference validation
-	testProperties := map[catalog.EntityGroup][]catalog.Property{
+	testProperties := map[catalog.EntityGroup][]catalog.PropertyV1{
 		"test-group": {
 			{LocalID: "page_name", Name: "Page Name", Type: "string"},
 			{LocalID: "search_term", Name: "Search Term", Type: "string"},
@@ -484,7 +484,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create test properties for nested reference validation
-	testProperties := map[catalog.EntityGroup][]catalog.Property{
+	testProperties := map[catalog.EntityGroup][]catalog.PropertyV1{
 		"test-group": {
 			{LocalID: "user_profile", Name: "User Profile", Type: "object"},
 			{LocalID: "profile_name", Name: "Profile Name", Type: "string"},

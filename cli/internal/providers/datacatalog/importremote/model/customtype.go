@@ -100,10 +100,10 @@ func (ct *ImportableCustomType) fromUpstream(
 		}
 
 		if customTypeRef == "" {
-			return fmt.Errorf("resolved reference is empty for itemTypes: %s", itemID)
+			return fmt.Errorf("resolved reference is empty for item_types: %s", itemID)
 		}
 
-		ct.CustomType.Config["itemTypes"] = []any{customTypeRef}
+		ct.CustomType.Config["item_types"] = []any{customTypeRef}
 		break
 	}
 
