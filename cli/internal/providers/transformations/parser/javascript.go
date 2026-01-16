@@ -169,8 +169,6 @@ func isRelativeOrAbsoluteImport(path string) bool {
 // Examples: @rs/hash/v1, @rs/utils/v2, @rs/crypto/v10
 var rudderStackLibraryPattern = regexp.MustCompile(`^@rs/[^/]+/v\d+$`)
 
-// isRudderStackLibrary checks if import is a RudderStack built-in library.
-// RudderStack libraries follow pattern: @rs/<library>/v<digits>
 func isRudderStackLibrary(path string) bool {
 	return rudderStackLibraryPattern.MatchString(path)
 }

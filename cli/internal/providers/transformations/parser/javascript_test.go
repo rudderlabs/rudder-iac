@@ -119,6 +119,7 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 				} from 'validationHelpers';
 				import * as utils from 'commonUtils';
 				import * as crypto from 'cryptoLib';
+				// import { add } from 'mathLib';
 				// Transform function
 				export function transformEvent(event) {
 					const email = utils.sanitize(event.email);
