@@ -88,16 +88,16 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		t.Parallel()
 
 		config := map[string]interface{}{
-			"minLength":         5,
-			"maxLength":         50,
-			"multipleOf":        3,
-			"itemTypes":         []interface{}{"string", "integer"},
-			"enum":              []interface{}{"value1", "value2"},
-			"minimum":           0,
-			"maximum":           100,
-			"pattern":           "^[a-z]+$",
-			"exclusiveMinimum":  1,
-			"exclusiveMaximum":  99,
+			"minLength":        5,
+			"maxLength":        50,
+			"multipleOf":       3,
+			"itemTypes":        []interface{}{"string", "integer"},
+			"enum":             []interface{}{"value1", "value2"},
+			"minimum":          0,
+			"maximum":          100,
+			"pattern":          "^[a-z]+$",
+			"exclusiveMinimum": 1,
+			"exclusiveMaximum": 99,
 		}
 
 		result := convertConfigKeysToSnakeCase(config)
@@ -229,9 +229,9 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 			expectedConfig: map[string]interface{}{"min_properties": 1, "max_properties": 10},
 		},
 		{
-			name:     "number type with complex config",
-			v0Type:   "number",
-			v0Config: map[string]interface{}{"minimum": 0, "maximum": 100, "exclusiveMinimum": true, "exclusiveMaximum": false},
+			name:           "number type with complex config",
+			v0Type:         "number",
+			v0Config:       map[string]interface{}{"minimum": 0, "maximum": 100, "exclusiveMinimum": true, "exclusiveMaximum": false},
 			expectedType:   "number",
 			expectedTypes:  nil,
 			expectedConfig: map[string]interface{}{"minimum": 0, "maximum": 100, "exclusive_minimum": true, "exclusive_maximum": false},
@@ -243,10 +243,10 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 			t.Parallel()
 
 			v0 := Property{
-				LocalID:    "test-prop",
-				Name:       "Test Property",
-				Type:       tt.v0Type,
-				Config: tt.v0Config,
+				LocalID: "test-prop",
+				Name:    "Test Property",
+				Type:    tt.v0Type,
+				Config:  tt.v0Config,
 			}
 
 			var v1 PropertyV1
@@ -260,4 +260,3 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 		})
 	}
 }
-
