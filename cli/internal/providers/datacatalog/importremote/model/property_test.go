@@ -44,10 +44,10 @@ func TestPropertyForExport(t *testing.T) {
 			"name":        "User Email",
 			"description": "Email address of the user",
 			"type":        "string",
-			"propConfig": map[string]interface{}{
-				"format":    "email",
-				"minLength": float64(5),
-				"maxLength": float64(255),
+			"config": map[string]interface{}{
+				"format":     "email",
+				"min_length": float64(5),
+				"max_length": float64(255),
 			},
 		}, result)
 	})

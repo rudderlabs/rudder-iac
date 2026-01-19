@@ -153,3 +153,111 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 	})
 }
 
+func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		v0Type         string
+		v0Config       map[string]interface{}
+		expectedType   string
+		expectedTypes  []string
+		expectedConfig map[string]interface{}
+	}{
+		{
+			name:           "single primitive type",
+			v0Type:         "string",
+			v0Config:       nil,
+			expectedType:   "string",
+			expectedTypes:  nil,
+			expectedConfig: nil,
+		},
+		{
+			name:           "single type with camelCase config",
+			v0Type:         "string",
+			v0Config:       map[string]interface{}{"minLength": 5, "maxLength": 50},
+			expectedType:   "string",
+			expectedTypes:  nil,
+			expectedConfig: map[string]interface{}{"min_length": 5, "max_length": 50},
+		},
+		{
+			name:           "comma-separated types",
+			v0Type:         "string,number",
+			v0Config:       nil,
+			expectedType:   "",
+			expectedTypes:  []string{"string", "number"},
+			expectedConfig: nil,
+		},
+		{
+			name:           "comma-separated types with config",
+			v0Type:         "string,number",
+			v0Config:       map[string]interface{}{"multipleOf": 3, "pattern": "^[a-z]+$"},
+			expectedType:   "",
+			expectedTypes:  []string{"string", "number"},
+			expectedConfig: map[string]interface{}{"multiple_of": 3, "pattern": "^[a-z]+$"},
+		},
+		{
+			name:           "comma-separated types with spaces",
+			v0Type:         "string, number, boolean",
+			v0Config:       nil,
+			expectedType:   "",
+			expectedTypes:  []string{"string", "number", "boolean"},
+			expectedConfig: nil,
+		},
+		{
+			name:           "custom type reference",
+			v0Type:         "#/custom-types/myGroup/MyType",
+			v0Config:       nil,
+			expectedType:   "#/custom-types/myGroup/MyType",
+			expectedTypes:  nil,
+			expectedConfig: nil,
+		},
+		{
+			name:           "array type with itemTypes config",
+			v0Type:         "array",
+			v0Config:       map[string]interface{}{"itemTypes": []interface{}{"string", "number"}},
+			expectedType:   "array",
+			expectedTypes:  nil,
+			expectedConfig: map[string]interface{}{"item_types": []interface{}{"string", "number"}},
+		},
+		{
+			name:           "object type with nested config",
+			v0Type:         "object",
+			v0Config:       map[string]interface{}{"minProperties": 1, "maxProperties": 10},
+			expectedType:   "object",
+			expectedTypes:  nil,
+			expectedConfig: map[string]interface{}{"min_properties": 1, "max_properties": 10},
+		},
+		{
+			name:     "number type with complex config",
+			v0Type:   "number",
+			v0Config: map[string]interface{}{"minimum": 0, "maximum": 100, "exclusiveMinimum": true, "exclusiveMaximum": false},
+			expectedType:   "number",
+			expectedTypes:  nil,
+			expectedConfig: map[string]interface{}{"minimum": 0, "maximum": 100, "exclusive_minimum": true, "exclusive_maximum": false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v0 := Property{
+				LocalID:    "test-prop",
+				Name:       "Test Property",
+				Type:       tt.v0Type,
+				Config: tt.v0Config,
+			}
+
+			var v1 PropertyV1
+			v1.FromV0(v0)
+
+			assert.Equal(t, tt.expectedType, v1.Type, "Type field mismatch")
+			assert.Equal(t, tt.expectedTypes, v1.Types, "Types field mismatch")
+			assert.Equal(t, tt.expectedConfig, v1.Config, "Config field mismatch")
+			assert.Equal(t, v0.LocalID, v1.LocalID)
+			assert.Equal(t, v0.Name, v1.Name)
+		})
+	}
+}
+

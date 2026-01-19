@@ -45,13 +45,20 @@ const PropertyResourceType = "property"
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description
-	args.Type = prop.Type
 	args.Config = make(map[string]interface{})
 	for k, v := range prop.Config {
 		args.Config[k] = v
 	}
 
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
+	// Handle single type field
+	args.Type = prop.Type
+	switch {
+	case len(prop.Types) > 0:
+		// Sort types for consistency and join to comma-separated string
+		sort.Strings(prop.Types)
+		args.Type = strings.Join(prop.Types, ",")
+		return nil
+	case strings.HasPrefix(prop.Type, "#/custom-types/"):
 		customTypeURN := urnFromRef(prop.Type)
 
 		if customTypeURN == "" {
@@ -61,9 +68,9 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 			URN:      customTypeURN,
 			Property: "name",
 		}
-	}
-
-	if prop.Type == "array" && prop.Config != nil {
+		return nil
+	// Handle array type with custom type references in item_types
+	case prop.Type == "array" && prop.Config != nil:
 		itemTypes, ok := prop.Config["item_types"]
 		if !ok {
 			return nil
@@ -94,11 +101,6 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		}
 	}
 
-	// sort the order of types for a multi type property
-	if multiTypeProp := strings.Split(prop.Type, ","); len(multiTypeProp) > 1 {
-		sort.Strings(multiTypeProp)
-		args.Type = strings.Join(multiTypeProp, ",")
-	}
 
 	return nil
 }

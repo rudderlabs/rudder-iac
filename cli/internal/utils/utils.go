@@ -1,6 +1,9 @@
 package utils
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // SortableResource defines an interface for resources that can be sorted.
 // will be extended with more sortable fields in the future like name, displayName, etc.
@@ -48,4 +51,15 @@ func ToSnakeCase(s string) string {
 	}
 
 	return string(result)
+}
+
+// SplitMultiTypeString splits a comma-separated string of types, trims whitespace,
+// and returns a slice of type strings.
+func SplitMultiTypeString(typeString string) []string {
+	typesList := strings.Split(typeString, ",")
+	types := make([]string, len(typesList))
+	for i, t := range typesList {
+		types[i] = strings.TrimSpace(t)
+	}
+	return types
 }
