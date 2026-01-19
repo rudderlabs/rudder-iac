@@ -20,6 +20,7 @@ type MockProvider struct {
 	ValidateArg                *resources.Graph
 	ValidateErr                error
 	LoadSpecErr                error
+	LoadLegacySpecErr          error
 	GetResourceGraphVal        *resources.Graph
 	GetResourceGraphErr        error
 	LoadResourcesFromRemoteVal *resources.RemoteResources
@@ -40,6 +41,7 @@ type MockProvider struct {
 	ValidateCalledCount                int
 	ValidateErrorReturnedCount         int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
+	LoadLegacySpecCalledWithArgs       []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
 	GetResourceGraphCalledCount        int
 	GetResourceGraphErrorReturnedCount int
@@ -131,6 +133,11 @@ func (m *MockProvider) LoadSpec(path string, s *specs.Spec) error {
 	return m.LoadSpecErr
 }
 
+func (m *MockProvider) LoadLegacySpec(path string, s *specs.Spec) error {
+	m.LoadLegacySpecCalledWithArgs = append(m.LoadLegacySpecCalledWithArgs, LoadSpecArgs{Path: path, Spec: s})
+	return m.LoadLegacySpecErr
+}
+
 func (m *MockProvider) ResourceGraph() (*resources.Graph, error) {
 	m.GetResourceGraphCalledCount++
 	if m.GetResourceGraphErr != nil {
@@ -175,6 +182,10 @@ func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resour
 
 func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
 	return nil, nil
+}
+
+func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	return s, nil
 }
 
 // ResetCallCounters resets all call counters and argument trackers.

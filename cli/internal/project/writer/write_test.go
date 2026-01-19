@@ -167,3 +167,94 @@ func TestWrite(t *testing.T) {
 		assert.ErrorIs(t, err, formatterFail)
 	})
 }
+
+func TestOverwriteFile(t *testing.T) {
+	t.Run("creates new file when it doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("new-content")})
+
+		entity := FormattableEntity{
+			Content:      map[string]any{"key": "value"},
+			RelativePath: filepath.Join(tmpDir, "new-file.yaml"),
+		}
+
+		err := OverwriteFile(formatters, entity)
+		require.NoError(t, err)
+
+		content, readErr := os.ReadFile(entity.RelativePath)
+		require.NoError(t, readErr)
+		assert.Equal(t, []byte("new-content"), content)
+	})
+
+	t.Run("overwrites existing file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		filePath := filepath.Join(tmpDir, "existing-file.yaml")
+
+		// Create existing file with original content
+		err := os.WriteFile(filePath, []byte("original-content"), 0644)
+		require.NoError(t, err)
+
+		// Verify original content
+		original, readErr := os.ReadFile(filePath)
+		require.NoError(t, readErr)
+		assert.Equal(t, []byte("original-content"), original)
+
+		// Overwrite with new content
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("updated-content")})
+
+		entity := FormattableEntity{
+			Content:      map[string]any{"updated": "data"},
+			RelativePath: filePath,
+		}
+
+		err = OverwriteFile(formatters, entity)
+		require.NoError(t, err)
+
+		// Verify file was overwritten
+		updated, readErr := os.ReadFile(filePath)
+		require.NoError(t, readErr)
+		assert.Equal(t, []byte("updated-content"), updated)
+	})
+
+	t.Run("propagates formatter error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+
+		formatterErr := errors.New("formatting failed")
+		formatters := formatter.Setup(stubFormatter{
+			exts: []string{"yaml"},
+			err:  formatterErr,
+		})
+
+		entity := FormattableEntity{
+			Content:      map[string]any{"data": "value"},
+			RelativePath: filepath.Join(tmpDir, "test.yaml"),
+		}
+
+		err := OverwriteFile(formatters, entity)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, formatterErr)
+		assert.ErrorContains(t, err, "formatting")
+	})
+
+	t.Run("returns error when writing to invalid directory", func(t *testing.T) {
+		t.Parallel()
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("content")})
+
+		entity := FormattableEntity{
+			Content:      map[string]any{"data": "value"},
+			RelativePath: "/nonexistent/directory/that/does/not/exist/file.yaml",
+		}
+
+		err := OverwriteFile(formatters, entity)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "writing file")
+	})
+}

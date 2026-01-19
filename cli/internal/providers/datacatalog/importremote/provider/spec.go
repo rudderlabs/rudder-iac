@@ -30,7 +30,7 @@ func toImportSpec(
 	}
 
 	return &specs.Spec{
-		Version:  specs.SpecVersion,
+		Version:  specs.SpecVersionV0_1,
 		Kind:     kind,
 		Metadata: metadataMap,
 		Spec:     data,

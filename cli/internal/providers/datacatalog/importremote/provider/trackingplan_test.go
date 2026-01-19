@@ -155,7 +155,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		require.True(t, ok)
 
 		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersion,
+			Version: specs.SpecVersionV0_1,
 			Kind:    "tp",
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
@@ -280,7 +280,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		}
 
 		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersion,
+			Version: specs.SpecVersionV0_1,
 			Kind:    "tp",
 			Metadata: map[string]any{
 				"name": "e-commerce-tracking",
@@ -322,7 +322,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		}, ecommerceSpec)
 
 		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersion,
+			Version: specs.SpecVersionV0_1,
 			Kind:    "tp",
 			Metadata: map[string]any{
 				"name": "user-analytics",

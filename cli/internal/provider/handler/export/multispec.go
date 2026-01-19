@@ -60,7 +60,7 @@ func (s *MultiSpecExportStrategy[Spec, Remote]) FormatForExport(
 		}
 
 		spec := &specs.Spec{
-			Version:  specs.SpecVersion,
+			Version:  specs.SpecVersionV0_1,
 			Kind:     s.Handler.Metadata().SpecKind,
 			Metadata: metadataMap,
 			Spec:     specData,

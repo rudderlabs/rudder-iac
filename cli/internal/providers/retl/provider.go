@@ -89,6 +89,12 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return handler.LoadSpec(path, s)
 }
 
+// LoadLegacySpec loads a legacy spec (rudder/0.1) for the given kind
+func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
+	// Empty implementation for now
+	return fmt.Errorf("not implemented")
+}
+
 // Validate validates all loaded specs
 func (p *Provider) Validate(_ *resources.Graph) error {
 	for resourceType, handler := range p.handlers {

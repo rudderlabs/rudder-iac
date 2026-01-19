@@ -640,7 +640,7 @@ func (p *Handler) toImportSpec(
 	}
 
 	return &specs.Spec{
-		Version:  specs.SpecVersion,
+		Version:  specs.SpecVersionV0_1Variant,
 		Kind:     ResourceKind,
 		Metadata: metadataMap,
 		Spec:     specMap,
