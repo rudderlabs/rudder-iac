@@ -49,3 +49,28 @@ func ToSnakeCase(s string) string {
 
 	return string(result)
 }
+
+func ToCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	capitalizeNext := false
+	for _, r := range s {
+		if r == '_' {
+			capitalizeNext = true
+			continue
+		}
+		if capitalizeNext && r >= 'a' && r <= 'z' {
+			// Convert to uppercase
+			result = append(result, r-32)
+			capitalizeNext = false
+		} else {
+			result = append(result, r)
+			capitalizeNext = false
+		}
+	}
+
+	return string(result)
+}
