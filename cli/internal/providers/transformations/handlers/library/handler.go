@@ -144,7 +144,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 	resource := &model.LibraryResource{
 		ID:          remote.ExternalID,
 		Name:        remote.Name,
-		Description: StringPtr(remote.Description),
+		Description: remote.Description,
 		Language:    remote.Language,
 		Code:        remote.Code,
 		ImportName:  remote.HandleName,
@@ -214,11 +214,4 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Libr
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteLibrary) (*export.SpecExportData[model.LibrarySpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
-}
-
-func StringPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

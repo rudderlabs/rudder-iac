@@ -141,7 +141,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteTransformation, urnRe
 	resource := &model.TransformationResource{
 		ID:          remote.ExternalID,
 		Name:        remote.Name,
-		Description: StringPtr(remote.Description),
+		Description: remote.Description,
 		Language:    remote.Language,
 		Code:        remote.Code,
 	}
@@ -210,11 +210,4 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Tran
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteTransformation) (*export.SpecExportData[model.TransformationSpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
-}
-
-func StringPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }
