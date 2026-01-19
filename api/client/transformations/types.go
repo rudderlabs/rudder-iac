@@ -28,36 +28,36 @@ type TransformationLibrary struct {
 
 // CreateTransformationRequest is the request body for creating a transformation
 type CreateTransformationRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Code        string  `json:"code"`
-	Language    string  `json:"language"`
-	ExternalID  string  `json:"externalId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	Language    string `json:"language"`
+	ExternalID  string `json:"externalId"`
 }
 
 // UpdateTransformationRequest is the request body for updating a transformation
 type UpdateTransformationRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Code        string  `json:"code"`
-	Language    string  `json:"language"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	Language    string `json:"language"`
 }
 
 // CreateLibraryRequest is the request body for creating a library
 type CreateLibraryRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Code        string  `json:"code"`
-	Language    string  `json:"language"`
-	ExternalID  string  `json:"externalId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	Language    string `json:"language"`
+	ExternalID  string `json:"externalId"`
 }
 
 // UpdateLibraryRequest is the request body for updating a library
 type UpdateLibraryRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	Code        string  `json:"code"`
-	Language    string  `json:"language"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	Language    string `json:"language"`
 }
 
 // BatchPublishRequest is the request body for batch publishing transformations and libraries
