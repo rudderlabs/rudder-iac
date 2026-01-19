@@ -32,7 +32,7 @@ type CreateTransformationRequest struct {
 	Description *string `json:"description"`
 	Code        string  `json:"code"`
 	Language    string  `json:"language"`
-	ExternalID  *string `json:"externalId,omitempty"`
+	ExternalID  string  `json:"externalId"`
 }
 
 // UpdateTransformationRequest is the request body for updating a transformation
@@ -49,7 +49,7 @@ type CreateLibraryRequest struct {
 	Description *string `json:"description"`
 	Code        string  `json:"code"`
 	Language    string  `json:"language"`
-	ExternalID  *string `json:"externalId,omitempty"`
+	ExternalID  string  `json:"externalId"`
 }
 
 // UpdateLibraryRequest is the request body for updating a library

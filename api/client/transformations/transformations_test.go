@@ -79,7 +79,7 @@ func TestCreateTransformation(t *testing.T) {
 				Description: strPtr("Test transformation description"),
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
-				ExternalID:  strPtr("ext-123"),
+				ExternalID:  "ext-123",
 			}
 
 			result, err := store.CreateTransformation(ctx, req, tt.publish)
@@ -351,7 +351,7 @@ func TestCreateLibrary(t *testing.T) {
 				Description: strPtr("Test library description"),
 				Code:        "function helper() { return true; }",
 				Language:    "javascript",
-				ExternalID:  strPtr("lib-ext-123"),
+				ExternalID:  "lib-ext-123",
 			}
 
 			result, err := store.CreateLibrary(ctx, req, tt.publish)
