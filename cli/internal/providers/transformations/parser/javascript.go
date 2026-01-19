@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -23,7 +24,7 @@ func (p *JavaScriptParser) ValidateSyntax(code string) error {
 		for _, err := range result.Errors {
 			errorMsgs = append(errorMsgs, err.Text)
 		}
-		return fmt.Errorf("javascript syntax error: %s", strings.Join(errorMsgs, "; "))
+		return fmt.Errorf("javascript syntax error: \n\t%s", strings.Join(errorMsgs, "\n\t"))
 	}
 
 	return nil
@@ -36,9 +37,18 @@ func (p *JavaScriptParser) ValidateSyntax(code string) error {
 // - Absolute imports (/path)
 // Filters out RudderStack built-in libraries (@rs/<library>/<version>)
 func (p *JavaScriptParser) ExtractImports(code string) ([]string, error) {
-	result := api.Transform(code, api.TransformOptions{
-		Loader: api.LoaderJS,
-		Format: api.FormatESModule,
+	// Use esbuild's Build with Metafile to get structured import data
+	result := api.Build(api.BuildOptions{
+		Stdin: &api.StdinOptions{
+			Contents:   code,
+			Loader:     api.LoaderJS,
+			ResolveDir: ".",
+		},
+		Format:   api.FormatESModule, // Needed to track require() calls
+		Bundle:   false,              // Don't actually bundle, just analyze
+		Metafile: true,               // Enable metadata output
+		Write:    false,              // Don't write to disk
+		LogLevel: api.LogLevelSilent,
 	})
 
 	if len(result.Errors) > 0 {
@@ -46,117 +56,54 @@ func (p *JavaScriptParser) ExtractImports(code string) ([]string, error) {
 		for _, err := range result.Errors {
 			errorMsgs = append(errorMsgs, err.Text)
 		}
-		return nil, fmt.Errorf("extracting imports: %s", strings.Join(errorMsgs, "; "))
+		return nil, fmt.Errorf("extracting imports: \n\t%s", strings.Join(errorMsgs, "\n\t"))
 	}
 
-	transformedCode := string(result.Code)
-
-	// Validate no require() in transformed code
-	if err := validateNoRequire(transformedCode); err != nil {
-		return nil, err
+	// Parse the metafile JSON to get imports from outputs
+	var meta struct {
+		Outputs map[string]struct {
+			Imports []struct {
+				Path     string `json:"path"`
+				Kind     string `json:"kind"`     // "import-statement", "require-call"
+				External bool   `json:"external"` // true for external libraries
+			} `json:"imports"`
+		} `json:"outputs"`
 	}
 
-	// Extract all import statements
-	imports := extractAllImports(transformedCode)
+	if err := json.Unmarshal([]byte(result.Metafile), &meta); err != nil {
+		return nil, fmt.Errorf("parsing metafile: %w", err)
+	}
 
-	// Validate and filter imports
-	libraryImports := make([]string, 0)
-	for imp := range imports {
-		if isRelativeOrAbsoluteImport(imp) {
-			return nil, fmt.Errorf("relative imports (./file, ../file) and absolute imports (/path) are not supported")
-		}
-		if isExternalLibraryImport(imp) {
-			libraryImports = append(libraryImports, imp)
+	// Extract and validate imports
+	var libraryImports []string
+	seen := make(map[string]bool)
+
+	for _, output := range meta.Outputs {
+		for _, imp := range output.Imports {
+			// Check for require() - not supported
+			if imp.Kind == "require-call" {
+				return nil, fmt.Errorf("require() syntax is not supported")
+			}
+
+			// Check for dynamic imports - skip them (not extracting, but also not erroring)
+			if imp.Kind == "dynamic-import" {
+				return nil, fmt.Errorf("dynamic imports are not supported")
+			}
+
+			// Check for relative/absolute imports
+			if isRelativeOrAbsoluteImport(imp.Path) {
+				return nil, fmt.Errorf("relative imports (./file, ../file) and absolute imports (/path) are not supported")
+			}
+
+			// Filter external libraries and deduplicate
+			if isExternalLibraryImport(imp.Path) && !seen[imp.Path] {
+				libraryImports = append(libraryImports, imp.Path)
+				seen[imp.Path] = true
+			}
 		}
 	}
 
 	return libraryImports, nil
-}
-
-// validateNoRequire checks if transformed code contains require() calls
-func validateNoRequire(code string) error {
-	i := 0
-	for i < len(code) {
-		idx := strings.Index(code[i:], "require")
-		if idx == -1 {
-			break
-		}
-
-		pos := i + idx
-		i = pos + 7 // Move past "require"
-
-		// Check if followed by ( with optional whitespace
-		for j := pos + 7; j < len(code); j++ {
-			ch := code[j]
-			if ch == ' ' || ch == '\t' || ch == '\n' {
-				continue
-			}
-			if ch == '(' {
-				return fmt.Errorf("require() syntax is not supported")
-			}
-			break
-		}
-	}
-	return nil
-}
-
-// extractAllImports extracts all import paths from esbuild-transformed code
-func extractAllImports(code string) map[string]bool {
-	imports := make(map[string]bool)
-
-	i := 0
-	for i < len(code) {
-		idx := strings.Index(code[i:], "import")
-		if idx == -1 {
-			break
-		}
-
-		pos := i + idx
-		i = pos + 1
-
-		// Extract module name from import statement
-		remaining := code[pos+6:] // Skip "import"
-
-		// Look for "from" keyword
-		fromIdx := strings.Index(remaining, "from")
-		if fromIdx != -1 {
-			remaining = remaining[fromIdx+4:]
-		}
-
-		if moduleName := extractQuotedString(remaining); moduleName != "" {
-			imports[moduleName] = true
-		}
-	}
-
-	return imports
-}
-
-// extractQuotedString extracts the first quoted string from text
-func extractQuotedString(text string) string {
-	// Skip whitespace and opening parenthesis
-	start := 0
-	for start < len(text) && (text[start] == ' ' || text[start] == '\t' || text[start] == '\n' || text[start] == '(') {
-		start++
-	}
-
-	if start >= len(text) {
-		return ""
-	}
-
-	// Find opening quote
-	quote := text[start]
-	if quote != '"' && quote != '\'' && quote != '`' {
-		return ""
-	}
-
-	// Find closing quote
-	for i := start + 1; i < len(text); i++ {
-		if text[i] == quote {
-			return text[start+1 : i]
-		}
-	}
-
-	return ""
 }
 
 // isRelativeOrAbsoluteImport checks if import is relative (./file, ../file) or absolute (/path)
