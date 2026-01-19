@@ -12,11 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper to convert string to *string
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestCreateTransformation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -76,7 +71,7 @@ func TestCreateTransformation(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateTransformationRequest{
 				Name:        "test-transformation",
-				Description: strPtr("Test transformation description"),
+				Description: "Test transformation description",
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
 				ExternalID:  "ext-123",
@@ -158,7 +153,7 @@ func TestUpdateTransformation(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.UpdateTransformationRequest{
 				Name:        "updated-transformation",
-				Description: strPtr("Updated description"),
+				Description: "Updated description",
 				Code:        "function transform(event) { return event; }",
 				Language:    "javascript",
 			}
@@ -348,7 +343,7 @@ func TestCreateLibrary(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.CreateLibraryRequest{
 				Name:        "test-library",
-				Description: strPtr("Test library description"),
+				Description: "Test library description",
 				Code:        "function helper() { return true; }",
 				Language:    "javascript",
 				ExternalID:  "lib-ext-123",
@@ -430,7 +425,7 @@ func TestUpdateLibrary(t *testing.T) {
 			store := transformations.NewRudderTransformationStore(c)
 			req := &transformations.UpdateLibraryRequest{
 				Name:        "updated-library",
-				Description: strPtr("Updated library description"),
+				Description: "Updated library description",
 				Code:        "function helper() { return false; }",
 				Language:    "javascript",
 			}
@@ -671,7 +666,7 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 	store := transformations.NewRudderTransformationStore(c)
 	req := &transformations.UpdateTransformationRequest{
 		Name:        "transformation",
-		Description: strPtr(""), // Explicitly set to empty - this clears the description!
+		Description: "",
 		Code:        "function transform(event) { return event; }",
 		Language:    "javascript",
 	}
@@ -683,4 +678,3 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
-
