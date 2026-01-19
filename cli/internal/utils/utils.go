@@ -63,3 +63,34 @@ func SplitMultiTypeString(typeString string) []string {
 	}
 	return types
 }
+
+// ToCamelCase converts a snake_case string to camelCase.
+// Examples:
+//   - min_length -> minLength
+//   - max_length -> maxLength
+//   - exclusive_maximum -> exclusiveMaximum
+//   - enum -> enum (already lowercase)
+func ToCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	capitalizeNext := false
+	for _, r := range s {
+		if r == '_' {
+			capitalizeNext = true
+			continue
+		}
+		if capitalizeNext && r >= 'a' && r <= 'z' {
+			// Convert to uppercase
+			result = append(result, r-32)
+			capitalizeNext = false
+		} else {
+			result = append(result, r)
+			capitalizeNext = false
+		}
+	}
+
+	return string(result)
+}

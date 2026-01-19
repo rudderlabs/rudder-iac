@@ -81,7 +81,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
 			ExternalID:  "test-project-id",
-			Config:      map[string]interface{}{"key": "value"},
+			Config:      map[string]interface{}{"key": "value", "secondKey": "value2"},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,
 		})
@@ -90,7 +90,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Name:        "property",
 			Description: "property description",
 			Type:        "property type",
-			Config:      map[string]interface{}{"key": "value"},
+			Config:      map[string]interface{}{"key": "value", "second_key": "value2"},
 		}
 
 		resourceData, err := propertyProvider.Create(ctx, "property-id", toArgs.ToResourceData())
@@ -100,7 +100,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			"name":        "property",
 			"description": "property description",
 			"type":        "property type",
-			"config":      map[string]interface{}{"key": "value"},
+			"config":      map[string]interface{}{"key": "value", "secondKey": "value2"},
 			"workspaceId": "workspace-id",
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
@@ -108,7 +108,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 				"name":        "property",
 				"description": "property description",
 				"type":        "property type",
-				"config":      map[string]interface{}{"key": "value"},
+				"config":      map[string]interface{}{"key": "value", "second_key": "value2"},
 			},
 		}, *resourceData)
 	})
@@ -135,7 +135,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Name:        "property",
 			Description: "property new description",
 			Type:        "property type",
-			Config:      map[string]interface{}{"key": "value", "key2": "value2"},
+			Config:      map[string]interface{}{"key": "value", "min_length": 10},
 		}
 
 		mockCatalog.SetProperty(&catalog.Property{
@@ -144,7 +144,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			Description: "property new description",
 			Type:        "property type",
 			WorkspaceId: "workspace-id",
-			Config:      map[string]interface{}{"key": "value", "key2": "value2"},
+			Config:      map[string]interface{}{"key": "value", "minLength": 10},
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,
 		})
@@ -164,7 +164,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 			"name":        "property",
 			"description": "property new description",
 			"type":        "property type",
-			"config":      map[string]interface{}{"key": "value", "key2": "value2"},
+			"config":      map[string]interface{}{"key": "value", "minLength": int(10)},
 			"workspaceId": "workspace-id",
 			"createdAt":   "2021-09-01 00:00:00 +0000 UTC",
 			"updatedAt":   "2021-09-02 00:00:00 +0000 UTC",
@@ -172,7 +172,7 @@ func TestPropertyProviderOperations(t *testing.T) {
 				"name":        "property",
 				"description": "property new description",
 				"type":        "property type",
-				"config":      map[string]interface{}{"key": "value", "key2": "value2"},
+				"config":      map[string]interface{}{"key": "value", "min_length": int(10)},
 			},
 		}, *updatedResource)
 

@@ -90,3 +90,86 @@ func TestToSnakeCase(t *testing.T) {
 	}
 }
 
+func TestToCamelCase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple snake_case",
+			input:    "min_length",
+			expected: "minLength",
+		},
+		{
+			name:     "snake_case with multiple words",
+			input:    "max_length",
+			expected: "maxLength",
+		},
+		{
+			name:     "snake_case with of",
+			input:    "multiple_of",
+			expected: "multipleOf",
+		},
+		{
+			name:     "snake_case with types",
+			input:    "item_types",
+			expected: "itemTypes",
+		},
+		{
+			name:     "lowercase only",
+			input:    "enum",
+			expected: "enum",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "single lowercase letter",
+			input:    "a",
+			expected: "a",
+		},
+		{
+			name:     "snake_case three words",
+			input:    "exclusive_minimum",
+			expected: "exclusiveMinimum",
+		},
+		{
+			name:     "snake_case four words",
+			input:    "exclusive_maximum_value",
+			expected: "exclusiveMaximumValue",
+		},
+		{
+			name:     "already camelCase",
+			input:    "minLength",
+			expected: "minLength",
+		},
+		{
+			name:     "trailing underscore",
+			input:    "min_length_",
+			expected: "minLength",
+		},
+		{
+			name:     "leading underscore",
+			input:    "_min_length",
+			expected: "MinLength",
+		},
+		{
+			name:     "multiple consecutive underscores",
+			input:    "min__length",
+			expected: "minLength",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := ToCamelCase(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
