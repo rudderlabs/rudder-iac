@@ -59,14 +59,14 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - **Integration tests**: Based on scope for new capabilities
 - **Struct comparisons**: Prefer comparing entire structs over field-by-field assertions:
 
-  ```go
-  // Preferred
-  assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
+```go
+// Preferred
+assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
 
-  // Avoid
-  assert.Equal(t, "dg-123", result.ID)
-  assert.Equal(t, "Test", result.Name)
-  ```
+// Avoid
+assert.Equal(t, "dg-123", result.ID)
+assert.Equal(t, "Test", result.Name)
+```
 
 ### Logging
 
