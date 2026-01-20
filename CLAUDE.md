@@ -113,8 +113,6 @@ actualKind := fieldVal.Kind()
 
 - **ID Naming Convention**: Use fully capitalized "ID" in identifiers (Go convention for initialisms), e.g., `ExternalID` not `ExternalId`, `WorkspaceID` not `WorkspaceId`
 
-- **ID Naming Convention**: Use fully capitalized "ID" in identifiers (Go convention for initialisms), e.g., `ExternalID` not `ExternalId`, `WorkspaceID` not `WorkspaceId`
-
 ### Comments
 
 - **Focus on "why"**, not "what" - explain the reasoning, not the mechanics
