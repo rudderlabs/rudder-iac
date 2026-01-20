@@ -64,3 +64,8 @@ type BatchPublishLibrary struct {
 type BatchPublishResponse struct {
 	Published bool `json:"published"`
 }
+
+// SetExternalIDRequest is the request body for setting external ID
+type SetExternalIDRequest struct {
+	ExternalID string `json:"externalId"`
+}
