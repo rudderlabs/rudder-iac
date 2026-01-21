@@ -45,16 +45,22 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
+			cfg := config.GetConfig()
+
 			opts := []project.ProjectOption{}
-			if config.GetConfig().ExperimentalFlags.V1SpecSupport {
+			if cfg.ExperimentalFlags.V1SpecSupport {
 				opts = append(opts, project.WithV1SpecSupport())
 			}
+
+			if cfg.ExperimentalFlags.ValidationFramework {
+				opts = append(opts, project.WithValidateUsingEngine())
+			}
+
 			p = project.New(location, deps.CompositeProvider(), opts...)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			validateLog.Debug("validate", "location", location)
-			validateLog.Debug("validating project configuration")
 
 			defer func() {
 				telemetry.TrackCommand("validate", err, []telemetry.KV{
