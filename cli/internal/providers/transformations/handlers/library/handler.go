@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/samber/lo"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -57,6 +58,10 @@ func (h *HandlerImpl) ValidateSpec(spec *model.LibrarySpec) error {
 	}
 	if spec.ImportName == "" {
 		return fmt.Errorf("import_name is required")
+	}
+	expectedImportName := lo.CamelCase(spec.Name)
+	if spec.ImportName != expectedImportName {
+		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, spec.ImportName)
 	}
 	if spec.Code != "" && spec.File != "" {
 		return fmt.Errorf("code and file are mutually exclusive")

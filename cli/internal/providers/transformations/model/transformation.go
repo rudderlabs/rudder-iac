@@ -11,19 +11,19 @@ type TransformationSpec = specs.TransformationSpec
 
 // TransformationResource represents the input data for a transformation
 type TransformationResource struct {
-	ID          string
-	Name        string
-	Description string
-	Language    string
-	Code        string                     // Resolved from inline or file
+	ID          string                     `json:"id"`
+	Name        string                     `json:"name"`
+	Description string                     `json:"description"`
+	Language    string                     `json:"language"`
+	Code        string                     `json:"code"` // Resolved from inline or file
 	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"` // Excluded from state comparison (local test-only field)
 }
 
 // TransformationState represents the output state from the remote system
 // Contains computed fields (remote ID, version ID)
 type TransformationState struct {
-	ID        string // Remote ID
-	VersionID string // Remote version ID
+	ID        string `json:"id"`        // Remote ID
+	VersionID string `json:"versionId"` // Remote version ID
 }
 
 // RemoteTransformation wraps transformations.Transformation to implement RemoteResource interface
