@@ -16,13 +16,13 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "ES6 default import",
-			code: `import myLib from 'myLib';`,
+			name:     "ES6 default import",
+			code:     `import myLib from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
-			name: "ES6 named import",
-			code: `import { func1, func2 } from 'myLib';`,
+			name:     "ES6 named import",
+			code:     `import { func1, func2 } from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
@@ -81,23 +81,23 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			expected: []string{"mathLib"},
 		},
 		{
-			name: "No imports",
-			code: `export function transformEvent(event) { return event; }`,
+			name:     "No imports",
+			code:     `export function transformEvent(event) { return event; }`,
 			expected: []string{},
 		},
 		{
-			name: "Import with newlines and tabs",
-			code: "import {\n\tadd,\n\tsubtract\n} from 'mathLib';",
+			name:     "Import with newlines and tabs",
+			code:     "import {\n\tadd,\n\tsubtract\n} from 'mathLib';",
 			expected: []string{"mathLib"},
 		},
 		{
-			name: "Namespace import",
-			code: `import * as lib from 'myLib';`,
+			name:     "Namespace import",
+			code:     `import * as lib from 'myLib';`,
 			expected: []string{"myLib"},
 		},
 		{
-			name: "Import without from (side effects)",
-			code: `import 'polyfill';`,
+			name:     "Import without from (side effects)",
+			code:     `import 'polyfill';`,
 			expected: []string{"polyfill"},
 		},
 		{
@@ -128,6 +128,15 @@ func TestJavaScriptParser_ExtractImports(t *testing.T) {
 			`,
 			expected: []string{"validationHelpers", "commonUtils", "cryptoLib"},
 		},
+		{
+			name: "Re-exports are included (esbuild treats them as imports)",
+			code: `
+				import myLib from 'myLib';
+				export { something } from 'reexportedLib';
+				export * from 'anotherReexport';
+			`,
+			expected: []string{"myLib", "reexportedLib", "anotherReexport"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,13 +157,13 @@ func TestJavaScriptParser_ExtractImports_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "CommonJS require not supported",
-			code: `const myLib = require('myLib');`,
+			name:        "CommonJS require not supported",
+			code:        `const myLib = require('myLib');`,
 			expectedErr: "require() syntax is not supported",
 		},
 		{
-			name: "CommonJS require with spaces",
-			code: `const lib = require(  'myLib'  );`,
+			name:        "CommonJS require with spaces",
+			code:        `const lib = require(  'myLib'  );`,
 			expectedErr: "require() syntax is not supported",
 		},
 		{
@@ -166,18 +175,18 @@ func TestJavaScriptParser_ExtractImports_Errors(t *testing.T) {
 			expectedErr: "require() syntax is not supported",
 		},
 		{
-			name: "Relative import with ./",
-			code: `import util from './util';`,
+			name:        "Relative import with ./",
+			code:        `import util from './util';`,
 			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
 		},
 		{
-			name: "Relative import with ../",
-			code: `import config from '../config';`,
+			name:        "Relative import with ../",
+			code:        `import config from '../config';`,
 			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
 		},
 		{
-			name: "Absolute import",
-			code: `import abs from '/absolute/path';`,
+			name:        "Absolute import",
+			code:        `import abs from '/absolute/path';`,
 			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
 		},
 		{
@@ -195,6 +204,22 @@ func TestJavaScriptParser_ExtractImports_Errors(t *testing.T) {
 				import config from '../config';
 			`,
 			expectedErr: "relative imports (./file, ../file) and absolute imports (/path) are not supported",
+		},
+		{
+			name: "Dynamic imports not supported",
+			code: `
+				import staticLib from 'staticLib';
+				async function load() {
+					const dynamicLib = await import('dynamicLib');
+					return dynamicLib;
+				}
+			`,
+			expectedErr: "dynamic imports are not supported",
+		},
+		{
+			name:        "Dynamic import only",
+			code:        `const lib = await import('lib');`,
+			expectedErr: "dynamic imports are not supported",
 		},
 	}
 

@@ -89,6 +89,15 @@ func (p *CompositeProvider) LoadSpec(path string, s *specs.Spec) error {
 	return provider.LoadSpec(path, s)
 }
 
+func (p *CompositeProvider) LoadLegacySpec(path string, s *specs.Spec) error {
+	provider, err := p.providerForKind(s.Kind)
+	if err != nil {
+		return err
+	}
+
+	return provider.LoadLegacySpec(path, s)
+}
+
 func (p *CompositeProvider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 	for _, provider := range p.Providers {
@@ -331,4 +340,12 @@ func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResourc
 		}
 	}
 	return s, nil
+}
+
+func (p *CompositeProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	provider, err := p.providerForKind(s.Kind)
+	if err != nil {
+		return nil, err
+	}
+	return provider.MigrateSpec(s)
 }

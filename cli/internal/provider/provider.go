@@ -36,6 +36,11 @@ type SpecLoader interface {
 	// that these are all steps of the same load spec process.
 	LoadSpec(path string, s *specs.Spec) error
 
+	// LoadLegacySpec loads and processes a legacy YAML spec (rudder/0.1) from the given path.
+	// It populates the provider's internal state with the resource definitions from the legacy spec.
+	// This is used during migration to load old specs before converting them.
+	LoadLegacySpec(path string, s *specs.Spec) error
+
 	// ParseSpec parses a specification without fully loading it into the provider's state.
 	// It extracts metadata such as external IDs that may be referenced by other specs.
 	// This allows for two-phase loading where references can be validated before full processing.
@@ -161,6 +166,14 @@ type Exporter interface {
 	) ([]writer.FormattableEntity, error)
 }
 
+// SpecMigrator handles migration of project specifications from one version to another.
+type SpecMigrator interface {
+	// MigrateSpec migrates project specifications from rudder/0.1 to rudder/1.
+	// This method transforms the existing project configuration to the new spec version. s contains the spec to migrate.
+	// Returns the migrated spec or an error.
+	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -171,6 +184,7 @@ type Exporter interface {
 //   - State management: Converting remote resources into state format for tracking
 //   - Lifecycle: Creating, updating, deleting, and importing resources in the remote system
 //   - Export: Generating configuration files from existing remote resources
+//   - Migration: Migrating project specifications from one version to another
 //
 // Providers act as adapters between the generic infrastructure management framework
 // and specific resource types or backend systems.
@@ -182,4 +196,5 @@ type Provider interface {
 	StateLoader
 	LifecycleManager
 	Exporter
+	SpecMigrator
 }

@@ -52,8 +52,8 @@ func TestProject_Load_Success(t *testing.T) {
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
 
 	expectedSpecs := map[string]*specs.Spec{
-		"path/to/spec1.yaml": {Kind: "Source"},
-		"path/to/spec2.yaml": {Kind: "Destination"},
+		"path/to/spec1.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
+		"path/to/spec2.yaml": {Kind: "Destination", Version: specs.SpecVersionV0_1},
 	}
 
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
@@ -63,11 +63,11 @@ func TestProject_Load_Success(t *testing.T) {
 	err := proj.Load()
 	require.NoError(t, err)
 
-	assert.Equal(t, 2, len(mockProvider.LoadSpecCalledWithArgs), "LoadSpec should be called for each spec")
+	assert.Equal(t, 2, len(mockProvider.LoadLegacySpecCalledWithArgs), "LoadLegacySpec should be called for each spec")
 	// Order might not be guaranteed from map iteration, so check presence
 	foundSpec1 := false
 	foundSpec2 := false
-	for _, arg := range mockProvider.LoadSpecCalledWithArgs {
+	for _, arg := range mockProvider.LoadLegacySpecCalledWithArgs {
 		if arg.Path == "path/to/spec1.yaml" && arg.Spec.Kind == "Source" {
 			foundSpec1 = true
 		}
@@ -90,7 +90,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
 
 	validSpecs := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "Source"},
+		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
 	}
 
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
@@ -98,7 +98,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	}
 
 	expectedErr := errors.New("provider LoadSpec failed")
-	mockProvider.LoadSpecErr = expectedErr
+	mockProvider.LoadLegacySpecErr = expectedErr
 
 	err := proj.Load()
 	require.Error(t, err)
@@ -115,14 +115,14 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
 
 	validSpecs := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "Source"},
+		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
 	}
 
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
 		return validSpecs, nil
 	}
 
-	mockProvider.LoadSpecErr = nil
+	mockProvider.LoadLegacySpecErr = nil
 	expectedErr := errors.New("provider Validate failed")
 	mockProvider.ValidateErr = expectedErr
 
@@ -163,6 +163,123 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	assert.Nil(t, graph)
 	assert.True(t, errors.Is(err, expectedErr))
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
+}
+
+func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                       string
+		specVersion                string
+		useV1SpecSupport           bool
+		expectError                bool
+		expectLoadSpecCalled       bool
+		expectLoadLegacySpecCalled bool
+		errorContains              string
+	}{
+		{
+			name:                       "rudder/v1 spec without v1 support - returns error",
+			specVersion:                "rudder/v1",
+			useV1SpecSupport:           false,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "unsupported spec version: rudder/v1",
+		},
+		{
+			name:                       "rudder/v1 spec with v1 support - calls LoadSpec",
+			specVersion:                "rudder/v1",
+			useV1SpecSupport:           true,
+			expectError:                false,
+			expectLoadSpecCalled:       true,
+			expectLoadLegacySpecCalled: false,
+		},
+		{
+			name:                       "rudder/0.1 spec without v1 support - calls LoadLegacySpec (backward compatible)",
+			specVersion:                "rudder/0.1",
+			useV1SpecSupport:           false,
+			expectError:                false,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: true,
+		},
+		{
+			name:                       "rudder/0.1 spec with v1 support - calls LoadLegacySpec (backward compatible)",
+			specVersion:                "rudder/0.1",
+			useV1SpecSupport:           true,
+			expectError:                false,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: true,
+		},
+		{
+			name:                       "unsupported version without v1 support - returns error",
+			specVersion:                "rudder/v2.0",
+			useV1SpecSupport:           false,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "unsupported spec version: rudder/v2.0",
+		},
+		{
+			name:                       "unsupported version with v1 support - returns error",
+			specVersion:                "rudder/v2.0",
+			useV1SpecSupport:           true,
+			expectError:                true,
+			expectLoadSpecCalled:       false,
+			expectLoadLegacySpecCalled: false,
+			errorContains:              "unsupported spec version: rudder/v2.0",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockLoader := &MockLoader{}
+
+			var opts []project.ProjectOption
+			opts = append(opts, project.WithLoader(mockLoader))
+			if tc.useV1SpecSupport {
+				opts = append(opts, project.WithV1SpecSupport())
+			}
+
+			proj := project.New("test_dir", mockProvider, opts...)
+
+			testSpec := &specs.Spec{
+				Kind:    "Source",
+				Version: tc.specVersion,
+			}
+			specsMap := map[string]*specs.Spec{
+				"path/to/spec.yaml": testSpec,
+			}
+
+			mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+				return specsMap, nil
+			}
+
+			err := proj.Load()
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Verify LoadSpec was called (or not)
+			loadSpecCalled := len(mockProvider.LoadSpecCalledWithArgs) > 0
+			assert.Equal(t, tc.expectLoadSpecCalled, loadSpecCalled,
+				"LoadSpec called mismatch: expected %v, got %v", tc.expectLoadSpecCalled, loadSpecCalled)
+
+			// Verify LoadLegacySpec was called (or not)
+			loadLegacySpecCalled := len(mockProvider.LoadLegacySpecCalledWithArgs) > 0
+			assert.Equal(t, tc.expectLoadLegacySpecCalled, loadLegacySpecCalled,
+				"LoadLegacySpec called mismatch: expected %v, got %v", tc.expectLoadLegacySpecCalled, loadLegacySpecCalled)
+		})
+	}
 }
 
 func TestProject_ValidateSpec(t *testing.T) {
