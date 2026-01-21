@@ -76,29 +76,29 @@ func (p *JavaScriptParser) ExtractImports(code string) ([]string, error) {
 
 	// Extract and validate imports
 	var libraryImports []string
-	seen := make(map[string]bool)
+	dedupedImports := make(map[string]bool)
 
 	for _, output := range meta.Outputs {
 		for _, imp := range output.Imports {
 			// Check for require() - not supported
 			if imp.Kind == "require-call" {
-				return nil, fmt.Errorf("require() syntax is not supported")
+				return nil, fmt.Errorf("require() syntax is not supported: %s", imp.Path)
 			}
 
-			// Check for dynamic imports - skip them (not extracting, but also not erroring)
+			// Check for dynamic imports - not supported
 			if imp.Kind == "dynamic-import" {
-				return nil, fmt.Errorf("dynamic imports are not supported")
+				return nil, fmt.Errorf("dynamic imports are not supported: %s", imp.Path)
 			}
 
-			// Check for relative/absolute imports
+			// Check for relative/absolute imports - not supported
 			if isRelativeOrAbsoluteImport(imp.Path) {
-				return nil, fmt.Errorf("relative imports (./file, ../file) and absolute imports (/path) are not supported")
+				return nil, fmt.Errorf("relative imports (./file, ../file) and absolute imports (/path) are not supported: %s", imp.Path)
 			}
 
 			// Filter external libraries and deduplicate
-			if isExternalLibraryImport(imp.Path) && !seen[imp.Path] {
+			if isExternalLibraryImport(imp.Path) && !dedupedImports[imp.Path] {
 				libraryImports = append(libraryImports, imp.Path)
-				seen[imp.Path] = true
+				dedupedImports[imp.Path] = true
 			}
 		}
 	}
