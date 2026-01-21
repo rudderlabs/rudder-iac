@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
@@ -14,6 +15,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
+
+var log = logger.New("transformationsprovider")
 
 // Provider wraps BaseProvider and adds transformations-specific functionality
 type Provider struct {
@@ -140,6 +143,7 @@ func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
 			len(req.Transformations), len(req.Libraries), err)
 	}
 
+	log.Info("Successfully published transformations and libraries", "transformations", len(req.Transformations), "libraries", len(req.Libraries))
 	return nil
 }
 

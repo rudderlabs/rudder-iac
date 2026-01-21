@@ -317,7 +317,7 @@ func TestResourceGraph(t *testing.T) {
 		assert.Nil(t, graph)
 	})
 
-// TODO: Implement this test once we have a python parser
+	// TODO: Implement this test once we have a python parser
 	t.Run("python transformation - no imports extracted", func(t *testing.T) {
 		t.Parallel()
 
