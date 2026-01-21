@@ -329,7 +329,7 @@ func TestCreateLibrary(t *testing.T) {
 						"description": "Test library description",
 						"code": "function helper() { return true; }",
 						"language": "javascript",
-						"handleName": "testLibrary",
+						"importName": "testLibrary",
 						"workspaceId": "ws-789",
 						"externalId": "lib-ext-123"
 					}`,
@@ -358,7 +358,7 @@ func TestCreateLibrary(t *testing.T) {
 			assert.Equal(t, "Test library description", result.Description)
 			assert.Equal(t, "function helper() { return true; }", result.Code)
 			assert.Equal(t, "javascript", result.Language)
-			assert.Equal(t, "testLibrary", result.HandleName)
+			assert.Equal(t, "testLibrary", result.ImportName)
 			assert.Equal(t, "ws-789", result.WorkspaceID)
 			assert.Equal(t, "lib-ext-123", result.ExternalID)
 
@@ -411,7 +411,7 @@ func TestUpdateLibrary(t *testing.T) {
 						"description": "Updated library description",
 						"code": "function helper() { return false; }",
 						"language": "javascript",
-						"handleName": "updatedLibrary",
+						"importName": "updatedLibrary",
 						"workspaceId": "ws-789",
 						"externalId": "lib-ext-123"
 					}`,
@@ -458,7 +458,7 @@ func TestGetLibrary(t *testing.T) {
 				"description": "Test library description",
 				"code": "function helper() { return true; }",
 				"language": "javascript",
-				"handleName": "testLibrary",
+				"importName": "testLibrary",
 				"workspaceId": "ws-789",
 				"externalId": "lib-ext-123"
 			}`,
@@ -477,7 +477,7 @@ func TestGetLibrary(t *testing.T) {
 	assert.Equal(t, "lib-ver-456", result.VersionID)
 	assert.Equal(t, "test-library", result.Name)
 	assert.Equal(t, "Test library description", result.Description)
-	assert.Equal(t, "testLibrary", result.HandleName)
+	assert.Equal(t, "testLibrary", result.ImportName)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -499,7 +499,7 @@ func TestListLibraries(t *testing.T) {
 						"name": "library-1",
 						"code": "code1",
 						"language": "javascript",
-						"handleName": "library1",
+						"importName": "library1",
 						"workspaceId": "ws-1"
 					},
 					{
@@ -508,7 +508,7 @@ func TestListLibraries(t *testing.T) {
 						"name": "library-2",
 						"code": "code2",
 						"language": "javascript",
-						"handleName": "library2",
+						"importName": "library2",
 						"workspaceId": "ws-1"
 					}
 				]
@@ -527,10 +527,10 @@ func TestListLibraries(t *testing.T) {
 	assert.Len(t, results, 2)
 	assert.Equal(t, "lib-1", results[0].ID)
 	assert.Equal(t, "library-1", results[0].Name)
-	assert.Equal(t, "library1", results[0].HandleName)
+	assert.Equal(t, "library1", results[0].ImportName)
 	assert.Equal(t, "lib-2", results[1].ID)
 	assert.Equal(t, "library-2", results[1].Name)
-	assert.Equal(t, "library2", results[1].HandleName)
+	assert.Equal(t, "library2", results[1].ImportName)
 
 	httpClient.AssertNumberOfCalls()
 }
