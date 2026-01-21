@@ -147,7 +147,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 		Description: remote.Description,
 		Language:    remote.Language,
 		Code:        remote.Code,
-		ImportName:  remote.HandleName,
+		ImportName:  remote.ImportName,
 	}
 
 	state := &model.LibraryState{
