@@ -36,6 +36,7 @@ func New(data []byte) (*Spec, error) {
 	var spec Spec
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true) // Enable strict mode - reject unknown fields
+	// /spec, /kind, /version, /abc( unknown )
 
 	if err := decoder.Decode(&spec); err != nil {
 		return nil, fmt.Errorf("unmarshaling yaml: %w", err)

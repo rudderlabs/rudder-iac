@@ -31,14 +31,14 @@ func TestNewProject_Load_Error(t *testing.T) {
 
 	provider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
-	p := project.New("test_location", provider, project.WithLoader(mockLoader))
+	p := project.New(provider, project.WithLoader(mockLoader))
 
 	assert.NotNil(t, p)
 	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
 		assert.Equal(t, "test_location", location)
 		return nil, errors.New("custom loader called")
 	}
-	err := p.Load()
+	err := p.Load("test_location")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "custom loader called")
 }
@@ -49,7 +49,7 @@ func TestProject_Load_Success(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
 	expectedSpecs := map[string]*specs.Spec{
 		"path/to/spec1.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
@@ -60,7 +60,7 @@ func TestProject_Load_Success(t *testing.T) {
 		return expectedSpecs, nil
 	}
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(mockProvider.LoadLegacySpecCalledWithArgs), "LoadLegacySpec should be called for each spec")
@@ -87,7 +87,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
 	validSpecs := map[string]*specs.Spec{
 		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
@@ -100,7 +100,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	expectedErr := errors.New("provider LoadSpec failed")
 	mockProvider.LoadLegacySpecErr = expectedErr
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "provider failed to load spec from path path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
@@ -112,7 +112,7 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
 	validSpecs := map[string]*specs.Spec{
 		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
@@ -126,7 +126,7 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 	expectedErr := errors.New("provider Validate failed")
 	mockProvider.ValidateErr = expectedErr
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, expectedErr))
 	assert.Equal(t, 1, mockProvider.ValidateCalledCount)
@@ -136,7 +136,7 @@ func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
-	proj := project.New("test_dir", mockProvider) // Loader doesn't matter for this test
+	proj := project.New(mockProvider) // Loader doesn't matter for this test
 
 	expectedGraph := &resources.Graph{}
 	mockProvider.GetResourceGraphVal = expectedGraph
@@ -152,7 +152,7 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
-	proj := project.New("test_dir", mockProvider)
+	proj := project.New(mockProvider)
 
 	expectedErr := errors.New("GetResourceGraph failed")
 	mockProvider.GetResourceGraphVal = nil
@@ -244,7 +244,7 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 				opts = append(opts, project.WithV1SpecSupport())
 			}
 
-			proj := project.New("test_dir", mockProvider, opts...)
+			proj := project.New(mockProvider, opts...)
 
 			testSpec := &specs.Spec{
 				Kind:    "Source",
@@ -258,7 +258,7 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 				return specsMap, nil
 			}
 
-			err := proj.Load()
+			err := proj.Load("test_dir")
 
 			if tc.expectError {
 				require.Error(t, err)

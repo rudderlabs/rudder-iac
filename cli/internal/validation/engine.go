@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -17,67 +16,60 @@ import (
 // It coordinates syntactic validation (pre-graph) and semantic validation (post-graph),
 // manages rule execution, and aggregates diagnostics across all validated files.
 type ValidationEngine interface {
-	// Validate runs two-phase validation on the project.
-	// It runs syntactic validation on all specs, builds the resource graph,
-	// then runs semantic validation on them.
-	Validate(ctx context.Context, specs map[string]*specs.Spec) ([]Diagnostic, error)
-}
+	// ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
+	// Rules receive ValidationContext with Graph = nil.
+	// Returns diagnostics for syntax errors (missing fields, invalid formats, etc.)
+	ValidateSyntax(ctx context.Context, specs map[string]*specs.Spec) (Diagnostics, error)
 
-type Provider interface {
-	provider.SpecLoader
-	provider.RuleProvider
+	// ValidateSemantic runs semantic validation after resource graph is built.
+	// Rules receive ValidationContext with populated Graph for cross-resource validation.
+	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
+	ValidateSemantic(ctx context.Context, specs map[string]*specs.Spec, graph *resources.Graph) (Diagnostics, error)
 }
 
 type validationEngine struct {
 	registry rules.Registry
-	provider Provider
 	log      *logger.Logger
 }
 
 // NewValidationEngine creates a new validation engine instance.
-// It collects and registers rules from the provider.
+// Registry should be pre-populated with syntactic and semantic rules.
 func NewValidationEngine(
 	registry rules.Registry,
-	p Provider,
 	log *logger.Logger,
 ) (ValidationEngine, error) {
 	return &validationEngine{
 		registry: registry,
-		provider: p,
 		log:      log,
 	}, nil
 }
 
-func (e *validationEngine) Validate(ctx context.Context, rawSpecs map[string]*specs.Spec) ([]Diagnostic, error) {
+// ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
+// Rules receive ValidationContext with Graph = nil.
+func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[string]*specs.Spec) (Diagnostics, error) {
 	collector := newDiagnosticCollector()
 
 	for fpath, spec := range rawSpecs {
-		// No resource graph exists yet for the syntactic validation rules
 		diagnostics, err := e.runValidationRules(
 			fpath,
 			e.registry.SyntacticRulesForKind(spec.Kind),
 			spec,
-			nil,
+			nil, // No graph for syntactic validation
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("syntactic validation for %s: %w", fpath, err)
 		}
-
 		collector.add(diagnostics...)
 	}
 
-	if collector.hasErrors() {
-		e.log.Debug("syntactic errors found", "count", len(collector.getErrors()))
-		collector.sortDiagnostics()
-		return collector.getAll(), nil
-	}
+	collector.sortDiagnostics()
+	return Diagnostics(collector.getAll()), nil
+}
 
-	e.log.Debug("building resource graph from all specs")
-	graph, err := e.buildResourceGraph(rawSpecs)
-	if err != nil {
-		return nil, fmt.Errorf("building resource graph: %w", err)
-	}
+// ValidateSemantic runs semantic validation after resource graph is built.
+// Rules receive ValidationContext with populated Graph for cross-resource validation.
+func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.Spec, graph *resources.Graph) (Diagnostics, error) {
+	collector := newDiagnosticCollector()
 
 	for fpath, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
@@ -93,39 +85,13 @@ func (e *validationEngine) Validate(ctx context.Context, rawSpecs map[string]*sp
 	}
 
 	collector.sortDiagnostics()
-	return collector.getAll(), nil
-}
-
-func (e *validationEngine) buildResourceGraph(specsMap map[string]*specs.Spec) (*resources.Graph, error) {
-	for path, spec := range specsMap {
-		// _, err := e.provider.ParseSpec(path, spec)
-		// if err != nil {
-		// 	e.log.Warn("failed to parse spec during graph building", "path", path, "error", err)
-		// 	continue
-		// }
-
-		if err := e.provider.LoadSpec(path, spec); err != nil {
-			return nil, fmt.Errorf("loading spec: %w", err)
-		}
-	}
-
-	graph, err := e.provider.ResourceGraph()
-	if err != nil {
-		return nil, fmt.Errorf("getting resource graph: %w", err)
-	}
-
-	_, err = graph.DetectCycles()
-	if err != nil {
-		return nil, fmt.Errorf("graph contains cycles: %w", err)
-	}
-
-	return graph, nil
+	return Diagnostics(collector.getAll()), nil
 }
 
 func (e *validationEngine) runValidationRules(
 	fpath string,
 	toValidateAgainst []rules.Rule,
-	spec *specs.Spec,
+	rawSpec *specs.Spec, // from loader => rawSpec.Spec is a map
 	graph *resources.Graph,
 ) ([]Diagnostic, error) {
 
@@ -139,13 +105,15 @@ func (e *validationEngine) runValidationRules(
 		return nil, fmt.Errorf("building path indexer: %w", err)
 	}
 
+	// unmarshal -> map -> struct
+	// syntactic validation ( spec syntax )
 	diagnostics := make([]Diagnostic, 0)
 	for _, rule := range toValidateAgainst {
 		results := rule.Validate(&rules.ValidationContext{
-			Spec:     spec.Spec,
-			Kind:     spec.Kind,
-			Version:  spec.Version,
-			Metadata: spec.Metadata,
+			Spec:     rawSpec.Spec,
+			Kind:     rawSpec.Kind,
+			Version:  rawSpec.Version,
+			Metadata: rawSpec.Metadata,
 			Graph:    graph,
 		})
 

@@ -8,6 +8,7 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -53,6 +54,14 @@ type Deps interface {
 	// CompositeProvider returns a composite provider aggregating all individual providers
 	// used by components that operate across multiple providers.
 	CompositeProvider() provider.Provider
+
+	// NewProject creates a new project instance with the composite provider and wires
+	// experimental flags from config. This centralizes project configuration.
+	NewProject() project.Project
+
+	// NewDataCatalogProject creates a new project instance with only the DataCatalog provider
+	// and wires experimental flags. Used by trackingplan commands.
+	NewDataCatalogProject() project.Project
 }
 
 func Initialise(version string) {
@@ -153,6 +162,40 @@ func (d *deps) Providers() *Providers {
 
 func (d *deps) CompositeProvider() provider.Provider {
 	return d.compositeProvider
+}
+
+// NewProject creates a project with composite provider and wires experimental flags.
+// This centralizes project configuration so commands don't need to wire flags manually.
+func (d *deps) NewProject() project.Project {
+	cfg := config.GetConfig()
+	opts := []project.ProjectOption{}
+
+	if cfg.ExperimentalFlags.V1SpecSupport {
+		opts = append(opts, project.WithV1SpecSupport())
+	}
+
+	if cfg.ExperimentalFlags.ValidationFramework {
+		opts = append(opts, project.WithValidateUsingEngine())
+	}
+
+	return project.New(d.CompositeProvider(), opts...)
+}
+
+// NewDataCatalogProject creates a project with only the DataCatalog provider.
+// Used by trackingplan commands that only need data catalog functionality.
+func (d *deps) NewDataCatalogProject() project.Project {
+	cfg := config.GetConfig()
+	opts := []project.ProjectOption{}
+
+	if cfg.ExperimentalFlags.V1SpecSupport {
+		opts = append(opts, project.WithV1SpecSupport())
+	}
+
+	if cfg.ExperimentalFlags.ValidationFramework {
+		opts = append(opts, project.WithValidateUsingEngine())
+	}
+
+	return project.New(d.Providers().DataCatalog, opts...)
 }
 
 func GetVersion() string {

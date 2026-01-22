@@ -35,8 +35,8 @@ func TestExamplesSync(t *testing.T) {
 		provider := example.NewProvider(b)
 
 		// Load specs from testdata directory
-		proj := project.New("dummy/path", provider, project.WithLoader(&mockLoader{specs: specs}))
-		err := proj.Load()
+		proj := project.New(provider, project.WithLoader(&mockLoader{specs: specs}))
+		err := proj.Load("dummy/path")
 		require.NoError(t, err, "Failed to load project specs")
 		// Create syncer and sync the project resource graph to the backend
 		targetGraph, err := proj.ResourceGraph()

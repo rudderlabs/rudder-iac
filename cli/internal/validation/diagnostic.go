@@ -33,3 +33,58 @@ type Diagnostic struct {
 	// Can be nil if the rule doesn't provide examples
 	Examples rules.Examples
 }
+
+// Diagnostics is a collection of Diagnostic items with utility methods.
+type Diagnostics []Diagnostic
+
+// HasErrors returns true if any diagnostic in the collection has Error severity.
+func (d Diagnostics) HasErrors() bool {
+	for _, diag := range d {
+		if diag.Severity == rules.Error {
+			return true
+		}
+	}
+	return false
+}
+
+// HasWarnings returns true if any diagnostic in the collection has Warning severity.
+func (d Diagnostics) HasWarnings() bool {
+	for _, diag := range d {
+		if diag.Severity == rules.Warning {
+			return true
+		}
+	}
+	return false
+}
+
+// Errors returns only the diagnostics with Error severity.
+func (d Diagnostics) Errors() Diagnostics {
+	errors := make(Diagnostics, 0)
+	for _, diag := range d {
+		if diag.Severity == rules.Error {
+			errors = append(errors, diag)
+		}
+	}
+	return errors
+}
+
+// Warnings returns only the diagnostics with Warning severity.
+func (d Diagnostics) Warnings() Diagnostics {
+	warnings := make(Diagnostics, 0)
+	for _, diag := range d {
+		if diag.Severity == rules.Warning {
+			warnings = append(warnings, diag)
+		}
+	}
+	return warnings
+}
+
+// Len returns the number of diagnostics in the collection.
+func (d Diagnostics) Len() int {
+	return len(d)
+}
+
+// IsEmpty returns true if there are no diagnostics.
+func (d Diagnostics) IsEmpty() bool {
+	return len(d) == 0
+}

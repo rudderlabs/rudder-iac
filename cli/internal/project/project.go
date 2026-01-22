@@ -35,7 +35,7 @@ type ProjectProvider interface {
 
 type Project interface {
 	Location() string
-	Load() error
+	Load(location string) error
 	ResourceGraph() (*resources.Graph, error)
 	Specs() map[string]*specs.Spec
 }
@@ -84,9 +84,9 @@ func WithV1SpecSupport() ProjectOption {
 
 // New creates a new Project instance.
 // By default, it uses a loader.Loader.
-func New(location string, provider provider.Provider, opts ...ProjectOption) Project {
+// Location is provided later via Load(location).
+func New(provider provider.Provider, opts ...ProjectOption) Project {
 	p := &project{
-		location: location,
 		provider: provider,
 	}
 
@@ -101,9 +101,7 @@ func New(location string, provider provider.Provider, opts ...ProjectOption) Pro
 	if p.renderer == nil {
 		// fallback to default text renderer if
 		// no renderer is provided
-		p.renderer = renderer.NewTextRenderer(
-			os.Stdout,
-			os.Stderr)
+		p.renderer = renderer.NewTextRenderer(os.Stdout)
 	}
 
 	return p
@@ -129,10 +127,12 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
-// Load loads the project specifications using the configured SpecLoader
+// Load loads the project specifications from the given location using the configured SpecLoader
 // and then validates them with the provider.
-func (p *project) Load() error {
+func (p *project) Load(location string) error {
 	var err error
+
+	p.location = location
 
 	p.specs, err = p.loader.Load(p.location) // Use the specLoader
 	if err != nil {
@@ -180,31 +180,65 @@ func (p *project) handleLegacyValidation() error {
 	return p.provider.Validate(graph)
 }
 
-// handleValidation validates the raw specs using the validation engine along
-// with rendering the diagnostics.
+// handleValidation orchestrates the two-phase validation workflow:
+// syntactic validation runs first to catch structural issues, and only if that passes,
+// we proceed to build the resource graph and run semantic validation.
+// This approach avoids expensive graph building when specs have basic syntax errors.
 func (p *project) handleValidation() error {
-	// setup the registry with the project-level rules along
-	// with the rules from the provider.
+	ctx := context.Background()
+
 	registry, err := p.registry()
 	if err != nil {
 		return fmt.Errorf("setting up registry: %w", err)
 	}
 
-	engine, err := validation.NewValidationEngine(registry, p.provider, log)
+	engine, err := validation.NewValidationEngine(registry, log)
 	if err != nil {
 		return fmt.Errorf("initialising validation engine: %w", err)
 	}
 
-	diagnostics, err := engine.Validate(context.Background(), p.specs)
+	syntaxDiags, err := engine.ValidateSyntax(ctx, p.specs)
 	if err != nil {
-		return fmt.Errorf("validating specs: %w", err)
+		return fmt.Errorf("syntactic validation: %w", err)
 	}
 
-	if err := p.renderer.Render(diagnostics); err != nil {
+	// Stop early if syntax errors exist to avoid building a graph from invalid specs
+	if syntaxDiags.HasErrors() {
+		if err := p.renderer.Render(syntaxDiags); err != nil {
+			return fmt.Errorf("rendering diagnostics: %w", err)
+		}
+		return fmt.Errorf("syntax validation failed")
+	}
+
+	for path, spec := range p.specs {
+		if err := p.loadSpec(path, spec); err != nil {
+			return fmt.Errorf("loading spec %s: %w", path, err)
+		}
+	}
+
+	// Graph is built once here - single source of truth for all resource relationships
+	graph, err := p.provider.ResourceGraph()
+	if err != nil {
+		return fmt.Errorf("building resource graph: %w", err)
+	}
+
+	// Cycles make the graph unusable, so detect them before semantic validation
+	if _, err := graph.DetectCycles(); err != nil {
+		return fmt.Errorf("cycle detected in resource graph: %w", err)
+	}
+
+	semanticDiags, err := engine.ValidateSemantic(ctx, p.specs, graph)
+	if err != nil {
+		return fmt.Errorf("semantic validation: %w", err)
+	}
+
+	// Show all diagnostics together so users see the complete picture
+	allDiags := append(syntaxDiags, semanticDiags...)
+	if err := p.renderer.Render(allDiags); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
 	}
 
-	if len(diagnostics) > 0 {
+	if allDiags.HasErrors() {
 		return fmt.Errorf("validation failed")
 	}
 

@@ -42,8 +42,8 @@ func NewCmdMigrate() *cobra.Command {
 			}
 
 			// Validate project before migration
-			proj = project.New(location, deps.CompositeProvider())
-			if err := proj.Load(); err != nil {
+			proj = deps.NewProject()
+			if err := proj.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 
