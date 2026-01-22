@@ -100,6 +100,7 @@ func NewProvider(apiClient *client.Client) *Provider {
 Register the provider in `cli/internal/app/dependencies.go`:
 
 1. **Add to Providers struct** - Use pointer to concrete type, not interface:
+
 ```go
 type Providers struct {
     // ... existing providers ...
@@ -108,6 +109,7 @@ type Providers struct {
 ```
 
 2. **Initialize in setupProviders()** - Conditionally if using experimental flag:
+
 ```go
 func setupProviders(c *client.Client) (*Providers, error) {
     cfg := config.GetConfig()
@@ -129,6 +131,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 ```
 
 3. **Add to composite provider** - In `NewDeps()`:
+
 ```go
 providers := map[string]provider.Provider{
     "datacatalog": p.DataCatalog,
