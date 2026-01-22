@@ -55,7 +55,7 @@ func verifyState(t *testing.T, dir string) {
 	require.NoError(t, err)
 	reader := helpers.NewAPIClientAdapter(dataCatalog)
 
-	expectedStateDir := filepath.Join("testdata", "datacatalog", "expected", dir)
+	expectedStateDir := filepath.Join("testdata", "datacatalog", "expected", "upstream", dir)
 	fileManager, err := helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
