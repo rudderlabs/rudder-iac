@@ -235,6 +235,7 @@ Resource-specific implementation providing:
 #### Why PropertyRef is Required
 
 Remote IDs are not known until resources are created. Using direct ID strings would cause:
+
 - Create operations to fail (referenced resource doesn't exist yet)
 - Invalid references during the apply cycle
 - Incorrect dependency tracking
@@ -242,6 +243,7 @@ Remote IDs are not known until resources are created. Using direct ID strings wo
 #### How to Use PropertyRef
 
 1. **In Resource struct** - Use `*resources.PropertyRef`, not `string`:
+
 ```go
 type ModelResource struct {
     ID           string
@@ -252,6 +254,7 @@ type ModelResource struct {
 ```
 
 2. **In Spec Parsing** - Create PropertyRef from external ID using URN:
+
 ```go
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *ModelSpec) (map[string]*ModelResource, error) {
     // Create URN for the parent resource
@@ -270,6 +273,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *ModelSpec) (ma
 **CRITICAL**: Always use `resources.URN()` to construct URNs. Never use `fmt.Sprintf` or string concatenation. Always use `HandlerMetadata.ResourceType` instead of hardcoding resource type strings.
 
 3. **Create Reference Helper** - Provide in parent handler:
+
 ```go
 // In the parent resource's handler (e.g., datagraph/handler.go)
 // IMPORTANT: The urn parameter is a full URN (e.g., "data-graph:my-dg"), not just an ID
@@ -284,6 +288,7 @@ func CreateDataGraphReference(urn string) *resources.PropertyRef {
 ```
 
 4. **In CRUD Operations** - Access resolved value:
+
 ```go
 func (h *HandlerImpl) Create(ctx context.Context, data *ModelResource) (*ModelState, error) {
     // PropertyRef is resolved by the syncer before Create is called
@@ -299,6 +304,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *ModelResource) (*ModelSt
 ```
 
 5. **In MapRemoteToState** - Convert remote ID to PropertyRef:
+
 ```go
 func (h *HandlerImpl) MapRemoteToState(remote *RemoteModel, urnResolver handler.URNResolver) (*ModelResource, *ModelState, error) {
     // Resolve the parent's URN from its remote ID
@@ -321,15 +327,17 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteModel, urnResolver handler.
 ```
 
 **CRITICAL RULES**:
+
 - ❌ **NEVER** parse URNs by splitting on `:` or using string manipulation
 - ❌ **NEVER** hardcode resource type strings (e.g., `"data-graph"`)
 - ✅ **ALWAYS** use `HandlerMetadata.ResourceType` for resource types
 - ✅ **ALWAYS** use `resources.URN(id, resourceType)` to construct URNs
-- ✅ **ALWAYS** pass URNs directly to Create*Reference functions
+- ✅ **ALWAYS** pass URNs directly to Create\*Reference functions
 
 #### Complete Reference Example
 
 **Spec (YAML)**:
+
 ```yaml
 spec:
   id: "my-dg"
@@ -341,6 +349,7 @@ spec:
 ```
 
 **Parent Handler (datagraph/handler.go)** - Provide reference helper:
+
 ```go
 // CreateDataGraphReference creates a PropertyRef for data graph references
 // The urn parameter is a full URN (e.g., "data-graph:my-dg")
@@ -355,6 +364,7 @@ func CreateDataGraphReference(urn string) *resources.PropertyRef {
 ```
 
 **Child Handler (model/handler.go)** - Use references:
+
 ```go
 // ExtractResourcesFromSpec - Create PropertyRef from parent external ID
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *ModelSpec) (map[string]*ModelResource, error) {
@@ -461,6 +471,7 @@ Two-phase validation:
 **CRITICAL RULES** - Follow these strictly:
 
 1. **Always use `resources.URN()`** to construct URNs:
+
    ```go
    // ✅ CORRECT
    urn := resources.URN(externalID, HandlerMetadata.ResourceType)
@@ -471,6 +482,7 @@ Two-phase validation:
    ```
 
 2. **Always use `HandlerMetadata.ResourceType`**, never hardcode:
+
    ```go
    // ✅ CORRECT
    urn := resources.URN(id, datagraph.HandlerMetadata.ResourceType)
@@ -482,6 +494,7 @@ Two-phase validation:
    ```
 
 3. **Never parse or split URNs**:
+
    ```go
    // ❌ WRONG - Don't parse URNs
    externalID := urn[len("data-graph:"):]
@@ -491,7 +504,8 @@ Two-phase validation:
    ref := datagraph.CreateDataGraphReference(urn)  // Pass URN directly
    ```
 
-4. **Create*Reference functions take URNs**, not external IDs:
+4. **Create\*Reference functions take URNs**, not external IDs:
+
    ```go
    // ✅ CORRECT
    urn := resources.URN(externalID, datagraph.HandlerMetadata.ResourceType)
