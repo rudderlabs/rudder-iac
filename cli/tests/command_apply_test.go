@@ -24,14 +24,14 @@ func TestProjectApply(t *testing.T) {
 	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
 
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "project", "create"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "datacatalog", "create"), "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
 		verifyState(t, "create")
 	})
 
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "project", "update"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "datacatalog", "update"), "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
 	})
@@ -55,7 +55,7 @@ func verifyState(t *testing.T, dir string) {
 	require.NoError(t, err)
 	reader := helpers.NewAPIClientAdapter(dataCatalog)
 
-	expectedStateDir := filepath.Join("testdata", "expected", "upstream", dir)
+	expectedStateDir := filepath.Join("testdata", "datacatalog", "expected", dir)
 	fileManager, err := helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
