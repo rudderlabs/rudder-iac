@@ -215,18 +215,6 @@ func TestValidateSpec(t *testing.T) {
 			errorContains: "import_name is required",
 		},
 		{
-			name: "import_name not camelCase of name",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "export function helper() { return true; }",
-				ImportName: "wrongName",
-			},
-			expectedError: true,
-			errorContains: "import_name must be camelCase of name",
-		},
-		{
 			name: "both code and file specified",
 			spec: &model.LibrarySpec{
 				ID:         "test-lib",
@@ -465,6 +453,18 @@ func TestValidateResource(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "validating code syntax",
+		},
+		{
+			name: "import_name not camelCase of name",
+			resource: &model.LibraryResource{
+				ID:         "test-lib",
+				Name:       "Test Library",
+				Language:   "javascript",
+				Code:       "export function helper() { return true; }",
+				ImportName: "wrongName",
+			},
+			expectedError: true,
+			errorContains: "import_name must be camelCase of name",
 		},
 	}
 
