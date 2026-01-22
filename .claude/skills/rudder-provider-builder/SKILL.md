@@ -76,19 +76,72 @@ import (
     // Import handler packages
 )
 
-func NewProvider(apiClient *client.Client) provider.Provider {
+// Provider wraps the base provider to provide a concrete type for dependency injection
+type Provider struct {
+    provider.Provider
+}
+
+func NewProvider(apiClient *client.Client) *Provider {
     handlers := []provider.Handler{
         resource1.NewHandler(apiClient),
         resource2.NewHandler(apiClient),
     }
 
-    return provider.NewBaseProvider(handlers)
+    return &Provider{
+        Provider: provider.NewBaseProvider(handlers),
+    }
 }
 ```
 
+**Important**: Always create a concrete `Provider` struct that embeds `provider.Provider`. This allows the provider to be used as a specific type in the `Providers` struct in `dependencies.go`, enabling access to provider-specific methods if needed.
+
 ### Step 4: Register Provider
 
-Register the provider in the application (typically in `cli/internal/cmd/` or provider registry).
+Register the provider in `cli/internal/app/dependencies.go`:
+
+1. **Add to Providers struct** - Use pointer to concrete type, not interface:
+```go
+type Providers struct {
+    // ... existing providers ...
+    MyProvider *myprovider.Provider  // Concrete type, not provider.Provider
+}
+```
+
+2. **Initialize in setupProviders()** - Conditionally if using experimental flag:
+```go
+func setupProviders(c *client.Client) (*Providers, error) {
+    cfg := config.GetConfig()
+
+    // ... existing provider setup ...
+
+    providers := &Providers{
+        // ... existing providers ...
+    }
+
+    // Initialize conditionally if experimental
+    if cfg.ExperimentalFlags.MyFeature {
+        myClient := myclient.New(c)
+        providers.MyProvider = myprovider.NewProvider(myClient)
+    }
+
+    return providers, nil
+}
+```
+
+3. **Add to composite provider** - In `NewDeps()`:
+```go
+providers := map[string]provider.Provider{
+    "datacatalog": p.DataCatalog,
+    // ... existing providers ...
+}
+
+// Add conditionally if needed
+if cfg.ExperimentalFlags.MyFeature {
+    providers["myprovider"] = p.MyProvider
+}
+```
+
+**Important**: The `Providers` struct uses concrete pointer types (`*myprovider.Provider`) instead of the interface (`provider.Provider`) to allow access to provider-specific methods if needed.
 
 ### Step 5: Testing
 
