@@ -3,7 +3,6 @@ package validation
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -19,12 +18,18 @@ type ValidationEngine interface {
 	// ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
 	// Rules receive ValidationContext with Graph = nil.
 	// Returns diagnostics for syntax errors (missing fields, invalid formats, etc.)
-	ValidateSyntax(ctx context.Context, specs map[string]*specs.Spec) (Diagnostics, error)
+	ValidateSyntax(ctx context.Context, input []*InputSpec) (Diagnostics, error)
 
 	// ValidateSemantic runs semantic validation after resource graph is built.
 	// Rules receive ValidationContext with populated Graph for cross-resource validation.
 	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
-	ValidateSemantic(ctx context.Context, specs map[string]*specs.Spec, graph *resources.Graph) (Diagnostics, error)
+	ValidateSemantic(ctx context.Context, input []*InputSpec, graph *resources.Graph) (Diagnostics, error)
+}
+
+type InputSpec struct {
+	Path   string
+	Raw    []byte
+	Parsed *specs.Spec
 }
 
 type validationEngine struct {
@@ -46,18 +51,18 @@ func NewValidationEngine(
 
 // ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
 // Rules receive ValidationContext with Graph = nil.
-func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[string]*specs.Spec) (Diagnostics, error) {
+func (e *validationEngine) ValidateSyntax(ctx context.Context, input []*InputSpec) (Diagnostics, error) {
 	collector := newDiagnosticCollector()
 
-	for fpath, spec := range rawSpecs {
+	for _, spec := range input {
 		diagnostics, err := e.runValidationRules(
-			fpath,
-			e.registry.SyntacticRulesForKind(spec.Kind),
+			spec.Path,
+			e.registry.SyntacticRulesForKind(spec.Parsed.Kind),
 			spec,
 			nil, // No graph for syntactic validation
 		)
 		if err != nil {
-			return nil, fmt.Errorf("syntactic validation for %s: %w", fpath, err)
+			return nil, fmt.Errorf("syntactic validation for %s: %w", spec.Path, err)
 		}
 		collector.add(diagnostics...)
 	}
@@ -68,18 +73,18 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 
 // ValidateSemantic runs semantic validation after resource graph is built.
 // Rules receive ValidationContext with populated Graph for cross-resource validation.
-func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.Spec, graph *resources.Graph) (Diagnostics, error) {
+func (e *validationEngine) ValidateSemantic(ctx context.Context, input []*InputSpec, graph *resources.Graph) (Diagnostics, error) {
 	collector := newDiagnosticCollector()
 
-	for fpath, spec := range rawSpecs {
+	for _, spec := range input {
 		diagnostics, err := e.runValidationRules(
-			fpath,
-			e.registry.SemanticRulesForKind(spec.Kind),
+			spec.Path,
+			e.registry.SemanticRulesForKind(spec.Parsed.Kind),
 			spec,
 			graph,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("semantic validation for %s: %w", fpath, err)
+			return nil, fmt.Errorf("semantic validation for %s: %w", spec.Path, err)
 		}
 		collector.add(diagnostics...)
 	}
@@ -91,16 +96,14 @@ func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[st
 func (e *validationEngine) runValidationRules(
 	fpath string,
 	toValidateAgainst []rules.Rule,
-	rawSpec *specs.Spec, // from loader => rawSpec.Spec is a map
+	inputSpec *InputSpec,
 	graph *resources.Graph,
 ) ([]Diagnostic, error) {
 
-	content, err := os.ReadFile(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
-	}
-
-	pi, err := pathindex.NewPathIndexer(content)
+	// The path indexer only works on the raw spec data
+	// from the input spec, it is not necessary the path resolves to filesystem path.
+	// It could also be a path over the network
+	pi, err := pathindex.NewPathIndexer(inputSpec.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("building path indexer: %w", err)
 	}
@@ -110,10 +113,10 @@ func (e *validationEngine) runValidationRules(
 	diagnostics := make([]Diagnostic, 0)
 	for _, rule := range toValidateAgainst {
 		results := rule.Validate(&rules.ValidationContext{
-			Spec:     rawSpec.Spec,
-			Kind:     rawSpec.Kind,
-			Version:  rawSpec.Version,
-			Metadata: rawSpec.Metadata,
+			Spec:     inputSpec.Parsed.Spec,
+			Kind:     inputSpec.Parsed.Kind,
+			Version:  inputSpec.Parsed.Version,
+			Metadata: inputSpec.Parsed.Metadata,
 			Graph:    graph,
 		})
 

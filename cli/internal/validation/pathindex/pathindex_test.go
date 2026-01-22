@@ -161,11 +161,10 @@ func TestPathIndexer_EmptyYAML(t *testing.T) {
 	require.NotNil(t, pi)
 
 	// Empty YAML should result in path lookup errors
-	var errPathNotFound *ErrPathNotFound
 	pos, err := pi.PositionLookup("/version")
-	assert.ErrorAs(t, err, &errPathNotFound)
+	assert.ErrorIs(t, err, ErrPathNotFound)
 	assert.Nil(t, pos)
-	assert.Contains(t, err.Error(), "path not found: /version")
+	assert.Contains(t, err.Error(), "path not found")
 }
 
 // TestPathIndexer_MalformedYAML tests error handling for invalid YAML syntax

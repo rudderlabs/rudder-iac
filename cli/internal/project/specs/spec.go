@@ -14,6 +14,26 @@ const (
 	SpecVersionV1          = "rudder/v1"
 )
 
+type RawSpec struct {
+	Data    []byte
+	parsed  *Spec
+	errored error
+}
+
+func (r *RawSpec) Parse() (*Spec, error) {
+	if r.parsed != nil || r.errored != nil {
+		return r.parsed, r.errored
+	}
+
+	s, err := New(r.Data)
+	if err != nil {
+		r.errored = fmt.Errorf("parsing spec: %w", err)
+	}
+
+	r.parsed = s
+	return r.parsed, r.errored
+}
+
 type Spec struct {
 	Version  string         `yaml:"version"`
 	Kind     string         `yaml:"kind"`
@@ -24,6 +44,24 @@ type Spec struct {
 // IsLegacyVersion returns true if the spec version is a legacy version (rudder/0.1 or rudder/v0.1)
 func (s *Spec) IsLegacyVersion() bool {
 	return s.Version == SpecVersionV0_1 || s.Version == SpecVersionV0_1Variant
+}
+
+func (s *Spec) Validate() error {
+
+	if s.Version == "" {
+		return fmt.Errorf("missing required field 'version'")
+	}
+	if s.Kind == "" {
+		return fmt.Errorf("missing required field 'kind'")
+	}
+	if s.Metadata == nil {
+		return fmt.Errorf("missing required field 'metadata'")
+	}
+	if s.Spec == nil {
+		return fmt.Errorf("missing required field 'spec'")
+	}
+
+	return nil
 }
 
 type ParsedSpec struct {
@@ -40,19 +78,6 @@ func New(data []byte) (*Spec, error) {
 
 	if err := decoder.Decode(&spec); err != nil {
 		return nil, fmt.Errorf("unmarshaling yaml: %w", err)
-	}
-
-	if spec.Version == "" {
-		return nil, fmt.Errorf("missing required field 'version'")
-	}
-	if spec.Kind == "" {
-		return nil, fmt.Errorf("missing required field 'kind'")
-	}
-	if spec.Metadata == nil {
-		return nil, fmt.Errorf("missing required field 'metadata'")
-	}
-	if spec.Spec == nil {
-		return nil, fmt.Errorf("missing required field 'spec'")
 	}
 
 	return &spec, nil

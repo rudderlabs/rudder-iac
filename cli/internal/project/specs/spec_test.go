@@ -62,62 +62,81 @@ spec:
 `
 
 	testCases := []struct {
-		name          string
-		yamlData      string
-		expectError   bool
-		errorContains string
-		expectedKind  string
-		expectedName  string // Extracted from metadata.name
+		name                string
+		yamlData            string
+		expectValidateError bool
+		expectNewError      bool
+		errorContains       string
+		expectedKind        string
+		expectedName        string // Extracted from metadata.name
 	}{
 		{
-			name:         "Valid Spec",
-			yamlData:     validYAML,
-			expectError:  false,
-			expectedKind: "Destination",
-			expectedName: "MyTestDest",
+			name:                "Valid Spec",
+			yamlData:            validYAML,
+			expectValidateError: false,
+			expectNewError:      false,
+			expectedKind:        "Destination",
+			expectedName:        "MyTestDest",
 		},
 		{
-			name:          "Missing Version",
-			yamlData:      missingVersionYAML,
-			expectError:   true,
-			errorContains: "missing required field 'version'",
+			name:                "Missing Version",
+			yamlData:            missingVersionYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'version'",
 		},
 		{
-			name:          "Missing Kind",
-			yamlData:      missingKindYAML,
-			expectError:   true,
-			errorContains: "missing required field 'kind'",
+			name:                "Missing Kind",
+			yamlData:            missingKindYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'kind'",
 		},
 		{
-			name:          "Missing Metadata",
-			yamlData:      missingMetadataYAML,
-			expectError:   true,
-			errorContains: "missing required field 'metadata'",
+			name:                "Missing Metadata",
+			yamlData:            missingMetadataYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'metadata'",
 		},
 		{
-			name:          "Missing Spec field",
-			yamlData:      missingSpecFieldYAML,
-			expectError:   true,
-			errorContains: "missing required field 'spec'",
+			name:                "Missing Spec field",
+			yamlData:            missingSpecFieldYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'spec'",
 		},
 		{
-			name:          "Invalid YAML syntax",
-			yamlData:      invalidYAML,
-			expectError:   true,
-			errorContains: "unmarshaling yaml",
+			name:                "Invalid YAML syntax",
+			yamlData:            invalidYAML,
+			expectValidateError: false,
+			expectNewError:      true,
+			errorContains:       "unmarshaling yaml",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec, err := New([]byte(tc.yamlData))
+			if tc.expectNewError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.ErrorContains(t, err, tc.errorContains)
+				}
+				require.Nil(t, spec)
 
-			if tc.expectError {
+				return
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, spec)
+			}
+
+			err = spec.Validate()
+			if tc.expectValidateError {
 				require.Error(t, err)
 				if tc.errorContains != "" {
 					assert.Contains(t, err.Error(), tc.errorContains)
 				}
-				assert.Nil(t, spec)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, spec)

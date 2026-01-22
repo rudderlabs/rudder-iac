@@ -1,18 +1,13 @@
 package pathindex
 
 import (
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
 
-type ErrPathNotFound struct {
-	Path string
-}
-
-func (e *ErrPathNotFound) Error() string {
-	return fmt.Sprintf("path not found: %s", e.Path)
-}
+var ErrPathNotFound = errors.New("path not found")
 
 // PathIndexer defines the interface for position lookup
 type PathIndexer interface {
@@ -68,7 +63,7 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 func (idx *PathIndex) PositionLookup(path string) (*Position, error) {
 	pos, ok := idx.positions[path]
 	if !ok {
-		return nil, &ErrPathNotFound{Path: path}
+		return nil, fmt.Errorf("%w: %s", ErrPathNotFound, path)
 	}
 	return &pos, nil
 }

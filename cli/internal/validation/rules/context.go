@@ -27,7 +27,7 @@ type ValidationContext struct {
 
 	// Metadata contains parsed common metadata from the spec.
 	// This includes name, import metadata, etc.
-	Metadata any
+	Metadata map[string]any
 
 	// Graph is the complete resource graph built from all loaded specs.
 	// This is nil for syntactic validation (pre-graph construction)
