@@ -13,7 +13,7 @@ func TestProjectLoad(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Load project and verify resource graph", func(t *testing.T) {
-		graph, err := project.Load(context.Background(), "../../../tests/testdata/project/create")
+		graph, err := project.Load(context.Background(), "../../../tests/testdata/datacatalog/create")
 		require.NoError(t, err)
 		require.NotNil(t, graph)
 
