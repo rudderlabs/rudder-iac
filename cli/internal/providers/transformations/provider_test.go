@@ -312,8 +312,7 @@ func TestResourceGraph(t *testing.T) {
 		graph, err := provider.ResourceGraph()
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "transformation trans-1 imports library 'missingLib' which is not found")
-		assert.Contains(t, err.Error(), "import_name: 'missingLib'")
+		assert.Contains(t, err.Error(), "transformation trans-1 importing library with import_name 'missingLib' not found")
 		assert.Nil(t, graph)
 	})
 

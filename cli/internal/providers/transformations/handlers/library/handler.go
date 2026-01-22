@@ -107,7 +107,7 @@ func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *r
 	if resource.ImportName != expectedImportName {
 		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, resource.ImportName)
 	}
-	
+
 	if resource.Code == "" {
 		return fmt.Errorf("code is required")
 	}

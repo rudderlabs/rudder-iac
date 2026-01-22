@@ -15,7 +15,7 @@ type TransformationResource struct {
 	Name        string                     `json:"name"`
 	Description string                     `json:"description"`
 	Language    string                     `json:"language"`
-	Code        string                     `json:"code"` // Resolved from inline or file
+	Code        string                     `json:"code"`               // Resolved from inline or file
 	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"` // Excluded from state comparison (local test-only field)
 }
 

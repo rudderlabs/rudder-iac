@@ -52,7 +52,7 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()
 
 	// libraries
-	libraryHandler, ok := p.BaseProvider.GetHandler(library.HandlerMetadata.ResourceType)
+	libraryHandler, ok := p.GetHandler(library.HandlerMetadata.ResourceType)
 	if !ok {
 		return nil, fmt.Errorf("library handler not found")
 	}
@@ -76,7 +76,7 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	}
 
 	// transformations
-	transformationHandler, ok := p.BaseProvider.GetHandler(transformation.HandlerMetadata.ResourceType)
+	transformationHandler, ok := p.GetHandler(transformation.HandlerMetadata.ResourceType)
 	if !ok {
 		return nil, fmt.Errorf("transformation handler not found")
 	}
@@ -107,10 +107,8 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 			libraryURN, exists := handleNameToURN[handleName]
 			if !exists {
 				return nil, fmt.Errorf(
-					"transformation %s imports library '%s' which is not found in the project. "+
-						"Ensure you have a transformation-library spec with import_name: '%s'",
+					"transformation %s importing library with import_name '%s' not found",
 					r.ID(),
-					handleName,
 					handleName,
 				)
 			}
