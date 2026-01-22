@@ -17,7 +17,7 @@ import (
 type BookHandler = handler.BaseHandler[model.BookSpec, model.BookResource, model.BookState, model.RemoteBook]
 
 var HandlerMetadata = handler.HandlerMetadata{
-	ResourceType:     "example_book",
+	ResourceType:     "example-book",
 	SpecKind:         "books",
 	SpecMetadataName: "books",
 }
