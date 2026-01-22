@@ -349,3 +349,12 @@ func (p *CompositeProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	}
 	return provider.MigrateSpec(s)
 }
+
+func (p *CompositeProvider) ConsolidateSync(ctx context.Context, st *state.State) error {
+	for name, provider := range p.Providers {
+		if err := provider.ConsolidateSync(ctx, st); err != nil {
+			return fmt.Errorf("consolidate sync for provider %s: %w", name, err)
+		}
+	}
+	return nil
+}

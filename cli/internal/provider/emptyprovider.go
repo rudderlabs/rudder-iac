@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 type EmptyProvider struct{}
@@ -53,4 +54,8 @@ func (p *EmptyProvider) MigrateSpec(_ *specs.Spec) (*specs.Spec, error) {
 	return nil, errNotImplemented
 }
 
-
+// ConsolidateSync default implementation
+func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *state.State) error {
+	// Default: no consolidation needed
+	return nil
+}
