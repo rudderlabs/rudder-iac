@@ -1,0 +1,22 @@
+version: rudder/v0.1
+kind: transformation
+metadata:
+  name: test-transformations
+spec:
+  id: event-validator
+  name: Event Validator
+  description: Validates and enriches events
+  language: javascript
+  code: |
+    import validationLib from 'validationLib';
+    import utilsLib from 'utilsLib';
+
+    export function transformEvent(event, metadata) {
+      if (event.properties && event.properties.email) {
+        event.properties.emailValid = validationLib.isValidEmail(event.properties.email);
+      }
+      if (event.timestamp) {
+        event.properties.formattedTimestamp = utilsLib.formatTimestamp(event.timestamp);
+      }
+      return event;
+    }

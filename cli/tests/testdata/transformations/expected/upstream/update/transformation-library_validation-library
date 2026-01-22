@@ -1,0 +1,11 @@
+{
+  "id": "ignored",
+  "versionId": "ignored",
+  "workspaceId": "ignored",
+  "name": "Validation Lib",
+  "description": "Validation helpers for event data",
+  "language": "javascript",
+  "importName": "validationLib",
+  "code": "function isValidEmail(email) {\n  const regex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  return regex.test(email);\n}\n\nfunction isNonEmpty(value) {\n  return value !== null && value !== undefined && value !== '';\n}\n\nexport default {\n  isValidEmail,\n  isNonEmpty\n};\n",
+  "externalId": "validation-library"
+}

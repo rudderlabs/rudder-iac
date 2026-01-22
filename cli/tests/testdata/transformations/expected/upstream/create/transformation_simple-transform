@@ -1,0 +1,11 @@
+{
+  "id": "ignored",
+  "versionId": "ignored",
+  "workspaceId": "ignored",
+  "imports": [],
+  "name": "Simple Transform",
+  "description": "A simple transformation without library dependencies",
+  "language": "javascript",
+  "code": "export function transformEvent(event, metadata) {\n  event.properties = event.properties || {};\n  event.properties.processed = true;\n  event.properties.processedAt = new Date().toISOString();\n  return event;\n}\n",
+  "externalId": "simple-transform"
+}

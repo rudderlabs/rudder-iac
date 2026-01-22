@@ -53,15 +53,14 @@ func verifyState(t *testing.T, dir string) {
 		catalog.WithEventUpdateBatchSize(1),
 	)
 	require.NoError(t, err)
-	reader := helpers.NewAPIClientAdapter(dataCatalog)
+	adapter := helpers.NewDataCatalogAdapter(dataCatalog)
 
 	expectedStateDir := filepath.Join("testdata", "datacatalog", "expected", "upstream", dir)
 	fileManager, err := helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
 	upstreamTester := helpers.NewUpstreamSnapshotTester(
-		dataCatalog,
-		reader,
+		adapter,
 		fileManager,
 		[]string{
 			"id",

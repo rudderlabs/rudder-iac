@@ -1,0 +1,11 @@
+{
+  "id": "ignored",
+  "versionId": "ignored",
+  "workspaceId": "ignored",
+  "imports": [],
+  "name": "Email Normalizer",
+  "description": "Normalizes email addresses in events - updated with name capitalization",
+  "language": "javascript",
+  "code": "import utilsLib from 'utilsLib';\n\nexport function transformEvent(event, metadata) {\n  if (event.properties && event.properties.email) {\n    event.properties.email = utilsLib.sanitizeEmail(event.properties.email);\n  }\n  if (event.properties && event.properties.name) {\n    event.properties.name = utilsLib.capitalize(event.properties.name);\n  }\n  return event;\n}\n",
+  "externalId": "email-normalizer"
+}

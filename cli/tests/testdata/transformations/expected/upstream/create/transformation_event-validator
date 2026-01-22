@@ -1,0 +1,11 @@
+{
+  "id": "ignored",
+  "versionId": "ignored",
+  "workspaceId": "ignored",
+  "imports": [],
+  "name": "Event Validator",
+  "description": "Validates and enriches events",
+  "language": "javascript",
+  "code": "import validationLib from 'validationLib';\nimport utilsLib from 'utilsLib';\n\nexport function transformEvent(event, metadata) {\n  if (event.properties && event.properties.email) {\n    event.properties.emailValid = validationLib.isValidEmail(event.properties.email);\n  }\n  if (event.timestamp) {\n    event.properties.formattedTimestamp = utilsLib.formatTimestamp(event.timestamp);\n  }\n  return event;\n}\n",
+  "externalId": "event-validator"
+}

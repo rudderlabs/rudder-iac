@@ -5,40 +5,42 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 )
+
+// UpstreamAdapter combines fetching resources and reading remote state.
+// Implementations should be able to list all managed resources and fetch individual resources by ID.
+type UpstreamAdapter interface {
+	// RemoteIDs returns a map of URN -> resource ID for all managed resources
+	RemoteIDs(ctx context.Context) (map[string]string, error)
+	// FetchResource fetches a resource by type and ID from the remote API
+	FetchResource(ctx context.Context, resourceType, resourceID string) (any, error)
+}
 
 // UpstreamSnapshotTester provides functionality to test upstream state snapshots
 // by fetching actual data from the API and comparing with expected upstream states
 type UpstreamSnapshotTester struct {
-	dataCatalog catalog.DataCatalog
+	adapter     UpstreamAdapter
 	fileManager *SnapshotFileManager
-	stateReader UpstreamStateReader
 	ignore      []string
 }
 
 // NewUpstreamSnapshotTester creates a new instance of UpstreamSnapshotTester
-// with the required dependencies: DataCatalogClient, FileManager, and UpstreamRawStateFetcher
 func NewUpstreamSnapshotTester(
-	dataCatalog catalog.DataCatalog,
-	stateReader UpstreamStateReader,
+	adapter UpstreamAdapter,
 	fileManager *SnapshotFileManager,
 	ignore []string,
 ) *UpstreamSnapshotTester {
 	return &UpstreamSnapshotTester{
-		dataCatalog: dataCatalog,
+		adapter:     adapter,
 		fileManager: fileManager,
-		stateReader: stateReader,
 		ignore:      ignore,
 	}
 }
 
-// SnapshotTest performs upstream validation by extracting IDs from state and calling catalog APIs
+// SnapshotTest performs upstream validation by extracting IDs from state and calling APIs
 // to verify actual upstream data against expected upstream state files
 func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
-	remoteIDs, err := u.stateReader.RemoteIDs(ctx)
+	remoteIDs, err := u.adapter.RemoteIDs(ctx)
 	if err != nil {
 		return fmt.Errorf("reading actual state: %w", err)
 	}
@@ -63,7 +65,7 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 		parts := strings.Split(urn, ":")
 		resourceType := parts[0]
 
-		actual, err := u.upstreamEntity(ctx, resourceID, resourceType)
+		actual, err := u.fetchAndMarshal(ctx, resourceID, resourceType)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("resource %s: failed to fetch upstream data: %v", urn, err))
 			continue
@@ -87,48 +89,11 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 	return errs
 }
 
-// fetchUpstreamData calls the appropriate API method based on resource type
-func (u *UpstreamSnapshotTester) upstreamEntity(ctx context.Context, entityID, entityType string) (any, error) {
-	var v any
-
-	switch entityType {
-	case state.EventResourceType:
-		event, err := u.dataCatalog.GetEvent(ctx, entityID)
-		if err != nil {
-			return nil, fmt.Errorf("calling GetEvent: %w", err)
-		}
-		v = event
-
-	case state.PropertyResourceType:
-		property, err := u.dataCatalog.GetProperty(ctx, entityID)
-		if err != nil {
-			return nil, fmt.Errorf("calling GetProperty: %w", err)
-		}
-		v = property
-
-	case state.TrackingPlanResourceType:
-		trackingPlan, err := u.dataCatalog.GetTrackingPlanWithIdentifiers(ctx, entityID, false)
-		if err != nil {
-			return nil, fmt.Errorf("calling GetTrackingPlan: %w", err)
-		}
-		v = trackingPlan
-
-	case state.CustomTypeResourceType:
-		customType, err := u.dataCatalog.GetCustomType(ctx, entityID)
-		if err != nil {
-			return nil, fmt.Errorf("calling GetCustomType: %w", err)
-		}
-		v = customType
-
-	case state.CategoryResourceType:
-		category, err := u.dataCatalog.GetCategory(ctx, entityID)
-		if err != nil {
-			return nil, fmt.Errorf("calling GetCategory: %w", err)
-		}
-		v = category
-
-	default:
-		return nil, fmt.Errorf("unsupported resource type: %s", entityType)
+// fetchAndMarshal fetches the resource and converts it to map[string]any for comparison
+func (u *UpstreamSnapshotTester) fetchAndMarshal(ctx context.Context, resourceID, resourceType string) (any, error) {
+	v, err := u.adapter.FetchResource(ctx, resourceType, resourceID)
+	if err != nil {
+		return nil, err
 	}
 
 	byt, err := json.Marshal(v)

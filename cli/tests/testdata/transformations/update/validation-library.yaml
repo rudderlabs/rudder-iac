@@ -1,0 +1,24 @@
+version: rudder/v0.1
+kind: transformation-library
+metadata:
+  name: test-libraries
+spec:
+  id: validation-library
+  name: Validation Lib
+  description: Validation helpers for event data
+  language: javascript
+  import_name: validationLib
+  code: |
+    function isValidEmail(email) {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return regex.test(email);
+    }
+
+    function isNonEmpty(value) {
+      return value !== null && value !== undefined && value !== '';
+    }
+
+    export default {
+      isValidEmail,
+      isNonEmpty
+    };

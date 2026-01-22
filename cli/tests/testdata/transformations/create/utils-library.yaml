@@ -1,0 +1,23 @@
+version: rudder/v0.1
+kind: transformation-library
+metadata:
+  name: test-libraries
+spec:
+  id: utils-library
+  name: Utils Lib
+  description: Utility functions for transformations
+  language: javascript
+  import_name: utilsLib
+  code: |
+    function sanitizeEmail(email) {
+      return email.toLowerCase().trim();
+    }
+
+    function formatTimestamp(ts) {
+      return new Date(ts).toISOString();
+    }
+
+    export default {
+      sanitizeEmail,
+      formatTimestamp
+    };

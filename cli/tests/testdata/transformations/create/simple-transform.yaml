@@ -1,0 +1,16 @@
+version: rudder/v0.1
+kind: transformation
+metadata:
+  name: test-transformations
+spec:
+  id: simple-transform
+  name: Simple Transform
+  description: A simple transformation without library dependencies
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) {
+      event.properties = event.properties || {};
+      event.properties.processed = true;
+      event.properties.processedAt = new Date().toISOString();
+      return event;
+    }

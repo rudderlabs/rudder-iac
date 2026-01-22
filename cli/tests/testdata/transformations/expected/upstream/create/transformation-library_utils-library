@@ -1,0 +1,11 @@
+{
+  "id": "ignored",
+  "versionId": "ignored",
+  "workspaceId": "ignored",
+  "name": "Utils Lib",
+  "description": "Utility functions for transformations",
+  "language": "javascript",
+  "importName": "utilsLib",
+  "code": "function sanitizeEmail(email) {\n  return email.toLowerCase().trim();\n}\n\nfunction formatTimestamp(ts) {\n  return new Date(ts).toISOString();\n}\n\nexport default {\n  sanitizeEmail,\n  formatTimestamp\n};\n",
+  "externalId": "utils-library"
+}

@@ -1,0 +1,21 @@
+version: rudder/v0.1
+kind: transformation
+metadata:
+  name: test-transformations
+spec:
+  id: email-normalizer
+  name: Email Normalizer
+  description: Normalizes email addresses in events - updated with name capitalization
+  language: javascript
+  code: |
+    import utilsLib from 'utilsLib';
+
+    export function transformEvent(event, metadata) {
+      if (event.properties && event.properties.email) {
+        event.properties.email = utilsLib.sanitizeEmail(event.properties.email);
+      }
+      if (event.properties && event.properties.name) {
+        event.properties.name = utilsLib.capitalize(event.properties.name);
+      }
+      return event;
+    }

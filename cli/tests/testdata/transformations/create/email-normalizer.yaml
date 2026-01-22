@@ -1,0 +1,18 @@
+version: rudder/v0.1
+kind: transformation
+metadata:
+  name: test-transformations
+spec:
+  id: email-normalizer
+  name: Email Normalizer
+  description: Normalizes email addresses in events
+  language: javascript
+  code: |
+    import utilsLib from 'utilsLib';
+
+    export function transformEvent(event, metadata) {
+      if (event.properties && event.properties.email) {
+        event.properties.email = utilsLib.sanitizeEmail(event.properties.email);
+      }
+      return event;
+    }
