@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/samber/lo"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -102,10 +103,14 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.LibraryS
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *resources.Graph) error {
+	expectedImportName := lo.CamelCase(resource.Name)
+	if resource.ImportName != expectedImportName {
+		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, resource.ImportName)
+	}
+
 	if resource.Code == "" {
 		return fmt.Errorf("code is required")
 	}
-
 	// Validate code syntax
 	codeParser, err := parser.NewParser(resource.Language)
 	if err != nil {

@@ -11,19 +11,19 @@ type LibrarySpec = specs.TransformationLibrarySpec
 
 // LibraryResource represents the input data for a transformation library
 type LibraryResource struct {
-	ID          string
-	Name        string
-	Description string
-	Language    string
-	Code        string // Resolved from inline or file
-	ImportName  string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Language    string `json:"language"`
+	Code        string `json:"code"` // Resolved from inline or file
+	ImportName  string `json:"import_name"`
 }
 
 // LibraryState represents the output state from the remote system
 // Contains computed fields (remote ID, version ID)
 type LibraryState struct {
-	ID        string // Remote ID
-	VersionID string // Remote version ID
+	ID        string `json:"id"`        // Remote ID
+	VersionID string `json:"versionId"` // Remote version ID
 }
 
 // RemoteLibrary wraps transformations.TransformationLibrary to implement RemoteResource interface
