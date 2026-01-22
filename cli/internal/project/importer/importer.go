@@ -84,7 +84,7 @@ func WorkspaceImport(
 		return fmt.Errorf("normalizing for import: %w", err)
 	}
 
-	formatters := formatter.Setup(formatter.DefaultYAML)
+	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
 	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
