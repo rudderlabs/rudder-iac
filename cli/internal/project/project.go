@@ -56,12 +56,6 @@ type project struct {
 // ProjectOption defines a functional option for configuring a Project.
 type ProjectOption func(*project)
 
-func WithValidationEngine(e validation.ValidationEngine) ProjectOption {
-	return func(p *project) {
-		p.validationEngine = e
-	}
-}
-
 func WithValidateUsingEngine() ProjectOption {
 	return func(p *project) {
 		p.validateUsingEngine = true
@@ -205,7 +199,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	// Start with parsing the specs and validating it's syntax.
 	// This is because we get raw specs from the loader and we need to parse them.
-	inputSpecs, specDiags := p.parseSpecs(rawSpecs)
+	specDiags := p.parseSpecs(rawSpecs)
 
 	registry, err := p.registry()
 	if err != nil {
@@ -217,7 +211,9 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("initialising validation engine: %w", err)
 	}
 
-	syntaxDiags, err := engine.ValidateSyntax(ctx, inputSpecs)
+	// At this point, rawspecs are successfully parsed as well and information
+	// parsed gets augmented to the base struct
+	syntaxDiags, err := engine.ValidateSyntax(ctx, rawSpecs)
 	if err != nil {
 		return fmt.Errorf("syntactic validation: %w", err)
 	}
@@ -234,49 +230,47 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("syntax validation failed")
 	}
 
-	for _, inputSpec := range inputSpecs {
+	for path, rawSpec := range rawSpecs {
 		if err := p.loadSpec(
-			inputSpec.Path,
-			inputSpec.Parsed,
+			path,
+			rawSpec.Parsed(),
 		); err != nil {
-			return fmt.Errorf("loading spec %s: %w", inputSpec.Path, err)
+			return fmt.Errorf("loading spec %s: %w", path, err)
 		}
 	}
 
-	// Graph is built once here - single source of truth for all resource relationships
+	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
 		return fmt.Errorf("building resource graph: %w", err)
 	}
 
-	// Cycles make the graph unusable, so detect them before semantic validation
+	// Cycles make the graph unusable,
+	// so detect them before semantic validation
 	if _, err := graph.DetectCycles(); err != nil {
 		return fmt.Errorf("cycle detected in resource graph: %w", err)
 	}
 
-	semanticDiags, err := engine.ValidateSemantic(ctx, inputSpecs, graph)
+	semanticDiags, err := engine.ValidateSemantic(ctx, rawSpecs, graph)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
 
-	// Show all diagnostics together so users see the complete picture
-	allDiags := append(syntaxDiags, semanticDiags...)
-	if err := p.renderer.Render(allDiags); err != nil {
+	if err := p.renderer.Render(semanticDiags); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
 	}
 
-	if allDiags.HasErrors() {
-		return fmt.Errorf("validation failed")
+	if semanticDiags.HasErrors() {
+		return fmt.Errorf("semantic validation failed")
 	}
 
 	return nil
 }
 
-func (p *project) parseSpecs(raw map[string]*specs.RawSpec) ([]*validation.InputSpec, validation.Diagnostics) {
+func (p *project) parseSpecs(raw map[string]*specs.RawSpec) validation.Diagnostics {
 	var (
 		diags      validation.Diagnostics
 		syntaxRule rules.Rule = prules.NewSpecSyntaxValidRule()
-		inputSpecs []*validation.InputSpec
 	)
 
 	// Validation Engine is responsible for validating
@@ -291,15 +285,11 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) ([]*validation.Input
 		parsed, err := rawSpec.Parse()
 		if err != nil {
 			diags = append(diags, validation.Diagnostic{
-				RuleID:   "project/spec-syntax",
+				RuleID:   "project/spec-syntax-parse-valid",
 				Severity: rules.Error,
 				Message:  fmt.Sprintf("failed to parse spec from path %s: %s", path, err.Error()),
 				File:     path,
-				Position: pathindex.Position{
-					Line:     1,
-					Column:   1,
-					LineText: "", // Use the first line of the spec as it couldn't be parsed
-				},
+				Position: pathindex.StartingPosition,
 			})
 			// Continue to the next spec if the current one is not parsable
 			// preventing addition to the input specs map as we can't create specs
@@ -340,14 +330,10 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) ([]*validation.Input
 			})
 		}
 
-		inputSpecs = append(inputSpecs, &validation.InputSpec{
-			Path:   path,
-			Raw:    rawSpec.Data,
-			Parsed: parsed,
-		})
 	}
 
-	return inputSpecs, diags
+	diags.Sort()
+	return diags
 }
 
 func (p *project) registry() (rules.Registry, error) {

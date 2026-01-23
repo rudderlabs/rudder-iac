@@ -27,6 +27,12 @@ type PathIndex struct {
 	positions map[string]Position
 }
 
+var StartingPosition = Position{
+	Line:     1,
+	Column:   1,
+	LineText: "",
+}
+
 // Position represents a location in a YAML file for error reporting
 type Position struct {
 	Line     int    // 1-indexed line number
@@ -47,11 +53,7 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 
 	// Record root position "/" at line 1, column 1
 	// This serves as the ultimate fallback for NearestPosition
-	pi.positions["/"] = Position{
-		Line:     1,
-		Column:   1,
-		LineText: "",
-	}
+	pi.positions["/"] = StartingPosition
 
 	// Walk the YAML tree and build the index
 	pi.walkNode(&node, "", nil)

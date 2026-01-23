@@ -34,6 +34,10 @@ func (r *RawSpec) Parse() (*Spec, error) {
 	return r.parsed, r.errored
 }
 
+func (r *RawSpec) Parsed() *Spec {
+	return r.parsed
+}
+
 type Spec struct {
 	Version  string         `yaml:"version"`
 	Kind     string         `yaml:"kind"`

@@ -1,6 +1,8 @@
 package validation
 
 import (
+	"sort"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -57,6 +59,20 @@ func (d Diagnostics) HasWarnings() bool {
 	return false
 }
 
+func (d Diagnostics) Sort() {
+	sort.Slice(d, func(i, j int) bool {
+		if d[i].File != d[j].File {
+			return d[i].File < d[j].File
+		}
+
+		if d[i].Position.Line != d[j].Position.Line {
+			return d[i].Position.Line < d[j].Position.Line
+		}
+
+		return d[i].Position.Column < d[j].Position.Column
+	})
+}
+
 // Errors returns only the diagnostics with Error severity.
 func (d Diagnostics) Errors() Diagnostics {
 	errors := make(Diagnostics, 0)
@@ -77,14 +93,4 @@ func (d Diagnostics) Warnings() Diagnostics {
 		}
 	}
 	return warnings
-}
-
-// Len returns the number of diagnostics in the collection.
-func (d Diagnostics) Len() int {
-	return len(d)
-}
-
-// IsEmpty returns true if there are no diagnostics.
-func (d Diagnostics) IsEmpty() bool {
-	return len(d) == 0
 }
