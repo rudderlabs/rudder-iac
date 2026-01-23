@@ -199,7 +199,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	// Start with parsing the specs and validating it's syntax.
 	// This is because we get raw specs from the loader and we need to parse them.
-	specDiags := p.parseSpecs(rawSpecs)
+	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
 
 	registry, err := p.registry()
 	if err != nil {
@@ -230,7 +230,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("syntax validation failed")
 	}
 
-	for path, rawSpec := range rawSpecs {
+	for path, rawSpec := range parsedRawSpecs {
 		if err := p.loadSpec(
 			path,
 			rawSpec.Parsed(),
@@ -251,7 +251,8 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("cycle detected in resource graph: %w", err)
 	}
 
-	semanticDiags, err := engine.ValidateSemantic(ctx, rawSpecs, graph)
+	// Specs which were parsed will now be validated against semantic rules.
+	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
@@ -267,10 +268,11 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	return nil
 }
 
-func (p *project) parseSpecs(raw map[string]*specs.RawSpec) validation.Diagnostics {
+func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
 	var (
-		diags      validation.Diagnostics
-		syntaxRule rules.Rule = prules.NewSpecSyntaxValidRule()
+		diags                     = make(validation.Diagnostics, 0)
+		parsedRawSpecs            = make(map[string]*specs.RawSpec)
+		syntaxRule     rules.Rule = prules.NewSpecSyntaxValidRule()
 	)
 
 	// Validation Engine is responsible for validating
@@ -300,6 +302,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) validation.Diagnosti
 		// At this point, we have a valid parsed spec which
 		// we need to add to the specs map on the project required by migrate command.
 		p.specs[path] = parsed
+		parsedRawSpecs[path] = rawSpec
 
 		// TODO: Do we also need to return an error if the pi cannot be instantiated ?
 		pi, _ := pathindex.NewPathIndexer(rawSpec.Data)
@@ -333,7 +336,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) validation.Diagnosti
 	}
 
 	diags.Sort()
-	return diags
+	return parsedRawSpecs, diags
 }
 
 func (p *project) registry() (rules.Registry, error) {
