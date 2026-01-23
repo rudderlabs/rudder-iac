@@ -7,12 +7,21 @@ import (
 	"path/filepath"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
+)
+
+const (
+	transformationsDir = "transformations"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -65,8 +74,8 @@ func (h *HandlerImpl) ValidateSpec(spec *model.LibrarySpec) error {
 	if spec.Code == "" && spec.File == "" {
 		return fmt.Errorf("either code or file must be specified")
 	}
-	if spec.Language != "javascript" && spec.Language != "python" {
-		return fmt.Errorf("language must be 'javascript' or 'python', got: %s", spec.Language)
+	if spec.Language == "" {
+		return fmt.Errorf("language is required")
 	}
 	return nil
 }
@@ -108,6 +117,10 @@ func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *r
 		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, resource.ImportName)
 	}
 
+	if resource.Language != "javascript" && resource.Language != "python" {
+		return fmt.Errorf("language must be javascript or python, got: %s", resource.Language)
+	}
+
 	if resource.Code == "" {
 		return fmt.Errorf("code is required")
 	}
@@ -141,8 +154,19 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteL
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteLibrary, error) {
-	// TODO: Implement when we add List operation to the store
-	return []*model.RemoteLibrary{}, nil
+	libraries, err := h.store.ListLibraries(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing libraries: %w", err)
+	}
+
+	// Filter resources WITHOUT external IDs (unmanaged resources)
+	result := make([]*model.RemoteLibrary, 0)
+	for _, l := range libraries {
+		if l.ExternalID == "" {
+			result = append(result, &model.RemoteLibrary{TransformationLibrary: l})
+		}
+	}
+	return result, nil
 }
 
 func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver handler.URNResolver) (*model.LibraryResource, *model.LibraryState, error) {
@@ -205,8 +229,21 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, remoteId string) (*model.LibraryState, error) {
-	// TODO: Implement when we add Get operation to the store
-	return nil, fmt.Errorf("import not implemented yet")
+	// Get the existing remote library
+	remote, err := h.store.GetLibrary(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting library %s: %w", remoteId, err)
+	}
+
+	// Set the externalID to link the remote resource to local management
+	if err := h.store.SetLibraryExternalID(ctx, remote.ID, data.ID); err != nil {
+		return nil, fmt.Errorf("setting library external ID: %w", err)
+	}
+
+	return &model.LibraryState{
+		ID:        remote.ID,
+		VersionID: remote.VersionID,
+	}, nil
 }
 
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.LibraryResource, oldState *model.LibraryState) error {
@@ -219,4 +256,119 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Libr
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteLibrary) (*export.SpecExportData[model.LibrarySpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
+}
+
+// FormatForExport implements the export functionality for libraries during import.
+// It generates two FormattableEntity objects per library: a YAML spec and a code file.
+func (h *HandlerImpl) FormatForExport(
+	remotes map[string]*model.RemoteLibrary,
+	idNamer namer.Namer,
+	resolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	if len(remotes) == 0 {
+		return nil, nil
+	}
+
+	formattables := make([]writer.FormattableEntity, 0)
+
+	for externalID, remote := range remotes {
+		// Validate language
+		if remote.Language != "javascript" && remote.Language != "python" {
+			return nil, fmt.Errorf("unsupported language '%s' for library %s: only javascript and python are supported", remote.Language, remote.ID)
+		}
+
+		// Determine file extension and folder based on language
+		var ext string
+		var langFolder string
+		switch remote.Language {
+		case "javascript":
+			ext = ".js"
+			langFolder = "javascript"
+		case "python":
+			ext = ".py"
+			langFolder = "python"
+		}
+
+		// Code file path: transformations/<language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(transformationsDir, langFolder, externalID+ext)
+
+		// Build import metadata
+		workspaceMetadata := specs.WorkspaceImportMetadata{
+			WorkspaceID: remote.WorkspaceID,
+			Resources: []specs.ImportIds{
+				{
+					LocalID:  externalID,
+					RemoteID: remote.ID,
+				},
+			},
+		}
+
+		// Create spec with file reference and import_name
+		spec, err := toImportSpec(
+			HandlerMetadata.SpecKind,
+			HandlerMetadata.SpecMetadataName,
+			workspaceMetadata,
+			map[string]any{
+				"id":          externalID,
+				"name":        remote.Name,
+				"description": remote.Description,
+				"language":    remote.Language,
+				"file":        codeFilePath,
+				"import_name": remote.ImportName,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating spec for library %s: %w", remote.ID, err)
+		}
+
+		// Generate unique filename for YAML spec
+		fileName, err := idNamer.Name(namer.ScopeName{
+			Name:  externalID,
+			Scope: transformationsDir,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
+		}
+
+		// Add YAML spec entity
+		formattables = append(formattables, writer.FormattableEntity{
+			Content:      spec,
+			RelativePath: filepath.Join(transformationsDir, fileName+loader.ExtensionYAML),
+		})
+
+		// Add code file entity
+		formattables = append(formattables, writer.FormattableEntity{
+			Content:      remote.Code,
+			RelativePath: codeFilePath,
+		})
+	}
+
+	return formattables, nil
+}
+
+// toImportSpec creates a Spec with import metadata for a library resource.
+func toImportSpec(
+	kind string,
+	metadataName string,
+	workspaceMetadata specs.WorkspaceImportMetadata,
+	specData map[string]any,
+) (*specs.Spec, error) {
+	metadata := specs.Metadata{
+		Name: metadataName,
+		Import: &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
+		},
+	}
+
+	metadataMap, err := metadata.ToMap()
+	if err != nil {
+		return nil, fmt.Errorf("converting metadata to map: %w", err)
+	}
+
+	return &specs.Spec{
+		Version:  specs.SpecVersionV0_1,
+		Kind:     kind,
+		Metadata: metadataMap,
+		Spec:     specData,
+	}, nil
 }
