@@ -332,3 +332,112 @@ type positionCheck struct {
 	expectedLine     int
 	expectedLineText string
 }
+
+// TestPathIndexer_NearestPosition tests the fallback behavior when exact paths don't exist
+func TestPathIndexer_NearestPosition(t *testing.T) {
+	// Same YAML fixture used in TestPathIndexer_RealWorldYAML for consistency
+	yamlContent := `version: rudder/v0.1
+kind: properties
+metadata:
+  name: "api_tracking"
+spec:
+  properties:
+  - id: "api_method"
+    name: "API Method"
+    type: "string"
+    description: "http method of the api called"
+    propConfig:
+      enum:
+        - "GET"
+        - "PUT"
+        - "POST"
+  - id: "http_retry_count"
+    name: "HTTP Retry Count"
+    type: "integer"
+    description: "Number of times to retry the API call"
+    propConfig:
+      minimum: 0
+      maximum: 10
+  - id: "signin_info"
+    name: "Signin Info"
+    description: "Signin info"
+    type: "object"`
+
+	pi, err := NewPathIndexer([]byte(yamlContent))
+	require.NoError(t, err)
+	require.NotNil(t, pi)
+
+	t.Run("exact match", func(t *testing.T) {
+		t.Parallel()
+
+		// When path exists, NearestPosition returns exact position
+		pos := pi.NearestPosition("/spec/properties")
+		require.NotNil(t, pos)
+		assert.Equal(t, 6, pos.Line)
+		assert.Equal(t, "properties: [...]", pos.LineText)
+	})
+
+	t.Run("ancestor resolution", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name             string
+			path             string
+			expectedLine     int
+			expectedLineText string
+		}{
+			{
+				name:             "one_level_up",
+				path:             "/spec/nonexistent",
+				expectedLine:     5,
+				expectedLineText: "spec: {...}",
+			},
+			{
+				name:             "multiple_levels_up",
+				path:             "/spec/properties/0/nonexistent/deep/path",
+				expectedLine:     7,
+				expectedLineText: "- id: api_method",
+			},
+			{
+				name:             "invalid_array_index",
+				path:             "/spec/properties/999/id",
+				expectedLine:     6,
+				expectedLineText: "properties: [...]",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				pos := pi.NearestPosition(tt.path)
+				require.NotNil(t, pos, "NearestPosition should never return nil")
+				assert.Equal(t, tt.expectedLine, pos.Line)
+				assert.Equal(t, tt.expectedLineText, pos.LineText)
+			})
+		}
+	})
+
+	t.Run("root fallback", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name string
+			path string
+		}{
+			{name: "root_path_itself", path: "/"},
+			{name: "complete_miss", path: "/nonexistent/path/deep"},
+			{name: "single_segment_miss", path: "/nonexistent"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				pos := pi.NearestPosition(tt.path)
+				require.NotNil(t, pos, "NearestPosition should never return nil")
+				assert.Equal(t, 1, pos.Line)
+				assert.Equal(t, 1, pos.Column)
+				assert.Equal(t, "", pos.LineText)
+			})
+		}
+	})
+}

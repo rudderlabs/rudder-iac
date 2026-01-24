@@ -226,7 +226,11 @@ func extractLineText(node *yaml.Node, key *yaml.Node) string {
 		if key != nil {
 			return fmt.Sprintf("%s: {...}", key.Value)
 		}
-		return "{...}"
+
+		// Array element (no key) - show first property to help identify the element
+		firstKey := node.Content[0]
+		firstVal := node.Content[1]
+		return fmt.Sprintf("- %s: %s", firstKey.Value, firstVal.Value)
 
 	case yaml.SequenceNode:
 		// Show that this is an array
