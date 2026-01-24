@@ -130,7 +130,7 @@ Resources reference each other using URNs with PropertyRef:
 - Book → Writer (single reference via `PropertyRef`)
 
 Reference strings in YAML follow the format: `#/{kind}/{group}/{id}` (e.g., `#/writer/common/tolkien`)
-URNs use the format: `resourceType:localId` (e.g., `example_writer:tolkien`)
+URNs use the format: `resourceType:localId` (e.g., `example-writer:tolkien`)
 
 Each handler provides a `Parse{ResourceType}Reference()` function to convert reference strings to URNs.
 
