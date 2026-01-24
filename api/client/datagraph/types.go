@@ -21,6 +21,7 @@ type DataGraph struct {
 type CreateDataGraphRequest struct {
 	Name               string `json:"name"`
 	WarehouseAccountID string `json:"warehouseAccountId"`
+	ExternalID         string `json:"externalId,omitempty"`
 }
 
 // UpdateDataGraphRequest is the request body for updating a data graph
