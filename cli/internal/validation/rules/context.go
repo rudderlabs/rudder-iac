@@ -17,7 +17,7 @@ type ValidationContext struct {
 
 	// Spec is the raw spec data (typically map[string]any) from the YAML.
 	// Rules can inspect this for syntactic validation before resource graph construction.
-	Spec any
+	Spec map[string]any
 
 	// Kind is the spec kind (e.g., "properties", "events", "tp", "custom-types")
 	Kind string

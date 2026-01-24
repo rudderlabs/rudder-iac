@@ -45,14 +45,14 @@ func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.Val
 		})
 	}
 
-	if ctx.Metadata == nil {
+	if len(ctx.Metadata) == 0 {
 		results = append(results, rules.ValidationResult{
 			Reference: "/metadata",
 			Message:   "metadata is required",
 		})
 	}
 
-	if ctx.Spec == nil {
+	if len(ctx.Spec) == 0 {
 		results = append(results, rules.ValidationResult{
 			Reference: "/spec",
 			Message:   "spec is required",
@@ -100,7 +100,7 @@ spec:
 			heredoc.Doc(`
 version: rudder/v1
 kind: properties
-metadata: # missing metadata
+metadata: # missing metadata name
 spec:
   properties:
     - name: MyTestProperty
@@ -111,6 +111,7 @@ version: rudder/v1
 kind: properties
 metadata:
   name: my-properties
+# missing spec
 `),
 		},
 	}
