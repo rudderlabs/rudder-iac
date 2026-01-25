@@ -2,6 +2,7 @@ package datagraph
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
@@ -9,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -17,24 +19,28 @@ import (
 // The provider owns all spec parsing logic for data-graph specs
 type Provider struct {
 	*provider.BaseProvider
-	dataGraphHandler *datagraph.DataGraphHandler
-	modelHandler     *model.ModelHandler
+	dataGraphHandler    *datagraph.DataGraphHandler
+	modelHandler        *model.ModelHandler
+	relationshipHandler *relationship.RelationshipHandler
 }
 
 // NewProvider creates a new data graph provider instance
 func NewProvider(client dgClient.DataGraphClient) *Provider {
 	dgHandler := datagraph.NewHandler(client)
 	modelHandler := model.NewHandler(client)
+	relationshipHandler := relationship.NewHandler(client)
 
 	handlers := []provider.Handler{
 		dgHandler,
 		modelHandler,
+		relationshipHandler,
 	}
 
 	return &Provider{
-		BaseProvider:     provider.NewBaseProvider(handlers),
-		dataGraphHandler: dgHandler,
-		modelHandler:     modelHandler,
+		BaseProvider:        provider.NewBaseProvider(handlers),
+		dataGraphHandler:    dgHandler,
+		modelHandler:        modelHandler,
+		relationshipHandler: relationshipHandler,
 	}
 }
 
@@ -53,7 +59,7 @@ func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, err
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	// For data-graph specs, check for inline models
 	if s.Kind == "data-graph" {
-		return p.loadDataGraphWithInlineModels(path, s)
+		return p.loadDataGraphWithInlineModels(s)
 	}
 
 	// For other specs, use base implementation
@@ -70,17 +76,23 @@ func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedS
 	// Start with the data graph ID
 	externalIDs := []string{dgSpec.ID}
 
-	// Add all inline model IDs
+	// Add all inline model IDs and relationship IDs
 	for _, modelSpec := range dgSpec.Models {
 		if modelSpec.ID != "" {
 			externalIDs = append(externalIDs, modelSpec.ID)
+		}
+		// Add inline relationship IDs
+		for _, relSpec := range modelSpec.Relationships {
+			if relSpec.ID != "" {
+				externalIDs = append(externalIDs, relSpec.ID)
+			}
 		}
 	}
 
 	return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
 }
 
-func (p *Provider) loadDataGraphWithInlineModels(path string, s *specs.Spec) error {
+func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {
 	// Parse the data-graph spec
 	var dgSpec dgModel.DataGraphSpec
 	if err := mapstructure.Decode(s.Spec, &dgSpec); err != nil {
@@ -105,7 +117,7 @@ func (p *Provider) loadDataGraphWithInlineModels(path string, s *specs.Spec) err
 
 	// Process inline models if any
 	for _, modelSpec := range dgSpec.Models {
-		if err := p.processInlineModel(path, dgSpec.ID, modelSpec); err != nil {
+		if err := p.processInlineModel(dgSpec.ID, modelSpec); err != nil {
 			return fmt.Errorf("processing inline model %s: %w", modelSpec.ID, err)
 		}
 	}
@@ -113,7 +125,7 @@ func (p *Provider) loadDataGraphWithInlineModels(path string, s *specs.Spec) err
 	return nil
 }
 
-func (p *Provider) processInlineModel(path string, dataGraphID string, modelSpec dgModel.ModelSpec) error {
+func (p *Provider) processInlineModel(dataGraphID string, modelSpec dgModel.ModelSpec) error {
 	// Validate the inline model spec
 	if err := p.validateModelSpec(&modelSpec); err != nil {
 		return fmt.Errorf("validating model spec: %w", err)
@@ -128,6 +140,13 @@ func (p *Provider) processInlineModel(path string, dataGraphID string, modelSpec
 	// Register resource with handler
 	if err := p.modelHandler.AddResource(modelSpec.ID, resource); err != nil {
 		return fmt.Errorf("adding model resource: %w", err)
+	}
+
+	// Process inline relationships if any
+	for _, relSpec := range modelSpec.Relationships {
+		if err := p.processInlineRelationship(dataGraphID, modelSpec.ID, &relSpec); err != nil {
+			return fmt.Errorf("processing inline relationship %s: %w", relSpec.ID, err)
+		}
 	}
 
 	return nil
@@ -204,4 +223,93 @@ func (p *Provider) extractDataGraphResource(spec *dgModel.DataGraphSpec) (*dgMod
 		AccountID: spec.AccountID,
 	}
 	return resource, nil
+}
+
+func (p *Provider) processInlineRelationship(dataGraphID, sourceModelID string, relSpec *dgModel.RelationshipSpec) error {
+	// Validate relationship spec
+	if err := p.validateRelationshipSpec(relSpec); err != nil {
+		return fmt.Errorf("validating relationship spec: %w", err)
+	}
+
+	// Extract relationship resource
+	resource, err := p.extractRelationshipResource(dataGraphID, sourceModelID, relSpec)
+	if err != nil {
+		return fmt.Errorf("extracting relationship: %w", err)
+	}
+
+	// Register with relationship handler
+	if err := p.relationshipHandler.AddResource(relSpec.ID, resource); err != nil {
+		return fmt.Errorf("adding relationship: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Provider) validateRelationshipSpec(spec *dgModel.RelationshipSpec) error {
+	if spec.ID == "" {
+		return fmt.Errorf("id is required")
+	}
+	if spec.DisplayName == "" {
+		return fmt.Errorf("display_name is required")
+	}
+	if spec.Type == "" {
+		return fmt.Errorf("type is required")
+	}
+	if spec.Type != "entity" && spec.Type != "event" {
+		return fmt.Errorf("type must be 'entity' or 'event', got %q", spec.Type)
+	}
+	if spec.Type == "entity" && spec.Cardinality == "" {
+		return fmt.Errorf("cardinality is required for entity relationships")
+	}
+	if spec.Target == "" {
+		return fmt.Errorf("target is required")
+	}
+	if spec.SourceJoinKey == "" {
+		return fmt.Errorf("source_join_key is required")
+	}
+	if spec.TargetJoinKey == "" {
+		return fmt.Errorf("target_join_key is required")
+	}
+	return nil
+}
+
+func (p *Provider) extractRelationshipResource(dataGraphID, sourceModelID string, spec *dgModel.RelationshipSpec) (*dgModel.RelationshipResource, error) {
+	// Create URN for data graph (parent)
+	dataGraphURN := resources.URN(dataGraphID, datagraph.HandlerMetadata.ResourceType)
+	dataGraphRef := relationship.CreateDataGraphReference(dataGraphURN)
+
+	// Create URN for source model (from)
+	sourceModelURN := resources.URN(sourceModelID, model.HandlerMetadata.ResourceType)
+	sourceModelRef := relationship.CreateModelReference(sourceModelURN)
+
+	// Parse target model reference from spec
+	targetModelURN, err := parseModelReference(spec.Target)
+	if err != nil {
+		return nil, fmt.Errorf("parsing target model reference: %w", err)
+	}
+	targetModelRef := relationship.CreateModelReference(targetModelURN)
+
+	return &dgModel.RelationshipResource{
+		ID:            spec.ID,
+		DisplayName:   spec.DisplayName,
+		Type:          spec.Type,
+		DataGraphRef:  dataGraphRef,
+		FromModelRef:  sourceModelRef,
+		ToModelRef:    targetModelRef,
+		SourceJoinKey: spec.SourceJoinKey,
+		TargetJoinKey: spec.TargetJoinKey,
+		Cardinality:   spec.Cardinality, // Empty for event relationships
+	}, nil
+}
+
+// parseModelReference parses a model reference like '#data-graph-model:user' and returns the URN
+func parseModelReference(ref string) (string, error) {
+	if !strings.HasPrefix(ref, "#data-graph-model:") {
+		return "", fmt.Errorf("invalid model reference format, expected '#data-graph-model:<id>', got %q", ref)
+	}
+	modelID := strings.TrimPrefix(ref, "#data-graph-model:")
+	if modelID == "" {
+		return "", fmt.Errorf("model ID cannot be empty in reference")
+	}
+	return resources.URN(modelID, model.HandlerMetadata.ResourceType), nil
 }
