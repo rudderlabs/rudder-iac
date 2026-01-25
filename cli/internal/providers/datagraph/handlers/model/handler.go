@@ -411,3 +411,13 @@ func (h *HandlerImpl) FormatForExport(
 	// Models don't have standalone specs - they're exported inline in data-graph specs
 	return nil, nil
 }
+
+// CreateModelReference creates a PropertyRef that points to a model's remote ID
+func CreateModelReference(urn string) *resources.PropertyRef {
+	return handler.CreatePropertyRef(
+		urn,
+		func(state *dgModel.ModelState) (string, error) {
+			return state.ID, nil
+		},
+	)
+}
