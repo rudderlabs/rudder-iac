@@ -16,11 +16,12 @@ type DataGraphSpec struct {
 // ModelSpec represents configuration for both entity and event models from YAML
 // This is part of the DataGraphSpec, not a standalone spec kind
 type ModelSpec struct {
-	ID          string `json:"id" mapstructure:"id"`
-	DisplayName string `json:"display_name" mapstructure:"display_name"`
-	Type        string `json:"type" mapstructure:"type"` // "entity" or "event"
-	Table       string `json:"table" mapstructure:"table"`
-	Description string `json:"description,omitempty" mapstructure:"description"`
+	ID            string             `json:"id" mapstructure:"id"`
+	DisplayName   string             `json:"display_name" mapstructure:"display_name"`
+	Type          string             `json:"type" mapstructure:"type"` // "entity" or "event"
+	Table         string             `json:"table" mapstructure:"table"`
+	Description   string             `json:"description,omitempty" mapstructure:"description"`
+	Relationships []RelationshipSpec `json:"relationships,omitempty" mapstructure:"relationships"` // Inline relationships
 
 	// Entity model fields (only used when Type == "entity")
 	PrimaryID string `json:"primary_id,omitempty" mapstructure:"primary_id"`
@@ -28,6 +29,18 @@ type ModelSpec struct {
 
 	// Event model fields (only used when Type == "event")
 	Timestamp string `json:"timestamp,omitempty" mapstructure:"timestamp"`
+}
+
+// RelationshipSpec represents configuration for both entity and event relationships from YAML
+// This is part of the ModelSpec, not a standalone spec kind
+type RelationshipSpec struct {
+	ID            string `json:"id" mapstructure:"id"`
+	DisplayName   string `json:"display_name" mapstructure:"display_name"`
+	Type          string `json:"type" mapstructure:"type"`                           // "entity" or "event"
+	Cardinality   string `json:"cardinality,omitempty" mapstructure:"cardinality"`   // only for entity relationships
+	Target        string `json:"target" mapstructure:"target"`                       // Reference: '#data-graph-model:user'
+	SourceJoinKey string `json:"source_join_key" mapstructure:"source_join_key"`
+	TargetJoinKey string `json:"target_join_key" mapstructure:"target_join_key"`
 }
 
 // DataGraphResource represents the input data for a data graph

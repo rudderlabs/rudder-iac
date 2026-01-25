@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	relationshipHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -18,7 +19,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	provider := datagraph.NewProvider(mockClient)
 
-	// Comprehensive spec with data graph and multiple inline models
+	// Comprehensive spec with data graph and multiple inline models with relationships
 	spec := &specs.Spec{
 		Version: "rudder/v0.1",
 		Kind:    "data-graph",
@@ -34,6 +35,17 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"description":  "User entity model",
 					"primary_id":   "user_id",
 					"root":         true,
+					"relationships": []map[string]interface{}{
+						{
+							"id":              "user-account",
+							"display_name":    "User Account",
+							"type":            "entity",
+							"cardinality":     "one-to-one",
+							"target":          "#data-graph-model:account",
+							"source_join_key": "account_id",
+							"target_join_key": "account_id",
+						},
+					},
 				},
 				{
 					"id":           "account",
@@ -51,6 +63,16 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"table":        "page_views",
 					"description":  "Page view event",
 					"timestamp":    "viewed_at",
+					"relationships": []map[string]interface{}{
+						{
+							"id":              "pageview-user",
+							"display_name":    "PageView User",
+							"type":            "event",
+							"target":          "#data-graph-model:user",
+							"source_join_key": "user_id",
+							"target_join_key": "user_id",
+						},
+					},
 				},
 				{
 					"id":           "purchase",
@@ -143,9 +165,45 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	assert.NotNil(t, purchaseData.DataGraphRef)
 	assert.Equal(t, resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType), purchaseData.DataGraphRef.URN)
 
-	// Validate total resources (1 data graph + 4 models)
+	// Validate entity relationship: user-account
+	userAccountResource, exists := graph.GetResource(resources.URN("user-account", relationshipHandler.HandlerMetadata.ResourceType))
+	require.True(t, exists, "user-account relationship should exist")
+	userAccountData, ok := userAccountResource.RawData().(*dgModel.RelationshipResource)
+	require.True(t, ok)
+	assert.Equal(t, "user-account", userAccountData.ID)
+	assert.Equal(t, "User Account", userAccountData.DisplayName)
+	assert.Equal(t, "entity", userAccountData.Type)
+	assert.Equal(t, "one-to-one", userAccountData.Cardinality)
+	assert.Equal(t, "account_id", userAccountData.SourceJoinKey)
+	assert.Equal(t, "account_id", userAccountData.TargetJoinKey)
+	assert.NotNil(t, userAccountData.DataGraphRef)
+	assert.Equal(t, resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType), userAccountData.DataGraphRef.URN)
+	assert.NotNil(t, userAccountData.FromModelRef)
+	assert.Equal(t, resources.URN("user", modelHandler.HandlerMetadata.ResourceType), userAccountData.FromModelRef.URN)
+	assert.NotNil(t, userAccountData.ToModelRef)
+	assert.Equal(t, resources.URN("account", modelHandler.HandlerMetadata.ResourceType), userAccountData.ToModelRef.URN)
+
+	// Validate event relationship: pageview-user
+	pageViewUserResource, exists := graph.GetResource(resources.URN("pageview-user", relationshipHandler.HandlerMetadata.ResourceType))
+	require.True(t, exists, "pageview-user relationship should exist")
+	pageViewUserData, ok := pageViewUserResource.RawData().(*dgModel.RelationshipResource)
+	require.True(t, ok)
+	assert.Equal(t, "pageview-user", pageViewUserData.ID)
+	assert.Equal(t, "PageView User", pageViewUserData.DisplayName)
+	assert.Equal(t, "event", pageViewUserData.Type)
+	assert.Empty(t, pageViewUserData.Cardinality) // Event relationships don't have cardinality
+	assert.Equal(t, "user_id", pageViewUserData.SourceJoinKey)
+	assert.Equal(t, "user_id", pageViewUserData.TargetJoinKey)
+	assert.NotNil(t, pageViewUserData.DataGraphRef)
+	assert.Equal(t, resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType), pageViewUserData.DataGraphRef.URN)
+	assert.NotNil(t, pageViewUserData.FromModelRef)
+	assert.Equal(t, resources.URN("page_view", modelHandler.HandlerMetadata.ResourceType), pageViewUserData.FromModelRef.URN)
+	assert.NotNil(t, pageViewUserData.ToModelRef)
+	assert.Equal(t, resources.URN("user", modelHandler.HandlerMetadata.ResourceType), pageViewUserData.ToModelRef.URN)
+
+	// Validate total resources (1 data graph + 4 models + 2 relationships)
 	allResources := graph.Resources()
-	assert.Len(t, allResources, 5)
+	assert.Len(t, allResources, 7)
 }
 
 func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
@@ -381,7 +439,8 @@ func TestProvider_SupportedTypes(t *testing.T) {
 	types := provider.SupportedTypes()
 	assert.Contains(t, types, dgHandler.HandlerMetadata.ResourceType)
 	assert.Contains(t, types, modelHandler.HandlerMetadata.ResourceType)
-	assert.Len(t, types, 2)
+	assert.Contains(t, types, relationshipHandler.HandlerMetadata.ResourceType)
+	assert.Len(t, types, 3)
 }
 
 func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
@@ -402,6 +461,24 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 					"type":         "entity",
 					"table":        "users",
 					"primary_id":   "user_id",
+					"relationships": []map[string]interface{}{
+						{
+							"id":              "user-orders",
+							"display_name":    "User Orders",
+							"type":            "entity",
+							"cardinality":     "one-to-many",
+							"target":          "#data-graph-model:order",
+							"source_join_key": "user_id",
+							"target_join_key": "user_id",
+						},
+					},
+				},
+				{
+					"id":           "order",
+					"display_name": "Order",
+					"type":         "entity",
+					"table":        "orders",
+					"primary_id":   "order_id",
 				},
 				{
 					"id":           "purchase",
@@ -409,6 +486,16 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 					"type":         "event",
 					"table":        "purchases",
 					"timestamp":    "purchased_at",
+					"relationships": []map[string]interface{}{
+						{
+							"id":              "purchase-user",
+							"display_name":    "Purchase User",
+							"type":            "event",
+							"target":          "#data-graph-model:user",
+							"source_join_key": "user_id",
+							"target_join_key": "user_id",
+						},
+					},
 				},
 			},
 		},
@@ -418,7 +505,7 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
 
-	// Should return data graph ID plus all inline model IDs
-	expectedIDs := []string{"my-data-graph", "user", "purchase"}
+	// Should return data graph ID plus all inline model IDs and relationship IDs
+	expectedIDs := []string{"my-data-graph", "user", "order", "purchase", "user-orders", "purchase-user"}
 	assert.ElementsMatch(t, expectedIDs, parsed.ExternalIDs)
 }

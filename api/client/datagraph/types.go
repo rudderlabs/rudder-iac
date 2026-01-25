@@ -122,3 +122,48 @@ type ListModelsResponse struct {
 	Data   []Model       `json:"data"`
 	Paging client.Paging `json:"paging"`
 }
+
+// Relationship represents both entity and event relationships from the API
+// Type field differentiates between "entity" and "event"
+type Relationship struct {
+	ID            string     `json:"id,omitempty"`
+	Name          string     `json:"name"`
+	Type          string     // "entity" or "event" - populated by client, not from API
+	Cardinality   string     `json:"cardinality,omitempty"`   // only for entity relationships
+	SourceModelID string     `json:"sourceModelId"`           // Source model ID
+	TargetModelID string     `json:"targetModelId"`           // Target model ID
+	SourceJoinKey string     `json:"sourceJoinKey"`           // Join column in source
+	TargetJoinKey string     `json:"targetJoinKey"`           // Join column in target
+	DataGraphID   string     `json:"dataGraphId,omitempty"`   // Parent data graph ID from API
+	WorkspaceID   string     `json:"workspaceId,omitempty"`   // Workspace ID from API
+	ExternalID    string     `json:"externalId,omitempty"`
+	CreatedAt     *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time `json:"updatedAt,omitempty"`
+}
+
+// CreateRelationshipRequest is the request body for creating relationships
+type CreateRelationshipRequest struct {
+	Name          string `json:"name"`
+	Cardinality   string `json:"cardinality,omitempty"` // only for entity relationships
+	SourceModelID string `json:"sourceModelId"`
+	TargetModelID string `json:"targetModelId"`
+	SourceJoinKey string `json:"sourceJoinKey"`
+	TargetJoinKey string `json:"targetJoinKey"`
+	ExternalID    string `json:"externalId,omitempty"`
+}
+
+// UpdateRelationshipRequest is the request body for updating relationships
+type UpdateRelationshipRequest struct {
+	Name          string `json:"name"`
+	Cardinality   string `json:"cardinality,omitempty"` // only for entity relationships
+	SourceModelID string `json:"sourceModelId"`
+	TargetModelID string `json:"targetModelId"`
+	SourceJoinKey string `json:"sourceJoinKey"`
+	TargetJoinKey string `json:"targetJoinKey"`
+}
+
+// ListRelationshipsResponse represents the paginated response from listing relationships
+type ListRelationshipsResponse struct {
+	Data   []Relationship `json:"data"`
+	Paging client.Paging  `json:"paging"`
+}
