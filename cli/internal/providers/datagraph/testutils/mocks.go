@@ -19,13 +19,13 @@ type MockDataGraphClient struct {
 	SetExternalIDFunc   func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error)
 
 	// Model methods
-	Models                  map[string]*dgClient.Model
-	ListModelsFunc          func(ctx context.Context, req *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error)
-	GetModelFunc            func(ctx context.Context, req *dgClient.GetModelRequest) (*dgClient.Model, error)
-	CreateModelFunc         func(ctx context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error)
-	UpdateModelFunc         func(ctx context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error)
-	DeleteModelFunc         func(ctx context.Context, req *dgClient.DeleteModelRequest) error
-	SetModelExternalIDFunc  func(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error)
+	Models                 map[string]*dgClient.Model
+	ListModelsFunc         func(ctx context.Context, req *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error)
+	GetModelFunc           func(ctx context.Context, req *dgClient.GetModelRequest) (*dgClient.Model, error)
+	CreateModelFunc        func(ctx context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error)
+	UpdateModelFunc        func(ctx context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error)
+	DeleteModelFunc        func(ctx context.Context, req *dgClient.DeleteModelRequest) error
+	SetModelExternalIDFunc func(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error)
 }
 
 // DataGraph methods
