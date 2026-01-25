@@ -44,6 +44,15 @@ func TestNewProject_Load_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "custom loader called")
 }
 
+// func TestSomething(t *testing.T) {
+// 	spec := specs.Spec{Kind: "properties", Version: "rudder/v0.1"}
+// 	mockProvider := testutils.NewMockProvider(nil, nil)
+
+// 	proj := project.New(mockProvider)
+// 	proj.Load("")
+
+// }
+
 func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
 

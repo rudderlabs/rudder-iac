@@ -333,7 +333,6 @@ func (p *project) registry() (rules.Registry, error) {
 	}
 
 	semantic := p.provider.SemanticRules()
-
 	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
