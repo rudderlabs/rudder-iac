@@ -160,7 +160,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 
 	// Initialize data graph provider if experimental flag is enabled
 	if cfg.ExperimentalFlags.DataGraph {
-		dgStore := dgClient.NewRudderDataGraphStore(c)
+		dgStore := dgClient.NewRudderDataGraphClient(c)
 		providers.DataGraph = dgProvider.NewProvider(dgStore)
 	}
 
