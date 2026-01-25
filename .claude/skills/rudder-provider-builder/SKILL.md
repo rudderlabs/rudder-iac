@@ -56,6 +56,37 @@ For each resource type:
    - `State`: Output state (computed fields only)
    - `Remote`: API response wrapper implementing `RemoteResource`
 
+   **CRITICAL: Mapstructure Tags Required for Spec Structs**
+
+   All `Spec` structs **must** include `mapstructure` tags alongside `json` tags. This is required because providers use `mapstructure.Decode()` to parse YAML specs into Go structs (see `provider.go` line 55).
+
+   Without mapstructure tags, the decoder cannot map YAML field names (especially those with underscores like `account_id`) to struct fields, causing validation errors even when fields are present in the YAML.
+
+   ```go
+   // ✅ CORRECT - Include both json and mapstructure tags
+   type DataGraphSpec struct {
+       ID        string      `json:"id" mapstructure:"id"`
+       Name      string      `json:"name" mapstructure:"name"`
+       AccountID string      `json:"account_id" mapstructure:"account_id"`  // Snake case in YAML
+       Models    []ModelSpec `json:"models,omitempty" mapstructure:"models"`
+   }
+
+   type ModelSpec struct {
+       ID          string `json:"id" mapstructure:"id"`
+       DisplayName string `json:"display_name" mapstructure:"display_name"`
+       Type        string `json:"type" mapstructure:"type"`
+   }
+
+   // ❌ WRONG - Missing mapstructure tags will cause decoding to fail
+   type DataGraphSpec struct {
+       ID        string      `json:"id"`
+       Name      string      `json:"name"`
+       AccountID string      `json:"account_id"`  // Won't decode from YAML without mapstructure tag
+   }
+   ```
+
+   **Rule**: Every field in a `Spec` struct needs both tags with matching field names. The `mapstructure` tag should match the YAML field name exactly (including snake_case).
+
 2. **Implement Handler** in `handlers/<resource>/handler.go`:
    - Create `HandlerImpl` struct with API client
    - Implement all `HandlerImpl[Spec, Res, State, Remote]` methods
@@ -391,6 +422,7 @@ Two-phase validation:
 ### Per Handler
 
 - [ ] Data types defined (Spec, Res, State, Remote)
+- [ ] Spec structs include both `json` and `mapstructure` tags for all fields
 - [ ] Remote implements `RemoteResource` with value receiver
 - [ ] HandlerMetadata configured (ResourceType, SpecKind, SpecMetadataName)
 - [ ] All HandlerImpl methods implemented:

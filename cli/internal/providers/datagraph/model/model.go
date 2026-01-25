@@ -35,10 +35,10 @@ type RemoteModel struct {
 
 // Metadata implements the RemoteResource interface
 func (r RemoteModel) Metadata() handler.RemoteResourceMetadata {
-	// AIFIX: Include WorkspaceID in the metadata
 	return handler.RemoteResourceMetadata{
-		ID:         r.ID,
-		ExternalID: r.ExternalID,
-		Name:       r.Name,
+		ID:          r.ID,
+		ExternalID:  r.ExternalID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
 	}
 }
