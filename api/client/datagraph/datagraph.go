@@ -7,15 +7,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
-const (
-	dataGraphsBasePath = "/v2/data-graphs"
-)
-
-// DataGraphStore is the interface for Data Graph operations
 type DataGraphStore interface {
 	// ListDataGraphs lists all data graphs with optional pagination and filtering
 	ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error)
@@ -36,20 +29,8 @@ type DataGraphStore interface {
 	SetExternalID(ctx context.Context, id string, externalID string) error
 }
 
-// rudderDataGraphStore implements the DataGraphStore interface
-type rudderDataGraphStore struct {
-	client *client.Client
-}
-
-// NewRudderDataGraphStore creates a new DataGraphStore implementation
-func NewRudderDataGraphStore(c *client.Client) DataGraphStore {
-	return &rudderDataGraphStore{
-		client: c,
-	}
-}
-
 // ListDataGraphs lists all data graphs with optional pagination and filtering
-func (s *rudderDataGraphStore) ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error) {
+func (s *rudderDataGraphClient) ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error) {
 	path := dataGraphsBasePath
 
 	query := url.Values{}
@@ -81,7 +62,7 @@ func (s *rudderDataGraphStore) ListDataGraphs(ctx context.Context, page, pageSiz
 }
 
 // GetDataGraph retrieves a data graph by ID
-func (s *rudderDataGraphStore) GetDataGraph(ctx context.Context, id string) (*DataGraph, error) {
+func (s *rudderDataGraphClient) GetDataGraph(ctx context.Context, id string) (*DataGraph, error) {
 	if id == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
@@ -101,7 +82,7 @@ func (s *rudderDataGraphStore) GetDataGraph(ctx context.Context, id string) (*Da
 }
 
 // CreateDataGraph creates a new data graph
-func (s *rudderDataGraphStore) CreateDataGraph(ctx context.Context, req *CreateDataGraphRequest) (*DataGraph, error) {
+func (s *rudderDataGraphClient) CreateDataGraph(ctx context.Context, req *CreateDataGraphRequest) (*DataGraph, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)
@@ -121,7 +102,7 @@ func (s *rudderDataGraphStore) CreateDataGraph(ctx context.Context, req *CreateD
 }
 
 // UpdateDataGraph updates an existing data graph
-func (s *rudderDataGraphStore) UpdateDataGraph(ctx context.Context, id string, req *UpdateDataGraphRequest) (*DataGraph, error) {
+func (s *rudderDataGraphClient) UpdateDataGraph(ctx context.Context, id string, req *UpdateDataGraphRequest) (*DataGraph, error) {
 	if id == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
@@ -146,7 +127,7 @@ func (s *rudderDataGraphStore) UpdateDataGraph(ctx context.Context, id string, r
 }
 
 // DeleteDataGraph deletes a data graph by ID
-func (s *rudderDataGraphStore) DeleteDataGraph(ctx context.Context, id string) error {
+func (s *rudderDataGraphClient) DeleteDataGraph(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("data graph ID cannot be empty")
 	}
@@ -161,7 +142,7 @@ func (s *rudderDataGraphStore) DeleteDataGraph(ctx context.Context, id string) e
 }
 
 // SetExternalID sets the external ID for a data graph
-func (s *rudderDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) error {
+func (s *rudderDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) error {
 	if id == "" {
 		return fmt.Errorf("data graph ID cannot be empty")
 	}
