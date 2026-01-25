@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // Helper function to create string pointers
 func stringPtr(s string) *string {
 	return &s
@@ -42,7 +41,7 @@ func TestCreateModel_Entity(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity",
 		Name:      "User",
 		TableRef:  "users",
 		PrimaryID: "id",
@@ -88,7 +87,7 @@ func TestCreateModel_EntityWithExternalID(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity",
 		Name:       "User",
 		TableRef:   "users",
 		ExternalID: "user-model",
@@ -176,7 +175,7 @@ func TestUpdateModel_Entity(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity", 
+	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity",
 		Name:      "Updated User",
 		TableRef:  "users_v2",
 		PrimaryID: "user_id",
@@ -408,7 +407,7 @@ func TestCreateModel_Event(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event",
 		Name:      "Purchase",
 		TableRef:  "purchases",
 		Timestamp: "event_time",
@@ -451,7 +450,7 @@ func TestCreateModel_EventWithDescription(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event",
 		Name:        "Purchase",
 		Description: "Purchase events",
 		TableRef:    "purchases",
@@ -534,7 +533,7 @@ func TestUpdateModel_Event(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event", 
+	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event",
 		Name:      "Updated Purchase",
 		TableRef:  "purchases_v2",
 		Timestamp: "ts",
@@ -746,7 +745,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "CreateEntityModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "entity", 
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "entity",
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -758,7 +757,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "CreateEventModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "event", 
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "event",
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -802,7 +801,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEntityModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "em-456", Type: "entity", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "em-456", Type: "entity",
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -814,7 +813,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEntityModel - empty model ID",
 			operation: func() error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "entity", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "entity",
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -826,7 +825,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEventModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "evm-789", Type: "event", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "evm-789", Type: "event",
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -838,7 +837,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEventModel - empty model ID",
 			operation: func() error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "event", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "event",
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -953,7 +952,7 @@ func TestModelAPIErrors(t *testing.T) {
 			responseStatus: 400,
 			responseBody:   `{"error":"Bad Request"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity",
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -969,7 +968,7 @@ func TestModelAPIErrors(t *testing.T) {
 			responseStatus: 400,
 			responseBody:   `{"error":"Bad Request"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event",
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -1009,7 +1008,7 @@ func TestModelAPIErrors(t *testing.T) {
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity",
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -1025,7 +1024,7 @@ func TestModelAPIErrors(t *testing.T) {
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event", 
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event",
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
