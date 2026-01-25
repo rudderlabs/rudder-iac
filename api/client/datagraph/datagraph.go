@@ -114,7 +114,7 @@ func (s *rudderDataGraphClient) DeleteDataGraph(ctx context.Context, id string) 
 }
 
 // SetExternalID sets the external ID for a data graph and returns the updated data graph
-func (s *rudderDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error) {
+func (s *rudderDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error) {
 	if id == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}

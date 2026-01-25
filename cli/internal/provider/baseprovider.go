@@ -81,8 +81,8 @@ func (p *BaseProvider) SupportedKinds() []string {
 }
 
 func (p *BaseProvider) SupportedTypes() []string {
-	types := make([]string, 0, len(p.kindToType))
-	for _, resourceType := range p.kindToType {
+	types := make([]string, 0, len(p.handlers))
+	for resourceType := range p.handlers {
 		types = append(types, resourceType)
 	}
 	return types
