@@ -15,11 +15,11 @@ type mockRule struct {
 	appliesTo   []string
 }
 
-func (m *mockRule) ID() string                                        { return m.id }
-func (m *mockRule) Severity() Severity                                { return m.severity }
-func (m *mockRule) Description() string                               { return m.description }
-func (m *mockRule) AppliesTo() []string                               { return m.appliesTo }
-func (m *mockRule) Examples() *Examples                               { return nil }
+func (m *mockRule) ID() string                                         { return m.id }
+func (m *mockRule) Severity() Severity                                 { return m.severity }
+func (m *mockRule) Description() string                                { return m.description }
+func (m *mockRule) AppliesTo() []string                                { return m.appliesTo }
+func (m *mockRule) Examples() Examples                                 { return Examples{} }
 func (m *mockRule) Validate(ctx *ValidationContext) []ValidationResult { return nil }
 
 func TestRegistry_RegisterRule(t *testing.T) {

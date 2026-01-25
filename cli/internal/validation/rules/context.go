@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -18,14 +17,17 @@ type ValidationContext struct {
 
 	// Spec is the raw spec data (typically map[string]any) from the YAML.
 	// Rules can inspect this for syntactic validation before resource graph construction.
-	Spec any
+	Spec map[string]any
 
 	// Kind is the spec kind (e.g., "properties", "events", "tp", "custom-types")
 	Kind string
 
+	// Version is the spec version (e.g., "rudder/v1")
+	Version string
+
 	// Metadata contains parsed common metadata from the spec.
 	// This includes name, import metadata, etc.
-	Metadata *specs.Metadata
+	Metadata map[string]any
 
 	// Graph is the complete resource graph built from all loaded specs.
 	// This is nil for syntactic validation (pre-graph construction)

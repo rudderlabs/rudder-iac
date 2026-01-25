@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type EmptyProvider struct{}
@@ -58,4 +59,12 @@ func (p *EmptyProvider) MigrateSpec(_ *specs.Spec) (*specs.Spec, error) {
 func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *state.State) error {
 	// Default: no consolidation needed
 	return nil
+}
+
+func (p *EmptyProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{}
+}
+
+func (p *EmptyProvider) SemanticRules() []rules.Rule {
+	return []rules.Rule{}
 }
