@@ -1,0 +1,483 @@
+package relationship
+
+import (
+	"context"
+	"fmt"
+
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+)
+
+type RelationshipHandler = handler.BaseHandler[struct{}, dgModel.RelationshipResource, dgModel.RelationshipState, dgModel.RemoteRelationship]
+
+var HandlerMetadata = handler.HandlerMetadata{
+	ResourceType:     "data-graph-relationship",
+	SpecKind:         "data-graph", // Relationships are inline in data-graph specs
+	SpecMetadataName: "data-graph",
+}
+
+// HandlerImpl implements the HandlerImpl interface for relationship resources
+// Note: Relationships don't have their own spec kind - they're inline in model specs
+// The provider handles all spec parsing and resource extraction
+type HandlerImpl struct {
+	client dgClient.DataGraphClient
+}
+
+// NewHandler creates a new BaseHandler for relationship resources
+func NewHandler(client dgClient.DataGraphClient) *RelationshipHandler {
+	h := &HandlerImpl{client: client}
+	return handler.NewHandler(h)
+}
+
+func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
+	return HandlerMetadata
+}
+
+func (h *HandlerImpl) NewSpec() *struct{} {
+	return &struct{}{}
+}
+
+func (h *HandlerImpl) ValidateSpec(spec *struct{}) error {
+	// Relationships don't have standalone specs - they're inline in model specs
+	// The provider handles all spec validation
+	return fmt.Errorf("relationship handler does not support standalone specs - relationships are inline in data-graph specs")
+}
+
+func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map[string]*dgModel.RelationshipResource, error) {
+	// Relationships don't have standalone specs - they're inline in model specs
+	// The provider handles all resource extraction
+	return nil, fmt.Errorf("relationship handler does not support standalone spec extraction - relationships are inline in data-graph specs")
+}
+
+func (h *HandlerImpl) ValidateResource(resource *dgModel.RelationshipResource, graph *resources.Graph) error {
+	if resource.DisplayName == "" {
+		return fmt.Errorf("display_name is required")
+	}
+	if resource.Type != "entity" && resource.Type != "event" {
+		return fmt.Errorf("type must be 'entity' or 'event'")
+	}
+	if resource.DataGraphRef == nil {
+		return fmt.Errorf("data_graph reference is required")
+	}
+	if resource.FromModelRef == nil {
+		return fmt.Errorf("source model reference is required")
+	}
+	if resource.ToModelRef == nil {
+		return fmt.Errorf("target model reference is required")
+	}
+	if resource.SourceJoinKey == "" {
+		return fmt.Errorf("source_join_key is required")
+	}
+	if resource.TargetJoinKey == "" {
+		return fmt.Errorf("target_join_key is required")
+	}
+
+	// Type-specific validation
+	if resource.Type == "entity" {
+		if resource.Cardinality == "" {
+			return fmt.Errorf("cardinality is required for entity relationships")
+		}
+		// Validate cardinality value
+		validCardinalities := map[string]bool{
+			"one-to-one":   true,
+			"one-to-many":  true,
+			"many-to-one":  true,
+		}
+		if !validCardinalities[resource.Cardinality] {
+			return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
+		}
+	} else if resource.Type == "event" {
+		if resource.Cardinality != "" {
+			return fmt.Errorf("cardinality should not be specified for event relationships")
+		}
+	}
+
+	// Validate that the referenced data graph exists
+	if _, exists := graph.GetResource(resource.DataGraphRef.URN); !exists {
+		return fmt.Errorf("referenced data graph %s does not exist", resource.DataGraphRef.URN)
+	}
+
+	// Validate that the referenced models exist
+	if _, exists := graph.GetResource(resource.FromModelRef.URN); !exists {
+		return fmt.Errorf("referenced source model %s does not exist", resource.FromModelRef.URN)
+	}
+	if _, exists := graph.GetResource(resource.ToModelRef.URN); !exists {
+		return fmt.Errorf("referenced target model %s does not exist", resource.ToModelRef.URN)
+	}
+
+	return nil
+}
+
+// listAllEntityRelationships fetches all entity relationships for a data graph with pagination
+func (h *HandlerImpl) listAllEntityRelationships(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
+	var allRelationships []*dgModel.RemoteRelationship
+	page := 1
+	perPage := 100
+
+	for {
+		resp, err := h.client.ListEntityRelationships(ctx, dataGraphID, page, perPage, nil, hasExternalID)
+		if err != nil {
+			return nil, fmt.Errorf("listing entity relationships: %w", err)
+		}
+
+		// Add all relationships from current page
+		for i := range resp.Data {
+			allRelationships = append(allRelationships, &dgModel.RemoteRelationship{
+				Relationship: &resp.Data[i],
+			})
+		}
+
+		// Check if there are more pages
+		if resp.Paging.Next == "" {
+			break
+		}
+		page++
+	}
+
+	return allRelationships, nil
+}
+
+// listAllEventRelationships fetches all event relationships for a data graph with pagination
+func (h *HandlerImpl) listAllEventRelationships(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
+	var allRelationships []*dgModel.RemoteRelationship
+	page := 1
+	perPage := 100
+
+	for {
+		resp, err := h.client.ListEventRelationships(ctx, dataGraphID, page, perPage, nil, hasExternalID)
+		if err != nil {
+			return nil, fmt.Errorf("listing event relationships: %w", err)
+		}
+
+		// Add all relationships from current page
+		for i := range resp.Data {
+			// Set DataGraphID if not already set by API
+			if resp.Data[i].DataGraphID == "" {
+				resp.Data[i].DataGraphID = dataGraphID
+			}
+			allRelationships = append(allRelationships, &dgModel.RemoteRelationship{
+				Relationship: &resp.Data[i],
+			})
+		}
+
+		// Check if there are more pages
+		if resp.Paging.Next == "" {
+			break
+		}
+		page++
+	}
+
+	return allRelationships, nil
+}
+
+// listAllRelationshipsForDataGraph fetches all relationships (entity and event) for a data graph
+func (h *HandlerImpl) listAllRelationshipsForDataGraph(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
+	var allRelationships []*dgModel.RemoteRelationship
+
+	// Fetch entity relationships
+	entityRelationships, err := h.listAllEntityRelationships(ctx, dataGraphID, hasExternalID)
+	if err != nil {
+		return nil, err
+	}
+	allRelationships = append(allRelationships, entityRelationships...)
+
+	// Fetch event relationships
+	eventRelationships, err := h.listAllEventRelationships(ctx, dataGraphID, hasExternalID)
+	if err != nil {
+		return nil, err
+	}
+	allRelationships = append(allRelationships, eventRelationships...)
+
+	return allRelationships, nil
+}
+
+func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.RemoteRelationship, error) {
+	hasExternalID := true
+
+	// First, get all data graphs with external IDs
+	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+	if err != nil {
+		return nil, err
+	}
+
+	// For each data graph, fetch all relationships with external IDs
+	var allRelationships []*dgModel.RemoteRelationship
+	for _, dg := range dataGraphs {
+		relationships, err := h.listAllRelationshipsForDataGraph(ctx, dg.ID, &hasExternalID)
+		if err != nil {
+			return nil, fmt.Errorf("loading relationships for data graph %s: %w", dg.ID, err)
+		}
+		allRelationships = append(allRelationships, relationships...)
+	}
+
+	return allRelationships, nil
+}
+
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.RemoteRelationship, error) {
+	hasExternalID := false
+
+	// First, get all data graphs
+	dataGraphs, err := h.listAllDataGraphs(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// For each data graph, fetch all relationships without external IDs
+	var allRelationships []*dgModel.RemoteRelationship
+	for _, dg := range dataGraphs {
+		relationships, err := h.listAllRelationshipsForDataGraph(ctx, dg.ID, &hasExternalID)
+		if err != nil {
+			return nil, fmt.Errorf("loading importable relationships for data graph %s: %w", dg.ID, err)
+		}
+		allRelationships = append(allRelationships, relationships...)
+	}
+
+	return allRelationships, nil
+}
+
+// listAllDataGraphs fetches all data graphs with pagination
+func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool) ([]*dgClient.DataGraph, error) {
+	var allDataGraphs []*dgClient.DataGraph
+	page := 1
+	perPage := 100
+
+	for {
+		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
+		if err != nil {
+			return nil, fmt.Errorf("listing data graphs: %w", err)
+		}
+
+		// Add all data graphs from current page
+		for i := range resp.Data {
+			allDataGraphs = append(allDataGraphs, &resp.Data[i])
+		}
+
+		// Check if there are more pages
+		if resp.Paging.Next == "" {
+			break
+		}
+		page++
+	}
+
+	return allDataGraphs, nil
+}
+
+func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteRelationship, urnResolver handler.URNResolver) (*dgModel.RelationshipResource, *dgModel.RelationshipState, error) {
+	// Skip resources without external IDs
+	if remote.ExternalID == "" {
+		return nil, nil, nil
+	}
+
+	// Resolve the data graph's URN from its remote ID
+	dataGraphURN, err := urnResolver.GetURNByID("data-graph", remote.DataGraphID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving data graph URN: %w", err)
+	}
+
+	// Resolve the from model's URN from its remote ID
+	fromModelURN, err := urnResolver.GetURNByID(model.HandlerMetadata.ResourceType, remote.SourceModelID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving from model URN: %w", err)
+	}
+
+	// Resolve the to model's URN from its remote ID
+	toModelURN, err := urnResolver.GetURNByID(model.HandlerMetadata.ResourceType, remote.TargetModelID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving to model URN: %w", err)
+	}
+
+	// Create PropertyRefs using the resolved URNs
+	dataGraphRef := CreateDataGraphReference(dataGraphURN)
+	fromModelRef := CreateModelReference(fromModelURN)
+	toModelRef := CreateModelReference(toModelURN)
+
+	resource := &dgModel.RelationshipResource{
+		ID:            remote.ExternalID,
+		DisplayName:   remote.Name,
+		Type:          remote.Type,
+		DataGraphRef:  dataGraphRef,
+		FromModelRef:  fromModelRef,
+		ToModelRef:    toModelRef,
+		SourceJoinKey: remote.SourceJoinKey,
+		TargetJoinKey: remote.TargetJoinKey,
+		Cardinality:   remote.Cardinality,
+	}
+
+	state := &dgModel.RelationshipState{
+		ID: remote.ID,
+	}
+
+	return resource, state, nil
+}
+
+func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.RelationshipResource) (*dgModel.RelationshipState, error) {
+	dataGraphRemoteID := data.DataGraphRef.Value
+	fromModelRemoteID := data.FromModelRef.Value
+	toModelRemoteID := data.ToModelRef.Value
+
+	var remote *dgClient.Relationship
+	var err error
+
+	switch data.Type {
+	case "entity":
+		req := &dgClient.CreateRelationshipRequest{
+			Name:          data.DisplayName,
+			Cardinality:   data.Cardinality,
+			SourceModelID: fromModelRemoteID,
+			TargetModelID: toModelRemoteID,
+			SourceJoinKey: data.SourceJoinKey,
+			TargetJoinKey: data.TargetJoinKey,
+			ExternalID:    data.ID,
+		}
+		remote, err = h.client.CreateEntityRelationship(ctx, dataGraphRemoteID, req)
+	case "event":
+		req := &dgClient.CreateRelationshipRequest{
+			Name:          data.DisplayName,
+			SourceModelID: fromModelRemoteID,
+			TargetModelID: toModelRemoteID,
+			SourceJoinKey: data.SourceJoinKey,
+			TargetJoinKey: data.TargetJoinKey,
+			ExternalID:    data.ID,
+		}
+		remote, err = h.client.CreateEventRelationship(ctx, dataGraphRemoteID, req)
+	default:
+		return nil, fmt.Errorf("invalid relationship type: %s", data.Type)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("creating %s relationship: %w", data.Type, err)
+	}
+
+	return &dgModel.RelationshipState{
+		ID: remote.ID,
+	}, nil
+}
+
+func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.RelationshipResource, oldData *dgModel.RelationshipResource, oldState *dgModel.RelationshipState) (*dgModel.RelationshipState, error) {
+	dataGraphRemoteID := oldData.DataGraphRef.Value
+	fromModelRemoteID := newData.FromModelRef.Value
+	toModelRemoteID := newData.ToModelRef.Value
+
+	var remote *dgClient.Relationship
+	var err error
+
+	switch newData.Type {
+	case "entity":
+		req := &dgClient.UpdateRelationshipRequest{
+			Name:          newData.DisplayName,
+			Cardinality:   newData.Cardinality,
+			SourceModelID: fromModelRemoteID,
+			TargetModelID: toModelRemoteID,
+			SourceJoinKey: newData.SourceJoinKey,
+			TargetJoinKey: newData.TargetJoinKey,
+		}
+		remote, err = h.client.UpdateEntityRelationship(ctx, dataGraphRemoteID, oldState.ID, req)
+	case "event":
+		req := &dgClient.UpdateRelationshipRequest{
+			Name:          newData.DisplayName,
+			SourceModelID: fromModelRemoteID,
+			TargetModelID: toModelRemoteID,
+			SourceJoinKey: newData.SourceJoinKey,
+			TargetJoinKey: newData.TargetJoinKey,
+		}
+		remote, err = h.client.UpdateEventRelationship(ctx, dataGraphRemoteID, oldState.ID, req)
+	default:
+		return nil, fmt.Errorf("invalid relationship type: %s", newData.Type)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("updating %s relationship: %w", newData.Type, err)
+	}
+
+	return &dgModel.RelationshipState{
+		ID: remote.ID,
+	}, nil
+}
+
+func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.RelationshipResource, remoteID string) (*dgModel.RelationshipState, error) {
+	dataGraphRemoteID := data.DataGraphRef.Value
+	relationshipType := data.Type
+
+	// Set external ID on the remote resource
+	var setErr error
+	if relationshipType == "entity" {
+		setErr = h.client.SetEntityRelationshipExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
+	} else {
+		setErr = h.client.SetEventRelationshipExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
+	}
+	if setErr != nil {
+		return nil, fmt.Errorf("setting external ID: %w", setErr)
+	}
+
+	// Fetch the remote resource to get updated data
+	var remote *dgClient.Relationship
+	var getErr error
+	if relationshipType == "entity" {
+		remote, getErr = h.client.GetEntityRelationship(ctx, dataGraphRemoteID, remoteID)
+	} else {
+		remote, getErr = h.client.GetEventRelationship(ctx, dataGraphRemoteID, remoteID)
+	}
+	if getErr != nil {
+		return nil, fmt.Errorf("getting relationship: %w", getErr)
+	}
+
+	return &dgModel.RelationshipState{
+		ID: remote.ID,
+	}, nil
+}
+
+func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *dgModel.RelationshipResource, oldState *dgModel.RelationshipState) error {
+	dataGraphRemoteID := oldData.DataGraphRef.Value
+
+	var err error
+	switch oldData.Type {
+	case "entity":
+		err = h.client.DeleteEntityRelationship(ctx, dataGraphRemoteID, oldState.ID)
+	case "event":
+		err = h.client.DeleteEventRelationship(ctx, dataGraphRemoteID, oldState.ID)
+	default:
+		return fmt.Errorf("invalid relationship type: %s", oldData.Type)
+	}
+
+	if err != nil {
+		return fmt.Errorf("deleting %s relationship: %w", oldData.Type, err)
+	}
+	return nil
+}
+
+// FormatForExport formats resources for export
+// Relationships are exported inline in model specs, so this is not supported
+func (h *HandlerImpl) FormatForExport(
+	collection map[string]*dgModel.RemoteRelationship,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	// Relationships don't have standalone specs - they're exported inline in model specs
+	return nil, nil
+}
+
+// CreateModelReference creates a PropertyRef that points to a model's remote ID
+func CreateModelReference(urn string) *resources.PropertyRef {
+	return handler.CreatePropertyRef(
+		urn,
+		func(state *dgModel.ModelState) (string, error) {
+			return state.ID, nil
+		},
+	)
+}
+
+// CreateDataGraphReference creates a PropertyRef that points to a data graph's remote ID
+func CreateDataGraphReference(urn string) *resources.PropertyRef {
+	return handler.CreatePropertyRef(
+		urn,
+		func(state *dgModel.DataGraphState) (string, error) {
+			return state.ID, nil
+		},
+	)
+}
