@@ -55,6 +55,10 @@ func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id s
 	return fmt.Errorf("not implemented")
 }
 
+func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformationsClient.CreateLibraryRequest, publish bool) (*transformationsClient.TransformationLibrary, error) {
 	return nil, fmt.Errorf("not implemented")
 }
@@ -72,6 +76,10 @@ func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transfo
 }
 
 func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
 	return fmt.Errorf("not implemented")
 }
 

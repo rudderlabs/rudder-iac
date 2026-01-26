@@ -76,3 +76,7 @@ type BatchPublishTransformation struct {
 type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
 }
+
+type SetExternalIDRequest struct {
+	ExternalID string `json:"externalId"`
+}
