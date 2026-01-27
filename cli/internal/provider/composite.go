@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"golang.org/x/exp/maps"
 )
@@ -358,3 +359,32 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, st *state.State
 	}
 	return nil
 }
+
+// SyntacticRules returns all syntactic rules from all providers implementing RuleProvider.
+// Providers that don't implement RuleProvider are skipped.
+// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
+func (p *CompositeProvider) SyntacticRules() []rules.Rule {
+	var allRules []rules.Rule
+	for _, provider := range p.Providers {
+		if rp, ok := provider.(RuleProvider); ok {
+			allRules = append(allRules, rp.SyntacticRules()...)
+		}
+	}
+	return allRules
+}
+
+// SemanticRules returns all semantic rules from all providers implementing RuleProvider.
+// Providers that don't implement RuleProvider are skipped.
+// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
+func (p *CompositeProvider) SemanticRules() []rules.Rule {
+	var allRules []rules.Rule
+	for _, provider := range p.Providers {
+		if rp, ok := provider.(RuleProvider); ok {
+			allRules = append(allRules, rp.SemanticRules()...)
+		}
+	}
+	return allRules
+}
+
+// Compile-time verification that CompositeProvider implements RuleProvider
+var _ RuleProvider = (*CompositeProvider)(nil)

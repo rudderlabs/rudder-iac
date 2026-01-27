@@ -50,14 +50,10 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			opts := []project.ProjectOption{}
-			if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-				opts = append(opts, project.WithV1SpecSupport())
-			}
-			p = project.New(location, deps.CompositeProvider(), opts...)
+			p = deps.NewProject()
 
 			// Load and validate the project configuration
-			if err := p.Load(); err != nil {
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 

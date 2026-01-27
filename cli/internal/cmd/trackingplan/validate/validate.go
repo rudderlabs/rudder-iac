@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/spf13/cobra"
 )
 
@@ -41,9 +40,9 @@ func NewCmdTPValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p := project.New(location, deps.Providers().DataCatalog)
+			p := deps.NewDataCatalogProject()
 
-			if err := p.Load(); err != nil {
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
 

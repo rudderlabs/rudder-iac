@@ -2,7 +2,6 @@ package provider_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -35,8 +34,8 @@ func TestExamplesSync(t *testing.T) {
 		provider := example.NewProvider(b)
 
 		// Load specs from testdata directory
-		proj := project.New("dummy/path", provider, project.WithLoader(&mockLoader{specs: specs}))
-		err := proj.Load()
+		proj := project.New(provider, project.WithLoader(&mockLoader{specs: specs}))
+		err := proj.Load("dummy/path")
 		require.NoError(t, err, "Failed to load project specs")
 		// Create syncer and sync the project resource graph to the backend
 		targetGraph, err := proj.ResourceGraph()
@@ -141,14 +140,10 @@ type mockLoader struct {
 	specs map[string]string
 }
 
-func (m *mockLoader) Load(_ string) (map[string]*specs.Spec, error) {
-	s := make(map[string]*specs.Spec, len(m.specs))
+func (m *mockLoader) Load(_ string) (map[string]*specs.RawSpec, error) {
+	s := make(map[string]*specs.RawSpec, len(m.specs))
 	for p, specStr := range m.specs {
-		spec, err := specs.New([]byte(specStr))
-		if err != nil {
-			return nil, fmt.Errorf("parsing spec '%s': %w", p, err)
-		}
-		s[p] = spec
+		s[p] = &specs.RawSpec{Data: []byte(specStr)}
 	}
 	return s, nil
 }
