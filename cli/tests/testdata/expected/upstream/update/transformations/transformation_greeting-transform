@@ -1,0 +1,18 @@
+{
+    "id": "38eVmTk7eJQ4KzAcowplKjslOwe",
+    "versionId": "38eW7qru32TGoGhMgQaVEiuL1mo",
+    "name": "Greeting Transform",
+    "description": "Uses library to greet user by name - updated",
+    "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+    "codeVersion": "1",
+    "language": "javascript",
+    "createdBy": "2N3mvKrWo8SQynb0ppqu5XX31mi",
+    "createdAt": "2026-01-23T09:23:02.099Z",
+    "updatedAt": "2026-01-23T09:25:53.549Z",
+    "secretsVersion": null,
+    "destinations": [],
+    "destinationTransformations": [],
+    "config": {},
+    "liveEventsConfig": {},
+    "secrets": []
+}
