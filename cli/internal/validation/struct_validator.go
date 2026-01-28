@@ -14,30 +14,28 @@ import (
 // arrayIndexRegex matches array indices like [0], [1], etc.
 var arrayIndexRegex = regexp.MustCompile(`\[(\d+)\]`)
 
-func tagNameFunc() func(fld reflect.StructField) string {
+var tagNameFunc = func(fld reflect.StructField) string {
 
-	return func(fld reflect.StructField) string {
-		var (
-			ymlTag, ymlOK   = fld.Tag.Lookup("yaml")
-			jsonTag, jsonOK = fld.Tag.Lookup("json")
-		)
+	var (
+		ymlTag, ymlOK   = fld.Tag.Lookup("yaml")
+		jsonTag, jsonOK = fld.Tag.Lookup("json")
+	)
 
-		// By default, the field name to be used
-		// is the lowercase of the struct's FieldName
-		name := strings.ToLower(fld.Name)
+	// By default, the field name to be used
+	// is the lowercase of the struct's FieldName
+	name := strings.ToLower(fld.Name)
 
-		if ymlOK {
-			name = strings.SplitN(ymlTag, ",", 2)[0]
-		}
-
-		// If both JSON and YAML tags are present,
-		// then JSON tag overrides the YAML tag
-		if jsonOK {
-			name = strings.SplitN(jsonTag, ",", 2)[0]
-		}
-
-		return name
+	if ymlOK {
+		name = strings.SplitN(ymlTag, ",", 2)[0]
 	}
+
+	// If both JSON and YAML tags are present,
+	// then JSON tag overrides the YAML tag
+	if jsonOK {
+		name = strings.SplitN(jsonTag, ",", 2)[0]
+	}
+
+	return name
 }
 
 // NamespaceToJSONPointer converts validator's StructNamespace to JSON Pointer format.
@@ -62,7 +60,7 @@ func ValidateStruct(data any, basePath string) ([]rules.ValidationResult, error)
 	results := []rules.ValidationResult{}
 
 	v := validator.New()
-	v.RegisterTagNameFunc(tagNameFunc())
+	v.RegisterTagNameFunc(tagNameFunc)
 
 	if err := v.Struct(data); err != nil {
 

@@ -212,7 +212,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	// At this point, rawspecs are successfully parsed as well and information
 	// parsed gets augmented to the base struct
-	syntaxDiags, err := engine.ValidateSyntax(ctx, rawSpecs)
+	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
 	if err != nil {
 		return fmt.Errorf("syntactic validation: %w", err)
 	}
