@@ -157,12 +157,13 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		v0Type         string
-		v0Config       map[string]interface{}
-		expectedType   string
-		expectedTypes  []string
-		expectedConfig map[string]interface{}
+		name              string
+		v0Type            string
+		v0Config          map[string]interface{}
+		expectedType      string
+		expectedTypes     []string
+		expectedItemTypes []string
+		expectedConfig    map[string]interface{}
 	}{
 		{
 			name:           "single primitive type",
@@ -213,12 +214,13 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 			expectedConfig: nil,
 		},
 		{
-			name:           "array type with itemTypes config",
-			v0Type:         "array",
-			v0Config:       map[string]interface{}{"itemTypes": []interface{}{"string", "number"}},
-			expectedType:   "array",
-			expectedTypes:  nil,
-			expectedConfig: map[string]interface{}{"item_types": []interface{}{"string", "number"}},
+			name:              "array type with itemTypes config",
+			v0Type:            "array",
+			v0Config:          map[string]interface{}{"itemTypes": []interface{}{"string", "number"}},
+			expectedType:      "array",
+			expectedTypes:     nil,
+			expectedItemTypes: []string{"string", "number"},
+			expectedConfig:    map[string]interface{}{},
 		},
 		{
 			name:           "object type with nested config",
@@ -254,6 +256,7 @@ func TestPropertyV1_FromV0_TypeConversion(t *testing.T) {
 
 			assert.Equal(t, tt.expectedType, v1.Type, "Type field mismatch")
 			assert.Equal(t, tt.expectedTypes, v1.Types, "Types field mismatch")
+			assert.Equal(t, tt.expectedItemTypes, v1.ItemTypes, "ItemTypes field mismatch")
 			assert.Equal(t, tt.expectedConfig, v1.Config, "Config field mismatch")
 			assert.Equal(t, v0.LocalID, v1.LocalID)
 			assert.Equal(t, v0.Name, v1.Name)

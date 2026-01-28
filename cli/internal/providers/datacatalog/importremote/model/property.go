@@ -76,10 +76,7 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 		if customTypeRef == "" {
 			return fmt.Errorf("resolved custom type reference is empty")
 		}
-
-		p.PropertyV1.Config = map[string]interface{}{
-			"item_types": []interface{}{customTypeRef},
-		}
+		p.PropertyV1.ItemType = customTypeRef
 	case strings.Contains(upstream.Type, ","):
 		p.PropertyV1.Types = utils.SplitMultiTypeString(upstream.Type)
 		p.PropertyV1.Type = ""

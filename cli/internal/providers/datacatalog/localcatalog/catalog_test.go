@@ -1469,14 +1469,17 @@ func TestDataCatalog_MigrateSpec(t *testing.T) {
 		assert.NotContains(t, config2, "multipleOf", "camelCase multipleOf should be converted")
 		assert.Equal(t, float64(5), config2["multiple_of"], "multipleOf should be converted to multiple_of")
 
-		// Verify array property config keys are converted
+		// Verify array property - itemTypes should be extracted to property-level item_types field
 		arrayProp, ok := propertiesSpec[2].(map[string]interface{})
 		require.True(t, ok)
-		config3, ok := arrayProp["config"].(map[string]interface{})
-		require.True(t, ok)
-		assert.NotContains(t, config3, "itemTypes", "camelCase itemTypes should be converted")
-		itemTypes, ok := config3["item_types"].([]interface{})
-		require.True(t, ok, "itemTypes should be converted to item_types")
+		// item_types should NOT be in config anymore - it's now a property-level field
+		if config3, ok := arrayProp["config"].(map[string]interface{}); ok {
+			assert.NotContains(t, config3, "itemTypes", "camelCase itemTypes should not be in config")
+			assert.NotContains(t, config3, "item_types", "item_types should be extracted to property level, not in config")
+		}
+		// Verify item_types is at property level
+		itemTypes, ok := arrayProp["item_types"].([]interface{})
+		require.True(t, ok, "item_types should be at property level")
 		assert.Equal(t, []interface{}{"string", "integer"}, itemTypes)
 
 		// Verify enum property config keys remain unchanged

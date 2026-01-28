@@ -110,36 +110,47 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				}
 			}
 
-			// Check for custom type references in item_types when property is of type array
-			if prop.Type == "array" && prop.Config != nil {
-				if itemTypes, ok := prop.Config["item_types"]; ok {
-					if itemTypesArray, ok := itemTypes.([]any); ok {
-						for idx, itemType := range itemTypesArray {
-							itemTypeStr, ok := itemType.(string)
-							if !ok {
-								continue
-							}
+			// Check for custom type reference in item_type field (single)
+			if prop.ItemType != "" && strings.HasPrefix(prop.ItemType, "#/custom-types/") {
+				matches := catalog.CustomTypeRegex.FindStringSubmatch(prop.ItemType)
+				if len(matches) != 3 {
+					errs = append(errs, ValidationError{
+						Reference: reference,
+						error:     fmt.Errorf("custom type reference in item_type has invalid format. Should be '#/custom-types/<group>/<id>'"),
+					})
+				} else {
+					// Validate custom type existence
+					customTypeGroup, customTypeID := matches[1], matches[2]
+					if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("custom type reference '%s' in item_type not found in catalog", prop.ItemType),
+						})
+					}
+				}
+			}
 
-							// Check if the item type is a custom type reference
-							if strings.HasPrefix(itemTypeStr, "#/custom-types/") {
-								matches := catalog.CustomTypeRegex.FindStringSubmatch(itemTypeStr)
-								if len(matches) != 3 {
-									errs = append(errs, ValidationError{
-										Reference: reference,
-										error:     fmt.Errorf("custom type reference in item_types at idx: %d has invalid format. Should be '#/custom-types/<group>/<id>'", idx),
-									})
-									continue
-								}
+			// Check for custom type references in item_types field (multiple)
+			if len(prop.ItemTypes) > 0 {
+				for idx, itemType := range prop.ItemTypes {
+					// Check if the item type is a custom type reference
+					if strings.HasPrefix(itemType, "#/custom-types/") {
+						matches := catalog.CustomTypeRegex.FindStringSubmatch(itemType)
+						if len(matches) != 3 {
+							errs = append(errs, ValidationError{
+								Reference: reference,
+								error:     fmt.Errorf("custom type reference in item_types at idx: %d has invalid format. Should be '#/custom-types/<group>/<id>'", idx),
+							})
+							continue
+						}
 
-								// Validate custom type existence
-								customTypeGroup, customTypeID := matches[1], matches[2]
-								if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
-									errs = append(errs, ValidationError{
-										Reference: reference,
-										error:     fmt.Errorf("custom type reference '%s' in item_types at idx: %d not found in catalog", itemTypeStr, idx),
-									})
-								}
-							}
+						// Validate custom type existence
+						customTypeGroup, customTypeID := matches[1], matches[2]
+						if customType := dc.CustomType(customTypeGroup, customTypeID); customType == nil {
+							errs = append(errs, ValidationError{
+								Reference: reference,
+								error:     fmt.Errorf("custom type reference '%s' in item_types at idx: %d not found in catalog", itemType, idx),
+							})
 						}
 					}
 				}

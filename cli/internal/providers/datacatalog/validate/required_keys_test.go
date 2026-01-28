@@ -20,7 +20,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		errorContains  string
 	}{
 		{
-			name: "valid property with single custom type in itemTypes",
+			name: "valid property with single custom type in item_type",
 			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
@@ -28,16 +28,14 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Name:        "Array Property",
 						Description: "Property with array type",
 						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{"#/custom-types/test-group/TestType"},
-						},
+						ItemType:    "#/custom-types/test-group/TestType",
 					},
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
-			name: "invalid property with multiple types including custom type in itemTypes",
+			name: "invalid property with multiple types including custom type in item_types",
 			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
@@ -45,53 +43,15 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Name:        "Array Property",
 						Description: "Property with array type",
 						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{
-								"#/custom-types/test-group/TestType",
-								"string",
-							},
+						ItemTypes: []string{
+							"#/custom-types/test-group/TestType",
+							"string",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
 			errorContains:  "cannot be paired with other types",
-		},
-		{
-			name: "invalid property with non-array itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": "string", // Not an array
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "item_types must be an array",
-		},
-		{
-			name: "invalid property with non-string item in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{123}, // Not a string
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "must be string value",
 		},
 	}
 
@@ -1210,36 +1170,6 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:         "array with itemTypes as string instead of array - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"item_types": "string",
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "item_types must be an array",
-		},
-		{
-			name:         "array with itemTypes containing mixed types - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"item_types": []any{"object", "string", 456},
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "item_types at index 2 must be a string value",
-		},
-		{
-			name:         "array with itemTypes containing nil - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"item_types": []any{nil},
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "item_types at index 0 must be a string value",
-		},
-		{
 			name:          "empty property type - should not allow",
 			propertyType:  "",
 			config:        map[string]any{},
@@ -1259,7 +1189,31 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			allowed, err := nestedPropertiesAllowed(tc.propertyType, tc.config)
+			// Extract itemType and itemTypes from config for backwards compatibility
+			var itemType string
+			var itemTypes []string
+			if tc.config != nil {
+				if it, ok := tc.config["item_types"]; ok {
+					if itArray, ok := it.([]any); ok {
+						if len(itArray) == 1 {
+							if itStr, ok := itArray[0].(string); ok {
+								itemType = itStr
+							}
+						} else {
+							itemTypes = make([]string, len(itArray))
+							for i, v := range itArray {
+								if str, ok := v.(string); ok {
+									itemTypes[i] = str
+								}
+							}
+						}
+					} else if itStr, ok := it.(string); ok {
+						itemType = itStr
+					}
+				}
+			}
+
+			allowed, err := nestedPropertiesAllowed(tc.propertyType, itemType, itemTypes)
 
 			// Check error expectations
 			if tc.expectError {
