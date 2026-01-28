@@ -3,6 +3,7 @@ package validation
 import (
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,10 +45,13 @@ func TestValidateStruct(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
-	t.Run("pointer to pointer to struct should not panic", func(t *testing.T) {
+	t.Run("pointer to pointer to struct creates an invalid validation error", func(t *testing.T) {
 		s := &TestStruct{Name: "test"}
-		assert.NotPanics(t, func() {
-			ValidateStruct(&s, "")
-		})
+		results, err := ValidateStruct(&s, "")
+		require.Error(t, err)
+
+		var invalidValidationError *validator.InvalidValidationError
+		assert.ErrorAs(t, err, &invalidValidationError)
+		assert.Empty(t, results)
 	})
 }
