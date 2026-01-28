@@ -56,6 +56,10 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return p.dc.LoadLegacySpec(path, s)
 }
 
+func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	return p.dc.MigrateSpec(s)
+}
+
 func (p *Provider) SupportedKinds() []string {
 	return []string{
 		localcatalog.KindProperties,

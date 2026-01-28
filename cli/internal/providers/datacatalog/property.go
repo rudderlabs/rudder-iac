@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/samber/lo"
 )
 
@@ -52,11 +53,16 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources
 	toArgs := state.PropertyArgs{}
 	toArgs.FromResourceData(data)
 
+	config := make(map[string]interface{})
+	for key, value := range toArgs.Config {
+		config[utils.ToCamelCase(key)] = value
+	}
+
 	property, err := p.client.CreateProperty(ctx, catalog.PropertyCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
-		Config:      toArgs.Config,
+		Config:      config,
 		ExternalId:  ID,
 	})
 
@@ -89,11 +95,16 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 	oldState := state.PropertyState{}
 	oldState.FromResourceData(olds)
 
+	config := make(map[string]interface{})
+	for key, value := range toArgs.Config {
+		config[utils.ToCamelCase(key)] = value
+	}
+
 	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &catalog.PropertyUpdate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
-		Config:      toArgs.Config,
+		Config:      config,
 	})
 
 	if err != nil {

@@ -15,13 +15,13 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     map[catalog.EntityGroup][]catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "valid property with single custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -29,7 +29,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Description: "Property with array type",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{"#/custom-types/test-group/TestType"},
+							"item_types": []interface{}{"#/custom-types/test-group/TestType"},
 						},
 					},
 				},
@@ -38,7 +38,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property with multiple types including custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -46,7 +46,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Description: "Property with array type",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{
+							"item_types": []interface{}{
 								"#/custom-types/test-group/TestType",
 								"string",
 							},
@@ -59,7 +59,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property with non-array itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -67,17 +67,17 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Description: "Property with array type",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": "string", // Not an array
+							"item_types": "string", // Not an array
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			errorContains:  "itemTypes must be an array",
+			errorContains:  "item_types must be an array",
 		},
 		{
 			name: "invalid property with non-string item in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "array-prop",
@@ -85,7 +85,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 						Description: "Property with array type",
 						Type:        "array",
 						Config: map[string]interface{}{
-							"itemTypes": []interface{}{123}, // Not a string
+							"item_types": []interface{}{123}, // Not a string
 						},
 					},
 				},
@@ -364,13 +364,13 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     map[catalog.EntityGroup][]catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "property with empty type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID: "prop-without-type",
@@ -382,7 +382,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "valid property name without whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "valid-prop",
@@ -396,7 +396,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with leading whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "leading-space-prop",
@@ -411,7 +411,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "trailing-space-prop",
@@ -426,7 +426,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with both leading and trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "both-space-prop",
@@ -441,7 +441,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with internal spaces (should be valid)",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "internal-space-prop",
@@ -455,7 +455,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "empty property name should trigger mandatory field error, not whitespace error",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "empty-name-prop",
@@ -956,7 +956,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	falseVal := false
 	// Setup test data catalog
 	dc := &catalog.DataCatalog{
-		Properties: map[catalog.EntityGroup][]catalog.Property{
+		Properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 			"test_props": {
 				{
 					LocalID:     "user_id",
@@ -1015,8 +1015,8 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						},
 						Properties: []*catalog.TPRuleProperty{
 							{
-								Ref:      "#/properties/test_props/user_profile",
-								Required: true,
+								Ref:                  "#/properties/test_props/user_profile",
+								Required:             true,
 								AdditionalProperties: &falseVal,
 							},
 						},
@@ -1180,7 +1180,7 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:         "array with itemTypes containing object - should allow",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{"string", "object", "null"},
+				"item_types": []any{"string", "object", "null"},
 			},
 			expectedAllow: true,
 			expectError:   false,
@@ -1189,7 +1189,7 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:         "array with itemTypes containing multiple non-object types - should not allow",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{"string", "number", "boolean"},
+				"item_types": []any{"string", "number", "boolean"},
 			},
 			expectedAllow: false,
 			expectError:   false,
@@ -1212,31 +1212,31 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:         "array with itemTypes as string instead of array - should error",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": "string",
+				"item_types": "string",
 			},
 			expectedAllow: false,
 			expectError:   true,
-			errorContains: "itemTypes must be an array",
+			errorContains: "item_types must be an array",
 		},
 		{
 			name:         "array with itemTypes containing mixed types - should error",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{"object", "string", 456},
+				"item_types": []any{"object", "string", 456},
 			},
 			expectedAllow: false,
 			expectError:   true,
-			errorContains: "itemTypes at index 2 must be a string value",
+			errorContains: "item_types at index 2 must be a string value",
 		},
 		{
 			name:         "array with itemTypes containing nil - should error",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{nil},
+				"item_types": []any{nil},
 			},
 			expectedAllow: false,
 			expectError:   true,
-			errorContains: "itemTypes at index 0 must be a string value",
+			errorContains: "item_types at index 0 must be a string value",
 		},
 		{
 			name:          "empty property type - should not allow",

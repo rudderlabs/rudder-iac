@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 // CustomTypeArgs holds the necessary information to create a custom type
@@ -148,7 +149,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	args.Variants = variants
 
 	// BUGGY CODE TO BE FIXED IN A BETTER
-	itemTypes, ok := args.Config["itemTypes"]
+	itemTypes, ok := args.Config["item_types"]
 	if ok {
 
 		for idx, item := range itemTypes.([]any) {
@@ -163,7 +164,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 				Property: "name",
 			}
 
-			args.Config["itemTypes"] = typesWithPropRef
+			args.Config["item_types"] = typesWithPropRef
 		}
 
 	}
@@ -178,10 +179,11 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 	args.Name = customType.Name
 	args.Description = customType.Description
 	args.Type = customType.Type
-	// Deep copy the config map
+	// Deep copy the config map and convert camelCase keys to snake_case
 	args.Config = make(map[string]any)
 	for key, value := range customType.Config {
-		args.Config[key] = value
+		snakeKey := utils.ToSnakeCase(key)
+		args.Config[snakeKey] = value
 	}
 
 	properties := make([]*CustomTypeProperty, 0, len(customType.Properties))
@@ -229,14 +231,14 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 		urn, err := getURNFromRemoteId(CustomTypeResourceType, id)
 		switch err {
 		case nil:
-			args.Config["itemTypes"] = []any{
+			args.Config["item_types"] = []any{
 				resources.PropertyRef{
 					URN:      urn,
 					Property: "name",
 				},
 			}
 		case resources.ErrRemoteResourceExternalIdNotFound:
-			args.Config["itemTypes"] = []any{nil}
+			args.Config["item_types"] = []any{nil}
 		default:
 			return err
 		}

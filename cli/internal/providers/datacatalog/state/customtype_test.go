@@ -16,9 +16,9 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 		Description: "Custom type for email validation",
 		Type:        "string",
 		Config: map[string]any{
-			"format":    "email",
-			"minLength": 5,
-			"maxLength": 255,
+			"format":     "email",
+			"min_length": 5,
+			"max_length": 255,
 		},
 		Properties: []*CustomTypeProperty{
 			{
@@ -43,8 +43,8 @@ func TestCustomTypeArgsToResourceData(t *testing.T) {
 
 	config := data["config"].(map[string]any)
 	assert.Equal(t, "email", config["format"])
-	assert.Equal(t, 5, config["minLength"])
-	assert.Equal(t, 255, config["maxLength"])
+	assert.Equal(t, 5, config["min_length"])
+	assert.Equal(t, 255, config["max_length"])
 
 	properties := data["properties"].([]map[string]any)
 	assert.Len(t, properties, 2)
@@ -62,9 +62,9 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 		"description": "Custom type for email validation",
 		"type":        "string",
 		"config": map[string]any{
-			"format":    "email",
-			"minLength": 5,
-			"maxLength": 255,
+			"format":     "email",
+			"min_length": 5,
+			"max_length": 255,
 		},
 		"properties": []map[string]any{
 			{
@@ -91,8 +91,8 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 	assert.Equal(t, "string", args.Type)
 
 	assert.Equal(t, "email", args.Config["format"])
-	assert.Equal(t, args.Config["minLength"], 5)
-	assert.Equal(t, args.Config["maxLength"], 255)
+	assert.Equal(t, args.Config["min_length"], 5)
+	assert.Equal(t, args.Config["max_length"], 255)
 
 	assert.Len(t, args.Properties, 2)
 	assert.Equal(t, "prop_val_1", args.Properties[0].ID)

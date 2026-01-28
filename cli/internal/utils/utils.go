@@ -21,3 +21,56 @@ func SortLexicographically(items []any) {
 		return items[i].(string) < items[j].(string)
 	})
 }
+
+// ToSnakeCase converts a camelCase or PascalCase string to snake_case.
+// Examples:
+//   - minLength -> min_length
+//   - maxLength -> max_length
+//   - ExclusiveMaximum -> exclusive_maximum
+//   - enum -> enum (already lowercase)
+func ToSnakeCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	for i, r := range s {
+		// If uppercase and not first character
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			// Convert to lowercase
+			result = append(result, r+32)
+		} else {
+			result = append(result, r)
+		}
+	}
+
+	return string(result)
+}
+
+func ToCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	capitalizeNext := false
+	for _, r := range s {
+		if r == '_' {
+			capitalizeNext = true
+			continue
+		}
+		if capitalizeNext && r >= 'a' && r <= 'z' {
+			// Convert to uppercase
+			result = append(result, r-32)
+			capitalizeNext = false
+		} else {
+			result = append(result, r)
+			capitalizeNext = false
+		}
+	}
+
+	return string(result)
+}
