@@ -9,25 +9,25 @@ import (
 
 // Metadata represents the common metadata fields for all specs
 type Metadata struct {
-	Name   string                    `yaml:"name" json:"name,omitempty"`
+	Name   string                    `yaml:"name" json:"name,omitempty" validate:"required"`
 	Import *WorkspacesImportMetadata `yaml:"import" json:"import,omitempty"`
 }
 
 // WorkspacesImportMetadata holds import spec metadata for a set of workspaces
 type WorkspacesImportMetadata struct {
-	Workspaces []WorkspaceImportMetadata `yaml:"workspaces" json:"workspaces,omitempty"`
+	Workspaces []WorkspaceImportMetadata `yaml:"workspaces" json:"workspaces,omitempty" validate:"dive"`
 }
 
 // WorkspaceImportMetadata holds import spec metadata for a single workspace
 type WorkspaceImportMetadata struct {
-	WorkspaceID string      `yaml:"workspace_id" json:"workspace_id"`
-	Resources   []ImportIds `yaml:"resources" json:"resources,omitempty"`
+	WorkspaceID string      `yaml:"workspace_id" json:"workspace_id" validate:"required"`
+	Resources   []ImportIds `yaml:"resources" json:"resources,omitempty" validate:"dive"`
 }
 
 // ImportIds holds the local and remote IDs for a resource to be imported, as specified in import spec metadata
 type ImportIds struct {
-	LocalID  string `yaml:"local_id" json:"local_id"`
-	RemoteID string `yaml:"remote_id" json:"remote_id"`
+	LocalID  string `yaml:"local_id" json:"local_id" validate:"required"`
+	RemoteID string `yaml:"remote_id" json:"remote_id" validate:"required"`
 }
 
 // Validate checks that all required fields are present in the Metadata

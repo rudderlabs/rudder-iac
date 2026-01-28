@@ -8,6 +8,8 @@ import (
 )
 
 func TestSpecSyntaxValidRule_Validate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		ctx            *rules.ValidationContext
@@ -88,6 +90,8 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 }
 
 func TestSpecSyntaxValidRule_Metadata(t *testing.T) {
+	t.Parallel()
+
 	rule := NewSpecSyntaxValidRule()
 
 	assert.Equal(t, "project/spec-syntax-valid", rule.ID())
