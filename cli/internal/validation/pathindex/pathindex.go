@@ -1,27 +1,36 @@
 package pathindex
 
 import (
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
 
-type ErrPathNotFound struct {
-	Path string
-}
-
-func (e *ErrPathNotFound) Error() string {
-	return fmt.Sprintf("path not found: %s", e.Path)
-}
+var ErrPathNotFound = errors.New("path not found")
 
 // PathIndexer defines the interface for position lookup
 type PathIndexer interface {
+	// PositionLookup returns the position for an exact JSON Pointer path.
+	// Returns ErrPathNotFound if the path doesn't exist.
 	PositionLookup(path string) (*Position, error)
+
+	// NearestPosition returns the position for the given path or its nearest ancestor.
+	// It tries the exact path first, then walks up the hierarchy until a match is found.
+	// For example: /a/b/c -> /a/b -> /a -> /
+	// Always succeeds since "/" (root) is guaranteed to exist at line 1, column 1.
+	NearestPosition(path string) *Position
 }
 
 // PathIndex stores mapping from JSON Pointer paths to file positions
 type PathIndex struct {
 	positions map[string]Position
+}
+
+var StartingPosition = Position{
+	Line:     1,
+	Column:   1,
+	LineText: "",
 }
 
 // Position represents a location in a YAML file for error reporting
@@ -42,6 +51,10 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 		positions: make(map[string]Position),
 	}
 
+	// Record root position "/" at line 1, column 1
+	// This serves as the ultimate fallback for NearestPosition
+	pi.positions["/"] = StartingPosition
+
 	// Walk the YAML tree and build the index
 	pi.walkNode(&node, "", nil)
 	return pi, nil
@@ -52,9 +65,47 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 func (idx *PathIndex) PositionLookup(path string) (*Position, error) {
 	pos, ok := idx.positions[path]
 	if !ok {
-		return nil, &ErrPathNotFound{Path: path}
+		return nil, fmt.Errorf("%w: %s", ErrPathNotFound, path)
 	}
 	return &pos, nil
+}
+
+// NearestPosition returns the position for the given path or its nearest ancestor.
+// It tries the exact path first, then walks up the hierarchy until a match is found.
+// For example: /a/b/c -> /a/b -> /a -> /
+// Always succeeds since "/" (root) is guaranteed to exist at line 1, column 1.
+func (idx *PathIndex) NearestPosition(path string) *Position {
+	// Try exact match first
+	if pos, err := idx.PositionLookup(path); err == nil {
+		return pos
+	}
+
+	// Walk up the path hierarchy
+	currentPath := path
+	for currentPath != "" && currentPath != "/" {
+		// Find the last slash and truncate
+		lastSlash := -1
+		for i := len(currentPath) - 1; i >= 0; i-- {
+			if currentPath[i] == '/' {
+				lastSlash = i
+				break
+			}
+		}
+
+		if lastSlash <= 0 {
+			// Reached root or no more slashes
+			break
+		}
+
+		currentPath = currentPath[:lastSlash]
+		if pos, err := idx.PositionLookup(currentPath); err == nil {
+			return pos
+		}
+	}
+
+	// Fall back to root position (always exists)
+	pos, _ := idx.PositionLookup("/")
+	return pos
 }
 
 // walkNode recursively walks the YAML node tree and records positions
@@ -175,7 +226,11 @@ func extractLineText(node *yaml.Node, key *yaml.Node) string {
 		if key != nil {
 			return fmt.Sprintf("%s: {...}", key.Value)
 		}
-		return "{...}"
+
+		// Array element (no key) - show first property to help identify the element
+		firstKey := node.Content[0]
+		firstVal := node.Content[1]
+		return fmt.Sprintf("- %s: %s", firstKey.Value, firstVal.Value)
 
 	case yaml.SequenceNode:
 		// Show that this is an array

@@ -2,6 +2,7 @@ package project_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,11 +16,11 @@ import (
 
 // MockLoader is a mock implementation of the project.Loader interface for testing.
 type MockLoader struct {
-	LoadFunc func(location string) (map[string]*specs.Spec, error)
+	LoadFunc func(location string) (map[string]*specs.RawSpec, error)
 }
 
 // Load calls the mock LoadFunc.
-func (m *MockLoader) Load(location string) (map[string]*specs.Spec, error) {
+func (m *MockLoader) Load(location string) (map[string]*specs.RawSpec, error) {
 	if m.LoadFunc != nil {
 		return m.LoadFunc(location)
 	}
@@ -31,17 +32,26 @@ func TestNewProject_Load_Error(t *testing.T) {
 
 	provider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
-	p := project.New("test_location", provider, project.WithLoader(mockLoader))
+	p := project.New(provider, project.WithLoader(mockLoader))
 
 	assert.NotNil(t, p)
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+	mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
 		assert.Equal(t, "test_location", location)
 		return nil, errors.New("custom loader called")
 	}
-	err := p.Load()
+	err := p.Load("test_location")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "custom loader called")
 }
+
+// func TestSomething(t *testing.T) {
+// 	spec := specs.Spec{Kind: "properties", Version: "rudder/v0.1"}
+// 	mockProvider := testutils.NewMockProvider(nil, nil)
+
+// 	proj := project.New(mockProvider)
+// 	proj.Load("")
+
+// }
 
 func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
@@ -49,18 +59,18 @@ func TestProject_Load_Success(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
-	expectedSpecs := map[string]*specs.Spec{
-		"path/to/spec1.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
-		"path/to/spec2.yaml": {Kind: "Destination", Version: specs.SpecVersionV0_1},
+	expectedSpecs := map[string]*specs.RawSpec{
+		"path/to/spec1.yaml": {Data: []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		"path/to/spec2.yaml": {Data: []byte("kind: Destination\nversion: rudder/0.1\nmetadata:\n name: abc\nspec:\n  k: v")},
 	}
 
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+	mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
 		return expectedSpecs, nil
 	}
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(mockProvider.LoadLegacySpecCalledWithArgs), "LoadLegacySpec should be called for each spec")
@@ -87,20 +97,20 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
-	validSpecs := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
+	validSpecs := map[string]*specs.RawSpec{
+		"path/to/spec.yaml": {Data: []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: my_source\nspec:\n  k: v")},
 	}
 
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+	mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
 		return validSpecs, nil
 	}
 
 	expectedErr := errors.New("provider LoadSpec failed")
 	mockProvider.LoadLegacySpecErr = expectedErr
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "provider failed to load spec from path path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
@@ -112,13 +122,13 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 	mockProvider := testutils.NewMockProvider(nil, nil)
 	mockLoader := &MockLoader{}
 
-	proj := project.New("test_dir", mockProvider, project.WithLoader(mockLoader))
+	proj := project.New(mockProvider, project.WithLoader(mockLoader))
 
-	validSpecs := map[string]*specs.Spec{
-		"path/to/spec.yaml": {Kind: "Source", Version: specs.SpecVersionV0_1},
+	validSpecs := map[string]*specs.RawSpec{
+		"path/to/spec.yaml": {Data: []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: my_source\nspec:\n  k: v")},
 	}
 
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+	mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
 		return validSpecs, nil
 	}
 
@@ -126,7 +136,7 @@ func TestProject_Load_ProviderValidateError(t *testing.T) {
 	expectedErr := errors.New("provider Validate failed")
 	mockProvider.ValidateErr = expectedErr
 
-	err := proj.Load()
+	err := proj.Load("test_dir")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, expectedErr))
 	assert.Equal(t, 1, mockProvider.ValidateCalledCount)
@@ -136,7 +146,7 @@ func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
-	proj := project.New("test_dir", mockProvider) // Loader doesn't matter for this test
+	proj := project.New(mockProvider) // Loader doesn't matter for this test
 
 	expectedGraph := &resources.Graph{}
 	mockProvider.GetResourceGraphVal = expectedGraph
@@ -152,7 +162,7 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
-	proj := project.New("test_dir", mockProvider)
+	proj := project.New(mockProvider)
 
 	expectedErr := errors.New("GetResourceGraph failed")
 	mockProvider.GetResourceGraphVal = nil
@@ -244,21 +254,22 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 				opts = append(opts, project.WithV1SpecSupport())
 			}
 
-			proj := project.New("test_dir", mockProvider, opts...)
+			proj := project.New(mockProvider, opts...)
 
-			testSpec := &specs.Spec{
-				Kind:    "Source",
-				Version: tc.specVersion,
-			}
-			specsMap := map[string]*specs.Spec{
-				"path/to/spec.yaml": testSpec,
+			specsMap := map[string]*specs.RawSpec{
+				"path/to/spec.yaml": {
+					Data: fmt.Appendf(
+						nil,
+						"kind: Source\nversion: %s\nmetadata:\n  name: my_source\nspec:\n  k: v",
+						tc.specVersion,
+					)},
 			}
 
-			mockLoader.LoadFunc = func(location string) (map[string]*specs.Spec, error) {
+			mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
 				return specsMap, nil
 			}
 
-			err := proj.Load()
+			err := proj.Load("test_dir")
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -271,12 +282,18 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 
 			// Verify LoadSpec was called (or not)
 			loadSpecCalled := len(mockProvider.LoadSpecCalledWithArgs) > 0
-			assert.Equal(t, tc.expectLoadSpecCalled, loadSpecCalled,
+			assert.Equal(
+				t,
+				tc.expectLoadSpecCalled,
+				loadSpecCalled,
 				"LoadSpec called mismatch: expected %v, got %v", tc.expectLoadSpecCalled, loadSpecCalled)
 
 			// Verify LoadLegacySpec was called (or not)
 			loadLegacySpecCalled := len(mockProvider.LoadLegacySpecCalledWithArgs) > 0
-			assert.Equal(t, tc.expectLoadLegacySpecCalled, loadLegacySpecCalled,
+			assert.Equal(
+				t,
+				tc.expectLoadLegacySpecCalled,
+				loadLegacySpecCalled,
 				"LoadLegacySpec called mismatch: expected %v, got %v", tc.expectLoadLegacySpecCalled, loadLegacySpecCalled)
 		})
 	}

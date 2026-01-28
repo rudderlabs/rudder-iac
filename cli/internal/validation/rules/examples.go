@@ -15,6 +15,6 @@ type Examples struct {
 
 // HasExamples returns true if at least one example (valid or invalid) is provided.
 // This is useful for checking if a rule has documentation examples available.
-func (e *Examples) HasExamples() bool {
+func (e Examples) HasExamples() bool {
 	return len(e.Valid) > 0 || len(e.Invalid) > 0
 }

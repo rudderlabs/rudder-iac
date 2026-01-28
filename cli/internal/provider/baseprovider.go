@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type Handler interface {
@@ -31,6 +32,20 @@ type Handler interface {
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
 	) ([]writer.FormattableEntity, error)
+}
+
+// RuleHandler is an optional interface that handlers can implement
+// to contribute validation rules for their resource type. Handlers that
+// implement this interface will have their rules aggregated by the provider.
+//
+// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
+// Example: "retl/models/valid-sql"
+type RuleHandler interface {
+	// SyntacticRules returns rules for pre-graph validation of this resource type
+	SyntacticRules() []rules.Rule
+
+	// SemanticRules returns rules for post-graph validation of this resource type
+	SemanticRules() []rules.Rule
 }
 
 type BaseProvider struct {
@@ -220,4 +235,41 @@ func (p *BaseProvider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
+}
+
+// GetHandler returns the handler for a given resource type
+func (p *BaseProvider) GetHandler(resourceType string) (Handler, bool) {
+	handler, ok := p.handlers[resourceType]
+	return handler, ok
+}
+
+// ConsolidateSync default implementation (no-op)
+// Providers that need post-execution consolidation should override this method
+func (p *BaseProvider) ConsolidateSync(ctx context.Context, st *state.State) error {
+	// Default: no consolidation needed
+	return nil
+}
+
+// SyntacticRules aggregates syntactic rules from all handlers implementing RuleHandler.
+// Handlers that don't implement RuleHandler are skipped.
+func (p *BaseProvider) SyntacticRules() []rules.Rule {
+	var allRules []rules.Rule
+	for _, handler := range p.handlers {
+		if rh, ok := handler.(RuleHandler); ok {
+			allRules = append(allRules, rh.SyntacticRules()...)
+		}
+	}
+	return allRules
+}
+
+// SemanticRules aggregates semantic rules from all handlers implementing RuleHandler.
+// Handlers that don't implement RuleHandler are skipped.
+func (p *BaseProvider) SemanticRules() []rules.Rule {
+	var allRules []rules.Rule
+	for _, handler := range p.handlers {
+		if rh, ok := handler.(RuleHandler); ok {
+			allRules = append(allRules, rh.SemanticRules()...)
+		}
+	}
+	return allRules
 }
