@@ -183,6 +183,30 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to resolve ref to the custom type urn")
 	})
+
+	t.Run("property with multiple types", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.PropertyV1{
+			LocalID:     "test-multi-type",
+			Name:        "Test Multi Type",
+			Description: "A property with multiple types",
+			Types:       []string{"string", "number", "boolean"},
+		}
+
+		urnFromRef := func(string) string {
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+		assert.Equal(t, "Test Multi Type", args.Name)
+		assert.Equal(t, "A property with multiple types", args.Description)
+		
+		// Type should be comma-separated sorted string
+		assert.Equal(t, "boolean,number,string", args.Type)
+	})
 }
 
 func TestPropertyState_ResourceData(t *testing.T) {

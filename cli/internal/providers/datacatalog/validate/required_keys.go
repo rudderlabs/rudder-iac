@@ -45,9 +45,26 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		for _, prop := range props {
 			reference := fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID)
 
+			// Check mandatory fields - either type or types must be present
 			if prop.Name == "" || prop.LocalID == "" {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id, name and type fields on property are mandatory"),
+					error:     fmt.Errorf("id and name fields on property are mandatory"),
+					Reference: reference,
+				})
+			}
+
+			// Validate mutual exclusivity of type and types fields
+			hasType := prop.Type != ""
+			hasTypes := len(prop.Types) > 0
+			
+			if !hasType && !hasTypes {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("either 'type' or 'types' field must be specified"),
+					Reference: reference,
+				})
+			} else if hasType && hasTypes {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("'type' and 'types' fields are mutually exclusive, only one can be specified"),
 					Reference: reference,
 				})
 			}
@@ -60,44 +77,66 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
-			if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
-				if prop.Config != nil {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
-						Reference: reference,
-					})
-				}
-
-			}
-
-			// Validate array type properties with custom type references in item_types
-			if prop.Type == "array" && prop.Config != nil {
-				if itemTypes, ok := prop.Config["item_types"]; ok {
-					itemTypesArray, ok := itemTypes.([]any)
-					if !ok {
+			// Validate types array contains only valid primitive types (no custom types or array/object)
+			if hasTypes {
+				typeSet := make(map[string]bool)
+				for idx, typeVal := range prop.Types {
+					// Check for invalid type
+					if !slices.Contains(ValidTypes, typeVal) {
 						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("item_types must be an array"),
+							error:     fmt.Errorf("types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
 							Reference: reference,
 						})
-						continue
 					}
+					// Check for duplicates
+					if typeSet[typeVal] {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("duplicate type '%s' found in types array", typeVal),
+							Reference: reference,
+						})
+					}
+					typeSet[typeVal] = true
+				}
+			} else {
+				// Validate single type field
+				if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
+					if prop.Config != nil {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+							Reference: reference,
+						})
+					}
+				}
 
-					for idx, itemType := range itemTypesArray {
-						val, ok := itemType.(string)
+				// Validate array type properties with custom type references in item_types
+				if prop.Type == "array" && prop.Config != nil {
+					if itemTypes, ok := prop.Config["item_types"]; ok {
+						itemTypesArray, ok := itemTypes.([]any)
 						if !ok {
 							errors = append(errors, ValidationError{
-								error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
+								error:     fmt.Errorf("item_types must be an array"),
 								Reference: reference,
 							})
 							continue
 						}
 
-						if catalog.CustomTypeRegex.Match([]byte(val)) {
-							if len(itemTypesArray) != 1 {
+						for idx, itemType := range itemTypesArray {
+							val, ok := itemType.(string)
+							if !ok {
 								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
+									error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
 									Reference: reference,
 								})
+								continue
+							}
+
+							if catalog.CustomTypeRegex.Match([]byte(val)) {
+								if len(itemTypesArray) != 1 {
+									errors = append(errors, ValidationError{
+										error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
+										Reference: reference,
+									})
+								}
 							}
 						}
 					}

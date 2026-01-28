@@ -98,6 +98,18 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				}
 			}
 
+			// Validate types array - should not contain custom type references
+			if len(prop.Types) > 0 {
+				for idx, typeVal := range prop.Types {
+					if strings.HasPrefix(typeVal, "#/custom-types/") {
+						errs = append(errs, ValidationError{
+							Reference: reference,
+							error:     fmt.Errorf("types[%d]: custom type references are not allowed in types array, use single 'type' field for custom types", idx),
+						})
+					}
+				}
+			}
+
 			// Check for custom type references in item_types when property is of type array
 			if prop.Type == "array" && prop.Config != nil {
 				if itemTypes, ok := prop.Config["item_types"]; ok {
