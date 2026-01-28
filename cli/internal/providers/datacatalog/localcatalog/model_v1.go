@@ -15,6 +15,8 @@ type PropertyV1 struct {
 	Description string                 `mapstructure:"description,omitempty" json:"description"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type"`
 	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
+	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
+	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`
 	Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
 }
 
@@ -37,6 +39,31 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 		// Single type - keep as-is
 		p.Type = v0.Type
 		p.Types = nil
+	}
+
+	// Extract itemTypes from config and move to property-level fields
+	if p.Config != nil {
+		if itemTypes, ok := p.Config["item_types"]; ok {
+			if itemTypesArray, ok := itemTypes.([]interface{}); ok {
+				// Check if single or multiple item types
+				if len(itemTypesArray) == 1 {
+					// Single item type
+					if itemTypeStr, ok := itemTypesArray[0].(string); ok {
+						p.ItemType = itemTypeStr
+					}
+				} else if len(itemTypesArray) > 1 {
+					// Multiple item types
+					p.ItemTypes = make([]string, len(itemTypesArray))
+					for i, item := range itemTypesArray {
+						if itemStr, ok := item.(string); ok {
+							p.ItemTypes[i] = itemStr
+						}
+					}
+				}
+				// Remove item_types from config after migration
+				delete(p.Config, "item_types")
+			}
+		}
 	}
 
 	return nil

@@ -153,11 +153,16 @@ func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources
 	if toArgs.DiffUpstream(property) {
 		p.log.Debug("property has differences, updating", "id", ID, "remoteId", remoteId)
 
+		config := make(map[string]interface{})
+		for key, value := range toArgs.Config {
+			config[utils.ToCamelCase(key)] = value
+		}
+
 		property, err = p.client.UpdateProperty(ctx, remoteId, &catalog.PropertyUpdate{
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type.(string),
-			Config:      toArgs.Config,
+			Config:      config,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating property during import: %w", err)

@@ -69,6 +69,16 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
+			// Validate mutual exclusivity of item_type and item_types fields
+			hasItemType := prop.ItemType != ""
+			hasItemTypes := len(prop.ItemTypes) > 0
+			if hasItemType && hasItemTypes {
+				errors = append(errors, ValidationError{
+					error:     fmt.Errorf("'item_type' and 'item_types' fields are mutually exclusive, only one can be specified"),
+					Reference: reference,
+				})
+			}
+
 			// Validate property name doesn't have leading or trailing whitespace
 			if prop.Name != strings.TrimSpace(prop.Name) {
 				errors = append(errors, ValidationError{
@@ -108,35 +118,38 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 					}
 				}
 
-				// Validate array type properties with custom type references in item_types
-				if prop.Type == "array" && prop.Config != nil {
-					if itemTypes, ok := prop.Config["item_types"]; ok {
-						itemTypesArray, ok := itemTypes.([]any)
-						if !ok {
+				// Validate item_type field (single item type)
+				if prop.ItemType != "" {
+					// If it's a custom type reference, don't validate it here (will be validated in refs.go)
+					if !catalog.CustomTypeRegex.Match([]byte(prop.ItemType)) {
+						// Validate it's a valid type
+						if !slices.Contains(ValidTypes, prop.ItemType) {
 							errors = append(errors, ValidationError{
-								error:     fmt.Errorf("item_types must be an array"),
+								error:     fmt.Errorf("item_type '%s' is invalid, valid type values are: %s", prop.ItemType, strings.Join(ValidTypes, ", ")),
 								Reference: reference,
 							})
-							continue
 						}
+					}
+				}
 
-						for idx, itemType := range itemTypesArray {
-							val, ok := itemType.(string)
-							if !ok {
+				// Validate item_types field (multiple item types)
+				if len(prop.ItemTypes) > 0 {
+					for idx, itemType := range prop.ItemTypes {
+						// Check if it's a custom type reference
+						if catalog.CustomTypeRegex.Match([]byte(itemType)) {
+							if len(prop.ItemTypes) != 1 {
 								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
+									error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
 									Reference: reference,
 								})
-								continue
 							}
-
-							if catalog.CustomTypeRegex.Match([]byte(val)) {
-								if len(itemTypesArray) != 1 {
-									errors = append(errors, ValidationError{
-										error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
-										Reference: reference,
-									})
-								}
+						} else {
+							// Validate it's a valid type
+							if !slices.Contains(ValidTypes, itemType) {
+								errors = append(errors, ValidationError{
+									error:     fmt.Errorf("item_types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
+									Reference: reference,
+								})
 							}
 						}
 					}
@@ -708,7 +721,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	}
 
 	// validate the property type
-	allowed, err := nestedPropertiesAllowed(property.Type, property.Config)
+	allowed, err := nestedPropertiesAllowed(property.Type, property.ItemType, property.ItemTypes)
 	if !allowed {
 		errs := make([]ValidationError, 0)
 		errs = append(errs, ValidationError{
@@ -756,7 +769,7 @@ func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRu
 	return errors
 }
 
-func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, error) {
+func nestedPropertiesAllowed(propertyType string, itemType string, itemTypes []string) (bool, error) {
 	if strings.Contains(propertyType, "object") && strings.Contains(propertyType, "array") {
 		// type array and object cannot be present together
 		// for a property to allow nesting
@@ -768,29 +781,23 @@ func nestedPropertiesAllowed(propertyType string, config map[string]any) (bool, 
 	}
 
 	if strings.Contains(propertyType, "array") {
-		itemTypes, itemTypesOk := config["item_types"]
-		if !itemTypesOk {
+		// Check if there are any item types specified
+		if itemType == "" && len(itemTypes) == 0 {
 			return true, nil
 		}
 
-		itemTypesArray, ok := itemTypes.([]any)
-		if !ok {
-			return false, fmt.Errorf("item_types must be an array")
+		// Check single item type
+		if itemType != "" {
+			if itemType == "object" {
+				return true, nil
+			}
 		}
 
-		found := false
-		for i, itemType := range itemTypesArray {
-			val, ok := itemType.(string)
-			if !ok {
-				return false, fmt.Errorf("item_types at index %d must be a string value", i)
-			}
+		// Check multiple item types
+		for _, val := range itemTypes {
 			if val == "object" {
-				found = true
+				return true, nil
 			}
-		}
-
-		if found {
-			return true, nil
 		}
 	}
 

@@ -69,38 +69,55 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 			Property: "name",
 		}
 		return nil
-	// Handle array type with custom type references in item_types
-	case prop.Type == "array" && prop.Config != nil:
-		itemTypes, ok := prop.Config["item_types"]
-		if !ok {
-			return nil
-		}
-
-		// sort itemTypes array lexicographically
-		itemTypesArray := itemTypes.([]any)
-		utils.SortLexicographically(itemTypesArray)
-
-		for _, item := range itemTypesArray {
-			val := item.(string)
-
-			if !strings.HasPrefix(val, "#/custom-types/") {
-				continue
-			}
-
-			customTypeURN := urnFromRef(val)
+	
+		// Handle item_type and item_types fields - merge into config["item_types"]
+	case prop.ItemType != "":
+		// Single item type - store as array with one element in config
+		if strings.HasPrefix(prop.ItemType, "#/custom-types/") {
+			customTypeURN := urnFromRef(prop.ItemType)
 			if customTypeURN == "" {
-				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", val)
+				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", prop.ItemType)
 			}
-
 			args.Config["item_types"] = []interface{}{
 				resources.PropertyRef{
 					URN:      customTypeURN,
 					Property: "name",
 				},
 			}
+		} else {
+			args.Config["item_types"] = []interface{}{prop.ItemType}
 		}
-	}
+	case len(prop.ItemTypes) > 0:
+		// Multiple item types - store as array in config
+		// Sort for consistency before processing
+		sort.Strings(prop.ItemTypes)
+		itemTypesArray := make([]interface{}, len(prop.ItemTypes))
 
+		// Look for custom type references and replace entire array with first one found
+		for i, itemType := range prop.ItemTypes {
+			if !strings.HasPrefix(itemType, "#/custom-types/") {
+				itemTypesArray[i] = itemType
+				continue
+			}
+
+			customTypeURN := urnFromRef(itemType)
+			if customTypeURN == "" {
+				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", itemType)
+			}
+
+			// Replace entire array with single PropertyRef
+			itemTypesArray = []interface{}{
+				resources.PropertyRef{
+					URN:      customTypeURN,
+					Property: "name",
+				},
+			}
+			break
+		}
+
+		// No custom type references found, store primitive types as-is
+		args.Config["item_types"] = itemTypesArray
+	}
 
 	return nil
 }
