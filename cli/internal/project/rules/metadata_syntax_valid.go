@@ -56,7 +56,17 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 	// ValidateStruct returns a list of validation results
 	// or nil. We pass "/metadata" as the base path since we're
 	// validating metadata which lives under the metadata key in YAML.
-	return validation.ValidateStruct(metadata, "/metadata")
+	results, err := validation.ValidateStruct(metadata, "/metadata")
+	if err != nil {
+		return []rules.ValidationResult{
+			{
+				Reference: "/metadata",
+				Message:   fmt.Sprintf("metadata needs to be valid: %s", err.Error()),
+			},
+		}
+	}
+
+	return results
 
 }
 

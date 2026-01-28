@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestStruct struct {
@@ -13,13 +14,15 @@ type TestStruct struct {
 func TestValidateStruct(t *testing.T) {
 	t.Run("valid struct", func(t *testing.T) {
 		s := TestStruct{Name: "test"}
-		results := ValidateStruct(s, "")
+		results, err := ValidateStruct(s, "")
+		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
 
 	t.Run("invalid struct", func(t *testing.T) {
 		s := TestStruct{Name: ""}
-		results := ValidateStruct(s, "")
+		results, err := ValidateStruct(s, "")
+		require.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.Equal(t, "/name", results[0].Reference)
 		assert.Equal(t, "'name' is required", results[0].Message)
@@ -27,7 +30,8 @@ func TestValidateStruct(t *testing.T) {
 
 	t.Run("invalid struct with basePath", func(t *testing.T) {
 		s := TestStruct{Name: ""}
-		results := ValidateStruct(s, "/metadata")
+		results, err := ValidateStruct(s, "/metadata")
+		require.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.Equal(t, "/metadata/name", results[0].Reference)
 		assert.Equal(t, "'name' is required", results[0].Message)
@@ -35,7 +39,8 @@ func TestValidateStruct(t *testing.T) {
 
 	t.Run("pointer to struct", func(t *testing.T) {
 		s := &TestStruct{Name: "test"}
-		results := ValidateStruct(s, "")
+		results, err := ValidateStruct(s, "")
+		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
 

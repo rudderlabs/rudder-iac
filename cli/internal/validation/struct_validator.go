@@ -58,13 +58,24 @@ func namespaceToJSONPointer(namespace string) string {
 // validation results with JSON Pointer references. The basePath is prepended to all
 // references to support nested struct validation (e.g., basePath="/metadata" for
 // validating metadata produces references like "/metadata/name").
-func ValidateStruct(data any, basePath string) []rules.ValidationResult {
+func ValidateStruct(data any, basePath string) ([]rules.ValidationResult, error) {
 	results := []rules.ValidationResult{}
 
 	v := validator.New()
 	v.RegisterTagNameFunc(tagNameFunc())
 
 	if err := v.Struct(data); err != nil {
+
+		// This check is needed because we can pass in a nil pointer to this function
+		// so the validator returns an invalid validation error.
+		var invalidValidationError *validator.InvalidValidationError
+		if errors.As(
+			err,
+			&invalidValidationError,
+		) {
+			return nil, fmt.Errorf("invalid validation error: %w", err)
+		}
+
 		var errs validator.ValidationErrors
 		errors.As(err, &errs)
 
@@ -81,7 +92,7 @@ func ValidateStruct(data any, basePath string) []rules.ValidationResult {
 		}
 	}
 
-	return results
+	return results, nil
 }
 
 func getErrorMessage(err validator.FieldError) string {
