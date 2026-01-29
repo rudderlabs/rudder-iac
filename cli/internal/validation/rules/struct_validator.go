@@ -1,4 +1,4 @@
-package validation
+package rules
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // arrayIndexRegex matches array indices like [0], [1], etc.
@@ -56,8 +55,8 @@ func namespaceToJSONPointer(namespace string) string {
 // validation results with JSON Pointer references. The basePath is prepended to all
 // references to support nested struct validation (e.g., basePath="/metadata" for
 // validating metadata produces references like "/metadata/name").
-func ValidateStruct(data any, basePath string) ([]rules.ValidationResult, error) {
-	results := []rules.ValidationResult{}
+func ValidateStruct(data any, basePath string) ([]ValidationResult, error) {
+	results := []ValidationResult{}
 
 	v := validator.New()
 	v.RegisterTagNameFunc(tagNameFunc)
@@ -83,7 +82,7 @@ func ValidateStruct(data any, basePath string) ([]rules.ValidationResult, error)
 				reference = basePath + reference
 			}
 
-			results = append(results, rules.ValidationResult{
+			results = append(results, ValidationResult{
 				Reference: reference,
 				Message:   getErrorMessage(err),
 			})

@@ -370,3 +370,13 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 	}
 	return nil
 }
+
+// SpecFactories returns all spec factories for the datacatalog provider
+func (p *Provider) SpecFactories() []provider.SpecFactory {
+	return []provider.SpecFactory{
+		&PropertySpecFactory{},
+	}
+}
+
+// Compile-time verification that Provider implements SpecFactoryProvider
+var _ provider.SpecFactoryProvider = (*Provider)(nil)
