@@ -40,7 +40,7 @@ func (r *SpecSemanticValidRule) Validate(ctx *rules.ValidationContext) []rules.V
 	results := []rules.ValidationResult{}
 
 	// Validate version against injected valid versions
-	if !slices.Contains(r.validVersions, ctx.Version) {
+	if ctx.Version != "" && !slices.Contains(r.validVersions, ctx.Version) {
 		results = append(results, rules.ValidationResult{
 			Reference: "/version",
 			Message:   fmt.Sprintf("version '%s' is not supported, supported versions: %v", ctx.Version, r.validVersions),
@@ -48,7 +48,7 @@ func (r *SpecSemanticValidRule) Validate(ctx *rules.ValidationContext) []rules.V
 	}
 
 	// Validate kind against injected valid kinds
-	if !slices.Contains(r.validKinds, ctx.Kind) {
+	if ctx.Kind != "" && !slices.Contains(r.validKinds, ctx.Kind) {
 		results = append(results, rules.ValidationResult{
 			Reference: "/kind",
 			Message:   fmt.Sprintf("kind '%s' is not supported, supported kinds: %v", ctx.Kind, r.validKinds),
