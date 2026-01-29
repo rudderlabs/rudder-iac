@@ -131,7 +131,7 @@ func TestSpecValidationRule_Validate_MissingRequiredField(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Contains(t, results[0].Message, "name")
 	assert.Contains(t, results[0].Message, "required")
-	assert.Equal(t, "/items/items/0/name", results[0].Reference)
+	assert.Equal(t, "/items/0/name", results[0].Reference)
 }
 
 func TestSpecValidationRule_Validate_InvalidStructure(t *testing.T) {
