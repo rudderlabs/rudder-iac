@@ -371,9 +371,7 @@ func (p *CompositeProvider) SyntacticRules() []rules.Rule {
 	// that don't implement SpecFactoryProvider, we wrap them with PathPrefixRule
 	for _, provider := range p.Providers {
 		for _, rule := range provider.SyntacticRules() {
-			allRules = append(
-				allRules,
-				rules.NewPathPrefixRule(rule, "/spec"))
+			allRules = append(allRules, rule)
 		}
 	}
 
@@ -389,7 +387,7 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 
 	for _, provider := range p.Providers {
 		for _, rule := range provider.SemanticRules() {
-			allRules = append(allRules, rules.NewPathPrefixRule(rule, "/spec"))
+			allRules = append(allRules, rule)
 		}
 	}
 
