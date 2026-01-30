@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
@@ -68,17 +69,21 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {
+	specDir := filepath.Dir(path)
+
+	// Enrich tests with SpecDir and apply defaults
+	enrichedTests := enrichTestsWithSpecDir(spec.Tests, specDir)
+
 	resource := &model.TransformationResource{
 		ID:          spec.ID,
 		Name:        spec.Name,
 		Description: spec.Description,
 		Language:    spec.Language,
-		Tests:       spec.Tests,
+		Tests:       enrichedTests,
 	}
 
 	// Resolve code from file if specified
 	if spec.File != "" {
-		specDir := filepath.Dir(path)
 		codePath := spec.File
 		if !filepath.IsAbs(codePath) {
 			codePath = filepath.Join(specDir, spec.File)
@@ -96,6 +101,30 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.Transfor
 	return map[string]*model.TransformationResource{
 		spec.ID: resource,
 	}, nil
+}
+
+// enrichTestsWithSpecDir enriches test configurations with the spec directory path
+// and applies default values for Input and Output paths if not specified.
+func enrichTestsWithSpecDir(tests []specs.TransformationTest, specDir string) []specs.TransformationTest {
+	if len(tests) == 0 {
+		return tests
+	}
+
+	enriched := make([]specs.TransformationTest, len(tests))
+	for i, test := range tests {
+		enriched[i] = test
+		enriched[i].SpecDir = specDir
+
+		// Apply defaults if not specified
+		if enriched[i].Input == "" {
+			enriched[i].Input = "./input"
+		}
+		if enriched[i].Output == "" {
+			enriched[i].Output = "./output"
+		}
+	}
+
+	return enriched
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, graph *resources.Graph) error {
