@@ -13,15 +13,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
-)
-
-const (
-	transformationsDir = "transformations"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -117,8 +114,8 @@ func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *r
 		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, resource.ImportName)
 	}
 
-	if resource.Language != "javascript" && resource.Language != "python" {
-		return fmt.Errorf("language must be javascript or python, got: %s", resource.Language)
+	if resource.Language != handlers.JavaScript && resource.Language != handlers.Python {
+		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, resource.Language)
 	}
 
 	if resource.Code == "" {
@@ -159,7 +156,7 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.Rem
 		return nil, fmt.Errorf("listing libraries: %w", err)
 	}
 
-	// Filter resources WITHOUT external IDs (unmanaged resources)
+	// Fetch resources WITHOUT external IDs (unmanaged resources)
 	result := make([]*model.RemoteLibrary, 0)
 	for _, l := range libraries {
 		if l.ExternalID == "" {
@@ -240,9 +237,21 @@ func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, r
 		return nil, fmt.Errorf("setting library external ID: %w", err)
 	}
 
+	// update the library
+	req := &transformations.UpdateLibraryRequest{
+		Name:        data.Name,
+		Description: data.Description,
+		Code:        data.Code,
+		Language:    data.Language,
+	}
+	updated, err := h.store.UpdateLibrary(ctx, remote.ID, req, false)
+	if err != nil {
+		return nil, fmt.Errorf("updating library: %w", err)
+	}
+
 	return &model.LibraryState{
-		ID:        remote.ID,
-		VersionID: remote.VersionID,
+		ID:        updated.ID,
+		VersionID: updated.VersionID,
 	}, nil
 }
 
@@ -273,24 +282,24 @@ func (h *HandlerImpl) FormatForExport(
 
 	for externalID, remote := range remotes {
 		// Validate language
-		if remote.Language != "javascript" && remote.Language != "python" {
-			return nil, fmt.Errorf("unsupported language '%s' for library %s: only javascript and python are supported", remote.Language, remote.ID)
+		if remote.Language != handlers.JavaScript && remote.Language != handlers.Python {
+			return nil, fmt.Errorf("unsupported language '%s' for library %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
 		}
 
 		// Determine file extension and folder based on language
 		var ext string
 		var langFolder string
 		switch remote.Language {
-		case "javascript":
-			ext = ".js"
-			langFolder = "javascript"
-		case "python":
-			ext = ".py"
-			langFolder = "python"
+		case handlers.JavaScript:
+			ext = handlers.ExtensionJS
+			langFolder = handlers.JavaScript
+		case handlers.Python:
+			ext = handlers.ExtensionPY
+			langFolder = handlers.Python
 		}
 
 		// Code file path: transformations/<language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(transformationsDir, langFolder, externalID+ext)
+		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
 
 		// Build import metadata
 		workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -304,7 +313,7 @@ func (h *HandlerImpl) FormatForExport(
 		}
 
 		// Create spec with file reference and import_name
-		spec, err := toImportSpec(
+		spec, err := handlers.ToImportSpec(
 			HandlerMetadata.SpecKind,
 			HandlerMetadata.SpecMetadataName,
 			workspaceMetadata,
@@ -324,7 +333,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Generate unique filename for YAML spec
 		fileName, err := idNamer.Name(namer.ScopeName{
 			Name:  externalID,
-			Scope: transformationsDir,
+			Scope: handlers.TransformationsDir,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
@@ -333,7 +342,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Add YAML spec entity
 		formattables = append(formattables, writer.FormattableEntity{
 			Content:      spec,
-			RelativePath: filepath.Join(transformationsDir, fileName+loader.ExtensionYAML),
+			RelativePath: filepath.Join(handlers.TransformationsDir, fileName+loader.ExtensionYAML),
 		})
 
 		// Add code file entity
@@ -344,31 +353,4 @@ func (h *HandlerImpl) FormatForExport(
 	}
 
 	return formattables, nil
-}
-
-// toImportSpec creates a Spec with import metadata for a library resource.
-func toImportSpec(
-	kind string,
-	metadataName string,
-	workspaceMetadata specs.WorkspaceImportMetadata,
-	specData map[string]any,
-) (*specs.Spec, error) {
-	metadata := specs.Metadata{
-		Name: metadataName,
-		Import: &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
-		},
-	}
-
-	metadataMap, err := metadata.ToMap()
-	if err != nil {
-		return nil, fmt.Errorf("converting metadata to map: %w", err)
-	}
-
-	return &specs.Spec{
-		Version:  specs.SpecVersionV0_1,
-		Kind:     kind,
-		Metadata: metadataMap,
-		Spec:     specData,
-	}, nil
 }

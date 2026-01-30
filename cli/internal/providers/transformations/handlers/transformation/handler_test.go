@@ -103,8 +103,6 @@ func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Contex
 	return nil
 }
 
-
-
 func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
 	return nil, fmt.Errorf("not implemented")
 }
@@ -1066,8 +1064,11 @@ func TestImport(t *testing.T) {
 		handler := transformation.NewHandler(mockStore)
 
 		resource := &model.TransformationResource{
-			ID:   "ext-new-123",
-			Name: "Local Transformation",
+			ID:          "ext-new-123",
+			Name:        "Local Transformation",
+			Description: "Local description",
+			Code:        "export function transformEvent(event, metadata) { return event; }",
+			Language:    "javascript",
 		}
 
 		state, err := handler.Impl.Import(context.Background(), resource, "trans-123")
@@ -1075,9 +1076,10 @@ func TestImport(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state)
 		assert.Equal(t, "trans-123", state.ID)
-		assert.Equal(t, "ver-456", state.VersionID)
+		assert.Equal(t, "ver-updated", state.VersionID)
 		assert.True(t, mockStore.getTransformationCalled)
 		assert.True(t, mockStore.setTransformationExternalIDCalled)
+		assert.True(t, mockStore.updateCalled)
 	})
 
 	t.Run("GetTransformation API error", func(t *testing.T) {

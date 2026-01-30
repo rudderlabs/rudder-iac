@@ -20,13 +20,13 @@ import (
 
 // mockTransformationStore implements the TransformationStore interface for testing
 type mockTransformationStore struct {
-	createLibraryCalled bool
-	updateLibraryCalled bool
-	deleteLibraryCalled bool
-	listLibrariesCalled bool
-	getLibraryCalled bool
+	createLibraryCalled        bool
+	updateLibraryCalled        bool
+	deleteLibraryCalled        bool
+	listLibrariesCalled        bool
+	getLibraryCalled           bool
 	setLibraryExternalIDCalled bool
-	
+
 	createLibraryFunc        func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
 	updateLibraryFunc        func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
 	deleteLibraryFunc        func(ctx context.Context, id string) error
@@ -1152,10 +1152,11 @@ func TestImport(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state)
 		assert.Equal(t, "lib-remote-123", state.ID)
-		assert.Equal(t, "ver-remote-456", state.VersionID)
+		assert.Equal(t, "ver-updated", state.VersionID)
 		assert.Equal(t, "ext-new-123", capturedExternalID)
 		assert.True(t, mockStore.getLibraryCalled)
 		assert.True(t, mockStore.setLibraryExternalIDCalled)
+		assert.True(t, mockStore.updateLibraryCalled)
 	})
 
 	t.Run("GetLibrary API error", func(t *testing.T) {
