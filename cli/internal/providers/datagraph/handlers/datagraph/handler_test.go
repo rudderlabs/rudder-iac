@@ -15,7 +15,7 @@ import (
 // mockDataGraphStore implements dgClient.DataGraphStore for testing
 type mockDataGraphStore struct {
 	dataGraphs          map[string]*dgClient.DataGraph
-	listDataGraphsFunc  func(ctx context.Context, page, perPage int) (*dgClient.ListDataGraphsResponse, error)
+	listDataGraphsFunc  func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error)
 	getDataGraphFunc    func(ctx context.Context, id string) (*dgClient.DataGraph, error)
 	createDataGraphFunc func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error)
 	updateDataGraphFunc func(ctx context.Context, id string, req *dgClient.UpdateDataGraphRequest) (*dgClient.DataGraph, error)
@@ -23,9 +23,9 @@ type mockDataGraphStore struct {
 	setExternalIDFunc   func(ctx context.Context, id string, externalID string) error
 }
 
-func (m *mockDataGraphStore) ListDataGraphs(ctx context.Context, page, perPage int) (*dgClient.ListDataGraphsResponse, error) {
+func (m *mockDataGraphStore) ListDataGraphs(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
 	if m.listDataGraphsFunc != nil {
-		return m.listDataGraphsFunc(ctx, page, perPage)
+		return m.listDataGraphsFunc(ctx, page, perPage, hasExternalID)
 	}
 	return &dgClient.ListDataGraphsResponse{}, nil
 }
@@ -207,7 +207,11 @@ func TestValidateResource(t *testing.T) {
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &mockDataGraphStore{
-		listDataGraphsFunc: func(ctx context.Context, page, perPage int) (*dgClient.ListDataGraphsResponse, error) {
+		listDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+			// Verify that hasExternalID is set to true
+			require.NotNil(t, hasExternalID)
+			assert.True(t, *hasExternalID)
+
 			if page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
@@ -216,12 +220,6 @@ func TestLoadRemoteResources(t *testing.T) {
 							ExternalID:         "dg-1",
 							Name:               "Data Graph 1",
 							WarehouseAccountID: "account-1",
-						},
-						{
-							ID:                 "remote-2",
-							ExternalID:         "", // No external ID - should be filtered
-							Name:               "Data Graph 2",
-							WarehouseAccountID: "account-2",
 						},
 					},
 					Paging: client.Paging{Next: ""},
@@ -250,19 +248,17 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &mockDataGraphStore{
-		listDataGraphsFunc: func(ctx context.Context, page, perPage int) (*dgClient.ListDataGraphsResponse, error) {
+		listDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+			// Verify that hasExternalID is set to false
+			require.NotNil(t, hasExternalID)
+			assert.False(t, *hasExternalID)
+
 			if page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
-							ID:                 "remote-1",
-							ExternalID:         "dg-1",
-							Name:               "Data Graph 1",
-							WarehouseAccountID: "account-1",
-						},
-						{
 							ID:                 "remote-2",
-							ExternalID:         "", // No external ID - should be included for import
+							ExternalID:         "", // No external ID - importable
 							Name:               "Data Graph 2",
 							WarehouseAccountID: "account-2",
 						},
@@ -277,7 +273,7 @@ func TestLoadImportableResources(t *testing.T) {
 	h := &HandlerImpl{client: mockClient}
 	remotes, err := h.LoadImportableResources(context.Background())
 	require.NoError(t, err)
-	require.Len(t, remotes, 2)
+	require.Len(t, remotes, 1)
 }
 
 func TestMapRemoteToState(t *testing.T) {
@@ -332,16 +328,13 @@ func TestCreate(t *testing.T) {
 		createDataGraphFunc: func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error) {
 			assert.Equal(t, "Test Data Graph", req.Name)
 			assert.Equal(t, "account-123", req.WarehouseAccountID)
+			assert.Equal(t, "test-dg", req.ExternalID)
 			return &dgClient.DataGraph{
 				ID:                 "remote-1",
 				Name:               req.Name,
 				WarehouseAccountID: req.WarehouseAccountID,
+				ExternalID:         req.ExternalID,
 			}, nil
-		},
-		setExternalIDFunc: func(ctx context.Context, id string, externalID string) error {
-			assert.Equal(t, "remote-1", id)
-			assert.Equal(t, "test-dg", externalID)
-			return nil
 		},
 	}
 

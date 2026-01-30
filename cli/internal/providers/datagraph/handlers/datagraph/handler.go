@@ -74,50 +74,19 @@ func (h *HandlerImpl) ValidateResource(resource *model.DataGraphResource, graph 
 	return nil
 }
 
-func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
-	// Fetch all data graphs with pagination
+// listAllDataGraphs fetches all data graphs with pagination and optional filtering
+func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool) ([]*model.RemoteDataGraph, error) {
 	var allDataGraphs []*model.RemoteDataGraph
 	page := 1
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage)
+		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
 		if err != nil {
 			return nil, fmt.Errorf("listing data graphs: %w", err)
 		}
 
-		// Filter only managed resources (those with external IDs)
-		for i := range resp.Data {
-			if resp.Data[i].ExternalID != "" {
-				allDataGraphs = append(allDataGraphs, &model.RemoteDataGraph{
-					DataGraph: &resp.Data[i],
-				})
-			}
-		}
-
-		// Check if there are more pages
-		if resp.Paging.Next == "" {
-			break
-		}
-		page++
-	}
-
-	return allDataGraphs, nil
-}
-
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
-	// Fetch all data graphs including those without external IDs
-	var allDataGraphs []*model.RemoteDataGraph
-	page := 1
-	perPage := 100
-
-	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage)
-		if err != nil {
-			return nil, fmt.Errorf("listing data graphs: %w", err)
-		}
-
-		// Include all resources for import
+		// Add all resources from current page
 		for i := range resp.Data {
 			allDataGraphs = append(allDataGraphs, &model.RemoteDataGraph{
 				DataGraph: &resp.Data[i],
@@ -132,6 +101,18 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.Rem
 	}
 
 	return allDataGraphs, nil
+}
+
+func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
+	// Fetch all data graphs with external IDs using API filtering
+	hasExternalID := true
+	return h.listAllDataGraphs(ctx, &hasExternalID)
+}
+
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
+	// Fetch all data graphs without external IDs using API filtering
+	hasExternalID := false
+	return h.listAllDataGraphs(ctx, &hasExternalID)
 }
 
 func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteDataGraph, urnResolver handler.URNResolver) (*model.DataGraphResource, *model.DataGraphState, error) {
@@ -157,16 +138,12 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.DataGraphResource)
 	req := &dgClient.CreateDataGraphRequest{
 		Name:               data.Name,
 		WarehouseAccountID: data.AccountID,
+		ExternalID:         data.ID,
 	}
 
 	remote, err := h.client.CreateDataGraph(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("creating data graph: %w", err)
-	}
-
-	// Set external ID
-	if err := h.client.SetExternalID(ctx, remote.ID, data.ID); err != nil {
-		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
 
 	return &model.DataGraphState{
