@@ -20,6 +20,8 @@ type ExperimentalConfig struct {
 	ValidationFramework bool `mapstructure:"validationFramework"`
 	// Transformations enables transformations provider and related features
 	Transformations bool `mapstructure:"transformations"`
+	// DataGraph enables data graph operations (sync, validate, import)
+	DataGraph bool `mapstructure:"dataGraph"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
