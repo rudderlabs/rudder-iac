@@ -15,7 +15,7 @@ import (
 type WriterHandler = handler.BaseHandler[model.WriterSpec, model.WriterResource, model.WriterState, model.RemoteWriter]
 
 var HandlerMetadata = handler.HandlerMetadata{
-	ResourceType:     "example_writer",
+	ResourceType:     "example-writer",
 	SpecKind:         "writer",
 	SpecMetadataName: "writers",
 }
