@@ -9,14 +9,12 @@ import (
 // Maps to the "data-graph" kind YAML structure
 type DataGraphSpec struct {
 	ID        string `json:"id"`
-	Name      string `json:"name"`
 	AccountID string `json:"account_id"`
 }
 
 // DataGraphResource represents the input data for a data graph
 type DataGraphResource struct {
 	ID        string
-	Name      string
 	AccountID string
 }
 
@@ -37,6 +35,5 @@ func (r RemoteDataGraph) Metadata() handler.RemoteResourceMetadata {
 		ID:          r.ID,
 		ExternalID:  r.ExternalID,
 		WorkspaceID: r.WorkspaceID,
-		Name:        r.Name,
 	}
 }
