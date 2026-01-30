@@ -106,6 +106,46 @@ func TestCreateDataGraphWithExternalID(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestCreateDataGraphWithExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"name":"Test Graph","warehouseAccountId":"wh-123","externalId":"ext-123"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs", expected)
+		},
+		ResponseStatus: 201,
+		ResponseBody: `{
+			"id": "dg-123",
+			"name": "Test Graph",
+			"workspaceId": "ws-456",
+			"warehouseAccountId": "wh-123",
+			"externalId": "ext-123",
+			"createdAt": "2024-01-15T12:00:00Z",
+			"updatedAt": "2024-01-15T12:00:00Z"
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
+		Name:               "Test Graph",
+		WarehouseAccountID: "wh-123",
+		ExternalID:         "ext-123",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.DataGraph{
+		ID:                 "dg-123",
+		Name:               "Test Graph",
+		WorkspaceID:        "ws-456",
+		WarehouseAccountID: "wh-123",
+		ExternalID:         "ext-123",
+		CreatedAt:          &testTime1,
+		UpdatedAt:          &testTime1,
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestGetDataGraph(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
