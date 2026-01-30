@@ -28,13 +28,9 @@ var examples = rules.Examples{
 	},
 }
 
-func validatePropertySpec(
-	Kind string,
-	Version string,
-	Metadata map[string]any,
-	Spec localcatalog.PropertySpec,
-) []rules.ValidationResult {
-
+// Main validation function for property spec
+// which delegates the validation to the go-validator through struct tags.
+var validatePropertySpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.PropertySpec) []rules.ValidationResult {
 	result, err := rules.ValidateStruct(Spec, "")
 
 	if err != nil {
@@ -49,7 +45,7 @@ func validatePropertySpec(
 	return result
 }
 
-func NewPropertySpecSyntaxValidRule() prules.TypedRule[localcatalog.PropertySpec] {
+func NewPropertySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/properties/spec-syntax-valid",
 		rules.Error,
