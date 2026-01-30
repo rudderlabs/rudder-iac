@@ -11,10 +11,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -371,12 +374,10 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 	return nil
 }
 
-// SpecFactories returns all spec factories for the datacatalog provider
-func (p *Provider) SpecFactories() []provider.SpecFactory {
-	return []provider.SpecFactory{
-		&PropertySpecFactory{},
+func (p *Provider) SyntacticRules() []rules.Rule {
+	syntactic := []rules.Rule{
+		prules.NewTypedRuleWrapper(catalogRules.NewPropertySpecSyntaxValidRule()),
 	}
-}
 
-// Compile-time verification that Provider implements SpecFactoryProvider
-var _ provider.SpecFactoryProvider = (*Provider)(nil)
+	return syntactic
+}

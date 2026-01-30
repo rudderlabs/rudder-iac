@@ -367,16 +367,6 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, st *state.State
 func (p *CompositeProvider) SyntacticRules() []rules.Rule {
 	var allRules []rules.Rule
 
-	// Based on the spec factories, create syntax rules for each spec
-	// and wrap them with PathPrefixRule to prefix references with "/spec".
-	for _, factory := range p.SpecFactories() {
-		allRules = append(
-			allRules,
-			rules.NewPathPrefixRule(
-				NewSpecValidationRule(factory), "/spec"),
-		)
-	}
-
 	// Add any other syntactic rules from the providers
 	// that don't implement SpecFactoryProvider, we wrap them with PathPrefixRule
 	for _, provider := range p.Providers {
@@ -406,22 +396,5 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
-// SpecFactories returns all spec factories from all providers implementing SpecFactoryProvider.
-// Providers that don't implement SpecFactoryProvider are skipped.
-func (p *CompositeProvider) SpecFactories() []SpecFactory {
-	var allFactories []SpecFactory
-
-	for _, provider := range p.Providers {
-		if sfp, ok := provider.(SpecFactoryProvider); ok {
-			allFactories = append(
-				allFactories,
-				sfp.SpecFactories()...)
-		}
-	}
-
-	return allFactories
-}
-
 // Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
 var _ RuleProvider = (*CompositeProvider)(nil)
-var _ SpecFactoryProvider = (*CompositeProvider)(nil)
