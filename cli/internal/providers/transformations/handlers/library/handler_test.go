@@ -112,6 +112,10 @@ func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transfo
 	return fmt.Errorf("not implemented")
 }
 
+func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) ([]*transformations.TransformationTestResult, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func TestHandlerMetadata(t *testing.T) {
 	t.Parallel()
 

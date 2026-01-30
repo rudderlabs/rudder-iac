@@ -35,6 +35,10 @@ func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transfo
 	return nil
 }
 
+func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformationsClient.BatchTestRequest) ([]*transformationsClient.TransformationTestResult, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (m *mockTransformationStore) CreateTransformation(ctx context.Context, req *transformationsClient.CreateTransformationRequest, publish bool) (*transformationsClient.Transformation, error) {
 	return nil, fmt.Errorf("not implemented")
 }
