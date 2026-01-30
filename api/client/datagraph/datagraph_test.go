@@ -44,15 +44,14 @@ func boolPtr(b bool) *bool {
 func TestCreateDataGraph(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Test Graph","warehouseAccountId":"wh-123"}`
+			expected := `{"accountId":"wh-123"}`
 			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs", expected)
 		},
 		ResponseStatus: 201,
 		ResponseBody: `{
 			"id": "dg-123",
-			"name": "Test Graph",
 			"workspaceId": "ws-456",
-			"warehouseAccountId": "wh-123",
+			"accountId": "wh-123",
 			"createdAt": "2024-01-15T12:00:00Z",
 			"updatedAt": "2024-01-15T12:00:00Z"
 		}`,
@@ -61,18 +60,16 @@ func TestCreateDataGraph(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	result, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
-		Name:               "Test Graph",
-		WarehouseAccountID: "wh-123",
+		AccountID: "wh-123",
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.DataGraph{
-		ID:                 "dg-123",
-		Name:               "Test Graph",
-		WorkspaceID:        "ws-456",
-		WarehouseAccountID: "wh-123",
-		CreatedAt:          &testTime1,
-		UpdatedAt:          &testTime1,
+		ID:          "dg-123",
+		WorkspaceID: "ws-456",
+		AccountID:   "wh-123",
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime1,
 	}, result)
 
 	httpClient.AssertNumberOfCalls()
@@ -86,9 +83,8 @@ func TestGetDataGraph(t *testing.T) {
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "dg-123",
-			"name": "Test Graph",
 			"workspaceId": "ws-456",
-			"warehouseAccountId": "wh-123",
+			"accountId": "wh-123",
 			"externalId": "ext-123",
 			"createdAt": "2024-01-15T12:00:00Z",
 			"updatedAt": "2024-01-15T12:00:00Z"
@@ -101,49 +97,12 @@ func TestGetDataGraph(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.DataGraph{
-		ID:                 "dg-123",
-		Name:               "Test Graph",
-		WorkspaceID:        "ws-456",
-		WarehouseAccountID: "wh-123",
-		ExternalID:         "ext-123",
-		CreatedAt:          &testTime1,
-		UpdatedAt:          &testTime1,
-	}, result)
-
-	httpClient.AssertNumberOfCalls()
-}
-
-func TestUpdateDataGraph(t *testing.T) {
-	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
-		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Updated Graph"}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123", expected)
-		},
-		ResponseStatus: 200,
-		ResponseBody: `{
-			"id": "dg-123",
-			"name": "Updated Graph",
-			"workspaceId": "ws-456",
-			"warehouseAccountId": "wh-123",
-			"createdAt": "2024-01-15T12:00:00Z",
-			"updatedAt": "2024-01-15T13:00:00Z"
-		}`,
-	})
-
-	store := newTestStore(t, httpClient)
-
-	result, err := store.UpdateDataGraph(context.Background(), "dg-123", &datagraph.UpdateDataGraphRequest{
-		Name: "Updated Graph",
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, &datagraph.DataGraph{
-		ID:                 "dg-123",
-		Name:               "Updated Graph",
-		WorkspaceID:        "ws-456",
-		WarehouseAccountID: "wh-123",
-		CreatedAt:          &testTime1,
-		UpdatedAt:          &testTime2,
+		ID:          "dg-123",
+		WorkspaceID: "ws-456",
+		AccountID:   "wh-123",
+		ExternalID:  "ext-123",
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime1,
 	}, result)
 
 	httpClient.AssertNumberOfCalls()
@@ -176,17 +135,15 @@ func TestListDataGraphs(t *testing.T) {
 			"data": [
 				{
 					"id": "dg-1",
-					"name": "Graph 1",
 					"workspaceId": "ws-456",
-					"warehouseAccountId": "wh-123",
+					"accountId": "wh-123",
 					"createdAt": "2024-01-15T12:00:00Z",
 					"updatedAt": "2024-01-15T12:00:00Z"
 				},
 				{
 					"id": "dg-2",
-					"name": "Graph 2",
 					"workspaceId": "ws-456",
-					"warehouseAccountId": "wh-456",
+					"accountId": "wh-456",
 					"createdAt": "2024-01-16T12:00:00Z",
 					"updatedAt": "2024-01-16T12:00:00Z"
 				}
@@ -203,20 +160,18 @@ func TestListDataGraphs(t *testing.T) {
 	assert.Equal(t, &datagraph.ListDataGraphsResponse{
 		Data: []datagraph.DataGraph{
 			{
-				ID:                 "dg-1",
-				Name:               "Graph 1",
-				WorkspaceID:        "ws-456",
-				WarehouseAccountID: "wh-123",
-				CreatedAt:          &testTime1,
-				UpdatedAt:          &testTime1,
+				ID:          "dg-1",
+				WorkspaceID: "ws-456",
+				AccountID:   "wh-123",
+				CreatedAt:   &testTime1,
+				UpdatedAt:   &testTime1,
 			},
 			{
-				ID:                 "dg-2",
-				Name:               "Graph 2",
-				WorkspaceID:        "ws-456",
-				WarehouseAccountID: "wh-456",
-				CreatedAt:          &testTime3,
-				UpdatedAt:          &testTime3,
+				ID:          "dg-2",
+				WorkspaceID: "ws-456",
+				AccountID:   "wh-456",
+				CreatedAt:   &testTime3,
+				UpdatedAt:   &testTime3,
 			},
 		},
 		Paging: client.Paging{Total: 2},
@@ -239,17 +194,15 @@ func TestListDataGraphsWithPagination(t *testing.T) {
 			"data": [
 				{
 					"id": "dg-11",
-					"name": "Graph 11",
 					"workspaceId": "ws-456",
-					"warehouseAccountId": "wh-123",
+					"accountId": "wh-123",
 					"createdAt": "2024-01-15T12:00:00Z",
 					"updatedAt": "2024-01-15T12:00:00Z"
 				},
 				{
 					"id": "dg-12",
-					"name": "Graph 12",
 					"workspaceId": "ws-456",
-					"warehouseAccountId": "wh-456",
+					"accountId": "wh-456",
 					"createdAt": "2024-01-16T12:00:00Z",
 					"updatedAt": "2024-01-16T12:00:00Z"
 				}
@@ -266,20 +219,18 @@ func TestListDataGraphsWithPagination(t *testing.T) {
 	assert.Equal(t, &datagraph.ListDataGraphsResponse{
 		Data: []datagraph.DataGraph{
 			{
-				ID:                 "dg-11",
-				Name:               "Graph 11",
-				WorkspaceID:        "ws-456",
-				WarehouseAccountID: "wh-123",
-				CreatedAt:          &testTime1,
-				UpdatedAt:          &testTime1,
+				ID:          "dg-11",
+				WorkspaceID: "ws-456",
+				AccountID:   "wh-123",
+				CreatedAt:   &testTime1,
+				UpdatedAt:   &testTime1,
 			},
 			{
-				ID:                 "dg-12",
-				Name:               "Graph 12",
-				WorkspaceID:        "ws-456",
-				WarehouseAccountID: "wh-456",
-				CreatedAt:          &testTime3,
-				UpdatedAt:          &testTime3,
+				ID:          "dg-12",
+				WorkspaceID: "ws-456",
+				AccountID:   "wh-456",
+				CreatedAt:   &testTime3,
+				UpdatedAt:   &testTime3,
 			},
 		},
 		Paging: client.Paging{Total: 42, Next: "/v2/data-graphs?page=3&pageSize=10"},
@@ -328,9 +279,8 @@ func TestListDataGraphsWithExternalIDFilter(t *testing.T) {
 							"data": [
 								{
 									"id": "dg-1",
-									"name": "Graph 1",
 									"workspaceId": "ws-456",
-									"warehouseAccountId": "wh-123",
+									"accountId": "wh-123",
 									"externalId": "ext-1",
 									"createdAt": "2024-01-15T12:00:00Z",
 									"updatedAt": "2024-01-15T12:00:00Z"
@@ -343,9 +293,8 @@ func TestListDataGraphsWithExternalIDFilter(t *testing.T) {
 						"data": [
 							{
 								"id": "dg-2",
-								"name": "Graph 2",
 								"workspaceId": "ws-456",
-								"warehouseAccountId": "wh-456",
+								"accountId": "wh-456",
 								"createdAt": "2024-01-16T12:00:00Z",
 								"updatedAt": "2024-01-16T12:00:00Z"
 							}
@@ -381,9 +330,8 @@ func TestSetExternalID(t *testing.T) {
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "dg-123",
-			"name": "Test Graph",
 			"workspaceId": "ws-456",
-			"warehouseAccountId": "wh-123",
+			"accountId": "wh-123",
 			"externalId": "ext-123",
 			"createdAt": "2024-01-15T12:00:00Z",
 			"updatedAt": "2024-01-15T13:00:00Z"
@@ -411,13 +359,6 @@ func TestEmptyIDValidation(t *testing.T) {
 			name: "GetDataGraph",
 			operation: func() error {
 				_, err := store.GetDataGraph(context.Background(), "")
-				return err
-			},
-		},
-		{
-			name: "UpdateDataGraph",
-			operation: func() error {
-				_, err := store.UpdateDataGraph(context.Background(), "", &datagraph.UpdateDataGraphRequest{Name: "Test"})
 				return err
 			},
 		},
@@ -464,8 +405,7 @@ func TestAPIErrors(t *testing.T) {
 			responseBody:   `{"error":"Bad Request"}`,
 			operation: func(store datagraph.DataGraphStore) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
-					Name:               "Test Graph",
-					WarehouseAccountID: "wh-123",
+					AccountID: "wh-123",
 				})
 				return err
 			},
@@ -482,18 +422,6 @@ func TestAPIErrors(t *testing.T) {
 				return err
 			},
 			expectedError: "getting data graph",
-		},
-		{
-			name:           "UpdateDataGraph",
-			method:         "PUT",
-			path:           "/v2/data-graphs/dg-123",
-			responseStatus: 500,
-			responseBody:   `{"error":"Internal Server Error"}`,
-			operation: func(store datagraph.DataGraphStore) error {
-				_, err := store.UpdateDataGraph(context.Background(), "dg-123", &datagraph.UpdateDataGraphRequest{Name: "Updated"})
-				return err
-			},
-			expectedError: "updating data graph",
 		},
 		{
 			name:           "DeleteDataGraph",
@@ -534,11 +462,10 @@ func TestAPIErrors(t *testing.T) {
 			method:         "POST",
 			path:           "/v2/data-graphs",
 			responseStatus: 409,
-			responseBody:   `{"error":"Data graph with the same name already exists"}`,
+			responseBody:   `{"error":"Data graph with the same warehouse id already exists"}`,
 			operation: func(store datagraph.DataGraphStore) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
-					Name:               "Existing Graph",
-					WarehouseAccountID: "wh-123",
+					AccountID: "wh-123",
 				})
 				return err
 			},
@@ -582,8 +509,7 @@ func TestMalformedResponses(t *testing.T) {
 			path:   "/v2/data-graphs",
 			operation: func(store datagraph.DataGraphStore) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
-					Name:               "Test Graph",
-					WarehouseAccountID: "wh-123",
+					AccountID: "wh-123",
 				})
 				return err
 			},
@@ -595,16 +521,6 @@ func TestMalformedResponses(t *testing.T) {
 			path:   "/v2/data-graphs/dg-123",
 			operation: func(store datagraph.DataGraphStore) error {
 				_, err := store.GetDataGraph(context.Background(), "dg-123")
-				return err
-			},
-			expectedError: "unmarshalling response",
-		},
-		{
-			name:   "UpdateDataGraph",
-			method: "PUT",
-			path:   "/v2/data-graphs/dg-123",
-			operation: func(store datagraph.DataGraphStore) error {
-				_, err := store.UpdateDataGraph(context.Background(), "dg-123", &datagraph.UpdateDataGraphRequest{Name: "Updated"})
 				return err
 			},
 			expectedError: "unmarshalling response",

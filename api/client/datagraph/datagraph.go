@@ -26,9 +26,6 @@ type DataGraphStore interface {
 	// CreateDataGraph creates a new data graph
 	CreateDataGraph(ctx context.Context, req *CreateDataGraphRequest) (*DataGraph, error)
 
-	// UpdateDataGraph updates an existing data graph
-	UpdateDataGraph(ctx context.Context, id string, req *UpdateDataGraphRequest) (*DataGraph, error)
-
 	// DeleteDataGraph deletes a data graph by ID
 	DeleteDataGraph(ctx context.Context, id string) error
 
@@ -110,31 +107,6 @@ func (s *rudderDataGraphStore) CreateDataGraph(ctx context.Context, req *CreateD
 	resp, err := s.client.Do(ctx, "POST", dataGraphsBasePath, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("creating data graph: %w", err)
-	}
-
-	var result DataGraph
-	if err := json.Unmarshal(resp, &result); err != nil {
-		return nil, fmt.Errorf("unmarshalling response: %w", err)
-	}
-
-	return &result, nil
-}
-
-// UpdateDataGraph updates an existing data graph
-func (s *rudderDataGraphStore) UpdateDataGraph(ctx context.Context, id string, req *UpdateDataGraphRequest) (*DataGraph, error) {
-	if id == "" {
-		return nil, fmt.Errorf("data graph ID cannot be empty")
-	}
-
-	data, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling request: %w", err)
-	}
-
-	path := fmt.Sprintf("%s/%s", dataGraphsBasePath, id)
-	resp, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("updating data graph: %w", err)
 	}
 
 	var result DataGraph
