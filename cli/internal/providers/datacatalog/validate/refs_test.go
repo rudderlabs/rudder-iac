@@ -26,15 +26,15 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		properties    map[string]catalog.PropertyV1
-		customTypes   map[string]catalog.CustomType
+		properties    []catalog.PropertyV1
+		customTypes   []catalog.CustomType
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid custom type reference in property item_type",
-			properties: map[string]catalog.PropertyV1{
-				"emailList": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "emailList",
 					Name:        "Email List",
 					Description: "List of user emails",
@@ -42,15 +42,15 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:EmailType",
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs: 0,
 		},
 		{
 			name: "invalid custom type reference format in property item_type",
-			properties: map[string]catalog.PropertyV1{
-				"emailList": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "emailList",
 					Name:        "Email List",
 					Description: "List of user emails",
@@ -58,16 +58,16 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:", // Missing type ID
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"custom type reference in item_type has invalid format"},
 		},
 		{
 			name: "reference to non-existent custom type in property item_type",
-			properties: map[string]catalog.PropertyV1{
-				"emailList": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "emailList",
 					Name:        "Email List",
 					Description: "List of user emails",
@@ -75,8 +75,8 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:NonExistentType",
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"custom type reference '#custom-type:NonExistentType' in item_type not found in catalog"},
@@ -113,15 +113,15 @@ func TestEventCategoryReferences(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		events        map[string]catalog.Event
-		categories    map[string]catalog.Category
+		events        []catalog.Event
+		categories    []catalog.Category
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid category reference in event",
-			events: map[string]catalog.Event{
-				"user_signup": {
+			events: []catalog.Event{
+				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
 					Type:        "track",
@@ -129,15 +129,15 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:user_actions"),
 				},
 			},
-			categories: map[string]catalog.Category{
-				"user_actions": testCategory,
+			categories: []catalog.Category{
+				testCategory,
 			},
 			expectedErrs: 0,
 		},
 		{
 			name: "event without category reference should pass validation",
-			events: map[string]catalog.Event{
-				"user_signup": {
+			events: []catalog.Event{
+				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
 					Type:        "track",
@@ -145,13 +145,13 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: nil,
 				},
 			},
-			categories:   map[string]catalog.Category{},
+			categories:   nil,
 			expectedErrs: 0,
 		},
 		{
 			name: "invalid category reference format in event",
-			events: map[string]catalog.Event{
-				"user_signup": {
+			events: []catalog.Event{
+				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
 					Type:        "track",
@@ -159,16 +159,16 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:"), // Missing category ID
 				},
 			},
-			categories: map[string]catalog.Category{
-				"user_actions": testCategory,
+			categories: []catalog.Category{
+				testCategory,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#category:<id>'"},
 		},
 		{
 			name: "reference to non-existent category in event",
-			events: map[string]catalog.Event{
-				"user_signup": {
+			events: []catalog.Event{
+				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
 					Type:        "track",
@@ -176,16 +176,16 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:non_existent_category"),
 				},
 			},
-			categories: map[string]catalog.Category{
-				"user_actions": testCategory,
+			categories: []catalog.Category{
+				testCategory,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"category reference '#category:non_existent_category' not found in catalog"},
 		},
 		{
 			name: "completely malformed category reference",
-			events: map[string]catalog.Event{
-				"user_signup": {
+			events: []catalog.Event{
+				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
 					Type:        "track",
@@ -193,8 +193,8 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("user_actions"),
 				},
 			},
-			categories: map[string]catalog.Category{
-				"user_actions": testCategory,
+			categories: []catalog.Category{
+				testCategory,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#category:<id>'"},
@@ -229,27 +229,27 @@ func TestVariantsReferenceValidation(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create test properties for reference validation
-	testProperties := map[string]catalog.PropertyV1{
-		"page_name":   {LocalID: "page_name", Name: "Page Name", Type: "string"},
-		"search_term": {LocalID: "search_term", Name: "Search Term", Type: "string"},
-		"product_id":  {LocalID: "product_id", Name: "Product ID", Type: "string"},
-		"user_id":     {LocalID: "user_id", Name: "User ID", Type: "string"},
+	testProperties := []catalog.PropertyV1{
+		{LocalID: "page_name", Name: "Page Name", Type: "string"},
+		{LocalID: "search_term", Name: "Search Term", Type: "string"},
+		{LocalID: "product_id", Name: "Product ID", Type: "string"},
+		{LocalID: "user_id", Name: "User ID", Type: "string"},
 	}
 
-	testEvents := map[string]catalog.Event{
-		"test-event": {LocalID: "test-event", Name: "Test Event", Type: "track"},
+	testEvents := []catalog.Event{
+		{LocalID: "test-event", Name: "Test Event", Type: "track"},
 	}
 
 	testCases := []struct {
 		name          string
-		trackingPlans map[string]*catalog.TrackingPlan
-		customTypes   map[string]catalog.CustomType
+		trackingPlans []*catalog.TrackingPlan
+		customTypes   []catalog.CustomType
 		errors        []ValidationError
 	}{
 		{
 			name: "valid variants references in tracking plan",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -290,8 +290,8 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "valid variants references in custom type",
-			customTypes: map[string]catalog.CustomType{
-				"TestType": {
+			customTypes: []catalog.CustomType{
+				{
 					LocalID:     "TestType",
 					Name:        "TestType",
 					Description: "Test custom type with variants",
@@ -323,8 +323,8 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid discriminator and property reference in variant case",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -366,8 +366,8 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property reference in variant default",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -456,29 +456,29 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create test properties for nested reference validation
-	testProperties := map[string]catalog.PropertyV1{
-		"user_profile":       {LocalID: "user_profile", Name: "User Profile", Type: "object"},
-		"profile_name":       {LocalID: "profile_name", Name: "Profile Name", Type: "string"},
-		"profile_settings":   {LocalID: "profile_settings", Name: "Profile Settings", Type: "object"},
-		"theme_preference":   {LocalID: "theme_preference", Name: "Theme Preference", Type: "string"},
-		"notification_prefs": {LocalID: "notification_prefs", Name: "Notification Preferences", Type: "object"},
-		"email_enabled":      {LocalID: "email_enabled", Name: "Email Enabled", Type: "boolean"},
+	testProperties := []catalog.PropertyV1{
+		{LocalID: "user_profile", Name: "User Profile", Type: "object"},
+		{LocalID: "profile_name", Name: "Profile Name", Type: "string"},
+		{LocalID: "profile_settings", Name: "Profile Settings", Type: "object"},
+		{LocalID: "theme_preference", Name: "Theme Preference", Type: "string"},
+		{LocalID: "notification_prefs", Name: "Notification Preferences", Type: "object"},
+		{LocalID: "email_enabled", Name: "Email Enabled", Type: "boolean"},
 	}
 
-	testEvents := map[string]catalog.Event{
-		"user_signup": {LocalID: "user_signup", Name: "User Signup", Type: "track"},
+	testEvents := []catalog.Event{
+		{LocalID: "user_signup", Name: "User Signup", Type: "track"},
 	}
 
 	testCases := []struct {
 		name          string
-		trackingPlans map[string]*catalog.TrackingPlan
+		trackingPlans []*catalog.TrackingPlan
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid nested property references (2 levels)",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -508,8 +508,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "valid nested property references (3 levels deep)",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -545,8 +545,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference (non-existent property)",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -577,8 +577,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference format",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -609,8 +609,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "multiple nested reference errors (different levels)",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{
@@ -654,8 +654,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "mixed valid and invalid nested references",
-			trackingPlans: map[string]*catalog.TrackingPlan{
-				"test-tp": {
+			trackingPlans: []*catalog.TrackingPlan{
+				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRule{

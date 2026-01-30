@@ -34,48 +34,62 @@ type WorkspaceRemoteIDMapping struct {
 
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties     map[string]PropertyV1                `json:"properties"`    // Key: property LocalID
-	Events         map[string]Event                     `json:"events"`        // Key: event LocalID
-	TrackingPlans  map[string]*TrackingPlan             `json:"trackingPlans"` // Key: tracking plan ID
-	CustomTypes    map[string]CustomType                `json:"customTypes"`   // Key: custom type LocalID
-	Categories     map[string]Category                  `json:"categories"`    // Key: category LocalID
+	Properties     []PropertyV1                         `json:"properties"`
+	Events         []Event                              `json:"events"`
+	TrackingPlans  []*TrackingPlan                      `json:"trackingPlans"`
+	CustomTypes    []CustomType                         `json:"customTypes"`
+	Categories     []Category                           `json:"categories"`
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 	ReferenceMap   map[string]string                    `json:"-"` // Maps URN references to original path-based references
 }
 
 func (dc *DataCatalog) Property(id string) *PropertyV1 {
-	if prop, ok := dc.Properties[id]; ok {
-		return &prop
+	for i := range dc.Properties {
+		if dc.Properties[i].LocalID == id {
+			return &dc.Properties[i]
+		}
 	}
 	return nil
 }
 
 func (dc *DataCatalog) Event(id string) *Event {
-	if event, ok := dc.Events[id]; ok {
-		return &event
+	for i := range dc.Events {
+		if dc.Events[i].LocalID == id {
+			return &dc.Events[i]
+		}
 	}
 	return nil
 }
 
 // Category returns a category by ID
 func (dc *DataCatalog) Category(id string) *Category {
-	if category, ok := dc.Categories[id]; ok {
-		return &category
+	for i := range dc.Categories {
+		if dc.Categories[i].LocalID == id {
+			return &dc.Categories[i]
+		}
 	}
 	return nil
 }
 
 // CustomType returns a custom type by ID
 func (dc *DataCatalog) CustomType(id string) *CustomType {
-	if customType, ok := dc.CustomTypes[id]; ok {
-		return &customType
+	for i := range dc.CustomTypes {
+		if dc.CustomTypes[i].LocalID == id {
+			return &dc.CustomTypes[i]
+		}
 	}
 	return nil
 }
 
 func (dc *DataCatalog) TPEventRule(tpID, ruleID string) *TPRule {
-	tp, ok := dc.TrackingPlans[tpID]
-	if !ok {
+	var tp *TrackingPlan
+	for i := range dc.TrackingPlans {
+		if dc.TrackingPlans[i].LocalID == tpID {
+			tp = dc.TrackingPlans[i]
+			break
+		}
+	}
+	if tp == nil {
 		return nil
 	}
 
@@ -89,8 +103,14 @@ func (dc *DataCatalog) TPEventRule(tpID, ruleID string) *TPRule {
 }
 
 func (dc *DataCatalog) TPEventRules(tpID string) ([]*TPRule, bool) {
-	tp, ok := dc.TrackingPlans[tpID]
-	if !ok {
+	var tp *TrackingPlan
+	for i := range dc.TrackingPlans {
+		if dc.TrackingPlans[i].LocalID == tpID {
+			tp = dc.TrackingPlans[i]
+			break
+		}
+	}
+	if tp == nil {
 		return nil, false
 	}
 
@@ -107,11 +127,11 @@ func (dc *DataCatalog) TPEventRules(tpID string) ([]*TPRule, bool) {
 
 func New() *DataCatalog {
 	return &DataCatalog{
-		Properties:     map[string]PropertyV1{},
-		Events:         map[string]Event{},
-		TrackingPlans:  map[string]*TrackingPlan{},
-		CustomTypes:    map[string]CustomType{},
-		Categories:     map[string]Category{},
+		Properties:     []PropertyV1{},
+		Events:         []Event{},
+		TrackingPlans:  []*TrackingPlan{},
+		CustomTypes:    []CustomType{},
+		Categories:     []Category{},
 		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
 		ReferenceMap:   map[string]string{},
 	}
@@ -335,27 +355,21 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		if err != nil {
 			return fmt.Errorf("extracting properties: %w", err)
 		}
-		for _, prop := range properties {
-			dc.Properties[prop.LocalID] = prop
-		}
+		dc.Properties = append(dc.Properties, properties...)
 
 	case KindEvents:
 		events, err := ExtractEvents(s)
 		if err != nil {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
-		for _, event := range events {
-			dc.Events[event.LocalID] = event
-		}
+		dc.Events = append(dc.Events, events...)
 
 	case KindCategories:
 		categories, err := ExtractCategories(s)
 		if err != nil {
 			return fmt.Errorf("extracting categories: %w", err)
 		}
-		for _, category := range categories {
-			dc.Categories[category.LocalID] = category
-		}
+		dc.Categories = append(dc.Categories, categories...)
 
 	case KindTrackingPlans:
 		tp, err := ExtractTrackingPlan(s)
@@ -363,19 +377,20 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
-		if _, exists := dc.TrackingPlans[tp.LocalID]; exists {
-			return fmt.Errorf("duplicate tracking plan with id '%s' found", tp.LocalID)
+		// Check for duplicates
+		for i := range dc.TrackingPlans {
+			if dc.TrackingPlans[i].LocalID == tp.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", tp.LocalID)
+			}
 		}
-		dc.TrackingPlans[tp.LocalID] = &tp
+		dc.TrackingPlans = append(dc.TrackingPlans, &tp)
 
 	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)
 		if err != nil {
 			return fmt.Errorf("extracting custom types: %w", err)
 		}
-		for _, customType := range customTypes {
-			dc.CustomTypes[customType.LocalID] = customType
-		}
+		dc.CustomTypes = append(dc.CustomTypes, customTypes...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)

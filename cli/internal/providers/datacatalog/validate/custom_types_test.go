@@ -14,14 +14,14 @@ func TestCustomTypeValidation(t *testing.T) {
 
 		testCases := []struct {
 			name          string
-			customTypes   map[string]catalog.CustomType
+			customTypes   []catalog.CustomType
 			expectedErrs  int
 			errorContains []string
 		}{
 			{
 				name: "valid custom type",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -33,9 +33,10 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "missing required fields",
-				customTypes: map[string]catalog.CustomType{
-					"": { // LocalID will be empty
+				customTypes: []catalog.CustomType{
+					{ // LocalID will be empty
 						// Missing LocalID
+						LocalID:     "",
 						Name:        "TestType",
 						Description: "Test custom type",
 						Type:        "string",
@@ -47,8 +48,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "object type with property missing ID",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -67,8 +68,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "invalid name format",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "invalidName", // Doesn't start with capital letter
 						Description: "Test custom type",
@@ -81,8 +82,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "invalid data type",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -95,8 +96,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "string type with invalid config",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -111,8 +112,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "number type with invalid config",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -127,8 +128,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "array type with invalid config",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -174,18 +175,18 @@ func TestCustomTypeValidation(t *testing.T) {
 
 		testCases := []struct {
 			name          string
-			properties    map[string]catalog.PropertyV1
-			customTypes   map[string]catalog.CustomType
+			properties    []catalog.PropertyV1
+			customTypes   []catalog.CustomType
 			expectedErrs  int
 			errorContains []string
 		}{
 			{
 				name: "valid property reference",
-				properties: map[string]catalog.PropertyV1{
-					"testProp": testProperty,
+				properties: []catalog.PropertyV1{
+					testProperty,
 				},
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -203,8 +204,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "invalid reference format",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -223,8 +224,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "reference to non-existent property",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType",
 						Description: "Test custom type",
@@ -267,21 +268,21 @@ func TestCustomTypeValidation(t *testing.T) {
 
 		testCases := []struct {
 			name          string
-			customTypes   map[string]catalog.CustomType
+			customTypes   []catalog.CustomType
 			expectedErrs  int
 			errorContains []string
 		}{
 			{
 				name: "no duplicates",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "TestType1",
 						Description: "Test custom type 1",
 						Type:        "string",
 						Config:      map[string]any{},
 					},
-					"TestType2": {
+					{
 						LocalID:     "TestType2",
 						Name:        "TestType2",
 						Description: "Test custom type 2",
@@ -293,15 +294,15 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "duplicate names",
-				customTypes: map[string]catalog.CustomType{
-					"TestType1": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "TestType1",
 						Name:        "DuplicateName",
 						Description: "Test custom type 1",
 						Type:        "string",
 						Config:      map[string]any{},
 					},
-					"TestType2": {
+					{
 						LocalID:     "TestType2",
 						Name:        "DuplicateName", // Duplicate name
 						Description: "Test custom type 2",
@@ -314,8 +315,8 @@ func TestCustomTypeValidation(t *testing.T) {
 			},
 			{
 				name: "duplicate IDs - not possible with map structure",
-				customTypes: map[string]catalog.CustomType{
-					"DuplicateID": {
+				customTypes: []catalog.CustomType{
+					{
 						LocalID:     "DuplicateID",
 						Name:        "TestType1",
 						Description: "Test custom type 1",
@@ -376,54 +377,54 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		properties    map[string]catalog.PropertyV1
-		customTypes   map[string]catalog.CustomType
+		properties    []catalog.PropertyV1
+		customTypes   []catalog.CustomType
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid custom type reference in property type",
-			properties: map[string]catalog.PropertyV1{
-				"email": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
 					Type:        "#custom-type:EmailType",
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs: 0,
 		},
 		{
 			name: "invalid custom type reference format in property type",
-			properties: map[string]catalog.PropertyV1{
-				"email": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
 					Type:        "#custom-type:", // Missing type ID
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"custom type reference in type field has invalid format"},
 		},
 		{
 			name: "reference to non-existent custom type in property type",
-			properties: map[string]catalog.PropertyV1{
-				"email": {
+			properties: []catalog.PropertyV1{
+				{
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
 					Type:        "#custom-type:NonExistentType",
 				},
 			},
-			customTypes: map[string]catalog.CustomType{
-				"EmailType": testCustomType,
+			customTypes: []catalog.CustomType{
+				testCustomType,
 			},
 			expectedErrs:  1,
 			errorContains: []string{"custom type reference '#custom-type:NonExistentType' not found in catalog"},

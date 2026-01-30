@@ -118,9 +118,7 @@ func extractEntititesV1(s *specs.Spec, dc *DataCatalog) error {
 		if err := extractSpec(s.Spec, &pSpec); err != nil {
 			return fmt.Errorf("extracting the property spec: %w", err)
 		}
-		for _, prop := range pSpec.Properties {
-			dc.Properties[prop.LocalID] = prop
-		}
+		dc.Properties = append(dc.Properties, pSpec.Properties...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)
