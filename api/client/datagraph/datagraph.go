@@ -29,8 +29,8 @@ type DataGraphStore interface {
 	// DeleteDataGraph deletes a data graph by ID
 	DeleteDataGraph(ctx context.Context, id string) error
 
-	// SetExternalID sets the external ID for a data graph
-	SetExternalID(ctx context.Context, id string, externalID string) error
+	// SetExternalID sets the external ID for a data graph and returns the updated data graph
+	SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error)
 }
 
 // rudderDataGraphStore implements the DataGraphStore interface
@@ -132,22 +132,27 @@ func (s *rudderDataGraphStore) DeleteDataGraph(ctx context.Context, id string) e
 	return nil
 }
 
-// SetExternalID sets the external ID for a data graph
-func (s *rudderDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) error {
+// SetExternalID sets the external ID for a data graph and returns the updated data graph
+func (s *rudderDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error) {
 	if id == "" {
-		return fmt.Errorf("data graph ID cannot be empty")
+		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
 
 	path := fmt.Sprintf("%s/%s/external-id", dataGraphsBasePath, id)
 	data, err := json.Marshal(map[string]string{"externalId": externalID})
 	if err != nil {
-		return fmt.Errorf("marshalling external ID: %w", err)
+		return nil, fmt.Errorf("marshalling external ID: %w", err)
 	}
 
-	_, err = s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	resp, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("setting external ID: %w", err)
+		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
 
-	return nil
+	var result DataGraph
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling response: %w", err)
+	}
+
+	return &result, nil
 }
