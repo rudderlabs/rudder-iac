@@ -234,7 +234,7 @@ func TestImport(t *testing.T) {
 			assert.Equal(t, "remote-1", id)
 			return &dgClient.DataGraph{
 				ID:         id,
-				ExternalID: "test-dg",
+				ExternalID: externalID,
 			}, nil
 		},
 	}
