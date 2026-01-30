@@ -3,9 +3,10 @@ package localcatalog
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type PropertyV1 struct {
@@ -29,6 +30,23 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 	return nil
 }
 
+var SupportedV0ConfigKeys = []string{
+	"enum",
+	"exclusiveMaximum",
+	"exclusiveMinimum",
+	"format",
+	"itemTypes",
+	"maxItems",
+	"maxLength",
+	"maximum",
+	"minItems",
+	"minLength",
+	"minimum",
+	"multipleOf",
+	"pattern",
+	"uniqueItems",
+}
+
 // convertConfigKeysToSnakeCase converts camelCase config keys to snake_case
 // for v1 spec format. This handles the migration from v0 to v1 config format.
 func convertConfigKeysToSnakeCase(config map[string]interface{}) map[string]interface{} {
@@ -36,10 +54,15 @@ func convertConfigKeysToSnakeCase(config map[string]interface{}) map[string]inte
 		return nil
 	}
 
+	snakeCaseNamer := namer.NewSnakeCase()
+
 	converted := make(map[string]interface{})
 	for key, value := range config {
-		snakeKey := utils.ToSnakeCase(key)
-		converted[snakeKey] = value
+		convertedKey := key
+		if slices.Contains(SupportedV0ConfigKeys, key) {
+			convertedKey = snakeCaseNamer.Name(key)
+		}
+		converted[convertedKey] = value
 	}
 
 	return converted

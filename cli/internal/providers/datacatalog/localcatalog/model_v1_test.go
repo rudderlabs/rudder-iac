@@ -98,6 +98,7 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 						"itemTypes":        []interface{}{"string", "integer"},
 						"exclusiveMinimum": 1,
 						"exclusiveMaximum": 99,
+						"unsupportedConfig": "some-value",
 					},
 				},
 			},
@@ -121,6 +122,7 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 				"item_types":        []interface{}{"string", "integer"},
 				"exclusive_minimum": 1,
 				"exclusive_maximum": 99,
+				"unsupportedConfig": "some-value",
 			},
 		}
 		assert.Equal(t, expected, v1Spec.Properties[0])
