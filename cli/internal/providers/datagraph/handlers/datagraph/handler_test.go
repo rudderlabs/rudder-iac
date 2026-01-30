@@ -18,9 +18,8 @@ type mockDataGraphStore struct {
 	listDataGraphsFunc  func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error)
 	getDataGraphFunc    func(ctx context.Context, id string) (*dgClient.DataGraph, error)
 	createDataGraphFunc func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error)
-	updateDataGraphFunc func(ctx context.Context, id string, req *dgClient.UpdateDataGraphRequest) (*dgClient.DataGraph, error)
 	deleteDataGraphFunc func(ctx context.Context, id string) error
-	setExternalIDFunc   func(ctx context.Context, id string, externalID string) error
+	setExternalIDFunc   func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error)
 }
 
 func (m *mockDataGraphStore) ListDataGraphs(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
@@ -47,13 +46,6 @@ func (m *mockDataGraphStore) CreateDataGraph(ctx context.Context, req *dgClient.
 	return nil, nil
 }
 
-func (m *mockDataGraphStore) UpdateDataGraph(ctx context.Context, id string, req *dgClient.UpdateDataGraphRequest) (*dgClient.DataGraph, error) {
-	if m.updateDataGraphFunc != nil {
-		return m.updateDataGraphFunc(ctx, id, req)
-	}
-	return nil, nil
-}
-
 func (m *mockDataGraphStore) DeleteDataGraph(ctx context.Context, id string) error {
 	if m.deleteDataGraphFunc != nil {
 		return m.deleteDataGraphFunc(ctx, id)
@@ -61,11 +53,11 @@ func (m *mockDataGraphStore) DeleteDataGraph(ctx context.Context, id string) err
 	return nil
 }
 
-func (m *mockDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) error {
+func (m *mockDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
 	if m.setExternalIDFunc != nil {
 		return m.setExternalIDFunc(ctx, id, externalID)
 	}
-	return nil
+	return &dgClient.DataGraph{ID: id, ExternalID: externalID}, nil
 }
 
 func TestValidateSpec(t *testing.T) {
@@ -82,7 +74,6 @@ func TestValidateSpec(t *testing.T) {
 			name: "valid spec",
 			spec: &model.DataGraphSpec{
 				ID:        "test-dg",
-				Name:      "Test Data Graph",
 				AccountID: "account-123",
 			},
 			wantErr: false,
@@ -90,26 +81,15 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "missing id",
 			spec: &model.DataGraphSpec{
-				Name:      "Test Data Graph",
 				AccountID: "account-123",
 			},
 			wantErr: true,
 			errMsg:  "id is required",
 		},
 		{
-			name: "missing name",
-			spec: &model.DataGraphSpec{
-				ID:        "test-dg",
-				AccountID: "account-123",
-			},
-			wantErr: true,
-			errMsg:  "name is required",
-		},
-		{
 			name: "missing account_id",
 			spec: &model.DataGraphSpec{
-				ID:   "test-dg",
-				Name: "Test Data Graph",
+				ID: "test-dg",
 			},
 			wantErr: true,
 			errMsg:  "account_id is required",
@@ -135,7 +115,6 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 
 	spec := &model.DataGraphSpec{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -145,7 +124,6 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 
 	expected := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -167,25 +145,14 @@ func TestValidateResource(t *testing.T) {
 			name: "valid resource",
 			resource: &model.DataGraphResource{
 				ID:        "test-dg",
-				Name:      "Test Data Graph",
 				AccountID: "account-123",
 			},
 			wantErr: false,
 		},
 		{
-			name: "missing name",
-			resource: &model.DataGraphResource{
-				ID:        "test-dg",
-				AccountID: "account-123",
-			},
-			wantErr: true,
-			errMsg:  "name is required",
-		},
-		{
 			name: "missing account_id",
 			resource: &model.DataGraphResource{
-				ID:   "test-dg",
-				Name: "Test Data Graph",
+				ID: "test-dg",
 			},
 			wantErr: true,
 			errMsg:  "account_id is required",
@@ -216,10 +183,9 @@ func TestLoadRemoteResources(t *testing.T) {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
-							ID:                 "remote-1",
-							ExternalID:         "dg-1",
-							Name:               "Data Graph 1",
-							WarehouseAccountID: "account-1",
+							ID:         "remote-1",
+							ExternalID: "dg-1",
+							AccountID:  "account-1",
 						},
 					},
 					Paging: client.Paging{Next: ""},
@@ -236,10 +202,9 @@ func TestLoadRemoteResources(t *testing.T) {
 
 	expected := &model.RemoteDataGraph{
 		DataGraph: &dgClient.DataGraph{
-			ID:                 "remote-1",
-			ExternalID:         "dg-1",
-			Name:               "Data Graph 1",
-			WarehouseAccountID: "account-1",
+			ID:         "remote-1",
+			ExternalID: "dg-1",
+			AccountID:  "account-1",
 		},
 	}
 
@@ -257,10 +222,9 @@ func TestLoadImportableResources(t *testing.T) {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
-							ID:                 "remote-2",
-							ExternalID:         "", // No external ID - importable
-							Name:               "Data Graph 2",
-							WarehouseAccountID: "account-2",
+							ID:         "remote-2",
+							ExternalID: "", // No external ID - importable
+							AccountID:  "account-2",
 						},
 					},
 					Paging: client.Paging{Next: ""},
@@ -283,10 +247,9 @@ func TestMapRemoteToState(t *testing.T) {
 	t.Run("with external ID", func(t *testing.T) {
 		remote := &model.RemoteDataGraph{
 			DataGraph: &dgClient.DataGraph{
-				ID:                 "remote-1",
-				ExternalID:         "dg-1",
-				Name:               "Data Graph 1",
-				WarehouseAccountID: "account-1",
+				ID:         "remote-1",
+				ExternalID: "dg-1",
+				AccountID:  "account-1",
 			},
 		}
 
@@ -295,7 +258,6 @@ func TestMapRemoteToState(t *testing.T) {
 
 		expectedResource := &model.DataGraphResource{
 			ID:        "dg-1",
-			Name:      "Data Graph 1",
 			AccountID: "account-1",
 		}
 		expectedState := &model.DataGraphState{
@@ -309,10 +271,9 @@ func TestMapRemoteToState(t *testing.T) {
 	t.Run("without external ID", func(t *testing.T) {
 		remote := &model.RemoteDataGraph{
 			DataGraph: &dgClient.DataGraph{
-				ID:                 "remote-2",
-				ExternalID:         "",
-				Name:               "Data Graph 2",
-				WarehouseAccountID: "account-2",
+				ID:         "remote-2",
+				ExternalID: "",
+				AccountID:  "account-2",
 			},
 		}
 
@@ -326,14 +287,12 @@ func TestMapRemoteToState(t *testing.T) {
 func TestCreate(t *testing.T) {
 	mockClient := &mockDataGraphStore{
 		createDataGraphFunc: func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "Test Data Graph", req.Name)
-			assert.Equal(t, "account-123", req.WarehouseAccountID)
+			assert.Equal(t, "account-123", req.AccountID)
 			assert.Equal(t, "test-dg", req.ExternalID)
 			return &dgClient.DataGraph{
-				ID:                 "remote-1",
-				Name:               req.Name,
-				WarehouseAccountID: req.WarehouseAccountID,
-				ExternalID:         req.ExternalID,
+				ID:         "remote-1",
+				AccountID:  req.AccountID,
+				ExternalID: req.ExternalID,
 			}, nil
 		},
 	}
@@ -342,7 +301,6 @@ func TestCreate(t *testing.T) {
 
 	data := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -356,28 +314,16 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	mockClient := &mockDataGraphStore{
-		updateDataGraphFunc: func(ctx context.Context, id string, req *dgClient.UpdateDataGraphRequest) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "remote-1", id)
-			assert.Equal(t, "Updated Data Graph", req.Name)
-			return &dgClient.DataGraph{
-				ID:   id,
-				Name: req.Name,
-			}, nil
-		},
-	}
-
+	mockClient := &mockDataGraphStore{}
 	h := &HandlerImpl{client: mockClient}
 
 	newData := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Updated Data Graph",
 		AccountID: "account-123",
 	}
 
 	oldData := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -385,27 +331,19 @@ func TestUpdate(t *testing.T) {
 		ID: "remote-1",
 	}
 
-	state, err := h.Update(context.Background(), newData, oldData, oldState)
-	require.NoError(t, err)
-
-	expectedState := &model.DataGraphState{
-		ID: "remote-1",
-	}
-	assert.Equal(t, expectedState, state)
+	_, err := h.Update(context.Background(), newData, oldData, oldState)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "do not support updates")
 }
 
 func TestImport(t *testing.T) {
 	mockClient := &mockDataGraphStore{
-		setExternalIDFunc: func(ctx context.Context, id string, externalID string) error {
+		setExternalIDFunc: func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
 			assert.Equal(t, "remote-1", id)
 			assert.Equal(t, "test-dg", externalID)
-			return nil
-		},
-		getDataGraphFunc: func(ctx context.Context, id string) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "remote-1", id)
 			return &dgClient.DataGraph{
 				ID:         id,
-				ExternalID: "test-dg",
+				ExternalID: externalID,
 			}, nil
 		},
 	}
@@ -414,7 +352,6 @@ func TestImport(t *testing.T) {
 
 	data := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -439,7 +376,6 @@ func TestDelete(t *testing.T) {
 
 	oldData := &model.DataGraphResource{
 		ID:        "test-dg",
-		Name:      "Test Data Graph",
 		AccountID: "account-123",
 	}
 
@@ -457,10 +393,9 @@ func TestMapRemoteToSpec(t *testing.T) {
 
 	remote := &model.RemoteDataGraph{
 		DataGraph: &dgClient.DataGraph{
-			ID:                 "remote-1",
-			ExternalID:         "dg-1",
-			Name:               "Data Graph 1",
-			WarehouseAccountID: "account-1",
+			ID:         "remote-1",
+			ExternalID: "dg-1",
+			AccountID:  "account-1",
 		},
 	}
 
@@ -469,7 +404,6 @@ func TestMapRemoteToSpec(t *testing.T) {
 
 	expected := &model.DataGraphSpec{
 		ID:        "dg-1",
-		Name:      "Data Graph 1",
 		AccountID: "account-1",
 	}
 

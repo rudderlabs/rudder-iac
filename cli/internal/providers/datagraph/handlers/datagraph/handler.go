@@ -44,9 +44,6 @@ func (h *HandlerImpl) ValidateSpec(spec *model.DataGraphSpec) error {
 	if spec.ID == "" {
 		return fmt.Errorf("id is required")
 	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
 	if spec.AccountID == "" {
 		return fmt.Errorf("account_id is required")
 	}
@@ -56,7 +53,6 @@ func (h *HandlerImpl) ValidateSpec(spec *model.DataGraphSpec) error {
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.DataGraphSpec) (map[string]*model.DataGraphResource, error) {
 	resource := &model.DataGraphResource{
 		ID:        spec.ID,
-		Name:      spec.Name,
 		AccountID: spec.AccountID,
 	}
 	return map[string]*model.DataGraphResource{
@@ -65,9 +61,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.DataGrap
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.DataGraphResource, graph *resources.Graph) error {
-	if resource.Name == "" {
-		return fmt.Errorf("name is required")
-	}
 	if resource.AccountID == "" {
 		return fmt.Errorf("account_id is required")
 	}
@@ -123,8 +116,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteDataGraph, urnResolve
 
 	resource := &model.DataGraphResource{
 		ID:        remote.ExternalID,
-		Name:      remote.Name,
-		AccountID: remote.WarehouseAccountID,
+		AccountID: remote.AccountID,
 	}
 
 	state := &model.DataGraphState{
@@ -136,9 +128,8 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteDataGraph, urnResolve
 
 func (h *HandlerImpl) Create(ctx context.Context, data *model.DataGraphResource) (*model.DataGraphState, error) {
 	req := &dgClient.CreateDataGraphRequest{
-		Name:               data.Name,
-		WarehouseAccountID: data.AccountID,
-		ExternalID:         data.ID,
+		AccountID:  data.AccountID,
+		ExternalID: data.ID,
 	}
 
 	remote, err := h.client.CreateDataGraph(ctx, req)
@@ -152,30 +143,16 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.DataGraphResource)
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.DataGraphResource, oldData *model.DataGraphResource, oldState *model.DataGraphState) (*model.DataGraphState, error) {
-	req := &dgClient.UpdateDataGraphRequest{
-		Name: newData.Name,
-	}
-
-	remote, err := h.client.UpdateDataGraph(ctx, oldState.ID, req)
-	if err != nil {
-		return nil, fmt.Errorf("updating data graph: %w", err)
-	}
-
-	return &model.DataGraphState{
-		ID: remote.ID,
-	}, nil
+	// Data graphs do not support updates after creation
+	// The only mutable field is externalId which is managed through Import operation
+	return nil, fmt.Errorf("data graphs do not support updates after creation; delete and recreate the resource to apply changes")
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.DataGraphResource, remoteID string) (*model.DataGraphState, error) {
-	// Set external ID on the remote resource
-	if err := h.client.SetExternalID(ctx, remoteID, data.ID); err != nil {
-		return nil, fmt.Errorf("setting external ID: %w", err)
-	}
-
-	// Fetch the remote resource to get updated data
-	remote, err := h.client.GetDataGraph(ctx, remoteID)
+	// Set external ID on the remote resource and get the updated data graph
+	remote, err := h.client.SetExternalID(ctx, remoteID, data.ID)
 	if err != nil {
-		return nil, fmt.Errorf("getting data graph: %w", err)
+		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
 
 	return &model.DataGraphState{
@@ -195,8 +172,7 @@ func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteDat
 	return &export.SpecExportData[model.DataGraphSpec]{
 		Data: &model.DataGraphSpec{
 			ID:        externalID,
-			Name:      remote.Name,
-			AccountID: remote.WarehouseAccountID,
+			AccountID: remote.AccountID,
 		},
 		RelativePath: fmt.Sprintf("data-graphs/%s.yaml", externalID),
 	}, nil
