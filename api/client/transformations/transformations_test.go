@@ -625,6 +625,110 @@ func TestBatchPublish(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestBatchTest(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/tests/run", `{
+					"transformations": [
+						{
+							"name": "test-transformation",
+							"language": "javascript",
+							"code": "export function transformEvent(event) { return event; }",
+							"testSuite": [
+								{
+									"id": "test-1",
+									"name": "Test Case 1",
+									"description": "Test description",
+									"input": [{"type": "track", "event": "Button Clicked"}],
+									"expectedOutput": [{"type": "track", "event": "Button Clicked"}]
+								}
+							]
+						}
+					],
+					"libraries": [
+						{
+							"versionId": "lib-ver-123"
+						}
+					]
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `[
+				{
+					"name": "test-transformation",
+					"language": "javascript",
+					"code": "export function transformEvent(event) { return event; }",
+					"testSuiteResult": {
+						"status": "pass",
+						"durationMS": 150,
+						"results": [
+							{
+								"id": "test-1",
+								"name": "Test Case 1",
+								"description": "Test description",
+								"status": "pass",
+								"actualOutput": [{"type": "track", "event": "Button Clicked"}],
+								"durationMS": 150,
+								"logs": ["Test passed successfully"]
+							}
+						]
+					}
+				}
+			]`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	req := &transformations.BatchTestRequest{
+		Transformations: []transformations.MultiTransformationTestInput{
+			{
+				Name:     "test-transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event) { return event; }",
+				TestSuite: []transformations.TestDefinition{
+					{
+						ID:             "test-1",
+						Name:           "Test Case 1",
+						Description:    "Test description",
+						Input:          []any{map[string]any{"type": "track", "event": "Button Clicked"}},
+						ExpectedOutput: []any{map[string]any{"type": "track", "event": "Button Clicked"}},
+					},
+				},
+			},
+		},
+		Libraries: []transformations.TransformationLibraryInput{
+			{
+				VersionID: "lib-ver-123",
+			},
+		},
+	}
+
+	results, err := store.BatchTest(ctx, req)
+	require.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "test-transformation", results[0].Name)
+	assert.Equal(t, "javascript", results[0].Language)
+	assert.Equal(t, transformations.TestRunStatusPass, results[0].TestSuiteResult.Status)
+	assert.Equal(t, 150, results[0].TestSuiteResult.DurationMS)
+	assert.Len(t, results[0].TestSuiteResult.Results, 1)
+	assert.Equal(t, "test-1", results[0].TestSuiteResult.Results[0].ID)
+	assert.Equal(t, "Test Case 1", results[0].TestSuiteResult.Results[0].Name)
+	assert.Equal(t, transformations.TestRunStatusPass, results[0].TestSuiteResult.Results[0].Status)
+	assert.Equal(t, 150, results[0].TestSuiteResult.Results[0].DurationMS)
+	assert.Len(t, results[0].TestSuiteResult.Results[0].Logs, 1)
+	assert.Equal(t, "Test passed successfully", results[0].TestSuiteResult.Results[0].Logs[0])
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestUpdateTransformationClearDescription(t *testing.T) {
 	// This test proves we can explicitly set description to empty string
 	// which is different from omitting the field entirely
