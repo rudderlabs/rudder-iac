@@ -397,7 +397,7 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 // 5. Array properties with multiple item types where at least one is object
 func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
 	// if the property's type is a custom type, additional properties should be false
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
+	if strings.HasPrefix(prop.Type, "#custom-type:") {
 		return false
 	}
 	hasObject := strings.Contains(prop.Type, "object")

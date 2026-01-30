@@ -34,7 +34,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 				if itemTypesMatch {
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("duplicate name key: %s, type: %s", prop.Name, prop.Type),
-						Reference: fmt.Sprintf("#properties:%s", prop.LocalID),
+						Reference: fmt.Sprintf("#property:%s", prop.LocalID),
 					})
 				}
 			}
@@ -43,7 +43,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		if _, ok := propID[prop.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s", prop.LocalID),
-				Reference: fmt.Sprintf("#properties:%s", prop.LocalID),
+				Reference: fmt.Sprintf("#property:%s", prop.LocalID),
 			})
 		}
 
@@ -66,14 +66,14 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		if _, ok := eventName[event.Name]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate name key %s", event.Name),
-				Reference: fmt.Sprintf("#events:%s", event.LocalID),
+				Reference: fmt.Sprintf("#event:%s", event.LocalID),
 			})
 		}
 
 		if _, ok := eventID[event.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s", event.LocalID),
-				Reference: fmt.Sprintf("#events:%s", event.LocalID),
+				Reference: fmt.Sprintf("#event:%s", event.LocalID),
 			})
 		}
 
@@ -128,14 +128,14 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		if _, ok := customTypeName[customType.Name]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate name key %s in custom types", customType.Name),
-				Reference: fmt.Sprintf("#custom-types:%s", customType.LocalID),
+				Reference: fmt.Sprintf("#custom-type:%s", customType.LocalID),
 			})
 		}
 
 		if _, ok := customTypeID[customType.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s in custom types", customType.LocalID),
-				Reference: fmt.Sprintf("#custom-types:%s", customType.LocalID),
+				Reference: fmt.Sprintf("#custom-type:%s", customType.LocalID),
 			})
 		}
 
@@ -153,14 +153,14 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		if _, ok := categoryName[category.Name]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate name key %s in categories", category.Name),
-				Reference: fmt.Sprintf("#categories:%s", category.LocalID),
+				Reference: fmt.Sprintf("#category:%s", category.LocalID),
 			})
 		}
 
 		if _, ok := categoryID[category.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s in categories", category.LocalID),
-				Reference: fmt.Sprintf("#categories:%s", category.LocalID),
+				Reference: fmt.Sprintf("#category:%s", category.LocalID),
 			})
 		}
 

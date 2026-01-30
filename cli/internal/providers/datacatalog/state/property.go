@@ -58,7 +58,7 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		sort.Strings(prop.Types)
 		args.Type = strings.Join(prop.Types, ",")
 		return nil
-	case strings.HasPrefix(prop.Type, "#/custom-types/"):
+	case strings.HasPrefix(prop.Type, "#custom-type:"):
 		customTypeURN := urnFromRef(prop.Type)
 
 		if customTypeURN == "" {
@@ -73,7 +73,7 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		// Handle item_type and item_types fields - merge into config["item_types"]
 	case prop.ItemType != "":
 		// Single item type - store as array with one element in config
-		if strings.HasPrefix(prop.ItemType, "#/custom-types/") {
+		if strings.HasPrefix(prop.ItemType, "#custom-type:") {
 			customTypeURN := urnFromRef(prop.ItemType)
 			if customTypeURN == "" {
 				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", prop.ItemType)
@@ -95,7 +95,7 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 
 		// Look for custom type references and replace entire array with first one found
 		for i, itemType := range prop.ItemTypes {
-			if !strings.HasPrefix(itemType, "#/custom-types/") {
+			if !strings.HasPrefix(itemType, "#custom-type:") {
 				itemTypesArray[i] = itemType
 				continue
 			}

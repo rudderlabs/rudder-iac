@@ -11,11 +11,11 @@ import (
 var (
 	// Regex patterns support both old (#/kind/group/id) and new (#kind:id) formats
 	// Non-capturing groups (?:...) ensure the we only capture the localId from the reference string
-	PropRegex       = regexp.MustCompile(`^#(?:/property/[^/]+/|property:)(.+)$`)
-	EventRegex      = regexp.MustCompile(`^#(?:/event/[^/]+/|event:)(.+)$`)
+	PropRegex       = regexp.MustCompile(`^#(?:/properties/[^/]+/|property:)(.+)$`)
+	EventRegex      = regexp.MustCompile(`^#(?:/events/[^/]+/|event:)(.+)$`)
 	IncludeRegex    = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
-	CustomTypeRegex = regexp.MustCompile(`^#(?:/custom-type/[^/]+/|custom-type:)(.+)$`)
-	CategoryRegex   = regexp.MustCompile(`^#(?:/category/[^/]+/|category:)(.+)$`)
+	CustomTypeRegex = regexp.MustCompile(`^#(?:/custom-types/[^/]+/|custom-type:)(.+)$`)
+	CategoryRegex   = regexp.MustCompile(`^#(?:/categories/[^/]+/|category:)(.+)$`)
 )
 
 type CatalogResourceFetcher interface {

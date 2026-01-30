@@ -41,7 +41,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 				if len(matches) != 2 {
 					errs = append(errs, ValidationError{
 						Reference: reference,
-						error:     fmt.Errorf("property reference at index %d has invalid format. Should be '#properties:<id>'", i),
+						error:     fmt.Errorf("property reference at index %d has invalid format. Should be '#property:<id>'", i),
 					})
 					continue
 				}
@@ -77,12 +77,12 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 		reference := fmt.Sprintf("#%s:%s", catalog.KindProperties, prop.LocalID)
 
 		// Check if the type field contains a custom type reference
-		if strings.HasPrefix(prop.Type, "#/custom-types/") {
+		if strings.HasPrefix(prop.Type, "#custom-type:") {
 			matches := catalog.CustomTypeRegex.FindStringSubmatch(prop.Type)
 			if len(matches) != 2 {
 				errs = append(errs, ValidationError{
 					Reference: reference,
-					error:     fmt.Errorf("custom type reference in type field has invalid format. Should be '#custom-types:<id>'"),
+					error:     fmt.Errorf("custom type reference in type field has invalid format. Should be '#custom-type:<id>'"),
 				})
 				continue
 			}
@@ -100,7 +100,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 		// Validate types array - should not contain custom type references
 		if len(prop.Types) > 0 {
 			for idx, typeVal := range prop.Types {
-				if strings.HasPrefix(typeVal, "#/custom-types/") {
+				if strings.HasPrefix(typeVal, "#custom-type:") {
 					errs = append(errs, ValidationError{
 						Reference: reference,
 						error:     fmt.Errorf("types[%d]: custom type references are not allowed in types array, use single 'type' field for custom types", idx),
@@ -110,12 +110,12 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 		}
 
 		// Check for custom type reference in item_type field (single)
-		if prop.ItemType != "" && strings.HasPrefix(prop.ItemType, "#/custom-types/") {
+		if prop.ItemType != "" && strings.HasPrefix(prop.ItemType, "#custom-type:") {
 			matches := catalog.CustomTypeRegex.FindStringSubmatch(prop.ItemType)
 			if len(matches) != 2 {
 				errs = append(errs, ValidationError{
 					Reference: reference,
-					error:     fmt.Errorf("custom type reference in item_type has invalid format. Should be '#custom-types:<id>'"),
+					error:     fmt.Errorf("custom type reference in item_type has invalid format. Should be '#custom-type:<id>'"),
 				})
 			} else {
 				// Validate custom type existence
@@ -133,12 +133,12 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 		if len(prop.ItemTypes) > 0 {
 			for idx, itemType := range prop.ItemTypes {
 				// Check if the item type is a custom type reference
-				if strings.HasPrefix(itemType, "#/custom-types/") {
+				if strings.HasPrefix(itemType, "#custom-type:") {
 					matches := catalog.CustomTypeRegex.FindStringSubmatch(itemType)
 					if len(matches) != 2 {
 						errs = append(errs, ValidationError{
 							Reference: reference,
-							error:     fmt.Errorf("custom type reference in item_types at idx: %d has invalid format. Should be '#custom-types:<id>'", idx),
+							error:     fmt.Errorf("custom type reference in item_types at idx: %d has invalid format. Should be '#custom-type:<id>'", idx),
 						})
 						continue
 					}
@@ -167,7 +167,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 			if len(matches) != 2 {
 				errs = append(errs, ValidationError{
 					Reference: reference,
-					error:     fmt.Errorf("the category field value is invalid. It should always be a reference and must follow the format '#categories:<id>'"),
+					error:     fmt.Errorf("the category field value is invalid. It should always be a reference and must follow the format '#category:<id>'"),
 				})
 				continue
 			}
@@ -285,7 +285,7 @@ func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRuleProperty,
 		if len(matches) != 2 {
 			errs = append(errs, ValidationError{
 				Reference: nestedProp.Ref,
-				error:     fmt.Errorf("property reference '%s' has invalid format in rule '%s'. Should be '#properties:<id>'", nestedProp.Ref, ruleRef),
+				error:     fmt.Errorf("property reference '%s' has invalid format in rule '%s'. Should be '#property:<id>'", nestedProp.Ref, ruleRef),
 			})
 			continue
 		}
@@ -321,12 +321,12 @@ func (rv *RefValidator) validateVariantsReferences(
 		if len(matches) != 2 {
 			errs = append(errs, ValidationError{
 				Reference: variantReference,
-				error:     errors.New("discriminator reference has invalid format, should be #properties:<id>"),
+				error:     errors.New("discriminator reference has invalid format, should be #property:<id>"),
 			})
 		} else {
 			propID := matches[1]
 			if prop := fetcher.Property(propID); prop != nil {
-				if !strings.HasPrefix(prop.Type, "#/custom-types/") {
+				if !strings.HasPrefix(prop.Type, "#custom-type:") {
 					if !strings.Contains(prop.Type, "string") && !strings.Contains(prop.Type, "integer") && !strings.Contains(prop.Type, "boolean") {
 						errs = append(errs, ValidationError{
 							Reference: variantReference,
@@ -354,7 +354,7 @@ func (rv *RefValidator) validateVariantsReferences(
 				if len(matches) != 2 {
 					errs = append(errs, ValidationError{
 						Reference: propReference,
-						error:     fmt.Errorf("property reference has invalid format. Should be '#properties:<id>'"),
+						error:     fmt.Errorf("property reference has invalid format. Should be '#property:<id>'"),
 					})
 					continue
 				}
@@ -376,7 +376,7 @@ func (rv *RefValidator) validateVariantsReferences(
 			if len(matches) != 2 {
 				errs = append(errs, ValidationError{
 					Reference: defaultReference,
-					error:     fmt.Errorf("default property reference has invalid format. Should be '#properties:<id>'"),
+					error:     fmt.Errorf("default property reference has invalid format. Should be '#property:<id>'"),
 				})
 				continue
 			}

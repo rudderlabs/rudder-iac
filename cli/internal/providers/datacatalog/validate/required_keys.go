@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 )
 
 type RequiredKeysValidator struct {
@@ -42,7 +43,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 	var errors []ValidationError
 
 	for _, prop := range dc.Properties {
-		reference := fmt.Sprintf("#%s:%s", catalog.KindProperties, prop.LocalID)
+		reference := fmt.Sprintf("#%s:%s", state.PropertyResourceType, prop.LocalID)
 
 		// Check mandatory fields - either type or types must be present
 		if prop.Name == "" || prop.LocalID == "" {
@@ -158,7 +159,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 	// Events required keys
 	for _, event := range dc.Events {
-		reference := fmt.Sprintf("#%s:%s", catalog.KindEvents, event.LocalID)
+		reference := fmt.Sprintf("#%s:%s", state.EventResourceType, event.LocalID)
 
 		if event.LocalID == "" || event.Type == "" {
 			errors = append(errors, ValidationError{
@@ -249,7 +250,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 	// Custom Types required keys
 	for _, customType := range dc.CustomTypes {
-		reference := fmt.Sprintf("#%s:%s", catalog.KindCustomTypes, customType.LocalID)
+		reference := fmt.Sprintf("#%s:%s", state.CustomTypeResourceType, customType.LocalID)
 
 		// Check mandatory fields
 		if customType.LocalID == "" || customType.Name == "" || customType.Type == "" {
@@ -322,7 +323,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 	// Categories required keys and format validation
 	for _, category := range dc.Categories {
-		reference := fmt.Sprintf("#%s:%s", catalog.KindCategories, category.LocalID)
+		reference := fmt.Sprintf("#%s:%s", state.CategoryResourceType, category.LocalID)
 
 		// Check mandatory fields
 		if category.LocalID == "" || category.Name == "" {

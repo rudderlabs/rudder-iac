@@ -339,7 +339,7 @@ func TestCustomTypeValidation(t *testing.T) {
 				// We only count errors related to custom types
 				customTypeErrs := 0
 				for _, err := range errs {
-					if strings.Contains(err.Reference, "custom-types") {
+					if strings.Contains(err.Reference, "custom-type") {
 						customTypeErrs++
 					}
 				}
@@ -388,7 +388,7 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
-					Type:        "#/custom-types/email-types/EmailType",
+					Type:        "#custom-type:EmailType",
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
@@ -403,7 +403,7 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
-					Type:        "#/custom-types/email-types", // Missing type ID
+					Type:        "#custom-type:", // Missing type ID
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
@@ -419,14 +419,14 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 					LocalID:     "email",
 					Name:        "Email",
 					Description: "User email",
-					Type:        "#/custom-types/email-types/NonExistentType",
+					Type:        "#custom-type:NonExistentType",
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
 				"EmailType": testCustomType,
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' not found in catalog"},
+			errorContains: []string{"custom type reference '#custom-type:NonExistentType' not found in catalog"},
 		},
 	}
 

@@ -10,11 +10,13 @@ import (
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
-		Events:        make(map[string]Event),
-		Properties:    make(map[string]PropertyV1),
-		TrackingPlans: make(map[string]*TrackingPlan),
-		CustomTypes:   make(map[string]CustomType),
-		Categories:    make(map[string]Category),
+		Events:         make(map[string]Event),
+		Properties:     make(map[string]PropertyV1),
+		TrackingPlans:  make(map[string]*TrackingPlan),
+		CustomTypes:    make(map[string]CustomType),
+		Categories:     make(map[string]Category),
+		ReferenceMap:   make(map[string]string),
+		ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 	}
 
 	t.Run("properties are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -1485,5 +1487,84 @@ func TestDataCatalog_MigrateSpec(t *testing.T) {
 		enum, ok := config4["enum"].([]interface{})
 		require.True(t, ok, "enum should remain unchanged")
 		assert.Equal(t, []interface{}{"value1", "value2"}, enum)
+	})
+}
+
+func TestDataCatalog_LoadLegacySpec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Loads legacy spec and transforms path-based references to URN format", func(t *testing.T) {
+		t.Parallel()
+
+		byt := []byte(`
+        version: rudder/v0.1
+        kind: tp
+        metadata:
+          name: tp_with_variants
+        spec:
+          id: tp_with_variants
+          display_name: "tracking plan with variants"
+          description: "testing variants field support"
+          rules:
+            - type: event_rule
+              id: rule_with_variants
+              event:
+                $ref: "#/events/mobile_events/user_signed_up"
+              properties:
+                - $ref: "#/properties/mypropertygroup/page_name"
+                  required: true
+              variants:
+                - type: discriminator
+                  discriminator: "page_name"
+                  cases:
+                    - display_name: "Search Page"
+                      match:
+                      - "search"
+                      - "search_bar"
+                      description: "applies when a product is viewed as part of search results"
+                      properties:
+                      - $ref: "#/properties/mypropertygroup/search_term"
+                        required: true
+                    - "display_name": "Product Page"
+                      match: 
+                      - "product"
+                      - "search"
+                      - "1"
+                      properties:
+                      - $ref: "#/properties/mypropertygroup/product_id"
+                        required: true
+                  default:
+                     - $ref: "#/properties/mypropertygroup/page_url"
+                       required: true
+        `)
+
+		s, err := specs.New(byt)
+		require.Nil(t, err)
+
+		dc := New()
+		err = dc.LoadLegacySpec("", s)
+		require.Nil(t, err)
+		require.NotNil(t, dc)
+
+		tp := dc.TrackingPlans["tp_with_variants"]
+		require.NotNil(t, tp)
+		require.Equal(t, 1, len(tp.Rules))
+
+		rule := tp.Rules[0]
+		require.NotNil(t, rule.Variants)
+		require.Equal(t, 1, len(rule.Variants))
+
+		assert.Equal(t, "#event:user_signed_up", rule.Event.Ref)
+		assert.Equal(t, "#property:page_name", rule.Properties[0].Ref)
+
+		variant := (rule.Variants)[0]
+		assert.Equal(t, "discriminator", variant.Type)
+		assert.Equal(t, "page_name", variant.Discriminator)
+		assert.Equal(t, 2, len(variant.Cases))
+		assert.Equal(t, "Search Page", variant.Cases[0].DisplayName)
+		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Ref)
+		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
+		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Ref)
+		assert.Equal(t, "#property:page_url", variant.Default[0].Ref)
 	})
 }

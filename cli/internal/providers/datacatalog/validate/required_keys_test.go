@@ -27,7 +27,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 					Name:        "Array Property",
 					Description: "Property with array type",
 					Type:        "array",
-					ItemType:    "#/custom-types/test-group/TestType",
+					ItemType:    "#custom-type:TestType",
 				},
 			},
 			expectedErrors: 0,
@@ -41,7 +41,7 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 					Description: "Property with array type",
 					Type:        "array",
 					ItemTypes: []string{
-						"#/custom-types/test-group/TestType",
+						"#custom-type:TestType",
 						"string",
 					},
 				},
@@ -617,7 +617,7 @@ func TestVariantsValidation(t *testing.T) {
 								LocalID: "test-rule",
 								Type:    "event_rule",
 								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
+									Ref: "#event:test-event",
 								},
 								Variants: catalog.Variants{
 									{
@@ -628,12 +628,12 @@ func TestVariantsValidation(t *testing.T) {
 												DisplayName: "Search Page",
 												Match:       []any{"search", "search_bar"},
 												Properties: []catalog.PropertyReference{
-													{Ref: "#/properties/test-group/search_term", Required: true},
+													{Ref: "#property:search_term", Required: true},
 												},
 											},
 										},
 										Default: []catalog.PropertyReference{
-											{Ref: "#/properties/test-group/page_url", Required: true},
+											{Ref: "#property:page_url", Required: true},
 										},
 									},
 								},
@@ -651,7 +651,7 @@ func TestVariantsValidation(t *testing.T) {
 						Description: "Test custom type with variants",
 						Type:        "object",
 						Properties: []catalog.CustomTypeProperty{
-							{Ref: "#/properties/test-group/profile_type", Required: true},
+							{Ref: "#property:profile_type", Required: true},
 						},
 						Variants: catalog.Variants{
 							{
@@ -662,7 +662,7 @@ func TestVariantsValidation(t *testing.T) {
 										DisplayName: "Premium User",
 										Match:       []any{"premium", "vip"},
 										Properties: []catalog.PropertyReference{
-											{Ref: "#/properties/test-group/subscription_tier", Required: true},
+											{Ref: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -818,7 +818,7 @@ func TestVariantsValidation(t *testing.T) {
 										DisplayName: "Premium User",
 										Match:       []any{"premium"},
 										Properties: []catalog.PropertyReference{
-											{Ref: "#/properties/test-group/subscription_tier", Required: true},
+											{Ref: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -830,7 +830,7 @@ func TestVariantsValidation(t *testing.T) {
 				errorContains: []ValidationError{
 					{
 						error:     fmt.Errorf("variants are only allowed for custom type of type object"),
-						Reference: "#custom-types:TestType",
+						Reference: "#custom-type:TestType",
 					},
 				},
 			},

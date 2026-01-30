@@ -39,7 +39,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					Name:        "Email List",
 					Description: "List of user emails",
 					Type:        "array",
-					ItemType:    "#/custom-types/email-types/EmailType",
+					ItemType:    "#custom-type:EmailType",
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
@@ -55,7 +55,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					Name:        "Email List",
 					Description: "List of user emails",
 					Type:        "array",
-					ItemType:    "#/custom-types/email-types", // Missing type ID
+					ItemType:    "#custom-type:", // Missing type ID
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
@@ -72,14 +72,14 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					Name:        "Email List",
 					Description: "List of user emails",
 					Type:        "array",
-					ItemType:    "#/custom-types/email-types/NonExistentType",
+					ItemType:    "#custom-type:NonExistentType",
 				},
 			},
 			customTypes: map[string]catalog.CustomType{
 				"EmailType": testCustomType,
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' in item_type not found in catalog"},
+			errorContains: []string{"custom type reference '#custom-type:NonExistentType' in item_type not found in catalog"},
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestEventCategoryReferences(t *testing.T) {
 					Name:        "User Signup",
 					Type:        "track",
 					Description: "User signed up for the app",
-					CategoryRef: stringPtr("#categories:user_actions"),
+					CategoryRef: stringPtr("#category:user_actions"),
 				},
 			},
 			categories: map[string]catalog.Category{
@@ -156,14 +156,14 @@ func TestEventCategoryReferences(t *testing.T) {
 					Name:        "User Signup",
 					Type:        "track",
 					Description: "User signed up for the app",
-					CategoryRef: stringPtr("#categories:"), // Missing category ID
+					CategoryRef: stringPtr("#category:"), // Missing category ID
 				},
 			},
 			categories: map[string]catalog.Category{
 				"user_actions": testCategory,
 			},
 			expectedErrs:  1,
-			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#categories:<id>'"},
+			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#category:<id>'"},
 		},
 		{
 			name: "reference to non-existent category in event",
@@ -173,14 +173,14 @@ func TestEventCategoryReferences(t *testing.T) {
 					Name:        "User Signup",
 					Type:        "track",
 					Description: "User signed up for the app",
-					CategoryRef: stringPtr("#categories:non_existent_category"),
+					CategoryRef: stringPtr("#category:non_existent_category"),
 				},
 			},
 			categories: map[string]catalog.Category{
 				"user_actions": testCategory,
 			},
 			expectedErrs:  1,
-			errorContains: []string{"category reference '#categories:non_existent_category' not found in catalog"},
+			errorContains: []string{"category reference '#category:non_existent_category' not found in catalog"},
 		},
 		{
 			name: "completely malformed category reference",
@@ -197,7 +197,7 @@ func TestEventCategoryReferences(t *testing.T) {
 				"user_actions": testCategory,
 			},
 			expectedErrs:  1,
-			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#categories:<id>'"},
+			errorContains: []string{"the category field value is invalid. It should always be a reference and must follow the format '#category:<id>'"},
 		},
 	}
 
@@ -257,29 +257,29 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/test-event",
+								Ref: "#event:test-event",
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:page_name",
+									Ref:      "#property:page_name",
 									Required: true,
 								},
 							},
 							Variants: catalog.Variants{
 								{
 									Type:          "discriminator",
-									Discriminator: "#properties:page_name",
+									Discriminator: "#property:page_name",
 									Cases: []catalog.VariantCase{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search", "search_bar"},
 											Properties: []catalog.PropertyReference{
-												{Ref: "#properties:search_term", Required: true},
+												{Ref: "#property:search_term", Required: true},
 											},
 										},
 									},
 									Default: []catalog.PropertyReference{
-										{Ref: "#properties:product_id", Required: true},
+										{Ref: "#property:product_id", Required: true},
 									},
 								},
 							},
@@ -298,20 +298,20 @@ func TestVariantsReferenceValidation(t *testing.T) {
 					Type:        "object",
 					Properties: []catalog.CustomTypeProperty{
 						{
-							Ref:      "#properties:user_id",
+							Ref:      "#property:user_id",
 							Required: true,
 						},
 					},
 					Variants: catalog.Variants{
 						{
 							Type:          "discriminator",
-							Discriminator: "#properties:user_id",
+							Discriminator: "#property:user_id",
 							Cases: []catalog.VariantCase{
 								{
 									DisplayName: "Admin User",
 									Match:       []any{"admin", "superuser"},
 									Properties: []catalog.PropertyReference{
-										{Ref: "#properties:product_id", Required: true},
+										{Ref: "#property:product_id", Required: true},
 									},
 								},
 							},
@@ -332,7 +332,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: &catalog.TPRuleEvent{
-								Ref: "#events:test-event",
+								Ref: "#event:test-event",
 							},
 							Variants: catalog.Variants{
 								{
@@ -343,7 +343,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
 											Properties: []catalog.PropertyReference{
-												{Ref: "#properties:non_existent_property", Required: true},
+												{Ref: "#property:non_existent_property", Required: true},
 											},
 										},
 									},
@@ -355,11 +355,11 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			},
 			errors: []ValidationError{
 				{
-					error:     errors.New("property reference '#properties:non_existent_property' not found in catalog"),
+					error:     errors.New("property reference '#property:non_existent_property' not found in catalog"),
 					Reference: "#tp:test-tp/event_rule/test-rule/variants[0]/cases[0]/properties[0]",
 				},
 				{
-					error:     errors.New("discriminator reference has invalid format, should be #properties:<id>"),
+					error:     errors.New("discriminator reference has invalid format, should be #property:<id>"),
 					Reference: "#tp:test-tp/event_rule/test-rule/variants[0]",
 				},
 			},
@@ -379,25 +379,25 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:page_name",
+									Ref:      "#property:page_name",
 									Required: true,
 								},
 							},
 							Variants: catalog.Variants{
 								{
 									Type:          "discriminator",
-									Discriminator: "#properties:page_name",
+									Discriminator: "#property:page_name",
 									Cases: []catalog.VariantCase{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
 											Properties: []catalog.PropertyReference{
-												{Ref: "#properties:search_term", Required: true},
+												{Ref: "#property:search_term", Required: true},
 											},
 										},
 									},
 									Default: []catalog.PropertyReference{
-										{Ref: "#properties:non_existent_property", Required: true},
+										{Ref: "#property:non_existent_property", Required: true},
 									},
 								},
 							},
@@ -407,7 +407,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			},
 			errors: []ValidationError{
 				{
-					error:     fmt.Errorf("default property reference '#properties:non_existent_property' not found in catalog"),
+					error:     fmt.Errorf("default property reference '#property:non_existent_property' not found in catalog"),
 					Reference: "#tp:test-tp/event_rule/test-rule/variants[0]/default/properties[0]",
 				},
 			},
@@ -490,11 +490,11 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:profile_name",
+											Ref:      "#property:profile_name",
 											Required: true,
 										},
 									},
@@ -521,15 +521,15 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:profile_settings",
+											Ref:      "#property:profile_settings",
 											Required: true,
 											Properties: []*catalog.TPRuleProperty{
 												{
-													Ref:      "#properties:theme_preference",
+													Ref:      "#property:theme_preference",
 													Required: true,
 												},
 											},
@@ -558,11 +558,11 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:nonexistent_property",
+											Ref:      "#property:nonexistent_property",
 											Required: true,
 										},
 									},
@@ -573,7 +573,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 				},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"property reference '#properties:nonexistent_property' in rule '#tp:test-tp/rules/test-rule' not found in catalog"},
+			errorContains: []string{"property reference '#property:nonexistent_property' in rule '#tp:test-tp/rules/test-rule' not found in catalog"},
 		},
 		{
 			name: "invalid nested property reference format",
@@ -586,15 +586,15 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: &catalog.TPRuleEvent{
-								Ref: "#events:user_signup",
+								Ref: "#event:user_signup",
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:", // Invalid format - missing property ID
+											Ref:      "#property:", // Invalid format - missing property ID
 											Required: true,
 										},
 									},
@@ -605,7 +605,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 				},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"property reference '#properties:' has invalid format in rule '#tp:test-tp/rules/test-rule'. Should be '#properties:<id>'"},
+			errorContains: []string{"property reference '#property:' has invalid format in rule '#tp:test-tp/rules/test-rule'. Should be '#property:<id>'"},
 		},
 		{
 			name: "multiple nested reference errors (different levels)",
@@ -618,23 +618,23 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: &catalog.TPRuleEvent{
-								Ref: "#events:user_signup",
+								Ref: "#event:user_signup",
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:invalid_property1", // Non-existent at level 2
+											Ref:      "#property:invalid_property1", // Non-existent at level 2
 											Required: true,
 										},
 										{
-											Ref:      "#properties:profile_settings",
+											Ref:      "#property:profile_settings",
 											Required: true,
 											Properties: []*catalog.TPRuleProperty{
 												{
-													Ref:      "#properties:invalid_property2", // Non-existent at level 3
+													Ref:      "#property:invalid_property2", // Non-existent at level 3
 													Required: true,
 												},
 											},
@@ -648,8 +648,8 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 			},
 			expectedErrs: 2,
 			errorContains: []string{
-				"property reference '#properties:invalid_property1' in rule '#tp:test-tp/rules/test-rule' not found in catalog",
-				"property reference '#properties:invalid_property2' in rule '#tp:test-tp/rules/test-rule' not found in catalog",
+				"property reference '#property:invalid_property1' in rule '#tp:test-tp/rules/test-rule' not found in catalog",
+				"property reference '#property:invalid_property2' in rule '#tp:test-tp/rules/test-rule' not found in catalog",
 			},
 		},
 		{
@@ -667,11 +667,11 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							},
 							Properties: []*catalog.TPRuleProperty{
 								{
-									Ref:      "#properties:user_profile",
+									Ref:      "#property:user_profile",
 									Required: true,
 									Properties: []*catalog.TPRuleProperty{
 										{
-											Ref:      "#properties:profile_name", // Valid
+											Ref:      "#property:profile_name", // Valid
 											Required: true,
 										},
 										{
@@ -679,11 +679,11 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 											Required: true,
 										},
 										{
-											Ref:      "#properties:notification_prefs",
+											Ref:      "#property:notification_prefs",
 											Required: true,
 											Properties: []*catalog.TPRuleProperty{
 												{
-													Ref:      "#properties:email_enabled", // Valid
+													Ref:      "#property:email_enabled", // Valid
 													Required: true,
 												},
 											},
@@ -697,7 +697,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 			},
 			expectedErrs: 1,
 			errorContains: []string{
-				"property reference '#/properties/invalid-format' has invalid format in rule '#tp:test-tp/rules/test-rule'. Should be '#properties:<id>'",
+				"property reference '#/properties/invalid-format' has invalid format in rule '#tp:test-tp/rules/test-rule'. Should be '#property:<id>'",
 			},
 		},
 	}
