@@ -10,11 +10,11 @@ import (
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
-		Events:        make(map[EntityGroup][]Event),
-		Properties:    make(map[EntityGroup][]PropertyV1),
-		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-		CustomTypes:   make(map[EntityGroup][]CustomType),
-		Categories:    make(map[EntityGroup][]Category),
+		Events:        make(map[string]Event),
+		Properties:    make(map[string]PropertyV1),
+		TrackingPlans: make(map[string]*TrackingPlan),
+		CustomTypes:   make(map[string]CustomType),
+		Categories:    make(map[string]Category),
 	}
 
 	t.Run("properties are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -41,7 +41,6 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 		assert.Equal(t, len(emptyCatalog.Properties), 1)
-		assert.Equal(t, len(emptyCatalog.Properties["base_props"]), 1)
 		assert.Equal(t, PropertyV1{
 			LocalID:     "write_key",
 			Name:        "Write Key",
@@ -51,7 +50,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 				"min_length": float64(24),
 				"max_length": float64(28),
 			},
-		}, emptyCatalog.Properties["base_props"][0])
+		}, emptyCatalog.Properties["write_key"])
 	})
 
 	t.Run("events are extracted from customer defined yamls successfully", func(t *testing.T) {
@@ -78,14 +77,13 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.Events))
-		assert.Equal(t, 1, len(emptyCatalog.Events["app_events"]))
 		assert.Equal(t, Event{
 			LocalID:     "user_signed_up",
 			Name:        "User Signed Up",
 			Type:        "track",
 			Description: "Triggered when user successfully signed up",
 			CategoryRef: &category,
-		}, emptyCatalog.Events["app_events"][0])
+		}, emptyCatalog.Events["user_signed_up"])
 	})
 
 	t.Run("tracking plan entities are extracted from yaml successfully", func(t *testing.T) {
@@ -369,8 +367,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
-		assert.Equal(t, 1, len(emptyCatalog.CustomTypes))
-		assert.Equal(t, 2, len(emptyCatalog.CustomTypes["email-types"]))
+		assert.Equal(t, 2, len(emptyCatalog.CustomTypes))
 
 		// Verify first custom type (EmailType)
 		assert.Equal(t, CustomType{
@@ -384,7 +381,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 				"maxLength": float64(255),
 				"pattern":   "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
 			},
-		}, emptyCatalog.CustomTypes["email-types"][0])
+		}, emptyCatalog.CustomTypes["EmailType"])
 
 		// Verify second custom type (ProductIdType)
 		assert.Equal(t, CustomType{
@@ -397,7 +394,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 				"maxLength": float64(20),
 				"pattern":   "^PROD-[0-9]{7}$",
 			},
-		}, emptyCatalog.CustomTypes["email-types"][1])
+		}, emptyCatalog.CustomTypes["ProductIdType"])
 	})
 
 	t.Run("custom type with variants field is extracted successfully", func(t *testing.T) {
@@ -444,10 +441,10 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
-		assert.Equal(t, 2, len(emptyCatalog.CustomTypes))
-		assert.Equal(t, 1, len(emptyCatalog.CustomTypes["custom-types-with-variants"]))
+		// After previous test, we have EmailType + ProductIdType, now adding user_profile_type = 3 total
+		assert.Equal(t, 3, len(emptyCatalog.CustomTypes))
 
-		customType := emptyCatalog.CustomTypes["custom-types-with-variants"][0]
+		customType := emptyCatalog.CustomTypes["user_profile_type"]
 		assert.Equal(t, "user_profile_type", customType.LocalID)
 		assert.Equal(t, "object", customType.Type)
 		assert.Equal(t, 1, len(customType.Variants))
@@ -489,11 +486,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
-		assert.Equal(t, 3, len(emptyCatalog.CustomTypes)) // email-types + object-types-with-variants + object-types
-		assert.Equal(t, 1, len(emptyCatalog.CustomTypes["object-types"]))
+		// After previous tests, we have EmailType + ProductIdType + user_profile_type + UserAddressType = 4 total
+		assert.Equal(t, 4, len(emptyCatalog.CustomTypes))
 
 		// Verify object custom type with properties
-		customType := emptyCatalog.CustomTypes["object-types"][0]
+		customType := emptyCatalog.CustomTypes["UserAddressType"]
 		assert.Equal(t, "UserAddressType", customType.LocalID)
 		assert.Equal(t, "User Address Type", customType.Name)
 		assert.Equal(t, "Custom type for user address information", customType.Description)
@@ -532,35 +529,34 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s, &emptyCatalog)
 		require.Nil(t, err)
 
-		assert.Equal(t, 1, len(emptyCatalog.Categories))
-		assert.Equal(t, 3, len(emptyCatalog.Categories["app_categories"]))
+		assert.Equal(t, 3, len(emptyCatalog.Categories))
 
 		// Verify first category
 		assert.Equal(t, Category{
 			LocalID: "user_actions",
 			Name:    "User Actions",
-		}, emptyCatalog.Categories["app_categories"][0])
+		}, emptyCatalog.Categories["user_actions"])
 
 		// Verify second category
 		assert.Equal(t, Category{
 			LocalID: "system_events",
 			Name:    "System Events",
-		}, emptyCatalog.Categories["app_categories"][1])
+		}, emptyCatalog.Categories["system_events"])
 
 		// Verify third category
 		assert.Equal(t, Category{
 			LocalID: "payment_events",
 			Name:    "Payment Events",
-		}, emptyCatalog.Categories["app_categories"][2])
+		}, emptyCatalog.Categories["payment_events"])
 	})
 
 	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]PropertyV1),
-			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-			CustomTypes:   make(map[EntityGroup][]CustomType),
-			Categories:    make(map[EntityGroup][]Category),
+			Events:        make(map[string]Event),
+			Properties:    make(map[string]PropertyV1),
+			TrackingPlans: make(map[string]*TrackingPlan),
+			CustomTypes:   make(map[string]CustomType),
+			Categories:    make(map[string]Category),
 		}
 
 		// First events file with metadata.name "shared_events"
@@ -587,9 +583,9 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		// Verify first file loaded correctly
-		assert.Len(t, catalog.Events["shared_events"], 2)
-		assert.Equal(t, "event_a", catalog.Events["shared_events"][0].LocalID)
-		assert.Equal(t, "event_b", catalog.Events["shared_events"][1].LocalID)
+		assert.Len(t, catalog.Events, 2)
+		assert.Equal(t, "event_a", catalog.Events["event_a"].LocalID)
+		assert.Equal(t, "event_b", catalog.Events["event_b"].LocalID)
 
 		// Second events file with same metadata.name "shared_events"
 		byt2 := []byte(`
@@ -615,20 +611,20 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		// Verify both files are merged - should have 4 events total
-		assert.Len(t, catalog.Events["shared_events"], 4)
-		assert.Equal(t, "event_a", catalog.Events["shared_events"][0].LocalID)
-		assert.Equal(t, "event_b", catalog.Events["shared_events"][1].LocalID)
-		assert.Equal(t, "event_c", catalog.Events["shared_events"][2].LocalID)
-		assert.Equal(t, "event_d", catalog.Events["shared_events"][3].LocalID)
+		assert.Len(t, catalog.Events, 4)
+		assert.Equal(t, "event_a", catalog.Events["event_a"].LocalID)
+		assert.Equal(t, "event_b", catalog.Events["event_b"].LocalID)
+		assert.Equal(t, "event_c", catalog.Events["event_c"].LocalID)
+		assert.Equal(t, "event_d", catalog.Events["event_d"].LocalID)
 	})
 
 	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]PropertyV1),
-			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-			CustomTypes:   make(map[EntityGroup][]CustomType),
-			Categories:    make(map[EntityGroup][]Category),
+			Events:        make(map[string]Event),
+			Properties:    make(map[string]PropertyV1),
+			TrackingPlans: make(map[string]*TrackingPlan),
+			CustomTypes:   make(map[string]CustomType),
+			Categories:    make(map[string]Category),
 		}
 
 		// First properties file
@@ -674,19 +670,19 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		// Verify both files are merged - should have 3 properties total
-		assert.Len(t, catalog.Properties["shared_props"], 3)
-		assert.Equal(t, "prop_a", catalog.Properties["shared_props"][0].LocalID)
-		assert.Equal(t, "prop_b", catalog.Properties["shared_props"][1].LocalID)
-		assert.Equal(t, "prop_c", catalog.Properties["shared_props"][2].LocalID)
+		assert.Len(t, catalog.Properties, 3)
+		assert.Equal(t, "prop_a", catalog.Properties["prop_a"].LocalID)
+		assert.Equal(t, "prop_b", catalog.Properties["prop_b"].LocalID)
+		assert.Equal(t, "prop_c", catalog.Properties["prop_c"].LocalID)
 	})
 
 	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]PropertyV1),
-			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-			CustomTypes:   make(map[EntityGroup][]CustomType),
-			Categories:    make(map[EntityGroup][]Category),
+			Events:        make(map[string]Event),
+			Properties:    make(map[string]PropertyV1),
+			TrackingPlans: make(map[string]*TrackingPlan),
+			CustomTypes:   make(map[string]CustomType),
+			Categories:    make(map[string]Category),
 		}
 
 		// First categories file
@@ -726,19 +722,19 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		// Verify both files are merged - should have 3 categories total
-		assert.Len(t, catalog.Categories["shared_categories"], 3)
-		assert.Equal(t, "cat_a", catalog.Categories["shared_categories"][0].LocalID)
-		assert.Equal(t, "cat_b", catalog.Categories["shared_categories"][1].LocalID)
-		assert.Equal(t, "cat_c", catalog.Categories["shared_categories"][2].LocalID)
+		assert.Len(t, catalog.Categories, 3)
+		assert.Equal(t, "cat_a", catalog.Categories["cat_a"].LocalID)
+		assert.Equal(t, "cat_b", catalog.Categories["cat_b"].LocalID)
+		assert.Equal(t, "cat_c", catalog.Categories["cat_c"].LocalID)
 	})
 
 	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]PropertyV1),
-			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-			CustomTypes:   make(map[EntityGroup][]CustomType),
-			Categories:    make(map[EntityGroup][]Category),
+			Events:        make(map[string]Event),
+			Properties:    make(map[string]PropertyV1),
+			TrackingPlans: make(map[string]*TrackingPlan),
+			CustomTypes:   make(map[string]CustomType),
+			Categories:    make(map[string]Category),
 		}
 
 		// First custom-types file
@@ -784,19 +780,19 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		// Verify both files are merged - should have 3 custom types total
-		assert.Len(t, catalog.CustomTypes["shared_types"], 3)
-		assert.Equal(t, "type_a", catalog.CustomTypes["shared_types"][0].LocalID)
-		assert.Equal(t, "type_b", catalog.CustomTypes["shared_types"][1].LocalID)
-		assert.Equal(t, "type_c", catalog.CustomTypes["shared_types"][2].LocalID)
+		assert.Len(t, catalog.CustomTypes, 3)
+		assert.Equal(t, "type_a", catalog.CustomTypes["type_a"].LocalID)
+		assert.Equal(t, "type_b", catalog.CustomTypes["type_b"].LocalID)
+		assert.Equal(t, "type_c", catalog.CustomTypes["type_c"].LocalID)
 	})
 
 	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]PropertyV1),
-			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
-			CustomTypes:   make(map[EntityGroup][]CustomType),
-			Categories:    make(map[EntityGroup][]Category),
+			Events:        make(map[string]Event),
+			Properties:    make(map[string]PropertyV1),
+			TrackingPlans: make(map[string]*TrackingPlan),
+			CustomTypes:   make(map[string]CustomType),
+			Categories:    make(map[string]Category),
 		}
 
 		// First tracking plan file
@@ -817,18 +813,18 @@ func TestExtractCatalogEntity(t *testing.T) {
 		err = extractEntities(s1, &catalog)
 		require.Nil(t, err)
 
-		// Verify first tracking plan loaded correctly
+		// Verify first tracking plan loaded correctly - now keyed by LocalID (tp_1)
 		assert.Len(t, catalog.TrackingPlans, 1)
-		assert.NotNil(t, catalog.TrackingPlans["shared_tp"])
+		assert.NotNil(t, catalog.TrackingPlans["tp_1"])
 
-		// Second tracking plan file with same metadata.name should fail
+		// Second tracking plan file with same id should fail
 		byt2 := []byte(`
         version: rudder/0.1
         kind: tp
         metadata:
-          name: shared_tp
+          name: shared_tp_duplicate
         spec:
-          id: tp_2
+          id: tp_1
           display_name: "Tracking Plan 2"
           description: "Second tracking plan"
           rules: []
@@ -838,8 +834,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 		err = extractEntities(s2, &catalog)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "duplicate tracking plan with metadata.name 'shared_tp' found")
-		assert.Contains(t, err.Error(), "only one tracking plan per entity group is allowed")
+		assert.Contains(t, err.Error(), "duplicate tracking plan with id 'tp_1' found")
 	})
 }
 
