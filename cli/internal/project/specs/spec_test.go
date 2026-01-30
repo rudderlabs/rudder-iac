@@ -62,62 +62,81 @@ spec:
 `
 
 	testCases := []struct {
-		name          string
-		yamlData      string
-		expectError   bool
-		errorContains string
-		expectedKind  string
-		expectedName  string // Extracted from metadata.name
+		name                string
+		yamlData            string
+		expectValidateError bool
+		expectNewError      bool
+		errorContains       string
+		expectedKind        string
+		expectedName        string // Extracted from metadata.name
 	}{
 		{
-			name:         "Valid Spec",
-			yamlData:     validYAML,
-			expectError:  false,
-			expectedKind: "Destination",
-			expectedName: "MyTestDest",
+			name:                "Valid Spec",
+			yamlData:            validYAML,
+			expectValidateError: false,
+			expectNewError:      false,
+			expectedKind:        "Destination",
+			expectedName:        "MyTestDest",
 		},
 		{
-			name:          "Missing Version",
-			yamlData:      missingVersionYAML,
-			expectError:   true,
-			errorContains: "missing required field 'version'",
+			name:                "Missing Version",
+			yamlData:            missingVersionYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'version'",
 		},
 		{
-			name:          "Missing Kind",
-			yamlData:      missingKindYAML,
-			expectError:   true,
-			errorContains: "missing required field 'kind'",
+			name:                "Missing Kind",
+			yamlData:            missingKindYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'kind'",
 		},
 		{
-			name:          "Missing Metadata",
-			yamlData:      missingMetadataYAML,
-			expectError:   true,
-			errorContains: "missing required field 'metadata'",
+			name:                "Missing Metadata",
+			yamlData:            missingMetadataYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'metadata'",
 		},
 		{
-			name:          "Missing Spec field",
-			yamlData:      missingSpecFieldYAML,
-			expectError:   true,
-			errorContains: "missing required field 'spec'",
+			name:                "Missing Spec field",
+			yamlData:            missingSpecFieldYAML,
+			expectValidateError: true,
+			expectNewError:      false,
+			errorContains:       "missing required field 'spec'",
 		},
 		{
-			name:          "Invalid YAML syntax",
-			yamlData:      invalidYAML,
-			expectError:   true,
-			errorContains: "unmarshaling yaml",
+			name:                "Invalid YAML syntax",
+			yamlData:            invalidYAML,
+			expectValidateError: false,
+			expectNewError:      true,
+			errorContains:       "unmarshaling yaml",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec, err := New([]byte(tc.yamlData))
+			if tc.expectNewError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.ErrorContains(t, err, tc.errorContains)
+				}
+				require.Nil(t, spec)
 
-			if tc.expectError {
+				return
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, spec)
+			}
+
+			err = spec.Validate()
+			if tc.expectValidateError {
 				require.Error(t, err)
 				if tc.errorContains != "" {
 					assert.Contains(t, err.Error(), tc.errorContains)
 				}
-				assert.Nil(t, spec)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, spec)
@@ -165,5 +184,119 @@ spec:
 		require.NoError(t, err)
 		require.NotNil(t, spec)
 		assert.Equal(t, "datacatalog", spec.Kind)
+	})
+}
+
+func TestRawSpec_Parse(t *testing.T) {
+	validYAML := []byte(`
+version: rudder/v1
+kind: properties
+metadata:
+  name: TestProperties
+spec:
+  properties:
+    - name: test
+`)
+
+	invalidYAML := []byte(`
+version: rudder/v1
+kind: properties
+metadata:
+  name: TestProperties
+spec:
+  properties: []
+unknown_field: "causes error"
+`)
+
+	t.Run("parses valid spec successfully", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+
+		spec, err := rawSpec.Parse()
+		require.NoError(t, err)
+		require.NotNil(t, spec)
+		assert.Equal(t, "properties", spec.Kind)
+		assert.Equal(t, "rudder/v1", spec.Version)
+	})
+
+	t.Run("caches parsed spec on subsequent calls", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+
+		spec1, err1 := rawSpec.Parse()
+		require.NoError(t, err1)
+		require.NotNil(t, spec1)
+
+		spec2, err2 := rawSpec.Parse()
+		require.NoError(t, err2)
+		assert.Same(t, spec1, spec2)
+	})
+
+	t.Run("returns error for spec with unknown fields", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: invalidYAML}
+
+		spec, err := rawSpec.Parse()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parsing spec")
+		assert.Nil(t, spec)
+	})
+
+	t.Run("caches error on subsequent calls", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: invalidYAML}
+
+		spec1, err1 := rawSpec.Parse()
+		require.Error(t, err1)
+		assert.Nil(t, spec1)
+
+		spec2, err2 := rawSpec.Parse()
+		require.Error(t, err2)
+		assert.Equal(t, err1, err2)
+		assert.Nil(t, spec2)
+	})
+}
+
+func TestRawSpec_Parsed(t *testing.T) {
+	validYAML := []byte(`
+version: rudder/v1
+kind: events
+metadata:
+  name: TestEvents
+spec:
+  events:
+    - name: test_event
+`)
+
+	t.Run("returns nil before parsing", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+		assert.Nil(t, rawSpec.Parsed())
+	})
+
+	t.Run("returns cached spec after successful parse", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+
+		spec, err := rawSpec.Parse()
+		require.NoError(t, err)
+		require.NotNil(t, spec)
+
+		cached := rawSpec.Parsed()
+		assert.Same(t, spec, cached)
+	})
+
+	t.Run("returns nil after failed parse", func(t *testing.T) {
+		invalidYAML := []byte(`
+version: rudder/v1
+kind: properties
+metadata:
+  name: test
+spec:
+  properties: []
+invalid_field: "error"
+`)
+		rawSpec := &RawSpec{Data: invalidYAML}
+
+		spec, err := rawSpec.Parse()
+		require.Error(t, err)
+		assert.Nil(t, spec)
+
+		cached := rawSpec.Parsed()
+		assert.Nil(t, cached)
 	})
 }

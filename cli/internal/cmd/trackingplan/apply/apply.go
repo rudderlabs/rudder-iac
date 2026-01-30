@@ -43,8 +43,8 @@ func NewCmdTPApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = project.New(location, deps.Providers().DataCatalog)
-			if err := p.Load(); err != nil {
+			p = deps.NewDataCatalogProject()
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
 
