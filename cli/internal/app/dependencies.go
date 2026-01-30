@@ -151,8 +151,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		RETL:            retlp,
 		EventStream:     esp,
 		Transformations: trp,
-
-		Workspace: wsp,
+		Workspace:       wsp,
 	}
 
 	// Initialize data graph provider if experimental flag is enabled
