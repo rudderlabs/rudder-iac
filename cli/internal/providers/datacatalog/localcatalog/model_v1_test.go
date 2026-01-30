@@ -3,83 +3,8 @@ package localcatalog
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestToSnakeCase(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "simple camelCase",
-			input:    "minLength",
-			expected: "min_length",
-		},
-		{
-			name:     "camelCase with multiple words",
-			input:    "maxLength",
-			expected: "max_length",
-		},
-		{
-			name:     "camelCase with Of",
-			input:    "multipleOf",
-			expected: "multiple_of",
-		},
-		{
-			name:     "camelCase with Types",
-			input:    "itemTypes",
-			expected: "item_types",
-		},
-		{
-			name:     "lowercase only",
-			input:    "enum",
-			expected: "enum",
-		},
-		{
-			name:     "lowercase only multiple words",
-			input:    "minimum",
-			expected: "minimum",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "single uppercase letter",
-			input:    "A",
-			expected: "a",
-		},
-		{
-			name:     "single lowercase letter",
-			input:    "a",
-			expected: "a",
-		},
-		{
-			name:     "PascalCase",
-			input:    "ExclusiveMinimum",
-			expected: "exclusive_minimum",
-		},
-		{
-			name:     "PascalCase with multiple capitals",
-			input:    "ExclusiveMaximum",
-			expected: "exclusive_maximum",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := utils.ToSnakeCase(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
 
 func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 	t.Parallel()
@@ -88,16 +13,16 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		t.Parallel()
 
 		config := map[string]interface{}{
-			"minLength":         5,
-			"maxLength":         50,
-			"multipleOf":        3,
-			"itemTypes":         []interface{}{"string", "integer"},
-			"enum":              []interface{}{"value1", "value2"},
-			"minimum":           0,
-			"maximum":           100,
-			"pattern":           "^[a-z]+$",
-			"exclusiveMinimum":  1,
-			"exclusiveMaximum":  99,
+			"minLength":        5,
+			"maxLength":        50,
+			"multipleOf":       3,
+			"itemTypes":        []interface{}{"string", "integer"},
+			"enum":             []interface{}{"value1", "value2"},
+			"minimum":          0,
+			"maximum":          100,
+			"pattern":          "^[a-z]+$",
+			"exclusiveMinimum": 1,
+			"exclusiveMaximum": 99,
 		}
 
 		result := convertConfigKeysToSnakeCase(config)
@@ -153,3 +78,145 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 	})
 }
 
+func TestPropertySpecV1_FromV0(t *testing.T) {
+	t.Parallel()
+
+	t.Run("converts single property and transforms config keys to snake_case", func(t *testing.T) {
+		t.Parallel()
+
+		v0Spec := PropertySpec{
+			Properties: []Property{
+				{
+					LocalID:     "prop1",
+					Name:        "Property 1",
+					Description: "Test property",
+					Type:        "string",
+					Config: map[string]interface{}{
+						"minLength":        5,
+						"maxLength":        50,
+						"multipleOf":       3,
+						"itemTypes":        []interface{}{"string", "integer"},
+						"exclusiveMinimum": 1,
+						"exclusiveMaximum": 99,
+					},
+				},
+			},
+		}
+
+		v1Spec := &PropertySpecV1{}
+		err := v1Spec.FromV0(v0Spec)
+
+		assert.NoError(t, err)
+		assert.Len(t, v1Spec.Properties, 1)
+
+		expected := PropertyV1{
+			LocalID:     "prop1",
+			Name:        "Property 1",
+			Description: "Test property",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"min_length":        5,
+				"max_length":        50,
+				"multiple_of":       3,
+				"item_types":        []interface{}{"string", "integer"},
+				"exclusive_minimum": 1,
+				"exclusive_maximum": 99,
+			},
+		}
+		assert.Equal(t, expected, v1Spec.Properties[0])
+	})
+
+	t.Run("converts multiple properties with different configurations and preserves order", func(t *testing.T) {
+		t.Parallel()
+
+		v0Spec := PropertySpec{
+			Properties: []Property{
+				{
+					LocalID:     "prop1",
+					Name:        "Property 1",
+					Description: "First property",
+					Type:        "string",
+					Config: map[string]interface{}{
+						"minLength": 5,
+					},
+				},
+				{
+					LocalID:     "prop2",
+					Name:        "Property 2",
+					Description: "Second property",
+					Type:        "integer",
+					Config: map[string]interface{}{
+						"minimum": 0,
+						"maximum": 100,
+					},
+				},
+				{
+					LocalID: "prop3",
+					Name:    "Property 3",
+					Type:    "boolean",
+					Config:  nil,
+				},
+				{
+					LocalID: "prop4",
+					Name:    "Property 4",
+					Type:    "array",
+				},
+				{
+					LocalID: "prop5",
+					Name:    "Property 5",
+					Type:    "#/custom-types/login_elements/email_type",
+				},
+			},
+		}
+
+		v1Spec := &PropertySpecV1{}
+		err := v1Spec.FromV0(v0Spec)
+
+		assert.NoError(t, err)
+		assert.Len(t, v1Spec.Properties, 5)
+
+		expected := []PropertyV1{
+			{
+				LocalID:     "prop1",
+				Name:        "Property 1",
+				Description: "First property",
+				Type:        "string",
+				Config: map[string]interface{}{
+					"min_length": 5,
+				},
+			},
+			{
+				LocalID:     "prop2",
+				Name:        "Property 2",
+				Description: "Second property",
+				Type:        "integer",
+				Config: map[string]interface{}{
+					"minimum": 0,
+					"maximum": 100,
+				},
+			},
+			{
+				LocalID:     "prop3",
+				Name:        "Property 3",
+				Description: "",
+				Type:        "boolean",
+				Config:      nil,
+			},
+			{
+				LocalID:     "prop4",
+				Name:        "Property 4",
+				Description: "",
+				Type:        "array",
+				Config:      nil,
+			},
+			{
+				LocalID:     "prop5",
+				Name:        "Property 5",
+				Description: "",
+				Type:        "#/custom-types/login_elements/email_type",
+				Config:      nil,
+			},
+		}
+		assert.Equal(t, expected, v1Spec.Properties)
+	})
+}
