@@ -5,12 +5,14 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -34,6 +36,7 @@ type Providers struct {
 	EventStream     *esProvider.Provider
 	Transformations *transformations.Provider
 	Workspace       *workspace.Provider
+	DataGraph       *dgProvider.Provider
 }
 
 type deps struct {
@@ -92,12 +95,20 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+	providers := map[string]provider.Provider{
 		"datacatalog":     p.DataCatalog,
 		"retl":            p.RETL,
 		"eventstream":     p.EventStream,
 		"transformations": p.Transformations,
-	})
+	}
+
+	// Add data graph provider if experimental flag is enabled
+	cfg := config.GetConfig()
+	if cfg.ExperimentalFlags.DataGraph {
+		providers["datagraph"] = p.DataGraph
+	}
+
+	cp, err := provider.NewCompositeProvider(providers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -135,13 +146,22 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 
-	return &Providers{
+	providers := &Providers{
 		DataCatalog:     dcp,
 		RETL:            retlp,
 		EventStream:     esp,
 		Transformations: trp,
-		Workspace:       wsp,
-	}, nil
+
+		Workspace: wsp,
+	}
+
+	// Initialize data graph provider if experimental flag is enabled
+	if cfg.ExperimentalFlags.DataGraph {
+		dgStore := dgClient.NewRudderDataGraphStore(c)
+		providers.DataGraph = dgProvider.NewProvider(dgStore)
+	}
+
+	return providers, nil
 }
 
 func SyncReporter() syncer.SyncReporter {

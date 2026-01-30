@@ -18,6 +18,8 @@ type ExperimentalConfig struct {
 	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
 	// ValidationFramework enables the new validation framework with rule-based validation
 	ValidationFramework bool `mapstructure:"validationFramework"`
+	// DataGraph enables data graph operations (sync, validate, import)
+	DataGraph bool `mapstructure:"dataGraph"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
