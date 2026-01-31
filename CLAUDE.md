@@ -70,6 +70,17 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - Concise, well-defined variable names fitting existing ecosystem
 - Consistent patterns with existing codebase
 
+### Comments
+- **Focus on "why"**, not "what" - explain the reasoning, not the mechanics
+- **Be selective** - not every code section needs comments; only add them where they truly help the reader understand non-obvious decisions or trade-offs
+- **Avoid over-commenting** - self-explanatory code doesn't need narration; let the code speak for itself
+- Examples of good comments:
+  - "Stop early to avoid building a graph from invalid specs" (explains reasoning)
+  - "Graph is built once here - single source of truth" (explains architectural decision)
+- Examples of unnecessary comments:
+  - "Create validation engine" (obvious from `NewValidationEngine()`)
+  - "Loop through specs" (obvious from `for path, spec := range p.specs`)
+
 ## Standard Workflows
 
 ### 1. New CLI Command + Provider Enhancement

@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/previewer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
@@ -48,8 +47,8 @@ func newCmdPreview() *cobra.Command {
 				return err
 			}
 
-			p := project.New(location, d.CompositeProvider())
-			if err := p.Load(); err != nil {
+			p := d.NewProject()
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
 

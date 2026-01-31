@@ -16,6 +16,8 @@ type ExperimentalConfig struct {
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// V1SpecSupport enables support for v1 specs (rudder/v1)
 	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
+	// ValidationFramework enables the new validation framework with rule-based validation
+	ValidationFramework bool `mapstructure:"validationFramework"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

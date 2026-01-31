@@ -3,8 +3,10 @@ package localcatalog
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -44,29 +46,54 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 	// Extract itemTypes from config and move to property-level fields
 	if p.Config != nil {
 		if itemTypes, ok := p.Config["item_types"]; ok {
-			if itemTypesArray, ok := itemTypes.([]interface{}); ok {
-				// Check if single or multiple item types
-				if len(itemTypesArray) == 1 {
-					// Single item type
-					if itemTypeStr, ok := itemTypesArray[0].(string); ok {
-						p.ItemType = itemTypeStr
-					}
-				} else if len(itemTypesArray) > 1 {
-					// Multiple item types
-					p.ItemTypes = make([]string, len(itemTypesArray))
-					for i, item := range itemTypesArray {
-						if itemStr, ok := item.(string); ok {
-							p.ItemTypes[i] = itemStr
-						}
-					}
-				}
-				// Remove item_types from config after migration
-				delete(p.Config, "item_types")
+			itemTypesArray, ok := itemTypes.([]interface{})
+			if !ok {
+				return fmt.Errorf("config['item_types'] must be an array of strings")
 			}
+
+			// Check if single or multiple item types
+			if len(itemTypesArray) == 1 {
+				// Single item type
+				itemTypeStr, ok := itemTypesArray[0].(string)
+				if !ok {
+					return fmt.Errorf("config['item_types']: item type must be a string")
+				}
+				p.ItemType = itemTypeStr
+			} else if len(itemTypesArray) > 1 {
+				// Multiple item types
+				p.ItemTypes = make([]string, len(itemTypesArray))
+				for i, item := range itemTypesArray {
+					itemStr, ok := item.(string)
+					if !ok {
+						return fmt.Errorf("config['item_types']: item type must be a string")
+					}
+					p.ItemTypes[i] = itemStr
+				}
+			}
+			// Remove item_types from config after migration
+			delete(p.Config, "item_types")
+
 		}
 	}
 
 	return nil
+}
+
+var SupportedV0ConfigKeys = []string{
+	"enum",
+	"exclusiveMaximum",
+	"exclusiveMinimum",
+	"format",
+	"itemTypes",
+	"maxItems",
+	"maxLength",
+	"maximum",
+	"minItems",
+	"minLength",
+	"minimum",
+	"multipleOf",
+	"pattern",
+	"uniqueItems",
 }
 
 // convertConfigKeysToSnakeCase converts camelCase config keys to snake_case
@@ -76,10 +103,15 @@ func convertConfigKeysToSnakeCase(config map[string]interface{}) map[string]inte
 		return nil
 	}
 
+	snakeCaseNamer := namer.NewSnakeCase()
+
 	converted := make(map[string]interface{})
 	for key, value := range config {
-		snakeKey := utils.ToSnakeCase(key)
-		converted[snakeKey] = value
+		convertedKey := key
+		if slices.Contains(SupportedV0ConfigKeys, key) {
+			convertedKey = snakeCaseNamer.Name(key)
+		}
+		converted[convertedKey] = value
 	}
 
 	return converted

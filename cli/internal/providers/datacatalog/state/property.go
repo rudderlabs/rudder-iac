@@ -68,7 +68,6 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 			Property: "name",
 		}
 		return nil
-	
 		// Handle item_type and item_types fields - merge into config["item_types"]
 	case prop.ItemType != "":
 		// Single item type - store as array with one element in config
@@ -90,32 +89,11 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		// Multiple item types - store as array in config
 		// Sort for consistency before processing
 		sort.Strings(prop.ItemTypes)
-		itemTypesArray := make([]interface{}, len(prop.ItemTypes))
-
-		// Look for custom type references and replace entire array with first one found
+		itemTypes := make([]interface{}, len(prop.ItemTypes))
 		for i, itemType := range prop.ItemTypes {
-			if !strings.HasPrefix(itemType, "#custom-type:") {
-				itemTypesArray[i] = itemType
-				continue
-			}
-
-			customTypeURN := urnFromRef(itemType)
-			if customTypeURN == "" {
-				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", itemType)
-			}
-
-			// Replace entire array with single PropertyRef
-			itemTypesArray = []interface{}{
-				resources.PropertyRef{
-					URN:      customTypeURN,
-					Property: "name",
-				},
-			}
-			break
+			itemTypes[i] = itemType
 		}
-
-		// No custom type references found, store primitive types as-is
-		args.Config["item_types"] = itemTypesArray
+		args.Config["item_types"] = itemTypes
 	}
 
 	return nil

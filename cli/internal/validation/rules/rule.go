@@ -27,7 +27,7 @@ type Rule interface {
 	// Examples returns usage examples for this rule.
 	// Can return nil if no examples are provided.
 	// Examples help users understand what the rule checks for.
-	Examples() *Examples
+	Examples() Examples
 
 	// Validate performs the actual validation logic.
 	// It receives a ValidationContext with all necessary information

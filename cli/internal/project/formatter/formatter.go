@@ -8,6 +8,7 @@ import (
 
 var (
 	DefaultYAML = YAMLFormatter{}
+	DefaultText = TextFormatter{}
 )
 
 var (

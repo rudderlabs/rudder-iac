@@ -5,7 +5,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -34,8 +33,8 @@ func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 		return nil, err
 	}
 
-	p := project.New(location, deps.CompositeProvider())
-	if err := p.Load(); err != nil {
+	p := deps.NewProject()
+	if err := p.Load(location); err != nil {
 		return nil, err
 	}
 
