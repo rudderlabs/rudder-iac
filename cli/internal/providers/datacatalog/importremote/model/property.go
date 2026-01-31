@@ -7,7 +7,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -52,7 +52,7 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 	// reference which needs to be resolved to a custom type reference
 	case isCustomType(upstream):
 		customTypeRef, err := resolver.ResolveToReference(
-			state.CustomTypeResourceType,
+			types.CustomTypeResourceType,
 			upstream.DefinitionId)
 		if err != nil {
 			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.PropertyV1.LocalID, err)
@@ -67,7 +67,7 @@ func (p *ImportableProperty) fromUpstream(externalID string, upstream *catalog.P
 		p.PropertyV1.Config = nil
 	case upstream.Type == "array" && upstream.ItemDefinitionId != "":
 		customTypeRef, err := resolver.ResolveToReference(
-			state.CustomTypeResourceType,
+			types.CustomTypeResourceType,
 			upstream.ItemDefinitionId)
 		if err != nil {
 			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.PropertyV1.LocalID, err)

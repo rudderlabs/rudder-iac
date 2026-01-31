@@ -9,7 +9,7 @@ import (
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -70,14 +70,14 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 						Reference:  "#/tracking-plans/tracking-plan/existing-tp-456",
 					},
 				}
-				remote.Set(dcstate.TrackingPlanResourceType, remoteTpMap)
+				remote.Set(types.TrackingPlanResourceType, remoteTpMap)
 				return remote
 			},
 			setupGraph: func() *resources.Graph {
 				graph := resources.NewGraph()
 				tpResource := resources.NewResource(
 					"existing-tp-456",
-					dcstate.TrackingPlanResourceType,
+					types.TrackingPlanResourceType,
 					nil,
 					nil,
 					resources.WithResourceFileMetadata("#/tracking-plans/tracking-plan/existing-tp-456"),
@@ -164,7 +164,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 						Reference:  "#/tracking-plans/tracking-plan/new-tp-456",
 					},
 				}
-				importable.Set(dcstate.TrackingPlanResourceType, importableTpMap)
+				importable.Set(types.TrackingPlanResourceType, importableTpMap)
 				return importable
 			},
 			setupRemote: func() *resources.RemoteResources {

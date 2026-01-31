@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -40,8 +41,6 @@ func (args *PropertyArgs) DiffUpstream(upstream *catalog.Property) bool {
 	return !reflect.DeepEqual(args.Config, upstreamConf)
 }
 
-const PropertyResourceType = "property"
-
 func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description
@@ -58,7 +57,7 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		sort.Strings(prop.Types)
 		args.Type = strings.Join(prop.Types, ",")
 		return nil
-	case strings.HasPrefix(prop.Type, "#/custom-types/"):
+	case strings.HasPrefix(prop.Type, "#custom-type:"):
 		customTypeURN := urnFromRef(prop.Type)
 
 		if customTypeURN == "" {
@@ -72,7 +71,7 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		// Handle item_type and item_types fields - merge into config["item_types"]
 	case prop.ItemType != "":
 		// Single item type - store as array with one element in config
-		if strings.HasPrefix(prop.ItemType, "#/custom-types/") {
+		if strings.HasPrefix(prop.ItemType, "#custom-type:") {
 			customTypeURN := urnFromRef(prop.ItemType)
 			if customTypeURN == "" {
 				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", prop.ItemType)
@@ -119,7 +118,7 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 
 	// Check if the property is referring to a customType using property.DefinitionId
 	if property.DefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.DefinitionId)
+		urn, err := getURNFromRemoteId(types.CustomTypeResourceType, property.DefinitionId)
 		switch {
 		case err == nil:
 			args.Type = resources.PropertyRef{
@@ -136,7 +135,7 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 
 	// Handle array types with custom type references in item_types
 	if property.Type == "array" && property.Config != nil && property.ItemDefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.ItemDefinitionId)
+		urn, err := getURNFromRemoteId(types.CustomTypeResourceType, property.ItemDefinitionId)
 		switch {
 		case err == nil:
 			// Update item_types in config to reference the same custom type

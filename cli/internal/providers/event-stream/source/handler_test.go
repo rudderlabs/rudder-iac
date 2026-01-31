@@ -14,7 +14,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -335,7 +335,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			{
 				name: "Validates existence of tracking plan resource reference",
 				externalGraphResources: []*resources.Resource{
-					resources.NewResource("tp-123", dcstate.TrackingPlanResourceType, resources.ResourceData{}, nil),
+					resources.NewResource("tp-123", types.TrackingPlanResourceType, resources.ResourceData{}, nil),
 				},
 				specs: []*specs.Spec{
 					{
@@ -506,7 +506,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"enabled": false,
 			"type":    "python",
 			"tracking_plan": &resources.PropertyRef{
-				URN:      resources.URN("tp-123", dcstate.TrackingPlanResourceType),
+				URN:      resources.URN("tp-123", types.TrackingPlanResourceType),
 				Property: "id",
 			},
 			"tracking_plan_config": map[string]interface{}{
@@ -1148,7 +1148,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ExternalID: "external-tp-789",
 				},
 			}
-			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+			collection.Set(types.TrackingPlanResourceType, trackingPlanResourceMap)
 
 			st, err := handler.MapRemoteToState(collection)
 
@@ -1184,7 +1184,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					"enabled": true,
 					"type":    "javascript",
 					"tracking_plan": &resources.PropertyRef{
-						URN:      resources.URN("external-tp-789", dcstate.TrackingPlanResourceType),
+						URN:      resources.URN("external-tp-789", types.TrackingPlanResourceType),
 						Property: "id",
 					},
 					"tracking_plan_config": map[string]interface{}{
@@ -1234,7 +1234,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					ID: "remote-tp-123",
 				},
 			}
-			collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+			collection.Set(types.TrackingPlanResourceType, trackingPlanResourceMap)
 
 			st, err := handler.MapRemoteToState(collection)
 
@@ -1388,7 +1388,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				Reference:  "#/tp/tracking-plan/test-tp-456",
 			},
 		}
-		collection.Set(dcstate.TrackingPlanResourceType, trackingPlanResourceMap)
+		collection.Set(types.TrackingPlanResourceType, trackingPlanResourceMap)
 
 		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
@@ -1514,10 +1514,10 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 		spec := &specs.Spec{
 			Kind: "event-stream-source",
 			Spec: map[string]interface{}{
-				"id":                "test-source",
-				"name":              "Test Source",
-				"type": "javascript",
-				"unknown_field":     "should fail", // Unknown field
+				"id":            "test-source",
+				"name":          "Test Source",
+				"type":          "javascript",
+				"unknown_field": "should fail", // Unknown field
 			},
 		}
 
@@ -1534,8 +1534,8 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 		spec := &specs.Spec{
 			Kind: "event-stream-source",
 			Spec: map[string]interface{}{
-				"id":                "test-source",
-				"name":              "Test Source",
+				"id":   "test-source",
+				"name": "Test Source",
 				"type": "javascript",
 			},
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -35,11 +36,11 @@ func New(client catalog.DataCatalog) *Provider {
 		client:      client,
 		dc:          localcatalog.New(),
 		providerStore: map[string]entityProvider{
-			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
-			pstate.EventResourceType:        NewEventProvider(client, importDir),
-			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
-			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client, importDir),
-			pstate.CategoryResourceType:     NewCategoryProvider(client, importDir),
+			types.PropertyResourceType:      NewPropertyProvider(client, importDir),
+			types.EventResourceType:         NewEventProvider(client, importDir),
+			types.CustomTypeResourceType:    NewCustomTypeProvider(client, importDir),
+			types.TrackingPlanResourceType: NewTrackingPlanProvider(client, importDir),
+			types.CategoryResourceType:      NewCategoryProvider(client, importDir),
 		},
 	}
 }
@@ -72,11 +73,11 @@ func (p *Provider) SupportedKinds() []string {
 
 func (p *Provider) SupportedTypes() []string {
 	return []string{
-		pstate.PropertyResourceType,
-		pstate.EventResourceType,
-		pstate.TrackingPlanResourceType,
-		pstate.CustomTypeResourceType,
-		pstate.CategoryResourceType,
+		types.PropertyResourceType,
+		types.EventResourceType,
+		types.TrackingPlanResourceType,
+		types.CustomTypeResourceType,
+		types.CategoryResourceType,
 	}
 }
 
@@ -107,7 +108,7 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 
 func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
 	switch resourceType {
-	case pstate.TrackingPlanResourceType:
+	case types.TrackingPlanResourceType:
 		return p.listTrackingPlans(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
@@ -149,31 +150,23 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 	// First, pre-calculate all URNs to use for references
 	propIDToURN := make(map[string]string)
-	for _, props := range catalog.Properties {
-		for _, prop := range props {
-			propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, pstate.PropertyResourceType)
-		}
+	for _, prop := range catalog.Properties {
+		propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, types.PropertyResourceType)
 	}
 
 	eventIDToURN := make(map[string]string)
-	for _, events := range catalog.Events {
-		for _, event := range events {
-			eventIDToURN[event.LocalID] = resources.URN(event.LocalID, pstate.EventResourceType)
-		}
+	for _, event := range catalog.Events {
+		eventIDToURN[event.LocalID] = resources.URN(event.LocalID, types.EventResourceType)
 	}
 
 	customTypeIDToURN := make(map[string]string)
-	for _, customTypes := range catalog.CustomTypes {
-		for _, customType := range customTypes {
-			customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, pstate.CustomTypeResourceType)
-		}
+	for _, customType := range catalog.CustomTypes {
+		customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, types.CustomTypeResourceType)
 	}
 
 	categoryIDToURN := make(map[string]string)
-	for _, categories := range catalog.Categories {
-		for _, category := range categories {
-			categoryIDToURN[category.LocalID] = resources.URN(category.LocalID, pstate.CategoryResourceType)
-		}
+	for _, category := range catalog.Categories {
+		categoryIDToURN[category.LocalID] = resources.URN(category.LocalID, types.CategoryResourceType)
 	}
 
 	getResourceImportMetadata := func(kind, id string) resources.ResourceOpts {
@@ -186,139 +179,100 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 	// Helper function to get URN from reference
 	getURNFromRef := func(ref string) string {
-		// Format: #/entities/group/id
-		parts := strings.Split(ref, "/")
-		if len(parts) < 4 {
-			return ""
-		}
-
-		var (
-			entityType = parts[1]
-			id         = parts[3]
-		)
-
-		switch entityType {
-		case localcatalog.KindProperties:
-			return propIDToURN[id]
-
-		case localcatalog.KindCustomTypes:
-			return customTypeIDToURN[id]
-
-		case localcatalog.KindCategories:
-			return categoryIDToURN[id]
-
-		case localcatalog.KindEvents:
-			return eventIDToURN[id]
-
-		default:
-			return ""
-		}
+		return strings.TrimPrefix(ref, "#")
 	}
 
 	// Add properties to the graph
-	for group, props := range catalog.Properties {
-		for _, prop := range props {
-			log.Debug("adding property to graph", "id", prop.LocalID, "group", group)
+	for _, prop := range catalog.Properties {
+		log.Debug("adding property to graph", "id", prop.LocalID)
 
-			args := &pstate.PropertyArgs{}
-			if err := args.FromCatalogPropertyType(prop, getURNFromRef); err != nil {
-				return nil, fmt.Errorf("creating property args from catalog property: %s, err:%w", prop.LocalID, err)
-			}
-
-			resource := resources.NewResource(
-				prop.LocalID,
-				pstate.PropertyResourceType,
-				args.ToResourceData(),
-				make([]string, 0),
-				getResourceImportMetadata(localcatalog.KindProperties, prop.LocalID),
-				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
-					localcatalog.KindProperties,
-					group,
-					prop.LocalID,
-				)),
-			)
-			graph.AddResource(resource)
-
-			propIDToURN[prop.LocalID] = resource.URN()
+		args := &pstate.PropertyArgs{}
+		if err := args.FromCatalogPropertyType(prop, getURNFromRef); err != nil {
+			return nil, fmt.Errorf("creating property args from catalog property: %s, err:%w", prop.LocalID, err)
 		}
+
+		resource := resources.NewResource(
+			prop.LocalID,
+			types.PropertyResourceType,
+			args.ToResourceData(),
+			make([]string, 0),
+			getResourceImportMetadata(localcatalog.KindProperties, prop.LocalID),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
+				localcatalog.KindProperties,
+				prop.LocalID,
+			)),
+		)
+		graph.AddResource(resource)
+
+		propIDToURN[prop.LocalID] = resource.URN()
 	}
 
 	// Add events to the graph
-	for group, events := range catalog.Events {
-		for _, event := range events {
-			log.Debug("adding event to graph", "event", event.LocalID, "group", group)
+	for _, event := range catalog.Events {
+		log.Debug("adding event to graph", "event", event.LocalID)
 
-			args := pstate.EventArgs{}
-			args.FromCatalogEvent(&event, getURNFromRef)
-			resource := resources.NewResource(
+		args := pstate.EventArgs{}
+		args.FromCatalogEvent(&event, getURNFromRef)
+		resource := resources.NewResource(
+			event.LocalID,
+			types.EventResourceType,
+			args.ToResourceData(),
+			make([]string, 0),
+			getResourceImportMetadata(localcatalog.KindEvents, event.LocalID),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
+				localcatalog.KindEvents,
 				event.LocalID,
-				pstate.EventResourceType,
-				args.ToResourceData(),
-				make([]string, 0),
-				getResourceImportMetadata(localcatalog.KindEvents, event.LocalID),
-				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
-					localcatalog.KindEvents,
-					group,
-					event.LocalID,
-				)),
-			)
-			graph.AddResource(resource)
+			)),
+		)
+		graph.AddResource(resource)
 
-			graph.AddResource(resource)
-			eventIDToURN[event.LocalID] = resource.URN()
-		}
+		eventIDToURN[event.LocalID] = resource.URN()
 	}
 
 	// Add custom types to the graph with dependencies on properties or other custom types
-	for group, customTypes := range catalog.CustomTypes {
-		for _, customType := range customTypes {
-			log.Debug("adding custom type to graph", "id", customType.LocalID, "group", group)
+	for _, customType := range catalog.CustomTypes {
+		log.Debug("adding custom type to graph", "id", customType.LocalID)
 
-			// Add CustomTypeArgs
-			args := pstate.CustomTypeArgs{}
-			args.FromCatalogCustomType(&customType, getURNFromRef)
-			resource := resources.NewResource(
+		// Add CustomTypeArgs
+		args := pstate.CustomTypeArgs{}
+		args.FromCatalogCustomType(&customType, getURNFromRef)
+		resource := resources.NewResource(
+			customType.LocalID,
+			types.CustomTypeResourceType,
+			args.ToResourceData(),
+			make([]string, 0),
+			getResourceImportMetadata(localcatalog.KindCustomTypes, customType.LocalID),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
+				localcatalog.KindCustomTypes,
 				customType.LocalID,
-				pstate.CustomTypeResourceType,
-				args.ToResourceData(),
-				make([]string, 0),
-				getResourceImportMetadata(localcatalog.KindCustomTypes, customType.LocalID),
-				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
-					localcatalog.KindCustomTypes,
-					group,
-					customType.LocalID,
-				)),
-			)
-			graph.AddResource(resource)
-		}
+			)),
+		)
+		graph.AddResource(resource)
 	}
 
 	// Add categories to the graph
-	for group, categories := range catalog.Categories {
-		for _, category := range categories {
-			log.Debug("adding category to graph", "id", category.LocalID, "group", group)
+	for _, category := range catalog.Categories {
+		log.Debug("adding category to graph", "id", category.LocalID)
 
-			args := pstate.CategoryArgs{}
-			args.FromCatalogCategory(&category)
-			resource := resources.NewResource(
+		args := pstate.CategoryArgs{}
+		args.FromCatalogCategory(&category)
+		resource := resources.NewResource(
+			category.LocalID,
+			types.CategoryResourceType,
+			args.ToResourceData(),
+			make([]string, 0),
+			getResourceImportMetadata(localcatalog.KindCategories, category.LocalID),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
+				localcatalog.KindCategories,
 				category.LocalID,
-				pstate.CategoryResourceType,
-				args.ToResourceData(),
-				make([]string, 0),
-				getResourceImportMetadata(localcatalog.KindCategories, category.LocalID),
-				resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
-					localcatalog.KindCategories,
-					group,
-					category.LocalID,
-				)),
-			)
-			graph.AddResource(resource)
-		}
+			)),
+		)
+		graph.AddResource(resource)
 	}
 
 	// Add tracking plans to the graph
-	for group, tp := range catalog.TrackingPlans {
-		log.Debug("adding tracking plan to graph", "tp", tp.LocalID, "group", group)
+	for _, tp := range catalog.TrackingPlans {
+		log.Debug("adding tracking plan to graph", "tp", tp.LocalID)
 
 		args := pstate.TrackingPlanArgs{}
 		if err := args.FromCatalogTrackingPlan(tp, getURNFromRef); err != nil {
@@ -327,13 +281,12 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 		resource := resources.NewResource(
 			tp.LocalID,
-			pstate.TrackingPlanResourceType,
+			types.TrackingPlanResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindTrackingPlans, tp.LocalID),
-			resources.WithResourceFileMetadata(fmt.Sprintf("#/%s/%s/%s",
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
 				localcatalog.KindTrackingPlans,
-				group,
 				tp.LocalID,
 			)),
 		)

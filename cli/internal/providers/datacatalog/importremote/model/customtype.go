@@ -6,7 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -64,7 +64,7 @@ func (ct *ImportableCustomType) fromUpstream(
 
 	for _, prop := range upstream.Properties {
 		propertyRef, err := resolver.ResolveToReference(
-			state.PropertyResourceType,
+			types.PropertyResourceType,
 			prop.ID,
 		)
 		if err != nil {
@@ -93,7 +93,7 @@ func (ct *ImportableCustomType) fromUpstream(
 		}
 
 		customTypeRef, err := resolver.ResolveToReference(
-			state.CustomTypeResourceType,
+			types.CustomTypeResourceType,
 			itemID,
 		)
 		if err != nil {

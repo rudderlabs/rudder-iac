@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	catalog "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type RequiredKeysValidator struct {
@@ -41,116 +42,114 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 	var errors []ValidationError
 
-	for group, props := range dc.Properties {
-		for _, prop := range props {
-			reference := fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID)
+	for _, prop := range dc.Properties {
+		reference := fmt.Sprintf("#%s:%s", types.PropertyResourceType, prop.LocalID)
 
-			// Check mandatory fields - either type or types must be present
-			if prop.Name == "" || prop.LocalID == "" {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id and name fields on property are mandatory"),
-					Reference: reference,
-				})
-			}
+		// Check mandatory fields - either type or types must be present
+		if prop.Name == "" || prop.LocalID == "" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("id and name fields on property are mandatory"),
+				Reference: reference,
+			})
+		}
 
-			// Validate mutual exclusivity of type and types fields
-			hasType := prop.Type != ""
-			hasTypes := len(prop.Types) > 0
-			
-			if !hasType && !hasTypes {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("either 'type' or 'types' field must be specified"),
-					Reference: reference,
-				})
-			} else if hasType && hasTypes {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("'type' and 'types' fields are mutually exclusive, only one can be specified"),
-					Reference: reference,
-				})
-			}
+		// Validate mutual exclusivity of type and types fields
+		hasType := prop.Type != ""
+		hasTypes := len(prop.Types) > 0
 
-			// Validate mutual exclusivity of item_type and item_types fields
-			hasItemType := prop.ItemType != ""
-			hasItemTypes := len(prop.ItemTypes) > 0
-			if hasItemType && hasItemTypes {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("'item_type' and 'item_types' fields are mutually exclusive, only one can be specified"),
-					Reference: reference,
-				})
-			}
+		if !hasType && !hasTypes {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("either 'type' or 'types' field must be specified"),
+				Reference: reference,
+			})
+		} else if hasType && hasTypes {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("'type' and 'types' fields are mutually exclusive, only one can be specified"),
+				Reference: reference,
+			})
+		}
 
-			// Validate property name doesn't have leading or trailing whitespace
-			if prop.Name != strings.TrimSpace(prop.Name) {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("property name cannot have leading or trailing whitespace characters"),
-					Reference: reference,
-				})
-			}
+		// Validate mutual exclusivity of item_type and item_types fields
+		hasItemType := prop.ItemType != ""
+		hasItemTypes := len(prop.ItemTypes) > 0
+		if hasItemType && hasItemTypes {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("'item_type' and 'item_types' fields are mutually exclusive, only one can be specified"),
+				Reference: reference,
+			})
+		}
 
-			// Validate types array contains only valid primitive types (no custom types or array/object)
-			if hasTypes {
-				typeSet := make(map[string]bool)
-				for idx, typeVal := range prop.Types {
-					// Check for invalid type
-					if !slices.Contains(ValidTypes, typeVal) {
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
-							Reference: reference,
-						})
-					}
-					// Check for duplicates
-					if typeSet[typeVal] {
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("duplicate type '%s' found in types array", typeVal),
-							Reference: reference,
-						})
-					}
-					typeSet[typeVal] = true
+		// Validate property name doesn't have leading or trailing whitespace
+		if prop.Name != strings.TrimSpace(prop.Name) {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("property name cannot have leading or trailing whitespace characters"),
+				Reference: reference,
+			})
+		}
+
+		// Validate types array contains only valid primitive types (no custom types or array/object)
+		if hasTypes {
+			typeSet := make(map[string]bool)
+			for idx, typeVal := range prop.Types {
+				// Check for invalid type
+				if !slices.Contains(ValidTypes, typeVal) {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
+						Reference: reference,
+					})
 				}
-			} else {
-				// Validate single type field
-				if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
-					if prop.Config != nil {
+				// Check for duplicates
+				if typeSet[typeVal] {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("duplicate type '%s' found in types array", typeVal),
+						Reference: reference,
+					})
+				}
+				typeSet[typeVal] = true
+			}
+		} else {
+			// Validate single type field
+			if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
+				if prop.Config != nil {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+						Reference: reference,
+					})
+				}
+			}
+
+			// Validate item_type field (single item type)
+			if prop.ItemType != "" {
+				// If it's a custom type reference, don't validate it here (will be validated in refs.go)
+				if !catalog.CustomTypeRegex.Match([]byte(prop.ItemType)) {
+					// Validate it's a valid type
+					if !slices.Contains(ValidTypes, prop.ItemType) {
 						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+							error:     fmt.Errorf("item_type '%s' is invalid, valid type values are: %s", prop.ItemType, strings.Join(ValidTypes, ", ")),
 							Reference: reference,
 						})
 					}
 				}
+			}
 
-				// Validate item_type field (single item type)
-				if prop.ItemType != "" {
-					// If it's a custom type reference, don't validate it here (will be validated in refs.go)
-					if !catalog.CustomTypeRegex.Match([]byte(prop.ItemType)) {
-						// Validate it's a valid type
-						if !slices.Contains(ValidTypes, prop.ItemType) {
+			// Validate item_types field (multiple item types)
+			if len(prop.ItemTypes) > 0 {
+				for idx, itemType := range prop.ItemTypes {
+					// Check if it's a custom type reference
+					if catalog.CustomTypeRegex.Match([]byte(itemType)) {
+						if len(prop.ItemTypes) != 1 {
 							errors = append(errors, ValidationError{
-								error:     fmt.Errorf("item_type '%s' is invalid, valid type values are: %s", prop.ItemType, strings.Join(ValidTypes, ", ")),
+								error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
 								Reference: reference,
 							})
 						}
-					}
-				}
-
-				// Validate item_types field (multiple item types)
-				if len(prop.ItemTypes) > 0 {
-					for idx, itemType := range prop.ItemTypes {
-						// Check if it's a custom type reference
-						if catalog.CustomTypeRegex.Match([]byte(itemType)) {
-							if len(prop.ItemTypes) != 1 {
-								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
-									Reference: reference,
-								})
-							}
-						} else {
-							// Validate it's a valid type
-							if !slices.Contains(ValidTypes, itemType) {
-								errors = append(errors, ValidationError{
-									error:     fmt.Errorf("item_types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
-									Reference: reference,
-								})
-							}
+					} else {
+						// Validate it's a valid type
+						if !slices.Contains(ValidTypes, itemType) {
+							errors = append(errors, ValidationError{
+								error:     fmt.Errorf("item_types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
+								Reference: reference,
+							})
 						}
 					}
 				}
@@ -159,31 +158,29 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 	}
 
 	// Events required keys
-	for group, events := range dc.Events {
-		for _, event := range events {
-			reference := fmt.Sprintf("#/events/%s/%s", group, event.LocalID)
+	for _, event := range dc.Events {
+		reference := fmt.Sprintf("#%s:%s", types.EventResourceType, event.LocalID)
 
-			if event.LocalID == "" || event.Type == "" {
+		if event.LocalID == "" || event.Type == "" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("id and event_type fields on event are mandatory"),
+				Reference: reference,
+			})
+		}
+
+		if event.Type == "track" {
+			if event.Name == "" {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id and event_type fields on event are mandatory"),
+					error:     fmt.Errorf("name field is mandatory on track event"),
 					Reference: reference,
 				})
-			}
-
-			if event.Type == "track" {
-				if event.Name == "" {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("name field is mandatory on track event"),
-						Reference: reference,
-					})
-				}
 			}
 		}
 	}
 
 	// Tracking Plan required keys
-	for group, tp := range dc.TrackingPlans {
-		reference := fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID)
+	for _, tp := range dc.TrackingPlans {
+		reference := fmt.Sprintf("#%s:%s", catalog.KindTrackingPlans, tp.LocalID)
 
 		if tp.Name == "" {
 			errors = append(errors, ValidationError{
@@ -252,111 +249,107 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 	}
 
 	// Custom Types required keys
-	for group, customTypes := range dc.CustomTypes {
-		for _, customType := range customTypes {
-			reference := fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID)
+	for _, customType := range dc.CustomTypes {
+		reference := fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, customType.LocalID)
 
-			// Check mandatory fields
-			if customType.LocalID == "" || customType.Name == "" || customType.Type == "" {
+		// Check mandatory fields
+		if customType.LocalID == "" || customType.Name == "" || customType.Type == "" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("id, name and type fields on custom type are mandatory"),
+				Reference: reference,
+			})
+			continue
+		}
+
+		// Check each property in properties has id field
+		if customType.Type == "object" {
+
+			if len(customType.Config) > 0 {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id, name and type fields on custom type are mandatory"),
+					error:     fmt.Errorf("config is not allowed on custom type of type object"),
 					Reference: reference,
 				})
-				continue
 			}
 
-			// Check each property in properties has id field
-			if customType.Type == "object" {
-
-				if len(customType.Config) > 0 {
+			for i, prop := range customType.Properties {
+				if prop.Ref == "" {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("config is not allowed on custom type of type object"),
+						error:     fmt.Errorf("$ref field is mandatory for property at index %d in custom type", i),
 						Reference: reference,
 					})
 				}
-
-				for i, prop := range customType.Properties {
-					if prop.Ref == "" {
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("$ref field is mandatory for property at index %d in custom type", i),
-							Reference: reference,
-						})
-					}
-				}
 			}
+		}
 
-			// Name format validation - no need to check if name is empty as we already checked above
-			if !customTypeNameRegex.MatchString(customType.Name) {
+		// Name format validation - no need to check if name is empty as we already checked above
+		if !customTypeNameRegex.MatchString(customType.Name) {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("custom type name must start with a capital letter and contain only letters, numbers, underscores and dashes, and be between 2 and 65 characters long"),
+				Reference: reference,
+			})
+		}
+
+		// Type validation
+		if !slices.Contains(ValidTypes, customType.Type) {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(ValidTypes, ", ")),
+				Reference: reference,
+			})
+		}
+
+		if customType.Config != nil {
+			switch customType.Type {
+			case "string":
+				errors = append(errors, rk.validateStringConfig(customType.Config, reference)...)
+			case "number", "integer":
+				errors = append(errors, rk.validateNumberConfig(customType.Config, reference, customType.Type)...)
+			case "array":
+				errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
+			}
+		}
+
+		if len(customType.Variants) > 0 {
+			if customType.Type != "object" {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("custom type name must start with a capital letter and contain only letters, numbers, underscores and dashes, and be between 2 and 65 characters long"),
+					error:     fmt.Errorf("variants are only allowed for custom type of type object"),
 					Reference: reference,
 				})
-			}
+			} else {
 
-			// Type validation
-			if !slices.Contains(ValidTypes, customType.Type) {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("invalid data type, acceptable values are: %s", strings.Join(ValidTypes, ", ")),
-					Reference: reference,
-				})
-			}
-
-			if customType.Config != nil {
-				switch customType.Type {
-				case "string":
-					errors = append(errors, rk.validateStringConfig(customType.Config, reference)...)
-				case "number", "integer":
-					errors = append(errors, rk.validateNumberConfig(customType.Config, reference, customType.Type)...)
-				case "array":
-					errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
-				}
-			}
-
-			if len(customType.Variants) > 0 {
-				if customType.Type != "object" {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("variants are only allowed for custom type of type object"),
-						Reference: reference,
-					})
-				} else {
-
-					errors = append(errors, rk.validateVariantsRequiredKeys(customType.Variants, reference)...)
-				}
+				errors = append(errors, rk.validateVariantsRequiredKeys(customType.Variants, reference)...)
 			}
 		}
 	}
 
 	// Categories required keys and format validation
-	for group, categories := range dc.Categories {
-		for _, category := range categories {
-			reference := fmt.Sprintf("#/categories/%s/%s", group, category.LocalID)
+	for _, category := range dc.Categories {
+		reference := fmt.Sprintf("#%s:%s", types.CategoryResourceType, category.LocalID)
 
-			// Check mandatory fields
-			if category.LocalID == "" || category.Name == "" {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("id and name fields on category are mandatory"),
-					Reference: reference,
-				})
-				continue
-			}
+		// Check mandatory fields
+		if category.LocalID == "" || category.Name == "" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("id and name fields on category are mandatory"),
+				Reference: reference,
+			})
+			continue
+		}
 
-			// Validate category name doesn't have leading or trailing whitespace
-			if category.Name != strings.TrimSpace(category.Name) {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("category name cannot have leading or trailing whitespace characters"),
-					Reference: reference,
-				})
-				continue
-			}
+		// Validate category name doesn't have leading or trailing whitespace
+		if category.Name != strings.TrimSpace(category.Name) {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("category name cannot have leading or trailing whitespace characters"),
+				Reference: reference,
+			})
+			continue
+		}
 
-			// Category name format validation using the regex from category.go
-			if !categoryNameRegex.MatchString(category.Name) {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("category name must start with a letter (upper/lower case) or underscore, followed by 2-64 characters including spaces, word characters, commas, periods, and hyphens"),
-					Reference: reference,
-				})
-				continue
-			}
+		// Category name format validation using the regex from category.go
+		if !categoryNameRegex.MatchString(category.Name) {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("category name must start with a letter (upper/lower case) or underscore, followed by 2-64 characters including spaces, word characters, commas, periods, and hyphens"),
+				Reference: reference,
+			})
+			continue
 		}
 	}
 
@@ -698,7 +691,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 
 	// validate the property reference
 	matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
-	if len(matches) != 3 {
+	if len(matches) != 2 {
 		return []ValidationError{
 			{
 				error:     fmt.Errorf("invalid property reference format: %s in event_rule %s", prop.Ref, ruleRef),
@@ -707,10 +700,10 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 		}
 	}
 
-	propertyGroup, propertyID := matches[1], matches[2]
+	propertyID := matches[1]
 
 	// check if the property exists in the data catalog
-	property := dc.Property(propertyGroup, propertyID)
+	property := dc.Property(propertyID)
 	if property == nil {
 		return []ValidationError{
 			{

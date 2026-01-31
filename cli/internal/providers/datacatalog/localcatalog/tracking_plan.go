@@ -9,20 +9,22 @@ import (
 )
 
 var (
-	PropRegex       = regexp.MustCompile(`^#\/properties\/(.*)\/(.*)$`)
-	EventRegex      = regexp.MustCompile(`^#\/events\/(.*)\/(.*)$`)
+	// Regex patterns support both old (#/kind/group/id) and new (#kind:id) formats
+	// Non-capturing groups (?:...) ensure the we only capture the localId from the reference string
+	PropRegex       = regexp.MustCompile(`^#(?:/properties/[^/]+/|property:)(.+)$`)
+	EventRegex      = regexp.MustCompile(`^#(?:/events/[^/]+/|event:)(.+)$`)
 	IncludeRegex    = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
-	CustomTypeRegex = regexp.MustCompile(`^#\/custom-types\/(.*)\/(.*)$`)
-	CategoryRegex   = regexp.MustCompile(`^#\/categories\/(.*)\/(.*)$`)
+	CustomTypeRegex = regexp.MustCompile(`^#(?:/custom-types/[^/]+/|custom-type:)(.+)$`)
+	CategoryRegex   = regexp.MustCompile(`^#(?:/categories/[^/]+/|category:)(.+)$`)
 )
 
 type CatalogResourceFetcher interface {
-	Event(group, id string) *Event
-	Property(group, id string) *PropertyV1
-	Category(group, id string) *Category
-	CustomType(group, id string) *CustomType
-	TPEventRule(group, id string) *TPRule
-	TPEventRules(group string) ([]*TPRule, bool)
+	Event(id string) *Event
+	Property(id string) *PropertyV1
+	Category(id string) *Category
+	CustomType(id string) *CustomType
+	TPEventRule(tpID, ruleID string) *TPRule
+	TPEventRules(tpID string) ([]*TPRule, bool)
 }
 
 type TrackingPlan struct {
@@ -147,14 +149,17 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 		return nil, fmt.Errorf("includes ref: %s invalid as failed regex match", rule.Includes.Ref)
 	}
 
-	tpGroup, ruleID := matches[1], matches[2]
+	// ASK: how are we using include?
+	// conventionally matches[1] would include the tpGroup and not the ID
+	// we need to sort this out
+	tpID, ruleID := matches[1], matches[2]
 	rules := make([]*TPRule, 0)
 
 	if ruleID == "*" {
-		eventRules, _ := fetcher.TPEventRules(tpGroup)
-		rules = append(rules, eventRules...) // fetch all the tp rules in the group
+		eventRules, _ := fetcher.TPEventRules(tpID)
+		rules = append(rules, eventRules...) // fetch all the tp rules
 	} else {
-		rules = append(rules, fetcher.TPEventRule(tpGroup, ruleID)) // fetch the specific rule with the tpGroup
+		rules = append(rules, fetcher.TPEventRule(tpID, ruleID)) // fetch the specific rule
 	}
 
 	toReturn := make([]*TPEvent, 0)
@@ -187,20 +192,20 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	}
 
 	matches := EventRegex.FindStringSubmatch(rule.Event.Ref)
-	if len(matches) != 3 {
+	if len(matches) != 2 {
 		return nil, fmt.Errorf("event ref: %s invalid as failed regex match", rule.Event.Ref)
 	}
 
-	eventGroup, eventID := matches[1], matches[2]
-	event := fetcher.Event(eventGroup, eventID)
+	eventID := matches[1]
+	event := fetcher.Event(eventID)
 	if event == nil {
-		return nil, fmt.Errorf("looking up event: %s in group: %s failed", eventID, eventGroup)
+		return nil, fmt.Errorf("looking up event: %s failed", eventID)
 	}
 
 	var categoryRef *string
 	if event.CategoryRef != nil {
 		catMatches := CategoryRegex.FindStringSubmatch(*event.CategoryRef)
-		if len(catMatches) != 3 {
+		if len(catMatches) != 2 {
 			return nil, fmt.Errorf("category ref: %s invalid as failed regex match", *event.CategoryRef)
 		}
 		categoryRef = event.CategoryRef
@@ -247,14 +252,14 @@ func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*
 	log.Debug("expanding property refs within the property", "propertyID", prop.Ref)
 
 	matches := PropRegex.FindStringSubmatch(prop.Ref)
-	if len(matches) != 3 {
+	if len(matches) != 2 {
 		return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
 	}
 
-	propertyGroup, propertyID := matches[1], matches[2]
-	property := fetcher.Property(propertyGroup, propertyID)
+	propertyID := matches[1]
+	property := fetcher.Property(propertyID)
 	if property == nil {
-		return nil, fmt.Errorf("looking up property: %s in group: %s failed", propertyID, propertyGroup)
+		return nil, fmt.Errorf("looking up property: %s failed", propertyID)
 	}
 
 	properties := make([]*TPEventProperty, 0)

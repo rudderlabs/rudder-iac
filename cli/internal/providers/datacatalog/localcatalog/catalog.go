@@ -3,6 +3,7 @@ package localcatalog
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -33,63 +34,62 @@ type WorkspaceRemoteIDMapping struct {
 
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties     map[EntityGroup][]PropertyV1         `json:"properties"`
-	Events         map[EntityGroup][]Event              `json:"events"`
-	TrackingPlans  map[EntityGroup]*TrackingPlan        `json:"trackingPlans"` // Only one tracking plan per entity group
-	CustomTypes    map[EntityGroup][]CustomType         `json:"customTypes"`   // Custom types grouped by entity group
-	Categories     map[EntityGroup][]Category           `json:"categories"`    // Categories grouped by entity group
+	Properties     []PropertyV1                         `json:"properties"`
+	Events         []Event                              `json:"events"`
+	TrackingPlans  []*TrackingPlan                      `json:"trackingPlans"`
+	CustomTypes    []CustomType                         `json:"customTypes"`
+	Categories     []Category                           `json:"categories"`
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
+	ReferenceMap   map[string]string                    `json:"-"` // Maps URN references to original path-based references
 }
 
-func (dc *DataCatalog) Property(groupName string, id string) *PropertyV1 {
-	if props, ok := dc.Properties[EntityGroup(groupName)]; ok {
-		for _, prop := range props {
-			if prop.LocalID == id {
-				return &prop
-			}
+func (dc *DataCatalog) Property(id string) *PropertyV1 {
+	for i := range dc.Properties {
+		if dc.Properties[i].LocalID == id {
+			return &dc.Properties[i]
 		}
 	}
 	return nil
 }
 
-func (dc *DataCatalog) Event(groupName string, id string) *Event {
-	if events, ok := dc.Events[EntityGroup(groupName)]; ok {
-		for _, event := range events {
-			if event.LocalID == id {
-				return &event
-			}
+func (dc *DataCatalog) Event(id string) *Event {
+	for i := range dc.Events {
+		if dc.Events[i].LocalID == id {
+			return &dc.Events[i]
 		}
 	}
 	return nil
 }
 
-// Category returns a category by group name and ID
-func (dc *DataCatalog) Category(groupName string, id string) *Category {
-	if categories, ok := dc.Categories[EntityGroup(groupName)]; ok {
-		for _, category := range categories {
-			if category.LocalID == id {
-				return &category
-			}
+// Category returns a category by ID
+func (dc *DataCatalog) Category(id string) *Category {
+	for i := range dc.Categories {
+		if dc.Categories[i].LocalID == id {
+			return &dc.Categories[i]
 		}
 	}
 	return nil
 }
 
-// CustomType returns a custom type by group name and ID
-func (dc *DataCatalog) CustomType(groupName string, id string) *CustomType {
-	if types, ok := dc.CustomTypes[EntityGroup(groupName)]; ok {
-		for _, customType := range types {
-			if customType.LocalID == id {
-				return &customType
-			}
+// CustomType returns a custom type by ID
+func (dc *DataCatalog) CustomType(id string) *CustomType {
+	for i := range dc.CustomTypes {
+		if dc.CustomTypes[i].LocalID == id {
+			return &dc.CustomTypes[i]
 		}
 	}
 	return nil
 }
 
-func (dc *DataCatalog) TPEventRule(tpGroup, ruleID string) *TPRule {
-	tp, ok := dc.TrackingPlans[EntityGroup(tpGroup)]
-	if !ok {
+func (dc *DataCatalog) TPEventRule(tpID, ruleID string) *TPRule {
+	var tp *TrackingPlan
+	for i := range dc.TrackingPlans {
+		if dc.TrackingPlans[i].LocalID == tpID {
+			tp = dc.TrackingPlans[i]
+			break
+		}
+	}
+	if tp == nil {
 		return nil
 	}
 
@@ -102,9 +102,15 @@ func (dc *DataCatalog) TPEventRule(tpGroup, ruleID string) *TPRule {
 	return nil
 }
 
-func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
-	tp, ok := dc.TrackingPlans[EntityGroup(tpGroup)]
-	if !ok {
+func (dc *DataCatalog) TPEventRules(tpID string) ([]*TPRule, bool) {
+	var tp *TrackingPlan
+	for i := range dc.TrackingPlans {
+		if dc.TrackingPlans[i].LocalID == tpID {
+			tp = dc.TrackingPlans[i]
+			break
+		}
+	}
+	if tp == nil {
 		return nil, false
 	}
 
@@ -121,13 +127,83 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 
 func New() *DataCatalog {
 	return &DataCatalog{
-		Properties:     map[EntityGroup][]PropertyV1{},
-		Events:         map[EntityGroup][]Event{},
-		TrackingPlans:  map[EntityGroup]*TrackingPlan{},
-		CustomTypes:    map[EntityGroup][]CustomType{},
-		Categories:     map[EntityGroup][]Category{},
+		Properties:     []PropertyV1{},
+		Events:         []Event{},
+		TrackingPlans:  []*TrackingPlan{},
+		CustomTypes:    []CustomType{},
+		Categories:     []Category{},
 		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
+		ReferenceMap:   map[string]string{},
 	}
+}
+
+// convertPathToURN converts a path-based reference to URN format
+// Example: #/custom-types/common/Address -> #custom-type:Address
+func convertPathToURN(pathRef string) (string, error) {
+	pathRef = strings.TrimPrefix(pathRef, "#/")
+	parts := strings.Split(pathRef, "/")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid path reference: %s", pathRef)
+	}
+
+	entityType := parts[0]
+	localId := parts[2]
+	URN := ""
+	switch entityType {
+	case KindProperties:
+		URN = resources.URN(localId, "property")
+	case KindEvents:
+		URN = resources.URN(localId, "event")
+	case KindCustomTypes:
+		URN = resources.URN(localId, "custom-type")
+	case KindCategories:
+		URN = resources.URN(localId, "category")
+	default:
+		return "", fmt.Errorf("invalid entity type: %s", entityType)
+	}
+
+	return fmt.Sprintf("#%s", URN), nil
+}
+
+// transformReferencesInSpec recursively walks the spec map and transforms
+// all string values starting with #/ to URN format, tracking the mappings
+func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
+	for key, value := range spec {
+		switch v := value.(type) {
+		case string:
+			if strings.HasPrefix(v, "#/") {
+				urnRef, err := convertPathToURN(v)
+				if err != nil {
+					return err
+				}
+				dc.ReferenceMap[urnRef] = v
+				spec[key] = urnRef
+			}
+		case map[string]any:
+			if err := dc.transformReferencesInSpec(v); err != nil {
+				return err
+			}
+		case []any:
+			for i, item := range v {
+				switch itemVal := item.(type) {
+				case string:
+					if strings.HasPrefix(itemVal, "#/") {
+						urnRef, err := convertPathToURN(itemVal)
+						if err != nil {
+							return err
+						}
+						dc.ReferenceMap[urnRef] = itemVal
+						v[i] = urnRef
+					}
+				case map[string]any:
+					if err := dc.transformReferencesInSpec(itemVal); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -193,6 +269,12 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 }
 
 func (dc *DataCatalog) LoadLegacySpec(path string, s *specs.Spec) error {
+	// Transform path-based references to URN format
+	err := dc.transformReferencesInSpec(s.Spec)
+	if err != nil {
+		return fmt.Errorf("processing references in spec: %w", err)
+	}
+
 	if err := extractEntities(s, dc); err != nil {
 		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
 	}
@@ -230,7 +312,7 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	default:
 		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
-	
+
 	jsonByt, err := json.Marshal(resourceSpec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling properties: %w", err)
@@ -267,31 +349,27 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 // and updates the datacatalog struct with it.
 func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 	// TODO: properly handle metadata - ensuring schema and types
-	name, ok := s.Metadata["name"].(string)
-	if !ok {
-		name = ""
-	}
 	switch s.Kind {
 	case KindProperties:
 		properties, err := ExtractProperties(s)
 		if err != nil {
 			return fmt.Errorf("extracting properties: %w", err)
 		}
-		dc.Properties[EntityGroup(name)] = append(dc.Properties[EntityGroup(name)], properties...)
+		dc.Properties = append(dc.Properties, properties...)
 
 	case KindEvents:
 		events, err := ExtractEvents(s)
 		if err != nil {
 			return fmt.Errorf("extracting property entity: %w", err)
 		}
-		dc.Events[EntityGroup(name)] = append(dc.Events[EntityGroup(name)], events...)
+		dc.Events = append(dc.Events, events...)
 
 	case KindCategories:
 		categories, err := ExtractCategories(s)
 		if err != nil {
 			return fmt.Errorf("extracting categories: %w", err)
 		}
-		dc.Categories[EntityGroup(name)] = append(dc.Categories[EntityGroup(name)], categories...)
+		dc.Categories = append(dc.Categories, categories...)
 
 	case KindTrackingPlans:
 		tp, err := ExtractTrackingPlan(s)
@@ -299,17 +377,20 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
-		if _, exists := dc.TrackingPlans[EntityGroup(name)]; exists {
-			return fmt.Errorf("duplicate tracking plan with metadata.name '%s' found - only one tracking plan per entity group is allowed", name)
+		// Check for duplicates
+		for i := range dc.TrackingPlans {
+			if dc.TrackingPlans[i].LocalID == tp.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", tp.LocalID)
+			}
 		}
-		dc.TrackingPlans[EntityGroup(name)] = &tp
+		dc.TrackingPlans = append(dc.TrackingPlans, &tp)
 
 	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)
 		if err != nil {
 			return fmt.Errorf("extracting custom types: %w", err)
 		}
-		dc.CustomTypes[EntityGroup(name)] = append(dc.CustomTypes[EntityGroup(name)], customTypes...)
+		dc.CustomTypes = append(dc.CustomTypes, customTypes...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)

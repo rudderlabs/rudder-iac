@@ -9,7 +9,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type mockTPResolver struct {
@@ -64,11 +64,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				switch entityType {
-				case state.EventResourceType:
+				case types.EventResourceType:
 					if remoteID == "evt_product_viewed" {
 						return "#/events/ecommerce/product-viewed", nil
 					}
-				case state.PropertyResourceType:
+				case types.PropertyResourceType:
 					switch remoteID {
 					case "prop_product_id":
 						return "#/properties/products/product-id", nil
@@ -131,8 +131,8 @@ func TestTrackingPlanForExport(t *testing.T) {
 					IdentitySection:      "context",
 					Properties: []*catalog.TrackingPlanEventProperty{
 						{
-							ID:       "prop_cart",
-							Required: true,
+							ID:                   "prop_cart",
+							Required:             true,
 							AdditionalProperties: false,
 							Properties: []*catalog.TrackingPlanEventProperty{
 								{ID: "prop_cart_id", Required: true},
@@ -147,9 +147,9 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				switch entityType {
-				case state.EventResourceType:
+				case types.EventResourceType:
 					return "#/events/checkout/checkout-completed", nil
-				case state.PropertyResourceType:
+				case types.PropertyResourceType:
 					refMap := map[string]string{
 						"prop_cart":    "#/properties/cart/cart-object",
 						"prop_cart_id": "#/properties/cart/cart-id",
@@ -187,8 +187,8 @@ func TestTrackingPlanForExport(t *testing.T) {
 					},
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/cart/cart-object",
-							"required": true,
+							"$ref":                 "#/properties/cart/cart-object",
+							"required":             true,
 							"additionalProperties": false,
 							"properties": []any{
 								map[string]any{
@@ -233,7 +233,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				switch entityType {
-				case state.EventResourceType:
+				case types.EventResourceType:
 					eventMap := map[string]string{
 						"evt_page_viewed":    "#/events/navigation/page-viewed",
 						"evt_button_clicked": "#/events/interaction/button-clicked",
@@ -241,7 +241,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 					if ref, ok := eventMap[remoteID]; ok {
 						return ref, nil
 					}
-				case state.PropertyResourceType:
+				case types.PropertyResourceType:
 					if remoteID == "prop_button_id" {
 						return "#/properties/ui/button-id", nil
 					}
@@ -388,7 +388,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				if entityType == state.EventResourceType {
+				if entityType == types.EventResourceType {
 					return "#/events/test/test-event", nil
 				}
 				return "", fmt.Errorf("property not found")
@@ -425,7 +425,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				if entityType == state.EventResourceType {
+				if entityType == types.EventResourceType {
 					return "#/events/test/test-event", nil
 				}
 				return "", nil
@@ -468,7 +468,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				if entityType == state.EventResourceType {
+				if entityType == types.EventResourceType {
 					return "#/events/nested/nested-event", nil
 				}
 				if remoteID == "prop_parent" {
@@ -576,11 +576,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				switch entityType {
-				case state.EventResourceType:
+				case types.EventResourceType:
 					if remoteID == "evt_user_action" {
 						return "#/events/analytics/user-action", nil
 					}
-				case state.PropertyResourceType:
+				case types.PropertyResourceType:
 					refMap := map[string]string{
 						"prop_action_type":   "#/properties/common/action-type",
 						"prop_user_id":       "#/properties/user/user-id",

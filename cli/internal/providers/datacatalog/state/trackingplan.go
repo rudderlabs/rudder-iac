@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/samber/lo"
@@ -15,7 +16,6 @@ const (
 	PropertiesIdentity       = "properties"
 	TraitsIdentity           = "traits"
 	ContextTraitsIdentity    = "context.traits"
-	TrackingPlanResourceType = "tracking-plan"
 )
 
 type TrackingPlanState struct {
@@ -397,7 +397,7 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 // 5. Array properties with multiple item types where at least one is object
 func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
 	// if the property's type is a custom type, additional properties should be false
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
+	if strings.HasPrefix(prop.Type, "#custom-type:") {
 		return false
 	}
 	hasObject := strings.Contains(prop.Type, "object")
@@ -487,7 +487,7 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 // for TrackingPlanState(which becomes the state's output field later), we use the propertyID as is
 func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp *catalog.TrackingPlanEventProperty, collection *resources.RemoteResources, usePropertyRefsForDependencies bool) error {
 	if usePropertyRefsForDependencies {
-		urn, err := collection.GetURNByID(PropertyResourceType, remoteProp.ID)
+		urn, err := collection.GetURNByID(types.PropertyResourceType, remoteProp.ID)
 		if err != nil {
 			return fmt.Errorf("getting URN for property %s: %w", remoteProp.ID, err)
 		}
@@ -500,7 +500,7 @@ func (args *TrackingPlanPropertyArgs) FromRemoteTrackingPlanProperty(remoteProp 
 		args.ID = remoteProp.ID
 	}
 
-	prop, ok := collection.GetByID(PropertyResourceType, remoteProp.ID)
+	prop, ok := collection.GetByID(types.PropertyResourceType, remoteProp.ID)
 	if !ok {
 		return fmt.Errorf("getting property %s from RemoteResources: %w", remoteProp.ID, resources.ErrRemoteResourceNotFound)
 	}
@@ -746,7 +746,7 @@ func (args *TrackingPlanArgs) FromRemoteTrackingPlan(trackingPlan *catalog.Track
 
 	events := make([]*TrackingPlanEventArgs, 0, len(trackingPlan.Events))
 	for _, event := range trackingPlan.Events {
-		eventURN, err := collection.GetURNByID(EventResourceType, event.ID)
+		eventURN, err := collection.GetURNByID(types.EventResourceType, event.ID)
 		if err != nil {
 			return fmt.Errorf("getting URN for event %s: %w", event.ID, err)
 		}

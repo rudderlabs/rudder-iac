@@ -5,7 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
 
@@ -37,7 +37,7 @@ func (iv *ImportableVariants) fromUpstream(
 		}
 
 		discriminatorRef, err := resolver.ResolveToReference(
-			state.PropertyResourceType,
+			types.PropertyResourceType,
 			remoteVariant.Discriminator,
 		)
 		if err != nil {
@@ -59,7 +59,7 @@ func (iv *ImportableVariants) fromUpstream(
 
 			for _, remoteProp := range remoteCase.Properties {
 				propRef, err := resolver.ResolveToReference(
-					state.PropertyResourceType,
+					types.PropertyResourceType,
 					remoteProp.ID,
 				)
 				if err != nil {
@@ -80,7 +80,7 @@ func (iv *ImportableVariants) fromUpstream(
 
 		for _, remoteProp := range remoteVariant.Default {
 			propRef, err := resolver.ResolveToReference(
-				state.PropertyResourceType,
+				types.PropertyResourceType,
 				remoteProp.ID,
 			)
 			if err != nil {

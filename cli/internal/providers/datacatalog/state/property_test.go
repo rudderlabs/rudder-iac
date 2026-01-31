@@ -99,12 +99,12 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			LocalID:     "test-email",
 			Name:        "Test Email",
 			Description: "A test email property",
-			Type:        "#/custom-types/email-types/EmailType",
+			Type:        "#custom-type:EmailType",
 			Config:      map[string]interface{}{},
 		}
 
 		urnFromRef := func(ref string) string {
-			if ref == "#/custom-types/email-types/EmailType" {
+			if ref == "#custom-type:EmailType" {
 				return "custom-type:EmailType"
 			}
 			return ""
@@ -131,11 +131,11 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Name:        "Test Email List",
 			Description: "A list of emails",
 			Type:        "array",
-			ItemType:    "#/custom-types/email-types/EmailType",
+			ItemType:    "#custom-type:EmailType",
 		}
 
 		urnFromRef := func(ref string) string {
-			if ref == "#/custom-types/email-types/EmailType" {
+			if ref == "#custom-type:EmailType" {
 				return "custom-type:EmailType"
 			}
 			return ""
@@ -168,7 +168,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Name:        "Test Email List",
 			Description: "A list of emails",
 			Type:        "array",
-			ItemType:    "#/custom-types/email-types/NonExistentType",
+			ItemType:    "#custom-type:NonExistentType",
 		}
 
 		urnFromRef := func(ref string) string {
@@ -243,7 +243,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Name:        "Test Array Custom Type",
 			Description: "An array with custom type in item_types",
 			Type:        "array",
-			ItemTypes:   []string{"string", "#/custom-types/email-types/EmailType", "number"},
+			ItemTypes:   []string{"string", "#custom-type:EmailType", "number"},
 		}
 
 		urnFromRef := func(ref string) string {
@@ -259,7 +259,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Description: "An array with custom type in item_types",
 			Type:        "array",
 			Config: map[string]interface{}{
-				"item_types": []interface{}{"#/custom-types/email-types/EmailType", "number", "string"},
+				"item_types": []interface{}{"#custom-type:EmailType", "number", "string"},
 			},
 		}
 		assert.Equal(t, expected, args)

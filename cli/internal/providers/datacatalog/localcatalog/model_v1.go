@@ -144,17 +144,13 @@ func extractSpec(spec map[string]any, result any) error {
 }
 
 func extractEntititesV1(s *specs.Spec, dc *DataCatalog) error {
-	name, ok := s.Metadata["name"].(string)
-	if !ok {
-		name = ""
-	}
 	switch s.Kind {
 	case KindProperties:
 		pSpec := PropertySpecV1{}
 		if err := extractSpec(s.Spec, &pSpec); err != nil {
 			return fmt.Errorf("extracting the property spec: %w", err)
 		}
-		dc.Properties[EntityGroup(name)] = pSpec.Properties
+		dc.Properties = append(dc.Properties, pSpec.Properties...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)
