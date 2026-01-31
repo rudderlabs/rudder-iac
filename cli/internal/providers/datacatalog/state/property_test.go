@@ -259,7 +259,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 			Description: "An array with custom type in item_types",
 			Type:        "array",
 			Config: map[string]interface{}{
-				"item_types": []interface{}{"#/custom-types/email-types/EmailType", "number", "string"},
+				"item_types": []interface{}{"#custom-type:EmailType", "number", "string"},
 			},
 		}
 		assert.Equal(t, expected, args)

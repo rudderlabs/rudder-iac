@@ -1425,7 +1425,7 @@ func TestDataCatalog_LoadSpec(t *testing.T) {
 		err := dc.LoadSpec("test.yaml", spec)
 
 		require.NoError(t, err)
-		assert.Len(t, dc.Properties["user_props"], 2)
+		assert.Len(t, dc.Properties, 2)
 
 		expected := []PropertyV1{
 			{
@@ -1449,7 +1449,7 @@ func TestDataCatalog_LoadSpec(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, expected, dc.Properties["user_props"])
+		assert.Equal(t, expected, dc.Properties)
 	})
 
 	t.Run("returns error for invalid property structure", func(t *testing.T) {
