@@ -403,7 +403,7 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 	hasObject := strings.Contains(prop.Type, "object")
 	hasArray := strings.Contains(prop.Type, "array")
 
-	// If both array and object types exist, additional properties must be true by default 
+	// If both array and object types exist, additional properties must be true by default
 	if hasArray && hasObject {
 		return true
 	}
@@ -415,7 +415,7 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 
 	// Cases 3, 4, 5: Array-specific cases
 	if hasArray {
-		itemTypes, ok := prop.Config["itemTypes"]
+		itemTypes, ok := prop.Config["item_types"]
 		if !ok {
 			// Case 3: Array properties with no item types defined
 			return true

@@ -18,7 +18,7 @@ var (
 
 type CatalogResourceFetcher interface {
 	Event(group, id string) *Event
-	Property(group, id string) *Property
+	Property(group, id string) *PropertyV1
 	Category(group, id string) *Category
 	CustomType(group, id string) *CustomType
 	TPEventRule(group, id string) *TPRule

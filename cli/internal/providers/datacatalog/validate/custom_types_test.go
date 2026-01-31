@@ -113,13 +113,13 @@ func TestCustomTypeValidation(t *testing.T) {
 							Description: "Test custom type",
 							Type:        "string",
 							Config: map[string]any{
-								"minLength": "not-a-number", // Should be a number
+								"min_length": "not-a-number", // Should be a number
 							},
 						},
 					},
 				},
 				expectedErrs:  1,
-				errorContains: []string{"minLength must be a number"},
+				errorContains: []string{"min_length must be a number"},
 			},
 			{
 				name: "number type with invalid config",
@@ -149,13 +149,13 @@ func TestCustomTypeValidation(t *testing.T) {
 							Description: "Test custom type",
 							Type:        "array",
 							Config: map[string]any{
-								"itemTypes": "not-an-array", // Should be an array
+								"item_types": "not-an-array", // Should be an array
 							},
 						},
 					},
 				},
 				expectedErrs:  1,
-				errorContains: []string{"itemTypes must be an array"},
+				errorContains: []string{"item_types must be an array"},
 			},
 		}
 
@@ -181,7 +181,7 @@ func TestCustomTypeValidation(t *testing.T) {
 		validator := &RefValidator{}
 
 		// Create a test property
-		testProperty := catalog.Property{
+		testProperty := catalog.PropertyV1{
 			LocalID:     "testProp",
 			Name:        "Test Property",
 			Description: "Test property",
@@ -190,14 +190,14 @@ func TestCustomTypeValidation(t *testing.T) {
 
 		testCases := []struct {
 			name          string
-			properties    map[catalog.EntityGroup][]catalog.Property
+			properties    map[catalog.EntityGroup][]catalog.PropertyV1
 			customTypes   map[catalog.EntityGroup][]catalog.CustomType
 			expectedErrs  int
 			errorContains []string
 		}{
 			{
 				name: "valid property reference",
-				properties: map[catalog.EntityGroup][]catalog.Property{
+				properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 					"test-group": {testProperty},
 				},
 				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
@@ -411,14 +411,14 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		properties    map[catalog.EntityGroup][]catalog.Property
+		properties    map[catalog.EntityGroup][]catalog.PropertyV1
 		customTypes   map[catalog.EntityGroup][]catalog.CustomType
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid custom type reference in property type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "email",
@@ -435,7 +435,7 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 		},
 		{
 			name: "invalid custom type reference format in property type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "email",
@@ -453,7 +453,7 @@ func TestPropertyTypeCustomTypeReferences(t *testing.T) {
 		},
 		{
 			name: "reference to non-existent custom type in property type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
+			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
 						LocalID:     "email",

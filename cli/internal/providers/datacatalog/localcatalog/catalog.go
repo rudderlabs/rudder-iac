@@ -1,6 +1,7 @@
 package localcatalog
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -32,7 +33,7 @@ type WorkspaceRemoteIDMapping struct {
 
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
-	Properties     map[EntityGroup][]Property           `json:"properties"`
+	Properties     map[EntityGroup][]PropertyV1         `json:"properties"`
 	Events         map[EntityGroup][]Event              `json:"events"`
 	TrackingPlans  map[EntityGroup]*TrackingPlan        `json:"trackingPlans"` // Only one tracking plan per entity group
 	CustomTypes    map[EntityGroup][]CustomType         `json:"customTypes"`   // Custom types grouped by entity group
@@ -40,7 +41,7 @@ type DataCatalog struct {
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 }
 
-func (dc *DataCatalog) Property(groupName string, id string) *Property {
+func (dc *DataCatalog) Property(groupName string, id string) *PropertyV1 {
 	if props, ok := dc.Properties[EntityGroup(groupName)]; ok {
 		for _, prop := range props {
 			if prop.LocalID == id {
@@ -120,7 +121,7 @@ func (dc *DataCatalog) TPEventRules(tpGroup string) ([]*TPRule, bool) {
 
 func New() *DataCatalog {
 	return &DataCatalog{
-		Properties:     map[EntityGroup][]Property{},
+		Properties:     map[EntityGroup][]PropertyV1{},
 		Events:         map[EntityGroup][]Event{},
 		TrackingPlans:  map[EntityGroup]*TrackingPlan{},
 		CustomTypes:    map[EntityGroup][]CustomType{},
@@ -204,7 +205,7 @@ func (dc *DataCatalog) LoadLegacySpec(path string, s *specs.Spec) error {
 }
 
 func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
-	if err := extractEntities(s, dc); err != nil {
+	if err := extractEntititesV1(s, dc); err != nil {
 		return fmt.Errorf("extracting data catalog entity from file: %s : %w", path, err)
 	}
 
@@ -213,6 +214,31 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 	}
 
 	return nil
+}
+
+func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	var resourceSpec any
+	switch s.Kind {
+	case KindProperties:
+		properties, err := ExtractProperties(s)
+		if err != nil {
+			return nil, fmt.Errorf("extracting properties: %w", err)
+		}
+		resourceSpec = PropertySpecV1{
+			Properties: properties,
+		}
+	default:
+		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
+	}
+	
+	jsonByt, err := json.Marshal(resourceSpec)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling properties: %w", err)
+	}
+	if err = json.Unmarshal(jsonByt, &s.Spec); err != nil {
+		return nil, fmt.Errorf("unmarshalling properties: %w", err)
+	}
+	return s, nil
 }
 
 func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {

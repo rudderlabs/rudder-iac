@@ -3,10 +3,13 @@ package datacatalog
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -52,11 +55,24 @@ func (p *PropertyProvider) Create(ctx context.Context, ID string, data resources
 	toArgs := state.PropertyArgs{}
 	toArgs.FromResourceData(data)
 
+	// convert supported config keys to camelCase
+	// leave other keys as is
+	config := make(map[string]interface{})
+	camelCaseNamer := namer.NewCamelCase()
+	for key, value := range toArgs.Config {
+		configKey := key
+		camelCaseKey := camelCaseNamer.Name(key)
+		if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+			configKey = camelCaseKey
+		}
+		config[configKey] = value
+	}
+
 	property, err := p.client.CreateProperty(ctx, catalog.PropertyCreate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
-		Config:      toArgs.Config,
+		Config:      config,
 		ExternalId:  ID,
 	})
 
@@ -89,11 +105,24 @@ func (p *PropertyProvider) Update(ctx context.Context, ID string, input resource
 	oldState := state.PropertyState{}
 	oldState.FromResourceData(olds)
 
+	// convert supported config keys to camelCase
+	// leave other keys as is
+	config := make(map[string]interface{})
+	camelCaseNamer := namer.NewCamelCase()
+	for key, value := range toArgs.Config {
+		configKey := key
+		camelCaseKey := camelCaseNamer.Name(key)
+		if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+			configKey = camelCaseKey
+		}
+		config[configKey] = value
+	}
+
 	updated, err := p.client.UpdateProperty(ctx, oldState.ID, &catalog.PropertyUpdate{
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type.(string),
-		Config:      toArgs.Config,
+		Config:      config,
 	})
 
 	if err != nil {

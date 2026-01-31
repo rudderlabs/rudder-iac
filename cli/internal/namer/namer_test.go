@@ -112,3 +112,68 @@ func TestCollisionHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestSnakeCase_Name(t *testing.T) {
+	t.Parallel()
+	strategy := NewSnakeCase()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"simple phrase", "Hello World", "hello_world"},
+		{"with numbers", "User123 Signed Up", "user123_signed_up"},
+		{"special chars", "User@Signed#Up", "user_signed_up"},
+		{"multiple spaces", "Hello   World", "hello_world"},
+		{"leading trailing", " Hello World ", "hello_world"},
+		{"empty", "", ""},
+		{"single word", "Hello", "hello"},
+		{"all special", "@#$%", ""},
+		{"camelCase input", "multipleOf", "multiple_of"},
+		{"camelCase multiple words", "minLength", "min_length"},
+		{"camelCase longer", "exclusiveMinimum", "exclusive_minimum"},
+		{"mixed camelCase and separators", "itemTypes-test", "item_types_test"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := strategy.Name(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCamelCase_Name(t *testing.T) {
+	t.Parallel()
+	strategy := NewCamelCase()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"simple phrase", "Hello World", "helloWorld"},
+		{"with numbers", "User123 Signed Up", "user123SignedUp"},
+		{"special chars", "User@Signed#Up", "userSignedUp"},
+		{"multiple spaces", "Hello   World", "helloWorld"},
+		{"leading trailing", " Hello World ", "helloWorld"},
+		{"empty", "", ""},
+		{"single word", "Hello", "hello"},
+		{"all special", "@#$%", ""},
+		{"snake_case input", "abc_def", "abcDef"},
+		{"kebab-case input", "abc-def", "abcDef"},
+		{"mixed separators", "abc_def-ghi", "abcDefGhi"},
+		{"already camelCase", "abcDef", "abcDef"},
+		{"numbers in middle", "abc123Def", "abc123Def"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := strategy.Name(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

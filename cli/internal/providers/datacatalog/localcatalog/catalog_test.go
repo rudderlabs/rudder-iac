@@ -11,7 +11,7 @@ import (
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:        make(map[EntityGroup][]Event),
-		Properties:    make(map[EntityGroup][]Property),
+		Properties:    make(map[EntityGroup][]PropertyV1),
 		TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 		CustomTypes:   make(map[EntityGroup][]CustomType),
 		Categories:    make(map[EntityGroup][]Category),
@@ -42,14 +42,14 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, len(emptyCatalog.Properties), 1)
 		assert.Equal(t, len(emptyCatalog.Properties["base_props"]), 1)
-		assert.Equal(t, Property{
+		assert.Equal(t, PropertyV1{
 			LocalID:     "write_key",
 			Name:        "Write Key",
 			Type:        "string",
 			Description: "KSUID identifier for the source embedded in the SDKs",
 			Config: map[string]interface{}{
-				"minLength": float64(24),
-				"maxLength": float64(28),
+				"min_length": float64(24),
+				"max_length": float64(28),
 			},
 		}, emptyCatalog.Properties["base_props"][0])
 	})
@@ -557,7 +557,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -625,7 +625,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -683,7 +683,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -735,7 +735,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -793,7 +793,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        make(map[EntityGroup][]Event),
-			Properties:    make(map[EntityGroup][]Property),
+			Properties:    make(map[EntityGroup][]PropertyV1),
 			TrackingPlans: make(map[EntityGroup]*TrackingPlan),
 			CustomTypes:   make(map[EntityGroup][]CustomType),
 			Categories:    make(map[EntityGroup][]Category),
@@ -1278,5 +1278,235 @@ func TestStrictSpecUnmarshal(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown_field")
 		assert.Empty(t, types)
+	})
+}
+
+func TestDataCatalog_MigrateSpec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Migrates properties spec to v1 spec", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "api_tracking",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":          "api_method",
+						"name":        "API Method",
+						"type":        "string",
+						"description": "http method of the api called",
+						"propConfig": map[string]interface{}{
+							"enum": []interface{}{"GET", "PUT", "POST", "DELETE", "PATCH"},
+						},
+					},
+					map[string]interface{}{
+						"id":          "http_retry_count",
+						"name":        "HTTP Retry Count",
+						"type":        "integer",
+						"description": "Number of times to retry the API call",
+						"propConfig": map[string]interface{}{
+							"minimum":    0,
+							"maximum":    10,
+							"multipleOf": 2,
+						},
+					},
+					map[string]interface{}{
+						"id":          "api_path",
+						"name":        "API Path",
+						"type":        "string",
+						"description": "subpath of the api requested",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.Nil(t, err)
+		require.NotNil(t, migratedSpec)
+
+		// Define expected migrated spec
+		expected := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "api_tracking",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":          "api_method",
+						"name":        "API Method",
+						"type":        "string",
+						"description": "http method of the api called",
+						"config": map[string]interface{}{
+							"enum": []interface{}{"GET", "PUT", "POST", "DELETE", "PATCH"},
+						},
+					},
+					map[string]interface{}{
+						"id":          "http_retry_count",
+						"name":        "HTTP Retry Count",
+						"type":        "integer",
+						"description": "Number of times to retry the API call",
+						"config": map[string]interface{}{
+							"minimum":     float64(0),
+							"maximum":     float64(10),
+							"multiple_of": float64(2),
+						},
+					},
+					map[string]interface{}{
+						"id":          "api_path",
+						"name":        "API Path",
+						"type":        "string",
+						"description": "subpath of the api requested",
+					},
+				},
+			},
+		}
+
+		// Compare entire migrated spec
+		assert.Equal(t, expected, migratedSpec)
+	})
+}
+
+func TestDataCatalog_LoadSpec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("loads properties spec successfully", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    KindProperties,
+			Metadata: map[string]any{
+				"name": "user_props",
+			},
+			Spec: map[string]any{
+				"properties": []any{
+					map[string]any{
+						"id":          "user_id",
+						"name":        "User ID",
+						"type":        "string",
+						"description": "Unique user identifier",
+						"config": map[string]any{
+							"min_length": 5,
+							"max_length": 50,
+						},
+					},
+					map[string]any{
+						"id":   "user_age",
+						"name": "User Age",
+						"type": "integer",
+						"config": map[string]any{
+							"minimum": 0,
+							"maximum": 120,
+						},
+					},
+				},
+			},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("test.yaml", spec)
+
+		require.NoError(t, err)
+		assert.Len(t, dc.Properties["user_props"], 2)
+
+		expected := []PropertyV1{
+			{
+				LocalID:     "user_id",
+				Name:        "User ID",
+				Type:        "string",
+				Description: "Unique user identifier",
+				Config: map[string]any{
+					"min_length": float64(5),
+					"max_length": float64(50),
+				},
+			},
+			{
+				LocalID:     "user_age",
+				Name:        "User Age",
+				Type:        "integer",
+				Description: "",
+				Config: map[string]any{
+					"minimum": float64(0),
+					"maximum": float64(120),
+				},
+			},
+		}
+		assert.Equal(t, expected, dc.Properties["user_props"])
+	})
+
+	t.Run("returns error for invalid property structure", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    KindProperties,
+			Metadata: map[string]any{
+				"name": "test",
+			},
+			Spec: map[string]any{
+				"properties": []any{
+					map[string]any{
+						"invalid_field": "value",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("test.yaml", spec)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "extracting data catalog entity")
+		assert.Contains(t, err.Error(), "test.yaml")
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "unknown-kind",
+			Metadata: map[string]any{
+				"name": "test",
+			},
+			Spec: map[string]any{},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("test.yaml", spec)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown kind: unknown-kind")
+		assert.Contains(t, err.Error(), "test.yaml")
+	})
+
+	t.Run("returns error for invalid spec structure", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    KindProperties,
+			Metadata: map[string]any{
+				"name": "test",
+			},
+			Spec: map[string]any{
+				"properties": "not-an-array",
+			},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("test.yaml", spec)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "extracting data catalog entity")
+		assert.Contains(t, err.Error(), "test.yaml")
 	})
 }

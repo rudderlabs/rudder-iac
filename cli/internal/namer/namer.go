@@ -16,6 +16,7 @@ import (
 var (
 	StrategyKebabCase = NewKebabCase()
 	StrategySnakeCase = NewSnakeCase()
+	StrategyCamelCase = NewCamelCase()
 )
 
 var ErrDuplicateNameException = errors.New("duplicate name exception")
@@ -136,16 +137,61 @@ type SnakeCase struct{}
 
 func (s *SnakeCase) Name(input string) string {
 	var result strings.Builder
-	input = strings.ToLower(input)
 
 	for i, r := range input {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			result.WriteRune(r)
+			// Insert underscore before uppercase letters (except at the start)
+			if i > 0 && unicode.IsUpper(r) && result.Len() > 0 {
+				lastChar := result.String()[result.Len()-1]
+				if lastChar != '_' {
+					result.WriteRune('_')
+				}
+			}
+			result.WriteRune(unicode.ToLower(r))
 			continue
 		}
+		// Replace non-alphanumeric with underscore
 		if i > 0 && result.Len() > 0 && result.String()[result.Len()-1] != '_' {
 			result.WriteRune('_')
 		}
 	}
 	return strings.Trim(result.String(), "_")
+}
+
+func NewCamelCase() NamingStrategy {
+	return &CamelCase{}
+}
+
+type CamelCase struct{}
+
+// Name provides a safe repeatable way to convert input to camelCase
+// Example: "User Signed Up" -> "userSignedUp"
+func (c *CamelCase) Name(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	capitalizeNext := false
+	isFirstWord := true
+
+	for _, r := range input {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if capitalizeNext {
+				result.WriteRune(unicode.ToUpper(r))
+				capitalizeNext = false
+			} else if isFirstWord {
+				result.WriteRune(unicode.ToLower(r))
+			} else {
+				result.WriteRune(r)
+			}
+			isFirstWord = false
+		} else {
+			if result.Len() > 0 {
+				capitalizeNext = true
+			}
+		}
+	}
+
+	return result.String()
 }
