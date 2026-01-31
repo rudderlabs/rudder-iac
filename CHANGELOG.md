@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.13.0](https://github.com/rudderlabs/rudder-iac/compare/v0.12.1...v0.13.0) (2026-01-31)
+
+
+### Features
+
+* add base implementation of path indexer ([#343](https://github.com/rudderlabs/rudder-iac/issues/343)) ([badcb88](https://github.com/rudderlabs/rudder-iac/commit/badcb88207de5dcb7dfd79f7fbfe155cb0d1f68b))
+* add spec validation rules ([#362](https://github.com/rudderlabs/rudder-iac/issues/362)) ([a9feda6](https://github.com/rudderlabs/rudder-iac/commit/a9feda6df29b11f88e1368c038efdc504339bd9b))
+* added support for rules and rules registry ([#344](https://github.com/rudderlabs/rudder-iac/issues/344)) ([613530b](https://github.com/rudderlabs/rudder-iac/commit/613530b2f525321b8da31ff4690cc06ae8200214))
+* consolidate syncer integration to composite provider ([#353](https://github.com/rudderlabs/rudder-iac/issues/353)) ([14e698c](https://github.com/rudderlabs/rudder-iac/commit/14e698cd1e39548dd02559b37a4c745dea8af3a7))
+* implement handlers for transformation and library ([#339](https://github.com/rudderlabs/rudder-iac/issues/339)) ([e9de343](https://github.com/rudderlabs/rudder-iac/commit/e9de3430c849db83b82b219e8265d9bf48d64c7e))
+* import flow for transformations and libraries ([#358](https://github.com/rudderlabs/rudder-iac/issues/358)) ([0512f99](https://github.com/rudderlabs/rudder-iac/commit/0512f99e0625eed151ee314c0844358ed6860a29))
+* initial setup for the spec migrator ([#327](https://github.com/rudderlabs/rudder-iac/issues/327)) ([6e940e4](https://github.com/rudderlabs/rudder-iac/commit/6e940e44eac0ac0491791cab047d253628c39145))
+* javascript code parser for transformations ([#337](https://github.com/rudderlabs/rudder-iac/issues/337)) ([ed132e3](https://github.com/rudderlabs/rudder-iac/commit/ed132e3a3ddfe10f1b6ab7aed84140ddc238ca3c))
+* new generic provider and example provider to demonstrate the new framework ([#310](https://github.com/rudderlabs/rudder-iac/issues/310)) ([38f2176](https://github.com/rudderlabs/rudder-iac/commit/38f2176acec032e75c5848ee1539df1e20020fe9))
+* provider implementation for transformations cli ([#352](https://github.com/rudderlabs/rudder-iac/issues/352)) ([49947de](https://github.com/rudderlabs/rudder-iac/commit/49947def89e03daf168e28c295c273e40ccd6e9d))
+* validation engine ([#357](https://github.com/rudderlabs/rudder-iac/issues/357)) ([25458a8](https://github.com/rudderlabs/rudder-iac/commit/25458a8fbfdaebf36e53da06056a2153d68ea44b))
+
+
+### Miscellaneous
+
+* add CLAUDE.md for the repository as a starting point ([#330](https://github.com/rudderlabs/rudder-iac/issues/330)) ([723ccbb](https://github.com/rudderlabs/rudder-iac/commit/723ccbb0216335ed5725b770ea0abc5f8d01bad1))
+* add models for transformation and library ([#338](https://github.com/rudderlabs/rudder-iac/issues/338)) ([b951640](https://github.com/rudderlabs/rudder-iac/commit/b95164073b5d9922b531e1713a0fa5dd5e7cbaf9))
+* add specs for transformation and library ([#336](https://github.com/rudderlabs/rudder-iac/issues/336)) ([91e5bdf](https://github.com/rudderlabs/rudder-iac/commit/91e5bdf80c13200fa256fe53c92d3ffdcbbd2c1a))
+* add support to apply common migrations to all specs ([#342](https://github.com/rudderlabs/rudder-iac/issues/342)) ([c9d019b](https://github.com/rudderlabs/rudder-iac/commit/c9d019b0b35faf5612beec61911e72c9721c149a))
+* convert path based references to URN based references ([#366](https://github.com/rudderlabs/rudder-iac/issues/366)) ([f88e83f](https://github.com/rudderlabs/rudder-iac/commit/f88e83f78abd943931dcf0b4a7861d28438dcb31))
+* **properties:** read array itemType/itemTypes via dedicated field ([#363](https://github.com/rudderlabs/rudder-iac/issues/363)) ([6c82f1f](https://github.com/rudderlabs/rudder-iac/commit/6c82f1fabb6bcf50e4cdbf4033d882a81dcd8c0c))
+* **properties:** split type field into type and types ([#348](https://github.com/rudderlabs/rudder-iac/issues/348)) ([5546c83](https://github.com/rudderlabs/rudder-iac/commit/5546c8373b8b882b926c3697798a19be0d30868d))
+* **propertySpec:** rename propConfig to config and transform config fields to snakecase ([#346](https://github.com/rudderlabs/rudder-iac/issues/346)) ([2248159](https://github.com/rudderlabs/rudder-iac/commit/22481596651cdb27b4d60f39a3666781e98614db))
+* text formatter to import transformations code ([#355](https://github.com/rudderlabs/rudder-iac/issues/355)) ([da46162](https://github.com/rudderlabs/rudder-iac/commit/da46162b4a9d4ff825b26e85988522c222d7267a))
+* transformations cli client ([#335](https://github.com/rudderlabs/rudder-iac/issues/335)) ([a0c0850](https://github.com/rudderlabs/rudder-iac/commit/a0c0850ea731b15227c4134b94b2f94c2729bef0))
+
 ## [0.12.1](https://github.com/rudderlabs/rudder-iac/compare/v0.12.0...v0.12.1) (2025-12-18)
 
 
