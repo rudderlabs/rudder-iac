@@ -321,7 +321,6 @@ func (p *project) registry() (rules.Registry, error) {
 			[]string{
 				specs.SpecVersionV0_1,
 				specs.SpecVersionV0_1Variant,
-				specs.SpecVersionV1,
 			},
 		),
 	}
