@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -29,8 +30,6 @@ type CustomTypeProperty struct {
 	ID       string
 	Required bool
 }
-
-const CustomTypeResourceType = "custom-type"
 
 // Diff compares two CustomTypeProperty instances and returns true if they differ
 func (prop *CustomTypeProperty) Diff(other *CustomTypeProperty) bool {
@@ -188,7 +187,7 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 
 	properties := make([]*CustomTypeProperty, 0, len(customType.Properties))
 	for _, prop := range customType.Properties {
-		urn, err := getURNFromRemoteId(PropertyResourceType, prop.ID)
+		urn, err := getURNFromRemoteId(types.PropertyResourceType, prop.ID)
 		switch {
 		case err == nil:
 			properties = append(properties, &CustomTypeProperty{
@@ -228,7 +227,7 @@ func (args *CustomTypeArgs) FromRemoteCustomType(customType *catalog.CustomType,
 		// we only support one itemdefinition, so we dont need to loop over the whole array
 		item := customType.ItemDefinitions[0]
 		id := MustString(item.(map[string]interface{}), "id")
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, id)
+		urn, err := getURNFromRemoteId(types.CustomTypeResourceType, id)
 		switch err {
 		case nil:
 			args.Config["item_types"] = []any{

@@ -15,7 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	dcstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -162,7 +162,7 @@ func validateSource(source *sourceResource, graph *resources.Graph) error {
 			return fmt.Errorf("tracking plan with URN '%s' not found in the project", ref.URN)
 		}
 
-		if tp.Type() != dcstate.TrackingPlanResourceType {
+		if tp.Type() != types.TrackingPlanResourceType {
 			return fmt.Errorf("referenced URN '%s' is not a tracking plan", ref.URN)
 		}
 	}
@@ -432,7 +432,7 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		}
 		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
-			tpURN, err := collection.GetURNByID(dcstate.TrackingPlanResourceType, source.TrackingPlan.ID)
+			tpURN, err := collection.GetURNByID(types.TrackingPlanResourceType, source.TrackingPlan.ID)
 			if err == resources.ErrRemoteResourceExternalIdNotFound {
 				// ErrRemoteResourceExternalIdNotFound would happen if the source was created via CLI
 				// but the tracking plan was created and linked via the UI/API
@@ -622,7 +622,7 @@ func (p *Handler) toImportSpec(
 
 	if source.TrackingPlan != nil {
 		tpRef, err := resolver.ResolveToReference(
-			dcstate.TrackingPlanResourceType,
+			types.TrackingPlanResourceType,
 			source.TrackingPlan.ID,
 		)
 		if err != nil {
@@ -763,7 +763,7 @@ func parseTrackingPlanRef(ref string) (*resources.PropertyRef, error) {
 		return nil, fmt.Errorf("invalid entity type: %s", parts[1])
 	}
 	return &resources.PropertyRef{
-		URN:      resources.URN(parts[3], dcstate.TrackingPlanResourceType),
+		URN:      resources.URN(parts[3], types.TrackingPlanResourceType),
 		Property: "id",
 	}, nil
 }

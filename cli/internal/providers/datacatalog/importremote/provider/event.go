@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -62,7 +62,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 	}
 
 	collection.Set(
-		state.EventResourceType,
+		types.EventResourceType,
 		resourceMap,
 	)
 
@@ -78,7 +78,7 @@ func (p *EventImportProvider) idResources(
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to events")
-	events := collection.GetAll(state.EventResourceType)
+	events := collection.GetAll(types.EventResourceType)
 
 	for _, event := range events {
 		data, ok := event.Data.(*catalog.Event)
@@ -95,7 +95,7 @@ func (p *EventImportProvider) idResources(
 
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  name,
-			Scope: state.EventResourceType})
+			Scope: types.EventResourceType})
 		if err != nil {
 			return fmt.Errorf("generating externalID for event %s: %w", data.Name, err)
 		}
@@ -118,7 +118,7 @@ func (p *EventImportProvider) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting events for export to file")
 
-	events := collection.GetAll(state.EventResourceType)
+	events := collection.GetAll(types.EventResourceType)
 	if len(events) == 0 {
 		return nil, nil
 	}

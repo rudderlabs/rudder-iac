@@ -7,7 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
 
@@ -58,7 +58,7 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 	rules := make([]*localcatalog.TPRule, 0, len(upstream.Events))
 	for _, event := range upstream.Events {
 		eventRef, err := resolver.ResolveToReference(
-			state.EventResourceType,
+			types.EventResourceType,
 			event.ID,
 		)
 		if err != nil {
@@ -128,7 +128,7 @@ func buildRuleProperties(
 	for _, prop := range upstreamProps {
 		// Resolve property reference
 		propRef, err := resolver.ResolveToReference(
-			state.PropertyResourceType,
+			types.PropertyResourceType,
 			prop.ID,
 		)
 		if err != nil {

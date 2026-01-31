@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type mockDataCatalog struct {
@@ -59,7 +59,7 @@ func TestLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		properties := collection.GetAll(state.PropertyResourceType)
+		properties := collection.GetAll(types.PropertyResourceType)
 		assert.Equal(t, 2, len(properties))
 
 		resourceIDs := make([]string, 0, len(properties))
@@ -89,7 +89,7 @@ func TestLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		properties := collection.GetAll(state.PropertyResourceType)
+		properties := collection.GetAll(types.PropertyResourceType)
 		require.Equal(t, 2, len(properties))
 
 		prop1, ok := properties["prop1"]

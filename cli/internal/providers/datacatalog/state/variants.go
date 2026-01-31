@@ -7,6 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -334,7 +335,7 @@ func diffPropertyReferences(left []PropertyReference, right []PropertyReference)
 func (v *Variant) FromRemoteVariant(remoteVariant catalog.Variant, getURNFromRemoteId func(string, string) (string, error), usePropertyRefsForDependencies bool) error {
 	getPropRefOrID := func(remoteID string) (any, error) {
 		if usePropertyRefsForDependencies {
-			urn, err := getURNFromRemoteId(PropertyResourceType, remoteID)
+			urn, err := getURNFromRemoteId(types.PropertyResourceType, remoteID)
 			switch {
 			case err == nil:
 				return resources.PropertyRef{

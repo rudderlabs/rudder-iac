@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -35,11 +36,11 @@ func New(client catalog.DataCatalog) *Provider {
 		client:      client,
 		dc:          localcatalog.New(),
 		providerStore: map[string]entityProvider{
-			pstate.PropertyResourceType:     NewPropertyProvider(client, importDir),
-			pstate.EventResourceType:        NewEventProvider(client, importDir),
-			pstate.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
-			pstate.TrackingPlanResourceType: NewTrackingPlanProvider(client, importDir),
-			pstate.CategoryResourceType:     NewCategoryProvider(client, importDir),
+			types.PropertyResourceType:      NewPropertyProvider(client, importDir),
+			types.EventResourceType:         NewEventProvider(client, importDir),
+			types.CustomTypeResourceType:    NewCustomTypeProvider(client, importDir),
+			types.TrackingPlanResourceType: NewTrackingPlanProvider(client, importDir),
+			types.CategoryResourceType:      NewCategoryProvider(client, importDir),
 		},
 	}
 }
@@ -72,11 +73,11 @@ func (p *Provider) SupportedKinds() []string {
 
 func (p *Provider) SupportedTypes() []string {
 	return []string{
-		pstate.PropertyResourceType,
-		pstate.EventResourceType,
-		pstate.TrackingPlanResourceType,
-		pstate.CustomTypeResourceType,
-		pstate.CategoryResourceType,
+		types.PropertyResourceType,
+		types.EventResourceType,
+		types.TrackingPlanResourceType,
+		types.CustomTypeResourceType,
+		types.CategoryResourceType,
 	}
 }
 
@@ -107,7 +108,7 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 
 func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
 	switch resourceType {
-	case pstate.TrackingPlanResourceType:
+	case types.TrackingPlanResourceType:
 		return p.listTrackingPlans(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
@@ -150,22 +151,22 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 	// First, pre-calculate all URNs to use for references
 	propIDToURN := make(map[string]string)
 	for _, prop := range catalog.Properties {
-		propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, pstate.PropertyResourceType)
+		propIDToURN[prop.LocalID] = resources.URN(prop.LocalID, types.PropertyResourceType)
 	}
 
 	eventIDToURN := make(map[string]string)
 	for _, event := range catalog.Events {
-		eventIDToURN[event.LocalID] = resources.URN(event.LocalID, pstate.EventResourceType)
+		eventIDToURN[event.LocalID] = resources.URN(event.LocalID, types.EventResourceType)
 	}
 
 	customTypeIDToURN := make(map[string]string)
 	for _, customType := range catalog.CustomTypes {
-		customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, pstate.CustomTypeResourceType)
+		customTypeIDToURN[customType.LocalID] = resources.URN(customType.LocalID, types.CustomTypeResourceType)
 	}
 
 	categoryIDToURN := make(map[string]string)
 	for _, category := range catalog.Categories {
-		categoryIDToURN[category.LocalID] = resources.URN(category.LocalID, pstate.CategoryResourceType)
+		categoryIDToURN[category.LocalID] = resources.URN(category.LocalID, types.CategoryResourceType)
 	}
 
 	getResourceImportMetadata := func(kind, id string) resources.ResourceOpts {
@@ -192,7 +193,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 		resource := resources.NewResource(
 			prop.LocalID,
-			pstate.PropertyResourceType,
+			types.PropertyResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindProperties, prop.LocalID),
@@ -214,7 +215,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		args.FromCatalogEvent(&event, getURNFromRef)
 		resource := resources.NewResource(
 			event.LocalID,
-			pstate.EventResourceType,
+			types.EventResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindEvents, event.LocalID),
@@ -237,7 +238,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		args.FromCatalogCustomType(&customType, getURNFromRef)
 		resource := resources.NewResource(
 			customType.LocalID,
-			pstate.CustomTypeResourceType,
+			types.CustomTypeResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindCustomTypes, customType.LocalID),
@@ -257,7 +258,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 		args.FromCatalogCategory(&category)
 		resource := resources.NewResource(
 			category.LocalID,
-			pstate.CategoryResourceType,
+			types.CategoryResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindCategories, category.LocalID),
@@ -280,7 +281,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 		resource := resources.NewResource(
 			tp.LocalID,
-			pstate.TrackingPlanResourceType,
+			types.TrackingPlanResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
 			getResourceImportMetadata(localcatalog.KindTrackingPlans, tp.LocalID),

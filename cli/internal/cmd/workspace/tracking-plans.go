@@ -4,7 +4,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +54,7 @@ func newCmdListTrackingPlans() *cobra.Command {
 				}),
 			)
 
-			err = l.List(cmd.Context(), state.TrackingPlanResourceType, nil)
+			err = l.List(cmd.Context(), types.TrackingPlanResourceType, nil)
 			return err
 		},
 	}
