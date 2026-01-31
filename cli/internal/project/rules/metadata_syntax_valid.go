@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -93,7 +92,7 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 	// ValidateStruct returns a list of validation results
 	// or nil. We pass "/metadata" as the base path since we're
 	// validating metadata which lives under the metadata key in YAML.
-	results, err := validation.ValidateStruct(metadata, "/metadata")
+	results, err := rules.ValidateStruct(metadata, "/metadata")
 	if err != nil {
 		return []rules.ValidationResult{
 			{
