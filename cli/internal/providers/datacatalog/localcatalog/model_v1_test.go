@@ -153,10 +153,10 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 			{
 				name:           "object type with nested config",
 				v0Type:         "object",
-				v0Config:       map[string]interface{}{"minProperties": 1, "maxProperties": 10},
+				v0Config:       map[string]interface{}{"minLength": 1, "maxLength": 10},
 				expectedType:   "object",
 				expectedTypes:  nil,
-				expectedConfig: map[string]interface{}{"min_properties": 1, "max_properties": 10},
+				expectedConfig: map[string]interface{}{"min_length": 1, "max_length": 10},
 			},
 			{
 				name:           "number type with complex config",
