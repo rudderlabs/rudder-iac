@@ -11,6 +11,9 @@ import (
 
 var log = logger.New("validate")
 
+// Match URN patterns: #custom-type:id, #category:id, #property:id, etc.
+var urnRegex = regexp.MustCompile(`#[\w-]+:[\w-]+`)
+
 type ValidationError struct {
 	error
 	Reference string
@@ -30,10 +33,8 @@ func DefaultValidators() []CatalogValidator {
 
 // convertURNReferencesToPath transforms URN references in a string back to path-based references
 func convertURNReferencesToPath(text string, refMap map[string]string) string {
-	// Match URN patterns: #custom-type:id, #category:id, #property:id, etc.
-	urnPattern := regexp.MustCompile(`#[\w-]+:[\w-]+`)
-	
-	return urnPattern.ReplaceAllStringFunc(text, func(urn string) string {
+
+	return urnRegex.ReplaceAllStringFunc(text, func(urn string) string {
 		if pathRef, ok := refMap[urn]; ok {
 			return pathRef
 		}
