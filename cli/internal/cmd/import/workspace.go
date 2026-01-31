@@ -35,9 +35,9 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
-			p = project.New(location, deps.CompositeProvider())
+			p = deps.NewProject()
 
-			if err := p.Load(); err != nil {
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 

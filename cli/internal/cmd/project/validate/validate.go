@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -45,16 +44,11 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			opts := []project.ProjectOption{}
-			if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-				opts = append(opts, project.WithV1SpecSupport())
-			}
-			p = project.New(location, deps.CompositeProvider(), opts...)
+			p = deps.NewProject()
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			validateLog.Debug("validate", "location", location)
-			validateLog.Debug("validating project configuration")
 
 			defer func() {
 				telemetry.TrackCommand("validate", err, []telemetry.KV{
@@ -64,7 +58,7 @@ func NewCmdValidate() *cobra.Command {
 
 			// Load and validate the project
 			// The Load method internally calls the provider's Validate method
-			if err := p.Load(); err != nil {
+			if err := p.Load(location); err != nil {
 				return fmt.Errorf("validating project: %w", err)
 			}
 

@@ -28,7 +28,9 @@ func TestExampleImport(t *testing.T) {
 	testDir := t.TempDir()
 
 	// Load specs from testdata directory
-	proj := project.New(testDir, provider)
+	proj := project.New(provider)
+	err := proj.Load(testDir)
+	require.NoError(t, err, "Failed to load project")
 
 	wA, err := b.CreateWriter("Writer A", "")
 	require.NoError(t, err)

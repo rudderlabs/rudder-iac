@@ -21,7 +21,7 @@ type TransformationLibrary struct {
 	Description string `json:"description"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
-	HandleName  string `json:"handleName"`
+	ImportName  string `json:"importName"`
 	WorkspaceID string `json:"workspaceId"`
 	ExternalID  string `json:"externalId,omitempty"`
 }
@@ -75,4 +75,8 @@ type BatchPublishTransformation struct {
 // BatchPublishLibrary represents a library to publish
 type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
+}
+
+type SetExternalIDRequest struct {
+	ExternalID string `json:"externalId"`
 }

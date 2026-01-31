@@ -25,8 +25,8 @@ type Loader struct {
 // It walks the directory tree recursively to discover them, and parses them into Spec objects.
 // It returns a map of file paths to their corresponding Spec objects,
 // or an error if any file operation or spec parsing fails.
-func (l *Loader) Load(location string) (map[string]*specs.Spec, error) {
-	var allSpecs map[string]*specs.Spec = make(map[string]*specs.Spec)
+func (l *Loader) Load(location string) (map[string]*specs.RawSpec, error) {
+	var allRawSpecs map[string]*specs.RawSpec = make(map[string]*specs.RawSpec)
 
 	log.Info("loading specs", "location", location)
 
@@ -58,13 +58,7 @@ func (l *Loader) Load(location string) (map[string]*specs.Spec, error) {
 			return fmt.Errorf("reading file: %w", err)
 		}
 
-		// Parse spec
-		spec, err := specs.New(data)
-		if err != nil {
-			return fmt.Errorf("parsing spec file %s: %w", path, err)
-		}
-
-		allSpecs[path] = spec
+		allRawSpecs[path] = &specs.RawSpec{Data: data}
 		return nil
 	})
 
@@ -72,5 +66,5 @@ func (l *Loader) Load(location string) (map[string]*specs.Spec, error) {
 		return nil, fmt.Errorf("loading specs: %w", err)
 	}
 
-	return allSpecs, nil
+	return allRawSpecs, nil
 }
