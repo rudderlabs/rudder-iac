@@ -44,10 +44,10 @@ func TestPropertyForExport(t *testing.T) {
 			"name":        "User Email",
 			"description": "Email address of the user",
 			"type":        "string",
-			"propConfig": map[string]interface{}{
-				"format":    "email",
-				"minLength": float64(5),
-				"maxLength": float64(255),
+			"config": map[string]interface{}{
+				"format":     "email",
+				"min_length": float64(5),
+				"max_length": float64(255),
 			},
 		}, result)
 	})
@@ -125,6 +125,32 @@ func TestPropertyForExport(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "resource not found")
+	})
+
+	t.Run("splits multi-type string into types array", func(t *testing.T) {
+		upstream := &catalog.Property{
+			Name:        "Nullable String",
+			Description: "A string that can be null",
+			Type:        "string,null",
+			Config: map[string]interface{}{
+				"minLength": float64(1),
+			},
+		}
+
+		mockRes := &mockResolver{}
+		prop := &ImportableProperty{}
+		result, err := prop.ForExport("nullable_string", upstream, mockRes)
+
+		require.Nil(t, err)
+		assert.Equal(t, map[string]any{
+			"id":          "nullable_string",
+			"name":        "Nullable String",
+			"description": "A string that can be null",
+			"types":       []string{"string", "null"},
+			"config": map[string]interface{}{
+				"min_length": float64(1),
+			},
+		}, result)
 	})
 }
 

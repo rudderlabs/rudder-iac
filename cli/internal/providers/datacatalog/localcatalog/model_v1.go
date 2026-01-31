@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type PropertyV1 struct {
@@ -14,6 +16,7 @@ type PropertyV1 struct {
 	Name        string                 `mapstructure:"name" json:"name"`
 	Description string                 `mapstructure:"description,omitempty" json:"description"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type"`
+	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
 	Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
 }
 
@@ -25,8 +28,19 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 	p.LocalID = v0.LocalID
 	p.Name = v0.Name
 	p.Description = v0.Description
-	p.Type = v0.Type
 	p.Config = convertConfigKeysToSnakeCase(v0.Config)
+
+	// Parse the v0 type field to determine if it's single or multiple types
+	if strings.Contains(v0.Type, ",") {
+		// Multiple types - split and trim
+		p.Types = utils.SplitMultiTypeString(v0.Type)
+		p.Type = "" // Clear single type field
+	} else {
+		// Single type - keep as-is
+		p.Type = v0.Type
+		p.Types = nil
+	}
+
 	return nil
 }
 

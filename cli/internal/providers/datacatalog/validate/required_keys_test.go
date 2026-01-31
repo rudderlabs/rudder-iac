@@ -378,7 +378,8 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 0,
+			expectedErrors: 1,
+			errorContains:  "either 'type' or 'types' field must be specified",
 		},
 		{
 			name: "valid property name without whitespace",
@@ -466,7 +467,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: 1,
-			errorContains:  "id, name and type fields on property are mandatory",
+			errorContains:  "id and name fields on property are mandatory",
 		},
 	}
 
