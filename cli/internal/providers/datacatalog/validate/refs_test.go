@@ -32,7 +32,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 		errorContains []string
 	}{
 		{
-			name: "valid custom type reference in property itemTypes",
+			name: "valid custom type reference in property item_type",
 			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
@@ -40,9 +40,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Name:        "Email List",
 						Description: "List of user emails",
 						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{"#/custom-types/email-types/EmailType"},
-						},
+						ItemType:    "#/custom-types/email-types/EmailType",
 					},
 				},
 			},
@@ -52,7 +50,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 			expectedErrs: 0,
 		},
 		{
-			name: "invalid custom type reference format in property itemTypes",
+			name: "invalid custom type reference format in property item_type",
 			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
@@ -60,9 +58,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Name:        "Email List",
 						Description: "List of user emails",
 						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{"#/custom-types/email-types"}, // Missing type ID
-						},
+						ItemType:    "#/custom-types/email-types", // Missing type ID
 					},
 				},
 			},
@@ -70,10 +66,10 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 				"email-types": {testCustomType},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference in item_types at idx: 0 has invalid format"},
+			errorContains: []string{"custom type reference in item_type has invalid format"},
 		},
 		{
-			name: "reference to non-existent custom type in property itemTypes",
+			name: "reference to non-existent custom type in property item_type",
 			properties: map[catalog.EntityGroup][]catalog.PropertyV1{
 				"test-group": {
 					{
@@ -81,9 +77,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 						Name:        "Email List",
 						Description: "List of user emails",
 						Type:        "array",
-						Config: map[string]interface{}{
-							"item_types": []interface{}{"#/custom-types/email-types/NonExistentType"},
-						},
+						ItemType:    "#/custom-types/email-types/NonExistentType",
 					},
 				},
 			},
@@ -91,7 +85,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 				"email-types": {testCustomType},
 			},
 			expectedErrs:  1,
-			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' in item_types at idx: 0 not found in catalog"},
+			errorContains: []string{"custom type reference '#/custom-types/email-types/NonExistentType' in item_type not found in catalog"},
 		},
 	}
 

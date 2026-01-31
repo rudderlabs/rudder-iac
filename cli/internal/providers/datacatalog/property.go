@@ -171,11 +171,24 @@ func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources
 	if toArgs.DiffUpstream(property) {
 		p.log.Debug("property has differences, updating", "id", ID, "remoteId", remoteId)
 
+		// convert supported config keys to camelCase
+		// leave other keys as is
+		config := make(map[string]interface{})
+		camelCaseNamer := namer.NewCamelCase()
+		for key, value := range toArgs.Config {
+			configKey := key
+			camelCaseKey := camelCaseNamer.Name(key)
+			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+				configKey = camelCaseKey
+			}
+			config[configKey] = value
+		}
+
 		property, err = p.client.UpdateProperty(ctx, remoteId, &catalog.PropertyUpdate{
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type.(string),
-			Config:      toArgs.Config,
+			Config:      config,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("updating property during import: %w", err)
