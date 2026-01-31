@@ -12,10 +12,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -326,4 +328,12 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 		}
 	}
 	return nil
+}
+
+func (p *Provider) SyntacticRules() []rules.Rule {
+	syntactic := []rules.Rule{
+		propertyRules.NewPropertySpecSyntaxValidRule(),
+	}
+
+	return syntactic
 }

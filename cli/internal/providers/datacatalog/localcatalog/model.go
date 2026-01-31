@@ -17,15 +17,15 @@ func strictUnmarshal(data []byte, v any) error {
 }
 
 type Property struct {
-	LocalID     string                 `mapstructure:"id" json:"id"`
-	Name        string                 `mapstructure:"name" json:"name"`
+	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required"`
 	Description string                 `mapstructure:"description,omitempty" json:"description"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`
 }
 
 type PropertySpec struct {
-	Properties []Property `json:"properties"`
+	Properties []Property `json:"properties" validate:"required,dive"`
 }
 
 // This method is used to extract the entity from the byte representation of it
