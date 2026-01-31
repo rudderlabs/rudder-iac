@@ -90,6 +90,7 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 			v0Config          map[string]interface{}
 			expectedType      string
 			expectedTypes     []string
+			expectedItemType  string
 			expectedItemTypes []string
 			expectedConfig    map[string]interface{}
 		}{
@@ -142,6 +143,16 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 				expectedConfig: nil,
 			},
 			{
+				name:              "array type with single itemType config",
+				v0Type:            "array",
+				v0Config:          map[string]interface{}{"itemTypes": []interface{}{"string"}},
+				expectedType:      "array",
+				expectedTypes:     nil,
+				expectedItemType:  "string",
+				expectedItemTypes: nil,
+				expectedConfig:    map[string]interface{}{},
+			},
+			{
 				name:              "array type with itemTypes config",
 				v0Type:            "array",
 				v0Config:          map[string]interface{}{"itemTypes": []interface{}{"string", "number"}},
@@ -182,15 +193,15 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 				var v1 PropertyV1
 				v1.FromV0(v0)
 				assert.Equal(t, tt.expectedType, v1.Type, "Type field mismatch")
-			assert.Equal(t, tt.expectedTypes, v1.Types, "Types field mismatch")
-			assert.Equal(t, tt.expectedItemTypes, v1.ItemTypes, "ItemTypes field mismatch")
-			assert.Equal(t, tt.expectedConfig, v1.Config, "Config field mismatch")
-			assert.Equal(t, v0.LocalID, v1.LocalID)
-			assert.Equal(t, v0.Name, v1.Name)
-		})
-	}
-				
-			
+				assert.Equal(t, tt.expectedTypes, v1.Types, "Types field mismatch")
+				assert.Equal(t, tt.expectedItemType, v1.ItemType, "ItemType field mismatch")
+				assert.Equal(t, tt.expectedItemTypes, v1.ItemTypes, "ItemTypes field mismatch")
+				assert.Equal(t, tt.expectedConfig, v1.Config, "Config field mismatch")
+				assert.Equal(t, v0.LocalID, v1.LocalID)
+				assert.Equal(t, v0.Name, v1.Name)
+			})
+		}
+
 	})
 
 	t.Run("converts multiple properties with different configurations and preserves order", func(t *testing.T) {

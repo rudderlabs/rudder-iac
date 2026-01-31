@@ -26,7 +26,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 		for _, prop := range props {
 
 			if lookup, ok := propName[prop.Name]; ok {
-				// Check if both properties have the same type
+				// If the name, type and arrayItemType on the property are the same, then its a duplicate
 				if lookup.Type == prop.Type {
 					// Check if item types match (for array properties)
 					sort.Strings(lookup.ItemTypes)

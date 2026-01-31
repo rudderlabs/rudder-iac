@@ -13,7 +13,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/samber/lo"
 )
 
@@ -172,9 +171,17 @@ func (p *PropertyProvider) Import(ctx context.Context, ID string, data resources
 	if toArgs.DiffUpstream(property) {
 		p.log.Debug("property has differences, updating", "id", ID, "remoteId", remoteId)
 
+		// convert supported config keys to camelCase
+		// leave other keys as is
 		config := make(map[string]interface{})
+		camelCaseNamer := namer.NewCamelCase()
 		for key, value := range toArgs.Config {
-			config[utils.ToCamelCase(key)] = value
+			configKey := key
+			camelCaseKey := camelCaseNamer.Name(key)
+			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+				configKey = camelCaseKey
+			}
+			config[configKey] = value
 		}
 
 		property, err = p.client.UpdateProperty(ctx, remoteId, &catalog.PropertyUpdate{

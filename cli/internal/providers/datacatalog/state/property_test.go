@@ -223,22 +223,19 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		args := &state.PropertyArgs{}
 		err := args.FromCatalogPropertyType(prop, urnFromRef)
 		assert.NoError(t, err)
-		assert.Equal(t, "Test Array Multi Type", args.Name)
-		assert.Equal(t, "An array with multiple item types", args.Description)
-		assert.Equal(t, "array", args.Type)
 
-		// Check that item_types is in config as an array with sorted primitive types
-		itemTypes, ok := args.Config["item_types"]
-		assert.True(t, ok, "item_types should be in config")
-		itemTypesArray, ok := itemTypes.([]interface{})
-		assert.True(t, ok, "item_types should be an array")
-		assert.Equal(t, 3, len(itemTypesArray))
-		assert.Equal(t, "boolean", itemTypesArray[0])
-		assert.Equal(t, "number", itemTypesArray[1])
-		assert.Equal(t, "string", itemTypesArray[2])
+		expected := &state.PropertyArgs{
+			Name:        "Test Array Multi Type",
+			Description: "An array with multiple item types",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"item_types": []interface{}{"boolean", "number", "string"},
+			},
+		}
+		assert.Equal(t, expected, args)
 	})
 
-	t.Run("property with custom type reference in itemTypes array", func(t *testing.T) {
+	t.Run("property with custom type reference in itemTypes array is not treated differently as customtypes should be added to itemType(not itemTypes)", func(t *testing.T) {
 		t.Parallel()
 
 		prop := localcatalog.PropertyV1{
@@ -250,29 +247,22 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		}
 
 		urnFromRef := func(ref string) string {
-			if ref == "#/custom-types/email-types/EmailType" {
-				return "custom-type:EmailType"
-			}
 			return ""
 		}
 
 		args := &state.PropertyArgs{}
 		err := args.FromCatalogPropertyType(prop, urnFromRef)
 		assert.NoError(t, err)
-		assert.Equal(t, "Test Array Custom Type", args.Name)
-		assert.Equal(t, "An array with custom type in item_types", args.Description)
-		assert.Equal(t, "array", args.Type)
 
-		// Check that entire item_types array is replaced with single PropertyRef
-		itemTypes, ok := args.Config["item_types"]
-		assert.True(t, ok, "item_types should be in config")
-		itemTypesArray, ok := itemTypes.([]interface{})
-		assert.True(t, ok, "item_types should be an array")
-		assert.Equal(t, 1, len(itemTypesArray), "Should have only one element when custom type is present")
-		propRef, ok := itemTypesArray[0].(resources.PropertyRef)
-		assert.True(t, ok, "item_types[0] should be a PropertyRef")
-		assert.Equal(t, "custom-type:EmailType", propRef.URN)
-		assert.Equal(t, "name", propRef.Property)
+		expected := &state.PropertyArgs{
+			Name:        "Test Array Custom Type",
+			Description: "An array with custom type in item_types",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"item_types": []interface{}{"#/custom-types/email-types/EmailType", "number", "string"},
+			},
+		}
+		assert.Equal(t, expected, args)
 	})
 }
 

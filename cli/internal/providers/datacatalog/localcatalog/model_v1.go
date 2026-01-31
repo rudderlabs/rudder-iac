@@ -46,25 +46,33 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 	// Extract itemTypes from config and move to property-level fields
 	if p.Config != nil {
 		if itemTypes, ok := p.Config["item_types"]; ok {
-			if itemTypesArray, ok := itemTypes.([]interface{}); ok {
-				// Check if single or multiple item types
-				if len(itemTypesArray) == 1 {
-					// Single item type
-					if itemTypeStr, ok := itemTypesArray[0].(string); ok {
-						p.ItemType = itemTypeStr
-					}
-				} else if len(itemTypesArray) > 1 {
-					// Multiple item types
-					p.ItemTypes = make([]string, len(itemTypesArray))
-					for i, item := range itemTypesArray {
-						if itemStr, ok := item.(string); ok {
-							p.ItemTypes[i] = itemStr
-						}
-					}
-				}
-				// Remove item_types from config after migration
-				delete(p.Config, "item_types")
+			itemTypesArray, ok := itemTypes.([]interface{})
+			if !ok {
+				return fmt.Errorf("config['item_types'] must be an array of strings")
 			}
+
+			// Check if single or multiple item types
+			if len(itemTypesArray) == 1 {
+				// Single item type
+				itemTypeStr, ok := itemTypesArray[0].(string)
+				if !ok {
+					return fmt.Errorf("config['item_types']: item type must be a string")
+				}
+				p.ItemType = itemTypeStr
+			} else if len(itemTypesArray) > 1 {
+				// Multiple item types
+				p.ItemTypes = make([]string, len(itemTypesArray))
+				for i, item := range itemTypesArray {
+					itemStr, ok := item.(string)
+					if !ok {
+						return fmt.Errorf("config['item_types']: item type must be a string")
+					}
+					p.ItemTypes[i] = itemStr
+				}
+			}
+			// Remove item_types from config after migration
+			delete(p.Config, "item_types")
+
 		}
 	}
 
