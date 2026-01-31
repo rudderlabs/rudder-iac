@@ -316,6 +316,13 @@ func (p *project) registry() (rules.Registry, error) {
 	syntactic := []rules.Rule{
 		prules.NewSpecSyntaxValidRule(),
 		prules.NewMetadataSyntaxValidRule(),
+		prules.NewSpecSemanticValidRule(
+			p.provider.SupportedKinds(),
+			[]string{
+				specs.SpecVersionV0_1,
+				specs.SpecVersionV0_1Variant,
+			},
+		),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
@@ -326,6 +333,7 @@ func (p *project) registry() (rules.Registry, error) {
 	}
 
 	semantic := p.provider.SemanticRules()
+
 	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
