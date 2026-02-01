@@ -135,7 +135,7 @@ type CustomTypeSpec struct {
 }
 
 // ExtractCustomTypes parses a resource definition and extracts custom types
-func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
+func ExtractCustomTypes(s *specs.Spec) ([]CustomTypeV1, error) {
 	spec := CustomTypeSpec{}
 
 	jsonByt, err := json.Marshal(s.Spec)
@@ -154,5 +154,16 @@ func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
 		}
 	}
 
-	return spec.Types, nil
+	// Convert V0 to V1
+	v1CustomTypes := make([]CustomTypeV1, 0, len(spec.Types))
+	for _, customType := range spec.Types {
+		v1CustomType := CustomTypeV1{}
+		err := v1CustomType.FromV0(customType)
+		if err != nil {
+			return nil, fmt.Errorf("converting custom type to v1: %w", err)
+		}
+		v1CustomTypes = append(v1CustomTypes, v1CustomType)
+	}
+
+	return v1CustomTypes, nil
 }

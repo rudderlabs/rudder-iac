@@ -3,10 +3,13 @@ package datacatalog
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -52,6 +55,19 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 	toArgs := state.CustomTypeArgs{}
 	toArgs.FromResourceData(data)
 
+	// convert supported config keys to camelCase
+	// leave other keys as is
+	config := make(map[string]interface{})
+	camelCaseNamer := namer.NewCamelCase()
+	for key, value := range toArgs.Config {
+		configKey := key
+		camelCaseKey := camelCaseNamer.Name(key)
+		if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+			configKey = camelCaseKey
+		}
+		config[configKey] = value
+	}
+
 	properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 	for _, prop := range toArgs.Properties {
 		properties = append(properties, catalog.CustomTypeProperty{
@@ -64,7 +80,7 @@ func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resourc
 		Name:        toArgs.Name,
 		Description: toArgs.Description,
 		Type:        toArgs.Type,
-		Config:      toArgs.Config,
+		Config:      config,
 		Properties:  properties,
 		Variants:    toArgs.Variants.ToCatalogVariants(),
 		ExternalId:  ID,
@@ -111,6 +127,19 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 
 	// Check if there are any changes using the Diff method
 	if prevState.CustomTypeArgs.Diff(&toArgs) {
+		// convert supported config keys to camelCase
+		// leave other keys as is
+		config := make(map[string]interface{})
+		camelCaseNamer := namer.NewCamelCase()
+		for key, value := range toArgs.Config {
+			configKey := key
+			camelCaseKey := camelCaseNamer.Name(key)
+			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+				configKey = camelCaseKey
+			}
+			config[configKey] = value
+		}
+
 		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 		for _, prop := range toArgs.Properties {
 			properties = append(properties, catalog.CustomTypeProperty{
@@ -123,7 +152,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type,
-			Config:      toArgs.Config,
+			Config:      config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
 		})
@@ -200,6 +229,19 @@ func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resourc
 	if toArgs.DiffUpstream(customType) {
 		p.log.Debug("custom type has differences, updating", "id", ID, "remoteId", remoteId)
 
+		// convert supported config keys to camelCase
+		// leave other keys as is
+		config := make(map[string]interface{})
+		camelCaseNamer := namer.NewCamelCase()
+		for key, value := range toArgs.Config {
+			configKey := key
+			camelCaseKey := camelCaseNamer.Name(key)
+			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+				configKey = camelCaseKey
+			}
+			config[configKey] = value
+		}
+
 		// Prepare properties for update
 		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 		for _, prop := range toArgs.Properties {
@@ -214,7 +256,7 @@ func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resourc
 			Name:        toArgs.Name,
 			Description: toArgs.Description,
 			Type:        toArgs.Type,
-			Config:      toArgs.Config,
+			Config:      config,
 			Properties:  properties,
 			Variants:    toArgs.Variants.ToCatalogVariants(),
 		})
