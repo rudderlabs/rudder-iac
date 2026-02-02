@@ -5,13 +5,15 @@ import (
 	"fmt"
 
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-type DataGraphHandler = handler.BaseHandler[model.DataGraphSpec, model.DataGraphResource, model.DataGraphState, model.RemoteDataGraph]
+type DataGraphHandler = handler.BaseHandler[struct{}, model.DataGraphResource, model.DataGraphState, model.RemoteDataGraph]
 
 var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     "data-graph",
@@ -20,15 +22,14 @@ var HandlerMetadata = handler.HandlerMetadata{
 }
 
 // HandlerImpl implements the HandlerImpl interface for data graph resources
+// Note: The provider handles all spec parsing and resource extraction for data-graph specs
 type HandlerImpl struct {
-	*export.MultiSpecExportStrategy[model.DataGraphSpec, model.RemoteDataGraph]
 	client dgClient.DataGraphStore
 }
 
 // NewHandler creates a new BaseHandler for data graph resources
 func NewHandler(client dgClient.DataGraphStore) *DataGraphHandler {
 	h := &HandlerImpl{client: client}
-	h.MultiSpecExportStrategy = &export.MultiSpecExportStrategy[model.DataGraphSpec, model.RemoteDataGraph]{Handler: h}
 	return handler.NewHandler(h)
 }
 
@@ -36,28 +37,18 @@ func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
 	return HandlerMetadata
 }
 
-func (h *HandlerImpl) NewSpec() *model.DataGraphSpec {
-	return &model.DataGraphSpec{}
+func (h *HandlerImpl) NewSpec() *struct{} {
+	return &struct{}{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.DataGraphSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.AccountID == "" {
-		return fmt.Errorf("account_id is required")
-	}
-	return nil
+func (h *HandlerImpl) ValidateSpec(spec *struct{}) error {
+	// Spec validation is handled by the provider
+	return fmt.Errorf("data graph handler does not handle spec validation - handled by provider")
 }
 
-func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.DataGraphSpec) (map[string]*model.DataGraphResource, error) {
-	resource := &model.DataGraphResource{
-		ID:        spec.ID,
-		AccountID: spec.AccountID,
-	}
-	return map[string]*model.DataGraphResource{
-		spec.ID: resource,
-	}, nil
+func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map[string]*model.DataGraphResource, error) {
+	// Resource extraction is handled by the provider
+	return nil, fmt.Errorf("data graph handler does not handle spec extraction - handled by provider")
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.DataGraphResource, graph *resources.Graph) error {
@@ -167,13 +158,25 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Data
 	return nil
 }
 
-// MapRemoteToSpec converts a remote data graph to a spec for export
-func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteDataGraph) (*export.SpecExportData[model.DataGraphSpec], error) {
-	return &export.SpecExportData[model.DataGraphSpec]{
-		Data: &model.DataGraphSpec{
-			ID:        externalID,
-			AccountID: remote.AccountID,
+// FormatForExport formats resources for export
+// Export is not currently implemented for data graphs
+func (h *HandlerImpl) FormatForExport(
+	collection map[string]*model.RemoteDataGraph,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	// Export is handled directly by the provider for data graphs
+	return nil, nil
+}
+
+// CreateDataGraphReference creates a PropertyRef that points to a data graph's remote ID
+// This is used by other resources (like models) that need to reference a data graph
+// The urn parameter should be in the format "data-graph:external-id"
+func CreateDataGraphReference(urn string) *resources.PropertyRef {
+	return handler.CreatePropertyRef(
+		urn,
+		func(state *model.DataGraphState) (string, error) {
+			return state.ID, nil
 		},
-		RelativePath: fmt.Sprintf("data-graphs/%s.yaml", externalID),
-	}, nil
+	)
 }
