@@ -290,6 +290,81 @@ func TestSpec_CommonMetadata(t *testing.T) {
 	}
 }
 
+func TestImportIds_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		importIds   ImportIds
+		expectError bool
+		errorText   string
+	}{
+		{
+			name: "valid with URN only",
+			importIds: ImportIds{
+				URN:      "data-graph:my-graph",
+				RemoteID: "remote-123",
+			},
+			expectError: false,
+		},
+		{
+			name: "valid with LocalID only",
+			importIds: ImportIds{
+				LocalID:  "my-resource",
+				RemoteID: "remote-123",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid - both URN and LocalID set",
+			importIds: ImportIds{
+				URN:      "data-graph:my-graph",
+				LocalID:  "my-resource",
+				RemoteID: "remote-123",
+			},
+			expectError: true,
+			errorText:   "urn and local_id are mutually exclusive",
+		},
+		{
+			name: "invalid - neither URN nor LocalID set",
+			importIds: ImportIds{
+				RemoteID: "remote-123",
+			},
+			expectError: true,
+			errorText:   "either urn or local_id must be set",
+		},
+		{
+			name: "invalid - missing RemoteID with URN",
+			importIds: ImportIds{
+				URN: "data-graph:my-graph",
+			},
+			expectError: true,
+			errorText:   "remote_id is required",
+		},
+		{
+			name: "invalid - missing RemoteID with LocalID",
+			importIds: ImportIds{
+				LocalID: "my-resource",
+			},
+			expectError: true,
+			errorText:   "remote_id is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.importIds.Validate()
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorText)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestMetadata_ToMap(t *testing.T) {
 	t.Parallel()
 

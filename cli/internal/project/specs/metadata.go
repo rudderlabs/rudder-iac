@@ -33,6 +33,23 @@ type ImportIds struct {
 	RemoteID string `yaml:"remote_id" json:"remote_id" validate:"required"`
 }
 
+// Validate checks that ImportIds has valid field combinations
+func (i *ImportIds) Validate() error {
+	hasLocalID := i.LocalID != ""
+	hasURN := i.URN != ""
+
+	if hasLocalID && hasURN {
+		return fmt.Errorf("urn and local_id are mutually exclusive")
+	}
+	if !hasLocalID && !hasURN {
+		return fmt.Errorf("either urn or local_id must be set")
+	}
+	if i.RemoteID == "" {
+		return fmt.Errorf("remote_id is required")
+	}
+	return nil
+}
+
 // Validate checks that all required fields are present in the Metadata
 func (m *Metadata) Validate() error {
 	if m.Import != nil {
