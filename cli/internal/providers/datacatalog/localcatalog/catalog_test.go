@@ -207,34 +207,34 @@ func TestExtractCatalogEntity(t *testing.T) {
 					Type:                 "event_rule",
 					Event:                "#/events/mobile_events/user_signed_up",
 					AdditionalProperties: true,
-					Properties: []*TPRuleProperty{
+					Properties: []*TPRulePropertyV1{
 						{
-							Ref:      "#/properties/base_mobile_props/username",
+							Property: "#/properties/base_mobile_props/username",
 							Required: true,
 						},
 						{
-							Ref:      "#/properties/base_mobile_props/button_signin",
+							Property: "#/properties/base_mobile_props/button_signin",
 							Required: false,
-							Properties: []*TPRuleProperty{
+							Properties: []*TPRulePropertyV1{
 								{
-									Ref:      "#/properties/base_mobile_props/username",
+									Property: "#/properties/base_mobile_props/username",
 									Required: true,
 								},
 								{
-									Ref:      "#/properties/base_mobile_props/remember_me_checkbox_clicked",
+									Property: "#/properties/base_mobile_props/remember_me_checkbox_clicked",
 									Required: false,
 								},
 								{
-									Ref:                  "#/properties/base_mobile_props/captcha",
+									Property:             "#/properties/base_mobile_props/captcha",
 									AdditionalProperties: &falseVal,
 									Required:             false,
-									Properties: []*TPRuleProperty{
+									Properties: []*TPRulePropertyV1{
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_solved",
+											Property: "#/properties/base_mobile_props/captcha_solved",
 											Required: false,
 										},
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_type",
+											Property: "#/properties/base_mobile_props/captcha_type",
 											Required: false,
 										},
 									},
@@ -1588,8 +1588,8 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		require.NotNil(t, rule.Variants)
 		require.Equal(t, 1, len(rule.Variants))
 
-		assert.Equal(t, "#event:user_signed_up", rule.Event)
-		assert.Equal(t, "#property:page_name", rule.Properties[0].Ref)
+	assert.Equal(t, "#event:user_signed_up", rule.Event)
+	assert.Equal(t, "#property:page_name", rule.Properties[0].Property)
 
 		variant := (rule.Variants)[0]
 		assert.Equal(t, "discriminator", variant.Type)

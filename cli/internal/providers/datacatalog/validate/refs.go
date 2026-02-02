@@ -207,16 +207,16 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRuleV1, baseReference string,
 	}
 	if rule.Properties != nil {
 		for _, prop := range rule.Properties {
-			matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
+			matches := catalog.PropRegex.FindStringSubmatch(prop.Property)
 			if len(matches) != 2 {
 				errs = append(errs, ValidationError{
-					Reference: prop.Ref,
+					Reference: prop.Property,
 					error:     errInvalidRefFormat,
 				})
 			} else {
 				if property := fetcher.Property(matches[1]); property == nil {
 					errs = append(errs, ValidationError{
-						Reference: prop.Ref,
+						Reference: prop.Property,
 						error:     fmt.Errorf("no property found from reference"),
 					})
 				}
@@ -264,9 +264,9 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRuleV1, baseReference string,
 				fmt.Sprintf("%s/event_rule/%s", baseReference, rule.LocalID),
 				fetcher,
 				func(id string) bool {
-					return lo.ContainsBy(rule.Properties, func(p *catalog.TPRuleProperty) bool {
-						// rule.Properties have been validated above, so we can safely assume the ref is valid
-						matches := catalog.PropRegex.FindStringSubmatch(p.Ref)
+					return lo.ContainsBy(rule.Properties, func(p *catalog.TPRulePropertyV1) bool {
+						// rule.Properties have been validated above, so we can safely assume the property is valid
+						matches := catalog.PropRegex.FindStringSubmatch(p.Property)
 						return matches[1] == id
 					})
 				},
@@ -277,15 +277,15 @@ func (rv *RefValidator) handleRefs(rule *catalog.TPRuleV1, baseReference string,
 	return errs
 }
 
-func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRuleProperty, ruleRef string, dc catalog.CatalogResourceFetcher) []ValidationError {
+func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRulePropertyV1, ruleRef string, dc catalog.CatalogResourceFetcher) []ValidationError {
 	errs := make([]ValidationError, 0)
 
 	for _, nestedProp := range prop.Properties {
-		matches := catalog.PropRegex.FindStringSubmatch(nestedProp.Ref)
+		matches := catalog.PropRegex.FindStringSubmatch(nestedProp.Property)
 		if len(matches) != 2 {
 			errs = append(errs, ValidationError{
-				Reference: nestedProp.Ref,
-				error:     fmt.Errorf("property reference '%s' has invalid format in rule '%s'. Should be '#property:<id>'", nestedProp.Ref, ruleRef),
+				Reference: nestedProp.Property,
+				error:     fmt.Errorf("property reference '%s' has invalid format in rule '%s'. Should be '#property:<id>'", nestedProp.Property, ruleRef),
 			})
 			continue
 		}
@@ -293,8 +293,8 @@ func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRuleProperty,
 		propID := matches[1]
 		if property := dc.Property(propID); property == nil {
 			errs = append(errs, ValidationError{
-				Reference: nestedProp.Ref,
-				error:     fmt.Errorf("property reference '%s' in rule '%s' not found in catalog", nestedProp.Ref, ruleRef),
+				Reference: nestedProp.Property,
+				error:     fmt.Errorf("property reference '%s' in rule '%s' not found in catalog", nestedProp.Property, ruleRef),
 			})
 		}
 

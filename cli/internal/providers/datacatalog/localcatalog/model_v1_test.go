@@ -520,13 +520,13 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 					Event:                "#event:user_signup", // Converted from object to direct reference
 					IdentitySection:      "context",            // Moved from rules.event.identity_section
 					AdditionalProperties: true,                 // Converted from rules.event.allow_unplanned
-					Properties: []*TPRuleProperty{
+					Properties: []*TPRulePropertyV1{
 						{
-							Ref:      "#property:user_email",
+							Property: "#property:user_email",
 							Required: true,
 						},
 						{
-							Ref:      "#property:signup_source",
+							Property: "#property:signup_source",
 							Required: false,
 						},
 					},
@@ -556,9 +556,9 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 					Event:                "#event:user_login", // Converted from object to direct reference
 					IdentitySection:      "traits",            // Moved from rules.event.identity_section
 					AdditionalProperties: false,               // allow_unplanned was false
-					Properties: []*TPRuleProperty{
+					Properties: []*TPRulePropertyV1{
 						{
-							Ref:      "#property:login_method",
+							Property: "#property:login_method",
 							Required: true,
 						},
 					},

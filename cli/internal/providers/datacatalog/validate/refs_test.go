@@ -258,9 +258,9 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:test-event",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:page_name",
+									Property: "#property:page_name",
 									Required: true,
 								},
 							},
@@ -374,9 +374,9 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:test-event",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:page_name",
+									Property: "#property:page_name",
 									Required: true,
 								},
 							},
@@ -484,13 +484,13 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:user_signup",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_name",
+											Property: "#property:profile_name",
 											Required: true,
 										},
 									},
@@ -513,17 +513,17 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: "#/events/test-group/user_signup",
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_settings",
+											Property: "#property:profile_settings",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:theme_preference",
+													Property: "#property:theme_preference",
 													Required: true,
 												},
 											},
@@ -548,13 +548,13 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							LocalID: "test-rule",
 							Type:    "event_rule",
 							Event: "#/events/test-group/user_signup",
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:nonexistent_property",
+											Property: "#property:nonexistent_property",
 											Required: true,
 										},
 									},
@@ -579,13 +579,13 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:user_signup",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:", // Invalid format - missing property ID
+											Property: "#property:", // Invalid format - missing property ID
 											Required: true,
 										},
 									},
@@ -610,21 +610,21 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:user_signup",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:invalid_property1", // Non-existent at level 2
+											Property: "#property:invalid_property1", // Non-existent at level 2
 											Required: true,
 										},
 										{
-											Ref:      "#property:profile_settings",
+											Property: "#property:profile_settings",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:invalid_property2", // Non-existent at level 3
+													Property: "#property:invalid_property2", // Non-existent at level 3
 													Required: true,
 												},
 											},
@@ -654,25 +654,25 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#/events/test-group/user_signup",
 							AdditionalProperties: false,
-							Properties: []*catalog.TPRuleProperty{
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_name", // Valid
+											Property: "#property:profile_name", // Valid
 											Required: true,
 										},
 										{
-											Ref:      "#/properties/invalid-format", // Invalid format
+											Property: "#/properties/invalid-format", // Invalid format
 											Required: true,
 										},
 										{
-											Ref:      "#property:notification_prefs",
+											Property: "#property:notification_prefs",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:email_enabled", // Valid
+													Property: "#property:email_enabled", // Valid
 													Required: true,
 												},
 											},

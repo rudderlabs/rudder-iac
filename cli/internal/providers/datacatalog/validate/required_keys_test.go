@@ -924,9 +924,9 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						LocalID: "valid_non_nested_rule",
 						Type:    "event_rule",
 						Event: "#/events/test/signup",
-						Properties: []*catalog.TPRuleProperty{
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:                  "#/properties/test_props/user_profile",
+								Property:              "#/properties/test_props/user_profile",
 								Required:             true,
 								AdditionalProperties: &falseVal,
 							},
@@ -936,13 +936,13 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						LocalID: "valid_nested_rule",
 						Type:    "event_rule",
 						Event: "#/events/test/signup",
-						Properties: []*catalog.TPRuleProperty{
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/user_profile",
+								Property: "#/properties/test_props/user_profile",
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/profile_name",
+										Property: "#/properties/test_props/profile_name",
 										Required: true,
 									},
 								},
@@ -953,13 +953,13 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						LocalID: "invalid_object_type_rule",
 						Type:    "event_rule",
 						Event: "#/events/test/signup",
-						Properties: []*catalog.TPRuleProperty{
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/button_signin", // string type with nested properties
+								Property: "#/properties/test_props/button_signin", // string type with nested properties
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/user_id",
+										Property: "#/properties/test_props/user_id",
 										Required: true,
 									},
 								},
@@ -970,25 +970,25 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						LocalID: "exceed_depth_rule",
 						Type:    "event_rule",
 						Event: "#/events/test/signup",
-						Properties: []*catalog.TPRuleProperty{
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/user_profile",
+								Property: "#/properties/test_props/user_profile",
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/profile_settings",
+										Property: "#/properties/test_props/profile_settings",
 										Required: true,
-										Properties: []*catalog.TPRuleProperty{
+										Properties: []*catalog.TPRulePropertyV1{
 											{
-												Ref:      "#/properties/test_props/user_profile",
+												Property: "#/properties/test_props/user_profile",
 												Required: true,
-												Properties: []*catalog.TPRuleProperty{
+												Properties: []*catalog.TPRulePropertyV1{
 													{
-														Ref:      "#/properties/test_props/theme_preference", // 4th level - should exceed limit
+														Property: "#/properties/test_props/theme_preference", // 4th level - should exceed limit
 														Required: true,
-														Properties: []*catalog.TPRuleProperty{
+														Properties: []*catalog.TPRulePropertyV1{
 															{
-																Ref:      "#/properties/test_props/deeply_nested_property",
+																Property: "#/properties/test_props/deeply_nested_property",
 																Required: true,
 															},
 														},
