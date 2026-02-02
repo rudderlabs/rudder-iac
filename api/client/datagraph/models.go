@@ -11,113 +11,48 @@ import (
 
 // ModelStore is the interface for Model operations
 type ModelStore interface {
-	// Entity Model operations
-	ListEntityModels(ctx context.Context, dataGraphID string, page, pageSize int, isRoot *bool, hasExternalID *bool) (*ListModelsResponse, error)
-	GetEntityModel(ctx context.Context, dataGraphID, modelID string) (*Model, error)
-	CreateEntityModel(ctx context.Context, dataGraphID string, req *CreateEntityModelRequest) (*Model, error)
-	UpdateEntityModel(ctx context.Context, dataGraphID, modelID string, req *UpdateEntityModelRequest) (*Model, error)
-	DeleteEntityModel(ctx context.Context, dataGraphID, modelID string) error
-	SetEntityModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error
+	// ListModels lists models in a data graph with optional type filtering
+	ListModels(ctx context.Context, req *ListModelsRequest) (*ListModelsResponse, error)
 
-	// Event Model operations
-	ListEventModels(ctx context.Context, dataGraphID string, page, pageSize int, hasExternalID *bool) (*ListModelsResponse, error)
-	GetEventModel(ctx context.Context, dataGraphID, modelID string) (*Model, error)
-	CreateEventModel(ctx context.Context, dataGraphID string, req *CreateEventModelRequest) (*Model, error)
-	UpdateEventModel(ctx context.Context, dataGraphID, modelID string, req *UpdateEventModelRequest) (*Model, error)
-	DeleteEventModel(ctx context.Context, dataGraphID, modelID string) error
-	SetEventModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error
+	// GetModel retrieves a model by ID (works for both entity and event models)
+	GetModel(ctx context.Context, req *GetModelRequest) (*Model, error)
+
+	// CreateModel creates a new model (entity or event based on type field in request)
+	CreateModel(ctx context.Context, req *CreateModelRequest) (*Model, error)
+
+	// UpdateModel updates a model (entity or event based on type field in request)
+	UpdateModel(ctx context.Context, req *UpdateModelRequest) (*Model, error)
+
+	// DeleteModel deletes a model by ID (works for both entity and event models)
+	DeleteModel(ctx context.Context, req *DeleteModelRequest) error
+
+	// SetModelExternalID sets the external ID for a model and returns the updated model (works for both entity and event models)
+	SetModelExternalID(ctx context.Context, req *SetModelExternalIDRequest) (*Model, error)
 }
 
-// ListEntityModels lists entity models in a data graph
-func (s *rudderDataGraphClient) ListEntityModels(ctx context.Context, dataGraphID string, page, pageSize int, isRoot *bool, hasExternalID *bool) (*ListModelsResponse, error) {
-	filters := map[string]*bool{
-		"isRoot":        isRoot,
-		"hasExternalId": hasExternalID,
-	}
-	return s.listModels(ctx, dataGraphID, page, pageSize, "entity", filters)
-}
-
-// ListEventModels lists event models in a data graph
-func (s *rudderDataGraphClient) ListEventModels(ctx context.Context, dataGraphID string, page, pageSize int, hasExternalID *bool) (*ListModelsResponse, error) {
-	filters := map[string]*bool{
-		"hasExternalId": hasExternalID,
-	}
-	return s.listModels(ctx, dataGraphID, page, pageSize, "event", filters)
-}
-
-// GetEntityModel retrieves an entity model by ID
-func (s *rudderDataGraphClient) GetEntityModel(ctx context.Context, dataGraphID, modelID string) (*Model, error) {
-	return s.getModel(ctx, dataGraphID, modelID, "entity")
-}
-
-// GetEventModel retrieves an event model by ID
-func (s *rudderDataGraphClient) GetEventModel(ctx context.Context, dataGraphID, modelID string) (*Model, error) {
-	return s.getModel(ctx, dataGraphID, modelID, "event")
-}
-
-// CreateEntityModel creates a new entity model
-func (s *rudderDataGraphClient) CreateEntityModel(ctx context.Context, dataGraphID string, req *CreateEntityModelRequest) (*Model, error) {
-	return s.createModel(ctx, dataGraphID, req, "entity")
-}
-
-// CreateEventModel creates a new event model
-func (s *rudderDataGraphClient) CreateEventModel(ctx context.Context, dataGraphID string, req *CreateEventModelRequest) (*Model, error) {
-	return s.createModel(ctx, dataGraphID, req, "event")
-}
-
-// UpdateEntityModel updates an existing entity model
-func (s *rudderDataGraphClient) UpdateEntityModel(ctx context.Context, dataGraphID, modelID string, req *UpdateEntityModelRequest) (*Model, error) {
-	return s.updateModel(ctx, dataGraphID, modelID, req, "entity")
-}
-
-// UpdateEventModel updates an existing event model
-func (s *rudderDataGraphClient) UpdateEventModel(ctx context.Context, dataGraphID, modelID string, req *UpdateEventModelRequest) (*Model, error) {
-	return s.updateModel(ctx, dataGraphID, modelID, req, "event")
-}
-
-// DeleteEntityModel deletes an entity model by ID
-func (s *rudderDataGraphClient) DeleteEntityModel(ctx context.Context, dataGraphID, modelID string) error {
-	return s.deleteModel(ctx, dataGraphID, modelID, "entity")
-}
-
-// DeleteEventModel deletes an event model by ID
-func (s *rudderDataGraphClient) DeleteEventModel(ctx context.Context, dataGraphID, modelID string) error {
-	return s.deleteModel(ctx, dataGraphID, modelID, "event")
-}
-
-// SetEntityModelExternalID sets the external ID for an entity model
-func (s *rudderDataGraphClient) SetEntityModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error {
-	return s.setModelExternalID(ctx, dataGraphID, modelID, externalID, "entity")
-}
-
-// SetEventModelExternalID sets the external ID for an event model
-func (s *rudderDataGraphClient) SetEventModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error {
-	return s.setModelExternalID(ctx, dataGraphID, modelID, externalID, "event")
-}
-
-// Private helper functions
-
-// listModels is a common helper for listing entity or event models with optional filters
-func (s *rudderDataGraphClient) listModels(ctx context.Context, dataGraphID string, page, pageSize int, modelType string, filters map[string]*bool) (*ListModelsResponse, error) {
-	if dataGraphID == "" {
+// ListModels lists models in a data graph with optional type filtering
+func (s *rudderDataGraphClient) ListModels(ctx context.Context, req *ListModelsRequest) (*ListModelsResponse, error) {
+	if req.DataGraphID == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/%s-models", dataGraphsBasePath, dataGraphID, modelType)
+	path := fmt.Sprintf("%s/%s/models", dataGraphsBasePath, req.DataGraphID)
 
 	query := url.Values{}
-	if page > 0 {
-		query.Add("page", strconv.Itoa(page))
+	if req.Page > 0 {
+		query.Add("page", strconv.Itoa(req.Page))
 	}
-	if pageSize > 0 {
-		query.Add("pageSize", strconv.Itoa(pageSize))
+	if req.PageSize > 0 {
+		query.Add("pageSize", strconv.Itoa(req.PageSize))
 	}
-
-	// Add filters
-	for key, value := range filters {
-		if value != nil {
-			query.Add(key, strconv.FormatBool(*value))
-		}
+	if req.ModelType != nil {
+		query.Add("type", *req.ModelType)
+	}
+	if req.IsRoot != nil {
+		query.Add("isRoot", strconv.FormatBool(*req.IsRoot))
+	}
+	if req.HasExternalID != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*req.HasExternalID))
 	}
 
 	if len(query) > 0 {
@@ -126,7 +61,7 @@ func (s *rudderDataGraphClient) listModels(ctx context.Context, dataGraphID stri
 
 	resp, err := s.client.Do(ctx, "GET", path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("listing %s models: %w", modelType, err)
+		return nil, fmt.Errorf("listing models: %w", err)
 	}
 
 	var result ListModelsResponse
@@ -134,27 +69,22 @@ func (s *rudderDataGraphClient) listModels(ctx context.Context, dataGraphID stri
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	// Set type on each model
-	for i := range result.Data {
-		result.Data[i].Type = modelType
-	}
-
 	return &result, nil
 }
 
-// getModel is a common helper for getting entity or event models
-func (s *rudderDataGraphClient) getModel(ctx context.Context, dataGraphID, modelID, modelType string) (*Model, error) {
-	if dataGraphID == "" {
+// GetModel retrieves a model by ID
+func (s *rudderDataGraphClient) GetModel(ctx context.Context, req *GetModelRequest) (*Model, error) {
+	if req.DataGraphID == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
-	if modelID == "" {
+	if req.ModelID == "" {
 		return nil, fmt.Errorf("model ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/%s-models/%s", dataGraphsBasePath, dataGraphID, modelType, modelID)
+	path := fmt.Sprintf("%s/%s/models/%s", dataGraphsBasePath, req.DataGraphID, req.ModelID)
 	resp, err := s.client.Do(ctx, "GET", path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("getting %s model: %w", modelType, err)
+		return nil, fmt.Errorf("getting model: %w", err)
 	}
 
 	var result Model
@@ -162,17 +92,30 @@ func (s *rudderDataGraphClient) getModel(ctx context.Context, dataGraphID, model
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	result.Type = modelType
 	return &result, nil
 }
 
-// createModel is a common helper for creating entity or event models
-func (s *rudderDataGraphClient) createModel(ctx context.Context, dataGraphID string, req any, modelType string) (*Model, error) {
-	if dataGraphID == "" {
+// CreateModel creates a new model
+func (s *rudderDataGraphClient) CreateModel(ctx context.Context, req *CreateModelRequest) (*Model, error) {
+	if req.DataGraphID == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
+	if req.Type == "" {
+		return nil, fmt.Errorf("model type cannot be empty")
+	}
+	if req.Type != "entity" && req.Type != "event" {
+		return nil, fmt.Errorf("model type must be 'entity' or 'event'")
+	}
 
-	path := fmt.Sprintf("%s/%s/%s-models", dataGraphsBasePath, dataGraphID, modelType)
+	// Validate required fields based on type
+	if req.Type == "entity" && req.PrimaryID == "" {
+		return nil, fmt.Errorf("primaryId is required for entity models")
+	}
+	if req.Type == "event" && req.Timestamp == "" {
+		return nil, fmt.Errorf("timestamp is required for event models")
+	}
+
+	path := fmt.Sprintf("%s/%s/models", dataGraphsBasePath, req.DataGraphID)
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)
@@ -180,7 +123,7 @@ func (s *rudderDataGraphClient) createModel(ctx context.Context, dataGraphID str
 
 	resp, err := s.client.Do(ctx, "POST", path, bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("creating %s model: %w", modelType, err)
+		return nil, fmt.Errorf("creating model: %w", err)
 	}
 
 	var result Model
@@ -188,20 +131,33 @@ func (s *rudderDataGraphClient) createModel(ctx context.Context, dataGraphID str
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	result.Type = modelType
 	return &result, nil
 }
 
-// updateModel is a common helper for updating entity or event models
-func (s *rudderDataGraphClient) updateModel(ctx context.Context, dataGraphID, modelID string, req any, modelType string) (*Model, error) {
-	if dataGraphID == "" {
+// UpdateModel updates a model
+func (s *rudderDataGraphClient) UpdateModel(ctx context.Context, req *UpdateModelRequest) (*Model, error) {
+	if req.DataGraphID == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
-	if modelID == "" {
+	if req.ModelID == "" {
 		return nil, fmt.Errorf("model ID cannot be empty")
 	}
+	if req.Type == "" {
+		return nil, fmt.Errorf("model type cannot be empty")
+	}
+	if req.Type != "entity" && req.Type != "event" {
+		return nil, fmt.Errorf("model type must be 'entity' or 'event'")
+	}
 
-	path := fmt.Sprintf("%s/%s/%s-models/%s", dataGraphsBasePath, dataGraphID, modelType, modelID)
+	// Validate required fields based on type
+	if req.Type == "entity" && req.PrimaryID == "" {
+		return nil, fmt.Errorf("primaryId is required for entity models")
+	}
+	if req.Type == "event" && req.Timestamp == "" {
+		return nil, fmt.Errorf("timestamp is required for event models")
+	}
+
+	path := fmt.Sprintf("%s/%s/models/%s", dataGraphsBasePath, req.DataGraphID, req.ModelID)
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)
@@ -209,7 +165,7 @@ func (s *rudderDataGraphClient) updateModel(ctx context.Context, dataGraphID, mo
 
 	resp, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("updating %s model: %w", modelType, err)
+		return nil, fmt.Errorf("updating model: %w", err)
 	}
 
 	var result Model
@@ -217,47 +173,52 @@ func (s *rudderDataGraphClient) updateModel(ctx context.Context, dataGraphID, mo
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
-	result.Type = modelType
 	return &result, nil
 }
 
-// deleteModel is a common helper for deleting entity or event models
-func (s *rudderDataGraphClient) deleteModel(ctx context.Context, dataGraphID, modelID, modelType string) error {
-	if dataGraphID == "" {
+// DeleteModel deletes a model by ID
+func (s *rudderDataGraphClient) DeleteModel(ctx context.Context, req *DeleteModelRequest) error {
+	if req.DataGraphID == "" {
 		return fmt.Errorf("data graph ID cannot be empty")
 	}
-	if modelID == "" {
+	if req.ModelID == "" {
 		return fmt.Errorf("model ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/%s-models/%s", dataGraphsBasePath, dataGraphID, modelType, modelID)
+	path := fmt.Sprintf("%s/%s/models/%s", dataGraphsBasePath, req.DataGraphID, req.ModelID)
 	_, err := s.client.Do(ctx, "DELETE", path, nil)
 	if err != nil {
-		return fmt.Errorf("deleting %s model: %w", modelType, err)
+		return fmt.Errorf("deleting model: %w", err)
 	}
 
 	return nil
 }
 
-// setModelExternalID is a common helper for setting external IDs on entity or event models
-func (s *rudderDataGraphClient) setModelExternalID(ctx context.Context, dataGraphID, modelID, externalID, modelType string) error {
-	if dataGraphID == "" {
-		return fmt.Errorf("data graph ID cannot be empty")
+// SetModelExternalID sets the external ID for a model and returns the updated model
+func (s *rudderDataGraphClient) SetModelExternalID(ctx context.Context, req *SetModelExternalIDRequest) (*Model, error) {
+	if req.DataGraphID == "" {
+		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
-	if modelID == "" {
-		return fmt.Errorf("model ID cannot be empty")
+	if req.ModelID == "" {
+		return nil, fmt.Errorf("model ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/%s-models/%s/external-id", dataGraphsBasePath, dataGraphID, modelType, modelID)
-	data, err := json.Marshal(map[string]string{"externalId": externalID})
+	path := fmt.Sprintf("%s/%s/models/%s/external-id", dataGraphsBasePath, req.DataGraphID, req.ModelID)
+	data, err := json.Marshal(map[string]string{"externalId": req.ExternalID})
 	if err != nil {
-		return fmt.Errorf("marshalling external ID: %w", err)
+		return nil, fmt.Errorf("marshalling external ID: %w", err)
 	}
 
-	_, err = s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	resp, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("setting external ID: %w", err)
+		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
 
-	return nil
+	var result Model
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling response: %w", err)
+	}
+
+	return &result, nil
 }
+
