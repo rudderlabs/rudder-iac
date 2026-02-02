@@ -6,17 +6,16 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-// RelationshipResource represents a relationship resource (both entity and event)
+// RelationshipResource represents a relationship resource
 type RelationshipResource struct {
-	ID            string
-	DisplayName   string
-	Type          string                 // "entity" or "event"
-	DataGraphRef  *resources.PropertyRef // Parent data graph
-	FromModelRef  *resources.PropertyRef // Source model
-	ToModelRef    *resources.PropertyRef // Target model
-	SourceJoinKey string
-	TargetJoinKey string
-	Cardinality   string // only for entity relationships
+	ID             string
+	DisplayName    string
+	DataGraphRef   *resources.PropertyRef // Parent data graph
+	SourceModelRef *resources.PropertyRef // Source model
+	TargetModelRef *resources.PropertyRef // Target model
+	SourceJoinKey  string
+	TargetJoinKey  string
+	Cardinality    string // "one-to-one", "one-to-many", or "many-to-one"
 }
 
 // RelationshipState represents the remote state of a relationship

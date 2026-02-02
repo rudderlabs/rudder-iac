@@ -252,14 +252,17 @@ func (p *Provider) validateRelationshipSpec(spec *dgModel.RelationshipSpec) erro
 	if spec.DisplayName == "" {
 		return fmt.Errorf("display_name is required")
 	}
-	if spec.Type == "" {
-		return fmt.Errorf("type is required")
+	if spec.Cardinality == "" {
+		return fmt.Errorf("cardinality is required")
 	}
-	if spec.Type != "entity" && spec.Type != "event" {
-		return fmt.Errorf("type must be 'entity' or 'event', got %q", spec.Type)
+	// Validate cardinality value
+	validCardinalities := map[string]bool{
+		"one-to-one":  true,
+		"one-to-many": true,
+		"many-to-one": true,
 	}
-	if spec.Type == "entity" && spec.Cardinality == "" {
-		return fmt.Errorf("cardinality is required for entity relationships")
+	if !validCardinalities[spec.Cardinality] {
+		return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
 	}
 	if spec.Target == "" {
 		return fmt.Errorf("target is required")
@@ -290,15 +293,14 @@ func (p *Provider) extractRelationshipResource(dataGraphID, sourceModelID string
 	targetModelRef := relationship.CreateModelReference(targetModelURN)
 
 	return &dgModel.RelationshipResource{
-		ID:            spec.ID,
-		DisplayName:   spec.DisplayName,
-		Type:          spec.Type,
-		DataGraphRef:  dataGraphRef,
-		FromModelRef:  sourceModelRef,
-		ToModelRef:    targetModelRef,
-		SourceJoinKey: spec.SourceJoinKey,
-		TargetJoinKey: spec.TargetJoinKey,
-		Cardinality:   spec.Cardinality, // Empty for event relationships
+		ID:             spec.ID,
+		DisplayName:    spec.DisplayName,
+		DataGraphRef:   dataGraphRef,
+		SourceModelRef: sourceModelRef,
+		TargetModelRef: targetModelRef,
+		SourceJoinKey:  spec.SourceJoinKey,
+		TargetJoinKey:  spec.TargetJoinKey,
+		Cardinality:    spec.Cardinality,
 	}, nil
 }
 
