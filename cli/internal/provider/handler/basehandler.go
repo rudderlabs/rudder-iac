@@ -102,18 +102,25 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 	return collection, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) {
+func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 	workspaces := m.Workspaces
 	for _, workspaceMetadata := range workspaces {
 		workspaceId := workspaceMetadata.WorkspaceID
 		resources := workspaceMetadata.Resources
 		for _, resourceMetadata := range resources {
-			h.importMetadata[resourceMetadata.LocalID] = &importResourceInfo{
+			if err := resourceMetadata.Validate(); err != nil {
+				return fmt.Errorf("invalid import metadata for workspace '%s': %w", workspaceId, err)
+			}
+			if resourceMetadata.URN == "" {
+				return fmt.Errorf("urn field is required for import metadata in workspace '%s' (local_id is not supported)", workspaceId)
+			}
+			h.importMetadata[resourceMetadata.URN] = &importResourceInfo{
 				WorkspaceId: workspaceId,
 				RemoteId:    resourceMetadata.RemoteID,
 			}
 		}
 	}
+	return nil
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -175,7 +182,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 	}
 
 	if commonMetadata.Import != nil {
-		h.loadImportMetadata(commonMetadata.Import)
+		if err := h.loadImportMetadata(commonMetadata.Import); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
 	}
 
 	return nil

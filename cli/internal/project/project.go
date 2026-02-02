@@ -357,13 +357,21 @@ func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 	if metadata.Import != nil {
 		for _, workspace := range metadata.Import.Workspaces {
 			for _, resource := range workspace.Resources {
-				metadataIds = append(metadataIds, resource.LocalID)
+				// Extract ID from URN (format: "resourceType:resourceId") or use LocalID
+				id := resource.LocalID
+				if id == "" && resource.URN != "" {
+					parts := strings.SplitN(resource.URN, ":", 2)
+					if len(parts) == 2 {
+						id = parts[1]
+					}
+				}
+				metadataIds = append(metadataIds, id)
 			}
 		}
 
 		_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
 		if len(missingInSpec) > 0 {
-			return fmt.Errorf("local_id from import metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
+			return fmt.Errorf("import metadata id missing in spec: %s", strings.Join(missingInSpec, ", "))
 		}
 	}
 
