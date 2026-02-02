@@ -4,14 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
-
-// arrayIndexRegex matches array indices like [0], [1], etc.
-var arrayIndexRegex = regexp.MustCompile(`\[(\d+)\]`)
 
 var tagNameFunc = func(fld reflect.StructField) string {
 
@@ -37,32 +33,33 @@ var tagNameFunc = func(fld reflect.StructField) string {
 	return name
 }
 
-// NamespaceToJSONPointer converts validator's StructNamespace to JSON Pointer format.
-// Example: "Spec.inners[1].surname" → "/inners/1/surname"
-func namespaceToJSONPointer(namespace string) string {
-	// Remove root struct name (everything before first dot)
-	if idx := strings.Index(namespace, "."); idx != -1 {
-		namespace = namespace[idx+1:]
-	}
-
-	namespace = arrayIndexRegex.ReplaceAllString(namespace, "/$1")
-	namespace = strings.ReplaceAll(namespace, ".", "/")
-
-	return fmt.Sprintf("/%s", namespace)
+// CustomValidateRule is a validation rule
+// that is defined by the user and be added as a tag to the struct.
+// go-validator will then use the function to validate the field
+// on which the tag is added.
+type CustomValidateFunc struct {
+	Tag  string
+	Func validator.Func
 }
 
 // ValidateStruct validates a struct using go-playground/validator tags and returns
 // validation results with JSON Pointer references. The basePath is prepended to all
 // references to support nested struct validation (e.g., basePath="/metadata" for
 // validating metadata produces references like "/metadata/name").
-func ValidateStruct(data any, basePath string) ([]ValidationResult, error) {
-	results := []ValidationResult{}
+func ValidateStruct(data any, basePath string, funcs ...CustomValidateFunc) (validator.ValidationErrors, error) {
 
 	v := validator.New()
 	v.RegisterTagNameFunc(tagNameFunc)
 
-	if err := v.Struct(data); err != nil {
+	for _, fn := range funcs {
+		err := v.RegisterValidation(fn.Tag, fn.Func)
+		if err == nil {
+			continue
+		}
+		return nil, fmt.Errorf("registering validation rule: %w", err)
+	}
 
+	if err := v.Struct(data); err != nil {
 		// This check is needed because we can pass in a nil pointer to this function
 		// so the validator returns an invalid validation error.
 		var invalidValidationError *validator.InvalidValidationError
@@ -76,30 +73,8 @@ func ValidateStruct(data any, basePath string) ([]ValidationResult, error) {
 		var errs validator.ValidationErrors
 		errors.As(err, &errs)
 
-		for _, err := range errs {
-			reference := namespaceToJSONPointer(err.Namespace())
-			if basePath != "" {
-				reference = basePath + reference
-			}
-
-			results = append(results, ValidationResult{
-				Reference: reference,
-				Message:   getErrorMessage(err),
-			})
-		}
+		return errs, nil
 	}
 
-	return results, nil
-}
-
-func getErrorMessage(err validator.FieldError) string {
-	fieldName := err.Field()
-
-	switch err.ActualTag() {
-	case "required":
-		return fmt.Sprintf("'%s' is required", fieldName)
-
-	default:
-		return fmt.Sprintf("'%s' is not valid", fieldName)
-	}
+	return nil, nil
 }

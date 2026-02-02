@@ -2,6 +2,7 @@ package rules
 
 import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -31,7 +32,11 @@ var examples = rules.Examples{
 // Main validation function for property spec
 // which delegates the validation to the go-validator through struct tags.
 var validatePropertySpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.PropertySpec) []rules.ValidationResult {
-	result, err := rules.ValidateStruct(Spec, "")
+	validationErrors, err := rules.ValidateStruct(
+		Spec,
+		"",
+		getValidateFuncs(Version)..., // attach custom validate funcs specially for property specs
+	)
 
 	if err != nil {
 		return []rules.ValidationResult{
@@ -42,7 +47,7 @@ var validatePropertySpec = func(Kind string, Version string, Metadata map[string
 		}
 	}
 
-	return result
+	return funcs.ParseValidationErrors(validationErrors)
 }
 
 func NewPropertySpecSyntaxValidRule() rules.Rule {
@@ -54,4 +59,23 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 		[]string{"properties"},
 		validatePropertySpec,
 	)
+}
+
+// getValidateFuncs returns custom validate functions which the property spec employs
+// by adding requisite tags to fields in the spec struct
+func getValidateFuncs(_ string) []rules.CustomValidateFunc {
+	// TODO: we would need to create a different regex for reference validation
+	// based on the version of spec.
+	return []rules.CustomValidateFunc{
+		// primitive or reference validation on the type
+		funcs.NewPrimitiveOrReference([]string{
+			"string",
+			"number",
+			"integer",
+			"boolean",
+			"array",
+			"object",
+			"null",
+		}, funcs.BuildLegacyReferenceRegex([]string{"custom-types"})),
+	}
 }
