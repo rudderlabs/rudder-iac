@@ -595,7 +595,7 @@ func TestProviderParseSpec(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported kind")
 	})
 
-	t.Run("DelegatesToHandlerAndReturnsLocalIDs", func(t *testing.T) {
+	t.Run("DelegatesToHandlerAndReturnsURNs", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
 		parsed, err := provider.ParseSpec("test.yaml", &specs.Spec{
@@ -612,6 +612,9 @@ func TestProviderParseSpec(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, parsed)
+		expectedURN := resources.URN("orders-model", sqlmodel.ResourceType)
+		assert.ElementsMatch(t, []string{expectedURN}, parsed.URNs)
+		assert.Equal(t, sqlmodel.ResourceType, parsed.LegacyResourceType)
 		assert.ElementsMatch(t, []specs.LocalID{{ID: "orders-model", JSONPointerPath: "/spec/id"}}, parsed.LocalIDs)
 	})
 }

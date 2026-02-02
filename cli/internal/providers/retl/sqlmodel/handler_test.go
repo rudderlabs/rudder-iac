@@ -287,6 +287,13 @@ func TestSQLModelHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
+					// Convert expected IDs to URNs for comparison
+					expectedURNs := make([]string, len(tc.expectedLocalIDs))
+					for i, localID := range tc.expectedLocalIDs {
+						expectedURNs[i] = resources.URN(localID.ID, sqlmodel.ResourceType)
+					}
+					assert.Equal(t, expectedURNs, parsedSpec.URNs)
+					assert.Equal(t, sqlmodel.ResourceType, parsedSpec.LegacyResourceType)
 					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 				}
 			})

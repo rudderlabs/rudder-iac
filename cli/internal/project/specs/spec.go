@@ -95,7 +95,9 @@ type LocalID struct {
 }
 
 type ParsedSpec struct {
-	LocalIDs []LocalID
+	URNs               []string
+	LegacyResourceType string // For backward compatibility with local_id imports
+	LocalIDs           []LocalID
 }
 
 // New creates and validates a Spec from YAML data

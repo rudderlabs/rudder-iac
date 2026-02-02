@@ -54,7 +54,9 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 		return nil, fmt.Errorf("id not found in sql model spec")
 	}
 	return &specs.ParsedSpec{
-		LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
+		URNs:               []string{resources.URN(id, ResourceType)},
+		LegacyResourceType: ResourceType,
+		LocalIDs:           []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
 	}, nil
 }
 
