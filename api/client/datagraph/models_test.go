@@ -12,17 +12,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
+// Helper function to create string pointers
+func stringPtr(s string) *string {
+	return &s
+}
+
 // Entity Model Tests
 
-func TestCreateEntityModel(t *testing.T) {
+func TestCreateModel_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"User","tableRef":"users","primaryId":"id","root":true}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models", expected)
+			expected := `{"type":"entity","name":"User","tableRef":"users","primaryId":"id","root":true}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", expected)
 		},
 		ResponseStatus: 201,
 		ResponseBody: `{
 			"id": "em-456",
+			"type": "entity",
 			"name": "User",
 			"tableRef": "users",
 			"dataGraphId": "dg-123",
@@ -35,7 +42,7 @@ func TestCreateEntityModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateEntityModel(context.Background(), "dg-123", &datagraph.CreateEntityModelRequest{
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
 		Name:      "User",
 		TableRef:  "users",
 		PrimaryID: "id",
@@ -58,15 +65,16 @@ func TestCreateEntityModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestCreateEntityModelWithExternalID(t *testing.T) {
+func TestCreateModel_EntityWithExternalID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"User","tableRef":"users","externalId":"user-model","primaryId":"id","root":true}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models", expected)
+			expected := `{"type":"entity","name":"User","tableRef":"users","externalId":"user-model","primaryId":"id","root":true}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", expected)
 		},
 		ResponseStatus: 201,
 		ResponseBody: `{
 			"id": "em-456",
+			"type": "entity",
 			"name": "User",
 			"tableRef": "users",
 			"dataGraphId": "dg-123",
@@ -80,7 +88,7 @@ func TestCreateEntityModelWithExternalID(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateEntityModel(context.Background(), "dg-123", &datagraph.CreateEntityModelRequest{
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
 		Name:       "User",
 		TableRef:   "users",
 		ExternalID: "user-model",
@@ -105,14 +113,15 @@ func TestCreateEntityModelWithExternalID(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestGetEntityModel(t *testing.T) {
+func TestGetModel_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models/em-456", "")
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "em-456",
+			"type": "entity",
 			"name": "User",
 			"tableRef": "users",
 			"dataGraphId": "dg-123",
@@ -126,7 +135,7 @@ func TestGetEntityModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.GetEntityModel(context.Background(), "dg-123", "em-456")
+	result, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: "em-456"})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.Model{
@@ -145,15 +154,16 @@ func TestGetEntityModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestUpdateEntityModel(t *testing.T) {
+func TestUpdateModel_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Updated User","tableRef":"users_v2","primaryId":"user_id","root":false}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models/em-456", expected)
+			expected := `{"type":"entity","name":"Updated User","tableRef":"users_v2","primaryId":"user_id"}`
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "em-456",
+			"type": "entity",
 			"name": "Updated User",
 			"tableRef": "users_v2",
 			"dataGraphId": "dg-123",
@@ -166,7 +176,7 @@ func TestUpdateEntityModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.UpdateEntityModel(context.Background(), "dg-123", "em-456", &datagraph.UpdateEntityModelRequest{
+	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity", 
 		Name:      "Updated User",
 		TableRef:  "users_v2",
 		PrimaryID: "user_id",
@@ -189,10 +199,10 @@ func TestUpdateEntityModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestDeleteEntityModel(t *testing.T) {
+func TestDeleteModel_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models/em-456", "")
+			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456", "")
 		},
 		ResponseStatus: 204,
 		ResponseBody:   "",
@@ -200,22 +210,23 @@ func TestDeleteEntityModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	err := store.DeleteEntityModel(context.Background(), "dg-123", "em-456")
+	err := store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: "em-456"})
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestListEntityModels(t *testing.T) {
+func TestListModels_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models", "")
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"data": [
 				{
 					"id": "em-1",
+			"type": "entity",
 					"name": "User",
 					"tableRef": "users",
 					"dataGraphId": "dg-123",
@@ -226,6 +237,7 @@ func TestListEntityModels(t *testing.T) {
 				},
 				{
 					"id": "em-2",
+			"type": "entity",
 					"name": "Account",
 					"tableRef": "accounts",
 					"dataGraphId": "dg-123",
@@ -241,7 +253,7 @@ func TestListEntityModels(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.ListEntityModels(context.Background(), "dg-123", 0, 0, nil, nil)
+	result, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 0, PageSize: 0, ModelType: stringPtr("entity"), IsRoot: nil, HasExternalID: nil})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.ListModelsResponse{
@@ -275,12 +287,13 @@ func TestListEntityModels(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestListEntityModelsWithFilters(t *testing.T) {
+func TestListModels_EntityWithFilters(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			query := req.URL.Query()
 			return req.Method == "GET" &&
-				req.URL.Path == "/v2/data-graphs/dg-123/entity-models" &&
+				req.URL.Path == "/v2/data-graphs/dg-123/models" &&
+				query.Get("type") == "entity" &&
 				query.Get("isRoot") == "true" &&
 				query.Get("hasExternalId") == "true"
 		},
@@ -289,6 +302,7 @@ func TestListEntityModelsWithFilters(t *testing.T) {
 			"data": [
 				{
 					"id": "em-1",
+			"type": "entity",
 					"name": "User",
 					"tableRef": "users",
 					"dataGraphId": "dg-123",
@@ -305,7 +319,7 @@ func TestListEntityModelsWithFilters(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.ListEntityModels(context.Background(), "dg-123", 0, 0, boolPtr(true), boolPtr(true))
+	result, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 0, PageSize: 0, ModelType: stringPtr("entity"), IsRoot: boolPtr(true), HasExternalID: boolPtr(true)})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.ListModelsResponse{
@@ -329,15 +343,16 @@ func TestListEntityModelsWithFilters(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestSetEntityModelExternalID(t *testing.T) {
+func TestSetModelExternalID_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"externalId":"user-model"}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/entity-models/em-456/external-id", expected)
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/external-id", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "em-456",
+			"type": "entity",
 			"name": "User",
 			"tableRef": "users",
 			"dataGraphId": "dg-123",
@@ -351,23 +366,37 @@ func TestSetEntityModelExternalID(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	err := store.SetEntityModelExternalID(context.Background(), "dg-123", "em-456", "user-model")
+	result, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "em-456", ExternalID: "user-model"})
 	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.Model{
+		ID:          "em-456",
+		Name:        "User",
+		Type:        "entity",
+		TableRef:    "users",
+		DataGraphID: "dg-123",
+		ExternalID:  "user-model",
+		PrimaryID:   "id",
+		Root:        true,
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime2,
+	}, result)
 
 	httpClient.AssertNumberOfCalls()
 }
 
 // Event Model Tests
 
-func TestCreateEventModel(t *testing.T) {
+func TestCreateModel_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Purchase","tableRef":"purchases","timestamp":"event_time"}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models", expected)
+			expected := `{"type":"event","name":"Purchase","tableRef":"purchases","timestamp":"event_time"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", expected)
 		},
 		ResponseStatus: 201,
 		ResponseBody: `{
 			"id": "evm-789",
+			"type": "event",
 			"name": "Purchase",
 			"tableRef": "purchases",
 			"dataGraphId": "dg-123",
@@ -379,7 +408,7 @@ func TestCreateEventModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateEventModel(context.Background(), "dg-123", &datagraph.CreateEventModelRequest{
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
 		Name:      "Purchase",
 		TableRef:  "purchases",
 		Timestamp: "event_time",
@@ -400,15 +429,16 @@ func TestCreateEventModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestCreateEventModelWithDescription(t *testing.T) {
+func TestCreateModel_EventWithDescription(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Purchase","description":"Purchase events","tableRef":"purchases","timestamp":"event_time"}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models", expected)
+			expected := `{"type":"event","name":"Purchase","description":"Purchase events","tableRef":"purchases","timestamp":"event_time"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", expected)
 		},
 		ResponseStatus: 201,
 		ResponseBody: `{
 			"id": "evm-789",
+			"type": "event",
 			"name": "Purchase",
 			"description": "Purchase events",
 			"tableRef": "purchases",
@@ -421,7 +451,7 @@ func TestCreateEventModelWithDescription(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.CreateEventModel(context.Background(), "dg-123", &datagraph.CreateEventModelRequest{
+	result, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
 		Name:        "Purchase",
 		Description: "Purchase events",
 		TableRef:    "purchases",
@@ -444,14 +474,15 @@ func TestCreateEventModelWithDescription(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestGetEventModel(t *testing.T) {
+func TestGetModel_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models/evm-789", "")
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/evm-789", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "evm-789",
+			"type": "event",
 			"name": "Purchase",
 			"tableRef": "purchases",
 			"dataGraphId": "dg-123",
@@ -464,7 +495,7 @@ func TestGetEventModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.GetEventModel(context.Background(), "dg-123", "evm-789")
+	result, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: "evm-789"})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.Model{
@@ -482,15 +513,16 @@ func TestGetEventModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestUpdateEventModel(t *testing.T) {
+func TestUpdateModel_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"name":"Updated Purchase","tableRef":"purchases_v2","timestamp":"ts"}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models/evm-789", expected)
+			expected := `{"type":"event","name":"Updated Purchase","tableRef":"purchases_v2","timestamp":"ts"}`
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/evm-789", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "evm-789",
+			"type": "event",
 			"name": "Updated Purchase",
 			"tableRef": "purchases_v2",
 			"dataGraphId": "dg-123",
@@ -502,7 +534,7 @@ func TestUpdateEventModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.UpdateEventModel(context.Background(), "dg-123", "evm-789", &datagraph.UpdateEventModelRequest{
+	result, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event", 
 		Name:      "Updated Purchase",
 		TableRef:  "purchases_v2",
 		Timestamp: "ts",
@@ -523,10 +555,10 @@ func TestUpdateEventModel(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestDeleteEventModel(t *testing.T) {
+func TestDeleteModel_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models/evm-789", "")
+			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/evm-789", "")
 		},
 		ResponseStatus: 204,
 		ResponseBody:   "",
@@ -534,22 +566,23 @@ func TestDeleteEventModel(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	err := store.DeleteEventModel(context.Background(), "dg-123", "evm-789")
+	err := store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: "evm-789"})
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestListEventModels(t *testing.T) {
+func TestListModels_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models", "")
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs/dg-123/models", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"data": [
 				{
 					"id": "evm-1",
+			"type": "event",
 					"name": "Purchase",
 					"tableRef": "purchases",
 					"dataGraphId": "dg-123",
@@ -559,6 +592,7 @@ func TestListEventModels(t *testing.T) {
 				},
 				{
 					"id": "evm-2",
+			"type": "event",
 					"name": "PageView",
 					"tableRef": "page_views",
 					"dataGraphId": "dg-123",
@@ -573,7 +607,7 @@ func TestListEventModels(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.ListEventModels(context.Background(), "dg-123", 0, 0, nil)
+	result, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 0, PageSize: 0, ModelType: stringPtr("event"), HasExternalID: nil})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.ListModelsResponse{
@@ -605,12 +639,13 @@ func TestListEventModels(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestListEventModelsWithPagination(t *testing.T) {
+func TestListModels_EventWithPagination(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			query := req.URL.Query()
 			return req.Method == "GET" &&
-				req.URL.Path == "/v2/data-graphs/dg-123/event-models" &&
+				req.URL.Path == "/v2/data-graphs/dg-123/models" &&
+				query.Get("type") == "event" &&
 				query.Get("page") == "2" &&
 				query.Get("pageSize") == "10"
 		},
@@ -619,6 +654,7 @@ func TestListEventModelsWithPagination(t *testing.T) {
 			"data": [
 				{
 					"id": "evm-11",
+			"type": "event",
 					"name": "Event 11",
 					"tableRef": "events",
 					"dataGraphId": "dg-123",
@@ -627,13 +663,13 @@ func TestListEventModelsWithPagination(t *testing.T) {
 					"updatedAt": "2024-01-15T12:00:00Z"
 				}
 			],
-			"paging": {"total": 42, "next": "/v2/data-graphs/dg-123/event-models?page=3&pageSize=10"}
+			"paging": {"total": 42, "next": "/v2/data-graphs/dg-123/models?page=3&pageSize=10"}
 		}`,
 	})
 
 	store := newTestStore(t, httpClient)
 
-	result, err := store.ListEventModels(context.Background(), "dg-123", 2, 10, nil)
+	result, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 2, PageSize: 10, ModelType: stringPtr("event"), HasExternalID: nil})
 	require.NoError(t, err)
 
 	assert.Equal(t, &datagraph.ListModelsResponse{
@@ -649,21 +685,22 @@ func TestListEventModelsWithPagination(t *testing.T) {
 				UpdatedAt:   &testTime1,
 			},
 		},
-		Paging: client.Paging{Total: 42, Next: "/v2/data-graphs/dg-123/event-models?page=3&pageSize=10"},
+		Paging: client.Paging{Total: 42, Next: "/v2/data-graphs/dg-123/models?page=3&pageSize=10"},
 	}, result)
 
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestSetEventModelExternalID(t *testing.T) {
+func TestSetModelExternalID_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"externalId":"purchase-event"}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/event-models/evm-789/external-id", expected)
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/evm-789/external-id", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"id": "evm-789",
+			"type": "event",
 			"name": "Purchase",
 			"tableRef": "purchases",
 			"dataGraphId": "dg-123",
@@ -676,8 +713,20 @@ func TestSetEventModelExternalID(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	err := store.SetEventModelExternalID(context.Background(), "dg-123", "evm-789", "purchase-event")
+	result, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "evm-789", ExternalID: "purchase-event"})
 	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.Model{
+		ID:          "evm-789",
+		Name:        "Purchase",
+		Type:        "event",
+		TableRef:    "purchases",
+		DataGraphID: "dg-123",
+		ExternalID:  "purchase-event",
+		Timestamp:   "event_time",
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime2,
+	}, result)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -697,7 +746,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "CreateEntityModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.CreateEntityModel(context.Background(), "", &datagraph.CreateEntityModelRequest{
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "entity", 
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -709,7 +758,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "CreateEventModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.CreateEventModel(context.Background(), "", &datagraph.CreateEventModelRequest{
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "", Type: "event", 
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -721,7 +770,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "GetEntityModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.GetEntityModel(context.Background(), "", "em-456")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "", ModelID: "em-456"})
 				return err
 			},
 			expectedError: "data graph ID cannot be empty",
@@ -729,7 +778,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "GetEntityModel - empty model ID",
 			operation: func() error {
-				_, err := store.GetEntityModel(context.Background(), "dg-123", "")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: ""})
 				return err
 			},
 			expectedError: "model ID cannot be empty",
@@ -737,7 +786,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "GetEventModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.GetEventModel(context.Background(), "", "evm-789")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "", ModelID: "evm-789"})
 				return err
 			},
 			expectedError: "data graph ID cannot be empty",
@@ -745,7 +794,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "GetEventModel - empty model ID",
 			operation: func() error {
-				_, err := store.GetEventModel(context.Background(), "dg-123", "")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: ""})
 				return err
 			},
 			expectedError: "model ID cannot be empty",
@@ -753,7 +802,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEntityModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.UpdateEntityModel(context.Background(), "", "em-456", &datagraph.UpdateEntityModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "em-456", Type: "entity", 
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -765,7 +814,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEntityModel - empty model ID",
 			operation: func() error {
-				_, err := store.UpdateEntityModel(context.Background(), "dg-123", "", &datagraph.UpdateEntityModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "entity", 
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
@@ -777,7 +826,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEventModel - empty data graph ID",
 			operation: func() error {
-				_, err := store.UpdateEventModel(context.Background(), "", "evm-789", &datagraph.UpdateEventModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "", ModelID: "evm-789", Type: "event", 
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -789,7 +838,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "UpdateEventModel - empty model ID",
 			operation: func() error {
-				_, err := store.UpdateEventModel(context.Background(), "dg-123", "", &datagraph.UpdateEventModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "", Type: "event", 
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
@@ -801,63 +850,67 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "DeleteEntityModel - empty data graph ID",
 			operation: func() error {
-				return store.DeleteEntityModel(context.Background(), "", "em-456")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "", ModelID: "em-456"})
 			},
 			expectedError: "data graph ID cannot be empty",
 		},
 		{
 			name: "DeleteEntityModel - empty model ID",
 			operation: func() error {
-				return store.DeleteEntityModel(context.Background(), "dg-123", "")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: ""})
 			},
 			expectedError: "model ID cannot be empty",
 		},
 		{
 			name: "DeleteEventModel - empty data graph ID",
 			operation: func() error {
-				return store.DeleteEventModel(context.Background(), "", "evm-789")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "", ModelID: "evm-789"})
 			},
 			expectedError: "data graph ID cannot be empty",
 		},
 		{
 			name: "DeleteEventModel - empty model ID",
 			operation: func() error {
-				return store.DeleteEventModel(context.Background(), "dg-123", "")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: ""})
 			},
 			expectedError: "model ID cannot be empty",
 		},
 		{
 			name: "SetEntityModelExternalID - empty data graph ID",
 			operation: func() error {
-				return store.SetEntityModelExternalID(context.Background(), "", "em-456", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "", ModelID: "em-456", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "data graph ID cannot be empty",
 		},
 		{
 			name: "SetEntityModelExternalID - empty model ID",
 			operation: func() error {
-				return store.SetEntityModelExternalID(context.Background(), "dg-123", "", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "model ID cannot be empty",
 		},
 		{
 			name: "SetEventModelExternalID - empty data graph ID",
 			operation: func() error {
-				return store.SetEventModelExternalID(context.Background(), "", "evm-789", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "", ModelID: "evm-789", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "data graph ID cannot be empty",
 		},
 		{
 			name: "SetEventModelExternalID - empty model ID",
 			operation: func() error {
-				return store.SetEventModelExternalID(context.Background(), "dg-123", "", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "model ID cannot be empty",
 		},
 		{
 			name: "ListEntityModels - empty data graph ID",
 			operation: func() error {
-				_, err := store.ListEntityModels(context.Background(), "", 0, 0, nil, nil)
+				_, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "", ModelType: stringPtr("entity")})
 				return err
 			},
 			expectedError: "data graph ID cannot be empty",
@@ -865,7 +918,7 @@ func TestModelValidation(t *testing.T) {
 		{
 			name: "ListEventModels - empty data graph ID",
 			operation: func() error {
-				_, err := store.ListEventModels(context.Background(), "", 0, 0, nil)
+				_, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "", ModelType: stringPtr("event")})
 				return err
 			},
 			expectedError: "data graph ID cannot be empty",
@@ -896,156 +949,158 @@ func TestModelAPIErrors(t *testing.T) {
 		{
 			name:           "CreateEntityModel - API error",
 			method:         "POST",
-			path:           "/v2/data-graphs/dg-123/entity-models",
+			path:           "/v2/data-graphs/dg-123/models",
 			responseStatus: 400,
 			responseBody:   `{"error":"Bad Request"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.CreateEntityModel(context.Background(), "dg-123", &datagraph.CreateEntityModelRequest{
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "entity", 
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
 				})
 				return err
 			},
-			expectedError: "creating entity model",
+			expectedError: "creating model",
 		},
 		{
 			name:           "CreateEventModel - API error",
 			method:         "POST",
-			path:           "/v2/data-graphs/dg-123/event-models",
+			path:           "/v2/data-graphs/dg-123/models",
 			responseStatus: 400,
 			responseBody:   `{"error":"Bad Request"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.CreateEventModel(context.Background(), "dg-123", &datagraph.CreateEventModelRequest{
+				_, err := store.CreateModel(context.Background(), &datagraph.CreateModelRequest{DataGraphID: "dg-123", Type: "event", 
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
 				})
 				return err
 			},
-			expectedError: "creating event model",
+			expectedError: "creating model",
 		},
 		{
 			name:           "GetEntityModel - not found",
 			method:         "GET",
-			path:           "/v2/data-graphs/dg-123/entity-models/em-456",
+			path:           "/v2/data-graphs/dg-123/models/em-456",
 			responseStatus: 404,
 			responseBody:   `{"error":"Not Found"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.GetEntityModel(context.Background(), "dg-123", "em-456")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: "em-456"})
 				return err
 			},
-			expectedError: "getting entity model",
+			expectedError: "getting model",
 		},
 		{
 			name:           "GetEventModel - not found",
 			method:         "GET",
-			path:           "/v2/data-graphs/dg-123/event-models/evm-789",
+			path:           "/v2/data-graphs/dg-123/models/evm-789",
 			responseStatus: 404,
 			responseBody:   `{"error":"Not Found"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.GetEventModel(context.Background(), "dg-123", "evm-789")
+				_, err := store.GetModel(context.Background(), &datagraph.GetModelRequest{DataGraphID: "dg-123", ModelID: "evm-789"})
 				return err
 			},
-			expectedError: "getting event model",
+			expectedError: "getting model",
 		},
 		{
 			name:           "UpdateEntityModel - API error",
 			method:         "PUT",
-			path:           "/v2/data-graphs/dg-123/entity-models/em-456",
+			path:           "/v2/data-graphs/dg-123/models/em-456",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.UpdateEntityModel(context.Background(), "dg-123", "em-456", &datagraph.UpdateEntityModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "em-456", Type: "entity", 
 					Name:      "User",
 					TableRef:  "users",
 					PrimaryID: "id",
 				})
 				return err
 			},
-			expectedError: "updating entity model",
+			expectedError: "updating model",
 		},
 		{
 			name:           "UpdateEventModel - API error",
 			method:         "PUT",
-			path:           "/v2/data-graphs/dg-123/event-models/evm-789",
+			path:           "/v2/data-graphs/dg-123/models/evm-789",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.UpdateEventModel(context.Background(), "dg-123", "evm-789", &datagraph.UpdateEventModelRequest{
+				_, err := store.UpdateModel(context.Background(), &datagraph.UpdateModelRequest{DataGraphID: "dg-123", ModelID: "evm-789", Type: "event", 
 					Name:      "Purchase",
 					TableRef:  "purchases",
 					Timestamp: "ts",
 				})
 				return err
 			},
-			expectedError: "updating event model",
+			expectedError: "updating model",
 		},
 		{
 			name:           "DeleteEntityModel - API error",
 			method:         "DELETE",
-			path:           "/v2/data-graphs/dg-123/entity-models/em-456",
+			path:           "/v2/data-graphs/dg-123/models/em-456",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				return store.DeleteEntityModel(context.Background(), "dg-123", "em-456")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: "em-456"})
 			},
-			expectedError: "deleting entity model",
+			expectedError: "deleting model",
 		},
 		{
 			name:           "DeleteEventModel - API error",
 			method:         "DELETE",
-			path:           "/v2/data-graphs/dg-123/event-models/evm-789",
+			path:           "/v2/data-graphs/dg-123/models/evm-789",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				return store.DeleteEventModel(context.Background(), "dg-123", "evm-789")
+				return store.DeleteModel(context.Background(), &datagraph.DeleteModelRequest{DataGraphID: "dg-123", ModelID: "evm-789"})
 			},
-			expectedError: "deleting event model",
+			expectedError: "deleting model",
 		},
 		{
 			name:           "ListEntityModels - API error",
 			method:         "GET",
-			path:           "/v2/data-graphs/dg-123/entity-models",
+			path:           "/v2/data-graphs/dg-123/models",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.ListEntityModels(context.Background(), "dg-123", 0, 0, nil, nil)
+				_, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 0, PageSize: 0, ModelType: stringPtr("entity"), IsRoot: nil, HasExternalID: nil})
 				return err
 			},
-			expectedError: "listing entity models",
+			expectedError: "listing models",
 		},
 		{
 			name:           "ListEventModels - API error",
 			method:         "GET",
-			path:           "/v2/data-graphs/dg-123/event-models",
+			path:           "/v2/data-graphs/dg-123/models",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				_, err := store.ListEventModels(context.Background(), "dg-123", 0, 0, nil)
+				_, err := store.ListModels(context.Background(), &datagraph.ListModelsRequest{DataGraphID: "dg-123", Page: 0, PageSize: 0, ModelType: stringPtr("event"), HasExternalID: nil})
 				return err
 			},
-			expectedError: "listing event models",
+			expectedError: "listing models",
 		},
 		{
 			name:           "SetEntityModelExternalID - API error",
 			method:         "PUT",
-			path:           "/v2/data-graphs/dg-123/entity-models/em-456/external-id",
+			path:           "/v2/data-graphs/dg-123/models/em-456/external-id",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				return store.SetEntityModelExternalID(context.Background(), "dg-123", "em-456", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "em-456", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "setting external ID",
 		},
 		{
 			name:           "SetEventModelExternalID - API error",
 			method:         "PUT",
-			path:           "/v2/data-graphs/dg-123/event-models/evm-789/external-id",
+			path:           "/v2/data-graphs/dg-123/models/evm-789/external-id",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphClient) error {
-				return store.SetEventModelExternalID(context.Background(), "dg-123", "evm-789", "ext-123")
+				_, err := store.SetModelExternalID(context.Background(), &datagraph.SetModelExternalIDRequest{DataGraphID: "dg-123", ModelID: "evm-789", ExternalID: "ext-123"})
+				return err
 			},
 			expectedError: "setting external ID",
 		},

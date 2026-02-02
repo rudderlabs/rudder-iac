@@ -19,19 +19,13 @@ type MockDataGraphClient struct {
 	SetExternalIDFunc   func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error)
 
 	// Model methods
-	Models                       map[string]*dgClient.Model
-	ListEntityModelsFunc         func(ctx context.Context, dataGraphID string, page, pageSize int, isRoot *bool, hasExternalID *bool) (*dgClient.ListModelsResponse, error)
-	ListEventModelsFunc          func(ctx context.Context, dataGraphID string, page, pageSize int, hasExternalID *bool) (*dgClient.ListModelsResponse, error)
-	GetEntityModelFunc           func(ctx context.Context, dataGraphID, modelID string) (*dgClient.Model, error)
-	GetEventModelFunc            func(ctx context.Context, dataGraphID, modelID string) (*dgClient.Model, error)
-	CreateEntityModelFunc        func(ctx context.Context, dataGraphID string, req *dgClient.CreateEntityModelRequest) (*dgClient.Model, error)
-	CreateEventModelFunc         func(ctx context.Context, dataGraphID string, req *dgClient.CreateEventModelRequest) (*dgClient.Model, error)
-	UpdateEntityModelFunc        func(ctx context.Context, dataGraphID, modelID string, req *dgClient.UpdateEntityModelRequest) (*dgClient.Model, error)
-	UpdateEventModelFunc         func(ctx context.Context, dataGraphID, modelID string, req *dgClient.UpdateEventModelRequest) (*dgClient.Model, error)
-	DeleteEntityModelFunc        func(ctx context.Context, dataGraphID, modelID string) error
-	DeleteEventModelFunc         func(ctx context.Context, dataGraphID, modelID string) error
-	SetEntityModelExternalIDFunc func(ctx context.Context, dataGraphID, modelID, externalID string) error
-	SetEventModelExternalIDFunc  func(ctx context.Context, dataGraphID, modelID, externalID string) error
+	Models                  map[string]*dgClient.Model
+	ListModelsFunc          func(ctx context.Context, req *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error)
+	GetModelFunc            func(ctx context.Context, req *dgClient.GetModelRequest) (*dgClient.Model, error)
+	CreateModelFunc         func(ctx context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error)
+	UpdateModelFunc         func(ctx context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error)
+	DeleteModelFunc         func(ctx context.Context, req *dgClient.DeleteModelRequest) error
+	SetModelExternalIDFunc  func(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error)
 }
 
 // DataGraph methods
@@ -76,94 +70,49 @@ func (m *MockDataGraphClient) SetExternalID(ctx context.Context, id string, exte
 
 // Model methods
 
-func (m *MockDataGraphClient) ListEntityModels(ctx context.Context, dataGraphID string, page, pageSize int, isRoot *bool, hasExternalID *bool) (*dgClient.ListModelsResponse, error) {
-	if m.ListEntityModelsFunc != nil {
-		return m.ListEntityModelsFunc(ctx, dataGraphID, page, pageSize, isRoot, hasExternalID)
+func (m *MockDataGraphClient) ListModels(ctx context.Context, req *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+	if m.ListModelsFunc != nil {
+		return m.ListModelsFunc(ctx, req)
 	}
 	return &dgClient.ListModelsResponse{}, nil
 }
 
-func (m *MockDataGraphClient) ListEventModels(ctx context.Context, dataGraphID string, page, pageSize int, hasExternalID *bool) (*dgClient.ListModelsResponse, error) {
-	if m.ListEventModelsFunc != nil {
-		return m.ListEventModelsFunc(ctx, dataGraphID, page, pageSize, hasExternalID)
+func (m *MockDataGraphClient) GetModel(ctx context.Context, req *dgClient.GetModelRequest) (*dgClient.Model, error) {
+	if m.GetModelFunc != nil {
+		return m.GetModelFunc(ctx, req)
 	}
-	return &dgClient.ListModelsResponse{}, nil
-}
-
-func (m *MockDataGraphClient) GetEntityModel(ctx context.Context, dataGraphID, modelID string) (*dgClient.Model, error) {
-	if m.GetEntityModelFunc != nil {
-		return m.GetEntityModelFunc(ctx, dataGraphID, modelID)
-	}
-	if mdl, ok := m.Models[modelID]; ok && mdl.Type == "entity" {
+	if mdl, ok := m.Models[req.ModelID]; ok {
 		return mdl, nil
 	}
 	return nil, assert.AnError
 }
 
-func (m *MockDataGraphClient) GetEventModel(ctx context.Context, dataGraphID, modelID string) (*dgClient.Model, error) {
-	if m.GetEventModelFunc != nil {
-		return m.GetEventModelFunc(ctx, dataGraphID, modelID)
-	}
-	if mdl, ok := m.Models[modelID]; ok && mdl.Type == "event" {
-		return mdl, nil
-	}
-	return nil, assert.AnError
-}
-
-func (m *MockDataGraphClient) CreateEntityModel(ctx context.Context, dataGraphID string, req *dgClient.CreateEntityModelRequest) (*dgClient.Model, error) {
-	if m.CreateEntityModelFunc != nil {
-		return m.CreateEntityModelFunc(ctx, dataGraphID, req)
+func (m *MockDataGraphClient) CreateModel(ctx context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error) {
+	if m.CreateModelFunc != nil {
+		return m.CreateModelFunc(ctx, req)
 	}
 	return nil, nil
 }
 
-func (m *MockDataGraphClient) CreateEventModel(ctx context.Context, dataGraphID string, req *dgClient.CreateEventModelRequest) (*dgClient.Model, error) {
-	if m.CreateEventModelFunc != nil {
-		return m.CreateEventModelFunc(ctx, dataGraphID, req)
+func (m *MockDataGraphClient) UpdateModel(ctx context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+	if m.UpdateModelFunc != nil {
+		return m.UpdateModelFunc(ctx, req)
 	}
 	return nil, nil
 }
 
-func (m *MockDataGraphClient) UpdateEntityModel(ctx context.Context, dataGraphID, modelID string, req *dgClient.UpdateEntityModelRequest) (*dgClient.Model, error) {
-	if m.UpdateEntityModelFunc != nil {
-		return m.UpdateEntityModelFunc(ctx, dataGraphID, modelID, req)
+func (m *MockDataGraphClient) DeleteModel(ctx context.Context, req *dgClient.DeleteModelRequest) error {
+	if m.DeleteModelFunc != nil {
+		return m.DeleteModelFunc(ctx, req)
+	}
+	return nil
+}
+
+func (m *MockDataGraphClient) SetModelExternalID(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error) {
+	if m.SetModelExternalIDFunc != nil {
+		return m.SetModelExternalIDFunc(ctx, req)
 	}
 	return nil, nil
-}
-
-func (m *MockDataGraphClient) UpdateEventModel(ctx context.Context, dataGraphID, modelID string, req *dgClient.UpdateEventModelRequest) (*dgClient.Model, error) {
-	if m.UpdateEventModelFunc != nil {
-		return m.UpdateEventModelFunc(ctx, dataGraphID, modelID, req)
-	}
-	return nil, nil
-}
-
-func (m *MockDataGraphClient) DeleteEntityModel(ctx context.Context, dataGraphID, modelID string) error {
-	if m.DeleteEntityModelFunc != nil {
-		return m.DeleteEntityModelFunc(ctx, dataGraphID, modelID)
-	}
-	return nil
-}
-
-func (m *MockDataGraphClient) DeleteEventModel(ctx context.Context, dataGraphID, modelID string) error {
-	if m.DeleteEventModelFunc != nil {
-		return m.DeleteEventModelFunc(ctx, dataGraphID, modelID)
-	}
-	return nil
-}
-
-func (m *MockDataGraphClient) SetEntityModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error {
-	if m.SetEntityModelExternalIDFunc != nil {
-		return m.SetEntityModelExternalIDFunc(ctx, dataGraphID, modelID, externalID)
-	}
-	return nil
-}
-
-func (m *MockDataGraphClient) SetEventModelExternalID(ctx context.Context, dataGraphID, modelID, externalID string) error {
-	if m.SetEventModelExternalIDFunc != nil {
-		return m.SetEventModelExternalIDFunc(ctx, dataGraphID, modelID, externalID)
-	}
-	return nil
 }
 
 // MockURNResolver implements handler.URNResolver for testing

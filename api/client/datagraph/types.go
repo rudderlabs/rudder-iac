@@ -50,40 +50,71 @@ type Model struct {
 	Timestamp string `json:"timestamp,omitempty"`
 }
 
-// CreateEntityModelRequest is the request body for creating an entity model
-type CreateEntityModelRequest struct {
+// ListModelsRequest is the request for listing models
+type ListModelsRequest struct {
+	DataGraphID   string
+	Page          int
+	PageSize      int
+	ModelType     *string // nil (all models), "entity", or "event"
+	IsRoot        *bool
+	HasExternalID *bool
+}
+
+// GetModelRequest is the request for getting a model
+type GetModelRequest struct {
+	DataGraphID string
+	ModelID     string
+}
+
+// CreateModelRequest is the unified request for creating models
+// Type field determines whether this is an entity or event model
+type CreateModelRequest struct {
+	DataGraphID string `json:"-"` // Not sent in JSON body
+
+	Type        string `json:"type"` // "entity" or "event" - REQUIRED
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	TableRef    string `json:"tableRef"`
 	ExternalID  string `json:"externalId,omitempty"`
-	PrimaryID   string `json:"primaryId"`
-	Root        bool   `json:"root"`
+
+	// Entity model fields (required when Type == "entity")
+	PrimaryID string `json:"primaryId,omitempty"`
+	Root      bool   `json:"root,omitempty"`
+
+	// Event model fields (required when Type == "event")
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
-// CreateEventModelRequest is the request body for creating an event model
-type CreateEventModelRequest struct {
+// UpdateModelRequest is the unified request for updating models
+// Type field determines whether this is an entity or event model update
+type UpdateModelRequest struct {
+	DataGraphID string `json:"-"` // Not sent in JSON body
+	ModelID     string `json:"-"` // Not sent in JSON body
+
+	Type        string `json:"type"` // "entity" or "event" - REQUIRED
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	TableRef    string `json:"tableRef"`
-	ExternalID  string `json:"externalId,omitempty"`
-	Timestamp   string `json:"timestamp"`
+
+	// Entity model fields (required when Type == "entity")
+	PrimaryID string `json:"primaryId,omitempty"`
+	Root      bool   `json:"root,omitempty"`
+
+	// Event model fields (required when Type == "event")
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
-// UpdateEntityModelRequest is the request body for updating an entity model
-type UpdateEntityModelRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	TableRef    string `json:"tableRef"`
-	PrimaryID   string `json:"primaryId"`
-	Root        bool   `json:"root"`
+// DeleteModelRequest is the request for deleting a model
+type DeleteModelRequest struct {
+	DataGraphID string
+	ModelID     string
 }
 
-// UpdateEventModelRequest is the request body for updating an event model
-type UpdateEventModelRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	TableRef    string `json:"tableRef"`
-	Timestamp   string `json:"timestamp"`
+// SetModelExternalIDRequest is the request for setting a model's external ID
+type SetModelExternalIDRequest struct {
+	DataGraphID string
+	ModelID     string
+	ExternalID  string
 }
 
 // ListModelsResponse represents the paginated response from listing models
