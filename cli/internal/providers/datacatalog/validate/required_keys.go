@@ -736,7 +736,7 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeysV1(variants catalog
 			}
 		}
 
-		for j, propRef := range variant.Default {
+		for j, propRef := range variant.Default.Properties {
 			propReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, j)
 
 			if propRef.Property == "" {

@@ -474,7 +474,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, []any{"premium", "vip"}, variant.Cases[0].Match)
 		assert.Equal(t, "Basic User", variant.Cases[1].DisplayName)
 		assert.Equal(t, []any{"basic", "free"}, variant.Cases[1].Match)
-		assert.Equal(t, 1, len(variant.Default))
+		assert.Equal(t, 1, len(variant.Default.Properties))
 	})
 
 	t.Run("custom types with property references are extracted successfully", func(t *testing.T) {

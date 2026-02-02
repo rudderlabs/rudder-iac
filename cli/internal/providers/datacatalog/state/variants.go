@@ -256,7 +256,7 @@ func (v *Variant) FromLocalCatalogVariantV1(
 		})
 	}
 
-	v.Default = lo.Map(localVariant.Default, func(localProp localcatalog.PropertyReferenceV1, _ int) PropertyReference {
+	v.Default = lo.Map(localVariant.Default.Properties, func(localProp localcatalog.PropertyReferenceV1, _ int) PropertyReference {
 		return PropertyReference{
 			ID: resources.PropertyRef{
 				URN:      urnFromRef(localProp.Property),

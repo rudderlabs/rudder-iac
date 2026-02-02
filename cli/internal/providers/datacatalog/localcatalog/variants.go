@@ -30,10 +30,14 @@ type PropertyReference struct {
 type VariantsV1 []VariantV1
 
 type VariantV1 struct {
-	Type          string                `json:"type"`
-	Discriminator string                `json:"discriminator"`
-	Cases         []VariantCaseV1       `json:"cases"`
-	Default       []PropertyReferenceV1 `json:"default"`
+	Type          string              `json:"type"`
+	Discriminator string              `json:"discriminator"`
+	Cases         []VariantCaseV1     `json:"cases"`
+	Default       DefaultPropertiesV1 `json:"default"`
+}
+
+type DefaultPropertiesV1 struct {
+	Properties []PropertyReferenceV1 `json:"properties"`
 }
 
 type VariantCaseV1 struct {
@@ -77,9 +81,9 @@ func (v *VariantV1) FromV0(v0 Variant) error {
 
 	// Convert default from V0 to V1
 	if len(v0.Default) > 0 {
-		v.Default = make([]PropertyReferenceV1, 0, len(v0.Default))
+		v.Default.Properties = make([]PropertyReferenceV1, 0, len(v0.Default))
 		for _, v0Default := range v0.Default {
-			v.Default = append(v.Default, PropertyReferenceV1{
+			v.Default.Properties = append(v.Default.Properties, PropertyReferenceV1{
 				Property: v0Default.Ref,
 				Required: v0Default.Required,
 			})
