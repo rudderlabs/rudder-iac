@@ -20,8 +20,6 @@ type ExperimentalConfig struct {
 	ValidationFramework bool `mapstructure:"validationFramework"`
 	// DataGraph enables data graph operations (sync, validate, import)
 	DataGraph bool `mapstructure:"dataGraph"`
-	// ValidationFramework enables the new validation framework with rule-based validation
-	ValidationFramework bool `mapstructure:"validationFramework"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
