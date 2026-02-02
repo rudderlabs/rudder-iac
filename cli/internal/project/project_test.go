@@ -361,7 +361,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1", "id2"},
 			},
 			expectedError: true,
-			errorContains: "local_id from import metadata missing in spec: id3",
+			errorContains: "import metadata id missing in spec: id3",
 		},
 		{
 			name: "success - missing IDs in import metadata (created instead of imported)",
@@ -492,7 +492,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				ExternalIDs: []string{"id1"},
 			},
 			expectedError: true,
-			errorContains: "local_id from import metadata missing in spec: id2, id3",
+			errorContains: "import metadata id missing in spec: id2, id3",
 		},
 		{
 			name: "success - no import metadata key",

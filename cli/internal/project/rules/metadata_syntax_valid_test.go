@@ -87,7 +87,11 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{"'workspace_id' is required"},
 		},
 		{
-			name: "import with missing local_id in resource",
+			// Note: The case of missing both local_id and urn is validated by Metadata.Validate()
+			// at the spec validation layer, not by struct validation tags. This test verifies
+			// that struct validation passes when only remote_id is provided (the conditional
+			// requirement of either local_id or urn is checked elsewhere).
+			name: "import with only remote_id (no local_id or urn) - passes struct validation",
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -105,9 +109,9 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
-			expectedMsgs:   []string{"'local_id' is required"},
+			expectedErrors: 0,
+			expectedRefs:   nil,
+			expectedMsgs:   nil,
 		},
 		{
 			name: "import with missing remote_id in resource",
