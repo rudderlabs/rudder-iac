@@ -123,28 +123,42 @@ type ListModelsResponse struct {
 	Paging client.Paging `json:"paging"`
 }
 
-// Relationship represents both entity and event relationships from the API
-// Type field differentiates between "entity" and "event"
+// Relationship represents a relationship in the data graph
 type Relationship struct {
 	ID            string     `json:"id,omitempty"`
 	Name          string     `json:"name"`
-	Type          string     // "entity" or "event" - populated by client, not from API
-	Cardinality   string     `json:"cardinality,omitempty"`   // only for entity relationships
-	SourceModelID string     `json:"sourceModelId"`           // Source model ID
-	TargetModelID string     `json:"targetModelId"`           // Target model ID
-	SourceJoinKey string     `json:"sourceJoinKey"`           // Join column in source
-	TargetJoinKey string     `json:"targetJoinKey"`           // Join column in target
-	DataGraphID   string     `json:"dataGraphId,omitempty"`   // Parent data graph ID from API
-	WorkspaceID   string     `json:"workspaceId,omitempty"`   // Workspace ID from API
+	Cardinality   string     `json:"cardinality"`
+	SourceModelID string     `json:"sourceModelId"`
+	TargetModelID string     `json:"targetModelId"`
+	SourceJoinKey string     `json:"sourceJoinKey"`
+	TargetJoinKey string     `json:"targetJoinKey"`
+	DataGraphID   string     `json:"dataGraphId,omitempty"`
+	WorkspaceID   string     `json:"workspaceId,omitempty"`
 	ExternalID    string     `json:"externalId,omitempty"`
 	CreatedAt     *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt     *time.Time `json:"updatedAt,omitempty"`
 }
 
-// CreateRelationshipRequest is the request body for creating relationships
+// ListRelationshipsRequest is the request for listing relationships
+type ListRelationshipsRequest struct {
+	DataGraphID   string
+	Page          int
+	PageSize      int
+	SourceModelID *string
+	HasExternalID *bool
+}
+
+// GetRelationshipRequest is the request for getting a relationship
+type GetRelationshipRequest struct {
+	DataGraphID    string
+	RelationshipID string
+}
+
+// CreateRelationshipRequest is the request for creating a relationship
 type CreateRelationshipRequest struct {
+	DataGraphID   string `json:"-"` // Path parameter
 	Name          string `json:"name"`
-	Cardinality   string `json:"cardinality,omitempty"` // only for entity relationships
+	Cardinality   string `json:"cardinality"`
 	SourceModelID string `json:"sourceModelId"`
 	TargetModelID string `json:"targetModelId"`
 	SourceJoinKey string `json:"sourceJoinKey"`
@@ -152,14 +166,29 @@ type CreateRelationshipRequest struct {
 	ExternalID    string `json:"externalId,omitempty"`
 }
 
-// UpdateRelationshipRequest is the request body for updating relationships
+// UpdateRelationshipRequest is the request for updating a relationship
 type UpdateRelationshipRequest struct {
-	Name          string `json:"name"`
-	Cardinality   string `json:"cardinality,omitempty"` // only for entity relationships
-	SourceModelID string `json:"sourceModelId"`
-	TargetModelID string `json:"targetModelId"`
-	SourceJoinKey string `json:"sourceJoinKey"`
-	TargetJoinKey string `json:"targetJoinKey"`
+	DataGraphID    string `json:"-"` // Path parameter
+	RelationshipID string `json:"-"` // Path parameter
+	Name           string `json:"name"`
+	Cardinality    string `json:"cardinality"`
+	SourceModelID  string `json:"sourceModelId"`
+	TargetModelID  string `json:"targetModelId"`
+	SourceJoinKey  string `json:"sourceJoinKey"`
+	TargetJoinKey  string `json:"targetJoinKey"`
+}
+
+// DeleteRelationshipRequest is the request for deleting a relationship
+type DeleteRelationshipRequest struct {
+	DataGraphID    string
+	RelationshipID string
+}
+
+// SetRelationshipExternalIDRequest is the request for setting a relationship's external ID
+type SetRelationshipExternalIDRequest struct {
+	DataGraphID    string
+	RelationshipID string
+	ExternalID     string
 }
 
 // ListRelationshipsResponse represents the paginated response from listing relationships
