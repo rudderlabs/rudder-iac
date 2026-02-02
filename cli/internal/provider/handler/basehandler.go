@@ -203,7 +203,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resour
 		opts := []resources.ResourceOpts{
 			resources.WithRawData(s),
 		}
-		if importMetadata, ok := h.importMetadata[resourceId]; ok {
+		// Construct URN to look up import metadata (keyed by URN, not resourceId)
+		urn := resources.URN(resourceId, h.metadata.ResourceType)
+		if importMetadata, ok := h.importMetadata[urn]; ok {
 			opts = append(opts, resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId))
 		}
 		r := resources.NewResource(
