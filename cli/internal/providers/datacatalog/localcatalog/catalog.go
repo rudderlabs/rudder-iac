@@ -207,9 +207,9 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-
 	var (
-		parsedSpec specs.ParsedSpec
+		parsedSpec   specs.ParsedSpec
+		resourceType string
 	)
 
 	var idArray []any
@@ -221,6 +221,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, properties not found in spec", s.Kind)
 		}
 		idArray = properties
+		resourceType = "property"
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -228,6 +229,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, events not found in spec", s.Kind)
 		}
 		idArray = events
+		resourceType = "event"
 
 	case KindTrackingPlans:
 		trackingPlans, ok := s.Spec["id"].(string)
@@ -237,6 +239,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		idArray = []any{map[string]any{
 			"id": trackingPlans,
 		}}
+		resourceType = "tracking-plan"
 
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
@@ -244,6 +247,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, custom types not found in spec", s.Kind)
 		}
 		idArray = customTypes
+		resourceType = "custom-type"
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -251,6 +255,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, categories not found in spec", s.Kind)
 		}
 		idArray = categories
+		resourceType = "category"
 	}
 
 	for _, id := range idArray {
@@ -262,9 +267,10 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
+		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(id, resourceType))
 	}
 
+	parsedSpec.LegacyResourceType = resourceType
 	return &parsedSpec, nil
 }
 

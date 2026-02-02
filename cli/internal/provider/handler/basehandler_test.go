@@ -62,8 +62,8 @@ spec:
 
 		err := proj.Load("dummy/path")
 		require.Error(t, err, "local_id-only import metadata should be rejected")
-		assert.Contains(t, err.Error(), "urn field is required")
-		assert.Contains(t, err.Error(), "local_id is not supported")
+		assert.Contains(t, err.Error(), "local_id")
+		assert.Contains(t, err.Error(), "only supports urn")
 	})
 
 	t.Run("rejects empty URN and local_id", func(t *testing.T) {

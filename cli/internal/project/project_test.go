@@ -44,15 +44,6 @@ func TestNewProject_Load_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "custom loader called")
 }
 
-// func TestSomething(t *testing.T) {
-// 	spec := specs.Spec{Kind: "properties", Version: "rudder/v0.1"}
-// 	mockProvider := testutils.NewMockProvider(nil, nil)
-
-// 	proj := project.New(mockProvider)
-// 	proj.Load("")
-
-// }
-
 func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
 
@@ -302,6 +293,18 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 func TestProject_ValidateSpec(t *testing.T) {
 	t.Parallel()
 
+	// Test resource type for URN construction
+	const testResourceType = "test-resource"
+
+	// Helper to construct URNs for test IDs
+	toURNs := func(ids ...string) []string {
+		urns := make([]string, len(ids))
+		for i, id := range ids {
+			urns[i] = resources.URN(id, testResourceType)
+		}
+		return urns
+	}
+
 	cases := []struct {
 		name          string
 		spec          *specs.Spec
@@ -310,7 +313,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "success - all import metadata IDs match external IDs",
+			name: "success - all import metadata IDs match URNs (using local_id)",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -334,7 +337,8 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2"},
+				URNs:               toURNs("id1", "id2"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: false,
 		},
@@ -367,10 +371,11 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2"},
+				URNs:               toURNs("id1", "id2"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: true,
-			errorContains: "import metadata id missing in spec: id3",
+			errorContains: "import metadata URN",
 		},
 		{
 			name: "success - missing IDs in import metadata (created instead of imported)",
@@ -393,12 +398,13 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2", "id3"},
+				URNs:               toURNs("id1", "id2", "id3"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: false,
 		},
 		{
-			name: "success - empty both external IDs and import metadata",
+			name: "success - empty both URNs and import metadata",
 			spec: &specs.Spec{
 				Kind: "Source",
 				Metadata: map[string]any{
@@ -408,7 +414,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
+				URNs: []string{},
 			},
 			expectedError: false,
 		},
@@ -421,7 +427,8 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1"},
+				URNs:               toURNs("id1"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: true,
 			errorContains: "failed to decode metadata",
@@ -460,7 +467,8 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2", "id3"},
+				URNs:               toURNs("id1", "id2", "id3"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: false,
 		},
@@ -498,10 +506,11 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1"},
+				URNs:               toURNs("id1"),
+				LegacyResourceType: testResourceType,
 			},
 			expectedError: true,
-			errorContains: "import metadata id missing in spec: id2, id3",
+			errorContains: "import metadata URN",
 		},
 		{
 			name: "success - no import metadata key",
@@ -510,9 +519,62 @@ func TestProject_ValidateSpec(t *testing.T) {
 				Metadata: map[string]any{},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
+				URNs: []string{},
 			},
 			expectedError: false,
+		},
+		{
+			name: "success - using URN field directly in import metadata",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"urn":       resources.URN("id1", testResourceType),
+										"remote_id": "remote1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				URNs: toURNs("id1"),
+				// No LegacyResourceType needed when using URN directly
+			},
+			expectedError: false,
+		},
+		{
+			name: "error - local_id used without LegacyResourceType",
+			spec: &specs.Spec{
+				Kind: "Source",
+				Metadata: map[string]any{
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			parsedSpec: &specs.ParsedSpec{
+				URNs: toURNs("id1"),
+				// LegacyResourceType not set - should fail
+			},
+			expectedError: true,
+			errorContains: "local_id",
 		},
 	}
 

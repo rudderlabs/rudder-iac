@@ -124,20 +124,24 @@ func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.Work
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType := h.metadata.ResourceType
+
 	// First, try to extract a single "id" field
 	if id, ok := s.Spec["id"].(string); ok {
-		return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+		return &specs.ParsedSpec{
+			URNs: []string{resources.URN(id, resourceType)},
+		}, nil
 	}
 
 	// If the spec has a single field that is an array, extract IDs from array elements
 	if len(s.Spec) == 1 {
 		for _, value := range s.Spec {
 			if arr, ok := value.([]interface{}); ok {
-				externalIDs := make([]string, 0, len(arr))
+				urns := make([]string, 0, len(arr))
 				for i, item := range arr {
 					if itemMap, ok := item.(map[string]interface{}); ok {
 						if id, ok := itemMap["id"].(string); ok {
-							externalIDs = append(externalIDs, id)
+							urns = append(urns, resources.URN(id, resourceType))
 						} else {
 							return nil, fmt.Errorf("array item at index %d does not have an 'id' field", i)
 						}
@@ -145,7 +149,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 						return nil, fmt.Errorf("array item at index %d is not a map", i)
 					}
 				}
-				return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
+				return &specs.ParsedSpec{URNs: urns}, nil
 			}
 		}
 	}

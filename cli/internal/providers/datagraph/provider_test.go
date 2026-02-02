@@ -498,9 +498,16 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
 
-	// Should return data graph ID plus all inline model IDs and relationship IDs
-	expectedIDs := []string{"my-data-graph", "user", "order", "purchase", "user-orders", "purchase-user"}
-	assert.ElementsMatch(t, expectedIDs, parsed.ExternalIDs)
+	// Should return URNs for data graph, all inline models, and relationships
+	expectedURNs := []string{
+		resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType),
+		resources.URN("user", modelHandler.HandlerMetadata.ResourceType),
+		resources.URN("order", modelHandler.HandlerMetadata.ResourceType),
+		resources.URN("purchase", modelHandler.HandlerMetadata.ResourceType),
+		resources.URN("user-orders", relationshipHandler.HandlerMetadata.ResourceType),
+		resources.URN("purchase-user", relationshipHandler.HandlerMetadata.ResourceType),
+	}
+	assert.ElementsMatch(t, expectedURNs, parsed.URNs)
 }
 
 func TestLoadSpec_RelationshipCardinalityConstraints(t *testing.T) {
