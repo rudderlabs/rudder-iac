@@ -53,7 +53,10 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 	if !ok {
 		return nil, fmt.Errorf("id not found in sql model spec")
 	}
-	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+	return &specs.ParsedSpec{
+		URNs:               []string{resources.URN(id, ResourceType)},
+		LegacyResourceType: ResourceType,
+	}, nil
 }
 
 // LoadSpec loads and validates a SQL Model spec

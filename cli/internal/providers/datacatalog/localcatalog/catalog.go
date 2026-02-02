@@ -208,11 +208,11 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	var parsedSpec specs.ParsedSpec
-
 	var (
-		idArray  []any
-		basePath string
+		parsedSpec   specs.ParsedSpec
+		idArray      []any
+		basePath     string
+		resourceType string
 	)
 
 	switch s.Kind {
@@ -223,6 +223,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = properties
 		basePath = "/spec/properties"
+		resourceType = "property"
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -231,13 +232,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 		basePath = "/spec/events"
+		resourceType = "event"
 
 	case KindTrackingPlans, KindTrackingPlansV1:
 		tpID, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
-		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, tpID)
+		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(tpID, "tracking-plan"))
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
 			ID:              tpID,
 			JSONPointerPath: "/spec/id",
@@ -251,6 +253,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = customTypes
 		basePath = "/spec/types"
+		resourceType = "custom-type"
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -259,6 +262,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = categories
 		basePath = "/spec/categories"
+		resourceType = "category"
 	}
 
 	for i, item := range idArray {
@@ -270,13 +274,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
+		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(id, resourceType))
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
 			ID:              id,
 			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
 		})
 	}
 
+	parsedSpec.LegacyResourceType = resourceType
 	return &parsedSpec, nil
 }
 
