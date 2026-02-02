@@ -231,6 +231,43 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			expectError: true,
 			errorText:   "failed to decode metadata",
 		},
+		{
+			name: "valid metadata with URN-based import",
+			metadata: map[string]any{
+				"name": "test-project",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"urn":       "data-graph:my-graph",
+									"remote_id": "remote-1",
+								},
+								map[string]any{
+									"urn":       "model:user-model",
+									"remote_id": "remote-2",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: Metadata{
+				Name: "test-project",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+								{URN: "model:user-model", RemoteID: "remote-2"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
