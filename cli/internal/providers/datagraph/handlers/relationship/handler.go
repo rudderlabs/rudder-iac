@@ -59,16 +59,16 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.RelationshipResource, g
 	if resource.DisplayName == "" {
 		return fmt.Errorf("display_name is required")
 	}
-	if resource.Type != "entity" && resource.Type != "event" {
-		return fmt.Errorf("type must be 'entity' or 'event'")
+	if resource.Cardinality == "" {
+		return fmt.Errorf("cardinality is required")
 	}
 	if resource.DataGraphRef == nil {
 		return fmt.Errorf("data_graph reference is required")
 	}
-	if resource.FromModelRef == nil {
+	if resource.SourceModelRef == nil {
 		return fmt.Errorf("source model reference is required")
 	}
-	if resource.ToModelRef == nil {
+	if resource.TargetModelRef == nil {
 		return fmt.Errorf("target model reference is required")
 	}
 	if resource.SourceJoinKey == "" {
@@ -78,37 +78,59 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.RelationshipResource, g
 		return fmt.Errorf("target_join_key is required")
 	}
 
-	// Type-specific validation
-	if resource.Type == "entity" {
-		if resource.Cardinality == "" {
-			return fmt.Errorf("cardinality is required for entity relationships")
-		}
-		// Validate cardinality value
-		validCardinalities := map[string]bool{
-			"one-to-one":  true,
-			"one-to-many": true,
-			"many-to-one": true,
-		}
-		if !validCardinalities[resource.Cardinality] {
-			return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
-		}
-	} else if resource.Type == "event" {
-		if resource.Cardinality != "" {
-			return fmt.Errorf("cardinality should not be specified for event relationships")
-		}
-	}
-
 	// Validate that the referenced data graph exists
 	if _, exists := graph.GetResource(resource.DataGraphRef.URN); !exists {
 		return fmt.Errorf("referenced data graph %s does not exist", resource.DataGraphRef.URN)
 	}
 
-	// Validate that the referenced models exist
-	if _, exists := graph.GetResource(resource.FromModelRef.URN); !exists {
-		return fmt.Errorf("referenced source model %s does not exist", resource.FromModelRef.URN)
+	// Validate that the referenced models exist and get both for validation
+	sourceModelRes, exists := graph.GetResource(resource.SourceModelRef.URN)
+	if !exists {
+		return fmt.Errorf("referenced source model %s does not exist", resource.SourceModelRef.URN)
 	}
-	if _, exists := graph.GetResource(resource.ToModelRef.URN); !exists {
-		return fmt.Errorf("referenced target model %s does not exist", resource.ToModelRef.URN)
+	targetModelRes, exists := graph.GetResource(resource.TargetModelRef.URN)
+	if !exists {
+		return fmt.Errorf("referenced target model %s does not exist", resource.TargetModelRef.URN)
+	}
+
+	// Get source and target models to determine relationship constraints
+	sourceModel, ok := sourceModelRes.RawData().(*dgModel.ModelResource)
+	if !ok {
+		return fmt.Errorf("source model reference does not point to a valid model resource")
+	}
+	targetModel, ok := targetModelRes.RawData().(*dgModel.ModelResource)
+	if !ok {
+		return fmt.Errorf("target model reference does not point to a valid model resource")
+	}
+
+	// Validate cardinality based on source and target model types
+	if sourceModel.Type == "event" {
+		// Event models cannot connect to other event models
+		if targetModel.Type == "event" {
+			return fmt.Errorf("event models cannot be connected to other event models")
+		}
+		// Event models can only connect to entity models with many-to-one cardinality
+		if resource.Cardinality != "many-to-one" {
+			return fmt.Errorf("relationships from event models must have cardinality 'many-to-one', got %q", resource.Cardinality)
+		}
+	} else {
+		// Entity models as source
+		if targetModel.Type == "event" {
+			// Entity to event relationships can only have one-to-many cardinality
+			if resource.Cardinality != "one-to-many" {
+				return fmt.Errorf("relationships from entity models to event models must have cardinality 'one-to-many', got %q", resource.Cardinality)
+			}
+		} else {
+			// Entity to entity relationships can have any valid cardinality
+			validCardinalities := map[string]bool{
+				"one-to-one":  true,
+				"one-to-many": true,
+				"many-to-one": true,
+			}
+			if !validCardinalities[resource.Cardinality] {
+				return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
+			}
+		}
 	}
 
 	return nil
@@ -248,22 +270,15 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteRelationship, urnRe
 	fromModelRef := CreateModelReference(fromModelURN)
 	toModelRef := CreateModelReference(toModelURN)
 
-	// Infer type from cardinality: if cardinality is present -> entity, otherwise -> event
-	relationshipType := "event"
-	if remote.Cardinality != "" {
-		relationshipType = "entity"
-	}
-
 	resource := &dgModel.RelationshipResource{
-		ID:            remote.ExternalID,
-		DisplayName:   remote.Name,
-		Type:          relationshipType,
-		DataGraphRef:  dataGraphRef,
-		FromModelRef:  fromModelRef,
-		ToModelRef:    toModelRef,
-		SourceJoinKey: remote.SourceJoinKey,
-		TargetJoinKey: remote.TargetJoinKey,
-		Cardinality:   remote.Cardinality,
+		ID:             remote.ExternalID,
+		DisplayName:    remote.Name,
+		DataGraphRef:   dataGraphRef,
+		SourceModelRef: fromModelRef,
+		TargetModelRef: toModelRef,
+		SourceJoinKey:  remote.SourceJoinKey,
+		TargetJoinKey:  remote.TargetJoinKey,
+		Cardinality:    remote.Cardinality,
 	}
 
 	state := &dgModel.RelationshipState{
@@ -275,8 +290,8 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteRelationship, urnRe
 
 func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.RelationshipResource) (*dgModel.RelationshipState, error) {
 	dataGraphRemoteID := data.DataGraphRef.Value
-	fromModelRemoteID := data.FromModelRef.Value
-	toModelRemoteID := data.ToModelRef.Value
+	fromModelRemoteID := data.SourceModelRef.Value
+	toModelRemoteID := data.TargetModelRef.Value
 
 	req := &dgClient.CreateRelationshipRequest{
 		DataGraphID:   dataGraphRemoteID,
@@ -301,8 +316,8 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.RelationshipReso
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.RelationshipResource, oldData *dgModel.RelationshipResource, oldState *dgModel.RelationshipState) (*dgModel.RelationshipState, error) {
 	dataGraphRemoteID := oldData.DataGraphRef.Value
-	fromModelRemoteID := newData.FromModelRef.Value
-	toModelRemoteID := newData.ToModelRef.Value
+	fromModelRemoteID := newData.SourceModelRef.Value
+	toModelRemoteID := newData.TargetModelRef.Value
 
 	req := &dgClient.UpdateRelationshipRequest{
 		DataGraphID:    dataGraphRemoteID,
