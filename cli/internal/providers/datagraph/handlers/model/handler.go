@@ -30,6 +30,12 @@ type HandlerImpl struct {
 }
 
 // NewHandler creates a new BaseHandler for model resources
+
+// stringPtr returns a pointer to the given string
+func stringPtr(s string) *string {
+	return &s
+}
+
 func NewHandler(client dgClient.DataGraphClient) *ModelHandler {
 	h := &HandlerImpl{client: client}
 	return handler.NewHandler(h)
@@ -96,7 +102,7 @@ func (h *HandlerImpl) listAllEntityModels(ctx context.Context, dataGraphID strin
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListEntityModels(ctx, dataGraphID, page, perPage, nil, hasExternalID)
+		resp, err := h.client.ListModels(ctx, &dgClient.ListModelsRequest{DataGraphID: dataGraphID, Page: page, PageSize: perPage, ModelType: stringPtr("entity"), HasExternalID: hasExternalID})
 		if err != nil {
 			return nil, fmt.Errorf("listing entity models: %w", err)
 		}
@@ -125,7 +131,7 @@ func (h *HandlerImpl) listAllEventModels(ctx context.Context, dataGraphID string
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListEventModels(ctx, dataGraphID, page, perPage, hasExternalID)
+		resp, err := h.client.ListModels(ctx, &dgClient.ListModelsRequest{DataGraphID: dataGraphID, Page: page, PageSize: perPage, ModelType: stringPtr("event"), HasExternalID: hasExternalID})
 		if err != nil {
 			return nil, fmt.Errorf("listing event models: %w", err)
 		}
@@ -285,7 +291,9 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (
 
 	switch data.Type {
 	case "entity":
-		req := &dgClient.CreateEntityModelRequest{
+		req := &dgClient.CreateModelRequest{
+			DataGraphID: dataGraphRemoteID,
+			Type:        "entity",
 			Name:        data.DisplayName,
 			Description: data.Description,
 			TableRef:    data.Table,
@@ -293,16 +301,18 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (
 			PrimaryID:   data.PrimaryID,
 			Root:        data.Root,
 		}
-		remote, err = h.client.CreateEntityModel(ctx, dataGraphRemoteID, req)
+		remote, err = h.client.CreateModel(ctx, req)
 	case "event":
-		req := &dgClient.CreateEventModelRequest{
+		req := &dgClient.CreateModelRequest{
+			DataGraphID: dataGraphRemoteID,
+			Type:        "event",
 			Name:        data.DisplayName,
 			Description: data.Description,
 			TableRef:    data.Table,
 			ExternalID:  data.ID,
 			Timestamp:   data.Timestamp,
 		}
-		remote, err = h.client.CreateEventModel(ctx, dataGraphRemoteID, req)
+		remote, err = h.client.CreateModel(ctx, req)
 	default:
 		return nil, fmt.Errorf("invalid model type: %s", data.Type)
 	}
@@ -324,22 +334,28 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 
 	switch newData.Type {
 	case "entity":
-		req := &dgClient.UpdateEntityModelRequest{
+		req := &dgClient.UpdateModelRequest{
+			DataGraphID: dataGraphRemoteID,
+			ModelID:     oldState.ID,
+			Type:        "entity",
 			Name:        newData.DisplayName,
 			Description: newData.Description,
 			TableRef:    newData.Table,
 			PrimaryID:   newData.PrimaryID,
 			Root:        newData.Root,
 		}
-		remote, err = h.client.UpdateEntityModel(ctx, dataGraphRemoteID, oldState.ID, req)
+		remote, err = h.client.UpdateModel(ctx, req)
 	case "event":
-		req := &dgClient.UpdateEventModelRequest{
+		req := &dgClient.UpdateModelRequest{
+			DataGraphID: dataGraphRemoteID,
+			ModelID:     oldState.ID,
+			Type:        "event",
 			Name:        newData.DisplayName,
 			Description: newData.Description,
 			TableRef:    newData.Table,
 			Timestamp:   newData.Timestamp,
 		}
-		remote, err = h.client.UpdateEventModel(ctx, dataGraphRemoteID, oldState.ID, req)
+		remote, err = h.client.UpdateModel(ctx, req)
 	default:
 		return nil, fmt.Errorf("invalid model type: %s", newData.Type)
 	}
@@ -355,29 +371,15 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 
 func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.ModelResource, remoteID string) (*dgModel.ModelState, error) {
 	dataGraphRemoteID := data.DataGraphRef.Value
-	modelType := data.Type
 
-	// Set external ID on the remote resource
-	var setErr error
-	if modelType == "entity" {
-		setErr = h.client.SetEntityModelExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
-	} else {
-		setErr = h.client.SetEventModelExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
-	}
+	// Set external ID on the remote resource and get the updated model
+	remote, setErr := h.client.SetModelExternalID(ctx, &dgClient.SetModelExternalIDRequest{
+		DataGraphID: dataGraphRemoteID,
+		ModelID:     remoteID,
+		ExternalID:  data.ID,
+	})
 	if setErr != nil {
 		return nil, fmt.Errorf("setting external ID: %w", setErr)
-	}
-
-	// Fetch the remote resource to get updated data
-	var remote *dgClient.Model
-	var getErr error
-	if modelType == "entity" {
-		remote, getErr = h.client.GetEntityModel(ctx, dataGraphRemoteID, remoteID)
-	} else {
-		remote, getErr = h.client.GetEventModel(ctx, dataGraphRemoteID, remoteID)
-	}
-	if getErr != nil {
-		return nil, fmt.Errorf("getting model: %w", getErr)
 	}
 
 	return &dgModel.ModelState{
@@ -388,19 +390,14 @@ func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.ModelResource, r
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *dgModel.ModelResource, oldState *dgModel.ModelState) error {
 	dataGraphRemoteID := oldData.DataGraphRef.Value
 
-	var err error
-	switch oldData.Type {
-	case "entity":
-		err = h.client.DeleteEntityModel(ctx, dataGraphRemoteID, oldState.ID)
-	case "event":
-		err = h.client.DeleteEventModel(ctx, dataGraphRemoteID, oldState.ID)
-	default:
-		return fmt.Errorf("invalid model type: %s", oldData.Type)
-	}
-
+	err := h.client.DeleteModel(ctx, &dgClient.DeleteModelRequest{
+		DataGraphID: dataGraphRemoteID,
+		ModelID:     oldState.ID,
+	})
 	if err != nil {
 		return fmt.Errorf("deleting %s model: %w", oldData.Type, err)
 	}
+
 	return nil
 }
 
