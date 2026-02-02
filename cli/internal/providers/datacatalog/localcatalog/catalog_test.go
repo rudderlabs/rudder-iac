@@ -4,9 +4,28 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// kindToResourceType maps spec kinds to resource types for URN construction
+func kindToResourceType(kind string) string {
+	switch kind {
+	case KindProperties:
+		return "property"
+	case KindEvents:
+		return "event"
+	case KindTrackingPlans:
+		return "tracking-plan"
+	case KindCustomTypes:
+		return "custom-type"
+	case KindCategories:
+		return "category"
+	default:
+		return ""
+	}
+}
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
@@ -1143,7 +1162,17 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
-				assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				// Convert expected IDs to URNs for comparison based on spec kind
+				resourceType := kindToResourceType(tc.spec.Kind)
+				var expectedURNs []string
+				if tc.expectedIDs != nil {
+					expectedURNs = make([]string, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = resources.URN(id, resourceType)
+					}
+				}
+				assert.Equal(t, expectedURNs, parsedSpec.URNs)
+				assert.Equal(t, resourceType, parsedSpec.LegacyResourceType)
 			}
 		})
 	}

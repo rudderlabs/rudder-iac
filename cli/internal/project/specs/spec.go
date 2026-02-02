@@ -69,7 +69,8 @@ func (s *Spec) Validate() error {
 }
 
 type ParsedSpec struct {
-	ExternalIDs []string
+	URNs               []string
+	LegacyResourceType string // For backward compatibility with local_id imports
 }
 
 // New creates and validates a Spec from YAML data

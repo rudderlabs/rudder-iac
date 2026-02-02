@@ -103,7 +103,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+					// Convert expected IDs to URNs for comparison
+					expectedURNs := make([]string, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = resources.URN(id, source.ResourceType)
+					}
+					assert.Equal(t, expectedURNs, parsedSpec.URNs)
+					assert.Equal(t, source.ResourceType, parsedSpec.LegacyResourceType)
 				}
 			})
 		}

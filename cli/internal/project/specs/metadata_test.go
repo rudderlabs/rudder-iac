@@ -231,6 +231,43 @@ func TestSpec_CommonMetadata(t *testing.T) {
 			expectError: true,
 			errorText:   "failed to decode metadata",
 		},
+		{
+			name: "valid metadata with URN-based import",
+			metadata: map[string]any{
+				"name": "test-project",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"urn":       "data-graph:my-graph",
+									"remote_id": "remote-1",
+								},
+								map[string]any{
+									"urn":       "model:user-model",
+									"remote_id": "remote-2",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: Metadata{
+				Name: "test-project",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+								{URN: "model:user-model", RemoteID: "remote-2"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -248,6 +285,176 @@ func TestSpec_CommonMetadata(t *testing.T) {
 
 			if tt.expectError {
 				assert.Contains(t, err.Error(), tt.errorText)
+			}
+		})
+	}
+}
+
+func TestImportIds_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		importIds   ImportIds
+		expectError bool
+		errorText   string
+	}{
+		{
+			name: "valid with URN only",
+			importIds: ImportIds{
+				URN:      "data-graph:my-graph",
+				RemoteID: "remote-123",
+			},
+			expectError: false,
+		},
+		{
+			name: "valid with LocalID only",
+			importIds: ImportIds{
+				LocalID:  "my-resource",
+				RemoteID: "remote-123",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid - both URN and LocalID set",
+			importIds: ImportIds{
+				URN:      "data-graph:my-graph",
+				LocalID:  "my-resource",
+				RemoteID: "remote-123",
+			},
+			expectError: true,
+			errorText:   "urn and local_id are mutually exclusive",
+		},
+		{
+			name: "invalid - neither URN nor LocalID set",
+			importIds: ImportIds{
+				RemoteID: "remote-123",
+			},
+			expectError: true,
+			errorText:   "either urn or local_id must be set",
+		},
+		{
+			name: "invalid - missing RemoteID with URN",
+			importIds: ImportIds{
+				URN: "data-graph:my-graph",
+			},
+			expectError: true,
+			errorText:   "remote_id is required",
+		},
+		{
+			name: "invalid - missing RemoteID with LocalID",
+			importIds: ImportIds{
+				LocalID: "my-resource",
+			},
+			expectError: true,
+			errorText:   "remote_id is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.importIds.Validate()
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorText)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestMetadata_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		metadata    Metadata
+		expectError bool
+		errorText   string
+	}{
+		{
+			name: "valid with URN-based imports",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid with LocalID-based imports",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{LocalID: "my-resource", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid - both URN and LocalID",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", LocalID: "conflict", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorText:   "urn and local_id are mutually exclusive",
+		},
+		{
+			name: "invalid - missing workspace_id",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorText:   "missing required field 'workspace_id'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.metadata.Validate()
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorText)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -296,6 +503,36 @@ func TestMetadata_ToMap(t *testing.T) {
 							"resources": []any{
 								map[string]any{"local_id": "local-1", "remote_id": "remote-1"},
 								map[string]any{"local_id": "local-2", "remote_id": "remote-2"},
+							},
+						},
+					},
+				},
+			},
+		},
+		"Metadata with URN-based imports": {
+			metadata: Metadata{
+				Name: "test-resource",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+								{URN: "model:user-model", RemoteID: "remote-2"},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]any{
+				"name": "test-resource",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{"urn": "data-graph:my-graph", "remote_id": "remote-1"},
+								map[string]any{"urn": "model:user-model", "remote_id": "remote-2"},
 							},
 						},
 					},

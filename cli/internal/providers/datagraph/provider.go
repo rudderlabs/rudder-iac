@@ -73,23 +73,23 @@ func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedS
 		return nil, fmt.Errorf("decoding data graph spec: %w", err)
 	}
 
-	// Start with the data graph ID
-	externalIDs := []string{dgSpec.ID}
+	// Start with the data graph URN
+	urns := []string{resources.URN(dgSpec.ID, datagraph.HandlerMetadata.ResourceType)}
 
-	// Add all inline model IDs and relationship IDs
+	// Add all inline model URNs and relationship URNs
 	for _, modelSpec := range dgSpec.Models {
 		if modelSpec.ID != "" {
-			externalIDs = append(externalIDs, modelSpec.ID)
+			urns = append(urns, resources.URN(modelSpec.ID, model.HandlerMetadata.ResourceType))
 		}
-		// Add inline relationship IDs
+		// Add inline relationship URNs
 		for _, relSpec := range modelSpec.Relationships {
 			if relSpec.ID != "" {
-				externalIDs = append(externalIDs, relSpec.ID)
+				urns = append(urns, resources.URN(relSpec.ID, relationship.HandlerMetadata.ResourceType))
 			}
 		}
 	}
 
-	return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
+	return &specs.ParsedSpec{URNs: urns}, nil
 }
 
 func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {

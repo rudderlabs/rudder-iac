@@ -28,13 +28,13 @@ type MockDataGraphClient struct {
 	SetModelExternalIDFunc func(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error)
 
 	// Relationship methods
-	Relationships                    map[string]*dgClient.Relationship
-	ListRelationshipsFunc            func(ctx context.Context, req *dgClient.ListRelationshipsRequest) (*dgClient.ListRelationshipsResponse, error)
-	GetRelationshipFunc              func(ctx context.Context, req *dgClient.GetRelationshipRequest) (*dgClient.Relationship, error)
-	CreateRelationshipFunc           func(ctx context.Context, req *dgClient.CreateRelationshipRequest) (*dgClient.Relationship, error)
-	UpdateRelationshipFunc           func(ctx context.Context, req *dgClient.UpdateRelationshipRequest) (*dgClient.Relationship, error)
-	DeleteRelationshipFunc           func(ctx context.Context, req *dgClient.DeleteRelationshipRequest) error
-	SetRelationshipExternalIDFunc    func(ctx context.Context, req *dgClient.SetRelationshipExternalIDRequest) (*dgClient.Relationship, error)
+	Relationships                 map[string]*dgClient.Relationship
+	ListRelationshipsFunc         func(ctx context.Context, req *dgClient.ListRelationshipsRequest) (*dgClient.ListRelationshipsResponse, error)
+	GetRelationshipFunc           func(ctx context.Context, req *dgClient.GetRelationshipRequest) (*dgClient.Relationship, error)
+	CreateRelationshipFunc        func(ctx context.Context, req *dgClient.CreateRelationshipRequest) (*dgClient.Relationship, error)
+	UpdateRelationshipFunc        func(ctx context.Context, req *dgClient.UpdateRelationshipRequest) (*dgClient.Relationship, error)
+	DeleteRelationshipFunc        func(ctx context.Context, req *dgClient.DeleteRelationshipRequest) error
+	SetRelationshipExternalIDFunc func(ctx context.Context, req *dgClient.SetRelationshipExternalIDRequest) (*dgClient.Relationship, error)
 }
 
 // DataGraph methods
