@@ -26,7 +26,10 @@ type WorkspaceImportMetadata struct {
 
 // ImportIds holds the local and remote IDs for a resource to be imported, as specified in import spec metadata
 type ImportIds struct {
-	LocalID  string `yaml:"local_id" json:"local_id" validate:"required"`
+	// Deprecated: Use URN instead for new providers.
+	LocalID string `yaml:"local_id,omitempty" json:"local_id,omitempty"`
+	// URN identifies the local resource (format: "resource-type:resource-id")
+	URN      string `yaml:"urn,omitempty" json:"urn,omitempty"`
 	RemoteID string `yaml:"remote_id" json:"remote_id" validate:"required"`
 }
 
