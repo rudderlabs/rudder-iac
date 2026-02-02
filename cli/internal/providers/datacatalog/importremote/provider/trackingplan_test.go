@@ -184,7 +184,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
-								"$ref":     "#/properties/product-id/product-id",
+								"property":     "#/properties/product-id/product-id",
 								"required": true,
 							},
 						},
@@ -306,7 +306,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
-								"$ref":     "#/properties/product-id/product-id",
+								"property":     "#/properties/product-id/product-id",
 								"required": true,
 							},
 						},
@@ -346,7 +346,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 						"identity_section":     "context",
 						"properties": []any{
 							map[string]any{
-								"$ref":     "#/properties/user-email/user-email",
+								"property":     "#/properties/user-email/user-email",
 								"required": false,
 							},
 						},

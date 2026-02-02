@@ -229,12 +229,12 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 	for _, prop := range rule.Properties {
 		property, err := expandPropertyRefs(prop, fetcher)
 		if err != nil {
-			return nil, fmt.Errorf("expanding property refs within the property: %s failed, err: %w", prop.Ref, err)
+			return nil, fmt.Errorf("expanding property refs within the property: %s failed, err: %w", prop.Property, err)
 		}
 
 		toReturn.Properties = append(toReturn.Properties, &TPEventProperty{
 			Name:                 property.Name,
-			Ref:                  prop.Ref,
+			Ref:                  prop.Property,
 			LocalID:              property.LocalID,
 			Properties:           property.Properties,
 			Description:          property.Description,
@@ -248,12 +248,12 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 	return &toReturn, nil
 }
 
-func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*TPEventProperty, error) {
-	log.Debug("expanding property refs within the property", "propertyID", prop.Ref)
+func expandPropertyRefs(prop *TPRulePropertyV1, fetcher CatalogResourceFetcher) (*TPEventProperty, error) {
+	log.Debug("expanding property refs within the property", "propertyID", prop.Property)
 
-	matches := PropRegex.FindStringSubmatch(prop.Ref)
+	matches := PropRegex.FindStringSubmatch(prop.Property)
 	if len(matches) != 2 {
-		return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Ref)
+		return nil, fmt.Errorf("property ref: %s invalid as failed regex match", prop.Property)
 	}
 
 	propertyID := matches[1]
@@ -266,14 +266,14 @@ func expandPropertyRefs(prop *TPRuleProperty, fetcher CatalogResourceFetcher) (*
 	for _, nestedProp := range prop.Properties {
 		nestedProp, err := expandPropertyRefs(nestedProp, fetcher)
 		if err != nil {
-			return nil, fmt.Errorf("expanding nested property refs within the property: %s failed, err: %w", prop.Ref, err)
+			return nil, fmt.Errorf("expanding nested property refs within the property: %s failed, err: %w", prop.Property, err)
 		}
 		properties = append(properties, nestedProp)
 	}
 
 	return &TPEventProperty{
 		Name:                 property.Name,
-		Ref:                  prop.Ref,
+		Ref:                  prop.Property,
 		Properties:           properties,
 		LocalID:              property.LocalID,
 		Description:          property.Description,
@@ -321,23 +321,51 @@ type TrackingPlanV1 struct {
 	EventProps  []*TPEvent  `json:"event_props,omitempty"`
 }
 
+// TPRulePropertyV1 represents the V1 spec format for tracking plan rule properties
+type TPRulePropertyV1 struct {
+	Property             string              `json:"property"`
+	Required             bool                `json:"required"`
+	AdditionalProperties *bool               `json:"additionalProperties,omitempty"`
+	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
+}
+
+// FromV0 converts a V0 TPRuleProperty to V1 format
+func (p *TPRulePropertyV1) FromV0(v0 *TPRuleProperty) error {
+	p.Property = v0.Ref
+	p.Required = v0.Required
+	p.AdditionalProperties = v0.AdditionalProperties
+
+	// Convert nested properties recursively
+	if len(v0.Properties) > 0 {
+		p.Properties = make([]*TPRulePropertyV1, 0, len(v0.Properties))
+		for _, v0Prop := range v0.Properties {
+			v1Prop := &TPRulePropertyV1{}
+			if err := v1Prop.FromV0(v0Prop); err != nil {
+				return fmt.Errorf("converting nested property to v1: %w", err)
+			}
+			p.Properties = append(p.Properties, v1Prop)
+		}
+	}
+
+	return nil
+}
+
 // TPRuleV1 represents the V1 spec format for tracking plan rules
 type TPRuleV1 struct {
-	Type                 string            `json:"type"`
-	LocalID              string            `json:"id"`
-	Event                string            `json:"event"` // Direct reference instead of object
-	IdentitySection      string            `json:"identity_section,omitempty"`
-	AdditionalProperties bool              `json:"additionalProperties,omitempty"`
-	Properties           []*TPRuleProperty `json:"properties,omitempty"`
-	Includes             *TPRuleIncludes   `json:"includes,omitempty"`
-	Variants             Variants          `json:"variants,omitempty"`
+	Type                 string              `json:"type"`
+	LocalID              string              `json:"id"`
+	Event                string              `json:"event"` // Direct reference instead of object
+	IdentitySection      string              `json:"identity_section,omitempty"`
+	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
+	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
+	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
+	Variants             Variants            `json:"variants,omitempty"`
 }
 
 // FromV0 converts a V0 TPRule to V1 format
 func (r *TPRuleV1) FromV0(v0 *TPRule) error {
 	r.Type = v0.Type
 	r.LocalID = v0.LocalID
-	r.Properties = v0.Properties
 	r.Includes = v0.Includes
 	r.Variants = v0.Variants
 
@@ -346,6 +374,18 @@ func (r *TPRuleV1) FromV0(v0 *TPRule) error {
 		r.Event = v0.Event.Ref
 		r.IdentitySection = v0.Event.IdentitySection
 		r.AdditionalProperties = v0.Event.AllowUnplanned
+	}
+
+	// Convert properties from V0 to V1
+	if len(v0.Properties) > 0 {
+		r.Properties = make([]*TPRulePropertyV1, 0, len(v0.Properties))
+		for _, v0Prop := range v0.Properties {
+			v1Prop := &TPRulePropertyV1{}
+			if err := v1Prop.FromV0(v0Prop); err != nil {
+				return fmt.Errorf("converting property to v1: %w", err)
+			}
+			r.Properties = append(r.Properties, v1Prop)
+		}
 	}
 
 	return nil

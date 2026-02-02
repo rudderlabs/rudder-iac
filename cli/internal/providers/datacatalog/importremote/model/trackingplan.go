@@ -113,16 +113,16 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 	return nil
 }
 
-// buildRuleProperties recursively builds TPRuleProperty from upstream properties
+// buildRuleProperties recursively builds TPRulePropertyV1 from upstream properties
 func buildRuleProperties(
 	upstreamProps []*catalog.TrackingPlanEventProperty,
 	resolver resolver.ReferenceResolver,
-) ([]*localcatalog.TPRuleProperty, error) {
+) ([]*localcatalog.TPRulePropertyV1, error) {
 	if len(upstreamProps) == 0 {
 		return nil, nil
 	}
 
-	ruleProps := make([]*localcatalog.TPRuleProperty, 0, len(upstreamProps))
+	ruleProps := make([]*localcatalog.TPRulePropertyV1, 0, len(upstreamProps))
 	for _, prop := range upstreamProps {
 		// Resolve property reference
 		propRef, err := resolver.ResolveToReference(
@@ -143,8 +143,8 @@ func buildRuleProperties(
 			return nil, fmt.Errorf("building nested properties for property %s: %w", prop.ID, err)
 		}
 
-		ruleProp := &localcatalog.TPRuleProperty{
-			Ref:        propRef,
+		ruleProp := &localcatalog.TPRulePropertyV1{
+			Property:   propRef,
 			Required:   prop.Required,
 			Properties: nestedProps,
 		}

@@ -104,11 +104,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/products/product-id",
+							"property": "#/properties/products/product-id",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/products/price",
+							"property": "#/properties/products/price",
 							"required": false,
 						},
 					},
@@ -182,16 +182,16 @@ func TestTrackingPlanForExport(t *testing.T) {
 					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"$ref":                 "#/properties/cart/cart-object",
+							"property":             "#/properties/cart/cart-object",
 							"required":             true,
 							"additionalProperties": false,
 							"properties": []any{
 								map[string]any{
-									"$ref":     "#/properties/cart/cart-id",
+									"property": "#/properties/cart/cart-id",
 									"required": true,
 								},
 								map[string]any{
-									"$ref":     "#/properties/cart/total-amount",
+									"property": "#/properties/cart/total-amount",
 									"required": false,
 								},
 							},
@@ -280,7 +280,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/ui/button-id",
+							"property": "#/properties/ui/button-id",
 							"required": true,
 						},
 					},
@@ -615,15 +615,15 @@ func TestTrackingPlanForExport(t *testing.T) {
 					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/common/action-type",
+							"property": "#/properties/common/action-type",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/user/user-id",
+							"property": "#/properties/user/user-id",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/common/timestamp",
+							"property": "#/properties/common/timestamp",
 							"required": true,
 						},
 					},
