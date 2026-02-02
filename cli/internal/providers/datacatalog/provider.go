@@ -38,11 +38,11 @@ func New(client catalog.DataCatalog) *Provider {
 		client:      client,
 		dc:          localcatalog.New(),
 		providerStore: map[string]entityProvider{
-			types.PropertyResourceType:      NewPropertyProvider(client, importDir),
-			types.EventResourceType:         NewEventProvider(client, importDir),
-			types.CustomTypeResourceType:    NewCustomTypeProvider(client, importDir),
+			types.PropertyResourceType:     NewPropertyProvider(client, importDir),
+			types.EventResourceType:        NewEventProvider(client, importDir),
+			types.CustomTypeResourceType:   NewCustomTypeProvider(client, importDir),
 			types.TrackingPlanResourceType: NewTrackingPlanProvider(client, importDir),
-			types.CategoryResourceType:      NewCategoryProvider(client, importDir),
+			types.CategoryResourceType:     NewCategoryProvider(client, importDir),
 		},
 	}
 }
@@ -301,7 +301,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 // getDependencies simply fetch the dependencies on the trackingplan in form of the URN's
 // of the properties and events that are used in the tracking plan
-func getDependencies(tp *localcatalog.TrackingPlan, propIDToURN, eventIDToURN map[string]string) []string {
+func getDependencies(tp *localcatalog.TrackingPlanV1, propIDToURN, eventIDToURN map[string]string) []string {
 	dependencies := make([]string, 0)
 
 	for _, event := range tp.EventProps {

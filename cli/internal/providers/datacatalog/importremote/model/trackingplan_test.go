@@ -98,13 +98,10 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"description":  "Main tracking plan for e-commerce",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "product-viewed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/ecommerce/product-viewed",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "product-viewed-rule",
+					"event":            "#/events/ecommerce/product-viewed",
+					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
 							"$ref":     "#/properties/products/product-id",
@@ -178,13 +175,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"display_name": "Nested Properties Plan",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "checkout-completed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/checkout/checkout-completed",
-						"allow_unplanned":  true,
-						"identity_section": "context",
-					},
+					"type":                 TypeEventRule,
+					"id":                   "checkout-completed-rule",
+					"event":                "#/events/checkout/checkout-completed",
+					"additionalProperties": true,
+					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
 							"$ref":                 "#/properties/cart/cart-object",
@@ -272,22 +267,17 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"display_name": "Multi Event Plan",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "page-viewed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/navigation/page-viewed",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "page-viewed-rule",
+					"event":            "#/events/navigation/page-viewed",
+					"identity_section": "properties",
 				},
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "button-clicked-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/interaction/button-clicked",
-						"allow_unplanned":  true,
-						"identity_section": "context",
-					},
+					"type":                 TypeEventRule,
+					"id":                   "button-clicked-rule",
+					"event":                "#/events/interaction/button-clicked",
+					"additionalProperties": true,
+					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
 							"$ref":     "#/properties/ui/button-id",
@@ -619,13 +609,10 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"description":  "Tracking plan with conditional variants",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "user-action-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/analytics/user-action",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "user-action-rule",
+					"event":            "#/events/analytics/user-action",
+					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
 							"$ref":     "#/properties/common/action-type",

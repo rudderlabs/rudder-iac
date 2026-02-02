@@ -603,22 +603,20 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation success", func(t *testing.T) {
 		testCases := []struct {
 			name          string
-			trackingPlans []*catalog.TrackingPlan
+			trackingPlans []*catalog.TrackingPlanV1
 			customTypes   []catalog.CustomTypeV1
 		}{
 			{
 				name: "valid variants in tracking plan",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#event:test-event",
-								},
+								Event: "#event:test-event",
 								Variants: catalog.Variants{
 									{
 										Type:          "discriminator",
@@ -673,17 +671,15 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants with mixed match value types",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
-								},
+								Event: "#/events/test-group/test-event",
 								Variants: catalog.Variants{
 									{
 										Type:          "discriminator",
@@ -721,24 +717,22 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation failures", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			trackingPlans  []*catalog.TrackingPlan
+			trackingPlans  []*catalog.TrackingPlanV1
 			customTypes    []catalog.CustomTypeV1
 			expectedErrors int
 			errorContains  []ValidationError
 		}{
 			{
 				name: "structural validation failures",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
-								},
+								Event: "#/events/test-group/test-event",
 								Variants: catalog.Variants{
 									{
 										Type:          "other_type", // Invalid type
@@ -921,17 +915,15 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				Description: "Deeply nested property",
 			},
 		},
-		TrackingPlans: []*catalog.TrackingPlan{
+		TrackingPlans: []*catalog.TrackingPlanV1{
 			{
 				LocalID: "test_plan",
 				Name:    "Test Tracking Plan",
-				Rules: []*catalog.TPRule{
+				Rules: []*catalog.TPRuleV1{
 					{
 						LocalID: "valid_non_nested_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
+						Event: "#/events/test/signup",
 						Properties: []*catalog.TPRuleProperty{
 							{
 								Ref:                  "#/properties/test_props/user_profile",
@@ -943,9 +935,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "valid_nested_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
+						Event: "#/events/test/signup",
 						Properties: []*catalog.TPRuleProperty{
 							{
 								Ref:      "#/properties/test_props/user_profile",
@@ -962,9 +952,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "invalid_object_type_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
+						Event: "#/events/test/signup",
 						Properties: []*catalog.TPRuleProperty{
 							{
 								Ref:      "#/properties/test_props/button_signin", // string type with nested properties
@@ -981,9 +969,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "exceed_depth_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
+						Event: "#/events/test/signup",
 						Properties: []*catalog.TPRuleProperty{
 							{
 								Ref:      "#/properties/test_props/user_profile",

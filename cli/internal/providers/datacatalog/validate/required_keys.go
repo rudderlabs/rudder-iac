@@ -199,21 +199,21 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
-			if rule.Event == nil && rule.Includes == nil {
+			if rule.Event == "" && rule.Includes == nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event or includes section within the rules: %s in tracking plan are mandatory", rule.LocalID),
 					Reference: reference,
 				})
 			}
 
-			if rule.Event != nil && rule.Includes != nil {
+			if rule.Event != "" && rule.Includes != nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event and includes both section within the rules: %s in tracking plan are not allowed", rule.LocalID),
 					Reference: reference,
 				})
 			}
 
-			if rule.Event == nil && len(rule.Properties) > 0 {
+			if rule.Event == "" && len(rule.Properties) > 0 {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("properties without events in event_rule: %s are not allowed", rule.LocalID),
 					Reference: reference,
@@ -225,7 +225,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Validate nested properties if they exist
-			if rule.Event != nil && len(rule.Properties) > 0 {
+			if rule.Event != "" && len(rule.Properties) > 0 {
 				// iterate over the properties and validate each of them
 				for _, prop := range rule.Properties {
 					isNested := false

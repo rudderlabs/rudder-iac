@@ -23,8 +23,8 @@ type CatalogResourceFetcher interface {
 	Property(id string) *PropertyV1
 	Category(id string) *Category
 	CustomType(id string) *CustomTypeV1
-	TPEventRule(tpID, ruleID string) *TPRule
-	TPEventRules(tpID string) ([]*TPRule, bool)
+	TPEventRule(tpID, ruleID string) *TPRuleV1
+	TPEventRules(tpID string) ([]*TPRuleV1, bool)
 }
 
 type TrackingPlan struct {
@@ -99,14 +99,14 @@ type TPRuleIncludes struct {
 
 // ExpandRefs simply expands the references being held
 // when reading the tracking plan with the actual events and properties
-func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
+func (tp *TrackingPlanV1) ExpandRefs(dc *DataCatalog) error {
 	log.Debug("expanding refs for the tracking plan", "id", tp.LocalID)
 
 	expandedEvents := make([]*TPEvent, 0)
 	for _, rule := range tp.Rules {
 
 		switch {
-		case rule.Event != nil:
+		case rule.Event != "":
 			tpEvent, err := expandEventRefs(rule, dc)
 			if err != nil {
 				return fmt.Errorf("expanding event refs on the rule: %s in tracking plan: %s, err:%w",
@@ -137,7 +137,7 @@ func (tp *TrackingPlan) ExpandRefs(dc *DataCatalog) error {
 
 // expandIncludeRefs expands the include references in the tracking plan rule definition
 // TODO: Make this function recursive to allow for multiple levels of include
-func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent, error) {
+func expandIncludeRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) ([]*TPEvent, error) {
 	log.Debug("expanding include refs within the rule", "ruleID", rule.LocalID)
 
 	if rule.Includes == nil {
@@ -153,7 +153,7 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 	// conventionally matches[1] would include the tpGroup and not the ID
 	// we need to sort this out
 	tpID, ruleID := matches[1], matches[2]
-	rules := make([]*TPRule, 0)
+	rules := make([]*TPRuleV1, 0)
 
 	if ruleID == "*" {
 		eventRules, _ := fetcher.TPEventRules(tpID)
@@ -166,7 +166,7 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 	// Assume rules are now actual rules and not indirections
 	for _, rule := range rules {
 
-		if rule.Event == nil {
+		if rule.Event == "" {
 			continue
 		}
 
@@ -184,16 +184,16 @@ func expandIncludeRefs(rule *TPRule, fetcher CatalogResourceFetcher) ([]*TPEvent
 }
 
 // expandEventRefs expands the direct event references in the tracking plan rule definition
-func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, error) {
+func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, error) {
 	log.Debug("expanding event refs within the rule", "ruleID", rule.LocalID)
 
-	if rule.Event == nil {
+	if rule.Event == "" {
 		return nil, fmt.Errorf("empty rule event")
 	}
 
-	matches := EventRegex.FindStringSubmatch(rule.Event.Ref)
+	matches := EventRegex.FindStringSubmatch(rule.Event)
 	if len(matches) != 2 {
-		return nil, fmt.Errorf("event ref: %s invalid as failed regex match", rule.Event.Ref)
+		return nil, fmt.Errorf("event ref: %s invalid as failed regex match", rule.Event)
 	}
 
 	eventID := matches[1]
@@ -214,12 +214,12 @@ func expandEventRefs(rule *TPRule, fetcher CatalogResourceFetcher) (*TPEvent, er
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
-		Ref:             rule.Event.Ref,
+		Ref:             rule.Event,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
 		Type:            event.Type,
-		AllowUnplanned:  rule.Event.AllowUnplanned,
-		IdentitySection: rule.Event.IdentitySection,
+		AllowUnplanned:  rule.AdditionalProperties,
+		IdentitySection: rule.IdentitySection,
 		Properties:      make([]*TPEventProperty, 0),
 		Variants:        rule.Variants,
 	}
@@ -310,4 +310,65 @@ func ExtractTrackingPlan(s *specs.Spec) (TrackingPlan, error) {
 	}
 
 	return tp, nil
+}
+
+// TrackingPlanV1 represents the V1 spec format for tracking plans
+type TrackingPlanV1 struct {
+	Name        string      `json:"display_name"`
+	LocalID     string      `json:"id"`
+	Description string      `json:"description,omitempty"`
+	Rules       []*TPRuleV1 `json:"rules,omitempty"`
+	EventProps  []*TPEvent  `json:"event_props,omitempty"`
+}
+
+// TPRuleV1 represents the V1 spec format for tracking plan rules
+type TPRuleV1 struct {
+	Type                 string            `json:"type"`
+	LocalID              string            `json:"id"`
+	Event                string            `json:"event"` // Direct reference instead of object
+	IdentitySection      string            `json:"identity_section,omitempty"`
+	AdditionalProperties bool              `json:"additionalProperties,omitempty"`
+	Properties           []*TPRuleProperty `json:"properties,omitempty"`
+	Includes             *TPRuleIncludes   `json:"includes,omitempty"`
+	Variants             Variants          `json:"variants,omitempty"`
+}
+
+// FromV0 converts a V0 TPRule to V1 format
+func (r *TPRuleV1) FromV0(v0 *TPRule) error {
+	r.Type = v0.Type
+	r.LocalID = v0.LocalID
+	r.Properties = v0.Properties
+	r.Includes = v0.Includes
+	r.Variants = v0.Variants
+
+	// Convert event from object to direct reference
+	if v0.Event != nil {
+		r.Event = v0.Event.Ref
+		r.IdentitySection = v0.Event.IdentitySection
+		r.AdditionalProperties = v0.Event.AllowUnplanned
+	}
+
+	return nil
+}
+
+// FromV0 converts a V0 TrackingPlan to V1 format
+func (tp *TrackingPlanV1) FromV0(v0 *TrackingPlan) error {
+	tp.Name = v0.Name
+	tp.LocalID = v0.LocalID
+	tp.Description = v0.Description
+	tp.EventProps = v0.EventProps
+
+	// Convert all rules from V0 to V1
+	if len(v0.Rules) > 0 {
+		tp.Rules = make([]*TPRuleV1, 0, len(v0.Rules))
+		for _, v0Rule := range v0.Rules {
+			v1Rule := &TPRuleV1{}
+			if err := v1Rule.FromV0(v0Rule); err != nil {
+				return fmt.Errorf("converting rule %s to v1: %w", v0Rule.LocalID, err)
+			}
+			tp.Rules = append(tp.Rules, v1Rule)
+		}
+	}
+
+	return nil
 }

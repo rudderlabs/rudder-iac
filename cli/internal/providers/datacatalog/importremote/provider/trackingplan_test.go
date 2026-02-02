@@ -178,13 +178,10 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "E-commerce Tracking",
 				"rules": []any{
 					map[string]any{
-						"type": "event_rule",
-						"id":   "product-viewed-rule",
-						"event": map[string]any{
-							"$ref":             "#/events/product-viewed/product-viewed",
-							"allow_unplanned":  false,
-							"identity_section": "properties",
-						},
+						"type":             "event_rule",
+						"id":               "product-viewed-rule",
+						"event":            "#/events/product-viewed/product-viewed",
+						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
 								"$ref":     "#/properties/product-id/product-id",
@@ -303,13 +300,10 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "E-commerce Tracking",
 				"rules": []any{
 					map[string]any{
-						"type": "event_rule",
-						"id":   "product-viewed-rule",
-						"event": map[string]any{
-							"$ref":             "#/events/product-viewed/product-viewed",
-							"allow_unplanned":  false,
-							"identity_section": "properties",
-						},
+						"type":             "event_rule",
+						"id":               "product-viewed-rule",
+						"event":            "#/events/product-viewed/product-viewed",
+						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
 								"$ref":     "#/properties/product-id/product-id",
@@ -345,13 +339,11 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "User Analytics",
 				"rules": []any{
 					map[string]any{
-						"type": "event_rule",
-						"id":   "user-signup-rule",
-						"event": map[string]any{
-							"$ref":             "#/events/user-signup/user-signup",
-							"allow_unplanned":  true,
-							"identity_section": "context",
-						},
+						"type":                 "event_rule",
+						"id":                   "user-signup-rule",
+						"event":                "#/events/user-signup/user-signup",
+						"additionalProperties": true,
+						"identity_section":     "context",
 						"properties": []any{
 							map[string]any{
 								"$ref":     "#/properties/user-email/user-email",

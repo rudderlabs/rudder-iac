@@ -242,23 +242,22 @@ func TestVariantsReferenceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		trackingPlans []*catalog.TrackingPlan
+		trackingPlans []*catalog.TrackingPlanV1
 		customTypes   []catalog.CustomTypeV1
 		errors        []ValidationError
 	}{
 		{
 			name: "valid variants references in tracking plan",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:test-event",
-							},
+							Event: "#event:test-event",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:page_name",
@@ -323,17 +322,16 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid discriminator and property reference in variant case",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:test-event",
-							},
+							Event: "#event:test-event",
+							AdditionalProperties: false,
 							Variants: catalog.Variants{
 								{
 									Type:          "discriminator",
@@ -366,17 +364,16 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property reference in variant default",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/test-event",
-							},
+							Event: "#event:test-event",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:page_name",
@@ -471,23 +468,22 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		trackingPlans []*catalog.TrackingPlan
+		trackingPlans []*catalog.TrackingPlanV1
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid nested property references (2 levels)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",
@@ -508,17 +504,15 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "valid nested property references (3 levels deep)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
+							Event: "#/events/test-group/user_signup",
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",
@@ -545,17 +539,15 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference (non-existent property)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{	
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
+							Event: "#/events/test-group/user_signup",
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",
@@ -577,17 +569,16 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference format",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:user_signup",
-							},
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",
@@ -609,17 +600,16 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "multiple nested reference errors (different levels)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:user_signup",
-							},
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",
@@ -654,17 +644,16 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "mixed valid and invalid nested references",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
+							Event: "#/events/test-group/user_signup",
+							AdditionalProperties: false,
 							Properties: []*catalog.TPRuleProperty{
 								{
 									Ref:      "#property:user_profile",

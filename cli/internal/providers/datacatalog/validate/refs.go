@@ -186,20 +186,20 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 	return errs
 }
 
-func (rv *RefValidator) handleRefs(rule *catalog.TPRule, baseReference string, fetcher catalog.CatalogResourceFetcher) []ValidationError {
+func (rv *RefValidator) handleRefs(rule *catalog.TPRuleV1, baseReference string, fetcher catalog.CatalogResourceFetcher) []ValidationError {
 	errs := make([]ValidationError, 0)
 
-	if rule.Event != nil {
-		matches := catalog.EventRegex.FindStringSubmatch(rule.Event.Ref)
+	if rule.Event != "" {
+		matches := catalog.EventRegex.FindStringSubmatch(rule.Event)
 		if len(matches) != 2 {
 			errs = append(errs, ValidationError{
-				Reference: rule.Event.Ref,
+				Reference: rule.Event,
 				error:     errInvalidRefFormat,
 			})
 		} else {
 			if event := fetcher.Event(matches[1]); event == nil {
 				errs = append(errs, ValidationError{
-					Reference: rule.Event.Ref,
+					Reference: rule.Event,
 					error:     fmt.Errorf("no event found from reference"),
 				})
 			}

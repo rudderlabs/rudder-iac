@@ -12,7 +12,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:         []Event{},
 		Properties:     []PropertyV1{},
-		TrackingPlans:  []*TrackingPlan{},
+		TrackingPlans:  []*TrackingPlanV1{},
 		CustomTypes:    []CustomTypeV1{},
 		Categories:     []Category{},
 		ReferenceMap:   make(map[string]string),
@@ -91,7 +91,6 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan entities are extracted from yaml successfully", func(t *testing.T) {
 
-		falseVal := false
 		byt := []byte(`
         version: rudder/0.1
         kind: events
@@ -196,18 +195,18 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(emptyCatalog.TrackingPlans))
-		assert.Equal(t, &TrackingPlan{
+
+		falseVal := false
+		assert.Equal(t, &TrackingPlanV1{
 			Name:        "Rudderstack First Tracking Plan",
 			LocalID:     "my_first_tp",
 			Description: "This is my first tracking plan",
-			Rules: []*TPRule{
+			Rules: []*TPRuleV1{
 				{
-					LocalID: "rule_01",
-					Type:    "event_rule",
-					Event: &TPRuleEvent{
-						Ref:            "#/events/mobile_events/user_signed_up",
-						AllowUnplanned: true,
-					},
+					LocalID:              "rule_01",
+					Type:                 "event_rule",
+					Event:                "#/events/mobile_events/user_signed_up",
+					AdditionalProperties: true,
 					Properties: []*TPRuleProperty{
 						{
 							Ref:      "#/properties/base_mobile_props/username",
@@ -245,6 +244,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 					},
 				},
 			},
+			EventProps: nil,
 		}, emptyCatalog.TrackingPlans[0])
 
 		byt = []byte(`
@@ -272,7 +272,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:         []Event{},
 			Properties:     []PropertyV1{},
-			TrackingPlans:  []*TrackingPlan{},
+			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
 			Categories:     []Category{},
 			ReferenceMap:   make(map[string]string),
@@ -571,7 +571,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -639,7 +639,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -697,7 +697,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -749,7 +749,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -807,7 +807,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -1588,7 +1588,7 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		require.NotNil(t, rule.Variants)
 		require.Equal(t, 1, len(rule.Variants))
 
-		assert.Equal(t, "#event:user_signed_up", rule.Event.Ref)
+		assert.Equal(t, "#event:user_signed_up", rule.Event)
 		assert.Equal(t, "#property:page_name", rule.Properties[0].Ref)
 
 		variant := (rule.Variants)[0]

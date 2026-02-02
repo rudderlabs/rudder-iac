@@ -14,7 +14,7 @@ import (
 const TypeEventRule = "event_rule"
 
 type ImportableTrackingPlan struct {
-	localcatalog.TrackingPlan
+	localcatalog.TrackingPlanV1
 }
 
 // ForExport loads the tracking plan from the upstream and returns it in a format
@@ -31,7 +31,7 @@ func (tp *ImportableTrackingPlan) ForExport(
 
 	toReturn := make(map[string]any)
 
-	byt, err := json.Marshal(tp.TrackingPlan)
+	byt, err := json.Marshal(tp.TrackingPlanV1)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling tracking plan: %w", err)
 	}
@@ -49,13 +49,13 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 	resolver resolver.ReferenceResolver,
 	idNamer namer.Namer,
 ) error {
-	tp.TrackingPlan.LocalID = externalID
-	tp.TrackingPlan.Name = upstream.Name
+	tp.TrackingPlanV1.LocalID = externalID
+	tp.TrackingPlanV1.Name = upstream.Name
 	if upstream.Description != nil {
-		tp.TrackingPlan.Description = *upstream.Description
+		tp.TrackingPlanV1.Description = *upstream.Description
 	}
 
-	rules := make([]*localcatalog.TPRule, 0, len(upstream.Events))
+	rules := make([]*localcatalog.TPRuleV1, 0, len(upstream.Events))
 	for _, event := range upstream.Events {
 		eventRef, err := resolver.ResolveToReference(
 			types.EventResourceType,
@@ -96,22 +96,20 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			return fmt.Errorf("processing variants on event %s: %w", event.ID, err)
 		}
 
-		rule := &localcatalog.TPRule{
-			Type:    TypeEventRule,
-			LocalID: ruleLocalID,
-			Event: &localcatalog.TPRuleEvent{
-				Ref:             eventRef,
-				AllowUnplanned:  event.AdditionalProperties,
-				IdentitySection: event.IdentitySection,
-			},
-			Properties: ruleProperties,
-			Variants:   importableVariants.Variants,
+		rule := &localcatalog.TPRuleV1{
+			Type:                 TypeEventRule,
+			LocalID:              ruleLocalID,
+			Event:                eventRef,
+			AdditionalProperties: event.AdditionalProperties,
+			IdentitySection:      event.IdentitySection,
+			Properties:           ruleProperties,
+			Variants:             importableVariants.Variants,
 		}
 
 		rules = append(rules, rule)
 	}
 
-	tp.TrackingPlan.Rules = rules
+	tp.TrackingPlanV1.Rules = rules
 	return nil
 }
 
