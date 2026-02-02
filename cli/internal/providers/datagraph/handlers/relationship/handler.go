@@ -85,9 +85,9 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.RelationshipResource, g
 		}
 		// Validate cardinality value
 		validCardinalities := map[string]bool{
-			"one-to-one":   true,
-			"one-to-many":  true,
-			"many-to-one":  true,
+			"one-to-one":  true,
+			"one-to-many": true,
+			"many-to-one": true,
 		}
 		if !validCardinalities[resource.Cardinality] {
 			return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
@@ -114,85 +114,36 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.RelationshipResource, g
 	return nil
 }
 
-// listAllEntityRelationships fetches all entity relationships for a data graph with pagination
-func (h *HandlerImpl) listAllEntityRelationships(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
-	var allRelationships []*dgModel.RemoteRelationship
-	page := 1
-	perPage := 100
-
-	for {
-		resp, err := h.client.ListEntityRelationships(ctx, dataGraphID, page, perPage, nil, hasExternalID)
-		if err != nil {
-			return nil, fmt.Errorf("listing entity relationships: %w", err)
-		}
-
-		// Add all relationships from current page
-		for i := range resp.Data {
-			allRelationships = append(allRelationships, &dgModel.RemoteRelationship{
-				Relationship: &resp.Data[i],
-			})
-		}
-
-		// Check if there are more pages
-		if resp.Paging.Next == "" {
-			break
-		}
-		page++
-	}
-
-	return allRelationships, nil
-}
-
-// listAllEventRelationships fetches all event relationships for a data graph with pagination
-func (h *HandlerImpl) listAllEventRelationships(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
-	var allRelationships []*dgModel.RemoteRelationship
-	page := 1
-	perPage := 100
-
-	for {
-		resp, err := h.client.ListEventRelationships(ctx, dataGraphID, page, perPage, nil, hasExternalID)
-		if err != nil {
-			return nil, fmt.Errorf("listing event relationships: %w", err)
-		}
-
-		// Add all relationships from current page
-		for i := range resp.Data {
-			// Set DataGraphID if not already set by API
-			if resp.Data[i].DataGraphID == "" {
-				resp.Data[i].DataGraphID = dataGraphID
-			}
-			allRelationships = append(allRelationships, &dgModel.RemoteRelationship{
-				Relationship: &resp.Data[i],
-			})
-		}
-
-		// Check if there are more pages
-		if resp.Paging.Next == "" {
-			break
-		}
-		page++
-	}
-
-	return allRelationships, nil
-}
-
-// listAllRelationshipsForDataGraph fetches all relationships (entity and event) for a data graph
+// listAllRelationshipsForDataGraph fetches all relationships for a data graph with pagination
 func (h *HandlerImpl) listAllRelationshipsForDataGraph(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
 	var allRelationships []*dgModel.RemoteRelationship
+	page := 1
+	perPage := 100
 
-	// Fetch entity relationships
-	entityRelationships, err := h.listAllEntityRelationships(ctx, dataGraphID, hasExternalID)
-	if err != nil {
-		return nil, err
-	}
-	allRelationships = append(allRelationships, entityRelationships...)
+	for {
+		resp, err := h.client.ListRelationships(ctx, &dgClient.ListRelationshipsRequest{
+			DataGraphID:   dataGraphID,
+			Page:          page,
+			PageSize:      perPage,
+			HasExternalID: hasExternalID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing relationships: %w", err)
+		}
 
-	// Fetch event relationships
-	eventRelationships, err := h.listAllEventRelationships(ctx, dataGraphID, hasExternalID)
-	if err != nil {
-		return nil, err
+		// Add all relationships from current page
+		for i := range resp.Data {
+			allRelationships = append(allRelationships, &dgModel.RemoteRelationship{
+				Relationship: &resp.Data[i],
+			})
+		}
+
+		// Check if there are more pages
+		if resp.Paging.Next == "" {
+			break
+		}
+		page++
 	}
-	allRelationships = append(allRelationships, eventRelationships...)
 
 	return allRelationships, nil
 }
@@ -297,10 +248,16 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteRelationship, urnRe
 	fromModelRef := CreateModelReference(fromModelURN)
 	toModelRef := CreateModelReference(toModelURN)
 
+	// Infer type from cardinality: if cardinality is present -> entity, otherwise -> event
+	relationshipType := "event"
+	if remote.Cardinality != "" {
+		relationshipType = "entity"
+	}
+
 	resource := &dgModel.RelationshipResource{
 		ID:            remote.ExternalID,
 		DisplayName:   remote.Name,
-		Type:          remote.Type,
+		Type:          relationshipType,
 		DataGraphRef:  dataGraphRef,
 		FromModelRef:  fromModelRef,
 		ToModelRef:    toModelRef,
@@ -321,37 +278,20 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.RelationshipReso
 	fromModelRemoteID := data.FromModelRef.Value
 	toModelRemoteID := data.ToModelRef.Value
 
-	var remote *dgClient.Relationship
-	var err error
-
-	switch data.Type {
-	case "entity":
-		req := &dgClient.CreateRelationshipRequest{
-			Name:          data.DisplayName,
-			Cardinality:   data.Cardinality,
-			SourceModelID: fromModelRemoteID,
-			TargetModelID: toModelRemoteID,
-			SourceJoinKey: data.SourceJoinKey,
-			TargetJoinKey: data.TargetJoinKey,
-			ExternalID:    data.ID,
-		}
-		remote, err = h.client.CreateEntityRelationship(ctx, dataGraphRemoteID, req)
-	case "event":
-		req := &dgClient.CreateRelationshipRequest{
-			Name:          data.DisplayName,
-			SourceModelID: fromModelRemoteID,
-			TargetModelID: toModelRemoteID,
-			SourceJoinKey: data.SourceJoinKey,
-			TargetJoinKey: data.TargetJoinKey,
-			ExternalID:    data.ID,
-		}
-		remote, err = h.client.CreateEventRelationship(ctx, dataGraphRemoteID, req)
-	default:
-		return nil, fmt.Errorf("invalid relationship type: %s", data.Type)
+	req := &dgClient.CreateRelationshipRequest{
+		DataGraphID:   dataGraphRemoteID,
+		Name:          data.DisplayName,
+		Cardinality:   data.Cardinality,
+		SourceModelID: fromModelRemoteID,
+		TargetModelID: toModelRemoteID,
+		SourceJoinKey: data.SourceJoinKey,
+		TargetJoinKey: data.TargetJoinKey,
+		ExternalID:    data.ID,
 	}
 
+	remote, err := h.client.CreateRelationship(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("creating %s relationship: %w", data.Type, err)
+		return nil, fmt.Errorf("creating relationship: %w", err)
 	}
 
 	return &dgModel.RelationshipState{
@@ -364,35 +304,20 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.RelationshipR
 	fromModelRemoteID := newData.FromModelRef.Value
 	toModelRemoteID := newData.ToModelRef.Value
 
-	var remote *dgClient.Relationship
-	var err error
-
-	switch newData.Type {
-	case "entity":
-		req := &dgClient.UpdateRelationshipRequest{
-			Name:          newData.DisplayName,
-			Cardinality:   newData.Cardinality,
-			SourceModelID: fromModelRemoteID,
-			TargetModelID: toModelRemoteID,
-			SourceJoinKey: newData.SourceJoinKey,
-			TargetJoinKey: newData.TargetJoinKey,
-		}
-		remote, err = h.client.UpdateEntityRelationship(ctx, dataGraphRemoteID, oldState.ID, req)
-	case "event":
-		req := &dgClient.UpdateRelationshipRequest{
-			Name:          newData.DisplayName,
-			SourceModelID: fromModelRemoteID,
-			TargetModelID: toModelRemoteID,
-			SourceJoinKey: newData.SourceJoinKey,
-			TargetJoinKey: newData.TargetJoinKey,
-		}
-		remote, err = h.client.UpdateEventRelationship(ctx, dataGraphRemoteID, oldState.ID, req)
-	default:
-		return nil, fmt.Errorf("invalid relationship type: %s", newData.Type)
+	req := &dgClient.UpdateRelationshipRequest{
+		DataGraphID:    dataGraphRemoteID,
+		RelationshipID: oldState.ID,
+		Name:           newData.DisplayName,
+		Cardinality:    newData.Cardinality,
+		SourceModelID:  fromModelRemoteID,
+		TargetModelID:  toModelRemoteID,
+		SourceJoinKey:  newData.SourceJoinKey,
+		TargetJoinKey:  newData.TargetJoinKey,
 	}
 
+	remote, err := h.client.UpdateRelationship(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("updating %s relationship: %w", newData.Type, err)
+		return nil, fmt.Errorf("updating relationship: %w", err)
 	}
 
 	return &dgModel.RelationshipState{
@@ -402,27 +327,22 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.RelationshipR
 
 func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.RelationshipResource, remoteID string) (*dgModel.RelationshipState, error) {
 	dataGraphRemoteID := data.DataGraphRef.Value
-	relationshipType := data.Type
 
 	// Set external ID on the remote resource
-	var setErr error
-	if relationshipType == "entity" {
-		setErr = h.client.SetEntityRelationshipExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
-	} else {
-		setErr = h.client.SetEventRelationshipExternalID(ctx, dataGraphRemoteID, remoteID, data.ID)
-	}
+	_, setErr := h.client.SetRelationshipExternalID(ctx, &dgClient.SetRelationshipExternalIDRequest{
+		DataGraphID:    dataGraphRemoteID,
+		RelationshipID: remoteID,
+		ExternalID:     data.ID,
+	})
 	if setErr != nil {
 		return nil, fmt.Errorf("setting external ID: %w", setErr)
 	}
 
 	// Fetch the remote resource to get updated data
-	var remote *dgClient.Relationship
-	var getErr error
-	if relationshipType == "entity" {
-		remote, getErr = h.client.GetEntityRelationship(ctx, dataGraphRemoteID, remoteID)
-	} else {
-		remote, getErr = h.client.GetEventRelationship(ctx, dataGraphRemoteID, remoteID)
-	}
+	remote, getErr := h.client.GetRelationship(ctx, &dgClient.GetRelationshipRequest{
+		DataGraphID:    dataGraphRemoteID,
+		RelationshipID: remoteID,
+	})
 	if getErr != nil {
 		return nil, fmt.Errorf("getting relationship: %w", getErr)
 	}
@@ -435,18 +355,12 @@ func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.RelationshipReso
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *dgModel.RelationshipResource, oldState *dgModel.RelationshipState) error {
 	dataGraphRemoteID := oldData.DataGraphRef.Value
 
-	var err error
-	switch oldData.Type {
-	case "entity":
-		err = h.client.DeleteEntityRelationship(ctx, dataGraphRemoteID, oldState.ID)
-	case "event":
-		err = h.client.DeleteEventRelationship(ctx, dataGraphRemoteID, oldState.ID)
-	default:
-		return fmt.Errorf("invalid relationship type: %s", oldData.Type)
-	}
-
+	err := h.client.DeleteRelationship(ctx, &dgClient.DeleteRelationshipRequest{
+		DataGraphID:    dataGraphRemoteID,
+		RelationshipID: oldState.ID,
+	})
 	if err != nil {
-		return fmt.Errorf("deleting %s relationship: %w", oldData.Type, err)
+		return fmt.Errorf("deleting relationship: %w", err)
 	}
 	return nil
 }
