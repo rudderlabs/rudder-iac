@@ -365,6 +365,101 @@ func TestImportIds_Validate(t *testing.T) {
 	}
 }
 
+func TestMetadata_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		metadata    Metadata
+		expectError bool
+		errorText   string
+	}{
+		{
+			name: "valid with URN-based imports",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid with LocalID-based imports",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{LocalID: "my-resource", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid - both URN and LocalID",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "ws-123",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", LocalID: "conflict", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorText:   "urn and local_id are mutually exclusive",
+		},
+		{
+			name: "invalid - missing workspace_id",
+			metadata: Metadata{
+				Name: "test",
+				Import: &WorkspacesImportMetadata{
+					Workspaces: []WorkspaceImportMetadata{
+						{
+							WorkspaceID: "",
+							Resources: []ImportIds{
+								{URN: "data-graph:my-graph", RemoteID: "remote-1"},
+							},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorText:   "missing required field 'workspace_id'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.metadata.Validate()
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorText)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestMetadata_ToMap(t *testing.T) {
 	t.Parallel()
 
