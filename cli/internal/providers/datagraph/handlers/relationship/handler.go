@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -248,7 +249,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteRelationship, urnRe
 	}
 
 	// Resolve the data graph's URN from its remote ID
-	dataGraphURN, err := urnResolver.GetURNByID("data-graph", remote.DataGraphID)
+	dataGraphURN, err := urnResolver.GetURNByID(datagraph.HandlerMetadata.ResourceType, remote.DataGraphID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving data graph URN: %w", err)
 	}
