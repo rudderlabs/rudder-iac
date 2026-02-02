@@ -391,10 +391,10 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Description: "Custom type for email validation",
 			Type:        "string",
 			Config: map[string]interface{}{
-				"format":     "email",
-				"min_length": float64(5),
-				"max_length": float64(255),
-				"pattern":    "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+				"format":            "email",
+				"min_length":        float64(5),
+				"max_length":        float64(255),
+				"pattern":           "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
 				"unsupportedConfig": "some-value",
 			},
 		}, emptyCatalog.CustomTypes[0])
