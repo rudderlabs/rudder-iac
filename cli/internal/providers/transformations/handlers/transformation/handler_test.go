@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -18,15 +19,19 @@ import (
 
 // mockTransformationStore implements the TransformationStore interface for testing
 type mockTransformationStore struct {
-	createCalled              bool
-	updateCalled              bool
-	deleteCalled              bool
-	listTransformationsCalled bool
+	createCalled                      bool
+	updateCalled                      bool
+	deleteCalled                      bool
+	listTransformationsCalled         bool
+	getTransformationCalled           bool
+	setTransformationExternalIDCalled bool
 
-	createFunc              func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
-	updateFunc              func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error)
-	deleteFunc              func(ctx context.Context, id string) error
-	listTransformationsFunc func(ctx context.Context) ([]*transformations.Transformation, error)
+	createFunc                      func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
+	updateFunc                      func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error)
+	deleteFunc                      func(ctx context.Context, id string) error
+	listTransformationsFunc         func(ctx context.Context) ([]*transformations.Transformation, error)
+	getTransformationFunc           func(ctx context.Context, id string) (*transformations.Transformation, error)
+	setTransformationExternalIDFunc func(ctx context.Context, id string, externalID string) error
 }
 
 func newMockTransformationStore() *mockTransformationStore {
@@ -83,7 +88,19 @@ func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*t
 }
 
 func (m *mockTransformationStore) GetTransformation(ctx context.Context, id string) (*transformations.Transformation, error) {
+	m.getTransformationCalled = true
+	if m.getTransformationFunc != nil {
+		return m.getTransformationFunc(ctx, id)
+	}
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
+	m.setTransformationExternalIDCalled = true
+	if m.setTransformationExternalIDFunc != nil {
+		return m.setTransformationExternalIDFunc(ctx, id, externalID)
+	}
+	return nil
 }
 
 func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
@@ -103,6 +120,10 @@ func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transfo
 }
 
 func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
 	return fmt.Errorf("not implemented")
 }
 
@@ -181,6 +202,17 @@ func TestValidateSpec(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "valid spec with empty language - validation deferred to resource",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+			},
+			expectedError: true,
+			errorContains: "language is required",
+		},
+		{
 			name: "missing id",
 			spec: &model.TransformationSpec{
 				Name:     "Test Transformation",
@@ -221,17 +253,6 @@ func TestValidateSpec(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "either code or file must be specified",
-		},
-		{
-			name: "invalid language",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "golang",
-				Code:     "package main",
-			},
-			expectedError: true,
-			errorContains: "language must be 'javascript' or 'python'",
 		},
 	}
 
@@ -428,6 +449,17 @@ func TestValidateResource(t *testing.T) {
 			expectedError: true,
 			errorContains: "validating code syntax",
 		},
+		{
+			name: "invalid language",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "golang",
+				Code:     "package main",
+			},
+			expectedError: true,
+			errorContains: "language must be javascript or python",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -574,14 +606,101 @@ func TestLoadRemoteResources(t *testing.T) {
 func TestLoadImportableResources(t *testing.T) {
 	t.Parallel()
 
-	mockStore := newMockTransformationStore()
-	handler := transformation.NewHandler(mockStore)
+	t.Run("returns only resources without external IDs", func(t *testing.T) {
+		t.Parallel()
 
-	importables, err := handler.Impl.LoadImportableResources(context.Background())
+		mockStore := newMockTransformationStore()
+		mockStore.listTransformationsFunc = func(ctx context.Context) ([]*transformations.Transformation, error) {
+			return []*transformations.Transformation{
+				{
+					ID:          "trans-1",
+					VersionID:   "ver-1",
+					Name:        "Transformation 1",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					ExternalID:  "", // No external ID - importable
+					WorkspaceID: "ws-1",
+				},
+				{
+					ID:          "trans-2",
+					VersionID:   "ver-2",
+					Name:        "Transformation 2",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					ExternalID:  "ext-2", // Has external ID - managed
+					WorkspaceID: "ws-1",
+				},
+			}, nil
+		}
 
-	require.NoError(t, err)
-	require.NotNil(t, importables)
-	assert.Len(t, importables, 0)
+		handler := transformation.NewHandler(mockStore)
+
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.Len(t, importables, 1)
+		assert.Equal(t, "trans-1", importables[0].ID)
+		assert.Equal(t, "", importables[0].ExternalID)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listTransformationsFunc = func(ctx context.Context) ([]*transformations.Transformation, error) {
+			return []*transformations.Transformation{}, nil
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.Len(t, importables, 0)
+	})
+
+	t.Run("all resources have external IDs", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listTransformationsFunc = func(ctx context.Context) ([]*transformations.Transformation, error) {
+			return []*transformations.Transformation{
+				{
+					ID:          "trans-1",
+					VersionID:   "ver-1",
+					Name:        "Transformation 1",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					ExternalID:  "ext-1",
+					WorkspaceID: "ws-1",
+				},
+			}, nil
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.Len(t, importables, 0)
+	})
+
+	t.Run("API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listTransformationsFunc = func(ctx context.Context) ([]*transformations.Transformation, error) {
+			return nil, fmt.Errorf("API error")
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "listing transformations")
+		assert.Nil(t, importables)
+	})
 }
 
 func TestMapRemoteToState(t *testing.T) {
@@ -924,5 +1043,310 @@ func TestDelete(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "trans-123", capturedID)
+	})
+}
+
+func TestImport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.getTransformationFunc = func(ctx context.Context, id string) (*transformations.Transformation, error) {
+			return &transformations.Transformation{
+				ID:          "trans-123",
+				VersionID:   "ver-456",
+				Name:        "Remote Transformation",
+				Description: "Remote description",
+				Code:        "export function transformEvent(event, metadata) { return event; }",
+				Language:    "javascript",
+				WorkspaceID: "ws-789",
+			}, nil
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		resource := &model.TransformationResource{
+			ID:          "ext-new-123",
+			Name:        "Local Transformation",
+			Description: "Local description",
+			Code:        "export function transformEvent(event, metadata) { return event; }",
+			Language:    "javascript",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), resource, "trans-123")
+
+		require.NoError(t, err)
+		require.NotNil(t, state)
+		assert.Equal(t, "trans-123", state.ID)
+		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, mockStore.getTransformationCalled)
+		assert.True(t, mockStore.setTransformationExternalIDCalled)
+		assert.True(t, mockStore.updateCalled)
+	})
+
+	t.Run("GetTransformation API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.getTransformationFunc = func(ctx context.Context, id string) (*transformations.Transformation, error) {
+			return nil, fmt.Errorf("API error")
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		resource := &model.TransformationResource{
+			ID:   "ext-new-123",
+			Name: "Local Transformation",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), resource, "trans-123")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "getting transformation trans-123")
+		assert.Nil(t, state)
+	})
+
+	t.Run("SetTransformationExternalID API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.getTransformationFunc = func(ctx context.Context, id string) (*transformations.Transformation, error) {
+			return &transformations.Transformation{
+				ID:        "trans-123",
+				VersionID: "ver-456",
+			}, nil
+		}
+		mockStore.setTransformationExternalIDFunc = func(ctx context.Context, id string, externalID string) error {
+			return fmt.Errorf("API error")
+		}
+
+		handler := transformation.NewHandler(mockStore)
+
+		resource := &model.TransformationResource{
+			ID:   "ext-new-123",
+			Name: "Local Transformation",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), resource, "trans-123")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "setting transformation external ID")
+		assert.Nil(t, state)
+	})
+}
+
+// Mock implementations for namer and resolver
+type mockNamer struct {
+	nameFunc func(scope namer.ScopeName) (string, error)
+}
+
+func (m *mockNamer) Name(scope namer.ScopeName) (string, error) {
+	if m.nameFunc != nil {
+		return m.nameFunc(scope)
+	}
+	return scope.Name, nil
+}
+
+func (m *mockNamer) Load(names []namer.ScopeName) error {
+	return nil
+}
+
+type mockResolver struct{}
+
+func (m *mockResolver) ResolveReference(urn string) (any, error) {
+	return nil, nil
+}
+
+func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
+	return "", nil
+}
+
+func TestFormatForExport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty remotes returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		namer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(map[string]*model.RemoteTransformation{}, namer, resolver)
+
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("javascript transformation exports spec and code file", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"test-trans": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					VersionID:   "ver-456",
+					Name:        "Test Transformation",
+					Description: "Test description",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		namer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+
+		// Check YAML spec file
+		assert.Equal(t, "transformations/test-trans.yaml", result[0].RelativePath)
+
+		// Check code file
+		assert.Equal(t, "transformations/javascript/test-trans.js", result[1].RelativePath)
+		assert.Equal(t, "export function transformEvent(event, metadata) { return event; }", result[1].Content)
+	})
+
+	t.Run("python transformation exports to python folder", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"test-trans": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					VersionID:   "ver-456",
+					Name:        "Test Transformation",
+					Description: "Test description",
+					Code:        "def transform(event):\n    return event",
+					Language:    "python",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		namer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+
+		// Check code file path
+		assert.Equal(t, "transformations/python/test-trans.py", result[1].RelativePath)
+		assert.Equal(t, "def transform(event):\n    return event", result[1].Content)
+	})
+
+	t.Run("unsupported language returns error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"test-trans": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					VersionID:   "ver-456",
+					Name:        "Test Transformation",
+					Code:        "package main",
+					Language:    "golang",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		namer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported language 'golang'")
+		assert.Nil(t, result)
+	})
+
+	t.Run("namer error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"test-trans": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					VersionID:   "ver-456",
+					Name:        "Test Transformation",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		namer := &mockNamer{
+			nameFunc: func(scope namer.ScopeName) (string, error) {
+				return "", fmt.Errorf("namer error")
+			},
+		}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "generating file name for transformation")
+		assert.Nil(t, result)
+	})
+
+	t.Run("multiple transformations", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"test-trans-1": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					VersionID:   "ver-456",
+					Name:        "Test Transformation 1",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					WorkspaceID: "ws-789",
+				},
+			},
+			"test-trans-2": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-456",
+					VersionID:   "ver-789",
+					Name:        "Test Transformation 2",
+					Code:        "def transform(event):\n    return event",
+					Language:    "python",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		namer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+
+		require.NoError(t, err)
+		require.Len(t, result, 4) // 2 specs + 2 code files
 	})
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
@@ -40,18 +41,23 @@ func (args *PropertyArgs) DiffUpstream(upstream *catalog.Property) bool {
 	return !reflect.DeepEqual(args.Config, upstreamConf)
 }
 
-const PropertyResourceType = "property"
-
-func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, urnFromRef func(string) string) error {
+func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, urnFromRef func(string) string) error {
 	args.Name = prop.Name
 	args.Description = prop.Description
-	args.Type = prop.Type
 	args.Config = make(map[string]interface{})
 	for k, v := range prop.Config {
 		args.Config[k] = v
 	}
 
-	if strings.HasPrefix(prop.Type, "#/custom-types/") {
+	// Handle single type field
+	args.Type = prop.Type
+	switch {
+	case len(prop.Types) > 0:
+		// Sort types for consistency and join to comma-separated string
+		sort.Strings(prop.Types)
+		args.Type = strings.Join(prop.Types, ",")
+		return nil
+	case strings.HasPrefix(prop.Type, "#custom-type:"):
 		customTypeURN := urnFromRef(prop.Type)
 
 		if customTypeURN == "" {
@@ -61,43 +67,33 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.Property, ur
 			URN:      customTypeURN,
 			Property: "name",
 		}
-	}
-
-	if prop.Type == "array" && prop.Config != nil {
-		itemTypes, ok := prop.Config["itemTypes"]
-		if !ok {
-			return nil
-		}
-
-		// sort itemTypes array lexicographically
-		itemTypesArray := itemTypes.([]any)
-		utils.SortLexicographically(itemTypesArray)
-
-		for _, item := range itemTypesArray {
-			val := item.(string)
-
-			if !strings.HasPrefix(val, "#/custom-types/") {
-				continue
-			}
-
-			customTypeURN := urnFromRef(val)
+		return nil
+		// Handle item_type and item_types fields - merge into config["item_types"]
+	case prop.ItemType != "":
+		// Single item type - store as array with one element in config
+		if strings.HasPrefix(prop.ItemType, "#custom-type:") {
+			customTypeURN := urnFromRef(prop.ItemType)
 			if customTypeURN == "" {
-				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", val)
+				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", prop.ItemType)
 			}
-
-			args.Config["itemTypes"] = []interface{}{
+			args.Config["item_types"] = []interface{}{
 				resources.PropertyRef{
 					URN:      customTypeURN,
 					Property: "name",
 				},
 			}
+		} else {
+			args.Config["item_types"] = []interface{}{prop.ItemType}
 		}
-	}
-
-	// sort the order of types for a multi type property
-	if multiTypeProp := strings.Split(prop.Type, ","); len(multiTypeProp) > 1 {
-		sort.Strings(multiTypeProp)
-		args.Type = strings.Join(multiTypeProp, ",")
+	case len(prop.ItemTypes) > 0:
+		// Multiple item types - store as array in config
+		// Sort for consistency before processing
+		sort.Strings(prop.ItemTypes)
+		itemTypes := make([]interface{}, len(prop.ItemTypes))
+		for i, itemType := range prop.ItemTypes {
+			itemTypes[i] = itemType
+		}
+		args.Config["item_types"] = itemTypes
 	}
 
 	return nil
@@ -108,19 +104,21 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 	args.Name = property.Name
 	args.Description = property.Description
 	args.Type = property.Type
-	// Deep copy the config map
+	// Deep copy the config map and convert camelCase keys to snake_case
 	args.Config = make(map[string]interface{})
 	for k, v := range property.Config {
-		// sort itemTypes array lexicographically
-		if k == "itemTypes" {
+		// Convert camelCase key to snake_case
+		snakeKey := utils.ToSnakeCase(k)
+		// sort item_types array lexicographically
+		if snakeKey == "item_types" {
 			utils.SortLexicographically(v.([]any))
 		}
-		args.Config[k] = v
+		args.Config[snakeKey] = v
 	}
 
 	// Check if the property is referring to a customType using property.DefinitionId
 	if property.DefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.DefinitionId)
+		urn, err := getURNFromRemoteId(types.CustomTypeResourceType, property.DefinitionId)
 		switch {
 		case err == nil:
 			args.Type = resources.PropertyRef{
@@ -135,20 +133,20 @@ func (args *PropertyArgs) FromRemoteProperty(property *catalog.Property, getURNF
 		args.Config = map[string]interface{}{}
 	}
 
-	// Handle array types with custom type references in itemTypes
+	// Handle array types with custom type references in item_types
 	if property.Type == "array" && property.Config != nil && property.ItemDefinitionId != "" {
-		urn, err := getURNFromRemoteId(CustomTypeResourceType, property.ItemDefinitionId)
+		urn, err := getURNFromRemoteId(types.CustomTypeResourceType, property.ItemDefinitionId)
 		switch {
 		case err == nil:
-			// Update itemTypes in config to reference the same custom type
-			args.Config["itemTypes"] = []interface{}{
+			// Update item_types in config to reference the same custom type
+			args.Config["item_types"] = []interface{}{
 				resources.PropertyRef{
 					URN:      urn,
 					Property: "name",
 				},
 			}
 		case err == resources.ErrRemoteResourceExternalIdNotFound:
-			args.Config["itemTypes"] = []interface{}{nil}
+			args.Config["item_types"] = []interface{}{nil}
 		default:
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -67,7 +67,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 	}
 
 	collection.Set(
-		state.CategoryResourceType,
+		types.CategoryResourceType,
 		resourceMap,
 	)
 
@@ -83,7 +83,7 @@ func (p *CategoryImportProvider) idResources(
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to categories")
-	categories := collection.GetAll(state.CategoryResourceType)
+	categories := collection.GetAll(types.CategoryResourceType)
 
 	for _, category := range categories {
 		data, ok := category.Data.(*catalog.Category)
@@ -93,7 +93,7 @@ func (p *CategoryImportProvider) idResources(
 
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  data.Name,
-			Scope: state.CategoryResourceType})
+			Scope: types.CategoryResourceType})
 		if err != nil {
 			return fmt.Errorf("generating externalID for category %s: %w", data.Name, err)
 		}
@@ -116,7 +116,7 @@ func (p *CategoryImportProvider) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting categories for export to file")
 
-	categories := collection.GetAll(state.CategoryResourceType)
+	categories := collection.GetAll(types.CategoryResourceType)
 	if len(categories) == 0 {
 		return nil, nil
 	}

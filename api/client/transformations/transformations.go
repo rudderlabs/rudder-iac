@@ -22,6 +22,7 @@ type TransformationStore interface {
 	GetTransformation(ctx context.Context, id string) (*Transformation, error)
 	ListTransformations(ctx context.Context) ([]*Transformation, error)
 	DeleteTransformation(ctx context.Context, id string) error
+	SetTransformationExternalID(ctx context.Context, id string, externalID string) error
 
 	// Library operations
 	CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error)
@@ -29,6 +30,7 @@ type TransformationStore interface {
 	GetLibrary(ctx context.Context, id string) (*TransformationLibrary, error)
 	ListLibraries(ctx context.Context) ([]*TransformationLibrary, error)
 	DeleteLibrary(ctx context.Context, id string) error
+	SetLibraryExternalID(ctx context.Context, id string, externalID string) error
 
 	// Batch operations
 	BatchPublish(ctx context.Context, req *BatchPublishRequest) error
@@ -138,6 +140,22 @@ func (r *rudderTransformationStore) DeleteTransformation(ctx context.Context, id
 	return nil
 }
 
+// SetTransformationExternalID sets the external ID for a transformation
+func (r *rudderTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
+	req := SetExternalIDRequest{ExternalID: externalID}
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshalling set external ID request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/external-id", transformationsPrefix, id)
+	_, err = r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("setting transformation external ID: %w", err)
+	}
+	return nil
+}
+
 // Library operations
 
 // CreateLibrary creates a new transformation library
@@ -226,6 +244,22 @@ func (r *rudderTransformationStore) DeleteLibrary(ctx context.Context, id string
 	_, err := r.client.Do(ctx, "DELETE", path, nil)
 	if err != nil {
 		return fmt.Errorf("deleting library: %w", err)
+	}
+	return nil
+}
+
+// SetLibraryExternalID sets the external ID for a library
+func (r *rudderTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
+	req := SetExternalIDRequest{ExternalID: externalID}
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshalling set external ID request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/external-id", librariesPrefix, id)
+	_, err = r.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("setting library external ID: %w", err)
 	}
 	return nil
 }

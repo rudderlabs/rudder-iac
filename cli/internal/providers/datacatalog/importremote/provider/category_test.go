@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type mockCategoryCatalog struct {
@@ -46,7 +46,7 @@ func TestCategoryLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		categories := collection.GetAll(state.CategoryResourceType)
+		categories := collection.GetAll(types.CategoryResourceType)
 		assert.Equal(t, 2, len(categories))
 
 		resourceIDs := make([]string, 0, len(categories))
@@ -76,7 +76,7 @@ func TestCategoryLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		categories := collection.GetAll(state.CategoryResourceType)
+		categories := collection.GetAll(types.CategoryResourceType)
 		require.Equal(t, 2, len(categories))
 
 		cat1, ok := categories["cat1"]

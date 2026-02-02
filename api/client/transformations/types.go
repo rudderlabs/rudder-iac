@@ -77,6 +77,10 @@ type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
 }
 
+type SetExternalIDRequest struct {
+	ExternalID string `json:"externalId"`
+}
+
 // Batch Test API Types
 
 // TestDefinition defines the structure of a test case

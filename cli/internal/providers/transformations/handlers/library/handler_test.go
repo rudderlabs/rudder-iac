@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -18,15 +20,19 @@ import (
 
 // mockTransformationStore implements the TransformationStore interface for testing
 type mockTransformationStore struct {
-	createLibraryCalled bool
-	updateLibraryCalled bool
-	deleteLibraryCalled bool
-	listLibrariesCalled bool
+	createLibraryCalled        bool
+	updateLibraryCalled        bool
+	deleteLibraryCalled        bool
+	listLibrariesCalled        bool
+	getLibraryCalled           bool
+	setLibraryExternalIDCalled bool
 
-	createLibraryFunc func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
-	updateLibraryFunc func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
-	deleteLibraryFunc func(ctx context.Context, id string) error
-	listLibrariesFunc func(ctx context.Context) ([]*transformations.TransformationLibrary, error)
+	createLibraryFunc        func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
+	updateLibraryFunc        func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
+	deleteLibraryFunc        func(ctx context.Context, id string) error
+	listLibrariesFunc        func(ctx context.Context) ([]*transformations.TransformationLibrary, error)
+	getLibraryFunc           func(ctx context.Context, id string) (*transformations.TransformationLibrary, error)
+	setLibraryExternalIDFunc func(ctx context.Context, id string, externalID string) error
 }
 
 func newMockTransformationStore() *mockTransformationStore {
@@ -85,7 +91,19 @@ func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transfo
 }
 
 func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
+	m.getLibraryCalled = true
+	if m.getLibraryFunc != nil {
+		return m.getLibraryFunc(ctx, id)
+	}
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
+	m.setLibraryExternalIDCalled = true
+	if m.setLibraryExternalIDFunc != nil {
+		return m.setLibraryExternalIDFunc(ctx, id, externalID)
+	}
+	return nil
 }
 
 func (m *mockTransformationStore) CreateTransformation(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
@@ -105,6 +123,10 @@ func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*t
 }
 
 func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
 	return fmt.Errorf("not implemented")
 }
 
@@ -241,18 +263,6 @@ func TestValidateSpec(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "either code or file must be specified",
-		},
-		{
-			name: "invalid language",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "rust",
-				Code:       "fn helper() {}",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "language must be 'javascript' or 'python'",
 		},
 	}
 
@@ -470,6 +480,18 @@ func TestValidateResource(t *testing.T) {
 			expectedError: true,
 			errorContains: "import_name must be camelCase of name",
 		},
+		{
+			name: "invalid language",
+			resource: &model.LibraryResource{
+				ID:         "test-lib",
+				Name:       "Test Library",
+				Language:   "rust",
+				Code:       "fn helper() {}",
+				ImportName: "testLibrary",
+			},
+			expectedError: true,
+			errorContains: "language must be javascript or python",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -622,14 +644,120 @@ func TestLoadRemoteResources(t *testing.T) {
 func TestLoadImportableResources(t *testing.T) {
 	t.Parallel()
 
-	mockStore := newMockTransformationStore()
-	handler := library.NewHandler(mockStore)
+	t.Run("returns only resources without external IDs", func(t *testing.T) {
+		t.Parallel()
 
-	importables, err := handler.Impl.LoadImportableResources(context.Background())
+		mockStore := newMockTransformationStore()
+		mockStore.listLibrariesFunc = func(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
+			return []*transformations.TransformationLibrary{
+				{
+					ID:          "lib-1",
+					VersionID:   "ver-1",
+					Name:        "Library 1",
+					Description: "Test library 1",
+					Code:        "export function helper1() { return true; }",
+					Language:    "javascript",
+					ImportName:  "library1",
+					WorkspaceID: "ws-1",
+					ExternalID:  "", // No external ID - should be included
+				},
+				{
+					ID:          "lib-2",
+					VersionID:   "ver-2",
+					Name:        "Library 2",
+					Description: "Test library 2",
+					Code:        "export function helper2() { return true; }",
+					Language:    "javascript",
+					ImportName:  "library2",
+					WorkspaceID: "ws-1",
+					ExternalID:  "ext-lib-2", // Has external ID - should be filtered out
+				},
+				{
+					ID:          "lib-3",
+					VersionID:   "ver-3",
+					Name:        "Library 3",
+					Description: "Test library 3",
+					Code:        "export function helper3() { return true; }",
+					Language:    "javascript",
+					ImportName:  "library3",
+					WorkspaceID: "ws-1",
+					ExternalID:  "", // No external ID - should be included
+				},
+			}, nil
+		}
 
-	require.NoError(t, err)
-	require.NotNil(t, importables)
-	assert.Len(t, importables, 0)
+		handler := library.NewHandler(mockStore)
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.NotNil(t, importables)
+		assert.Len(t, importables, 2) // Only lib-1 and lib-3 (no external IDs)
+		assert.Equal(t, "lib-1", importables[0].ID)
+		assert.Equal(t, "Library 1", importables[0].Name)
+		assert.Equal(t, "lib-3", importables[1].ID)
+		assert.Equal(t, "Library 3", importables[1].Name)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listLibrariesFunc = func(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
+			return []*transformations.TransformationLibrary{}, nil
+		}
+
+		handler := library.NewHandler(mockStore)
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.NotNil(t, importables)
+		assert.Len(t, importables, 0)
+	})
+
+	t.Run("all have external IDs", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listLibrariesFunc = func(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
+			return []*transformations.TransformationLibrary{
+				{
+					ID:         "lib-1",
+					VersionID:  "ver-1",
+					Name:       "Library 1",
+					ExternalID: "ext-lib-1",
+				},
+				{
+					ID:         "lib-2",
+					VersionID:  "ver-2",
+					Name:       "Library 2",
+					ExternalID: "ext-lib-2",
+				},
+			}, nil
+		}
+
+		handler := library.NewHandler(mockStore)
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.NoError(t, err)
+		require.NotNil(t, importables)
+		assert.Len(t, importables, 0) // All filtered out
+	})
+
+	t.Run("API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.listLibrariesFunc = func(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
+			return nil, fmt.Errorf("API error")
+		}
+
+		handler := library.NewHandler(mockStore)
+		importables, err := handler.Impl.LoadImportableResources(context.Background())
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "listing libraries")
+		assert.Nil(t, importables)
+	})
 }
 
 func TestMapRemoteToState(t *testing.T) {
@@ -985,4 +1113,353 @@ func TestDelete(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "lib-123", capturedID)
 	})
+}
+
+func TestImport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var capturedExternalID string
+		mockStore := newMockTransformationStore()
+		mockStore.getLibraryFunc = func(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
+			return &transformations.TransformationLibrary{
+				ID:          "lib-remote-123",
+				VersionID:   "ver-remote-456",
+				Name:        "Remote Library",
+				Description: "Remote library description",
+				Code:        "export function helper() { return true; }",
+				Language:    "javascript",
+				ImportName:  "remoteLibrary",
+				WorkspaceID: "ws-789",
+				ExternalID:  "", // No external ID initially
+			}, nil
+		}
+		mockStore.setLibraryExternalIDFunc = func(ctx context.Context, id string, externalID string) error {
+			capturedExternalID = externalID
+			return nil
+		}
+
+		handler := library.NewHandler(mockStore)
+
+		data := &model.LibraryResource{
+			ID:         "ext-new-123",
+			Name:       "Imported Library",
+			Language:   "javascript",
+			Code:       "export function helper() { return true; }",
+			ImportName: "importedLibrary",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), data, "lib-remote-123")
+
+		require.NoError(t, err)
+		require.NotNil(t, state)
+		assert.Equal(t, "lib-remote-123", state.ID)
+		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.Equal(t, "ext-new-123", capturedExternalID)
+		assert.True(t, mockStore.getLibraryCalled)
+		assert.True(t, mockStore.setLibraryExternalIDCalled)
+		assert.True(t, mockStore.updateLibraryCalled)
+	})
+
+	t.Run("GetLibrary API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.getLibraryFunc = func(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
+			return nil, fmt.Errorf("library not found")
+		}
+
+		handler := library.NewHandler(mockStore)
+
+		data := &model.LibraryResource{
+			ID:         "ext-new-123",
+			Name:       "Imported Library",
+			Language:   "javascript",
+			Code:       "export function helper() { return true; }",
+			ImportName: "importedLibrary",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), data, "lib-remote-123")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "getting library")
+		assert.Nil(t, state)
+	})
+
+	t.Run("SetLibraryExternalID API error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.getLibraryFunc = func(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
+			return &transformations.TransformationLibrary{
+				ID:          "lib-remote-123",
+				VersionID:   "ver-remote-456",
+				Name:        "Remote Library",
+				Description: "Remote library description",
+				Code:        "export function helper() { return true; }",
+				Language:    "javascript",
+				ImportName:  "remoteLibrary",
+				WorkspaceID: "ws-789",
+			}, nil
+		}
+		mockStore.setLibraryExternalIDFunc = func(ctx context.Context, id string, externalID string) error {
+			return fmt.Errorf("API error setting external ID")
+		}
+
+		handler := library.NewHandler(mockStore)
+
+		data := &model.LibraryResource{
+			ID:         "ext-new-123",
+			Name:       "Imported Library",
+			Language:   "javascript",
+			Code:       "export function helper() { return true; }",
+			ImportName: "importedLibrary",
+		}
+
+		state, err := handler.Impl.Import(context.Background(), data, "lib-remote-123")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "setting library external ID")
+		assert.Nil(t, state)
+	})
+}
+
+func TestFormatForExport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty remotes returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{}
+		idNamer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("javascript library exports spec and code file", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{
+			"my-library": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:          "remote-lib-123",
+					VersionID:   "ver-456",
+					Name:        "My Library",
+					Description: "Test library",
+					Code:        "export function helper() { return true; }",
+					Language:    "javascript",
+					ImportName:  "myLibrary",
+					WorkspaceID: "ws-789",
+					ExternalID:  "",
+				},
+			},
+		}
+		idNamer := &mockNamer{nameFunc: func(scope namer.ScopeName) (string, error) {
+			return "my-library", nil
+		}}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result, 2) // Spec YAML + Code file
+
+		// Check YAML spec
+		assert.Equal(t, "transformations/my-library.yaml", result[0].RelativePath)
+		assert.IsType(t, &specs.Spec{}, result[0].Content)
+
+		spec := result[0].Content.(*specs.Spec)
+		assert.Equal(t, "transformation-library", spec.Kind)
+		assert.Equal(t, "my-library", spec.Spec["id"])
+		assert.Equal(t, "My Library", spec.Spec["name"])
+		assert.Equal(t, "Test library", spec.Spec["description"])
+		assert.Equal(t, "javascript", spec.Spec["language"])
+		assert.Equal(t, "myLibrary", spec.Spec["import_name"])
+		assert.Equal(t, "transformations/javascript/my-library.js", spec.Spec["file"])
+
+		// Check code file
+		assert.Equal(t, "transformations/javascript/my-library.js", result[1].RelativePath)
+		assert.Equal(t, "export function helper() { return true; }", result[1].Content)
+	})
+
+	t.Run("python library exports to python folder", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{
+			"my-py-lib": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:          "remote-lib-123",
+					VersionID:   "ver-456",
+					Name:        "My Python Library",
+					Description: "Test python library",
+					Code:        "def helper():\n    return True",
+					Language:    "python",
+					ImportName:  "myPyLib",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+		idNamer := &mockNamer{nameFunc: func(scope namer.ScopeName) (string, error) {
+			return "my-py-lib", nil
+		}}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result, 2)
+
+		// Check YAML spec has .py extension
+		spec := result[0].Content.(*specs.Spec)
+		assert.Equal(t, "python", spec.Spec["language"])
+		assert.Equal(t, "transformations/python/my-py-lib.py", spec.Spec["file"])
+
+		// Check code file path
+		assert.Equal(t, "transformations/python/my-py-lib.py", result[1].RelativePath)
+	})
+
+	t.Run("unsupported language returns error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{
+			"bad-lib": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:       "remote-lib-123",
+					Name:     "Bad Library",
+					Language: "ruby",
+				},
+			},
+		}
+		idNamer := &mockNamer{}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported language 'ruby'")
+		assert.Nil(t, result)
+	})
+
+	t.Run("namer error returns error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{
+			"my-lib": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:       "remote-lib-123",
+					Name:     "My Library",
+					Language: "javascript",
+				},
+			},
+		}
+		idNamer := &mockNamer{nameFunc: func(scope namer.ScopeName) (string, error) {
+			return "", fmt.Errorf("namer error")
+		}}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "generating file name")
+		assert.Nil(t, result)
+	})
+
+	t.Run("multiple libraries", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteLibrary{
+			"lib1": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:         "remote-lib-1",
+					Name:       "Library 1",
+					Code:       "export function lib1() { return 1; }",
+					Language:   "javascript",
+					ImportName: "lib1",
+				},
+			},
+			"lib2": {
+				TransformationLibrary: &transformations.TransformationLibrary{
+					ID:         "remote-lib-2",
+					Name:       "Library 2",
+					Code:       "def lib2():\n    return 2",
+					Language:   "python",
+					ImportName: "lib2",
+				},
+			},
+		}
+		idNamer := &mockNamer{nameFunc: func(scope namer.ScopeName) (string, error) {
+			return scope.Name, nil
+		}}
+		resolver := &mockResolver{}
+
+		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Len(t, result, 4) // 2 libraries × (spec + code)
+
+		// Verify we have both libraries
+		relativePaths := make([]string, len(result))
+		for i, r := range result {
+			relativePaths[i] = r.RelativePath
+		}
+		assert.Contains(t, relativePaths, "transformations/lib1.yaml")
+		assert.Contains(t, relativePaths, "transformations/javascript/lib1.js")
+		assert.Contains(t, relativePaths, "transformations/lib2.yaml")
+		assert.Contains(t, relativePaths, "transformations/python/lib2.py")
+	})
+}
+
+// Mock implementations for testing FormatForExport
+
+type mockNamer struct {
+	nameFunc func(scope namer.ScopeName) (string, error)
+}
+
+func (m *mockNamer) Name(scope namer.ScopeName) (string, error) {
+	if m.nameFunc != nil {
+		return m.nameFunc(scope)
+	}
+	return "default-name", nil
+}
+
+type mockResolver struct {
+}
+
+func (m *mockResolver) ResolveReference(urn string) (any, error) {
+	return nil, nil
+}
+
+func (m *mockNamer) Load(names []namer.ScopeName) error {
+	return nil
+}
+
+func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
+	return "", nil
 }
