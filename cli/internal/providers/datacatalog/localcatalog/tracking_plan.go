@@ -47,7 +47,7 @@ type TPEvent struct {
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TPEventProperty
-	Variants        Variants
+	Variants        VariantsV1
 }
 
 func (e *TPEvent) PropertyByLocalID(localID string) *TPEventProperty {
@@ -321,6 +321,18 @@ type TrackingPlanV1 struct {
 	EventProps  []*TPEvent  `json:"event_props,omitempty"`
 }
 
+// TPRuleV1 represents the V1 spec format for tracking plan rules
+type TPRuleV1 struct {
+	Type                 string              `json:"type"`
+	LocalID              string              `json:"id"`
+	Event                string              `json:"event"` // Direct reference instead of object
+	IdentitySection      string              `json:"identity_section,omitempty"`
+	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
+	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
+	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
+	Variants             VariantsV1          `json:"variants,omitempty"`
+}
+
 // TPRulePropertyV1 represents the V1 spec format for tracking plan rule properties
 type TPRulePropertyV1 struct {
 	Property             string              `json:"property"`
@@ -350,24 +362,11 @@ func (p *TPRulePropertyV1) FromV0(v0 *TPRuleProperty) error {
 	return nil
 }
 
-// TPRuleV1 represents the V1 spec format for tracking plan rules
-type TPRuleV1 struct {
-	Type                 string              `json:"type"`
-	LocalID              string              `json:"id"`
-	Event                string              `json:"event"` // Direct reference instead of object
-	IdentitySection      string              `json:"identity_section,omitempty"`
-	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
-	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
-	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
-	Variants             Variants            `json:"variants,omitempty"`
-}
-
 // FromV0 converts a V0 TPRule to V1 format
 func (r *TPRuleV1) FromV0(v0 *TPRule) error {
 	r.Type = v0.Type
 	r.LocalID = v0.LocalID
 	r.Includes = v0.Includes
-	r.Variants = v0.Variants
 
 	// Convert event from object to direct reference
 	if v0.Event != nil {
@@ -385,6 +384,18 @@ func (r *TPRuleV1) FromV0(v0 *TPRule) error {
 				return fmt.Errorf("converting property to v1: %w", err)
 			}
 			r.Properties = append(r.Properties, v1Prop)
+		}
+	}
+
+	// Convert variants from V0 to V1
+	if len(v0.Variants) > 0 {
+		r.Variants = make(VariantsV1, 0, len(v0.Variants))
+		for _, v0Variant := range v0.Variants {
+			v1Variant := VariantV1{}
+			if err := v1Variant.FromV0(v0Variant); err != nil {
+				return fmt.Errorf("converting variant to v1: %w", err)
+			}
+			r.Variants = append(r.Variants, v1Variant)
 		}
 	}
 

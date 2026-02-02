@@ -617,22 +617,22 @@ func TestVariantsValidation(t *testing.T) {
 								LocalID: "test-rule",
 								Type:    "event_rule",
 								Event: "#event:test-event",
-								Variants: catalog.Variants{
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
 										Discriminator: "page_name",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Search Page",
 												Match:       []any{"search", "search_bar"},
-												Properties: []catalog.PropertyReference{
-													{Ref: "#property:search_term", Required: true},
+												Properties: []catalog.PropertyReferenceV1{
+													{Property: "#property:search_term", Required: true},
 												},
 											},
 										},
-										Default: []catalog.PropertyReference{
-											{Ref: "#property:page_url", Required: true},
-										},
+										Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:page_url", Required: true},
+										}},
 									},
 								},
 							},
@@ -680,16 +680,16 @@ func TestVariantsValidation(t *testing.T) {
 								LocalID: "test-rule",
 								Type:    "event_rule",
 								Event: "#/events/test-group/test-event",
-								Variants: catalog.Variants{
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
 										Discriminator: "user_id",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Admin User",
 												Match:       []any{123, 123.0, true, "admin"},
-												Properties: []catalog.PropertyReference{
-													{Ref: "#/properties/test-group/admin_level", Required: true},
+												Properties: []catalog.PropertyReferenceV1{
+													{Property: "#/properties/test-group/admin_level", Required: true},
 												},
 											},
 										},
@@ -733,26 +733,26 @@ func TestVariantsValidation(t *testing.T) {
 								LocalID: "test-rule",
 								Type:    "event_rule",
 								Event: "#/events/test-group/test-event",
-								Variants: catalog.Variants{
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "other_type", // Invalid type
 										Discriminator: "",           // Missing discriminator
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "",                            // Missing display name
 												Match:       []any{},                       // Empty match array
-												Properties:  []catalog.PropertyReference{}, // Empty properties array
+												Properties:  []catalog.PropertyReferenceV1{}, // Empty properties array
 											},
 										},
 									},
 									{
 										Type:          "discriminator", // Second variant (should fail length check)
 										Discriminator: "page_name",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Search Page",
 												Match:       []any{"search"},
-												Properties: []catalog.PropertyReference{
+												Properties: []catalog.PropertyReferenceV1{
 													{Required: true}, // Missing Ref
 												},
 											},
@@ -790,7 +790,7 @@ func TestVariantsValidation(t *testing.T) {
 						Reference: "#tp:test-tp/rules/test-rule",
 					},
 					{
-						error:     fmt.Errorf("$ref field is mandatory for property reference"),
+						error:     fmt.Errorf("property field is mandatory for property reference"),
 						Reference: "#tp:test-tp/rules/test-rule/variants[1]/cases[0]/properties[0]",
 					},
 				},

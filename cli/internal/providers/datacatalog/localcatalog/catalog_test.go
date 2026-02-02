@@ -344,7 +344,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, []any{"search", "search_bar"}, variant.Cases[0].Match)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
 		assert.Equal(t, []any{"product", "search", "1"}, variant.Cases[1].Match)
-		assert.Equal(t, 1, len(variant.Default))
+		assert.Equal(t, 1, len(variant.Default.Properties))
 	})
 
 	t.Run("custom types are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -1588,17 +1588,17 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		require.NotNil(t, rule.Variants)
 		require.Equal(t, 1, len(rule.Variants))
 
-	assert.Equal(t, "#event:user_signed_up", rule.Event)
-	assert.Equal(t, "#property:page_name", rule.Properties[0].Property)
+		assert.Equal(t, "#event:user_signed_up", rule.Event)
+		assert.Equal(t, "#property:page_name", rule.Properties[0].Property)
 
 		variant := (rule.Variants)[0]
 		assert.Equal(t, "discriminator", variant.Type)
 		assert.Equal(t, "page_name", variant.Discriminator)
 		assert.Equal(t, 2, len(variant.Cases))
 		assert.Equal(t, "Search Page", variant.Cases[0].DisplayName)
-		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Ref)
+		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Property)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
-		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Ref)
-		assert.Equal(t, "#property:page_url", variant.Default[0].Ref)
+		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Property)
+		assert.Equal(t, "#property:page_url", variant.Default.Properties[0].Property)
 	})
 }

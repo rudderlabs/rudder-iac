@@ -638,11 +638,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to signup actions",
 									"properties": []any{
 										map[string]any{
-											"$ref":     "#/properties/user/email",
+											"property": "#/properties/user/email",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/marketing/referral-code",
+											"property": "#/properties/marketing/referral-code",
 											"required": false,
 										},
 									},
@@ -653,28 +653,30 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to purchase actions",
 									"properties": []any{
 										map[string]any{
-											"$ref":     "#/properties/product/product-id",
+											"property": "#/properties/product/product-id",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/transaction/amount",
+											"property": "#/properties/transaction/amount",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/transaction/currency",
+											"property": "#/properties/transaction/currency",
 											"required": false,
 										},
 									},
 								},
 							},
-							"default": []any{
-								map[string]any{
-									"$ref":     "#/properties/session/session-id",
-									"required": true,
-								},
-								map[string]any{
-									"$ref":     "#/properties/device/device-type",
-									"required": false,
+							"default": map[string]any{
+								"properties": []any{
+									map[string]any{
+										"property": "#/properties/session/session-id",
+										"required": true,
+									},
+									map[string]any{
+										"property": "#/properties/device/device-type",
+										"required": false,
+									},
 								},
 							},
 						},
