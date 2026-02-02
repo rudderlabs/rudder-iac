@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
@@ -238,13 +239,13 @@ func (p *TrackingPlanProvider) LoadResourcesFromRemote(ctx context.Context) (*re
 			Data:       trackingPlan,
 		}
 	}
-	collection.Set(state.TrackingPlanResourceType, resourceMap)
+	collection.Set(types.TrackingPlanResourceType, resourceMap)
 	return collection, nil
 }
 
 func (p *TrackingPlanProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
 	s := rstate.EmptyState()
-	trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
+	trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
 	for _, remoteTP := range trackingPlans {
 		if remoteTP.ExternalID == "" {
 			continue
@@ -260,14 +261,14 @@ func (p *TrackingPlanProvider) MapRemoteToState(collection *resources.RemoteReso
 		stateArgs.FromRemoteTrackingPlan(trackingPlan, collection)
 
 		resourceState := &rstate.ResourceState{
-			Type:         state.TrackingPlanResourceType,
+			Type:         types.TrackingPlanResourceType,
 			ID:           remoteTP.ExternalID,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(remoteTP.ExternalID, state.TrackingPlanResourceType)
+		urn := resources.URN(remoteTP.ExternalID, types.TrackingPlanResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

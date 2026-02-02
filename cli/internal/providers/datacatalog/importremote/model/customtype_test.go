@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				assert.Equal(t, state.PropertyResourceType, entityType)
+				assert.Equal(t, types.PropertyResourceType, entityType)
 				switch remoteID {
 				case "prop_street_123":
 					return "#/properties/address/street", nil
@@ -109,7 +109,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				assert.Equal(t, state.CustomTypeResourceType, entityType)
+				assert.Equal(t, types.CustomTypeResourceType, entityType)
 				assert.Equal(t, customTypeID, remoteID)
 				return expectedRef, nil
 			},
@@ -125,9 +125,9 @@ func TestCustomTypeForExport(t *testing.T) {
 			"description": "Array of products",
 			"type":        "array",
 			"config": map[string]any{
-				"minItems":  float64(1),
-				"maxItems":  float64(5),
-				"itemTypes": []any{expectedRef},
+				"min_items":  float64(1),
+				"max_items":  float64(5),
+				"item_types": []any{expectedRef},
 			},
 		}, result)
 	})
@@ -173,7 +173,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				assert.Equal(t, state.PropertyResourceType, entityType)
+				assert.Equal(t, types.PropertyResourceType, entityType)
 				refMap := map[string]string{
 					"prop_page":        "#/properties/mypropertygroup/page",
 					"prop_search_term": "#/properties/mypropertygroup/search_term",
@@ -344,7 +344,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "resolved reference is empty for itemTypes")
+		assert.Contains(t, err.Error(), "resolved reference is empty for item_types")
 	})
 
 	t.Run("errors when variant discriminator resolver fails", func(t *testing.T) {

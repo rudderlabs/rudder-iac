@@ -362,29 +362,37 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, st *state.State
 
 // SyntacticRules returns all syntactic rules from all providers implementing RuleProvider.
 // Providers that don't implement RuleProvider are skipped.
+// Rules are wrapped with PathPrefixRule to prefix references with "/spec".
 // Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
 func (p *CompositeProvider) SyntacticRules() []rules.Rule {
 	var allRules []rules.Rule
+
+	// Add any other syntactic rules from the providers
+	// that don't implement SpecFactoryProvider, we wrap them with PathPrefixRule
 	for _, provider := range p.Providers {
-		if rp, ok := provider.(RuleProvider); ok {
-			allRules = append(allRules, rp.SyntacticRules()...)
+		for _, rule := range provider.SyntacticRules() {
+			allRules = append(allRules, rule)
 		}
 	}
+
 	return allRules
 }
 
 // SemanticRules returns all semantic rules from all providers implementing RuleProvider.
 // Providers that don't implement RuleProvider are skipped.
+// Rules are wrapped with PathPrefixRule to prefix references with "/spec".
 // Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
 func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	var allRules []rules.Rule
+
 	for _, provider := range p.Providers {
-		if rp, ok := provider.(RuleProvider); ok {
-			allRules = append(allRules, rp.SemanticRules()...)
+		for _, rule := range provider.SemanticRules() {
+			allRules = append(allRules, rule)
 		}
 	}
+
 	return allRules
 }
 
-// Compile-time verification that CompositeProvider implements RuleProvider
+// Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
 var _ RuleProvider = (*CompositeProvider)(nil)

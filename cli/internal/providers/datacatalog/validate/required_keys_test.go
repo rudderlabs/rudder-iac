@@ -15,83 +15,39 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     []catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
-			name: "valid property with single custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"itemTypes": []interface{}{"#/custom-types/test-group/TestType"},
-						},
-					},
+			name: "valid property with single custom type in item_type",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "array-prop",
+					Name:        "Array Property",
+					Description: "Property with array type",
+					Type:        "array",
+					ItemType:    "#custom-type:TestType",
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
-			name: "invalid property with multiple types including custom type in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"itemTypes": []interface{}{
-								"#/custom-types/test-group/TestType",
-								"string",
-							},
-						},
+			name: "invalid property with multiple types including custom type in item_types",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "array-prop",
+					Name:        "Array Property",
+					Description: "Property with array type",
+					Type:        "array",
+					ItemTypes: []string{
+						"#custom-type:TestType",
+						"string",
 					},
 				},
 			},
 			expectedErrors: 1,
 			errorContains:  "cannot be paired with other types",
-		},
-		{
-			name: "invalid property with non-array itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"itemTypes": "string", // Not an array
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "itemTypes must be an array",
-		},
-		{
-			name: "invalid property with non-string item in itemTypes",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "array-prop",
-						Name:        "Array Property",
-						Description: "Property with array type",
-						Type:        "array",
-						Config: map[string]interface{}{
-							"itemTypes": []interface{}{123}, // Not a string
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			errorContains:  "must be string value",
 		},
 	}
 
@@ -364,46 +320,41 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		properties     map[catalog.EntityGroup][]catalog.Property
+		properties     []catalog.PropertyV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "property with empty type",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID: "prop-without-type",
-						Name:    "Property Without Type",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID: "prop-without-type",
+					Name:    "Property Without Type",
 				},
 			},
-			expectedErrors: 0,
+			expectedErrors: 1,
+			errorContains:  "either 'type' or 'types' field must be specified",
 		},
 		{
 			name: "valid property name without whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "valid-prop",
-						Name:        "Valid Property Name",
-						Description: "A valid property name",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "valid-prop",
+					Name:        "Valid Property Name",
+					Description: "A valid property name",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "property name with leading whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "leading-space-prop",
-						Name:        " Property With Leading Space",
-						Description: "Property with leading whitespace",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "leading-space-prop",
+					Name:        " Property With Leading Space",
+					Description: "Property with leading whitespace",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 1,
@@ -411,14 +362,12 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "trailing-space-prop",
-						Name:        "Property With Trailing Space ",
-						Description: "Property with trailing whitespace",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "trailing-space-prop",
+					Name:        "Property With Trailing Space ",
+					Description: "Property with trailing whitespace",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 1,
@@ -426,14 +375,12 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with both leading and trailing whitespace",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "both-space-prop",
-						Name:        " Property With Both Spaces ",
-						Description: "Property with both leading and trailing whitespace",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "both-space-prop",
+					Name:        " Property With Both Spaces ",
+					Description: "Property with both leading and trailing whitespace",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 1,
@@ -441,32 +388,28 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 		},
 		{
 			name: "property name with internal spaces (should be valid)",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "internal-space-prop",
-						Name:        "Property With Internal Spaces",
-						Description: "Property with internal spaces which should be allowed",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "internal-space-prop",
+					Name:        "Property With Internal Spaces",
+					Description: "Property with internal spaces which should be allowed",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "empty property name should trigger mandatory field error, not whitespace error",
-			properties: map[catalog.EntityGroup][]catalog.Property{
-				"test-group": {
-					{
-						LocalID:     "empty-name-prop",
-						Name:        "",
-						Description: "Property with empty name",
-						Type:        "string",
-					},
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "empty-name-prop",
+					Name:        "",
+					Description: "Property with empty name",
+					Type:        "string",
 				},
 			},
 			expectedErrors: 1,
-			errorContains:  "id, name and type fields on property are mandatory",
+			errorContains:  "id and name fields on property are mandatory",
 		},
 	}
 
@@ -505,30 +448,26 @@ func TestCategoryValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		categories     map[catalog.EntityGroup][]catalog.Category
+		categories     []catalog.Category
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "valid category",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "valid-category",
-						Name:    "Valid Category",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "valid-category",
+					Name:    "Valid Category",
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "category with missing fields",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "",
-						Name:    "",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "",
+					Name:    "",
 				},
 			},
 			expectedErrors: 1,
@@ -536,12 +475,10 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing LocalID",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "",
-						Name:    "Valid Name",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "",
+					Name:    "Valid Name",
 				},
 			},
 			expectedErrors: 1,
@@ -549,12 +486,10 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing Name",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "valid-id",
-						Name:    "",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "valid-id",
+					Name:    "",
 				},
 			},
 			expectedErrors: 1,
@@ -562,12 +497,10 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with leading whitespace in name",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "leading-space",
-						Name:    " Category With Leading Space",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "leading-space",
+					Name:    " Category With Leading Space",
 				},
 			},
 			expectedErrors: 1,
@@ -575,12 +508,10 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with trailing whitespace in name",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "trailing-space",
-						Name:    "Category With Trailing Space ",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "trailing-space",
+					Name:    "Category With Trailing Space ",
 				},
 			},
 			expectedErrors: 1,
@@ -588,12 +519,10 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with invalid name format",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "invalid-format",
-						Name:    "!@#Invalid",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "invalid-format",
+					Name:    "!@#Invalid",
 				},
 			},
 			expectedErrors: 1,
@@ -601,40 +530,36 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with valid name formats",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "uppercase-start",
-						Name:    "Uppercase Start",
-					},
-					{
-						LocalID: "lowercase-start",
-						Name:    "lowercase start",
-					},
-					{
-						LocalID: "underscore-start",
-						Name:    "_underscore start",
-					},
-					{
-						LocalID: "with-numbers",
-						Name:    "Category123",
-					},
-					{
-						LocalID: "with-special-chars",
-						Name:    "Category-Name.With,Special",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "uppercase-start",
+					Name:    "Uppercase Start",
+				},
+				{
+					LocalID: "lowercase-start",
+					Name:    "lowercase start",
+				},
+				{
+					LocalID: "underscore-start",
+					Name:    "_underscore start",
+				},
+				{
+					LocalID: "with-numbers",
+					Name:    "Category123",
+				},
+				{
+					LocalID: "with-special-chars",
+					Name:    "Category-Name.With,Special",
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "category name too short",
-			categories: map[catalog.EntityGroup][]catalog.Category{
-				"test-group": {
-					{
-						LocalID: "too-short",
-						Name:    "A",
-					},
+			categories: []catalog.Category{
+				{
+					LocalID: "too-short",
+					Name:    "A",
 				},
 			},
 			expectedErrors: 1,
@@ -678,13 +603,13 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation success", func(t *testing.T) {
 		testCases := []struct {
 			name          string
-			trackingPlans map[catalog.EntityGroup]*catalog.TrackingPlan
-			customTypes   map[catalog.EntityGroup][]catalog.CustomType
+			trackingPlans []*catalog.TrackingPlan
+			customTypes   []catalog.CustomType
 		}{
 			{
 				name: "valid variants in tracking plan",
-				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
-					"test-group": {
+				trackingPlans: []*catalog.TrackingPlan{
+					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
 						Rules: []*catalog.TPRule{
@@ -692,7 +617,7 @@ func TestVariantsValidation(t *testing.T) {
 								LocalID: "test-rule",
 								Type:    "event_rule",
 								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
+									Ref: "#event:test-event",
 								},
 								Variants: catalog.Variants{
 									{
@@ -703,12 +628,12 @@ func TestVariantsValidation(t *testing.T) {
 												DisplayName: "Search Page",
 												Match:       []any{"search", "search_bar"},
 												Properties: []catalog.PropertyReference{
-													{Ref: "#/properties/test-group/search_term", Required: true},
+													{Ref: "#property:search_term", Required: true},
 												},
 											},
 										},
 										Default: []catalog.PropertyReference{
-											{Ref: "#/properties/test-group/page_url", Required: true},
+											{Ref: "#property:page_url", Required: true},
 										},
 									},
 								},
@@ -719,27 +644,25 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants in custom type",
-				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
-					"test-group": {
-						{
-							LocalID:     "TestType",
-							Name:        "TestType",
-							Description: "Test custom type with variants",
-							Type:        "object",
-							Properties: []catalog.CustomTypeProperty{
-								{Ref: "#/properties/test-group/profile_type", Required: true},
-							},
-							Variants: catalog.Variants{
-								{
-									Type:          "discriminator",
-									Discriminator: "profile_type",
-									Cases: []catalog.VariantCase{
-										{
-											DisplayName: "Premium User",
-											Match:       []any{"premium", "vip"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#/properties/test-group/subscription_tier", Required: true},
-											},
+				customTypes: []catalog.CustomType{
+					{
+						LocalID:     "TestType",
+						Name:        "TestType",
+						Description: "Test custom type with variants",
+						Type:        "object",
+						Properties: []catalog.CustomTypeProperty{
+							{Ref: "#property:profile_type", Required: true},
+						},
+						Variants: catalog.Variants{
+							{
+								Type:          "discriminator",
+								Discriminator: "profile_type",
+								Cases: []catalog.VariantCase{
+									{
+										DisplayName: "Premium User",
+										Match:       []any{"premium", "vip"},
+										Properties: []catalog.PropertyReference{
+											{Ref: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -750,8 +673,8 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants with mixed match value types",
-				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
-					"test-group": {
+				trackingPlans: []*catalog.TrackingPlan{
+					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
 						Rules: []*catalog.TPRule{
@@ -798,15 +721,15 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation failures", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			trackingPlans  map[catalog.EntityGroup]*catalog.TrackingPlan
-			customTypes    map[catalog.EntityGroup][]catalog.CustomType
+			trackingPlans  []*catalog.TrackingPlan
+			customTypes    []catalog.CustomType
 			expectedErrors int
 			errorContains  []ValidationError
 		}{
 			{
 				name: "structural validation failures",
-				trackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
-					"test-group": {
+				trackingPlans: []*catalog.TrackingPlan{
+					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
 						Rules: []*catalog.TPRule{
@@ -850,54 +773,52 @@ func TestVariantsValidation(t *testing.T) {
 				errorContains: []ValidationError{
 					{
 						error:     fmt.Errorf("type field is mandatory for variant and must be 'discriminator'"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[0]",
 					},
 					{
 						error:     fmt.Errorf("discriminator field is mandatory for variant"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[0]",
 					},
 					{
 						error:     fmt.Errorf("display_name field is mandatory for variant case"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[0]/cases[0]",
 					},
 					{
 						error:     fmt.Errorf("match array must have at least one element"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[0]/cases[0]",
 					},
 					{
 						error:     fmt.Errorf("properties array must have at least one element"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[0]/cases[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[0]/cases[0]",
 					},
 					{
 						error:     fmt.Errorf("variants array cannot have more than 1 variant (current length: 2)"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule",
+						Reference: "#tp:test-tp/rules/test-rule",
 					},
 					{
 						error:     fmt.Errorf("$ref field is mandatory for property reference"),
-						Reference: "#/tp/test-group/test-tp/rules/test-rule/variants[1]/cases[0]/properties[0]",
+						Reference: "#tp:test-tp/rules/test-rule/variants[1]/cases[0]/properties[0]",
 					},
 				},
 			},
 			{
 				name: "custom type validation failures",
-				customTypes: map[catalog.EntityGroup][]catalog.CustomType{
-					"test-group": {
-						{
-							LocalID:     "TestType",
-							Name:        "TestType",
-							Description: "Test custom type with variants",
-							Type:        "string",
-							Variants: catalog.Variants{
-								{
-									Type:          "discriminator",
-									Discriminator: "profile_type",
-									Cases: []catalog.VariantCase{
-										{
-											DisplayName: "Premium User",
-											Match:       []any{"premium"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#/properties/test-group/subscription_tier", Required: true},
-											},
+				customTypes: []catalog.CustomType{
+					{
+						LocalID:     "TestType",
+						Name:        "TestType",
+						Description: "Test custom type with variants",
+						Type:        "string",
+						Variants: catalog.Variants{
+							{
+								Type:          "discriminator",
+								Discriminator: "profile_type",
+								Cases: []catalog.VariantCase{
+									{
+										DisplayName: "Premium User",
+										Match:       []any{"premium"},
+										Properties: []catalog.PropertyReference{
+											{Ref: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -909,7 +830,7 @@ func TestVariantsValidation(t *testing.T) {
 				errorContains: []ValidationError{
 					{
 						error:     fmt.Errorf("variants are only allowed for custom type of type object"),
-						Reference: "#/custom-types/test-group/TestType",
+						Reference: "#custom-type:TestType",
 					},
 				},
 			},
@@ -956,54 +877,52 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	falseVal := false
 	// Setup test data catalog
 	dc := &catalog.DataCatalog{
-		Properties: map[catalog.EntityGroup][]catalog.Property{
-			"test_props": {
-				{
-					LocalID:     "user_id",
-					Name:        "User ID",
-					Type:        "string",
-					Description: "User identifier",
-				},
-				{
-					LocalID:     "user_profile",
-					Name:        "User Profile",
-					Type:        "object",
-					Description: "User profile object",
-				},
-				{
-					LocalID:     "profile_name",
-					Name:        "Profile Name",
-					Type:        "string",
-					Description: "User's display name",
-				},
-				{
-					LocalID:     "profile_settings",
-					Name:        "Profile Settings",
-					Type:        "object",
-					Description: "User profile settings",
-				},
-				{
-					LocalID:     "theme_preference",
-					Name:        "Theme Preference",
-					Type:        "string",
-					Description: "User's theme preference",
-				},
-				{
-					LocalID:     "button_signin",
-					Name:        "Button Sign In",
-					Type:        "string", // Wrong type for nested properties
-					Description: "Sign in button",
-				},
-				{
-					LocalID:     "deeply_nested_property",
-					Name:        "Deeply Nested Property",
-					Type:        "string",
-					Description: "Deeply nested property",
-				},
+		Properties: []catalog.PropertyV1{
+			{
+				LocalID:     "user_id",
+				Name:        "User ID",
+				Type:        "string",
+				Description: "User identifier",
+			},
+			{
+				LocalID:     "user_profile",
+				Name:        "User Profile",
+				Type:        "object",
+				Description: "User profile object",
+			},
+			{
+				LocalID:     "profile_name",
+				Name:        "Profile Name",
+				Type:        "string",
+				Description: "User's display name",
+			},
+			{
+				LocalID:     "profile_settings",
+				Name:        "Profile Settings",
+				Type:        "object",
+				Description: "User profile settings",
+			},
+			{
+				LocalID:     "theme_preference",
+				Name:        "Theme Preference",
+				Type:        "string",
+				Description: "User's theme preference",
+			},
+			{
+				LocalID:     "button_signin",
+				Name:        "Button Sign In",
+				Type:        "string", // Wrong type for nested properties
+				Description: "Sign in button",
+			},
+			{
+				LocalID:     "deeply_nested_property",
+				Name:        "Deeply Nested Property",
+				Type:        "string",
+				Description: "Deeply nested property",
 			},
 		},
-		TrackingPlans: map[catalog.EntityGroup]*catalog.TrackingPlan{
-			"test_tp": {
+		TrackingPlans: []*catalog.TrackingPlan{
+			{
 				LocalID: "test_plan",
 				Name:    "Test Tracking Plan",
 				Rules: []*catalog.TPRule{
@@ -1015,8 +934,8 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 						},
 						Properties: []*catalog.TPRuleProperty{
 							{
-								Ref:      "#/properties/test_props/user_profile",
-								Required: true,
+								Ref:                  "#/properties/test_props/user_profile",
+								Required:             true,
 								AdditionalProperties: &falseVal,
 							},
 						},
@@ -1099,25 +1018,25 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				},
 			},
 		},
-		Events:      make(map[catalog.EntityGroup][]catalog.Event),
-		CustomTypes: make(map[catalog.EntityGroup][]catalog.CustomType),
-		Categories:  make(map[catalog.EntityGroup][]catalog.Category),
+		Events:      []catalog.Event{},
+		CustomTypes: []catalog.CustomType{},
+		Categories:  []catalog.Category{},
 	}
 
 	validator := &RequiredKeysValidator{}
 	errors := validator.Validate(dc)
 
 	// Test 1: Valid nested properties should not generate errors for nested structure
-	validRuleErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/valid_nested_rule")
+	validRuleErrors := filterErrorsByReference(errors, "#tp:test_plan/rules/valid_nested_rule")
 	assert.Empty(t, validRuleErrors, "Valid nested properties should not generate validation errors")
 
 	// Test 2: Object-type constraint violation should generate error
-	objectTypeErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/invalid_object_type_rule")
+	objectTypeErrors := filterErrorsByReference(errors, "#tp:test_plan/rules/invalid_object_type_rule")
 	assert.Len(t, objectTypeErrors, 1, "Should have one error for object-type constraint violation")
 	assert.Contains(t, objectTypeErrors[0].Error(), "nested properties are not allowed for property")
 
 	// Test 3: Nesting depth exceeded should generate error
-	depthErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/exceed_depth_rule")
+	depthErrors := filterErrorsByReference(errors, "#tp:test_plan/rules/exceed_depth_rule")
 	depthFound := false
 	for _, err := range depthErrors {
 		if strings.Contains(err.Error(), "maximum property nesting depth of 3 levels exceeded in event_rule") {
@@ -1128,7 +1047,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 	assert.True(t, depthFound, "Should have error for exceeding maximum nesting depth")
 
 	// Test 4: Additional properties not allowed for non-nested properties
-	additionalPropertiesErrors := filterErrorsByReference(errors, "#/tp/test_tp/test_plan/rules/valid_non_nested_rule")
+	additionalPropertiesErrors := filterErrorsByReference(errors, "#tp:test_plan/rules/valid_non_nested_rule")
 	assert.Len(t, additionalPropertiesErrors, 1, "Should have one error for additional properties not allowed for non-nested properties")
 	assert.Contains(t, additionalPropertiesErrors[0].Error(), "setting additional_properties is only allowed for nested properties")
 }
@@ -1180,7 +1099,7 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:         "array with itemTypes containing object - should allow",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{"string", "object", "null"},
+				"item_types": []any{"string", "object", "null"},
 			},
 			expectedAllow: true,
 			expectError:   false,
@@ -1189,7 +1108,7 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			name:         "array with itemTypes containing multiple non-object types - should not allow",
 			propertyType: "array",
 			config: map[string]any{
-				"itemTypes": []any{"string", "number", "boolean"},
+				"item_types": []any{"string", "number", "boolean"},
 			},
 			expectedAllow: false,
 			expectError:   false,
@@ -1207,36 +1126,6 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 			config:        map[string]any{},
 			expectedAllow: false,
 			expectError:   false,
-		},
-		{
-			name:         "array with itemTypes as string instead of array - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"itemTypes": "string",
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "itemTypes must be an array",
-		},
-		{
-			name:         "array with itemTypes containing mixed types - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"itemTypes": []any{"object", "string", 456},
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "itemTypes at index 2 must be a string value",
-		},
-		{
-			name:         "array with itemTypes containing nil - should error",
-			propertyType: "array",
-			config: map[string]any{
-				"itemTypes": []any{nil},
-			},
-			expectedAllow: false,
-			expectError:   true,
-			errorContains: "itemTypes at index 0 must be a string value",
 		},
 		{
 			name:          "empty property type - should not allow",
@@ -1258,7 +1147,31 @@ func TestNestedPropertiesAllowed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			allowed, err := nestedPropertiesAllowed(tc.propertyType, tc.config)
+			// Extract itemType and itemTypes from config for backwards compatibility
+			var itemType string
+			var itemTypes []string
+			if tc.config != nil {
+				if it, ok := tc.config["item_types"]; ok {
+					if itArray, ok := it.([]any); ok {
+						if len(itArray) == 1 {
+							if itStr, ok := itArray[0].(string); ok {
+								itemType = itStr
+							}
+						} else {
+							itemTypes = make([]string, len(itArray))
+							for i, v := range itArray {
+								if str, ok := v.(string); ok {
+									itemTypes[i] = str
+								}
+							}
+						}
+					} else if itStr, ok := it.(string); ok {
+						itemType = itStr
+					}
+				}
+			}
+
+			allowed, err := nestedPropertiesAllowed(tc.propertyType, itemType, itemTypes)
 
 			// Check error expectations
 			if tc.expectError {

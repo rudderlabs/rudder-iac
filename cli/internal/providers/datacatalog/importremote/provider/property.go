@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -62,7 +62,7 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer nam
 	}
 
 	collection.Set(
-		state.PropertyResourceType,
+		types.PropertyResourceType,
 		resourceMap,
 	)
 
@@ -78,7 +78,7 @@ func (p *PropertyImportProvider) idResources(
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to properties")
-	properties := collection.GetAll(state.PropertyResourceType)
+	properties := collection.GetAll(types.PropertyResourceType)
 
 	for _, property := range properties {
 		data, ok := property.Data.(*catalog.Property)
@@ -88,7 +88,7 @@ func (p *PropertyImportProvider) idResources(
 
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  data.Name,
-			Scope: state.PropertyResourceType})
+			Scope: types.PropertyResourceType})
 		if err != nil {
 			return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
 		}
@@ -111,7 +111,7 @@ func (p *PropertyImportProvider) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting properties for export to file")
 
-	properties := collection.GetAll(state.PropertyResourceType)
+	properties := collection.GetAll(types.PropertyResourceType)
 	if len(properties) == 0 {
 		return nil, nil
 	}

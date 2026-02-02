@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
@@ -269,14 +270,14 @@ func (p *CustomTypeProvider) LoadResourcesFromRemote(ctx context.Context) (*reso
 			Data:       customType,
 		}
 	}
-	collection.Set(state.CustomTypeResourceType, resourceMap)
+	collection.Set(types.CustomTypeResourceType, resourceMap)
 
 	return collection, nil
 }
 
 func (p *CustomTypeProvider) MapRemoteToState(collection *resources.RemoteResources) (*rstate.State, error) {
 	s := rstate.EmptyState()
-	customTypes := collection.GetAll(state.CustomTypeResourceType)
+	customTypes := collection.GetAll(types.CustomTypeResourceType)
 	for _, remoteCustomType := range customTypes {
 		if remoteCustomType.ExternalID == "" {
 			continue
@@ -292,14 +293,14 @@ func (p *CustomTypeProvider) MapRemoteToState(collection *resources.RemoteResour
 		stateArgs.FromRemoteCustomType(customType, collection.GetURNByID)
 
 		resourceState := &rstate.ResourceState{
-			Type:         state.CustomTypeResourceType,
+			Type:         types.CustomTypeResourceType,
 			ID:           remoteCustomType.ExternalID,
 			Input:        args.ToResourceData(),
 			Output:       stateArgs.ToResourceData(),
 			Dependencies: make([]string, 0),
 		}
 
-		urn := resources.URN(remoteCustomType.ExternalID, state.CustomTypeResourceType)
+		urn := resources.URN(remoteCustomType.ExternalID, types.CustomTypeResourceType)
 		s.Resources[urn] = resourceState
 	}
 	return s, nil

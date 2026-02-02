@@ -11,8 +11,6 @@ type CategoryArgs struct {
 	Name string
 }
 
-const CategoryResourceType = "category"
-
 func (args *CategoryArgs) ToResourceData() resources.ResourceData {
 	return resources.ResourceData{
 		"name": args.Name,

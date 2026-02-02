@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 // UpstreamSnapshotTester provides functionality to test upstream state snapshots
@@ -92,35 +92,35 @@ func (u *UpstreamSnapshotTester) upstreamEntity(ctx context.Context, entityID, e
 	var v any
 
 	switch entityType {
-	case state.EventResourceType:
+	case types.EventResourceType:
 		event, err := u.dataCatalog.GetEvent(ctx, entityID)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetEvent: %w", err)
 		}
 		v = event
 
-	case state.PropertyResourceType:
+	case types.PropertyResourceType:
 		property, err := u.dataCatalog.GetProperty(ctx, entityID)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetProperty: %w", err)
 		}
 		v = property
 
-	case state.TrackingPlanResourceType:
+	case types.TrackingPlanResourceType:
 		trackingPlan, err := u.dataCatalog.GetTrackingPlanWithIdentifiers(ctx, entityID, false)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetTrackingPlan: %w", err)
 		}
 		v = trackingPlan
 
-	case state.CustomTypeResourceType:
+	case types.CustomTypeResourceType:
 		customType, err := u.dataCatalog.GetCustomType(ctx, entityID)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetCustomType: %w", err)
 		}
 		v = customType
 
-	case state.CategoryResourceType:
+	case types.CategoryResourceType:
 		category, err := u.dataCatalog.GetCategory(ctx, entityID)
 		if err != nil {
 			return nil, fmt.Errorf("calling GetCategory: %w", err)

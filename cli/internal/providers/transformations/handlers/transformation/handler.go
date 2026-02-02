@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -62,8 +67,8 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 	if spec.Code == "" && spec.File == "" {
 		return fmt.Errorf("either code or file must be specified")
 	}
-	if spec.Language != "javascript" && spec.Language != "python" {
-		return fmt.Errorf("language must be 'javascript' or 'python', got: %s", spec.Language)
+	if spec.Language == "" {
+		return fmt.Errorf("language is required")
 	}
 	return nil
 }
@@ -132,6 +137,10 @@ func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, g
 		return fmt.Errorf("code is required")
 	}
 
+	if resource.Language != handlers.JavaScript && resource.Language != handlers.Python {
+		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, resource.Language)
+	}
+
 	// Validate code syntax
 	codeParser, err := parser.NewParser(resource.Language)
 	if err != nil {
@@ -162,8 +171,19 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteT
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteTransformation, error) {
-	// TODO: Implement when we add List operation to the store
-	return []*model.RemoteTransformation{}, nil
+	transformations, err := h.store.ListTransformations(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing transformations: %w", err)
+	}
+
+	// Fetch resources WITHOUT external IDs (unmanaged resources)
+	result := make([]*model.RemoteTransformation, 0)
+	for _, t := range transformations {
+		if t.ExternalID == "" {
+			result = append(result, &model.RemoteTransformation{Transformation: t})
+		}
+	}
+	return result, nil
 }
 
 func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteTransformation, urnResolver handler.URNResolver) (*model.TransformationResource, *model.TransformationState, error) {
@@ -225,8 +245,33 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.TransformationR
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.TransformationResource, remoteId string) (*model.TransformationState, error) {
-	// TODO: Implement when we add Get operation to the store
-	return nil, fmt.Errorf("import not implemented yet")
+	// Get the existing remote transformation
+	remote, err := h.store.GetTransformation(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting transformation %s: %w", remoteId, err)
+	}
+
+	// Set the externalID to link the remote resource to local management
+	if err := h.store.SetTransformationExternalID(ctx, remote.ID, data.ID); err != nil {
+		return nil, fmt.Errorf("setting transformation external ID: %w", err)
+	}
+
+	// update the transformation
+	req := &transformations.UpdateTransformationRequest{
+		Name:        data.Name,
+		Description: data.Description,
+		Code:        data.Code,
+		Language:    data.Language,
+	}
+	updated, err := h.store.UpdateTransformation(ctx, remote.ID, req, false)
+	if err != nil {
+		return nil, fmt.Errorf("updating transformation: %w", err)
+	}
+
+	return &model.TransformationState{
+		ID:        updated.ID,
+		VersionID: updated.VersionID,
+	}, nil
 }
 
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.TransformationResource, oldState *model.TransformationState) error {
@@ -239,4 +284,91 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Tran
 func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteTransformation) (*export.SpecExportData[model.TransformationSpec], error) {
 	// TODO: Implement export functionality
 	return nil, fmt.Errorf("export not implemented yet")
+}
+
+// FormatForExport implements the export functionality for transformations during import.
+// It generates two FormattableEntity objects per transformation: a YAML spec and a code file.
+func (h *HandlerImpl) FormatForExport(
+	remotes map[string]*model.RemoteTransformation,
+	idNamer namer.Namer,
+	resolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, error) {
+	if len(remotes) == 0 {
+		return nil, nil
+	}
+
+	formattables := make([]writer.FormattableEntity, 0)
+
+	for externalID, remote := range remotes {
+		// Validate language
+		if remote.Language != handlers.JavaScript && remote.Language != handlers.Python {
+			return nil, fmt.Errorf("unsupported language '%s' for transformation %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
+		}
+
+		// Determine file extension and folder based on language
+		var ext string
+		var langFolder string
+		switch remote.Language {
+		case handlers.JavaScript:
+			ext = handlers.ExtensionJS
+			langFolder = handlers.JavaScript
+		case handlers.Python:
+			ext = handlers.ExtensionPY
+			langFolder = handlers.Python
+		}
+
+		// Code file path: transformations/<language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+
+		// Build import metadata
+		workspaceMetadata := specs.WorkspaceImportMetadata{
+			WorkspaceID: remote.WorkspaceID,
+			Resources: []specs.ImportIds{
+				{
+					LocalID:  externalID,
+					RemoteID: remote.ID,
+				},
+			},
+		}
+
+		// Create spec with file reference
+		spec, err := handlers.ToImportSpec(
+			HandlerMetadata.SpecKind,
+			HandlerMetadata.SpecMetadataName,
+			workspaceMetadata,
+			map[string]any{
+				"id":          externalID,
+				"name":        remote.Name,
+				"description": remote.Description,
+				"language":    remote.Language,
+				"file":        codeFilePath,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating spec for transformation %s: %w", remote.ID, err)
+		}
+
+		// Generate unique filename for YAML spec
+		fileName, err := idNamer.Name(namer.ScopeName{
+			Name:  externalID,
+			Scope: handlers.TransformationsDir,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generating file name for transformation %s: %w", remote.ID, err)
+		}
+
+		// Add YAML spec entity
+		formattables = append(formattables, writer.FormattableEntity{
+			Content:      spec,
+			RelativePath: filepath.Join(handlers.TransformationsDir, fileName+loader.ExtensionYAML),
+		})
+
+		// Add code file entity
+		formattables = append(formattables, writer.FormattableEntity{
+			Content:      remote.Code,
+			RelativePath: codeFilePath,
+		})
+	}
+
+	return formattables, nil
 }

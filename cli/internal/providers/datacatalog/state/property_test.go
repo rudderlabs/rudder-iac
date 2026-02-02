@@ -68,7 +68,7 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("standard property", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-prop",
 			Name:        "Test Property",
 			Description: "A test property",
@@ -95,16 +95,16 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 	t.Run("custom type reference in type field", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email",
 			Name:        "Test Email",
 			Description: "A test email property",
-			Type:        "#/custom-types/email-types/EmailType",
+			Type:        "#custom-type:EmailType",
 			Config:      map[string]interface{}{},
 		}
 
 		urnFromRef := func(ref string) string {
-			if ref == "#/custom-types/email-types/EmailType" {
+			if ref == "#custom-type:EmailType" {
 				return "custom-type:EmailType"
 			}
 			return ""
@@ -123,21 +123,19 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		assert.Equal(t, "name", propRef.Property)
 	})
 
-	t.Run("custom type reference in itemTypes", func(t *testing.T) {
+	t.Run("custom type reference in itemType", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email-list",
 			Name:        "Test Email List",
 			Description: "A list of emails",
 			Type:        "array",
-			Config: map[string]interface{}{
-				"itemTypes": []interface{}{"#/custom-types/email-types/EmailType"},
-			},
+			ItemType:    "#custom-type:EmailType",
 		}
 
 		urnFromRef := func(ref string) string {
-			if ref == "#/custom-types/email-types/EmailType" {
+			if ref == "#custom-type:EmailType" {
 				return "custom-type:EmailType"
 			}
 			return ""
@@ -150,28 +148,27 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		assert.Equal(t, "A list of emails", args.Description)
 		assert.Equal(t, "array", args.Type)
 
-		// Check that the itemTypes field is correctly converted to contain a PropertyRef
-		itemTypes, ok := args.Config["itemTypes"].([]interface{})
-		assert.True(t, ok, "itemTypes should be an array")
-		assert.Len(t, itemTypes, 1)
-
-		propRef, ok := itemTypes[0].(resources.PropertyRef)
-		assert.True(t, ok, "itemTypes[0] should be a PropertyRef")
+		// Check that item_types is in config as an array with PropertyRef
+		itemTypes, ok := args.Config["item_types"]
+		assert.True(t, ok, "item_types should be in config")
+		itemTypesArray, ok := itemTypes.([]interface{})
+		assert.True(t, ok, "item_types should be an array")
+		assert.Equal(t, 1, len(itemTypesArray))
+		propRef, ok := itemTypesArray[0].(resources.PropertyRef)
+		assert.True(t, ok, "item_types[0] should be a PropertyRef")
 		assert.Equal(t, "custom-type:EmailType", propRef.URN)
 		assert.Equal(t, "name", propRef.Property)
 	})
 
-	t.Run("itemTypes reference resolution error", func(t *testing.T) {
+	t.Run("itemType reference resolution error", func(t *testing.T) {
 		t.Parallel()
 
-		prop := localcatalog.Property{
+		prop := localcatalog.PropertyV1{
 			LocalID:     "test-email-list",
 			Name:        "Test Email List",
 			Description: "A list of emails",
 			Type:        "array",
-			Config: map[string]interface{}{
-				"itemTypes": []interface{}{"#/custom-types/email-types/NonExistentType"},
-			},
+			ItemType:    "#custom-type:NonExistentType",
 		}
 
 		urnFromRef := func(ref string) string {
@@ -182,6 +179,90 @@ func TestPropertyArgs_FromCatalogPropertyType(t *testing.T) {
 		err := args.FromCatalogPropertyType(prop, urnFromRef)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to resolve ref to the custom type urn")
+	})
+
+	t.Run("property with multiple types", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.PropertyV1{
+			LocalID:     "test-multi-type",
+			Name:        "Test Multi Type",
+			Description: "A property with multiple types",
+			Types:       []string{"string", "number", "boolean"},
+		}
+
+		urnFromRef := func(string) string {
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+		assert.Equal(t, "Test Multi Type", args.Name)
+		assert.Equal(t, "A property with multiple types", args.Description)
+
+		// Type should be comma-separated sorted string
+		assert.Equal(t, "boolean,number,string", args.Type)
+	})
+
+	t.Run("property with multiple primitive item types", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.PropertyV1{
+			LocalID:     "test-array-multi-type",
+			Name:        "Test Array Multi Type",
+			Description: "An array with multiple item types",
+			Type:        "array",
+			ItemTypes:   []string{"string", "number", "boolean"},
+		}
+
+		urnFromRef := func(string) string {
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+
+		expected := &state.PropertyArgs{
+			Name:        "Test Array Multi Type",
+			Description: "An array with multiple item types",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"item_types": []interface{}{"boolean", "number", "string"},
+			},
+		}
+		assert.Equal(t, expected, args)
+	})
+
+	t.Run("property with custom type reference in itemTypes array is not treated differently as customtypes should be added to itemType(not itemTypes)", func(t *testing.T) {
+		t.Parallel()
+
+		prop := localcatalog.PropertyV1{
+			LocalID:     "test-array-custom-type",
+			Name:        "Test Array Custom Type",
+			Description: "An array with custom type in item_types",
+			Type:        "array",
+			ItemTypes:   []string{"string", "#custom-type:EmailType", "number"},
+		}
+
+		urnFromRef := func(ref string) string {
+			return ""
+		}
+
+		args := &state.PropertyArgs{}
+		err := args.FromCatalogPropertyType(prop, urnFromRef)
+		assert.NoError(t, err)
+
+		expected := &state.PropertyArgs{
+			Name:        "Test Array Custom Type",
+			Description: "An array with custom type in item_types",
+			Type:        "array",
+			Config: map[string]interface{}{
+				"item_types": []interface{}{"#custom-type:EmailType", "number", "string"},
+			},
+		}
+		assert.Equal(t, expected, args)
 	})
 }
 

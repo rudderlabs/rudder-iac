@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type mockTrackingPlanDataCatalog struct {
@@ -46,7 +46,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
+		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
 		assert.Equal(t, 2, len(trackingPlans))
 
 		resourceIDs := make([]string, 0, len(trackingPlans))
@@ -76,7 +76,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		trackingPlans := collection.GetAll(state.TrackingPlanResourceType)
+		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
 		require.Equal(t, 2, len(trackingPlans))
 
 		tp1, ok := trackingPlans["tp1"]
@@ -97,11 +97,11 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 	t.Run("generates spec with correct relativePath and content structure", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
-				state.EventResourceType: {
+				types.EventResourceType: {
 					"evt1": "#/events/product-viewed/product-viewed",
 					"evt2": "#/events/checkout-completed/checkout-completed",
 				},
-				state.PropertyResourceType: {
+				types.PropertyResourceType: {
 					"prop1": "#/properties/product-id/product-id",
 					"prop2": "#/properties/revenue/revenue",
 				},
@@ -200,11 +200,11 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 	t.Run("generates multiple tracking plans with different specs", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
-				state.EventResourceType: {
+				types.EventResourceType: {
 					"evt1": "#/events/product-viewed/product-viewed",
 					"evt2": "#/events/user-signup/user-signup",
 				},
-				state.PropertyResourceType: {
+				types.PropertyResourceType: {
 					"prop1": "#/properties/product-id/product-id",
 					"prop2": "#/properties/user-email/user-email",
 				},

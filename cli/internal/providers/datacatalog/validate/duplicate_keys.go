@@ -3,9 +3,9 @@ package validate
 import (
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type DuplicateNameIDKeysValidator struct {
@@ -17,64 +17,39 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	var errors []ValidationError
 
 	var (
-		propName = make(map[string]*localcatalog.Property)
-		propID   = make(map[string]*localcatalog.Property)
+		propName = make(map[string]*localcatalog.PropertyV1)
+		propID   = make(map[string]*localcatalog.PropertyV1)
 	)
 
 	// Checking duplicate id and name keys in properties
-	for group, props := range dc.Properties {
-		for _, prop := range props {
+	for _, prop := range dc.Properties {
+		if lookup, ok := propName[prop.Name]; ok {
+			// Check if both properties have the same type
+			if lookup.Type == prop.Type {
+				// Check if item types match (for array properties)
+				sort.Strings(lookup.ItemTypes)
+				sort.Strings(prop.ItemTypes)
+				itemTypesMatch := (lookup.ItemType == prop.ItemType) && slices.Equal(lookup.ItemTypes, prop.ItemTypes)
 
-			if lookup, ok := propName[prop.Name]; ok {
-				var lookupArrayItemType []any
-				var propArrayItemType []any
-				if lookup.Type == "array" && lookup.Config != nil {
-					if itemTypes, ok := lookup.Config["itemTypes"]; ok {
-						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
-							utils.SortLexicographically(arr)
-							lookupArrayItemType = arr
-						}
-					}
-				}
-				if prop.Type == "array" && prop.Config != nil {
-					if itemTypes, ok := prop.Config["itemTypes"]; ok {
-						if arr, ok := itemTypes.([]any); ok && len(arr) > 0 {
-							utils.SortLexicographically(arr)
-							propArrayItemType = arr
-						}
-					}
-				}
-
-				// If name, type and arrayItemType on the property are the same, then it's a duplicate
-				if lookup.Type == prop.Type {
-					switch {
-					// the property is a duplicate if - 
-					// 1. lookupArrayItemType and propArrayItemType are both nil
-					// 2. lookupArrayItemType and propArrayItemType are not nil and identical
-					case lookupArrayItemType == nil && propArrayItemType == nil:
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("duplicate name key: %s, type: %s", prop.Name, prop.Type),
-							Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
-						})
-					case lookupArrayItemType != nil && propArrayItemType != nil && slices.Equal(lookupArrayItemType, propArrayItemType):
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("duplicate name key: %s, type: %s and arrayItemType: %v", prop.Name, prop.Type, propArrayItemType),
-							Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
-						})
-					}
+				if itemTypesMatch {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("duplicate name key: %s, type: %s", prop.Name, prop.Type),
+						Reference: fmt.Sprintf("#property:%s", prop.LocalID),
+					})
 				}
 			}
-
-			if _, ok := propID[prop.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s", prop.LocalID),
-					Reference: fmt.Sprintf("#/properties/%s/%s", group, prop.LocalID),
-				})
-			}
-
-			propName[prop.Name] = &prop
-			propID[prop.LocalID] = &prop
 		}
+
+		if _, ok := propID[prop.LocalID]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate id key %s", prop.LocalID),
+				Reference: fmt.Sprintf("#property:%s", prop.LocalID),
+			})
+		}
+
+		propCopy := prop
+		propName[prop.Name] = &propCopy
+		propID[prop.LocalID] = &propCopy
 	}
 
 	var (
@@ -83,30 +58,27 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	)
 
 	// Checking duplicate id and name keys in events
-	for group, events := range dc.Events {
-		for _, event := range events {
-
-			if event.Type != "track" {
-				continue
-			}
-
-			if _, ok := eventName[event.Name]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate name key %s", event.Name),
-					Reference: fmt.Sprintf("#/events/%s/%s", group, event.LocalID),
-				})
-			}
-
-			if _, ok := eventID[event.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s", event.LocalID),
-					Reference: fmt.Sprintf("#/events/%s/%s", group, event.LocalID),
-				})
-			}
-
-			eventName[event.Name] = nil
-			eventID[event.LocalID] = nil
+	for _, event := range dc.Events {
+		if event.Type != "track" {
+			continue
 		}
+
+		if _, ok := eventName[event.Name]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate name key %s", event.Name),
+				Reference: fmt.Sprintf("#event:%s", event.LocalID),
+			})
+		}
+
+		if _, ok := eventID[event.LocalID]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate id key %s", event.LocalID),
+				Reference: fmt.Sprintf("#event:%s", event.LocalID),
+			})
+		}
+
+		eventName[event.Name] = nil
+		eventID[event.LocalID] = nil
 	}
 
 	var (
@@ -115,18 +87,18 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	)
 
 	// Checking duplicate id and name keys of trackingplans
-	for group, tp := range dc.TrackingPlans {
+	for _, tp := range dc.TrackingPlans {
 		if _, ok := tpName[tp.Name]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate name key %s", tp.Name),
-				Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+				Reference: fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlans, tp.LocalID),
 			})
 		}
 
 		if _, ok := tpID[tp.LocalID]; ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("duplicate id key %s", tp.LocalID),
-				Reference: fmt.Sprintf("#/tp/%s/%s", group, tp.LocalID),
+				Reference: fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlans, tp.LocalID),
 			})
 		}
 
@@ -135,7 +107,7 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 			if _, ok := eventRuleIDs[rule.LocalID]; ok {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("duplicate id key %s", rule.LocalID),
-					Reference: fmt.Sprintf("#/tp/%s/%s/rules/%s", group, tp.LocalID, rule.LocalID),
+					Reference: fmt.Sprintf("#%s:%s:rules:%s", localcatalog.KindTrackingPlans, tp.LocalID, rule.LocalID),
 				})
 			}
 			eventRuleIDs[rule.LocalID] = nil
@@ -152,25 +124,23 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	)
 
 	// Checking duplicate id and name keys in custom types
-	for group, customTypes := range dc.CustomTypes {
-		for _, customType := range customTypes {
-			if _, ok := customTypeName[customType.Name]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate name key %s in custom types", customType.Name),
-					Reference: fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID),
-				})
-			}
-
-			if _, ok := customTypeID[customType.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s in custom types", customType.LocalID),
-					Reference: fmt.Sprintf("#/custom-types/%s/%s", group, customType.LocalID),
-				})
-			}
-
-			customTypeName[customType.Name] = nil
-			customTypeID[customType.LocalID] = nil
+	for _, customType := range dc.CustomTypes {
+		if _, ok := customTypeName[customType.Name]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate name key %s in custom types", customType.Name),
+				Reference: fmt.Sprintf("#custom-type:%s", customType.LocalID),
+			})
 		}
+
+		if _, ok := customTypeID[customType.LocalID]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate id key %s in custom types", customType.LocalID),
+				Reference: fmt.Sprintf("#custom-type:%s", customType.LocalID),
+			})
+		}
+
+		customTypeName[customType.Name] = nil
+		customTypeID[customType.LocalID] = nil
 	}
 
 	var (
@@ -179,25 +149,23 @@ func (dv *DuplicateNameIDKeysValidator) Validate(dc *localcatalog.DataCatalog) [
 	)
 
 	// Checking duplicate id and name keys in categories
-	for group, categories := range dc.Categories {
-		for _, category := range categories {
-			if _, ok := categoryName[category.Name]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate name key %s in categories", category.Name),
-					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
-				})
-			}
-
-			if _, ok := categoryID[category.LocalID]; ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("duplicate id key %s in categories", category.LocalID),
-					Reference: fmt.Sprintf("#/categories/%s/%s", group, category.LocalID),
-				})
-			}
-
-			categoryName[category.Name] = nil
-			categoryID[category.LocalID] = nil
+	for _, category := range dc.Categories {
+		if _, ok := categoryName[category.Name]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate name key %s in categories", category.Name),
+				Reference: fmt.Sprintf("#category:%s", category.LocalID),
+			})
 		}
+
+		if _, ok := categoryID[category.LocalID]; ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("duplicate id key %s in categories", category.LocalID),
+				Reference: fmt.Sprintf("#category:%s", category.LocalID),
+			})
+		}
+
+		categoryName[category.Name] = nil
+		categoryID[category.LocalID] = nil
 	}
 
 	return errors
