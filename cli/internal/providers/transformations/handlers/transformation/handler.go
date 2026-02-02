@@ -74,17 +74,21 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {
+	specDir := filepath.Dir(path)
+
+	// Enrich tests with SpecDir and apply defaults
+	enrichedTests := enrichTestsWithSpecDir(spec.Tests, specDir)
+
 	resource := &model.TransformationResource{
 		ID:          spec.ID,
 		Name:        spec.Name,
 		Description: spec.Description,
 		Language:    spec.Language,
-		Tests:       spec.Tests,
+		Tests:       enrichedTests,
 	}
 
 	// Resolve code from file if specified
 	if spec.File != "" {
-		specDir := filepath.Dir(path)
 		codePath := spec.File
 		if !filepath.IsAbs(codePath) {
 			codePath = filepath.Join(specDir, spec.File)
@@ -102,6 +106,36 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.Transfor
 	return map[string]*model.TransformationResource{
 		spec.ID: resource,
 	}, nil
+}
+
+// enrichTestsWithSpecDir populates SpecDir on each test and applies default paths if not specified
+func enrichTestsWithSpecDir(tests []specs.TransformationTest, specDir string) []specs.TransformationTest {
+	if len(tests) == 0 {
+		return tests
+	}
+
+	enriched := make([]specs.TransformationTest, len(tests))
+	for i, test := range tests {
+		enriched[i] = test
+		enriched[i].SpecDir = specDir
+
+		// Apply defaults for Input and Output if empty
+		if enriched[i].Input == "" {
+			enriched[i].Input = filepath.Join(specDir, "tests", test.Name, "input")
+		} else if !filepath.IsAbs(enriched[i].Input) {
+			// Resolve relative paths relative to spec directory
+			enriched[i].Input = filepath.Join(specDir, enriched[i].Input)
+		}
+
+		if enriched[i].Output == "" {
+			enriched[i].Output = filepath.Join(specDir, "tests", test.Name, "output")
+		} else if !filepath.IsAbs(enriched[i].Output) {
+			// Resolve relative paths relative to spec directory
+			enriched[i].Output = filepath.Join(specDir, enriched[i].Output)
+		}
+	}
+
+	return enriched
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, graph *resources.Graph) error {
