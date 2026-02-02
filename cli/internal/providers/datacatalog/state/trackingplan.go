@@ -597,7 +597,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 		for _, localVariant := range event.Variants {
 			variant := &Variant{}
 
-			if err := variant.FromLocalCatalogVariant(
+			if err := variant.FromLocalCatalogVariantV1(
 				localVariant,
 				urnFromRef,
 			); err != nil {

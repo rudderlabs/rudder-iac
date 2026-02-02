@@ -443,6 +443,7 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 	t.Run("converts V0 tracking plan with event rules to V1 format", func(t *testing.T) {
 		t.Parallel()
 
+		trueVal := true
 		v0TrackingPlan := TrackingPlan{
 			Name:        "Mobile App Events",
 			LocalID:     "mobile_app_tracking",
@@ -498,6 +499,13 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 						{
 							Ref:      "#property:login_method",
 							Required: true,
+							AdditionalProperties: &trueVal,
+							Properties: []*TPRuleProperty{
+								{
+									Ref:      "#property:login_details",
+									Required: true,
+								},
+							},
 						},
 					},
 				},
@@ -530,19 +538,20 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 							Required: false,
 						},
 					},
-					Variants: Variants{
+					Variants: VariantsV1{
 						{
 							Type:          "discriminator",
 							Discriminator: "#property:platform",
-							Cases: []VariantCase{
+							Cases: []VariantCaseV1{
 								{
 									DisplayName: "iOS",
 									Match:       []any{"ios"},
 									Description: "iOS platform",
-									Properties: []PropertyReference{
+									Properties: []PropertyReferenceV1{
 										{
-											Ref:      "#property:device_id",
+											Property: "#property:device_id",
 											Required: true,
+											
 										},
 									},
 								},
@@ -560,6 +569,13 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 						{
 							Property: "#property:login_method",
 							Required: true,
+							AdditionalProperties: &trueVal,
+							Properties: []*TPRulePropertyV1{
+								{
+									Property: "#property:login_details",
+									Required: true,
+								},
+							},
 						},
 					},
 				},

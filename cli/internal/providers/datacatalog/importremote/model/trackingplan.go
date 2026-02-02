@@ -91,7 +91,7 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			return fmt.Errorf("generating externalID for rule on event %s: %w", event.ID, err)
 		}
 
-		var importableVariants ImportableVariants
+		var importableVariants ImportableVariantsV1
 		if err := importableVariants.fromUpstream(event.Variants, resolver); err != nil {
 			return fmt.Errorf("processing variants on event %s: %w", event.ID, err)
 		}
@@ -103,7 +103,7 @@ func (tp *ImportableTrackingPlan) fromUpstream(
 			AdditionalProperties: event.AdditionalProperties,
 			IdentitySection:      event.IdentitySection,
 			Properties:           ruleProperties,
-			Variants:             importableVariants.Variants,
+			Variants:             importableVariants.VariantsV1,
 		}
 
 		rules = append(rules, rule)

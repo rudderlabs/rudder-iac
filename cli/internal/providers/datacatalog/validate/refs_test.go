@@ -264,22 +264,22 @@ func TestVariantsReferenceValidation(t *testing.T) {
 									Required: true,
 								},
 							},
-							Variants: catalog.Variants{
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "#property:page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search", "search_bar"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:search_term", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:search_term", Required: true},
 											},
 										},
 									},
-									Default: []catalog.PropertyReference{
-										{Ref: "#property:product_id", Required: true},
-									},
+									Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+										{Property: "#property:product_id", Required: true},
+									}},
 								},
 							},
 						},
@@ -332,16 +332,16 @@ func TestVariantsReferenceValidation(t *testing.T) {
 							Type:    "event_rule",
 							Event: "#event:test-event",
 							AdditionalProperties: false,
-							Variants: catalog.Variants{
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:non_existent_property", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:non_existent_property", Required: true},
 											},
 										},
 									},
@@ -380,22 +380,22 @@ func TestVariantsReferenceValidation(t *testing.T) {
 									Required: true,
 								},
 							},
-							Variants: catalog.Variants{
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "#property:page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:search_term", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:search_term", Required: true},
 											},
 										},
 									},
-									Default: []catalog.PropertyReference{
-										{Ref: "#property:non_existent_property", Required: true},
-									},
+									Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+										{Property: "#property:non_existent_property", Required: true},
+									}},
 								},
 							},
 						},
@@ -410,7 +410,6 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dc := &catalog.DataCatalog{
