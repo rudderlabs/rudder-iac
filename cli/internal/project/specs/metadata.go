@@ -58,11 +58,8 @@ func (m *Metadata) Validate() error {
 				return fmt.Errorf("missing required field 'workspace_id' in import metadata, workspace index %d", idx)
 			}
 			for _, res := range ws.Resources {
-				if res.LocalID == "" {
-					return fmt.Errorf("missing required field 'local_id' in import metadata for workspace '%s'", ws.WorkspaceID)
-				}
-				if res.RemoteID == "" {
-					return fmt.Errorf("missing required field 'remote_id' in import metadata for workspace '%s', local_id '%s'", ws.WorkspaceID, res.LocalID)
+				if err := res.Validate(); err != nil {
+					return fmt.Errorf("invalid import resource in workspace '%s': %w", ws.WorkspaceID, err)
 				}
 			}
 		}
