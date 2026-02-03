@@ -43,6 +43,10 @@ func namespaceToJSONPointer(namespace string) string {
 func getErrorMessage(err validator.FieldError) string {
 	fieldName := err.Field()
 
+	if msg, ok := customTagErrorMessages[err.ActualTag()]; ok {
+		return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
+	}
+
 	switch err.ActualTag() {
 	case "required":
 		return fmt.Sprintf("'%s' is required", fieldName)
@@ -52,6 +56,9 @@ func getErrorMessage(err validator.FieldError) string {
 
 	case "primitive_or_reference":
 		return fmt.Sprintf("'%s' is not a valid primitive type or reference format", fieldName)
+
+	case "primitive":
+		return fmt.Sprintf("'%s' must be a valid primitive type (string, number, integer, boolean, null, array, or object)", fieldName)
 
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {
