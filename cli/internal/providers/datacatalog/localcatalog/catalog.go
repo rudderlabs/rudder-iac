@@ -16,11 +16,12 @@ var (
 )
 
 const (
-	KindProperties    = "properties"
-	KindEvents        = "events"
-	KindCategories    = "categories"
-	KindTrackingPlans = "tp"
-	KindCustomTypes   = "custom-types"
+	KindProperties      = "properties"
+	KindEvents          = "events"
+	KindCategories      = "categories"
+	KindTrackingPlans   = "tp"
+	KindTrackingPlansV1 = "tracking-plan"
+	KindCustomTypes     = "custom-types"
 )
 
 // entity group is logical grouping of entities defined
@@ -35,10 +36,10 @@ type WorkspaceRemoteIDMapping struct {
 // Create a reverse lookup based on the groupName and identifier per entity
 type DataCatalog struct {
 	Properties     []PropertyV1                         `json:"properties"`
-	Events         []Event                              `json:"events"`
+	Events         []EventV1                            `json:"events"`
 	TrackingPlans  []*TrackingPlanV1                    `json:"trackingPlans"`
 	CustomTypes    []CustomTypeV1                       `json:"customTypes"`
-	Categories     []Category                           `json:"categories"`
+	Categories     []CategoryV1                         `json:"categories"`
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 	ReferenceMap   map[string]string                    `json:"-"` // Maps URN references to original path-based references
 }
@@ -52,7 +53,7 @@ func (dc *DataCatalog) Property(id string) *PropertyV1 {
 	return nil
 }
 
-func (dc *DataCatalog) Event(id string) *Event {
+func (dc *DataCatalog) Event(id string) *EventV1 {
 	for i := range dc.Events {
 		if dc.Events[i].LocalID == id {
 			return &dc.Events[i]
@@ -62,7 +63,7 @@ func (dc *DataCatalog) Event(id string) *Event {
 }
 
 // Category returns a category by ID
-func (dc *DataCatalog) Category(id string) *Category {
+func (dc *DataCatalog) Category(id string) *CategoryV1 {
 	for i := range dc.Categories {
 		if dc.Categories[i].LocalID == id {
 			return &dc.Categories[i]
@@ -128,10 +129,10 @@ func (dc *DataCatalog) TPEventRules(tpID string) ([]*TPRuleV1, bool) {
 func New() *DataCatalog {
 	return &DataCatalog{
 		Properties:     []PropertyV1{},
-		Events:         []Event{},
+		Events:         []EventV1{},
 		TrackingPlans:  []*TrackingPlanV1{},
 		CustomTypes:    []CustomTypeV1{},
-		Categories:     []Category{},
+		Categories:     []CategoryV1{},
 		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
 		ReferenceMap:   map[string]string{},
 	}
@@ -309,6 +310,38 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = PropertySpecV1{
 			Properties: properties,
 		}
+	case KindCustomTypes:
+		customTypes, err := ExtractCustomTypes(s)
+		if err != nil {
+			return nil, fmt.Errorf("extracting custom types: %w", err)
+		}
+		resourceSpec = CustomTypeSpecV1{
+			Types: customTypes,
+		}
+	case KindEvents:
+		events, err := ExtractEvents(s)
+		if err != nil {
+			return nil, fmt.Errorf("extracting events: %w", err)
+		}
+		resourceSpec = EventSpecV1{
+			Events: events,
+		}
+	case KindCategories:
+		categories, err := ExtractCategories(s)
+		if err != nil {
+			return nil, fmt.Errorf("extracting categories: %w", err)
+		}
+		resourceSpec = CategorySpecV1{
+			Categories: categories,
+		}
+	case KindTrackingPlans:
+		trackingPlan, err := ExtractTrackingPlan(s)
+		if err != nil {
+			return nil, fmt.Errorf("extracting tracking plans: %w", err)
+		}
+		resourceSpec = trackingPlan
+		// change kind for tracking plans from "tp" to "tracking-plan"
+		s.Kind = KindTrackingPlansV1
 	default:
 		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
@@ -372,24 +405,18 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		dc.Categories = append(dc.Categories, categories...)
 
 	case KindTrackingPlans:
-		tpV0, err := ExtractTrackingPlan(s)
+		tp, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
-		// Convert V0 to V1
-		tpV1 := &TrackingPlanV1{}
-		if err := tpV1.FromV0(&tpV0); err != nil {
-			return fmt.Errorf("converting tracking plan to v1: %w", err)
-		}
-
 		// Check for duplicates
 		for i := range dc.TrackingPlans {
-			if dc.TrackingPlans[i].LocalID == tpV1.LocalID {
-				return fmt.Errorf("duplicate tracking plan with id '%s' found", tpV1.LocalID)
+			if dc.TrackingPlans[i].LocalID == tp.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", tp.LocalID)
 			}
 		}
-		dc.TrackingPlans = append(dc.TrackingPlans, tpV1)
+		dc.TrackingPlans = append(dc.TrackingPlans, &tp)
 
 	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)

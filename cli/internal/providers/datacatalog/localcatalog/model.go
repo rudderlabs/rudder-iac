@@ -54,7 +54,7 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 	return v1Properties, nil
 }
 
-type Event struct {
+type EventV1 struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
 	Type        string  `json:"event_type" mapstructure:"event_type"`
@@ -62,14 +62,14 @@ type Event struct {
 	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
-type EventSpec struct {
-	Events []Event `json:"events"`
+type EventSpecV1 struct {
+	Events []EventV1 `json:"events"`
 }
 
 // ExtractEvents simply parses the whole file defined as resource definition
 // and returns the events from it.
-func ExtractEvents(s *specs.Spec) ([]Event, error) {
-	spec := EventSpec{}
+func ExtractEvents(s *specs.Spec) ([]EventV1, error) {
+	spec := EventSpecV1{}
 
 	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
@@ -83,20 +83,20 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 	return spec.Events, nil
 }
 
-// Category represents a user-defined category
-type Category struct {
+// CategoryV1 represents a user-defined category
+type CategoryV1 struct {
 	LocalID string `mapstructure:"id" json:"id"`
 	Name    string `mapstructure:"name" json:"name"`
 }
 
-// CategorySpec represents the spec section of a categories resource
-type CategorySpec struct {
-	Categories []Category `json:"categories"`
+// CategorySpecV1 represents the spec section of a categories resource
+type CategorySpecV1 struct {
+	Categories []CategoryV1 `json:"categories"`
 }
 
 // ExtractCategories parses a resource definition and extracts categories
-func ExtractCategories(s *specs.Spec) ([]Category, error) {
-	spec := CategorySpec{}
+func ExtractCategories(s *specs.Spec) ([]CategoryV1, error) {
+	spec := CategorySpecV1{}
 
 	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {

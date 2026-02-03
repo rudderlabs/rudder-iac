@@ -10,11 +10,11 @@ import (
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
-		Events:         []Event{},
+		Events:         []EventV1{},
 		Properties:     []PropertyV1{},
 		TrackingPlans:  []*TrackingPlanV1{},
 		CustomTypes:    []CustomTypeV1{},
-		Categories:     []Category{},
+		Categories:     []CategoryV1{},
 		ReferenceMap:   make(map[string]string),
 		ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 	}
@@ -80,7 +80,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.Events))
-		assert.Equal(t, Event{
+		assert.Equal(t, EventV1{
 			LocalID:     "user_signed_up",
 			Name:        "User Signed Up",
 			Type:        "track",
@@ -270,11 +270,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan with variants is extracted successfully", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:         []Event{},
+			Events:         []EventV1{},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -549,19 +549,19 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, 3, len(emptyCatalog.Categories))
 
 		// Verify first category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "user_actions",
 			Name:    "User Actions",
 		}, emptyCatalog.Categories[0])
 
 		// Verify second category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "system_events",
 			Name:    "System Events",
 		}, emptyCatalog.Categories[1])
 
 		// Verify third category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "payment_events",
 			Name:    "Payment Events",
 		}, emptyCatalog.Categories[2])
@@ -569,11 +569,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
-			Categories:    []Category{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First events file with metadata.name "shared_events"
@@ -637,11 +637,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
-			Categories:    []Category{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First properties file
@@ -695,11 +695,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
-			Categories:    []Category{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First categories file
@@ -747,11 +747,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
-			Categories:    []Category{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First custom-types file
@@ -805,11 +805,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
-			Categories:    []Category{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First tracking plan file

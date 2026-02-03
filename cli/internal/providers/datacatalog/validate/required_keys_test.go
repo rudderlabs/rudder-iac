@@ -448,13 +448,13 @@ func TestCategoryValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		categories     []catalog.Category
+		categories     []catalog.CategoryV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "valid category",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "valid-category",
 					Name:    "Valid Category",
@@ -464,7 +464,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing fields",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "",
 					Name:    "",
@@ -475,7 +475,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing LocalID",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "",
 					Name:    "Valid Name",
@@ -486,7 +486,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing Name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "valid-id",
 					Name:    "",
@@ -497,7 +497,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with leading whitespace in name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "leading-space",
 					Name:    " Category With Leading Space",
@@ -508,7 +508,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with trailing whitespace in name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "trailing-space",
 					Name:    "Category With Trailing Space ",
@@ -519,7 +519,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with invalid name format",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "invalid-format",
 					Name:    "!@#Invalid",
@@ -530,7 +530,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with valid name formats",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "uppercase-start",
 					Name:    "Uppercase Start",
@@ -556,7 +556,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category name too short",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "too-short",
 					Name:    "A",
@@ -616,7 +616,7 @@ func TestVariantsValidation(t *testing.T) {
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: "#event:test-event",
+								Event:   "#event:test-event",
 								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
@@ -679,7 +679,7 @@ func TestVariantsValidation(t *testing.T) {
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: "#/events/test-group/test-event",
+								Event:   "#/events/test-group/test-event",
 								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
@@ -732,15 +732,15 @@ func TestVariantsValidation(t *testing.T) {
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: "#/events/test-group/test-event",
+								Event:   "#/events/test-group/test-event",
 								Variants: catalog.VariantsV1{
 									{
 										Type:          "other_type", // Invalid type
 										Discriminator: "",           // Missing discriminator
 										Cases: []catalog.VariantCaseV1{
 											{
-												DisplayName: "",                            // Missing display name
-												Match:       []any{},                       // Empty match array
+												DisplayName: "",                              // Missing display name
+												Match:       []any{},                         // Empty match array
 												Properties:  []catalog.PropertyReferenceV1{}, // Empty properties array
 											},
 										},
@@ -923,10 +923,10 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "valid_non_nested_rule",
 						Type:    "event_rule",
-						Event: "#/events/test/signup",
+						Event:   "#/events/test/signup",
 						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Property:              "#/properties/test_props/user_profile",
+								Property:             "#/properties/test_props/user_profile",
 								Required:             true,
 								AdditionalProperties: &falseVal,
 							},
@@ -935,7 +935,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "valid_nested_rule",
 						Type:    "event_rule",
-						Event: "#/events/test/signup",
+						Event:   "#/events/test/signup",
 						Properties: []*catalog.TPRulePropertyV1{
 							{
 								Property: "#/properties/test_props/user_profile",
@@ -952,7 +952,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "invalid_object_type_rule",
 						Type:    "event_rule",
-						Event: "#/events/test/signup",
+						Event:   "#/events/test/signup",
 						Properties: []*catalog.TPRulePropertyV1{
 							{
 								Property: "#/properties/test_props/button_signin", // string type with nested properties
@@ -969,7 +969,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "exceed_depth_rule",
 						Type:    "event_rule",
-						Event: "#/events/test/signup",
+						Event:   "#/events/test/signup",
 						Properties: []*catalog.TPRulePropertyV1{
 							{
 								Property: "#/properties/test_props/user_profile",
@@ -1004,9 +1004,9 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				},
 			},
 		},
-		Events:      []catalog.Event{},
+		Events:      []catalog.EventV1{},
 		CustomTypes: []catalog.CustomTypeV1{},
-		Categories:  []catalog.Category{},
+		Categories:  []catalog.CategoryV1{},
 	}
 
 	validator := &RequiredKeysValidator{}
