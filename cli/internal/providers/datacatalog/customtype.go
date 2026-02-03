@@ -49,24 +49,29 @@ func NewCustomTypeProvider(dc catalog.DataCatalog, importDir string) *CustomType
 	}
 }
 
+// normalizeConfigKeys converts supported config keys to camelCase for API compatibility.
+// Keys in SupportedV0ConfigKeys are normalized; other keys are left as-is.
+func normalizeConfigKeys(config map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(config))
+	camelCaseNamer := namer.NewCamelCase()
+	for key, value := range config {
+		configKey := key
+		camelCaseKey := camelCaseNamer.Name(key)
+		if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
+			configKey = camelCaseKey
+		}
+		out[configKey] = value
+	}
+	return out
+}
+
 func (p *CustomTypeProvider) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
 	p.log.Debug("creating custom type in upstream catalog", "id", ID)
 
 	toArgs := state.CustomTypeArgs{}
 	toArgs.FromResourceData(data)
 
-	// convert supported config keys to camelCase
-	// leave other keys as is
-	config := make(map[string]interface{})
-	camelCaseNamer := namer.NewCamelCase()
-	for key, value := range toArgs.Config {
-		configKey := key
-		camelCaseKey := camelCaseNamer.Name(key)
-		if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
-			configKey = camelCaseKey
-		}
-		config[configKey] = value
-	}
+	config := normalizeConfigKeys(toArgs.Config)
 
 	properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 	for _, prop := range toArgs.Properties {
@@ -127,18 +132,7 @@ func (p *CustomTypeProvider) Update(ctx context.Context, ID string, input resour
 
 	// Check if there are any changes using the Diff method
 	if prevState.CustomTypeArgs.Diff(&toArgs) {
-		// convert supported config keys to camelCase
-		// leave other keys as is
-		config := make(map[string]interface{})
-		camelCaseNamer := namer.NewCamelCase()
-		for key, value := range toArgs.Config {
-			configKey := key
-			camelCaseKey := camelCaseNamer.Name(key)
-			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
-				configKey = camelCaseKey
-			}
-			config[configKey] = value
-		}
+		config := normalizeConfigKeys(toArgs.Config)
 
 		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
 		for _, prop := range toArgs.Properties {
@@ -229,18 +223,7 @@ func (p *CustomTypeProvider) Import(ctx context.Context, ID string, data resourc
 	if toArgs.DiffUpstream(customType) {
 		p.log.Debug("custom type has differences, updating", "id", ID, "remoteId", remoteId)
 
-		// convert supported config keys to camelCase
-		// leave other keys as is
-		config := make(map[string]interface{})
-		camelCaseNamer := namer.NewCamelCase()
-		for key, value := range toArgs.Config {
-			configKey := key
-			camelCaseKey := camelCaseNamer.Name(key)
-			if slices.Contains(localcatalog.SupportedV0ConfigKeys, camelCaseKey) {
-				configKey = camelCaseKey
-			}
-			config[configKey] = value
-		}
+		config := normalizeConfigKeys(toArgs.Config)
 
 		// Prepare properties for update
 		properties := make([]catalog.CustomTypeProperty, 0, len(toArgs.Properties))
