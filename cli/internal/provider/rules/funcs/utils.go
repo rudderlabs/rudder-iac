@@ -91,6 +91,21 @@ func getErrorMessage(err validator.FieldError) string {
 			err.Param(),
 		)
 
+	case "min":
+		if err.Kind() == reflect.String || err.Kind() == reflect.Slice || err.Kind() == reflect.Array {
+			return fmt.Sprintf("'%s' length must be greater than or equal to %s", fieldName, err.Param())
+		}
+		return fmt.Sprintf("'%s' must be greater than or equal to %s", fieldName, err.Param())
+
+	case "max":
+		if err.Kind() == reflect.String || err.Kind() == reflect.Slice || err.Kind() == reflect.Array {
+			return fmt.Sprintf("'%s' length must be less than or equal to %s", fieldName, err.Param())
+		}
+		return fmt.Sprintf("'%s' must be less than or equal to %s", fieldName, err.Param())
+
+	case "eq":
+		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
+
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
