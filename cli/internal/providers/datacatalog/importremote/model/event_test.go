@@ -32,7 +32,7 @@ func TestEventForExport(t *testing.T) {
 
 	t.Run("resolves category reference when categoryId is set", func(t *testing.T) {
 		categoryId := "cat-123"
-		categoryRef := "#/categories/ecommerce/ecommerce_category"
+		categoryRef := "#category:ecommerce_category"
 		upstream := &catalog.Event{
 			Name:        "Product Purchased",
 			Description: "User purchased a product",
@@ -43,7 +43,7 @@ func TestEventForExport(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if entityType == types.CategoryResourceType && remoteID == "cat-123" {
-					return "#/categories/ecommerce/ecommerce_category", nil
+					return "#category:ecommerce_category", nil
 				}
 				return "", nil
 			},

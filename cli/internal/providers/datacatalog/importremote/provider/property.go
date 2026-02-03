@@ -94,11 +94,7 @@ func (p *PropertyImportProvider) idResources(
 		}
 
 		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindProperties,
-			MetadataNameProperties,
-			externalID,
-		)
+		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
 	}
 	return nil
 }

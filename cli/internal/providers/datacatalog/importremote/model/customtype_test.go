@@ -28,11 +28,11 @@ func TestCustomTypeForExport(t *testing.T) {
 				assert.Equal(t, types.PropertyResourceType, entityType)
 				switch remoteID {
 				case "prop_street_123":
-					return "#/properties/address/street", nil
+					return "#property:street", nil
 				case "prop_city_456":
-					return "#/properties/address/city", nil
+					return "#property:city", nil
 				case "prop_zip_789":
-					return "#/properties/address/zip_code", nil
+					return "#property:zip_code", nil
 				default:
 					return "", fmt.Errorf("unknown property: %s", remoteID)
 				}
@@ -50,15 +50,15 @@ func TestCustomTypeForExport(t *testing.T) {
 			"type":        "object",
 			"properties": []any{
 				map[string]any{
-					"property": "#/properties/address/street",
+					"property": "#property:street",
 					"required": true,
 				},
 				map[string]any{
-					"property": "#/properties/address/city",
+					"property": "#property:city",
 					"required": true,
 				},
 				map[string]any{
-					"property": "#/properties/address/zip_code",
+					"property": "#property:zip_code",
 					"required": false,
 				},
 			},
@@ -88,7 +88,7 @@ func TestCustomTypeForExport(t *testing.T) {
 
 	t.Run("resolves itemTypes custom type references in config", func(t *testing.T) {
 		customTypeID := "ct_product_123"
-		expectedRef := "#/custom-types/catalog/Product"
+		expectedRef := "#custom-type:Product"
 
 		upstream := &catalog.CustomType{
 			Name:        "Product List",
@@ -175,9 +175,9 @@ func TestCustomTypeForExport(t *testing.T) {
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				assert.Equal(t, types.PropertyResourceType, entityType)
 				refMap := map[string]string{
-					"prop_page":        "#/properties/mypropertygroup/page",
-					"prop_search_term": "#/properties/mypropertygroup/search_term",
-					"prop_product_id":  "#/properties/mypropertygroup/original_product_id",
+					"prop_page":        "#property:page",
+					"prop_search_term": "#property:search_term",
+					"prop_product_id":  "#property:original_product_id",
 				}
 				if ref, ok := refMap[remoteID]; ok {
 					return ref, nil
@@ -198,22 +198,22 @@ func TestCustomTypeForExport(t *testing.T) {
 			"type":        "object",
 			"properties": []any{
 				map[string]any{
-					"property": "#/properties/mypropertygroup/page",
+					"property": "#property:page",
 					"required": true,
 				},
 				map[string]any{
-					"property": "#/properties/mypropertygroup/search_term",
+					"property": "#property:search_term",
 					"required": false,
 				},
 				map[string]any{
-					"property": "#/properties/mypropertygroup/original_product_id",
+					"property": "#property:original_product_id",
 					"required": false,
 				},
 			},
 			"variants": []any{
 				map[string]any{
 					"type":          "discriminator",
-					"discriminator": "#/properties/mypropertygroup/page",
+					"discriminator": "#property:page",
 					"cases": []any{
 						map[string]any{
 							"display_name": "search_page",
@@ -221,7 +221,7 @@ func TestCustomTypeForExport(t *testing.T) {
 							"description":  "applies when a product part of search results",
 							"properties": []any{
 								map[string]any{
-									"property": "#/properties/mypropertygroup/search_term",
+									"property": "#property:search_term",
 									"required": true,
 								},
 							},
@@ -232,7 +232,7 @@ func TestCustomTypeForExport(t *testing.T) {
 							"description":  "applies on a product page",
 							"properties": []any{
 								map[string]any{
-									"property": "#/properties/mypropertygroup/page",
+									"property": "#property:page",
 									"required": false,
 								},
 							},
@@ -241,7 +241,7 @@ func TestCustomTypeForExport(t *testing.T) {
 					"default": map[string]any{
 						"properties": []any{
 							map[string]any{
-								"property": "#/properties/mypropertygroup/page",
+								"property": "#property:page",
 								"required": true,
 							},
 						},
@@ -427,7 +427,7 @@ func TestCustomTypeForExport(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_discriminator" {
-					return "#/properties/discriminator", nil
+					return "#property:discriminator", nil
 				}
 				return "", fmt.Errorf("case property not found")
 			},
@@ -462,7 +462,7 @@ func TestCustomTypeForExport(t *testing.T) {
 				if remoteID == "prop_invalid" {
 					return "", fmt.Errorf("default property not found")
 				}
-				return "#/properties/discriminator", nil
+				return "#property:discriminator", nil
 			},
 		}
 

@@ -99,11 +99,7 @@ func (p *CategoryImportProvider) idResources(
 		}
 
 		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindCategories,
-			MetadataNameCategories,
-			externalID,
-		)
+		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
 	}
 	return nil
 }

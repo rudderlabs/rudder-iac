@@ -93,11 +93,7 @@ func (p *CustomTypeImportProvider) idResources(
 		}
 
 		customType.ExternalID = externalID
-		customType.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindCustomTypes,
-			MetadataNameCustomTypes,
-			externalID,
-		)
+		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
 	}
 	return nil
 }

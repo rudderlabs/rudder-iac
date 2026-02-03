@@ -98,12 +98,12 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.EventResourceType: {
-					"evt1": "#/events/product-viewed/product-viewed",
-					"evt2": "#/events/checkout-completed/checkout-completed",
+					"evt1": "#event:product-viewed",
+					"evt2": "#event:checkout-completed",
 				},
 				types.PropertyResourceType: {
-					"prop1": "#/properties/product-id/product-id",
-					"prop2": "#/properties/revenue/revenue",
+					"prop1": "#property:product-id",
+					"prop2": "#property:revenue",
 				},
 			},
 		}
@@ -180,11 +180,11 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 					map[string]any{
 						"type":             "event_rule",
 						"id":               "product-viewed-rule",
-						"event":            "#/events/product-viewed/product-viewed",
+						"event":            "#event:product-viewed",
 						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/product-id/product-id",
+								"property":     "#property:product-id",
 								"required": true,
 							},
 						},
@@ -198,12 +198,12 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.EventResourceType: {
-					"evt1": "#/events/product-viewed/product-viewed",
-					"evt2": "#/events/user-signup/user-signup",
+					"evt1": "#event:product-viewed",
+					"evt2": "#event:user-signup",
 				},
 				types.PropertyResourceType: {
-					"prop1": "#/properties/product-id/product-id",
-					"prop2": "#/properties/user-email/user-email",
+					"prop1": "#property:product-id",
+					"prop2": "#property:user-email",
 				},
 			},
 		}
@@ -302,11 +302,11 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 					map[string]any{
 						"type":             "event_rule",
 						"id":               "product-viewed-rule",
-						"event":            "#/events/product-viewed/product-viewed",
+						"event":            "#event:product-viewed",
 						"identity_section": "properties",
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/product-id/product-id",
+								"property":     "#property:product-id",
 								"required": true,
 							},
 						},
@@ -341,12 +341,12 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 					map[string]any{
 						"type":                 "event_rule",
 						"id":                   "user-signup-rule",
-						"event":                "#/events/user-signup/user-signup",
+						"event":                "#event:user-signup",
 						"additionalProperties": true,
 						"identity_section":     "context",
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/user-email/user-email",
+								"property":     "#property:user-email",
 								"required": false,
 							},
 						},

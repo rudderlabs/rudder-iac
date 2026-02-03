@@ -74,7 +74,7 @@ func TestPropertyForExport(t *testing.T) {
 
 	t.Run("resolves custom type to reference", func(t *testing.T) {
 		customTypeID := "ct_abc123xyz"
-		expectedRef := "#/custom-types/product_types/ProductIDType"
+		expectedRef := "#custom-type:ProductIDType"
 
 		upstream := &catalog.Property{
 			Name:        "Product ID",

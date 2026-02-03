@@ -95,11 +95,7 @@ func (p *TrackingPlanImportProvider) idResources(
 		}
 
 		tp.ExternalID = externalID
-		tp.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindTrackingPlans,
-			externalID,
-			externalID,
-		)
+		tp.Reference = fmt.Sprintf("#tp:%s", externalID)
 	}
 	return nil
 }

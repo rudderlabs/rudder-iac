@@ -66,14 +66,14 @@ func TestTrackingPlanForExport(t *testing.T) {
 				switch entityType {
 				case types.EventResourceType:
 					if remoteID == "evt_product_viewed" {
-						return "#/events/ecommerce/product-viewed", nil
+						return "#event:product-viewed", nil
 					}
 				case types.PropertyResourceType:
 					switch remoteID {
 					case "prop_product_id":
-						return "#/properties/products/product-id", nil
+						return "#property:product-id", nil
 					case "prop_price":
-						return "#/properties/products/price", nil
+						return "#property:price", nil
 					}
 				}
 				return "", fmt.Errorf("unknown entity: %s/%s", entityType, remoteID)
@@ -100,15 +100,15 @@ func TestTrackingPlanForExport(t *testing.T) {
 				map[string]any{
 					"type":             TypeEventRule,
 					"id":               "product-viewed-rule",
-					"event":            "#/events/ecommerce/product-viewed",
+					"event":            "#event:product-viewed",
 					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"property": "#/properties/products/product-id",
+							"property": "#property:product-id",
 							"required": true,
 						},
 						map[string]any{
-							"property": "#/properties/products/price",
+							"property": "#property:price",
 							"required": false,
 						},
 					},
@@ -145,12 +145,12 @@ func TestTrackingPlanForExport(t *testing.T) {
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				switch entityType {
 				case types.EventResourceType:
-					return "#/events/checkout/checkout-completed", nil
+					return "#event:checkout-completed", nil
 				case types.PropertyResourceType:
 					refMap := map[string]string{
-						"prop_cart":    "#/properties/cart/cart-object",
-						"prop_cart_id": "#/properties/cart/cart-id",
-						"prop_total":   "#/properties/cart/total-amount",
+						"prop_cart":    "#property:cart-object",
+						"prop_cart_id": "#property:cart-id",
+						"prop_total":   "#property:total-amount",
 					}
 					if ref, ok := refMap[remoteID]; ok {
 						return ref, nil
@@ -177,21 +177,21 @@ func TestTrackingPlanForExport(t *testing.T) {
 				map[string]any{
 					"type":                 TypeEventRule,
 					"id":                   "checkout-completed-rule",
-					"event":                "#/events/checkout/checkout-completed",
+					"event":                "#event:checkout-completed",
 					"additionalProperties": true,
 					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"property":             "#/properties/cart/cart-object",
+							"property":             "#property:cart-object",
 							"required":             true,
 							"additionalProperties": false,
 							"properties": []any{
 								map[string]any{
-									"property": "#/properties/cart/cart-id",
+									"property": "#property:cart-id",
 									"required": true,
 								},
 								map[string]any{
-									"property": "#/properties/cart/total-amount",
+									"property": "#property:total-amount",
 									"required": false,
 								},
 							},
@@ -230,15 +230,15 @@ func TestTrackingPlanForExport(t *testing.T) {
 				switch entityType {
 				case types.EventResourceType:
 					eventMap := map[string]string{
-						"evt_page_viewed":    "#/events/navigation/page-viewed",
-						"evt_button_clicked": "#/events/interaction/button-clicked",
+						"evt_page_viewed":    "#event:page-viewed",
+						"evt_button_clicked": "#event:button-clicked",
 					}
 					if ref, ok := eventMap[remoteID]; ok {
 						return ref, nil
 					}
 				case types.PropertyResourceType:
 					if remoteID == "prop_button_id" {
-						return "#/properties/ui/button-id", nil
+						return "#property:button-id", nil
 					}
 				}
 				return "", fmt.Errorf("unknown entity: %s/%s", entityType, remoteID)
@@ -269,18 +269,18 @@ func TestTrackingPlanForExport(t *testing.T) {
 				map[string]any{
 					"type":             TypeEventRule,
 					"id":               "page-viewed-rule",
-					"event":            "#/events/navigation/page-viewed",
+					"event":            "#event:page-viewed",
 					"identity_section": "properties",
 				},
 				map[string]any{
 					"type":                 TypeEventRule,
 					"id":                   "button-clicked-rule",
-					"event":                "#/events/interaction/button-clicked",
+					"event":                "#event:button-clicked",
 					"additionalProperties": true,
 					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"property": "#/properties/ui/button-id",
+							"property": "#property:button-id",
 							"required": true,
 						},
 					},
@@ -379,7 +379,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if entityType == types.EventResourceType {
-					return "#/events/test/test-event", nil
+					return "#event:test-event", nil
 				}
 				return "", fmt.Errorf("property not found")
 			},
@@ -416,7 +416,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if entityType == types.EventResourceType {
-					return "#/events/test/test-event", nil
+					return "#event:test-event", nil
 				}
 				return "", nil
 			},
@@ -459,10 +459,10 @@ func TestTrackingPlanForExport(t *testing.T) {
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if entityType == types.EventResourceType {
-					return "#/events/nested/nested-event", nil
+					return "#event:nested-event", nil
 				}
 				if remoteID == "prop_parent" {
-					return "#/properties/parent/parent-prop", nil
+					return "#property:parent-prop", nil
 				}
 				return "", fmt.Errorf("nested property not found")
 			},
@@ -495,7 +495,7 @@ func TestTrackingPlanForExport(t *testing.T) {
 
 		mockRes := &mockTPResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				return "#/events/test/namer-error-event", nil
+				return "#event:namer-error-event", nil
 			},
 		}
 
@@ -568,20 +568,20 @@ func TestTrackingPlanForExport(t *testing.T) {
 				switch entityType {
 				case types.EventResourceType:
 					if remoteID == "evt_user_action" {
-						return "#/events/analytics/user-action", nil
+						return "#event:user-action", nil
 					}
 				case types.PropertyResourceType:
 					refMap := map[string]string{
-						"prop_action_type":   "#/properties/common/action-type",
-						"prop_user_id":       "#/properties/user/user-id",
-						"prop_timestamp":     "#/properties/common/timestamp",
-						"prop_email":         "#/properties/user/email",
-						"prop_referral_code": "#/properties/marketing/referral-code",
-						"prop_product_id":    "#/properties/product/product-id",
-						"prop_amount":        "#/properties/transaction/amount",
-						"prop_currency":      "#/properties/transaction/currency",
-						"prop_session_id":    "#/properties/session/session-id",
-						"prop_device_type":   "#/properties/device/device-type",
+						"prop_action_type":   "#property:action-type",
+						"prop_user_id":       "#property:user-id",
+						"prop_timestamp":     "#property:timestamp",
+						"prop_email":         "#property:email",
+						"prop_referral_code": "#property:referral-code",
+						"prop_product_id":    "#property:product-id",
+						"prop_amount":        "#property:amount",
+						"prop_currency":      "#property:currency",
+						"prop_session_id":    "#property:session-id",
+						"prop_device_type":   "#property:device-type",
 					}
 					if ref, ok := refMap[remoteID]; ok {
 						return ref, nil
@@ -611,26 +611,26 @@ func TestTrackingPlanForExport(t *testing.T) {
 				map[string]any{
 					"type":             TypeEventRule,
 					"id":               "user-action-rule",
-					"event":            "#/events/analytics/user-action",
+					"event":            "#event:user-action",
 					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"property": "#/properties/common/action-type",
+							"property": "#property:action-type",
 							"required": true,
 						},
 						map[string]any{
-							"property": "#/properties/user/user-id",
+							"property": "#property:user-id",
 							"required": true,
 						},
 						map[string]any{
-							"property": "#/properties/common/timestamp",
+							"property": "#property:timestamp",
 							"required": true,
 						},
 					},
 					"variants": []any{
 						map[string]any{
 							"type":          "discriminator",
-							"discriminator": "#/properties/common/action-type",
+							"discriminator": "#property:action-type",
 							"cases": []any{
 								map[string]any{
 									"display_name": "Sign Up Action",
@@ -638,11 +638,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to signup actions",
 									"properties": []any{
 										map[string]any{
-											"property": "#/properties/user/email",
+											"property": "#property:email",
 											"required": true,
 										},
 										map[string]any{
-											"property": "#/properties/marketing/referral-code",
+											"property": "#property:referral-code",
 											"required": false,
 										},
 									},
@@ -653,15 +653,15 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to purchase actions",
 									"properties": []any{
 										map[string]any{
-											"property": "#/properties/product/product-id",
+											"property": "#property:product-id",
 											"required": true,
 										},
 										map[string]any{
-											"property": "#/properties/transaction/amount",
+											"property": "#property:amount",
 											"required": true,
 										},
 										map[string]any{
-											"property": "#/properties/transaction/currency",
+											"property": "#property:currency",
 											"required": false,
 										},
 									},
@@ -670,11 +670,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 							"default": map[string]any{
 								"properties": []any{
 									map[string]any{
-										"property": "#/properties/session/session-id",
+										"property": "#property:session-id",
 										"required": true,
 									},
 									map[string]any{
-										"property": "#/properties/device/device-type",
+										"property": "#property:device-type",
 										"required": false,
 									},
 								},
