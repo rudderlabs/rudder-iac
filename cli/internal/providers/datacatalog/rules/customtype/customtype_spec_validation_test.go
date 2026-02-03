@@ -54,7 +54,7 @@ func TestCustomTypeSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_status",
-						Name:    "User Status",
+						Name:    "UserStatus",
 						Type:    "string",
 					},
 				},
@@ -86,7 +86,7 @@ func TestCustomTypeSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_profile",
-						Name:    "User Profile",
+						Name:    "UserProfile",
 						Type:    "object",
 						Properties: []localcatalog.CustomTypeProperty{
 							{Ref: "#/properties/user-traits/name", Required: true},
@@ -131,7 +131,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
-						Name: "User Status",
+						Name: "UserStatus",
 						Type: "string",
 					},
 				},
@@ -160,7 +160,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_status",
-						Name:    "User Status",
+						Name:    "UserStatus",
 					},
 				},
 			},
@@ -202,7 +202,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_profile",
-						Name:    "User Profile",
+						Name:    "UserProfile",
 						Type:    "object",
 						Properties: []localcatalog.CustomTypeProperty{
 							{Required: true},
@@ -220,7 +220,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_profile",
-						Name:    "User Profile",
+						Name:    "UserProfile",
 						Type:    "object",
 						Properties: []localcatalog.CustomTypeProperty{
 							{Ref: "invalid-ref-format", Required: true},
@@ -236,10 +236,10 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			name: "multiple custom types with errors at different indices",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
-					{LocalID: "valid_type", Name: "Valid Type", Type: "string"},
-					{Name: "Missing ID", Type: "number"},
+					{LocalID: "valid_type", Name: "ValidType", Type: "string"},
+					{Name: "MissingID", Type: "number"},
 					{LocalID: "missing_name", Type: "boolean"},
-					{LocalID: "missing_type", Name: "Missing Type"},
+					{LocalID: "missing_type", Name: "MissingType"},
 				},
 			},
 			expectedErrors: 3,
@@ -266,7 +266,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validateCustomTypeSpec("custom-types", "rudder/v1", map[string]any{}, tt.spec)
+			results := validateCustomTypeSpec("custom-types", "rudder/v0.1", map[string]any{}, tt.spec)
 
 			assert.Len(t, results, tt.expectedErrors, "Unexpected number of validation errors")
 
@@ -317,7 +317,7 @@ func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID:    "user_profile",
-						Name:       "User Profile",
+						Name:       "UserProfile",
 						Type:       "object",
 						Properties: []localcatalog.CustomTypeProperty{},
 					},
@@ -349,7 +349,7 @@ func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 				Types: []localcatalog.CustomType{
 					{
 						LocalID: "user_profile",
-						Name:    "User Profile",
+						Name:    "UserProfile",
 						Type:    "object",
 						Properties: []localcatalog.CustomTypeProperty{
 							{Ref: "#/properties/user-traits/name", Required: true},
