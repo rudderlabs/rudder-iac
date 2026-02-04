@@ -1,4 +1,4 @@
-version: rudder/v1
+version: rudder/v0.1
 kind: transformation-library
 metadata:
   name: test_libraries

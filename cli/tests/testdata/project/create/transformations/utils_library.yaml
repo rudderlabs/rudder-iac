@@ -1,4 +1,4 @@
-version: rudder/v1
+version: rudder/v0.1
 kind: transformation-library
 metadata:
   name: test_libraries
@@ -9,12 +9,10 @@ spec:
   language: javascript
   import_name: utilsLibrary
   code: |
-    function greet(name) {
+    export function greet(name) {
       return 'Hello, ' + name + '!';
     }
 
-    function toUpperCase(str) {
+    export function toUpperCase(str) {
       return str.toUpperCase();
     }
-
-    export default { greet, toUpperCase };
