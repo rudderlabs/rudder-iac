@@ -28,17 +28,16 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	msg := e.Message
-	if msg == "" {
-		msg = e.ErrorMessage
-	}
-	return fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, msg)
+	return fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, e.Msg())
 }
 
 func (e *APIError) FeatureNotEnabled() bool {
-	msg := e.Message
-	if msg == "" {
-		msg = e.ErrorMessage
+	return e.HTTPStatusCode == 403 && strings.Contains(e.Msg(), FeatureFlagNotEnabled)
+}
+
+func (e *APIError) Msg() string {
+	if e.Message != "" {
+		return e.Message
 	}
-	return e.HTTPStatusCode == 403 && strings.Contains(msg, FeatureFlagNotEnabled)
+	return e.ErrorMessage
 }
