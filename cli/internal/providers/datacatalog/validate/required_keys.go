@@ -199,21 +199,21 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			}
 
-			if rule.Event == nil && rule.Includes == nil {
+			if rule.Event == "" && rule.Includes == nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event or includes section within the rules: %s in tracking plan are mandatory", rule.LocalID),
 					Reference: reference,
 				})
 			}
 
-			if rule.Event != nil && rule.Includes != nil {
+			if rule.Event != "" && rule.Includes != nil {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("event and includes both section within the rules: %s in tracking plan are not allowed", rule.LocalID),
 					Reference: reference,
 				})
 			}
 
-			if rule.Event == nil && len(rule.Properties) > 0 {
+			if rule.Event == "" && len(rule.Properties) > 0 {
 				errors = append(errors, ValidationError{
 					error:     fmt.Errorf("properties without events in event_rule: %s are not allowed", rule.LocalID),
 					Reference: reference,
@@ -225,7 +225,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			}
 
 			// Validate nested properties if they exist
-			if rule.Event != nil && len(rule.Properties) > 0 {
+			if rule.Event != "" && len(rule.Properties) > 0 {
 				// iterate over the properties and validate each of them
 				for _, prop := range rule.Properties {
 					isNested := false
@@ -239,7 +239,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 					if !isNested && prop.AdditionalProperties != nil {
 						errors = append(errors, ValidationError{
 							error:     fmt.Errorf("setting additional_properties is only allowed for nested properties"),
-							Reference: fmt.Sprintf("%s/properties/%s", ruleRef, prop.Ref),
+							Reference: fmt.Sprintf("%s/properties/%s", ruleRef, prop.Property),
 						})
 					}
 				}
@@ -542,7 +542,8 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 	return errors
 }
 
-func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.Variants, reference string) []ValidationError {
+// validateVariantsRequiredKeysV1 validates required keys in V1 variants (for custom types)
+func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.VariantsV1, reference string) []ValidationError {
 	var errors []ValidationError
 
 	if len(variants) > 1 {
@@ -622,21 +623,21 @@ func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.V
 			for k, propRef := range variantCase.Properties {
 				propReference := fmt.Sprintf("%s/properties[%d]", caseReference, k)
 
-				if propRef.Ref == "" {
+				if propRef.Property == "" {
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("$ref field is mandatory for property reference"),
+						error:     fmt.Errorf("property field is mandatory for property reference"),
 						Reference: propReference,
 					})
 				}
 			}
 		}
 
-		for j, propRef := range variant.Default {
+		for j, propRef := range variant.Default.Properties {
 			propReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, j)
 
-			if propRef.Ref == "" {
+			if propRef.Property == "" {
 				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("$ref field is mandatory for property reference"),
+					error:     fmt.Errorf("property field is mandatory for property reference"),
 					Reference: propReference,
 				})
 			}
@@ -779,11 +780,11 @@ func isInteger(val any) bool {
 	return false
 }
 
-func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProperty, ruleRef string, dc *catalog.DataCatalog) []ValidationError {
-	if prop.Ref == "" {
+func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRulePropertyV1, ruleRef string, dc *catalog.DataCatalog) []ValidationError {
+	if prop.Property == "" {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("ref field is mandatory for property %s in event_rule %s", prop.Ref, ruleRef),
+				error:     fmt.Errorf("property field is mandatory for property %s in event_rule %s", prop.Property, ruleRef),
 				Reference: ruleRef,
 			},
 		}
@@ -795,11 +796,11 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	}
 
 	// validate the property reference
-	matches := catalog.PropRegex.FindStringSubmatch(prop.Ref)
+	matches := catalog.PropRegex.FindStringSubmatch(prop.Property)
 	if len(matches) != 2 {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("invalid property reference format: %s in event_rule %s", prop.Ref, ruleRef),
+				error:     fmt.Errorf("invalid property reference format: %s in event_rule %s", prop.Property, ruleRef),
 				Reference: ruleRef,
 			},
 		}
@@ -812,7 +813,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	if property == nil {
 		return []ValidationError{
 			{
-				error:     fmt.Errorf("invalid property reference: %s found in tracking plan rule: %s - referred property does not exist", prop.Ref, ruleRef),
+				error:     fmt.Errorf("invalid property reference: %s found in tracking plan rule: %s - referred property does not exist", prop.Property, ruleRef),
 				Reference: ruleRef,
 			},
 		}
@@ -823,13 +824,13 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 	if !allowed {
 		errs := make([]ValidationError, 0)
 		errs = append(errs, ValidationError{
-			error:     fmt.Errorf("nested properties are not allowed for property %s", prop.Ref),
+			error:     fmt.Errorf("nested properties are not allowed for property %s", prop.Property),
 			Reference: ruleRef,
 		})
 
 		if err != nil {
 			errs = append(errs, ValidationError{
-				error:     fmt.Errorf("error validating nested property %s: %w", prop.Ref, err),
+				error:     fmt.Errorf("error validating nested property %s: %w", prop.Property, err),
 				Reference: ruleRef,
 			})
 		}
@@ -847,7 +848,7 @@ func (rk *RequiredKeysValidator) validateNestedProperty(prop *catalog.TPRuleProp
 }
 
 // validateNestingDepth validates maximum nesting depth (3 levels)
-func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRuleProperty, currentDepth int, maxDepth int, ruleRef string) []ValidationError {
+func (rk *RequiredKeysValidator) validateNestingDepth(properties []*catalog.TPRulePropertyV1, currentDepth int, maxDepth int, ruleRef string) []ValidationError {
 	var errors []ValidationError
 
 	if currentDepth > maxDepth {

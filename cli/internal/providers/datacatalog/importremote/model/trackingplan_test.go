@@ -98,20 +98,17 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"description":  "Main tracking plan for e-commerce",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "product-viewed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/ecommerce/product-viewed",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "product-viewed-rule",
+					"event":            "#/events/ecommerce/product-viewed",
+					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/products/product-id",
+							"property": "#/properties/products/product-id",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/products/price",
+							"property": "#/properties/products/price",
 							"required": false,
 						},
 					},
@@ -178,25 +175,23 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"display_name": "Nested Properties Plan",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "checkout-completed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/checkout/checkout-completed",
-						"allow_unplanned":  true,
-						"identity_section": "context",
-					},
+					"type":                 TypeEventRule,
+					"id":                   "checkout-completed-rule",
+					"event":                "#/events/checkout/checkout-completed",
+					"additionalProperties": true,
+					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"$ref":                 "#/properties/cart/cart-object",
+							"property":             "#/properties/cart/cart-object",
 							"required":             true,
 							"additionalProperties": false,
 							"properties": []any{
 								map[string]any{
-									"$ref":     "#/properties/cart/cart-id",
+									"property": "#/properties/cart/cart-id",
 									"required": true,
 								},
 								map[string]any{
-									"$ref":     "#/properties/cart/total-amount",
+									"property": "#/properties/cart/total-amount",
 									"required": false,
 								},
 							},
@@ -272,25 +267,20 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"display_name": "Multi Event Plan",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "page-viewed-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/navigation/page-viewed",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "page-viewed-rule",
+					"event":            "#/events/navigation/page-viewed",
+					"identity_section": "properties",
 				},
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "button-clicked-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/interaction/button-clicked",
-						"allow_unplanned":  true,
-						"identity_section": "context",
-					},
+					"type":                 TypeEventRule,
+					"id":                   "button-clicked-rule",
+					"event":                "#/events/interaction/button-clicked",
+					"additionalProperties": true,
+					"identity_section":     "context",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/ui/button-id",
+							"property": "#/properties/ui/button-id",
 							"required": true,
 						},
 					},
@@ -619,24 +609,21 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"description":  "Tracking plan with conditional variants",
 			"rules": []any{
 				map[string]any{
-					"type": TypeEventRule,
-					"id":   "user-action-rule",
-					"event": map[string]any{
-						"$ref":             "#/events/analytics/user-action",
-						"allow_unplanned":  false,
-						"identity_section": "properties",
-					},
+					"type":             TypeEventRule,
+					"id":               "user-action-rule",
+					"event":            "#/events/analytics/user-action",
+					"identity_section": "properties",
 					"properties": []any{
 						map[string]any{
-							"$ref":     "#/properties/common/action-type",
+							"property": "#/properties/common/action-type",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/user/user-id",
+							"property": "#/properties/user/user-id",
 							"required": true,
 						},
 						map[string]any{
-							"$ref":     "#/properties/common/timestamp",
+							"property": "#/properties/common/timestamp",
 							"required": true,
 						},
 					},
@@ -651,11 +638,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to signup actions",
 									"properties": []any{
 										map[string]any{
-											"$ref":     "#/properties/user/email",
+											"property": "#/properties/user/email",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/marketing/referral-code",
+											"property": "#/properties/marketing/referral-code",
 											"required": false,
 										},
 									},
@@ -666,28 +653,30 @@ func TestTrackingPlanForExport(t *testing.T) {
 									"description":  "Properties specific to purchase actions",
 									"properties": []any{
 										map[string]any{
-											"$ref":     "#/properties/product/product-id",
+											"property": "#/properties/product/product-id",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/transaction/amount",
+											"property": "#/properties/transaction/amount",
 											"required": true,
 										},
 										map[string]any{
-											"$ref":     "#/properties/transaction/currency",
+											"property": "#/properties/transaction/currency",
 											"required": false,
 										},
 									},
 								},
 							},
-							"default": []any{
-								map[string]any{
-									"$ref":     "#/properties/session/session-id",
-									"required": true,
-								},
-								map[string]any{
-									"$ref":     "#/properties/device/device-type",
-									"required": false,
+							"default": map[string]any{
+								"properties": []any{
+									map[string]any{
+										"property": "#/properties/session/session-id",
+										"required": true,
+									},
+									map[string]any{
+										"property": "#/properties/device/device-type",
+										"required": false,
+									},
 								},
 							},
 						},
