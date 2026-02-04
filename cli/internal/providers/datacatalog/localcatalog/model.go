@@ -25,7 +25,7 @@ type Property struct {
 }
 
 type PropertySpec struct {
-	Properties []Property `json:"properties" validate:"required,dive"`
+	Properties []Property `json:"properties" validate:"dive"`
 }
 
 // This method is used to extract the entity from the byte representation of it

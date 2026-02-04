@@ -3,6 +3,7 @@ package rules
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -91,6 +92,18 @@ func TestPropertySpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "properties array is nil",
+			spec: localcatalog.PropertySpec{
+				Properties: nil,
+			},
+		},
+		{
+			name: "properties array is empty",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -111,15 +124,6 @@ func TestPropertySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
-		{
-			name: "missing properties array",
-			spec: localcatalog.PropertySpec{
-				Properties: nil,
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/properties"},
-			expectedMsgs:   []string{"'properties' is required"},
-		},
 		{
 			name: "property missing id",
 			spec: localcatalog.PropertySpec{
@@ -203,15 +207,6 @@ func TestPropertySpecSyntaxValidRule_EdgeCases(t *testing.T) {
 		expectedMsgs   []string
 	}{
 		{
-			name: "empty properties array is considered valid by go-validator",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{},
-			},
-			expectedErrors: 0,
-			expectedRefs:   []string{},
-			expectedMsgs:   []string{},
-		},
-		{
 			name: "property with all fields empty",
 			spec: localcatalog.PropertySpec{
 				Properties: []localcatalog.Property{
@@ -249,7 +244,12 @@ func TestPropertySpecSyntaxValidRule_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertySpec("properties", "rudder/v1", map[string]any{}, tt.spec)
+			results := validatePropertySpec(
+				localcatalog.KindProperties,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
 
 			assert.Len(t, results, tt.expectedErrors, "Unexpected number of validation errors")
 
