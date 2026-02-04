@@ -139,4 +139,112 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 2, len(customTypes))
 	})
+
+	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.PropertyResourceType: {
+					"prop1": "#property:street",
+				},
+			},
+		}
+
+		mockClient := &mockCustomTypeDataCatalog{
+			customTypes: []*catalog.CustomType{
+				{
+					ID:          "ct1",
+					Name:        "Address",
+					Type:        "object",
+					WorkspaceId: "ws1",
+					Properties: []catalog.CustomTypeProperty{
+						{ID: "prop1", Required: true},
+					},
+				},
+			},
+		}
+
+		provider := &CustomTypeImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: false,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		customTypes, ok := spec.Spec["types"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, customTypes, 1)
+
+		properties, ok := customTypes[0]["properties"].([]any)
+		require.True(t, ok)
+		require.Len(t, properties, 1)
+
+		propMap, ok := properties[0].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, propMap, "$ref")
+	})
+
+	t.Run("uses v1 spec when v1 support enabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.PropertyResourceType: {
+					"prop1": "#property:street",
+				},
+			},
+		}
+
+		mockClient := &mockCustomTypeDataCatalog{
+			customTypes: []*catalog.CustomType{
+				{
+					ID:          "ct1",
+					Name:        "Address",
+					Type:        "object",
+					WorkspaceId: "ws1",
+					Properties: []catalog.CustomTypeProperty{
+						{ID: "prop1", Required: true},
+					},
+				},
+			},
+		}
+
+		provider := &CustomTypeImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		customTypes, ok := spec.Spec["types"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, customTypes, 1)
+
+		properties, ok := customTypes[0]["properties"].([]any)
+		require.True(t, ok)
+		require.Len(t, properties, 1)
+
+		propMap, ok := properties[0].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, propMap, "property")
+	})
 }

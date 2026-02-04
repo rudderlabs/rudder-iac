@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -28,16 +29,18 @@ var (
 )
 
 type PropertyImportProvider struct {
-	client   catalog.DataCatalog
-	log      logger.Logger
-	filepath string
+	client        catalog.DataCatalog
+	log           logger.Logger
+	filepath      string
+	v1SpecSupport bool
 }
 
 func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *PropertyImportProvider {
 	return &PropertyImportProvider{
-		log:      log,
-		filepath: filepath.Join(importDir, PropertiesRelativePath),
-		client:   client,
+		log:           log,
+		filepath:      filepath.Join(importDir, PropertiesRelativePath),
+		client:        client,
+		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -131,8 +134,15 @@ func (p *PropertyImportProvider) FormatForExport(
 			RemoteID: property.ID,
 		})
 
-		importableProp := &model.ImportableProperty{}
-		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
+		var formatted map[string]any
+		var err error
+		if p.v1SpecSupport {
+			importableProp := &model.ImportablePropertyV1{}
+			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
+		} else {
+			importableProp := &model.ImportableProperty{}
+			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("formatting property: %w", err)
 		}
