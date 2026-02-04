@@ -22,14 +22,23 @@ type APIPage struct {
 type APIError struct {
 	HTTPStatusCode int
 	Message        string          `json:"error"`
+	ErrorMessage   string          `json:"message"` // Some APIs use "message" instead of "error"
 	ErrorCode      string          `json:"code"`
 	Details        json.RawMessage `json:"details"`
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, e.Message)
+	msg := e.Message
+	if msg == "" {
+		msg = e.ErrorMessage
+	}
+	return fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, msg)
 }
 
 func (e *APIError) FeatureNotEnabled() bool {
-	return e.HTTPStatusCode == 403 && strings.Contains(e.Message, FeatureFlagNotEnabled)
+	msg := e.Message
+	if msg == "" {
+		msg = e.ErrorMessage
+	}
+	return e.HTTPStatusCode == 403 && strings.Contains(msg, FeatureFlagNotEnabled)
 }
