@@ -106,21 +106,21 @@ func TestEventCategoryReferences(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create a test category
-	testCategory := catalog.Category{
+	testCategory := catalog.CategoryV1{
 		LocalID: "user_actions",
 		Name:    "User Actions",
 	}
 
 	testCases := []struct {
 		name          string
-		events        []catalog.Event
-		categories    []catalog.Category
+		events        []catalog.EventV1
+		categories    []catalog.CategoryV1
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid category reference in event",
-			events: []catalog.Event{
+			events: []catalog.EventV1{
 				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
@@ -129,14 +129,14 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:user_actions"),
 				},
 			},
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				testCategory,
 			},
 			expectedErrs: 0,
 		},
 		{
 			name: "event without category reference should pass validation",
-			events: []catalog.Event{
+			events: []catalog.EventV1{
 				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
@@ -150,7 +150,7 @@ func TestEventCategoryReferences(t *testing.T) {
 		},
 		{
 			name: "invalid category reference format in event",
-			events: []catalog.Event{
+			events: []catalog.EventV1{
 				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
@@ -159,7 +159,7 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:"), // Missing category ID
 				},
 			},
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				testCategory,
 			},
 			expectedErrs:  1,
@@ -167,7 +167,7 @@ func TestEventCategoryReferences(t *testing.T) {
 		},
 		{
 			name: "reference to non-existent category in event",
-			events: []catalog.Event{
+			events: []catalog.EventV1{
 				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
@@ -176,7 +176,7 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("#category:non_existent_category"),
 				},
 			},
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				testCategory,
 			},
 			expectedErrs:  1,
@@ -184,7 +184,7 @@ func TestEventCategoryReferences(t *testing.T) {
 		},
 		{
 			name: "completely malformed category reference",
-			events: []catalog.Event{
+			events: []catalog.EventV1{
 				{
 					LocalID:     "user_signup",
 					Name:        "User Signup",
@@ -193,7 +193,7 @@ func TestEventCategoryReferences(t *testing.T) {
 					CategoryRef: stringPtr("user_actions"),
 				},
 			},
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				testCategory,
 			},
 			expectedErrs:  1,
@@ -236,7 +236,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		{LocalID: "user_id", Name: "User ID", Type: "string"},
 	}
 
-	testEvents := []catalog.Event{
+	testEvents := []catalog.EventV1{
 		{LocalID: "test-event", Name: "Test Event", Type: "track"},
 	}
 
@@ -254,9 +254,9 @@ func TestVariantsReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:test-event",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:test-event",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{
@@ -328,9 +328,9 @@ func TestVariantsReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:test-event",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:test-event",
 							AdditionalProperties: false,
 							Variants: catalog.VariantsV1{
 								{
@@ -370,9 +370,9 @@ func TestVariantsReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:test-event",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:test-event",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{
@@ -461,7 +461,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		{LocalID: "email_enabled", Name: "Email Enabled", Type: "boolean"},
 	}
 
-	testEvents := []catalog.Event{
+	testEvents := []catalog.EventV1{
 		{LocalID: "user_signup", Name: "User Signup", Type: "track"},
 	}
 
@@ -479,9 +479,9 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:user_signup",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:user_signup",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{
@@ -511,7 +511,7 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: "#/events/test-group/user_signup",
+							Event:   "#/events/test-group/user_signup",
 							Properties: []*catalog.TPRulePropertyV1{
 								{
 									Property: "#property:user_profile",
@@ -542,11 +542,11 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRuleV1{	
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: "#/events/test-group/user_signup",
+							Event:   "#/events/test-group/user_signup",
 							Properties: []*catalog.TPRulePropertyV1{
 								{
 									Property: "#property:user_profile",
@@ -574,9 +574,9 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:user_signup",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:user_signup",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{
@@ -605,9 +605,9 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#event:user_signup",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#event:user_signup",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{
@@ -649,9 +649,9 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 					Name:    "Test Tracking Plan",
 					Rules: []*catalog.TPRuleV1{
 						{
-							LocalID: "test-rule",
-							Type:    "event_rule",
-							Event: "#/events/test-group/user_signup",
+							LocalID:              "test-rule",
+							Type:                 "event_rule",
+							Event:                "#/events/test-group/user_signup",
 							AdditionalProperties: false,
 							Properties: []*catalog.TPRulePropertyV1{
 								{

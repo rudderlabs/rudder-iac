@@ -201,6 +201,34 @@ func extractEntititesV1(s *specs.Spec, dc *DataCatalog) error {
 		}
 		dc.Properties = append(dc.Properties, pSpec.Properties...)
 
+	case KindEvents:
+		eventSpec := EventSpecV1{}
+		if err := extractSpec(s.Spec, &eventSpec); err != nil {
+			return fmt.Errorf("extracting the event spec: %w", err)
+		}
+		dc.Events = append(dc.Events, eventSpec.Events...)
+
+	case KindCategories:
+		categorySpec := CategorySpecV1{}
+		if err := extractSpec(s.Spec, &categorySpec); err != nil {
+			return fmt.Errorf("extracting the category spec: %w", err)
+		}
+		dc.Categories = append(dc.Categories, categorySpec.Categories...)
+
+	case KindTrackingPlansV1:
+		tpSpec := TrackingPlanV1{}
+		if err := extractSpec(s.Spec, &tpSpec); err != nil {
+			return fmt.Errorf("extracting the tracking plan spec: %w", err)
+		}
+
+		// Check for duplicates
+		for i := range dc.TrackingPlans {
+			if dc.TrackingPlans[i].LocalID == tpSpec.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", tpSpec.LocalID)
+			}
+		}
+		dc.TrackingPlans = append(dc.TrackingPlans, &tpSpec)
+
 	case KindCustomTypes:
 		ctSpec := CustomTypeSpecV1{}
 		if err := extractSpec(s.Spec, &ctSpec); err != nil {

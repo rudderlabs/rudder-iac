@@ -19,9 +19,9 @@ var (
 )
 
 type CatalogResourceFetcher interface {
-	Event(id string) *Event
+	Event(id string) *EventV1
 	Property(id string) *PropertyV1
-	Category(id string) *Category
+	Category(id string) *CategoryV1
 	CustomType(id string) *CustomTypeV1
 	TPEventRule(tpID, ruleID string) *TPRuleV1
 	TPEventRules(tpID string) ([]*TPRuleV1, bool)
@@ -294,7 +294,7 @@ func shallowCopy(input map[string]any) map[string]any {
 	return output
 }
 
-func ExtractTrackingPlan(s *specs.Spec) (TrackingPlan, error) {
+func ExtractTrackingPlan(s *specs.Spec) (TrackingPlanV1, error) {
 	log.Debug("extracting tracking plan from resource definition", "metadata.name", s.Metadata["name"])
 
 	// The spec is the tracking plan in its enterity
@@ -302,14 +302,20 @@ func ExtractTrackingPlan(s *specs.Spec) (TrackingPlan, error) {
 
 	byt, err := json.Marshal(s.Spec)
 	if err != nil {
-		return TrackingPlan{}, fmt.Errorf("marshalling the spec")
+		return TrackingPlanV1{}, fmt.Errorf("marshalling the spec")
 	}
 
 	if err := strictUnmarshal(byt, &tp); err != nil {
-		return TrackingPlan{}, fmt.Errorf("unmarshalling the spec into tracking plan: %w", err)
+		return TrackingPlanV1{}, fmt.Errorf("unmarshalling the spec into tracking plan: %w", err)
 	}
 
-	return tp, nil
+	// Convert V0 to V1
+	tpV1 := &TrackingPlanV1{}
+	if err := tpV1.FromV0(&tp); err != nil {
+		return TrackingPlanV1{}, fmt.Errorf("converting tracking plan to v1: %w", err)
+	}
+
+	return *tpV1, nil
 }
 
 // TrackingPlanV1 represents the V1 spec format for tracking plans

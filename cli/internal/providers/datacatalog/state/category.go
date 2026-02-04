@@ -21,7 +21,7 @@ func (args *CategoryArgs) FromResourceData(from resources.ResourceData) {
 	args.Name = MustString(from, "name")
 }
 
-func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.Category) {
+func (args *CategoryArgs) FromCatalogCategory(category *localcatalog.CategoryV1) {
 	args.Name = category.Name
 }
 

@@ -25,7 +25,7 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events: []Event{
+			Events: []EventV1{
 				{
 					LocalID:     "signup",
 					Name:        "User Sign Up",
@@ -36,7 +36,7 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -62,14 +62,14 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events: []Event{
+			Events: []EventV1{
 				{LocalID: "page_viewed", Name: "Page Viewed", Type: "track"},
 				{LocalID: "button_clicked", Name: "Button Clicked", Type: "track"},
 			},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -91,13 +91,13 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events: []Event{
+			Events: []EventV1{
 				{LocalID: "login", Name: "User Login", Type: "track"},
 			},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -122,11 +122,11 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events:         []Event{},
+			Events:         []EventV1{},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -146,11 +146,11 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events:         []Event{},
+			Events:         []EventV1{},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -169,11 +169,11 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 			},
 		}
 		dc := &DataCatalog{
-			Events:         []Event{},
+			Events:         []EventV1{},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
-			Categories:     []Category{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
