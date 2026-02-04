@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ func TestEventForExport(t *testing.T) {
 
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				if entityType == state.CategoryResourceType && remoteID == "cat-123" {
+				if entityType == types.CategoryResourceType && remoteID == "cat-123" {
 					return "#/categories/ecommerce/ecommerce_category", nil
 				}
 				return "", nil

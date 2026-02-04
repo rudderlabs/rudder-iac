@@ -3,12 +3,12 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type ImportableCustomType struct {
@@ -50,10 +50,11 @@ func (ct *ImportableCustomType) fromUpstream(
 	ct.CustomType.Type = upstream.Type
 
 	ct.CustomType.Config = make(map[string]any)
-	maps.Copy(
-		ct.CustomType.Config,
-		upstream.Config,
-	)
+	// Convert camelCase keys to snake_case when copying from upstream
+	for key, value := range upstream.Config {
+		snakeKey := utils.ToSnakeCase(key)
+		ct.CustomType.Config[snakeKey] = value
+	}
 
 	ct.CustomType.Properties = make(
 		[]localcatalog.CustomTypeProperty,
@@ -63,7 +64,7 @@ func (ct *ImportableCustomType) fromUpstream(
 
 	for _, prop := range upstream.Properties {
 		propertyRef, err := resolver.ResolveToReference(
-			state.PropertyResourceType,
+			types.PropertyResourceType,
 			prop.ID,
 		)
 		if err != nil {
@@ -92,7 +93,7 @@ func (ct *ImportableCustomType) fromUpstream(
 		}
 
 		customTypeRef, err := resolver.ResolveToReference(
-			state.CustomTypeResourceType,
+			types.CustomTypeResourceType,
 			itemID,
 		)
 		if err != nil {
@@ -100,10 +101,10 @@ func (ct *ImportableCustomType) fromUpstream(
 		}
 
 		if customTypeRef == "" {
-			return fmt.Errorf("resolved reference is empty for itemTypes: %s", itemID)
+			return fmt.Errorf("resolved reference is empty for item_types: %s", itemID)
 		}
 
-		ct.CustomType.Config["itemTypes"] = []any{customTypeRef}
+		ct.CustomType.Config["item_types"] = []any{customTypeRef}
 		break
 	}
 

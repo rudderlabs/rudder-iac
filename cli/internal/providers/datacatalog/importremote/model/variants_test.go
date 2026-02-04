@@ -7,7 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +59,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
-				require.Equal(t, state.PropertyResourceType, entityType)
+				require.Equal(t, types.PropertyResourceType, entityType)
 
 				refMap := map[string]string{
 					"prop_event_type_id": "#/properties/common/event_type",

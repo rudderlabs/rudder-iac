@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -61,7 +61,7 @@ func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer n
 	}
 
 	collection.Set(
-		state.CustomTypeResourceType,
+		types.CustomTypeResourceType,
 		resourceMap,
 	)
 
@@ -77,7 +77,7 @@ func (p *CustomTypeImportProvider) idResources(
 	idNamer namer.Namer,
 ) error {
 	p.log.Debug("assigning identifiers to custom types")
-	customTypes := collection.GetAll(state.CustomTypeResourceType)
+	customTypes := collection.GetAll(types.CustomTypeResourceType)
 
 	for _, customType := range customTypes {
 		data, ok := customType.Data.(*catalog.CustomType)
@@ -87,7 +87,7 @@ func (p *CustomTypeImportProvider) idResources(
 
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  data.Name,
-			Scope: state.CustomTypeResourceType})
+			Scope: types.CustomTypeResourceType})
 		if err != nil {
 			return fmt.Errorf("generating externalID for custom type %s: %w", data.Name, err)
 		}
@@ -110,7 +110,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	p.log.Debug("formatting custom types for export to file")
 
-	customTypes := collection.GetAll(state.CustomTypeResourceType)
+	customTypes := collection.GetAll(types.CustomTypeResourceType)
 	if len(customTypes) == 0 {
 		return nil, nil
 	}

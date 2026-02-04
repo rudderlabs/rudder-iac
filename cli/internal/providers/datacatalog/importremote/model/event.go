@@ -6,7 +6,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
 
@@ -42,7 +42,7 @@ func (e *ImportableEvent) fromUpstream(externalID string, upstream *catalog.Even
 	// Resolve category reference if categoryId is set
 	if upstream.CategoryId != nil {
 		categoryRef, err := resolver.ResolveToReference(
-			state.CategoryResourceType,
+			types.CategoryResourceType,
 			*upstream.CategoryId,
 		)
 		if err != nil {

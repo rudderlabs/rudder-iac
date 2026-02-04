@@ -2,7 +2,6 @@ package project
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -213,7 +212,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	// At this point, rawspecs are successfully parsed as well and information
 	// parsed gets augmented to the base struct
-	syntaxDiags, err := engine.ValidateSyntax(ctx, rawSpecs)
+	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
 	if err != nil {
 		return fmt.Errorf("syntactic validation: %w", err)
 	}
@@ -270,9 +269,8 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
 	var (
-		diags                     = make(validation.Diagnostics, 0)
-		parsedRawSpecs            = make(map[string]*specs.RawSpec)
-		syntaxRule     rules.Rule = prules.NewSpecSyntaxValidRule()
+		diags          = make(validation.Diagnostics, 0)
+		parsedRawSpecs = make(map[string]*specs.RawSpec)
 	)
 
 	// Validation Engine is responsible for validating
@@ -304,35 +302,6 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		p.specs[path] = parsed
 		parsedRawSpecs[path] = rawSpec
 
-		// TODO: Do we also need to return an error if the pi cannot be instantiated ?
-		pi, _ := pathindex.NewPathIndexer(rawSpec.Data)
-		results := syntaxRule.Validate(&rules.ValidationContext{
-			Spec:     parsed.Spec,
-			Kind:     parsed.Kind,
-			Version:  parsed.Version,
-			Metadata: parsed.Metadata,
-			Graph:    nil,
-		})
-
-		for _, result := range results {
-			position, err := pi.PositionLookup(result.Reference)
-
-			if errors.Is(err, pathindex.ErrPathNotFound) {
-				// Find the nearest position if we are unable to find
-				// the exact position.
-				// Should indexer be sent in as part of the rule arguments ?
-				position = pi.NearestPosition(result.Reference)
-			}
-
-			diags = append(diags, validation.Diagnostic{
-				RuleID:   syntaxRule.ID(),
-				Severity: syntaxRule.Severity(),
-				Message:  result.Message,
-				File:     path,
-				Position: *position,
-			})
-		}
-
 	}
 
 	diags.Sort()
@@ -342,9 +311,21 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 func (p *project) registry() (rules.Registry, error) {
 	baseRegistry := rules.NewRegistry()
 
-	// Add project-level syntactic rules
-	// to the syntactic rules from the provider
-	syntactic := p.provider.SyntacticRules()
+	// Add project-level syntactic rules along with aggregated
+	// syntactic rules from each provider.
+	syntactic := []rules.Rule{
+		prules.NewSpecSyntaxValidRule(),
+		prules.NewMetadataSyntaxValidRule(),
+		prules.NewSpecSemanticValidRule(
+			p.provider.SupportedKinds(),
+			[]string{
+				specs.SpecVersionV0_1,
+				specs.SpecVersionV0_1Variant,
+			},
+		),
+	}
+	syntactic = append(syntactic, p.provider.SyntacticRules()...)
+
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
 			return nil, fmt.Errorf("registering syntactic rule %s: %w", rule.ID(), err)
@@ -352,6 +333,7 @@ func (p *project) registry() (rules.Registry, error) {
 	}
 
 	semantic := p.provider.SemanticRules()
+
 	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)

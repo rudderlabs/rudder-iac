@@ -678,3 +678,55 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+func TestSetTransformationExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/transformations/trans-123/external-id", `{
+					"externalId": "ext-new-123"
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody:   `{}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	err = store.SetTransformationExternalID(ctx, "trans-123", "ext-new-123")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestSetLibraryExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/libraries/lib-123/external-id", `{
+					"externalId": "lib-ext-new-123"
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody:   `{}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	err = store.SetLibraryExternalID(ctx, "lib-123", "lib-ext-new-123")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}

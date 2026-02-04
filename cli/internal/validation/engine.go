@@ -2,6 +2,7 @@ package validation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -118,7 +119,16 @@ func (e *validationEngine) runValidationRules(
 		for _, result := range results {
 			position, err := pi.PositionLookup(result.Reference)
 			if err != nil {
-				return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
+				if !errors.Is(
+					err,
+					pathindex.ErrPathNotFound,
+				) {
+					return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
+				}
+
+				// if the error is ErrPathNotFound which is usually the case, we
+				// use the nearest position to the reference.
+				position = pi.NearestPosition(result.Reference)
 			}
 			diagnostics = append(diagnostics, Diagnostic{
 				RuleID:   rule.ID(),

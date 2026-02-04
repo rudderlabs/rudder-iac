@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 type mockEventCatalog struct {
@@ -46,7 +46,7 @@ func TestEventLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		events := collection.GetAll(state.EventResourceType)
+		events := collection.GetAll(types.EventResourceType)
 		assert.Equal(t, 2, len(events))
 
 		resourceIDs := make([]string, 0, len(events))
@@ -76,7 +76,7 @@ func TestEventLoadImportable(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		events := collection.GetAll(state.EventResourceType)
+		events := collection.GetAll(types.EventResourceType)
 		require.Equal(t, 2, len(events))
 
 		evt1, ok := events["evt1"]
