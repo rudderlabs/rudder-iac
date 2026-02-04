@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
 	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"

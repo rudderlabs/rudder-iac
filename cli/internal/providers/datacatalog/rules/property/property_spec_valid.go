@@ -1,4 +1,4 @@
-package rules
+package property
 
 import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"

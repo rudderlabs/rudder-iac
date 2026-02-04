@@ -138,7 +138,7 @@ type CustomType struct {
 
 // CustomTypeProperty represents a property reference within a custom type
 type CustomTypeProperty struct {
-	Ref      string `mapstructure:"$ref" json:"$ref" validate:"required,reference"`
+	Ref      string `mapstructure:"$ref" json:"$ref" validate:"required,pattern=legacy_property_ref"`
 	Required bool   `mapstructure:"required" json:"required"`
 }
 

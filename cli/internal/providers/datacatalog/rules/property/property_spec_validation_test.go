@@ -1,4 +1,4 @@
-package rules
+package property
 
 import (
 	"testing"

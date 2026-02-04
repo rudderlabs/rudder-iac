@@ -9,6 +9,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+const (
+	LegacyReferenceTag   = "legacy_reference"
+	LegacyReferenceRegex = `^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`
+
+	ReferenceTag   = "reference"
+	ReferenceRegex = `^#(%s):([a-zA-Z0-9_-]+)$`
+)
+
 // NewLegacyReferenceValidateFunc creates a validator for legacy reference format: #/<kind>/<group>/<id>
 // Example:
 //
