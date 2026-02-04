@@ -37,7 +37,7 @@ type DataCatalog struct {
 	Properties     []PropertyV1                         `json:"properties"`
 	Events         []Event                              `json:"events"`
 	TrackingPlans  []*TrackingPlan                      `json:"trackingPlans"`
-	CustomTypes    []CustomType                         `json:"customTypes"`
+	CustomTypes    []CustomTypeV1                       `json:"customTypes"`
 	Categories     []Category                           `json:"categories"`
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 	ReferenceMap   map[string]string                    `json:"-"` // Maps URN references to original path-based references
@@ -72,7 +72,7 @@ func (dc *DataCatalog) Category(id string) *Category {
 }
 
 // CustomType returns a custom type by ID
-func (dc *DataCatalog) CustomType(id string) *CustomType {
+func (dc *DataCatalog) CustomType(id string) *CustomTypeV1 {
 	for i := range dc.CustomTypes {
 		if dc.CustomTypes[i].LocalID == id {
 			return &dc.CustomTypes[i]
@@ -130,7 +130,7 @@ func New() *DataCatalog {
 		Properties:     []PropertyV1{},
 		Events:         []Event{},
 		TrackingPlans:  []*TrackingPlan{},
-		CustomTypes:    []CustomType{},
+		CustomTypes:    []CustomTypeV1{},
 		Categories:     []Category{},
 		ImportMetadata: map[string]*WorkspaceRemoteIDMapping{},
 		ReferenceMap:   map[string]string{},

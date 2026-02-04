@@ -112,7 +112,7 @@ func (args *CustomTypeArgs) FromResourceData(from resources.ResourceData) {
 	args.Properties = customTypeProperties
 }
 
-func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType, urnFromRef func(urn string) string) error {
+func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomTypeV1, urnFromRef func(urn string) string) error {
 	args.LocalID = from.LocalID
 	args.Name = from.Name
 	args.Description = from.Description
@@ -124,7 +124,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	for _, prop := range from.Properties {
 		properties = append(properties, &CustomTypeProperty{
 			RefToID: resources.PropertyRef{
-				URN:      urnFromRef(prop.Ref),
+				URN:      urnFromRef(prop.Property),
 				Property: "id",
 			},
 			Required: prop.Required,
@@ -140,7 +140,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomType,
 	for _, variant := range from.Variants {
 		toAdd := Variant{}
 
-		if err := toAdd.FromLocalCatalogVariant(variant, urnFromRef); err != nil {
+		if err := toAdd.FromLocalCatalogVariantV1(variant, urnFromRef); err != nil {
 			return fmt.Errorf("processing %s variant %s: %w", variant.Type, variant.Discriminator, err)
 		}
 		variants = append(variants, toAdd)

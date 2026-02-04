@@ -604,7 +604,7 @@ func TestVariantsValidation(t *testing.T) {
 		testCases := []struct {
 			name          string
 			trackingPlans []*catalog.TrackingPlan
-			customTypes   []catalog.CustomType
+			customTypes   []catalog.CustomTypeV1
 		}{
 			{
 				name: "valid variants in tracking plan",
@@ -644,25 +644,25 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants in custom type",
-				customTypes: []catalog.CustomType{
+				customTypes: []catalog.CustomTypeV1{
 					{
 						LocalID:     "TestType",
 						Name:        "TestType",
 						Description: "Test custom type with variants",
 						Type:        "object",
-						Properties: []catalog.CustomTypeProperty{
-							{Ref: "#property:profile_type", Required: true},
+						Properties: []catalog.CustomTypePropertyV1{
+							{Property: "#property:profile_type", Required: true},
 						},
-						Variants: catalog.Variants{
+						Variants: catalog.VariantsV1{
 							{
 								Type:          "discriminator",
 								Discriminator: "profile_type",
-								Cases: []catalog.VariantCase{
+								Cases: []catalog.VariantCaseV1{
 									{
 										DisplayName: "Premium User",
 										Match:       []any{"premium", "vip"},
-										Properties: []catalog.PropertyReference{
-											{Ref: "#property:subscription_tier", Required: true},
+										Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -722,7 +722,7 @@ func TestVariantsValidation(t *testing.T) {
 		testCases := []struct {
 			name           string
 			trackingPlans  []*catalog.TrackingPlan
-			customTypes    []catalog.CustomType
+			customTypes    []catalog.CustomTypeV1
 			expectedErrors int
 			errorContains  []ValidationError
 		}{
@@ -803,22 +803,22 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "custom type validation failures",
-				customTypes: []catalog.CustomType{
+				customTypes: []catalog.CustomTypeV1{
 					{
 						LocalID:     "TestType",
 						Name:        "TestType",
 						Description: "Test custom type with variants",
 						Type:        "string",
-						Variants: catalog.Variants{
+						Variants: catalog.VariantsV1{
 							{
 								Type:          "discriminator",
 								Discriminator: "profile_type",
-								Cases: []catalog.VariantCase{
+								Cases: []catalog.VariantCaseV1{
 									{
 										DisplayName: "Premium User",
 										Match:       []any{"premium"},
-										Properties: []catalog.PropertyReference{
-											{Ref: "#property:subscription_tier", Required: true},
+										Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -1019,7 +1019,7 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 			},
 		},
 		Events:      []catalog.Event{},
-		CustomTypes: []catalog.CustomType{},
+		CustomTypes: []catalog.CustomTypeV1{},
 		Categories:  []catalog.Category{},
 	}
 

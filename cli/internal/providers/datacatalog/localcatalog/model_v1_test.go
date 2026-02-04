@@ -298,3 +298,141 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 		assert.Equal(t, expected, v1Spec.Properties)
 	})
 }
+
+func TestCustomTypeV1_FromV0(t *testing.T) {
+	t.Parallel()
+
+	t.Run("converts V0 custom type with variants to V1 format", func(t *testing.T) {
+		t.Parallel()
+
+		v0CustomType := CustomType{
+			LocalID:     "user_profile_type",
+			Name:        "User Profile Type",
+			Description: "Custom type for user profile with variants",
+			Type:        "object",
+			Config: map[string]any{
+				"minLength": 5,
+				"maxLength": 100,
+			},
+			Properties: []CustomTypeProperty{
+				{
+					Ref:      "#property:profile_name",
+					Required: true,
+				},
+				{
+					Ref:      "#property:profile_type",
+					Required: true,
+				},
+				{
+					Ref:      "#property:premium_features",
+					Required: false,
+				},
+			},
+			Variants: Variants{
+				{
+					Type:          "discriminator",
+					Discriminator: "#property:profile_type",
+					Cases: []VariantCase{
+						{
+							DisplayName: "Premium User",
+							Match:       []any{"premium", "vip"},
+							Description: "applies when user is premium",
+							Properties: []PropertyReference{
+								{
+									Ref:      "#property:premium_features",
+									Required: true,
+								},
+							},
+						},
+						{
+							DisplayName: "Basic User",
+							Match:       []any{"basic", "free"},
+							Description: "applies when user is basic",
+							Properties: []PropertyReference{
+								{
+									Ref:      "#property:profile_name",
+									Required: true,
+								},
+							},
+						},
+					},
+					Default: []PropertyReference{
+						{
+							Ref:      "#property:profile_name",
+							Required: true,
+						},
+					},
+				},
+			},
+		}
+
+		var v1CustomType CustomTypeV1
+		err := v1CustomType.FromV0(v0CustomType)
+
+		assert.NoError(t, err)
+		// Expected V1 spec after conversion
+		expectedV1CustomType := CustomTypeV1{
+			LocalID:     "user_profile_type",
+			Name:        "User Profile Type",
+			Description: "Custom type for user profile with variants",
+			Type:        "object",
+			Config: map[string]any{
+				"min_length": 5,
+				"max_length": 100,
+			},
+			Properties: []CustomTypePropertyV1{
+				{
+					Property: "#property:profile_name",
+					Required: true,
+				},
+				{
+					Property: "#property:profile_type",
+					Required: true,
+				},
+				{
+					Property: "#property:premium_features",
+					Required: false,
+				},
+			},
+			Variants: VariantsV1{
+				{
+					Type:          "discriminator",
+					Discriminator: "#property:profile_type",
+					Cases: []VariantCaseV1{
+						{
+							DisplayName: "Premium User",
+							Match:       []any{"premium", "vip"},
+							Description: "applies when user is premium",
+							Properties: []PropertyReferenceV1{
+								{
+									Property: "#property:premium_features",
+									Required: true,
+								},
+							},
+						},
+						{
+							DisplayName: "Basic User",
+							Match:       []any{"basic", "free"},
+							Description: "applies when user is basic",
+							Properties: []PropertyReferenceV1{
+								{
+									Property: "#property:profile_name",
+									Required: true,
+								},
+							},
+						},
+					},
+					Default: DefaultPropertiesV1{
+						Properties: []PropertyReferenceV1{
+							{
+								Property: "#property:profile_name",
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		}
+		assert.Equal(t, expectedV1CustomType, v1CustomType)
+	})
+}

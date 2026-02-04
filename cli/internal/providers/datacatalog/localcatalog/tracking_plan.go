@@ -22,7 +22,7 @@ type CatalogResourceFetcher interface {
 	Event(id string) *Event
 	Property(id string) *PropertyV1
 	Category(id string) *Category
-	CustomType(id string) *CustomType
+	CustomType(id string) *CustomTypeV1
 	TPEventRule(tpID, ruleID string) *TPRule
 	TPEventRules(tpID string) ([]*TPRule, bool)
 }

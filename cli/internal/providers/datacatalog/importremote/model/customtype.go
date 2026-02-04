@@ -12,7 +12,7 @@ import (
 )
 
 type ImportableCustomType struct {
-	localcatalog.CustomType
+	localcatalog.CustomTypeV1
 }
 
 // ForExport loads the custom type from the upstream and resolves references to properties and other custom types.
@@ -27,7 +27,7 @@ func (ct *ImportableCustomType) ForExport(
 	}
 
 	toReturn := make(map[string]any)
-	byt, err := json.Marshal(ct.CustomType)
+	byt, err := json.Marshal(ct.CustomTypeV1)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling custom type: %w", err)
 	}
@@ -44,20 +44,20 @@ func (ct *ImportableCustomType) fromUpstream(
 	upstream *catalog.CustomType,
 	resolver resolver.ReferenceResolver,
 ) error {
-	ct.CustomType.LocalID = externalID
-	ct.CustomType.Name = upstream.Name
-	ct.CustomType.Description = upstream.Description
-	ct.CustomType.Type = upstream.Type
+	ct.CustomTypeV1.LocalID = externalID
+	ct.CustomTypeV1.Name = upstream.Name
+	ct.CustomTypeV1.Description = upstream.Description
+	ct.CustomTypeV1.Type = upstream.Type
 
-	ct.CustomType.Config = make(map[string]any)
+	ct.CustomTypeV1.Config = make(map[string]any)
 	// Convert camelCase keys to snake_case when copying from upstream
 	for key, value := range upstream.Config {
 		snakeKey := utils.ToSnakeCase(key)
-		ct.CustomType.Config[snakeKey] = value
+		ct.CustomTypeV1.Config[snakeKey] = value
 	}
 
-	ct.CustomType.Properties = make(
-		[]localcatalog.CustomTypeProperty,
+	ct.CustomTypeV1.Properties = make(
+		[]localcatalog.CustomTypePropertyV1,
 		0,
 		len(upstream.Properties),
 	)
@@ -75,8 +75,8 @@ func (ct *ImportableCustomType) fromUpstream(
 			return fmt.Errorf("resolved reference is empty for property %s", prop.ID)
 		}
 
-		ct.CustomType.Properties = append(ct.CustomType.Properties, localcatalog.CustomTypeProperty{
-			Ref:      propertyRef,
+		ct.CustomTypeV1.Properties = append(ct.CustomTypeV1.Properties, localcatalog.CustomTypePropertyV1{
+			Property: propertyRef,
 			Required: prop.Required,
 		})
 	}
@@ -104,16 +104,16 @@ func (ct *ImportableCustomType) fromUpstream(
 			return fmt.Errorf("resolved reference is empty for item_types: %s", itemID)
 		}
 
-		ct.CustomType.Config["item_types"] = []any{customTypeRef}
+		ct.CustomTypeV1.Config["item_types"] = []any{customTypeRef}
 		break
 	}
 
 	// Process variants and resolve property references within them
-	var importableVariants ImportableVariants
+	var importableVariants ImportableVariantsV1
 	if err := importableVariants.fromUpstream(upstream.Variants, resolver); err != nil {
 		return fmt.Errorf("processing variants: %w", err)
 	}
-	ct.CustomType.Variants = importableVariants.Variants
+	ct.CustomTypeV1.Variants = importableVariants.VariantsV1
 
 	return nil
 }
