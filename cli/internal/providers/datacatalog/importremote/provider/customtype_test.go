@@ -194,7 +194,7 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		assert.Contains(t, propMap, "$ref")
 	})
 
-	t.Run("uses v1 spec when v1 support enabled", func(t *testing.T) {
+	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.PropertyResourceType: {

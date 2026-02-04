@@ -197,7 +197,81 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		}, spec)
 	})
 
-	t.Run("uses v1 spec when v1 support enabled", func(t *testing.T) {
+	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.EventResourceType: {
+					"evt1": "#/events/default/product-viewed",
+				},
+				types.PropertyResourceType: {
+					"prop1": "#/properties/default/product-id",
+				},
+			},
+		}
+
+		mockClient := &mockTrackingPlanDataCatalog{
+			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
+				{
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
+					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+						{
+							ID:   "evt1",
+							Name: "Product Viewed",
+							Properties: []*catalog.TrackingPlanEventProperty{
+								{
+									ID:       "prop1",
+									Required: true,
+								},
+							},
+							AdditionalProperties: false,
+							IdentitySection:      "properties",
+						},
+					},
+				},
+			},
+		}
+
+		provider := &TrackingPlanImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			baseImportDir: "data-catalog",
+			v1SpecSupport: false,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(
+			collection,
+			externalIdNamer,
+			mockResolver,
+		)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		rules, ok := spec.Spec["rules"].([]any)
+		require.True(t, ok)
+		require.Len(t, rules, 1)
+
+		rule, ok := rules[0].(map[string]any)
+		require.True(t, ok)
+		event, ok := rule["event"].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, event["$ref"], "#/events/")
+
+		properties, ok := rule["properties"].([]any)
+		require.True(t, ok)
+		require.Len(t, properties, 1)
+		prop, ok := properties[0].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, prop["$ref"], "#/properties/")
+	})
+
+	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.EventResourceType: {

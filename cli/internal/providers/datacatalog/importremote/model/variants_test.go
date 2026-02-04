@@ -62,13 +62,13 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 				require.Equal(t, types.PropertyResourceType, entityType)
 
 				refMap := map[string]string{
-					"prop_event_type_id": "#property:event_type",
-					"prop_user_id":       "#property:user_id",
-					"prop_email":         "#property:email",
-					"prop_source":        "#property:source",
-					"prop_session_id":    "#property:session_id",
-					"prop_timestamp":     "#property:timestamp",
-					"prop_user_agent":    "#property:user_agent",
+					"prop_event_type_id": "#/properties/common/event_type",
+					"prop_user_id":       "#/properties/user/user_id",
+					"prop_email":         "#/properties/user/email",
+					"prop_source":        "#/properties/tracking/source",
+					"prop_session_id":    "#/properties/session/session_id",
+					"prop_timestamp":     "#/properties/common/timestamp",
+					"prop_user_agent":    "#/properties/common/user_agent",
 				}
 
 				ref, ok := refMap[remoteID]
@@ -87,16 +87,16 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		expected := []localcatalog.Variant{
 			{
 				Type:          "conditional",
-				Discriminator: "#property:event_type",
+				Discriminator: "#/properties/common/event_type",
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Sign Up Event",
 						Match:       []any{"signup"},
 						Description: "Properties for signup events",
 						Properties: []localcatalog.PropertyReference{
-							{Ref: "#property:user_id", Required: true},
-							{Ref: "#property:email", Required: true},
-							{Ref: "#property:source", Required: false},
+							{Ref: "#/properties/user/user_id", Required: true},
+							{Ref: "#/properties/user/email", Required: true},
+							{Ref: "#/properties/tracking/source", Required: false},
 						},
 					},
 					{
@@ -104,14 +104,14 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 						Match:       []any{"login"},
 						Description: "Properties for login events",
 						Properties: []localcatalog.PropertyReference{
-							{Ref: "#property:user_id", Required: true},
-							{Ref: "#property:session_id", Required: false},
+							{Ref: "#/properties/user/user_id", Required: true},
+							{Ref: "#/properties/session/session_id", Required: false},
 						},
 					},
 				},
 				Default: []localcatalog.PropertyReference{
-					{Ref: "#property:timestamp", Required: true},
-					{Ref: "#property:user_agent", Required: false},
+					{Ref: "#/properties/common/timestamp", Required: true},
+					{Ref: "#/properties/common/user_agent", Required: false},
 				},
 			},
 		}
@@ -160,12 +160,12 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				refMap := map[string]string{
-					"prop_platform":     "#property:platform",
-					"prop_ios_version":  "#property:ios_version",
-					"prop_country":      "#property:country",
-					"prop_state":        "#property:state",
-					"prop_zipcode":      "#property:zipcode",
-					"prop_country_code": "#property:country_code",
+					"prop_platform":     "#/properties/device/platform",
+					"prop_ios_version":  "#/properties/device/ios_version",
+					"prop_country":      "#/properties/location/country",
+					"prop_state":        "#/properties/location/state",
+					"prop_zipcode":      "#/properties/location/zipcode",
+					"prop_country_code": "#/properties/location/country_code",
 				}
 
 				ref, ok := refMap[remoteID]
@@ -184,13 +184,13 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		expected := []localcatalog.Variant{
 			{
 				Type:          "conditional",
-				Discriminator: "#property:platform",
+				Discriminator: "#/properties/device/platform",
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "iOS Platform",
 						Match:       []any{"ios"},
 						Properties: []localcatalog.PropertyReference{
-							{Ref: "#property:ios_version", Required: true},
+							{Ref: "#/properties/device/ios_version", Required: true},
 						},
 					},
 				},
@@ -198,19 +198,19 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 			},
 			{
 				Type:          "conditional",
-				Discriminator: "#property:country",
+				Discriminator: "#/properties/location/country",
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "US Users",
 						Match:       []any{"US", "USA"},
 						Properties: []localcatalog.PropertyReference{
-							{Ref: "#property:state", Required: true},
-							{Ref: "#property:zipcode", Required: false},
+							{Ref: "#/properties/location/state", Required: true},
+							{Ref: "#/properties/location/zipcode", Required: false},
 						},
 					},
 				},
 				Default: []localcatalog.PropertyReference{
-					{Ref: "#property:country_code", Required: true},
+					{Ref: "#/properties/location/country_code", Required: true},
 				},
 			},
 		}
@@ -234,7 +234,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_feature_flag" {
-					return "#property:feature_flag", nil
+					return "#/properties/flags/feature_flag", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -248,7 +248,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		expected := []localcatalog.Variant{
 			{
 				Type:          "conditional",
-				Discriminator: "#property:feature_flag",
+				Discriminator: "#/properties/flags/feature_flag",
 				Cases:         []localcatalog.VariantCase{},
 				Default:       []localcatalog.PropertyReference{},
 			},
@@ -331,7 +331,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#property:valid", nil
+					return "#/properties/valid", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -368,7 +368,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#property:valid", nil
+					return "#/properties/valid", nil
 				}
 				return "", nil
 			},
@@ -399,7 +399,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#property:valid", nil
+					return "#/properties/valid", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -430,7 +430,7 @@ func TestImportableVariants_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#property:valid", nil
+					return "#/properties/valid", nil
 				}
 				return "", nil
 			},
@@ -498,13 +498,13 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 				require.Equal(t, types.PropertyResourceType, entityType)
 
 				refMap := map[string]string{
-					"prop_event_type_id": "#/properties/common/event_type",
-					"prop_user_id":       "#/properties/user/user_id",
-					"prop_email":         "#/properties/user/email",
-					"prop_source":        "#/properties/tracking/source",
-					"prop_session_id":    "#/properties/session/session_id",
-					"prop_timestamp":     "#/properties/common/timestamp",
-					"prop_user_agent":    "#/properties/common/user_agent",
+					"prop_event_type_id": "#property:event_type",
+					"prop_user_id":       "#property:user_id",
+					"prop_email":         "#property:email",
+					"prop_source":        "#property:source",
+					"prop_session_id":    "#property:session_id",
+					"prop_timestamp":     "#property:timestamp",
+					"prop_user_agent":    "#property:user_agent",
 				}
 
 				ref, ok := refMap[remoteID]
@@ -523,16 +523,16 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		expected := localcatalog.VariantsV1{
 			{
 				Type:          "conditional",
-				Discriminator: "#/properties/common/event_type",
+				Discriminator: "#property:event_type",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Sign Up Event",
 						Match:       []any{"signup"},
 						Description: "Properties for signup events",
 						Properties: []localcatalog.PropertyReferenceV1{
-							{Property: "#/properties/user/user_id", Required: true},
-							{Property: "#/properties/user/email", Required: true},
-							{Property: "#/properties/tracking/source", Required: false},
+							{Property: "#property:user_id", Required: true},
+							{Property: "#property:email", Required: true},
+							{Property: "#property:source", Required: false},
 						},
 					},
 					{
@@ -540,15 +540,15 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 						Match:       []any{"login"},
 						Description: "Properties for login events",
 						Properties: []localcatalog.PropertyReferenceV1{
-							{Property: "#/properties/user/user_id", Required: true},
-							{Property: "#/properties/session/session_id", Required: false},
+							{Property: "#property:user_id", Required: true},
+							{Property: "#property:session_id", Required: false},
 						},
 					},
 				},
 				Default: localcatalog.DefaultPropertiesV1{
 					Properties: []localcatalog.PropertyReferenceV1{
-						{Property: "#/properties/common/timestamp", Required: true},
-						{Property: "#/properties/common/user_agent", Required: false},
+						{Property: "#property:timestamp", Required: true},
+						{Property: "#property:user_agent", Required: false},
 					},
 				},
 			},
@@ -596,12 +596,12 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				refMap := map[string]string{
-					"prop_platform":     "#/properties/device/platform",
-					"prop_ios_version":  "#/properties/device/ios_version",
-					"prop_country":      "#/properties/location/country",
-					"prop_state":        "#/properties/location/state",
-					"prop_zipcode":      "#/properties/location/zipcode",
-					"prop_country_code": "#/properties/location/country_code",
+					"prop_platform":     "#property:platform",
+					"prop_ios_version":  "#property:ios_version",
+					"prop_country":      "#property:country",
+					"prop_state":        "#property:state",
+					"prop_zipcode":      "#property:zipcode",
+					"prop_country_code": "#property:country_code",
 				}
 
 				ref, ok := refMap[remoteID]
@@ -620,13 +620,13 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		expected := localcatalog.VariantsV1{
 			{
 				Type:          "conditional",
-				Discriminator: "#/properties/device/platform",
+				Discriminator: "#property:platform",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "iOS Platform",
 						Match:       []any{"ios"},
 						Properties: []localcatalog.PropertyReferenceV1{
-							{Property: "#/properties/device/ios_version", Required: true},
+							{Property: "#property:ios_version", Required: true},
 						},
 					},
 				},
@@ -636,20 +636,20 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 			},
 			{
 				Type:          "conditional",
-				Discriminator: "#/properties/location/country",
+				Discriminator: "#property:country",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "US Users",
 						Match:       []any{"US", "USA"},
 						Properties: []localcatalog.PropertyReferenceV1{
-							{Property: "#/properties/location/state", Required: true},
-							{Property: "#/properties/location/zipcode", Required: false},
+							{Property: "#property:state", Required: true},
+							{Property: "#property:zipcode", Required: false},
 						},
 					},
 				},
 				Default: localcatalog.DefaultPropertiesV1{
 					Properties: []localcatalog.PropertyReferenceV1{
-						{Property: "#/properties/location/country_code", Required: true},
+						{Property: "#property:country_code", Required: true},
 					},
 				},
 			},
@@ -672,7 +672,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_feature_flag" {
-					return "#/properties/flags/feature_flag", nil
+					return "#property:feature_flag", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -686,7 +686,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		expected := localcatalog.VariantsV1{
 			{
 				Type:          "conditional",
-				Discriminator: "#/properties/flags/feature_flag",
+				Discriminator: "#property:feature_flag",
 				Cases:         []localcatalog.VariantCaseV1{},
 				Default: localcatalog.DefaultPropertiesV1{
 					Properties: []localcatalog.PropertyReferenceV1{},
@@ -769,7 +769,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#/properties/valid", nil
+					return "#property:valid", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -806,7 +806,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#/properties/valid", nil
+					return "#property:valid", nil
 				}
 				return "", nil
 			},
@@ -837,7 +837,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#/properties/valid", nil
+					return "#property:valid", nil
 				}
 				return "", fmt.Errorf("property not found: %s", remoteID)
 			},
@@ -868,7 +868,7 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 		mockRes := &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				if remoteID == "prop_valid" {
-					return "#/properties/valid", nil
+					return "#property:valid", nil
 				}
 				return "", nil
 			},
