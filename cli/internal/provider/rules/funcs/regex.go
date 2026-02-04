@@ -8,11 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// customTagErrorMessages is a map of custom tag names to error messages
-// which are used mainly for custom regex patterns
-var customTagErrorMessages = make(map[string]string)
-var lock = sync.RWMutex{}
-
 // patternRegistry holds pre-compiled regex patterns and their error messages
 type patternRegistry struct {
 	patterns map[string]*regexp.Regexp
