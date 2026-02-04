@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
+	trackingplanRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/trackingplan"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
@@ -333,6 +334,7 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 func (p *Provider) SyntacticRules() []rules.Rule {
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
+		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(),
 	}
 
 	return syntactic
