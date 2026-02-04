@@ -20,6 +20,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
+const (
+	// default directories for test input and output files
+	DefaultInputPath  = "./input"
+	DefaultOutputPath = "./output"
+)
+
 type TransformationHandler = handler.BaseHandler[
 	model.TransformationSpec,
 	model.TransformationResource,
@@ -74,12 +80,15 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {
+	// Extract and enrich tests with SpecDir and apply defaults
+	tests := extractTestsFromSpec(path, spec)
+
 	resource := &model.TransformationResource{
 		ID:          spec.ID,
 		Name:        spec.Name,
 		Description: spec.Description,
 		Language:    spec.Language,
-		Tests:       spec.Tests,
+		Tests:       tests,
 	}
 
 	// Resolve code from file if specified
@@ -102,6 +111,32 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.Transfor
 	return map[string]*model.TransformationResource{
 		spec.ID: resource,
 	}, nil
+}
+
+// extractTestsFromSpec extracts test configurations from the spec,
+// enriches them with the spec directory path, and applies default values
+// for Input and Output paths if not specified.
+func extractTestsFromSpec(path string, spec *model.TransformationSpec) []specs.TransformationTest {
+	tests := spec.Tests
+	if len(tests) == 0 {
+		return tests
+	}
+
+	enriched := make([]specs.TransformationTest, len(tests))
+	for i, test := range tests {
+		enriched[i] = test
+		enriched[i].SpecDir = filepath.Dir(path)
+
+		// Apply defaults if not specified
+		if enriched[i].Input == "" {
+			enriched[i].Input = DefaultInputPath
+		}
+		if enriched[i].Output == "" {
+			enriched[i].Output = DefaultOutputPath
+		}
+	}
+
+	return enriched
 }
 
 func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, graph *resources.Graph) error {
