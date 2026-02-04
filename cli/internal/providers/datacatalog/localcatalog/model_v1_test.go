@@ -436,3 +436,195 @@ func TestCustomTypeV1_FromV0(t *testing.T) {
 		assert.Equal(t, expectedV1CustomType, v1CustomType)
 	})
 }
+
+func TestTrackingPlanV1_FromV0(t *testing.T) {
+	t.Parallel()
+
+	t.Run("converts V0 tracking plan with event rules to V1 format", func(t *testing.T) {
+		t.Parallel()
+
+		trueVal := true
+		v0TrackingPlan := TrackingPlan{
+			Name:        "Mobile App Events",
+			LocalID:     "mobile_app_tracking",
+			Description: "Tracking plan for mobile app events",
+			Rules: []*TPRule{
+				{
+					Type:    "event_rule",
+					LocalID: "user_signup_rule",
+					Event: &TPRuleEvent{
+						Ref:             "#event:user_signup",
+						AllowUnplanned:  true,
+						IdentitySection: "context",
+					},
+					Properties: []*TPRuleProperty{
+						{
+							Ref:      "#property:user_email",
+							Required: true,
+						},
+						{
+							Ref:      "#property:signup_source",
+							Required: false,
+						},
+					},
+					Variants: Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:platform",
+							Cases: []VariantCase{
+								{
+									DisplayName: "iOS",
+									Match:       []any{"ios"},
+									Description: "iOS platform",
+									Properties: []PropertyReference{
+										{
+											Ref:      "#property:device_id",
+											Required: true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Type:    "event_rule",
+					LocalID: "user_login_rule",
+					Event: &TPRuleEvent{
+						Ref:             "#event:user_login",
+						AllowUnplanned:  false,
+						IdentitySection: "traits",
+					},
+					Properties: []*TPRuleProperty{
+						{
+							Ref:      "#property:login_method",
+							Required: true,
+							AdditionalProperties: &trueVal,
+							Properties: []*TPRuleProperty{
+								{
+									Ref:      "#property:login_details",
+									Required: true,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var v1TrackingPlan TrackingPlanV1
+		err := v1TrackingPlan.FromV0(&v0TrackingPlan)
+
+		assert.NoError(t, err)
+		// Expected V1 spec after conversion
+		expectedV1TrackingPlan := TrackingPlanV1{
+			Name:        "Mobile App Events",
+			LocalID:     "mobile_app_tracking",
+			Description: "Tracking plan for mobile app events",
+			Rules: []*TPRuleV1{
+				{
+					Type:                 "event_rule",
+					LocalID:              "user_signup_rule",
+					Event:                "#event:user_signup", // Converted from object to direct reference
+					IdentitySection:      "context",            // Moved from rules.event.identity_section
+					AdditionalProperties: true,                 // Converted from rules.event.allow_unplanned
+					Properties: []*TPRulePropertyV1{
+						{
+							Property: "#property:user_email",
+							Required: true,
+						},
+						{
+							Property: "#property:signup_source",
+							Required: false,
+						},
+					},
+					Variants: VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:platform",
+							Cases: []VariantCaseV1{
+								{
+									DisplayName: "iOS",
+									Match:       []any{"ios"},
+									Description: "iOS platform",
+									Properties: []PropertyReferenceV1{
+										{
+											Property: "#property:device_id",
+											Required: true,
+											
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Type:                 "event_rule",
+					LocalID:              "user_login_rule",
+					Event:                "#event:user_login", // Converted from object to direct reference
+					IdentitySection:      "traits",            // Moved from rules.event.identity_section
+					AdditionalProperties: false,               // allow_unplanned was false
+					Properties: []*TPRulePropertyV1{
+						{
+							Property: "#property:login_method",
+							Required: true,
+							AdditionalProperties: &trueVal,
+							Properties: []*TPRulePropertyV1{
+								{
+									Property: "#property:login_details",
+									Required: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			EventProps: nil,
+		}
+		// Compare public fields only (RulesV0 is internal)
+		assert.Equal(t, expectedV1TrackingPlan, v1TrackingPlan)
+	})
+
+	t.Run("handles tracking plan with nil event", func(t *testing.T) {
+		t.Parallel()
+
+		v0TrackingPlan := TrackingPlan{
+			Name:        "Test Plan",
+			LocalID:     "test_plan",
+			Description: "Test tracking plan",
+			Rules: []*TPRule{
+				{
+					Type:    "event_rule",
+					LocalID: "rule_without_event",
+					Event:   nil, // Edge case: no event
+				},
+			},
+		}
+
+		var v1TrackingPlan TrackingPlanV1
+		err := v1TrackingPlan.FromV0(&v0TrackingPlan)
+
+		assert.NoError(t, err)
+
+		expectedV1 := TrackingPlanV1{
+			Name:        "Test Plan",
+			LocalID:     "test_plan",
+			Description: "Test tracking plan",
+			Rules: []*TPRuleV1{
+				{
+					Type:                 "event_rule",
+					LocalID:              "rule_without_event",
+					Event:                "",
+					IdentitySection:      "",
+					AdditionalProperties: false,
+					Properties:           nil,
+					Includes:             nil,
+					Variants:             nil,
+				},
+			},
+			EventProps: nil,
+		}
+		assert.Equal(t, expectedV1, v1TrackingPlan)
+	})
+}

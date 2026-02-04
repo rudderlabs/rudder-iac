@@ -12,7 +12,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:         []Event{},
 		Properties:     []PropertyV1{},
-		TrackingPlans:  []*TrackingPlan{},
+		TrackingPlans:  []*TrackingPlanV1{},
 		CustomTypes:    []CustomTypeV1{},
 		Categories:     []Category{},
 		ReferenceMap:   make(map[string]string),
@@ -91,7 +91,6 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan entities are extracted from yaml successfully", func(t *testing.T) {
 
-		falseVal := false
 		byt := []byte(`
         version: rudder/0.1
         kind: events
@@ -196,46 +195,46 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(emptyCatalog.TrackingPlans))
-		assert.Equal(t, &TrackingPlan{
+
+		falseVal := false
+		assert.Equal(t, &TrackingPlanV1{
 			Name:        "Rudderstack First Tracking Plan",
 			LocalID:     "my_first_tp",
 			Description: "This is my first tracking plan",
-			Rules: []*TPRule{
+			Rules: []*TPRuleV1{
 				{
-					LocalID: "rule_01",
-					Type:    "event_rule",
-					Event: &TPRuleEvent{
-						Ref:            "#/events/mobile_events/user_signed_up",
-						AllowUnplanned: true,
-					},
-					Properties: []*TPRuleProperty{
+					LocalID:              "rule_01",
+					Type:                 "event_rule",
+					Event:                "#/events/mobile_events/user_signed_up",
+					AdditionalProperties: true,
+					Properties: []*TPRulePropertyV1{
 						{
-							Ref:      "#/properties/base_mobile_props/username",
+							Property: "#/properties/base_mobile_props/username",
 							Required: true,
 						},
 						{
-							Ref:      "#/properties/base_mobile_props/button_signin",
+							Property: "#/properties/base_mobile_props/button_signin",
 							Required: false,
-							Properties: []*TPRuleProperty{
+							Properties: []*TPRulePropertyV1{
 								{
-									Ref:      "#/properties/base_mobile_props/username",
+									Property: "#/properties/base_mobile_props/username",
 									Required: true,
 								},
 								{
-									Ref:      "#/properties/base_mobile_props/remember_me_checkbox_clicked",
+									Property: "#/properties/base_mobile_props/remember_me_checkbox_clicked",
 									Required: false,
 								},
 								{
-									Ref:                  "#/properties/base_mobile_props/captcha",
+									Property:             "#/properties/base_mobile_props/captcha",
 									AdditionalProperties: &falseVal,
 									Required:             false,
-									Properties: []*TPRuleProperty{
+									Properties: []*TPRulePropertyV1{
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_solved",
+											Property: "#/properties/base_mobile_props/captcha_solved",
 											Required: false,
 										},
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_type",
+											Property: "#/properties/base_mobile_props/captcha_type",
 											Required: false,
 										},
 									},
@@ -245,6 +244,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 					},
 				},
 			},
+			EventProps: nil,
 		}, emptyCatalog.TrackingPlans[0])
 
 		byt = []byte(`
@@ -272,7 +272,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:         []Event{},
 			Properties:     []PropertyV1{},
-			TrackingPlans:  []*TrackingPlan{},
+			TrackingPlans:  []*TrackingPlanV1{},
 			CustomTypes:    []CustomTypeV1{},
 			Categories:     []Category{},
 			ReferenceMap:   make(map[string]string),
@@ -344,7 +344,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, []any{"search", "search_bar"}, variant.Cases[0].Match)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
 		assert.Equal(t, []any{"product", "search", "1"}, variant.Cases[1].Match)
-		assert.Equal(t, 1, len(variant.Default))
+		assert.Equal(t, 1, len(variant.Default.Properties))
 	})
 
 	t.Run("custom types are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -571,7 +571,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -639,7 +639,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -697,7 +697,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -749,7 +749,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -807,7 +807,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		catalog := DataCatalog{
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
+			TrackingPlans: []*TrackingPlanV1{},
 			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
@@ -1588,17 +1588,17 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		require.NotNil(t, rule.Variants)
 		require.Equal(t, 1, len(rule.Variants))
 
-		assert.Equal(t, "#event:user_signed_up", rule.Event.Ref)
-		assert.Equal(t, "#property:page_name", rule.Properties[0].Ref)
+		assert.Equal(t, "#event:user_signed_up", rule.Event)
+		assert.Equal(t, "#property:page_name", rule.Properties[0].Property)
 
 		variant := (rule.Variants)[0]
 		assert.Equal(t, "discriminator", variant.Type)
 		assert.Equal(t, "page_name", variant.Discriminator)
 		assert.Equal(t, 2, len(variant.Cases))
 		assert.Equal(t, "Search Page", variant.Cases[0].DisplayName)
-		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Ref)
+		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Property)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
-		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Ref)
-		assert.Equal(t, "#property:page_url", variant.Default[0].Ref)
+		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Property)
+		assert.Equal(t, "#property:page_url", variant.Default.Properties[0].Property)
 	})
 }

@@ -242,45 +242,44 @@ func TestVariantsReferenceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		trackingPlans []*catalog.TrackingPlan
+		trackingPlans []*catalog.TrackingPlanV1
 		customTypes   []catalog.CustomTypeV1
 		errors        []ValidationError
 	}{
 		{
 			name: "valid variants references in tracking plan",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:test-event",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#event:test-event",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:page_name",
+									Property: "#property:page_name",
 									Required: true,
 								},
 							},
-							Variants: catalog.Variants{
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "#property:page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search", "search_bar"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:search_term", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:search_term", Required: true},
 											},
 										},
 									},
-									Default: []catalog.PropertyReference{
-										{Ref: "#property:product_id", Required: true},
-									},
+									Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+										{Property: "#property:product_id", Required: true},
+									}},
 								},
 							},
 						},
@@ -323,27 +322,26 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid discriminator and property reference in variant case",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:test-event",
-							},
-							Variants: catalog.Variants{
+							Event: "#event:test-event",
+							AdditionalProperties: false,
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:non_existent_property", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:non_existent_property", Required: true},
 											},
 										},
 									},
@@ -366,39 +364,38 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid property reference in variant default",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/test-event",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#event:test-event",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:page_name",
+									Property: "#property:page_name",
 									Required: true,
 								},
 							},
-							Variants: catalog.Variants{
+							Variants: catalog.VariantsV1{
 								{
 									Type:          "discriminator",
 									Discriminator: "#property:page_name",
-									Cases: []catalog.VariantCase{
+									Cases: []catalog.VariantCaseV1{
 										{
 											DisplayName: "Search Page",
 											Match:       []any{"search"},
-											Properties: []catalog.PropertyReference{
-												{Ref: "#property:search_term", Required: true},
+											Properties: []catalog.PropertyReferenceV1{
+												{Property: "#property:search_term", Required: true},
 											},
 										},
 									},
-									Default: []catalog.PropertyReference{
-										{Ref: "#property:non_existent_property", Required: true},
-									},
+									Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+										{Property: "#property:non_existent_property", Required: true},
+									}},
 								},
 							},
 						},
@@ -413,7 +410,6 @@ func TestVariantsReferenceValidation(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dc := &catalog.DataCatalog{
@@ -471,30 +467,29 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		trackingPlans []*catalog.TrackingPlan
+		trackingPlans []*catalog.TrackingPlanV1
 		expectedErrs  int
 		errorContains []string
 	}{
 		{
 			name: "valid nested property references (2 levels)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_name",
+											Property: "#property:profile_name",
 											Required: true,
 										},
 									},
@@ -508,28 +503,26 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "valid nested property references (3 levels deep)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#/events/test-group/user_signup",
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_settings",
+											Property: "#property:profile_settings",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:theme_preference",
+													Property: "#property:theme_preference",
 													Required: true,
 												},
 											},
@@ -545,24 +538,22 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference (non-existent property)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{	
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#/events/test-group/user_signup",
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:nonexistent_property",
+											Property: "#property:nonexistent_property",
 											Required: true,
 										},
 									},
@@ -577,24 +568,23 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "invalid nested property reference format",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:", // Invalid format - missing property ID
+											Property: "#property:", // Invalid format - missing property ID
 											Required: true,
 										},
 									},
@@ -609,32 +599,31 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "multiple nested reference errors (different levels)",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#event:user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#event:user_signup",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:invalid_property1", // Non-existent at level 2
+											Property: "#property:invalid_property1", // Non-existent at level 2
 											Required: true,
 										},
 										{
-											Ref:      "#property:profile_settings",
+											Property: "#property:profile_settings",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:invalid_property2", // Non-existent at level 3
+													Property: "#property:invalid_property2", // Non-existent at level 3
 													Required: true,
 												},
 											},
@@ -654,36 +643,35 @@ func TestRecursiveReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "mixed valid and invalid nested references",
-			trackingPlans: []*catalog.TrackingPlan{
+			trackingPlans: []*catalog.TrackingPlanV1{
 				{
 					LocalID: "test-tp",
 					Name:    "Test Tracking Plan",
-					Rules: []*catalog.TPRule{
+					Rules: []*catalog.TPRuleV1{
 						{
 							LocalID: "test-rule",
 							Type:    "event_rule",
-							Event: &catalog.TPRuleEvent{
-								Ref: "#/events/test-group/user_signup",
-							},
-							Properties: []*catalog.TPRuleProperty{
+							Event: "#/events/test-group/user_signup",
+							AdditionalProperties: false,
+							Properties: []*catalog.TPRulePropertyV1{
 								{
-									Ref:      "#property:user_profile",
+									Property: "#property:user_profile",
 									Required: true,
-									Properties: []*catalog.TPRuleProperty{
+									Properties: []*catalog.TPRulePropertyV1{
 										{
-											Ref:      "#property:profile_name", // Valid
+											Property: "#property:profile_name", // Valid
 											Required: true,
 										},
 										{
-											Ref:      "#/properties/invalid-format", // Invalid format
+											Property: "#/properties/invalid-format", // Invalid format
 											Required: true,
 										},
 										{
-											Ref:      "#property:notification_prefs",
+											Property: "#property:notification_prefs",
 											Required: true,
-											Properties: []*catalog.TPRuleProperty{
+											Properties: []*catalog.TPRulePropertyV1{
 												{
-													Ref:      "#property:email_enabled", // Valid
+													Property: "#property:email_enabled", // Valid
 													Required: true,
 												},
 											},
