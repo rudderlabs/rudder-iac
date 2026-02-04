@@ -1,18 +1,18 @@
-version: rudder/0.1
+version: rudder/v1
 kind: transformation
 metadata:
-  name: test-transformations
+  name: test_transformations
 spec:
-  id: greeting-transform
+  id: greeting_transform
   name: Greeting Transform
   description: Uses library to greet user by name
   language: javascript
   code: |
-    import utilsLibrary from 'utilsLibrary';
+    import { greet } from 'utilsLibrary';
 
     export function transformEvent(event, metadata) {
       if (event.properties && event.properties.name) {
-        event.properties.greeting = utilsLibrary.greet(event.properties.name);
+        event.properties.greeting = greet(event.properties.name);
       }
       return event;
     }

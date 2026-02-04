@@ -1,9 +1,9 @@
-version: rudder/0.1
+version: rudder/v1
 kind: transformation
 metadata:
-  name: test-transformations
+  name: test_transformations
 spec:
-  id: simple-transform
+  id: simple_transform
   name: Simple Transform
   description: Adds a greeting message to events
   language: javascript
