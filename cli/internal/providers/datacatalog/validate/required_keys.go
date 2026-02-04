@@ -316,7 +316,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				})
 			} else {
 
-				errors = append(errors, rk.validateVariantsRequiredKeysV1(customType.Variants, reference)...)
+				errors = append(errors, rk.validateVariantsRequiredKeys(customType.Variants, reference)...)
 			}
 		}
 	}
@@ -544,111 +544,6 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 
 // validateVariantsRequiredKeysV1 validates required keys in V1 variants (for custom types)
 func (rk *RequiredKeysValidator) validateVariantsRequiredKeys(variants catalog.VariantsV1, reference string) []ValidationError {
-	var errors []ValidationError
-
-	if len(variants) > 1 {
-		errors = append(errors, ValidationError{
-			error:     fmt.Errorf("variants array cannot have more than 1 variant (current length: %d)", len(variants)),
-			Reference: reference,
-		})
-	}
-
-	for i, variant := range variants {
-		variantReference := fmt.Sprintf("%s/variants[%d]", reference, i)
-
-		if variant.Type != "discriminator" {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("type field is mandatory for variant and must be 'discriminator'"),
-				Reference: variantReference,
-			})
-		}
-
-		if variant.Discriminator == "" {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("discriminator field is mandatory for variant"),
-				Reference: variantReference,
-			})
-		}
-
-		if len(variant.Cases) == 0 {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("cases array must have at least one element"),
-				Reference: variantReference,
-			})
-		}
-
-		for j, variantCase := range variant.Cases {
-			caseReference := fmt.Sprintf("%s/cases[%d]", variantReference, j)
-
-			if variantCase.DisplayName == "" {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("display_name field is mandatory for variant case"),
-					Reference: caseReference,
-				})
-			}
-
-			if len(variantCase.Match) == 0 {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("match array must have at least one element"),
-					Reference: caseReference,
-				})
-			}
-
-			if len(variantCase.Properties) == 0 {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("properties array must have at least one element"),
-					Reference: caseReference,
-				})
-			}
-
-			for k, matchValue := range variantCase.Match {
-				switch matchValue := matchValue.(type) {
-				case string, bool, int:
-				case float64:
-					if matchValue != math.Trunc(matchValue) {
-						errors = append(errors, ValidationError{
-							error:     fmt.Errorf("match value at index %d must be an integer", k),
-							Reference: caseReference,
-						})
-					}
-
-				default:
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("match value at index %d must be string, bool or integer type (got: %T)", k, matchValue),
-						Reference: caseReference,
-					})
-				}
-			}
-
-			for k, propRef := range variantCase.Properties {
-				propReference := fmt.Sprintf("%s/properties[%d]", caseReference, k)
-
-				if propRef.Property == "" {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("property field is mandatory for property reference"),
-						Reference: propReference,
-					})
-				}
-			}
-		}
-
-		for j, propRef := range variant.Default.Properties {
-			propReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, j)
-
-			if propRef.Property == "" {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("property field is mandatory for property reference"),
-					Reference: propReference,
-				})
-			}
-		}
-	}
-
-	return errors
-}
-
-// validateVariantsRequiredKeysV1 validates required keys in V1 variants (for custom types)
-func (rk *RequiredKeysValidator) validateVariantsRequiredKeysV1(variants catalog.VariantsV1, reference string) []ValidationError {
 	var errors []ValidationError
 
 	if len(variants) > 1 {
