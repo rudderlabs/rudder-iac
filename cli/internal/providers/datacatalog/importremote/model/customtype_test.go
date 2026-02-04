@@ -238,10 +238,12 @@ func TestCustomTypeForExport(t *testing.T) {
 							},
 						},
 					},
-					"default": []any{
-						map[string]any{
-							"property": "#/properties/mypropertygroup/page",
-							"required": true,
+					"default": map[string]any{
+						"properties": []any{
+							map[string]any{
+								"property": "#/properties/mypropertygroup/page",
+								"required": true,
+							},
 						},
 					},
 				},

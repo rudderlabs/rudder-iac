@@ -58,9 +58,9 @@ func TestVariantV1_FromV0(t *testing.T) {
 		assert.Equal(t, "#property:session_id", v1.Cases[1].Properties[0].Property)
 		assert.False(t, v1.Cases[1].Properties[0].Required)
 
-		require.Len(t, v1.Default, 1)
-		assert.Equal(t, "#property:timestamp", v1.Default[0].Property)
-		assert.True(t, v1.Default[0].Required)
+		require.Len(t, v1.Default.Properties, 1)
+		assert.Equal(t, "#property:timestamp", v1.Default.Properties[0].Property)
+		assert.True(t, v1.Default.Properties[0].Required)
 	})
 }
 
@@ -115,7 +115,7 @@ func TestVariantsV1_FromV0(t *testing.T) {
 		assert.Equal(t, "#property:country", v1[1].Discriminator)
 		require.Len(t, v1[1].Cases, 1)
 		assert.Equal(t, "US", v1[1].Cases[0].DisplayName)
-		require.Len(t, v1[1].Default, 1)
-		assert.Equal(t, "#property:country_code", v1[1].Default[0].Property)
+		require.Len(t, v1[1].Default.Properties, 1)
+		assert.Equal(t, "#property:country_code", v1[1].Default.Properties[0].Property)
 	})
 }

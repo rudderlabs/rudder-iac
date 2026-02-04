@@ -545,9 +545,11 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 						},
 					},
 				},
-				Default: []localcatalog.PropertyReferenceV1{
-					{Property: "#/properties/common/timestamp", Required: true},
-					{Property: "#/properties/common/user_agent", Required: false},
+				Default: localcatalog.DefaultPropertiesV1{
+					Properties: []localcatalog.PropertyReferenceV1{
+						{Property: "#/properties/common/timestamp", Required: true},
+						{Property: "#/properties/common/user_agent", Required: false},
+					},
 				},
 			},
 		}
@@ -628,7 +630,9 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 						},
 					},
 				},
-				Default: []localcatalog.PropertyReferenceV1{},
+				Default: localcatalog.DefaultPropertiesV1{
+					Properties: []localcatalog.PropertyReferenceV1{},
+				},
 			},
 			{
 				Type:          "conditional",
@@ -643,8 +647,10 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 						},
 					},
 				},
-				Default: []localcatalog.PropertyReferenceV1{
-					{Property: "#/properties/location/country_code", Required: true},
+				Default: localcatalog.DefaultPropertiesV1{
+					Properties: []localcatalog.PropertyReferenceV1{
+						{Property: "#/properties/location/country_code", Required: true},
+					},
 				},
 			},
 		}
@@ -682,7 +688,9 @@ func TestImportableVariantsV1_fromUpstream(t *testing.T) {
 				Type:          "conditional",
 				Discriminator: "#/properties/flags/feature_flag",
 				Cases:         []localcatalog.VariantCaseV1{},
-				Default:       []localcatalog.PropertyReferenceV1{},
+				Default: localcatalog.DefaultPropertiesV1{
+					Properties: []localcatalog.PropertyReferenceV1{},
+				},
 			},
 		}
 

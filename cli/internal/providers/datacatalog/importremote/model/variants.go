@@ -127,7 +127,9 @@ func (iv *ImportableVariantsV1) fromUpstream(
 			Type:          remoteVariant.Type,
 			Discriminator: remoteVariant.Discriminator,
 			Cases:         make([]localcatalog.VariantCaseV1, 0, len(remoteVariant.Cases)),
-			Default:       make([]localcatalog.PropertyReferenceV1, 0, len(remoteVariant.Default)),
+			Default: localcatalog.DefaultPropertiesV1{
+				Properties: make([]localcatalog.PropertyReferenceV1, 0, len(remoteVariant.Default)),
+			},
 		}
 
 		discriminatorRef, err := resolver.ResolveToReference(
@@ -185,7 +187,7 @@ func (iv *ImportableVariantsV1) fromUpstream(
 				return fmt.Errorf("resolved reference is empty for property %s in variant default", remoteProp.ID)
 			}
 
-			localVariant.Default = append(localVariant.Default, localcatalog.PropertyReferenceV1{
+			localVariant.Default.Properties = append(localVariant.Default.Properties, localcatalog.PropertyReferenceV1{
 				Property: propRef,
 				Required: remoteProp.Required,
 			})

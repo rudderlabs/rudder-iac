@@ -458,7 +458,7 @@ func (rv *RefValidator) validateVariantsReferencesV1(
 			}
 		}
 
-		for idx, propRef := range variant.Default {
+		for idx, propRef := range variant.Default.Properties {
 			defaultReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, idx)
 
 			matches := catalog.PropRegex.FindStringSubmatch(propRef.Property)
