@@ -82,7 +82,7 @@ var (
 
 	trackingPlanReferenceRegex = fmt.Sprintf(
 		`^#(%s):([a-zA-Z0-9_-]+)$`,
-		localcatalog.KindTrackingPlans,
+		localcatalog.KindTrackingPlansV1,
 	)
 )
 
