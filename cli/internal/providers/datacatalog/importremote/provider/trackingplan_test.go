@@ -98,12 +98,12 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.EventResourceType: {
-					"evt1": "#/events/product-viewed/product-viewed",
-					"evt2": "#/events/checkout-completed/checkout-completed",
+					"evt1": "#event:product-viewed",
+					"evt2": "#event:checkout-completed",
 				},
 				types.PropertyResourceType: {
-					"prop1": "#/properties/product-id/product-id",
-					"prop2": "#/properties/revenue/revenue",
+					"prop1": "#property:product-id",
+					"prop2": "#property:revenue",
 				},
 			},
 		}
@@ -178,13 +178,16 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "E-commerce Tracking",
 				"rules": []any{
 					map[string]any{
-						"type":             "event_rule",
-						"id":               "product-viewed-rule",
-						"event":            "#/events/product-viewed/product-viewed",
-						"identity_section": "properties",
+						"type": "event_rule",
+						"id":   "product-viewed-rule",
+						"event": map[string]any{
+							"$ref":             "#event:product-viewed",
+							"allow_unplanned":  false,
+							"identity_section": "properties",
+						},
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/product-id/product-id",
+								"$ref":     "#property:product-id",
 								"required": true,
 							},
 						},
@@ -194,16 +197,164 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		}, spec)
 	})
 
+	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.EventResourceType: {
+					"evt1": "#/events/default/product-viewed",
+				},
+				types.PropertyResourceType: {
+					"prop1": "#/properties/default/product-id",
+				},
+			},
+		}
+
+		mockClient := &mockTrackingPlanDataCatalog{
+			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
+				{
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
+					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+						{
+							ID:   "evt1",
+							Name: "Product Viewed",
+							Properties: []*catalog.TrackingPlanEventProperty{
+								{
+									ID:       "prop1",
+									Required: true,
+								},
+							},
+							AdditionalProperties: false,
+							IdentitySection:      "properties",
+						},
+					},
+				},
+			},
+		}
+
+		provider := &TrackingPlanImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			baseImportDir: "data-catalog",
+			v1SpecSupport: false,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(
+			collection,
+			externalIdNamer,
+			mockResolver,
+		)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		rules, ok := spec.Spec["rules"].([]any)
+		require.True(t, ok)
+		require.Len(t, rules, 1)
+
+		rule, ok := rules[0].(map[string]any)
+		require.True(t, ok)
+		event, ok := rule["event"].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, event["$ref"], "#/events/")
+
+		properties, ok := rule["properties"].([]any)
+		require.True(t, ok)
+		require.Len(t, properties, 1)
+		prop, ok := properties[0].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, prop["$ref"], "#/properties/")
+	})
+
+	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.EventResourceType: {
+					"evt1": "#event:product-viewed",
+				},
+				types.PropertyResourceType: {
+					"prop1": "#property:product-id",
+				},
+			},
+		}
+
+		mockClient := &mockTrackingPlanDataCatalog{
+			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
+				{
+					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
+					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+						{
+							ID:   "evt1",
+							Name: "Product Viewed",
+							Properties: []*catalog.TrackingPlanEventProperty{
+								{
+									ID:       "prop1",
+									Required: true,
+								},
+							},
+							AdditionalProperties: false,
+							IdentitySection:      "properties",
+						},
+					},
+				},
+			},
+		}
+
+		provider := &TrackingPlanImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			baseImportDir: "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(
+			collection,
+			externalIdNamer,
+			mockResolver,
+		)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		assert.Equal(t, "tracking-plan", spec.Kind)
+
+		rules, ok := spec.Spec["rules"].([]any)
+		require.True(t, ok)
+		require.Len(t, rules, 1)
+
+		rule, ok := rules[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "#event:product-viewed", rule["event"])
+
+		properties, ok := rule["properties"].([]any)
+		require.True(t, ok)
+		require.Len(t, properties, 1)
+
+		prop, ok := properties[0].(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, prop, "property")
+	})
+
 	t.Run("generates multiple tracking plans with different specs", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.EventResourceType: {
-					"evt1": "#/events/product-viewed/product-viewed",
-					"evt2": "#/events/user-signup/user-signup",
+					"evt1": "#event:product-viewed",
+					"evt2": "#event:user-signup",
 				},
 				types.PropertyResourceType: {
-					"prop1": "#/properties/product-id/product-id",
-					"prop2": "#/properties/user-email/user-email",
+					"prop1": "#property:product-id",
+					"prop2": "#property:user-email",
 				},
 			},
 		}
@@ -300,13 +451,16 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "E-commerce Tracking",
 				"rules": []any{
 					map[string]any{
-						"type":             "event_rule",
-						"id":               "product-viewed-rule",
-						"event":            "#/events/product-viewed/product-viewed",
-						"identity_section": "properties",
+						"type": "event_rule",
+						"id":   "product-viewed-rule",
+						"event": map[string]any{
+							"$ref":             "#event:product-viewed",
+							"allow_unplanned":  false,
+							"identity_section": "properties",
+						},
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/product-id/product-id",
+								"$ref":     "#property:product-id",
 								"required": true,
 							},
 						},
@@ -339,14 +493,16 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 				"display_name": "User Analytics",
 				"rules": []any{
 					map[string]any{
-						"type":                 "event_rule",
-						"id":                   "user-signup-rule",
-						"event":                "#/events/user-signup/user-signup",
-						"additionalProperties": true,
-						"identity_section":     "context",
+						"type": "event_rule",
+						"id":   "user-signup-rule",
+						"event": map[string]any{
+							"$ref":             "#event:user-signup",
+							"allow_unplanned":  true,
+							"identity_section": "context",
+						},
 						"properties": []any{
 							map[string]any{
-								"property":     "#/properties/user-email/user-email",
+								"$ref":     "#property:user-email",
 								"required": false,
 							},
 						},

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
@@ -32,6 +33,7 @@ type TrackingPlanImportProvider struct {
 	client        catalog.DataCatalog
 	log           logger.Logger
 	baseImportDir string
+	v1SpecSupport bool
 }
 
 func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger, baseImportDir string) *TrackingPlanImportProvider {
@@ -39,6 +41,7 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 		log:           log,
 		baseImportDir: baseImportDir,
 		client:        client,
+		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -95,11 +98,7 @@ func (p *TrackingPlanImportProvider) idResources(
 		}
 
 		tp.ExternalID = externalID
-		tp.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindTrackingPlans,
-			externalID,
-			externalID,
-		)
+		tp.Reference = fmt.Sprintf("#tp:%s", externalID)
 	}
 	return nil
 }
@@ -136,14 +135,26 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			},
 		}
 
-		importableTrackingPlan := &model.ImportableTrackingPlan{}
-		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
+		var formatted map[string]any
+		var err error
+		if p.v1SpecSupport {
+			importableTrackingPlan := &model.ImportableTrackingPlanV1{}
+			formatted, err = importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
+		} else {
+			importableTrackingPlan := &model.ImportableTrackingPlan{}
+			formatted, err = importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("formatting tracking plan %s for export: %w", trackingPlan.ID, err)
 		}
 
+		kind := localcatalog.KindTrackingPlans
+		if p.v1SpecSupport {
+			kind = localcatalog.KindTrackingPlansV1
+		}
+
 		spec, err := toImportSpec(
-			localcatalog.KindTrackingPlans,
+			kind,
 			trackingPlan.ExternalID,
 			workspaceMetadata,
 			formatted,

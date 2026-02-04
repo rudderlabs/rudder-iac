@@ -136,4 +136,76 @@ func TestCategoryFormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 2, len(categories))
 	})
+
+	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{},
+		}
+
+		mockClient := &mockCategoryCatalog{
+			categories: []*catalog.Category{
+				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
+			},
+		}
+
+		provider := &CategoryImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: false,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		categories, ok := spec.Spec["categories"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, categories, 1)
+		assert.Contains(t, categories[0], "id")
+		assert.Contains(t, categories[0], "name")
+	})
+
+	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{},
+		}
+
+		mockClient := &mockCategoryCatalog{
+			categories: []*catalog.Category{
+				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
+			},
+		}
+
+		provider := &CategoryImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		categories, ok := spec.Spec["categories"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, categories, 1)
+		assert.Contains(t, categories[0], "id")
+		assert.Contains(t, categories[0], "name")
+	})
 }

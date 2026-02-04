@@ -28,6 +28,15 @@ type PropertySpec struct {
 	Properties []Property `json:"properties" validate:"dive"`
 }
 
+// Event represents a user-defined event (V0 spec)
+type Event struct {
+	LocalID     string  `json:"id" mapstructure:"id"`
+	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type"`
+	Description string  `json:"description" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
+}
+
 // This method is used to extract the entity from the byte representation of it
 func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 	spec := PropertySpec{}
@@ -85,6 +94,12 @@ func ExtractEvents(s *specs.Spec) ([]EventV1, error) {
 
 // CategoryV1 represents a user-defined category
 type CategoryV1 struct {
+	LocalID string `mapstructure:"id" json:"id"`
+	Name    string `mapstructure:"name" json:"name"`
+}
+
+// Category represents a user-defined category (V0 spec)
+type Category struct {
 	LocalID string `mapstructure:"id" json:"id"`
 	Name    string `mapstructure:"name" json:"name"`
 }
