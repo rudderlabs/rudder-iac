@@ -128,7 +128,7 @@ func ExtractCategories(s *specs.Spec) ([]CategoryV1, error) {
 // CustomType represents a user-defined custom type
 type CustomType struct {
 	LocalID     string               `mapstructure:"id" json:"id" validate:"required"`
-	Name        string               `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern_custom_type_name"`
+	Name        string               `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern=custom_type_name"`
 	Description string               `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
 	Type        string               `mapstructure:"type" json:"type" validate:"required,primitive"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`

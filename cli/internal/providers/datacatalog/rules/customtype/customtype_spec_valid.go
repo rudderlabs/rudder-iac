@@ -9,9 +9,18 @@ import (
 
 const (
 	customTypeNameRegexPattern = "^[A-Z][A-Za-z0-9_-]*$"
-	customTypeNameRegexTag     = "pattern_custom_type_name"
+	customTypeNameRegexTag     = "custom_type_name"
 	customTypeNameErrorMessage = "must start with uppercase and contain only alphanumeric, underscores, or hyphens"
 )
+
+func init() {
+	// Register the custom type name pattern for use with validate:"pattern=custom_type_name"
+	funcs.NewPattern(
+		customTypeNameRegexTag,
+		customTypeNameRegexPattern,
+		customTypeNameErrorMessage,
+	)
+}
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -89,10 +98,7 @@ func getValidateFuncs(_ string) []rules.CustomValidateFunc {
 		}),
 		// reference validation for the $ref field in properties
 		funcs.NewLegacyReferenceValidateFunc([]string{"properties"}),
-		funcs.NewPattern(
-			customTypeNameRegexTag,
-			customTypeNameRegexPattern,
-			customTypeNameErrorMessage,
-		),
+		// Note: Pattern validation is now handled by the global "pattern" validator
+		// registered via init(). Use validate:"pattern:pattern_custom_type_name" in struct tags.
 	}
 }

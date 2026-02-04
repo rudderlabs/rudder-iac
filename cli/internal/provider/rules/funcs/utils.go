@@ -63,6 +63,12 @@ func getErrorMessage(err validator.FieldError) string {
 	case "primitive":
 		return fmt.Sprintf("'%s' must be a valid primitive type (string, number, integer, boolean, null, array, or object)", fieldName)
 
+	case "pattern":
+		if msg, ok := getPatternErrorMessage(err.Param()); ok {
+			return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
+		}
+		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
+
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {
 			// For string and slice, the gte tag is used to validate the length

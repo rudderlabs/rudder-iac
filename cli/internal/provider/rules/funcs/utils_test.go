@@ -78,6 +78,9 @@ func TestNamespaceToJSONPointer(t *testing.T) {
 func TestGetErrorMessage(t *testing.T) {
 	t.Parallel()
 
+	// Register a test pattern for the pattern tag test case
+	NewPattern("test_pattern_for_error_msg", "^[A-Z]+$", "must match test pattern")
+
 	tests := []struct {
 		name     string
 		err      validator.FieldError
@@ -146,6 +149,24 @@ func TestGetErrorMessage(t *testing.T) {
 				param:     "50",
 			},
 			expected: "'Text' length must be less than or equal to 50",
+		},
+		{
+			name: "pattern tag with registered pattern",
+			err: mockFieldError{
+				field:     "Name",
+				actualTag: "pattern",
+				param:     "test_pattern_for_error_msg",
+			},
+			expected: "'Name' is not valid: must match test pattern",
+		},
+		{
+			name: "pattern tag with non-existent pattern",
+			err: mockFieldError{
+				field:     "Name",
+				actualTag: "pattern",
+				param:     "nonexistent_pattern",
+			},
+			expected: "'Name' does not match the required pattern",
 		},
 		{
 			name: "unknown tag",
