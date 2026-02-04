@@ -405,18 +405,18 @@ func extractEntities(s *specs.Spec, dc *DataCatalog) error {
 		dc.Categories = append(dc.Categories, categories...)
 
 	case KindTrackingPlans:
-		tp, err := ExtractTrackingPlan(s)
+		trackingPlan, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return fmt.Errorf("extracting tracking plan: %w", err)
 		}
 
 		// Check for duplicates
 		for i := range dc.TrackingPlans {
-			if dc.TrackingPlans[i].LocalID == tp.LocalID {
-				return fmt.Errorf("duplicate tracking plan with id '%s' found", tp.LocalID)
+			if dc.TrackingPlans[i].LocalID == trackingPlan.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", trackingPlan.LocalID)
 			}
 		}
-		dc.TrackingPlans = append(dc.TrackingPlans, &tp)
+		dc.TrackingPlans = append(dc.TrackingPlans, &trackingPlan)
 
 	case KindCustomTypes:
 		customTypes, err := ExtractCustomTypes(s)
