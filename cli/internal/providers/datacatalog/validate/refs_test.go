@@ -14,7 +14,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 	validator := &RefValidator{}
 
 	// Create a test custom type
-	testCustomType := catalog.CustomType{
+	testCustomType := catalog.CustomTypeV1{
 		LocalID:     "EmailType",
 		Name:        "EmailType",
 		Description: "Custom type for email validation",
@@ -27,7 +27,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 	testCases := []struct {
 		name          string
 		properties    []catalog.PropertyV1
-		customTypes   []catalog.CustomType
+		customTypes   []catalog.CustomTypeV1
 		expectedErrs  int
 		errorContains []string
 	}{
@@ -42,7 +42,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:EmailType",
 				},
 			},
-			customTypes: []catalog.CustomType{
+			customTypes: []catalog.CustomTypeV1{
 				testCustomType,
 			},
 			expectedErrs: 0,
@@ -58,7 +58,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:", // Missing type ID
 				},
 			},
-			customTypes: []catalog.CustomType{
+			customTypes: []catalog.CustomTypeV1{
 				testCustomType,
 			},
 			expectedErrs:  1,
@@ -75,7 +75,7 @@ func TestPropertyItemTypesCustomTypeReferences(t *testing.T) {
 					ItemType:    "#custom-type:NonExistentType",
 				},
 			},
-			customTypes: []catalog.CustomType{
+			customTypes: []catalog.CustomTypeV1{
 				testCustomType,
 			},
 			expectedErrs:  1,
@@ -243,7 +243,7 @@ func TestVariantsReferenceValidation(t *testing.T) {
 	testCases := []struct {
 		name          string
 		trackingPlans []*catalog.TrackingPlan
-		customTypes   []catalog.CustomType
+		customTypes   []catalog.CustomTypeV1
 		errors        []ValidationError
 	}{
 		{
@@ -290,28 +290,28 @@ func TestVariantsReferenceValidation(t *testing.T) {
 		},
 		{
 			name: "valid variants references in custom type",
-			customTypes: []catalog.CustomType{
+			customTypes: []catalog.CustomTypeV1{
 				{
 					LocalID:     "TestType",
 					Name:        "TestType",
 					Description: "Test custom type with variants",
 					Type:        "object",
-					Properties: []catalog.CustomTypeProperty{
+					Properties: []catalog.CustomTypePropertyV1{
 						{
-							Ref:      "#property:user_id",
+							Property: "#property:user_id",
 							Required: true,
 						},
 					},
-					Variants: catalog.Variants{
+					Variants: catalog.VariantsV1{
 						{
 							Type:          "discriminator",
 							Discriminator: "#property:user_id",
-							Cases: []catalog.VariantCase{
+							Cases: []catalog.VariantCaseV1{
 								{
 									DisplayName: "Admin User",
 									Match:       []any{"admin", "superuser"},
-									Properties: []catalog.PropertyReference{
-										{Ref: "#property:product_id", Required: true},
+									Properties: []catalog.PropertyReferenceV1{
+										{Property: "#property:product_id", Required: true},
 									},
 								},
 							},

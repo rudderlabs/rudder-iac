@@ -13,7 +13,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		Events:         []Event{},
 		Properties:     []PropertyV1{},
 		TrackingPlans:  []*TrackingPlan{},
-		CustomTypes:    []CustomType{},
+		CustomTypes:    []CustomTypeV1{},
 		Categories:     []Category{},
 		ReferenceMap:   make(map[string]string),
 		ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
@@ -273,7 +273,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:         []Event{},
 			Properties:     []PropertyV1{},
 			TrackingPlans:  []*TrackingPlan{},
-			CustomTypes:    []CustomType{},
+			CustomTypes:    []CustomTypeV1{},
 			Categories:     []Category{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
@@ -365,6 +365,7 @@ func TestExtractCatalogEntity(t *testing.T) {
                 minLength: 5
                 maxLength: 255
                 pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                unsupportedConfig: "some-value"
             - id: "ProductIdType"
               name: "Product ID Type"
               description: "Custom type for product identifiers"
@@ -384,30 +385,31 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 		// Verify first custom type (EmailType)
 		assert.Equal(t, "EmailType", emptyCatalog.CustomTypes[0].LocalID)
-		assert.Equal(t, CustomType{
+		assert.Equal(t, CustomTypeV1{
 			LocalID:     "EmailType",
 			Name:        "Email Type",
 			Description: "Custom type for email validation",
 			Type:        "string",
 			Config: map[string]interface{}{
-				"format":    "email",
-				"minLength": float64(5),
-				"maxLength": float64(255),
-				"pattern":   "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+				"format":            "email",
+				"min_length":        float64(5),
+				"max_length":        float64(255),
+				"pattern":           "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+				"unsupportedConfig": "some-value",
 			},
 		}, emptyCatalog.CustomTypes[0])
 
 		// Verify second custom type (ProductIdType)
 		assert.Equal(t, "ProductIdType", emptyCatalog.CustomTypes[1].LocalID)
-		assert.Equal(t, CustomType{
+		assert.Equal(t, CustomTypeV1{
 			LocalID:     "ProductIdType",
 			Name:        "Product ID Type",
 			Description: "Custom type for product identifiers",
 			Type:        "string",
 			Config: map[string]interface{}{
-				"minLength": float64(10),
-				"maxLength": float64(20),
-				"pattern":   "^PROD-[0-9]{7}$",
+				"min_length": float64(10),
+				"max_length": float64(20),
+				"pattern":    "^PROD-[0-9]{7}$",
 			},
 		}, emptyCatalog.CustomTypes[1])
 	})
@@ -515,10 +517,10 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Equal(t, 4, len(customType.Properties))
 
 		// Check each property reference
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/street", Required: true}, customType.Properties[0])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/city", Required: true}, customType.Properties[1])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/state", Required: false}, customType.Properties[2])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/zip", Required: true}, customType.Properties[3])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/street", Required: true}, customType.Properties[0])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/city", Required: true}, customType.Properties[1])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/state", Required: false}, customType.Properties[2])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/zip", Required: true}, customType.Properties[3])
 	})
 
 	t.Run("categories are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -570,7 +572,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
+			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
 
@@ -638,7 +640,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
+			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
 
@@ -696,7 +698,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
+			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
 
@@ -748,7 +750,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
+			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
 
@@ -806,7 +808,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 			Events:        []Event{},
 			Properties:    []PropertyV1{},
 			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
+			CustomTypes:   []CustomTypeV1{},
 			Categories:    []Category{},
 		}
 

@@ -227,6 +227,48 @@ func (v *Variant) FromLocalCatalogVariant(
 	return nil
 }
 
+// FromLocalCatalogVariantV1 converts a V1 local catalog variant to state variant
+func (v *Variant) FromLocalCatalogVariantV1(
+	localVariant localcatalog.VariantV1,
+	urnFromRef func(string) string,
+) error {
+
+	v.Type = localVariant.Type
+	v.Discriminator = resources.PropertyRef{
+		URN:      urnFromRef(localVariant.Discriminator),
+		Property: "id",
+	}
+
+	for _, localCase := range localVariant.Cases {
+		v.Cases = append(v.Cases, VariantCase{
+			DisplayName: localCase.DisplayName,
+			Match:       localCase.Match,
+			Description: localCase.Description,
+			Properties: lo.Map(localCase.Properties, func(localProp localcatalog.PropertyReferenceV1, _ int) PropertyReference {
+				return PropertyReference{
+					ID: resources.PropertyRef{
+						URN:      urnFromRef(localProp.Property),
+						Property: "id",
+					},
+					Required: localProp.Required,
+				}
+			}),
+		})
+	}
+
+	v.Default = lo.Map(localVariant.Default, func(localProp localcatalog.PropertyReferenceV1, _ int) PropertyReference {
+		return PropertyReference{
+			ID: resources.PropertyRef{
+				URN:      urnFromRef(localProp.Property),
+				Property: "id",
+			},
+			Required: localProp.Required,
+		}
+	})
+
+	return nil
+}
+
 type VariantCase struct {
 	DisplayName string              `json:"display_name"`
 	Match       []any               `json:"match,omitempty"`

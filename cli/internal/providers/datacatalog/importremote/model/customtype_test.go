@@ -50,15 +50,15 @@ func TestCustomTypeForExport(t *testing.T) {
 			"type":        "object",
 			"properties": []any{
 				map[string]any{
-					"$ref":     "#/properties/address/street",
+					"property": "#/properties/address/street",
 					"required": true,
 				},
 				map[string]any{
-					"$ref":     "#/properties/address/city",
+					"property": "#/properties/address/city",
 					"required": true,
 				},
 				map[string]any{
-					"$ref":     "#/properties/address/zip_code",
+					"property": "#/properties/address/zip_code",
 					"required": false,
 				},
 			},
@@ -198,15 +198,15 @@ func TestCustomTypeForExport(t *testing.T) {
 			"type":        "object",
 			"properties": []any{
 				map[string]any{
-					"$ref":     "#/properties/mypropertygroup/page",
+					"property": "#/properties/mypropertygroup/page",
 					"required": true,
 				},
 				map[string]any{
-					"$ref":     "#/properties/mypropertygroup/search_term",
+					"property": "#/properties/mypropertygroup/search_term",
 					"required": false,
 				},
 				map[string]any{
-					"$ref":     "#/properties/mypropertygroup/original_product_id",
+					"property": "#/properties/mypropertygroup/original_product_id",
 					"required": false,
 				},
 			},
@@ -221,7 +221,7 @@ func TestCustomTypeForExport(t *testing.T) {
 							"description":  "applies when a product part of search results",
 							"properties": []any{
 								map[string]any{
-									"$ref":     "#/properties/mypropertygroup/search_term",
+									"property": "#/properties/mypropertygroup/search_term",
 									"required": true,
 								},
 							},
@@ -232,7 +232,7 @@ func TestCustomTypeForExport(t *testing.T) {
 							"description":  "applies on a product page",
 							"properties": []any{
 								map[string]any{
-									"$ref":     "#/properties/mypropertygroup/page",
+									"property": "#/properties/mypropertygroup/page",
 									"required": false,
 								},
 							},
@@ -240,7 +240,7 @@ func TestCustomTypeForExport(t *testing.T) {
 					},
 					"default": []any{
 						map[string]any{
-							"$ref":     "#/properties/mypropertygroup/page",
+							"property": "#/properties/mypropertygroup/page",
 							"required": true,
 						},
 					},
