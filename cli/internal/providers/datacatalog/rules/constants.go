@@ -10,28 +10,28 @@ import (
 const (
 	customTypeLegacyReferenceTag     = "legacy_custom_type_ref"
 	customTypeReferenceTag           = "custom_type_ref"
-	customTypeLegacyReferenceMessage = "must be a valid custom type reference #/custom-types/<group>/<id>"
-	customTypeReferenceMessage       = "must be a valid custom type reference #custom-types:<id>"
+	customTypeLegacyReferenceMessage = "must be of pattern #/custom-types/<group>/<id>"
+	customTypeReferenceMessage       = "must be of pattern #custom-types:<id>"
 
 	propertyLegacyReferenceTag     = "legacy_property_ref"
 	propertyReferenceTag           = "property_ref"
-	propertyLegacyReferenceMessage = "must be a valid property reference #/properties/<group>/<id>"
-	propertyReferenceMessage       = "must be a valid property reference #properties:<id>"
+	propertyLegacyReferenceMessage = "must be of pattern #/properties/<group>/<id>"
+	propertyReferenceMessage       = "must be of pattern #properties:<id>"
 
 	eventLegacyReferenceTag     = "legacy_event_ref"
 	eventReferenceTag           = "event_ref"
-	eventLegacyReferenceMessage = "must be a valid event reference #/events/<group>/<id>"
-	eventReferenceMessage       = "must be a valid event reference #events:<id>"
+	eventLegacyReferenceMessage = "must be of pattern #/events/<group>/<id>"
+	eventReferenceMessage       = "must be of pattern #events:<id>"
 
 	categoryLegacyReferenceTag     = "legacy_category_ref"
 	categoryReferenceTag           = "category_ref"
-	categoryLegacyReferenceMessage = "must be a valid category reference #/categories/<group>/<id>"
-	categoryReferenceMessage       = "must be a valid category reference #categories:<id>"
+	categoryLegacyReferenceMessage = "must be of pattern #/categories/<group>/<id>"
+	categoryReferenceMessage       = "must be of pattern #categories:<id>"
 
 	trackingPlanLegacyReferenceTag     = "legacy_tracking_plan_ref"
 	trackingPlanReferenceTag           = "tracking_plan_ref"
-	trackingPlanLegacyReferenceMessage = "must be a valid tracking plan reference #/tp/<group>/<id>"
-	trackingPlanReferenceMessage       = "must be a valid tracking plan reference #tracking-plan:<id>"
+	trackingPlanLegacyReferenceMessage = "must be of pattern #/tp/<group>/<id>"
+	trackingPlanReferenceMessage       = "must be of pattern #tracking-plan:<id>"
 )
 
 var (

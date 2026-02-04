@@ -3,7 +3,9 @@ package customtype
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,7 +103,12 @@ func TestCustomTypeSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validateCustomTypeSpec("custom-types", "rudder/v1", map[string]any{}, tt.spec)
+			results := validateCustomTypeSpec(
+				localcatalog.KindCustomTypes,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
 			assert.Empty(t, results, "Valid spec should not produce validation errors")
 		})
 	}
@@ -230,7 +237,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/properties/0/$ref"},
-			expectedMsgs:   []string{"'$ref' is not a valid reference format"},
+			expectedMsgs:   []string{"'$ref' is not valid: must be of pattern #/properties/<group>/<id>"},
 		},
 		{
 			name: "multiple custom types with errors at different indices",
@@ -266,7 +273,12 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validateCustomTypeSpec("custom-types", "rudder/v0.1", map[string]any{}, tt.spec)
+			results := validateCustomTypeSpec(
+				localcatalog.KindCustomTypes,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
 
 			assert.Len(t, results, tt.expectedErrors, "Unexpected number of validation errors")
 
@@ -361,7 +373,7 @@ func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/properties/1/$ref"},
-			expectedMsgs:   []string{"'$ref' is not a valid reference format"},
+			expectedMsgs:   []string{"'$ref' is not valid: must be of pattern #/properties/<group>/<id>"},
 		},
 	}
 
