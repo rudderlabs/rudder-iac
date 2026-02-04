@@ -58,7 +58,7 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 			// Step 2: Validate references in custom type variants
 			errs = append(
 				errs,
-				rv.validateVariantsReferences(
+				rv.validateVariantsReferencesV1(
 					customType.Variants,
 					reference,
 					dc,
@@ -308,6 +308,95 @@ func (rv *RefValidator) validateNestedPropertyRefs(prop *catalog.TPRulePropertyV
 
 // validateVariantsReferencesV1 validates V1 variant references (for custom types)
 func (rv *RefValidator) validateVariantsReferences(
+	variants catalog.VariantsV1,
+	reference string,
+	fetcher catalog.CatalogResourceFetcher,
+	rulePropertyExists func(id string) bool,
+) []ValidationError {
+	errs := make([]ValidationError, 0)
+
+	for idx, variant := range variants {
+		variantReference := fmt.Sprintf("%s/variants[%d]", reference, idx)
+
+		matches := catalog.PropRegex.FindStringSubmatch(variant.Discriminator)
+		if len(matches) != 2 {
+			errs = append(errs, ValidationError{
+				Reference: variantReference,
+				error:     errors.New("discriminator reference has invalid format, should be #property:<id>"),
+			})
+		} else {
+			propID := matches[1]
+			if prop := fetcher.Property(propID); prop != nil {
+				if !strings.HasPrefix(prop.Type, "#custom-type:") {
+					if !strings.Contains(prop.Type, "string") && !strings.Contains(prop.Type, "integer") && !strings.Contains(prop.Type, "boolean") {
+						errs = append(errs, ValidationError{
+							Reference: variantReference,
+							error:     fmt.Errorf("discriminator reference '%s' has invalid type, should be one of 'string', 'integer', 'boolean'", variant.Discriminator),
+						})
+					}
+				}
+			}
+
+			if !rulePropertyExists(propID) {
+				errs = append(errs, ValidationError{
+					Reference: variantReference,
+					error:     fmt.Errorf("discriminator reference '%s' not found in rule properties", variant.Discriminator),
+				})
+			}
+		}
+
+		for idx, variantCase := range variant.Cases {
+			caseReference := fmt.Sprintf("%s/cases[%d]", variantReference, idx)
+
+			for idx, propRef := range variantCase.Properties {
+				propReference := fmt.Sprintf("%s/properties[%d]", caseReference, idx)
+
+				matches := catalog.PropRegex.FindStringSubmatch(propRef.Property)
+				if len(matches) != 2 {
+					errs = append(errs, ValidationError{
+						Reference: propReference,
+						error:     fmt.Errorf("property reference has invalid format. Should be '#property:<id>'"),
+					})
+					continue
+				}
+
+				propID := matches[1]
+				if property := fetcher.Property(propID); property == nil {
+					errs = append(errs, ValidationError{
+						Reference: propReference,
+						error:     fmt.Errorf("property reference '%s' not found in catalog", propRef.Property),
+					})
+				}
+			}
+		}
+
+		for idx, propRef := range variant.Default.Properties {
+			defaultReference := fmt.Sprintf("%s/default/properties[%d]", variantReference, idx)
+
+			matches := catalog.PropRegex.FindStringSubmatch(propRef.Property)
+			if len(matches) != 2 {
+				errs = append(errs, ValidationError{
+					Reference: defaultReference,
+					error:     fmt.Errorf("default property reference has invalid format. Should be '#property:<id>'"),
+				})
+				continue
+			}
+
+			propID := matches[1]
+			if property := fetcher.Property(propID); property == nil {
+				errs = append(errs, ValidationError{
+					Reference: defaultReference,
+					error:     fmt.Errorf("default property reference '%s' not found in catalog", propRef.Property),
+				})
+			}
+		}
+	}
+
+	return errs
+}
+
+// validateVariantsReferencesV1 validates V1 variant references (for custom types)
+func (rv *RefValidator) validateVariantsReferencesV1(
 	variants catalog.VariantsV1,
 	reference string,
 	fetcher catalog.CatalogResourceFetcher,
