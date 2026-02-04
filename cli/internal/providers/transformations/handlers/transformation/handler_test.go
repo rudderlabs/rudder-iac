@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -434,8 +434,8 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 		assert.Equal(t, expectedSpecDir, resource.Tests[1].SpecDir)
 
 		// Verify defaults are applied for first test
-		assert.Equal(t, "./input", resource.Tests[0].Input)
-		assert.Equal(t, "./output", resource.Tests[0].Output)
+		assert.Equal(t, transformation.DefaultInputPath, resource.Tests[0].Input)
+		assert.Equal(t, transformation.DefaultOutputPath, resource.Tests[0].Output)
 
 		// Verify custom values are preserved for second test
 		assert.Equal(t, "./custom-input", resource.Tests[1].Input)
