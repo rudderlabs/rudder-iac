@@ -45,13 +45,6 @@ func namespaceToJSONPointer(namespace string) string {
 func getErrorMessage(err validator.FieldError) string {
 	fieldName := err.Field()
 
-	lock.RLock()
-	defer lock.RUnlock()
-
-	if msg, ok := customTagErrorMessages[err.ActualTag()]; ok {
-		return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
-	}
-
 	switch err.ActualTag() {
 	case "required":
 		return fmt.Sprintf("'%s' is required", fieldName)
