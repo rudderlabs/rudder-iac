@@ -137,7 +137,7 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 			expectedMsgs:   []string{"'enum' must be an array"},
 		},
 		{
-			name: "enum with non-string values",
+			name: "enum with mixed type values is valid",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -145,14 +145,12 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 						Name:    "Status",
 						Type:    "string",
 						Config: map[string]any{
-							"enum": []any{"active", 123, "inactive"},
+							"enum": []any{"active", 123, true, "inactive"},
 						},
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/enum/1"},
-			expectedMsgs:   []string{"'enum[1]' must be a string"},
+			expectedErrors: 0,
 		},
 		{
 			name: "minLength not number",
@@ -262,6 +260,24 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
 		},
 		{
+			name: "enum with multiple duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "status",
+						Name:    "Status",
+						Type:    "string",
+						Config: map[string]any{
+							"enum": []any{"active", "inactive", "active", "pending", "inactive"},
+						},
+					},
+				},
+			},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/types/0/config/enum/2", "/types/0/config/enum/4"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value", "'enum[4]' is a duplicate value"},
+		},
+		{
 			name: "unknown config key",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
@@ -353,7 +369,7 @@ func TestCustomTypeConfigValidRule_NumberType(t *testing.T) {
 			expectedMsgs:   []string{"'enum' must be an array"},
 		},
 		{
-			name: "enum with non-number values",
+			name: "enum with mixed type values is valid",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -361,14 +377,12 @@ func TestCustomTypeConfigValidRule_NumberType(t *testing.T) {
 						Name:    "Rating",
 						Type:    "number",
 						Config: map[string]any{
-							"enum": []any{1.0, "two", 3.0},
+							"enum": []any{1.0, "two", true, 3.0},
 						},
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/enum/1"},
-			expectedMsgs:   []string{"'enum[1]' must be a number"},
+			expectedErrors: 0,
 		},
 		{
 			name: "minimum not number",
@@ -405,6 +419,24 @@ func TestCustomTypeConfigValidRule_NumberType(t *testing.T) {
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/config/enum/2"},
 			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
+		},
+		{
+			name: "enum with multiple duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "rating",
+						Name:    "Rating",
+						Type:    "number",
+						Config: map[string]any{
+							"enum": []any{1.0, 2.5, 1.0, 3.5, 2.5},
+						},
+					},
+				},
+			},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/types/0/config/enum/2", "/types/0/config/enum/4"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value", "'enum[4]' is a duplicate value"},
 		},
 		{
 			name: "unknown config key",
@@ -496,7 +528,7 @@ func TestCustomTypeConfigValidRule_IntegerType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "enum with float values",
+			name: "enum with mixed type values is valid",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -504,14 +536,12 @@ func TestCustomTypeConfigValidRule_IntegerType(t *testing.T) {
 						Name:    "Age",
 						Type:    "integer",
 						Config: map[string]any{
-							"enum": []any{18, 21.5, 30},
+							"enum": []any{18, 21.5, "thirty", true},
 						},
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/enum/1"},
-			expectedMsgs:   []string{"'enum[1]' must be a integer"},
+			expectedErrors: 0,
 		},
 		{
 			name: "minimum not integer",
