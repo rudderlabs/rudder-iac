@@ -80,6 +80,6 @@ func GetPatternValidator() rules.CustomValidateFunc {
 
 func init() {
 	// Register the pattern validator as a default validator
+	// so that the callers downstream can register their own patterns
 	rules.RegisterDefaultValidator(GetPatternValidator())
-	NewPattern(LegacyReferenceTag, LegacyReferenceRegex, "must be a valid reference")
 }
