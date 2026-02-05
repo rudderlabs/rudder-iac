@@ -2,6 +2,7 @@ package customtype
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -26,18 +27,22 @@ var (
 		"string", "number", "integer", "boolean", "null", "array", "object",
 	}
 
-	// Allowed config keys per type
+	// Allowed config keys per type (v0 structure - camelCased)
 	allowedStringConfigKeys = map[string]bool{
-		"enum": true, "min_length": true, "max_length": true, "pattern": true, "format": true,
+		"enum": true, "minLength": true, "maxLength": true, "pattern": true, "format": true,
 	}
 
 	allowedNumberConfigKeys = map[string]bool{
 		"enum": true, "minimum": true, "maximum": true,
-		"exclusive_minimum": true, "exclusive_maximum": true, "multiple_of": true,
+		"exclusiveMinimum": true, "exclusiveMaximum": true, "multipleOf": true,
 	}
 
 	allowedArrayConfigKeys = map[string]bool{
-		"item_types": true, "minItems": true, "maxItems": true, "uniqueItems": true,
+		"itemTypes": true, "minItems": true, "maxItems": true, "uniqueItems": true,
+	}
+
+	allowedBooleanConfigKeys = map[string]bool{
+		"enum": true,
 	}
 
 	// Legacy custom type reference pattern
@@ -65,7 +70,7 @@ var configExamples = rules.Examples{
     name: Tags
     type: array
     config:
-      item_types: ["string"]
+      itemTypes: ["string"]
       minItems: 1`,
 	},
 	Invalid: []string{
@@ -108,15 +113,16 @@ var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[st
 		switch customType.Type {
 		case "object":
 			results = append(results, validateObjectConfig(customType, i)...)
+		case "null":
+			results = append(results, validateNullConfig(customType, i)...)
 		case "string":
 			results = append(results, validateStringConfig(customType.Config, i)...)
 		case "number", "integer":
 			results = append(results, validateNumberConfig(customType.Config, i, customType.Type)...)
 		case "array":
 			results = append(results, validateArrayConfig(customType.Config, i)...)
-		case "boolean", "null":
-			// No validation required for boolean/null types
-			continue
+		case "boolean":
+			results = append(results, validateBooleanConfig(customType.Config, i)...)
 		default:
 			// Unknown type - skip validation
 			continue
@@ -151,6 +157,55 @@ func validateObjectConfig(customType localcatalog.CustomType, typeIndex int) []r
 	return nil
 }
 
+// validateNullConfig validates that null types don't have config
+func validateNullConfig(customType localcatalog.CustomType, typeIndex int) []rules.ValidationResult {
+	if len(customType.Config) > 0 {
+		return []rules.ValidationResult{
+			{
+				Reference: fmt.Sprintf("/types/%d/config", typeIndex),
+				Message:   "'config' is not allowed for custom type of type 'null'",
+			},
+		}
+	}
+	return nil
+}
+
+// validateBooleanConfig validates config for boolean type (only enum allowed)
+func validateBooleanConfig(config map[string]any, typeIndex int) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	// Check for unknown config keys (only enum is allowed)
+	for key := range config {
+		if !allowedBooleanConfigKeys[key] {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/types/%d/config/%s", typeIndex, key),
+				Message:   fmt.Sprintf("'%s' is not a valid config key for type 'boolean', only 'enum' is allowed", key),
+			})
+		}
+	}
+
+	// Validate enum
+	if enum, ok := config["enum"]; ok {
+		enumArray, ok := enum.([]any)
+		if !ok {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/types/%d/config/enum", typeIndex),
+				Message:   "'enum' must be an array",
+			})
+		} else {
+			// Check for duplicate values
+			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
+					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
+				})
+			}
+		}
+	}
+
+	return results
+}
+
 // validateStringConfig validates config for string type
 func validateStringConfig(config map[string]any, typeIndex int) []rules.ValidationResult {
 	var results []rules.ValidationResult
@@ -165,7 +220,7 @@ func validateStringConfig(config map[string]any, typeIndex int) []rules.Validati
 		}
 	}
 
-	// Validate enum - must be array of strings
+	// Validate enum - must be array of strings with unique values
 	if enum, ok := config["enum"]; ok {
 		enumArray, ok := enum.([]any)
 		if !ok {
@@ -183,25 +238,33 @@ func validateStringConfig(config map[string]any, typeIndex int) []rules.Validati
 					})
 				}
 			}
+
+			// Check for duplicate values
+			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
+					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
+				})
+			}
 		}
 	}
 
-	// Validate min_length
-	if minLength, ok := config["min_length"]; ok {
+	// Validate minLength
+	if minLength, ok := config["minLength"]; ok {
 		if !isInteger(minLength) {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/types/%d/config/min_length", typeIndex),
-				Message:   "'min_length' must be a number",
+				Reference: fmt.Sprintf("/types/%d/config/minLength", typeIndex),
+				Message:   "'minLength' must be a number",
 			})
 		}
 	}
 
-	// Validate max_length
-	if maxLength, ok := config["max_length"]; ok {
+	// Validate maxLength
+	if maxLength, ok := config["maxLength"]; ok {
 		if !isInteger(maxLength) {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/types/%d/config/max_length", typeIndex),
-				Message:   "'max_length' must be a number",
+				Reference: fmt.Sprintf("/types/%d/config/maxLength", typeIndex),
+				Message:   "'maxLength' must be a number",
 			})
 		}
 	}
@@ -272,11 +335,19 @@ func validateNumberConfig(config map[string]any, typeIndex int, typeName string)
 					})
 				}
 			}
+
+			// Check for duplicate values
+			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
+					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
+				})
+			}
 		}
 	}
 
 	// Validate numeric fields
-	numericFields := []string{"minimum", "maximum", "exclusive_minimum", "exclusive_maximum", "multiple_of"}
+	numericFields := []string{"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
 	for _, field := range numericFields {
 		if val, ok := config[field]; ok {
 			if !typeCheck(val) {
@@ -305,21 +376,21 @@ func validateArrayConfig(config map[string]any, typeIndex int) []rules.Validatio
 		}
 	}
 
-	// Validate item_types
-	if itemTypes, ok := config["item_types"]; ok {
+	// Validate itemTypes
+	if itemTypes, ok := config["itemTypes"]; ok {
 		itemTypesArray, ok := itemTypes.([]any)
 		if !ok {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/types/%d/config/item_types", typeIndex),
-				Message:   "'item_types' must be an array",
+				Reference: fmt.Sprintf("/types/%d/config/itemTypes", typeIndex),
+				Message:   "'itemTypes' must be an array",
 			})
 		} else {
 			for idx, itemType := range itemTypesArray {
 				val, ok := itemType.(string)
 				if !ok {
 					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/types/%d/config/item_types/%d", typeIndex, idx),
-						Message:   fmt.Sprintf("'item_types[%d]' must be a string value", idx),
+						Reference: fmt.Sprintf("/types/%d/config/itemTypes/%d", typeIndex, idx),
+						Message:   fmt.Sprintf("'itemTypes[%d]' must be a string value", idx),
 					})
 					continue
 				}
@@ -329,8 +400,8 @@ func validateArrayConfig(config map[string]any, typeIndex int) []rules.Validatio
 					// Custom type reference must be the only item
 					if len(itemTypesArray) != 1 {
 						results = append(results, rules.ValidationResult{
-							Reference: fmt.Sprintf("/types/%d/config/item_types/%d", typeIndex, idx),
-							Message:   "'item_types' containing custom type reference cannot be paired with other types",
+							Reference: fmt.Sprintf("/types/%d/config/itemTypes/%d", typeIndex, idx),
+							Message:   "'itemTypes' containing custom type reference cannot be paired with other types",
 						})
 					}
 					continue
@@ -339,8 +410,8 @@ func validateArrayConfig(config map[string]any, typeIndex int) []rules.Validatio
 				// Must be a valid primitive type
 				if !slices.Contains(validPrimitiveTypes, val) {
 					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/types/%d/config/item_types/%d", typeIndex, idx),
-						Message:   fmt.Sprintf("'item_types[%d]' is invalid, valid type values are: %s", idx, strings.Join(validPrimitiveTypes, ", ")),
+						Reference: fmt.Sprintf("/types/%d/config/itemTypes/%d", typeIndex, idx),
+						Message:   fmt.Sprintf("'itemTypes[%d]' is invalid, valid type values are: %s", idx, strings.Join(validPrimitiveTypes, ", ")),
 					})
 				}
 			}
@@ -406,4 +477,45 @@ func isInteger(val any) bool {
 		return float64(int64(v)) == v
 	}
 	return false
+}
+
+// findDuplicateIndex checks for duplicate values in an array using reflection
+// Returns the index of the first duplicate found, or -1 if no duplicates
+func findDuplicateIndex(arr []any) int {
+	seen := make(map[any]int)
+
+	for i, val := range arr {
+		// Use reflection to get a comparable key
+		key := getComparableKey(val)
+
+		if _, exists := seen[key]; exists {
+			// Return the index of the duplicate (the later occurrence)
+			return i
+		}
+		seen[key] = i
+	}
+
+	return -1
+}
+
+// getComparableKey converts a value to a comparable key for duplicate detection
+func getComparableKey(val any) any {
+	// Use reflection to handle different types
+	v := reflect.ValueOf(val)
+
+	switch v.Kind() {
+	case reflect.String:
+		return val.(string)
+	case reflect.Bool:
+		return val.(bool)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v.Uint()
+	case reflect.Float32, reflect.Float64:
+		return v.Float()
+	default:
+		// For complex types, use the value itself as string representation
+		return fmt.Sprintf("%v", val)
+	}
 }
