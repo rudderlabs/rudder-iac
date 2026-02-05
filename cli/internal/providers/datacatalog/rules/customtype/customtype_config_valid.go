@@ -194,7 +194,8 @@ func validateBooleanConfig(config map[string]any, typeIndex int) []rules.Validat
 			})
 		} else {
 			// Check for duplicate values
-			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+			duplicateIndices := findDuplicateIndices(enumArray)
+			for _, duplicateIdx := range duplicateIndices {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
 					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
@@ -220,7 +221,7 @@ func validateStringConfig(config map[string]any, typeIndex int) []rules.Validati
 		}
 	}
 
-	// Validate enum - must be array of strings with unique values
+	// Validate enum - must be array with unique values
 	if enum, ok := config["enum"]; ok {
 		enumArray, ok := enum.([]any)
 		if !ok {
@@ -229,18 +230,9 @@ func validateStringConfig(config map[string]any, typeIndex int) []rules.Validati
 				Message:   "'enum' must be an array",
 			})
 		} else {
-			// Check each enum value is a string
-			for i, val := range enumArray {
-				if _, ok := val.(string); !ok {
-					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, i),
-						Message:   fmt.Sprintf("'enum[%d]' must be a string", i),
-					})
-				}
-			}
-
 			// Check for duplicate values
-			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+			duplicateIndices := findDuplicateIndices(enumArray)
+			for _, duplicateIdx := range duplicateIndices {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
 					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
@@ -318,7 +310,7 @@ func validateNumberConfig(config map[string]any, typeIndex int, typeName string)
 		}
 	}
 
-	// Validate enum
+	// Validate enum - must be array with unique values
 	if enum, ok := config["enum"]; ok {
 		enumArray, ok := enum.([]any)
 		if !ok {
@@ -327,17 +319,9 @@ func validateNumberConfig(config map[string]any, typeIndex int, typeName string)
 				Message:   "'enum' must be an array",
 			})
 		} else {
-			for i, val := range enumArray {
-				if !typeCheck(val) {
-					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, i),
-						Message:   fmt.Sprintf("'enum[%d]' must be a %s", i, typeName),
-					})
-				}
-			}
-
 			// Check for duplicate values
-			if duplicateIdx := findDuplicateIndex(enumArray); duplicateIdx != -1 {
+			duplicateIndices := findDuplicateIndices(enumArray)
+			for _, duplicateIdx := range duplicateIndices {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/types/%d/config/enum/%d", typeIndex, duplicateIdx),
 					Message:   fmt.Sprintf("'enum[%d]' is a duplicate value", duplicateIdx),
@@ -479,23 +463,25 @@ func isInteger(val any) bool {
 	return false
 }
 
-// findDuplicateIndex checks for duplicate values in an array using reflection
-// Returns the index of the first duplicate found, or -1 if no duplicates
-func findDuplicateIndex(arr []any) int {
+// findDuplicateIndices checks for duplicate values in an array using reflection
+// Returns the indices of all duplicate values (later occurrences)
+func findDuplicateIndices(arr []any) []int {
 	seen := make(map[any]int)
+	duplicates := []int{}
 
 	for i, val := range arr {
 		// Use reflection to get a comparable key
 		key := getComparableKey(val)
 
 		if _, exists := seen[key]; exists {
-			// Return the index of the duplicate (the later occurrence)
-			return i
+			// Record the index of the duplicate (the later occurrence)
+			duplicates = append(duplicates, i)
+		} else {
+			seen[key] = i
 		}
-		seen[key] = i
 	}
 
-	return -1
+	return duplicates
 }
 
 // getComparableKey converts a value to a comparable key for duplicate detection
