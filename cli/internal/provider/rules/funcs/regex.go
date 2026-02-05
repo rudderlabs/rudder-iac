@@ -77,9 +77,3 @@ func GetPatternValidator() rules.CustomValidateFunc {
 		Func: fn,
 	}
 }
-
-func init() {
-	// Register the pattern validator as a default validator
-	// so that the callers downstream can register their own patterns
-	rules.RegisterDefaultValidator(GetPatternValidator())
-}
