@@ -108,8 +108,8 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 						Type:    "string",
 						Config: map[string]any{
 							"enum":       []any{"active", "inactive"},
-							"min_length": 3,
-							"max_length": 20,
+							"minLength": 3,
+							"maxLength": 20,
 							"pattern":    "^[a-z]+$",
 							"format":     "email",
 						},
@@ -155,7 +155,7 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 			expectedMsgs:   []string{"'enum[1]' must be a string"},
 		},
 		{
-			name: "min_length not number",
+			name: "minLength not number",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -163,17 +163,17 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 						Name:    "Status",
 						Type:    "string",
 						Config: map[string]any{
-							"min_length": "three",
+							"minLength": "three",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/min_length"},
-			expectedMsgs:   []string{"'min_length' must be a number"},
+			expectedRefs:   []string{"/types/0/config/minLength"},
+			expectedMsgs:   []string{"'minLength' must be a number"},
 		},
 		{
-			name: "max_length not number",
+			name: "maxLength not number",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -181,14 +181,14 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 						Name:    "Status",
 						Type:    "string",
 						Config: map[string]any{
-							"max_length": "ten",
+							"maxLength": "ten",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/max_length"},
-			expectedMsgs:   []string{"'max_length' must be a number"},
+			expectedRefs:   []string{"/types/0/config/maxLength"},
+			expectedMsgs:   []string{"'maxLength' must be a number"},
 		},
 		{
 			name: "pattern not string",
@@ -242,6 +242,24 @@ func TestCustomTypeConfigValidRule_StringType(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/config/format"},
+		},
+		{
+			name: "enum with duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "status",
+						Name:    "Status",
+						Type:    "string",
+						Config: map[string]any{
+							"enum": []any{"active", "inactive", "active"},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/enum/2"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
 		},
 		{
 			name: "unknown config key",
@@ -307,9 +325,9 @@ func TestCustomTypeConfigValidRule_NumberType(t *testing.T) {
 							"enum":               []any{1.0, 2.5, 3.5, 4.0, 5.0},
 							"minimum":            0.0,
 							"maximum":            5.0,
-							"exclusive_minimum":  0.0,
-							"exclusive_maximum":  5.0,
-							"multiple_of":        0.5,
+							"exclusiveMinimum":  0.0,
+							"exclusiveMaximum":  5.0,
+							"multipleOf":        0.5,
 						},
 					},
 				},
@@ -369,6 +387,24 @@ func TestCustomTypeConfigValidRule_NumberType(t *testing.T) {
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/config/minimum"},
 			expectedMsgs:   []string{"'minimum' must be a number"},
+		},
+		{
+			name: "enum with duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "rating",
+						Name:    "Rating",
+						Type:    "number",
+						Config: map[string]any{
+							"enum": []any{1.0, 2.5, 1.0},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/enum/2"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
 		},
 		{
 			name: "unknown config key",
@@ -434,7 +470,7 @@ func TestCustomTypeConfigValidRule_IntegerType(t *testing.T) {
 							"enum":        []any{18, 21, 30, 40},
 							"minimum":     0,
 							"maximum":     120,
-							"multiple_of": 1,
+							"multipleOf": 1,
 						},
 					},
 				},
@@ -495,6 +531,24 @@ func TestCustomTypeConfigValidRule_IntegerType(t *testing.T) {
 			expectedRefs:   []string{"/types/0/config/minimum"},
 			expectedMsgs:   []string{"'minimum' must be a integer"},
 		},
+		{
+			name: "enum with duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "age",
+						Name:    "Age",
+						Type:    "integer",
+						Config: map[string]any{
+							"enum": []any{18, 21, 18},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/enum/2"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -539,7 +593,7 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types":  []any{"string"},
+							"itemTypes":  []any{"string"},
 							"minItems":    1,
 							"maxItems":    10,
 							"uniqueItems": true,
@@ -558,7 +612,7 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Addresses",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": []any{"#/custom-types/user-data/address"},
+							"itemTypes": []any{"#/custom-types/user-data/address"},
 						},
 					},
 				},
@@ -566,7 +620,7 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "item_types not array",
+			name: "itemTypes not array",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -574,17 +628,17 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": "string",
+							"itemTypes": "string",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types"},
-			expectedMsgs:   []string{"'item_types' must be an array"},
+			expectedRefs:   []string{"/types/0/config/itemTypes"},
+			expectedMsgs:   []string{"'itemTypes' must be an array"},
 		},
 		{
-			name: "item_types element not string",
+			name: "itemTypes element not string",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -592,14 +646,14 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": []any{123},
+							"itemTypes": []any{123},
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
-			expectedMsgs:   []string{"'item_types[0]' must be a string value"},
+			expectedRefs:   []string{"/types/0/config/itemTypes/0"},
+			expectedMsgs:   []string{"'itemTypes[0]' must be a string value"},
 		},
 		{
 			name: "custom type paired with other types",
@@ -610,14 +664,14 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Mixed",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": []any{"#/custom-types/user-data/address", "string"},
+							"itemTypes": []any{"#/custom-types/user-data/address", "string"},
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
-			expectedMsgs:   []string{"'item_types' containing custom type reference cannot be paired with other types"},
+			expectedRefs:   []string{"/types/0/config/itemTypes/0"},
+			expectedMsgs:   []string{"'itemTypes' containing custom type reference cannot be paired with other types"},
 		},
 		{
 			name: "invalid primitive type",
@@ -628,13 +682,13 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": []any{"invalid-type"},
+							"itemTypes": []any{"invalid-type"},
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
+			expectedRefs:   []string{"/types/0/config/itemTypes/0"},
 		},
 		{
 			name: "minItems not number",
@@ -732,16 +786,18 @@ func TestCustomTypeConfigValidRule_ArrayType(t *testing.T) {
 	}
 }
 
-func TestCustomTypeConfigValidRule_BooleanNullTypes(t *testing.T) {
+func TestCustomTypeConfigValidRule_BooleanType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
 		spec           localcatalog.CustomTypeSpec
 		expectedErrors int
+		expectedRefs   []string
+		expectedMsgs   []string
 	}{
 		{
-			name: "boolean type with config is valid",
+			name: "valid boolean config with enum",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -749,7 +805,7 @@ func TestCustomTypeConfigValidRule_BooleanNullTypes(t *testing.T) {
 						Name:    "Flag",
 						Type:    "boolean",
 						Config: map[string]any{
-							"any_key": "any_value",
+							"enum": []any{true, false},
 						},
 					},
 				},
@@ -757,20 +813,58 @@ func TestCustomTypeConfigValidRule_BooleanNullTypes(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "null type with config is valid",
+			name: "boolean type with non-enum config key",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
-						LocalID: "empty",
-						Name:    "Empty",
-						Type:    "null",
+						LocalID: "flag",
+						Name:    "Flag",
+						Type:    "boolean",
 						Config: map[string]any{
-							"any_key": "any_value",
+							"pattern": "value",
 						},
 					},
 				},
 			},
-			expectedErrors: 0,
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/pattern"},
+			expectedMsgs:   []string{"'pattern' is not a valid config key for type 'boolean', only 'enum' is allowed"},
+		},
+		{
+			name: "boolean enum with duplicate values",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "flag",
+						Name:    "Flag",
+						Type:    "boolean",
+						Config: map[string]any{
+							"enum": []any{true, false, true},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/enum/2"},
+			expectedMsgs:   []string{"'enum[2]' is a duplicate value"},
+		},
+		{
+			name: "boolean enum not array",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "flag",
+						Name:    "Flag",
+						Type:    "boolean",
+						Config: map[string]any{
+							"enum": true,
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/enum"},
+			expectedMsgs:   []string{"'enum' must be an array"},
 		},
 	}
 
@@ -784,6 +878,79 @@ func TestCustomTypeConfigValidRule_BooleanNullTypes(t *testing.T) {
 			)
 
 			assert.Len(t, results, tt.expectedErrors)
+
+			if tt.expectedErrors > 0 {
+				actualRefs := extractRefs(results)
+				actualMsgs := extractMsgs(results)
+				assert.ElementsMatch(t, tt.expectedRefs, actualRefs)
+				if len(tt.expectedMsgs) > 0 {
+					assert.ElementsMatch(t, tt.expectedMsgs, actualMsgs)
+				}
+			}
+		})
+	}
+}
+
+func TestCustomTypeConfigValidRule_NullType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		spec           localcatalog.CustomTypeSpec
+		expectedErrors int
+		expectedRefs   []string
+		expectedMsgs   []string
+	}{
+		{
+			name: "null type with no config is valid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "empty",
+						Name:    "Empty",
+						Type:    "null",
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "null type with config is invalid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "empty",
+						Name:    "Empty",
+						Type:    "null",
+						Config: map[string]any{
+							"any_key": "any_value",
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config"},
+			expectedMsgs:   []string{"'config' is not allowed for custom type of type 'null'"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := validateCustomTypeConfig(
+				localcatalog.KindCustomTypes,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
+
+			assert.Len(t, results, tt.expectedErrors)
+
+			if tt.expectedErrors > 0 {
+				actualRefs := extractRefs(results)
+				actualMsgs := extractMsgs(results)
+				assert.ElementsMatch(t, tt.expectedRefs, actualRefs)
+				assert.ElementsMatch(t, tt.expectedMsgs, actualMsgs)
+			}
 		})
 	}
 }
