@@ -18,7 +18,7 @@ func strictUnmarshal(data []byte, v any) error {
 
 type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
-	Name        string                 `mapstructure:"name" json:"name" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
 	Description string                 `mapstructure:"description,omitempty" json:"description" validate:"omitempty,gte=3,lte=2000"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type" validate:"omitempty,primitive_or_reference"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`

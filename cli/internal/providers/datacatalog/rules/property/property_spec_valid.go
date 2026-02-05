@@ -26,6 +26,16 @@ var examples = rules.Examples{
   - id: user_id
     # Missing required name field
     type: string`,
+		`properties:
+  - id: user_id
+    name: ""
+    # Name cannot be empty
+    type: string`,
+		`properties:
+  - id: user_id
+    name: This is a very long name that exceeds the maximum allowed length of sixty five characters for a property name
+    # Name exceeds 65 characters
+    type: string`,
 	},
 }
 
