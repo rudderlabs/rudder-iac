@@ -13,6 +13,8 @@ import (
 // arrayIndexRegex matches array indices like [0], [1], etc.
 var arrayIndexRegex = regexp.MustCompile(`\[(\d+)\]`)
 
+// ParseValidationErrors is a helper function which converts the validation errors from
+// the struct validator to the validation results
 func ParseValidationErrors(errs validator.ValidationErrors) []rules.ValidationResult {
 	results := []rules.ValidationResult{}
 

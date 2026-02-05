@@ -129,7 +129,7 @@ func ExtractCategories(s *specs.Spec) ([]CategoryV1, error) {
 type CustomType struct {
 	LocalID     string               `mapstructure:"id" json:"id" validate:"required"`
 	Name        string               `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern=custom_type_name"`
-	Description string               `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
+	Description string               `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
 	Type        string               `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
 	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
