@@ -44,7 +44,8 @@ func (r *patternRegistry) Get(name string) (*regexp.Regexp, string, bool) {
 	return pattern, r.errors[name], true
 }
 
-// GetPatternErrorMessage retrieves the custom error message for a registered pattern
+// getPatternErrorMessage retrieves the custom error message for a registered pattern
+// from the registry and returns if the pattern is registered.
 func getPatternErrorMessage(patternName string) (string, bool) {
 	_, msg, ok := registry.Get(patternName)
 	return msg, ok
@@ -79,6 +80,6 @@ func GetPatternValidator() rules.CustomValidateFunc {
 
 func init() {
 	// Register the pattern validator as a default validator
+	// so that the callers downstream can register their own patterns
 	rules.RegisterDefaultValidator(GetPatternValidator())
-	NewPattern(LegacyReferenceTag, LegacyReferenceRegex, "must be a valid reference")
 }

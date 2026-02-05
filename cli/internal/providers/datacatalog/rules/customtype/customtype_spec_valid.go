@@ -11,6 +11,10 @@ const (
 	customTypeNameRegexPattern = "^[A-Z][A-Za-z0-9_-]*$"
 	customTypeNameRegexTag     = "custom_type_name"
 	customTypeNameErrorMessage = "must start with uppercase and contain only alphanumeric, underscores, or hyphens"
+
+	customTypeTypeRegexPattern = "^(string|number|integer|boolean|array|object|null)$"
+	customTypeTypeRegexTag     = "primitive_type"
+	customTypeTypeErrorMessage = "must be one of the following: string, number, integer, boolean, array, object, null"
 )
 
 func init() {
@@ -19,6 +23,13 @@ func init() {
 		customTypeNameRegexTag,
 		customTypeNameRegexPattern,
 		customTypeNameErrorMessage,
+	)
+
+	// Register the custom type type pattern for use with validate:"pattern=primitive_type"
+	funcs.NewPattern(
+		customTypeTypeRegexTag,
+		customTypeTypeRegexPattern,
+		customTypeTypeErrorMessage,
 	)
 }
 
@@ -83,22 +94,5 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 // getValidateFuncs returns custom validate functions which the custom type spec employs
 // by adding requisite tags to fields in the spec struct
 func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	// TODO: we would need to create a different regex for reference validation
-	// based on the version of spec.
-	return []rules.CustomValidateFunc{
-		// primitive validation on the type field
-		funcs.NewPrimitive([]string{
-			"string",
-			"number",
-			"integer",
-			"boolean",
-			"array",
-			"object",
-			"null",
-		}),
-		// reference validation for the $ref field in properties
-		funcs.NewLegacyReferenceValidateFunc([]string{"properties"}),
-		// Note: Pattern validation is now handled by the global "pattern" validator
-		// registered via init(). Use validate:"pattern:pattern_custom_type_name" in struct tags.
-	}
+	return []rules.CustomValidateFunc{}
 }

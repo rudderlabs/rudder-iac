@@ -201,7 +201,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/type"},
-			expectedMsgs:   []string{"'type' must be a valid primitive type (string, number, integer, boolean, null, array, or object)"},
+			expectedMsgs:   []string{"'type' is not valid: must be one of the following: string, number, integer, boolean, array, object, null"},
 		},
 		{
 			name: "custom type with property missing $ref",
@@ -379,7 +379,12 @@ func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validateCustomTypeSpec("custom-types", "rudder/v1", map[string]any{}, tt.spec)
+			results := validateCustomTypeSpec(
+				localcatalog.KindCustomTypes,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
 
 			assert.Len(t, results, tt.expectedErrors, "Unexpected number of validation errors")
 

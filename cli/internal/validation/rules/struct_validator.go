@@ -47,7 +47,7 @@ type CustomValidateFunc struct {
 var defaultValidators []CustomValidateFunc
 
 // RegisterDefaultValidator adds a validator to the list of default validators
-// that are automatically registered in ValidateStruct
+// that are automatically registered in ValidateStruct every time.
 func RegisterDefaultValidator(fn CustomValidateFunc) {
 	defaultValidators = append(defaultValidators, fn)
 }
