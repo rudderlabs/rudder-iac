@@ -336,6 +336,7 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
 		customtypeRules.NewCustomTypeSpecSyntaxValidRule(),
+		customtypeRules.NewCustomTypeConfigValidRule(),
 	}
 
 	return syntactic
