@@ -205,14 +205,23 @@ func TestNumberValidator(t *testing.T) {
 		assert.True(t, validator.ConfigAllowed())
 	})
 
-	t.Run("valid fields accept decimals", func(t *testing.T) {
+	t.Run("valid fields", func(t *testing.T) {
 		testCases := []struct {
 			name      string
 			fieldname string
 			fieldval  any
 		}{
+			{"enum with numbers", "enum", []any{1, 2, 3}},
+			{"enum with decimals", "enum", []any{1.5, 2.5, 3.5}},
+			{"minimum integer", "minimum", 0},
 			{"minimum decimal", "minimum", 0.5},
+			{"maximum integer", "maximum", 100},
 			{"maximum decimal", "maximum", 99.9},
+			{"exclusiveMinimum integer", "exclusiveMinimum", 0},
+			{"exclusiveMinimum decimal", "exclusiveMinimum", 0.5},
+			{"exclusiveMaximum integer", "exclusiveMaximum", 100},
+			{"exclusiveMaximum decimal", "exclusiveMaximum", 99.9},
+			{"multipleOf integer", "multipleOf", 5},
 			{"multipleOf decimal", "multipleOf", 0.1},
 		}
 
@@ -225,12 +234,134 @@ func TestNumberValidator(t *testing.T) {
 		}
 	})
 
-	t.Run("enum with duplicate numbers", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", []any{1.5, 2.5, 1.5})
-		assert.NoError(t, err)
-		require.Len(t, results, 1)
-		assert.Equal(t, "enum/2", results[0].Reference)
-		assert.Contains(t, results[0].Message, "1.5")
+	t.Run("invalid field names", func(t *testing.T) {
+		results, err := validator.ValidateField("minLength", 10)
+		assert.ErrorIs(t, err, ErrFieldNotSupported)
+		assert.Nil(t, results)
+	})
+
+	t.Run("invalid field values", func(t *testing.T) {
+		testCases := []struct {
+			name            string
+			fieldname       string
+			fieldval        any
+			expectedMessage string
+		}{
+			{"enum not array", "enum", "not-array", "'enum' must be an array"},
+			{"minimum not number", "minimum", "five", "'minimum' must be a number"},
+			{"maximum not number", "maximum", "hundred", "'maximum' must be a number"},
+			{"exclusiveMinimum not number", "exclusiveMinimum", "zero", "'exclusiveMinimum' must be a number"},
+			{"exclusiveMaximum not number", "exclusiveMaximum", true, "'exclusiveMaximum' must be a number"},
+			{"multipleOf not number", "multipleOf", "five", "'multipleOf' must be a number"},
+			{"multipleOf zero", "multipleOf", 0, "'multipleOf' must be > 0"},
+			{"multipleOf negative", "multipleOf", -5, "'multipleOf' must be > 0"},
+			{"multipleOf negative decimal", "multipleOf", -0.5, "'multipleOf' must be > 0"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				results, err := validator.ValidateField(tc.fieldname, tc.fieldval)
+				assert.NoError(t, err)
+				require.Len(t, results, 1)
+				assert.Contains(t, results[0].Message, tc.expectedMessage)
+			})
+		}
+	})
+
+	t.Run("enum with duplicates", func(t *testing.T) {
+		t.Run("single duplicate", func(t *testing.T) {
+			results, err := validator.ValidateField("enum", []any{1.5, 2.5, 1.5})
+			assert.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.Equal(t, "enum/2", results[0].Reference)
+			assert.Contains(t, results[0].Message, "1.5")
+		})
+
+		t.Run("multiple duplicates", func(t *testing.T) {
+			results, err := validator.ValidateField("enum", []any{1, 2, 1, 3, 2})
+			assert.NoError(t, err)
+			require.Len(t, results, 2)
+			assert.Contains(t, results[0].Message, "is a duplicate value")
+			assert.Contains(t, results[1].Message, "is a duplicate value")
+		})
+	})
+
+	t.Run("cross-field validation", func(t *testing.T) {
+		t.Run("valid: minimum <= maximum", func(t *testing.T) {
+			config := map[string]any{"minimum": 0, "maximum": 100}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("valid: minimum == maximum", func(t *testing.T) {
+			config := map[string]any{"minimum": 50, "maximum": 50}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("valid: minimum <= maximum with decimals", func(t *testing.T) {
+			config := map[string]any{"minimum": 0.5, "maximum": 99.9}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("invalid: minimum > maximum", func(t *testing.T) {
+			config := map[string]any{"minimum": 100, "maximum": 0}
+			results := validator.ValidateCrossFields(config)
+			require.Len(t, results, 1)
+			assert.Equal(t, "minimum cannot be greater than maximum", results[0].Message)
+		})
+
+		t.Run("invalid: minimum > maximum with decimals", func(t *testing.T) {
+			config := map[string]any{"minimum": 99.9, "maximum": 0.5}
+			results := validator.ValidateCrossFields(config)
+			require.Len(t, results, 1)
+			assert.Equal(t, "minimum cannot be greater than maximum", results[0].Message)
+		})
+
+		t.Run("valid: exclusiveMinimum < exclusiveMaximum", func(t *testing.T) {
+			config := map[string]any{"exclusiveMinimum": 0, "exclusiveMaximum": 100}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("valid: exclusiveMinimum < exclusiveMaximum with decimals", func(t *testing.T) {
+			config := map[string]any{"exclusiveMinimum": 0.5, "exclusiveMaximum": 99.9}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("invalid: exclusiveMinimum == exclusiveMaximum", func(t *testing.T) {
+			config := map[string]any{"exclusiveMinimum": 50, "exclusiveMaximum": 50}
+			results := validator.ValidateCrossFields(config)
+			require.Len(t, results, 1)
+			assert.Equal(t, "exclusiveMinimum must be less than exclusiveMaximum", results[0].Message)
+		})
+
+		t.Run("invalid: exclusiveMinimum > exclusiveMaximum", func(t *testing.T) {
+			config := map[string]any{"exclusiveMinimum": 100, "exclusiveMaximum": 0}
+			results := validator.ValidateCrossFields(config)
+			require.Len(t, results, 1)
+			assert.Equal(t, "exclusiveMinimum must be less than exclusiveMaximum", results[0].Message)
+		})
+
+		t.Run("skips validation if values are invalid", func(t *testing.T) {
+			config := map[string]any{"minimum": "invalid", "maximum": 100}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("skips validation if exclusive values are invalid", func(t *testing.T) {
+			config := map[string]any{"exclusiveMinimum": "invalid", "exclusiveMaximum": 100}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
+
+		t.Run("validates only fields present", func(t *testing.T) {
+			config := map[string]any{"minimum": 50}
+			results := validator.ValidateCrossFields(config)
+			assert.Empty(t, results)
+		})
 	})
 }
 
