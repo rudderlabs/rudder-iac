@@ -92,25 +92,21 @@ type TestDefinition struct {
 	ExpectedOutput []any  `json:"expectedOutput,omitempty"`
 }
 
-// MultiTransformationTestInput represents transformation test input
-// Either Code or VersionID must be provided
-type MultiTransformationTestInput struct {
-	Name      string           `json:"name"`
-	Language  string           `json:"language"`
-	Code      string           `json:"code,omitempty"`
-	VersionID string           `json:"versionId,omitempty"`
+// TransformationTestInputs represents transformation test input
+type TransformationTestInput struct {
+	VersionID string           `json:"versionId"`
 	TestSuite []TestDefinition `json:"testSuite"`
 }
 
 // TransformationLibraryInput represents library input for transformation testing
-type TransformationLibraryInput struct {
+type LibraryTestInput struct {
 	VersionID string `json:"versionId"`
 }
 
 // BatchTestRequest is the request body for batch testing
 type BatchTestRequest struct {
-	Transformations []MultiTransformationTestInput `json:"transformations,omitempty"`
-	Libraries       []TransformationLibraryInput   `json:"libraries,omitempty"`
+	Transformations []TransformationTestInput `json:"transformations,omitempty"`
+	Libraries       []LibraryTestInput        `json:"libraries,omitempty"`
 }
 
 // TestRunStatus represents possible test run statuses
@@ -136,22 +132,18 @@ type TestResult struct {
 	Status       TestRunStatus `json:"status"`
 	ActualOutput []any         `json:"actualOutput,omitempty"`
 	Errors       []TestError   `json:"errors,omitempty"`
-	DurationMS   int           `json:"durationMS"`
-	Logs         []string      `json:"logs"`
 }
 
 // TestSuiteRunResult represents the aggregate result of running a test suite
 type TestSuiteRunResult struct {
-	Status     TestRunStatus `json:"status"`
-	DurationMS int           `json:"durationMS"`
-	Results    []TestResult  `json:"results"`
+	Status  TestRunStatus `json:"status"`
+	Results []TestResult  `json:"results"`
 }
 
 // TransformationTestResult represents result for a single transformation's test suite
 type TransformationTestResult struct {
 	Name            string             `json:"name"`
-	Language        string             `json:"language"`
-	Code            string             `json:"code,omitempty"`
-	VersionID       string             `json:"versionId,omitempty"`
+	VersionID       string             `json:"versionId"`
+	Imports         []string           `json:"imports,omitempty"`
 	TestSuiteResult TestSuiteRunResult `json:"testSuiteResult"`
 }
