@@ -13,7 +13,7 @@ func TestCustomTypeReferences(t *testing.T) {
 	t.Run("legacy format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(customTypeLegacyReferenceRegex)
+		regex := regexp.MustCompile(CustomTypeLegacyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -47,7 +47,7 @@ func TestCustomTypeReferences(t *testing.T) {
 	t.Run("new format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(customTypeReferenceRegex)
+		regex := regexp.MustCompile(CustomTypeReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -83,7 +83,7 @@ func TestPropertyReferences(t *testing.T) {
 	t.Run("legacy format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(propertyLegacyReferenceRegex)
+		regex := regexp.MustCompile(PropertyLegacyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -113,7 +113,7 @@ func TestPropertyReferences(t *testing.T) {
 	t.Run("new format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(propertyReferenceRegex)
+		regex := regexp.MustCompile(PropertyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -145,7 +145,7 @@ func TestEventReferences(t *testing.T) {
 	t.Run("legacy format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(eventLegacyReferenceRegex)
+		regex := regexp.MustCompile(EventLegacyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -173,7 +173,7 @@ func TestEventReferences(t *testing.T) {
 	t.Run("new format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(eventReferenceRegex)
+		regex := regexp.MustCompile(EventReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -204,7 +204,7 @@ func TestCategoryReferences(t *testing.T) {
 	t.Run("legacy format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(categoryLegacyReferenceRegex)
+		regex := regexp.MustCompile(CategoryLegacyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -232,7 +232,7 @@ func TestCategoryReferences(t *testing.T) {
 	t.Run("new format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(categoryReferenceRegex)
+		regex := regexp.MustCompile(CategoryReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -263,7 +263,7 @@ func TestTrackingPlanReferences(t *testing.T) {
 	t.Run("legacy format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(trackingPlanLegacyReferenceRegex)
+		regex := regexp.MustCompile(TrackingPlanLegacyReferenceRegex)
 
 		tests := []struct {
 			name      string
@@ -291,7 +291,7 @@ func TestTrackingPlanReferences(t *testing.T) {
 	t.Run("new format", func(t *testing.T) {
 		t.Parallel()
 
-		regex := regexp.MustCompile(trackingPlanReferenceRegex)
+		regex := regexp.MustCompile(TrackingPlanReferenceRegex)
 
 		tests := []struct {
 			name      string

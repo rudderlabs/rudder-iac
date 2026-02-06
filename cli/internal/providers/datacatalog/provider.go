@@ -335,7 +335,9 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 func (p *Provider) SyntacticRules() []rules.Rule {
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
+		propertyRules.NewPropertyConfigValidRule(),
 		customtypeRules.NewCustomTypeSpecSyntaxValidRule(),
+		customtypeRules.NewCustomTypeConfigValidRule(),
 	}
 
 	return syntactic
