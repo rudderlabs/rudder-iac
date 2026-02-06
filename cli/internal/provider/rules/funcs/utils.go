@@ -13,6 +13,8 @@ import (
 // arrayIndexRegex matches array indices like [0], [1], etc.
 var arrayIndexRegex = regexp.MustCompile(`\[(\d+)\]`)
 
+// ParseValidationErrors is a helper function which converts the validation errors from
+// the struct validator to the validation results
 func ParseValidationErrors(errs validator.ValidationErrors) []rules.ValidationResult {
 	results := []rules.ValidationResult{}
 
@@ -52,6 +54,15 @@ func getErrorMessage(err validator.FieldError) string {
 
 	case "primitive_or_reference":
 		return fmt.Sprintf("'%s' is not a valid primitive type or reference format", fieldName)
+
+	case "primitive":
+		return fmt.Sprintf("'%s' must be a valid primitive type (string, number, integer, boolean, null, array, or object)", fieldName)
+
+	case "pattern":
+		if msg, ok := getPatternErrorMessage(err.Param()); ok {
+			return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
+		}
+		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
 
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {

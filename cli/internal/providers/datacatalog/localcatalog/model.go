@@ -127,24 +127,24 @@ func ExtractCategories(s *specs.Spec) ([]CategoryV1, error) {
 
 // CustomType represents a user-defined custom type
 type CustomType struct {
-	LocalID     string               `mapstructure:"id" json:"id"`
-	Name        string               `mapstructure:"name" json:"name"`
-	Description string               `mapstructure:"description,omitempty" json:"description,omitempty"`
-	Type        string               `mapstructure:"type" json:"type"`
+	LocalID     string               `mapstructure:"id" json:"id" validate:"required"`
+	Name        string               `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern=custom_type_name"`
+	Description string               `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	Type        string               `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
-	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty"`
+	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
 	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type
 type CustomTypeProperty struct {
-	Ref      string `mapstructure:"$ref" json:"$ref"`
+	Ref      string `mapstructure:"$ref" json:"$ref" validate:"required,pattern=legacy_property_ref"`
 	Required bool   `mapstructure:"required" json:"required"`
 }
 
 // CustomTypeSpec represents the spec section of a custom-types resource
 type CustomTypeSpec struct {
-	Types []CustomType `json:"types"`
+	Types []CustomType `json:"types" validate:"required,dive"`
 }
 
 // ExtractCustomTypes parses a resource definition and extracts custom types

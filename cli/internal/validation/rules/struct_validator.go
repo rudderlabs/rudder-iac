@@ -42,6 +42,16 @@ type CustomValidateFunc struct {
 	Func validator.Func
 }
 
+// defaultValidators holds globally registered validators that are automatically
+// included in every ValidateStruct call (e.g., the "pattern" validator)
+var defaultValidators []CustomValidateFunc
+
+// RegisterDefaultValidator adds a validator to the list of default validators
+// that are automatically registered in ValidateStruct every time.
+func RegisterDefaultValidator(fn CustomValidateFunc) {
+	defaultValidators = append(defaultValidators, fn)
+}
+
 // ValidateStruct validates a struct using go-playground/validator tags and returns
 // validation results with JSON Pointer references. The basePath is prepended to all
 // references to support nested struct validation (e.g., basePath="/metadata" for
@@ -51,6 +61,15 @@ func ValidateStruct(data any, basePath string, funcs ...CustomValidateFunc) (val
 	v := validator.New()
 	v.RegisterTagNameFunc(tagNameFunc)
 
+	// Register default validators first
+	for _, fn := range defaultValidators {
+		err := v.RegisterValidation(fn.Tag, fn.Func)
+		if err != nil {
+			return nil, fmt.Errorf("registering default validation rule: %w", err)
+		}
+	}
+
+	// Then register user-provided validators (can override defaults)
 	for _, fn := range funcs {
 		err := v.RegisterValidation(fn.Tag, fn.Func)
 		if err == nil {
