@@ -608,6 +608,27 @@ func TestValidateConfig(t *testing.T) {
 		assert.Equal(t, "/types/0/config/minLength", results[0].Reference)
 	})
 
+	t.Run("multi-type union deduplicates enum errors", func(t *testing.T) {
+		config := map[string]any{
+			"enum": []any{1, 2, 1},
+		}
+		// Both string and integer validators recognize "enum" and report the same duplicate error.
+		// Without dedup, we'd get duplicate results.
+		results := ValidateConfig([]string{"string", "integer"}, config, "/test")
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/enum/2", results[0].Reference)
+		assert.Contains(t, results[0].Message, "'1' is a duplicate value")
+	})
+
+	t.Run("multi-type union deduplicates enum not-array error", func(t *testing.T) {
+		config := map[string]any{
+			"enum": "not-array",
+		}
+		results := ValidateConfig([]string{"string", "integer", "boolean"}, config, "/test")
+		require.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "'enum' must be an array")
+	})
+
 	t.Run("cross-field validation with deduplication", func(t *testing.T) {
 		config := map[string]any{
 			"minLength": 10,

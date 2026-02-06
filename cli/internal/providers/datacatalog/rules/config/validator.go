@@ -134,40 +134,46 @@ func validateFieldUnion(
 		}}
 	}
 
-	return collectedResults
+	return dedup(collectedResults)
 }
 
 // validateCrossFieldsWithDedup implements strict semantics with deduplication
 func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[string]any, baseRef string) []rules.ValidationResult {
+	var collectedResults []rules.ValidationResult
+
+	for _, validator := range validators {
+		crossResults := validator.ValidateCrossFields(config)
+
+		for i := range crossResults {
+			crossResults[i].Reference = joinReference(baseRef, crossResults[i].Reference)
+		}
+
+		collectedResults = append(collectedResults, crossResults...)
+	}
+
+	return dedup(collectedResults)
+}
+
+// dedup removes duplicate validation results based on reference and message
+func dedup(results []rules.ValidationResult) []rules.ValidationResult {
 	type errorKey struct {
 		Reference string
 		Message   string
 	}
 
-	errorMap := make(map[errorKey]rules.ValidationResult)
+	seen := make(map[errorKey]struct{}, len(results))
+	deduplicated := make([]rules.ValidationResult, 0, len(results))
 
-	for _, validator := range validators {
-		crossResults := validator.ValidateCrossFields(config)
-
-		for _, result := range crossResults {
-			result.Reference = joinReference(baseRef, result.Reference)
-
-			key := errorKey{
-				Reference: result.Reference,
-				Message:   result.Message,
-			}
-
-			errorMap[key] = result
+	for _, result := range results {
+		key := errorKey{Reference: result.Reference, Message: result.Message}
+		if _, exists := seen[key]; exists {
+			continue
 		}
+		seen[key] = struct{}{}
+		deduplicated = append(deduplicated, result)
 	}
 
-	var results []rules.ValidationResult
-
-	for _, result := range errorMap {
-		results = append(results, result)
-	}
-
-	return results
+	return deduplicated
 }
 
 // getValidatorForType returns validator for given type name
