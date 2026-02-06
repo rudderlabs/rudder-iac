@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
@@ -669,5 +670,89 @@ func TestConsolidateSync(t *testing.T) {
 		require.NotNil(t, capturedReq)
 		assert.Len(t, capturedReq.Transformations, 1)
 		assert.Len(t, capturedReq.Libraries, 0)
+	})
+}
+
+func TestMapRemoteToState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("dependencies populated from imports field", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		provider := transformations.NewProviderWithStore(mockStore)
+
+		collection := resources.NewRemoteResources()
+		collection.Set(library.HandlerMetadata.ResourceType, map[string]*resources.RemoteResource{
+			"remote-lib-1": {
+				ID:         "remote-lib-1",
+				ExternalID: "lib-1",
+				Data: &model.RemoteLibrary{
+					TransformationLibrary: &transformationsClient.TransformationLibrary{
+						ImportName: "mathLib",
+						ExternalID: "lib-1",
+					},
+				},
+			},
+			"remote-lib-2": {
+				ID:         "remote-lib-2",
+				ExternalID: "lib-2",
+				Data: &model.RemoteLibrary{
+					TransformationLibrary: &transformationsClient.TransformationLibrary{
+						ImportName: "stringLib",
+						ExternalID: "lib-2",
+					},
+				},
+			},
+		})
+		collection.Set(transformation.HandlerMetadata.ResourceType, map[string]*resources.RemoteResource{
+			"remote-trans-1": {
+				ID:         "remote-trans-1",
+				ExternalID: "trans-1",
+				Data: &model.RemoteTransformation{
+					Transformation: &transformationsClient.Transformation{
+						Imports:    []string{"mathLib", "stringLib"},
+						ExternalID: "trans-1",
+					},
+				},
+			},
+		})
+
+		st, err := provider.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		resourceState := st.GetResource("transformation:trans-1")
+		require.NotNil(t, resourceState)
+		require.Len(t, resourceState.Dependencies, 2)
+		assert.Contains(t, resourceState.Dependencies, "transformation-library:lib-1")
+		assert.Contains(t, resourceState.Dependencies, "transformation-library:lib-2")
+	})
+
+	t.Run("unresolved library import skipped", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		provider := transformations.NewProviderWithStore(mockStore)
+
+		collection := resources.NewRemoteResources()
+		collection.Set(transformation.HandlerMetadata.ResourceType, map[string]*resources.RemoteResource{
+			"remote-trans-1": {
+				ID:         "remote-trans-1",
+				ExternalID: "trans-1",
+				Data: &model.RemoteTransformation{
+					Transformation: &transformationsClient.Transformation{
+						Imports:    []string{"unmanagedLib"},
+						ExternalID: "trans-1",
+					},
+				},
+			},
+		})
+
+		st, err := provider.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		resourceState := st.GetResource("transformation:trans-1")
+		require.NotNil(t, resourceState)
+		assert.Len(t, resourceState.Dependencies, 0)
 	})
 }
