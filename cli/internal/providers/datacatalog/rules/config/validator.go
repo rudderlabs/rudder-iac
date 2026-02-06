@@ -34,6 +34,10 @@ var (
 // Implements union semantics for field validation and strict semantics for cross-field
 func ValidateConfig(types []string, config map[string]any, reference string) []rules.ValidationResult {
 
+	if len(config) == 0 {
+		return nil
+	}
+
 	var validators []TypeConfigValidator
 	for _, typeName := range types {
 		validator := getValidatorForType(typeName)
@@ -54,22 +58,20 @@ func ValidateConfig(types []string, config map[string]any, reference string) []r
 	// Initial check simply verifies that the
 	// config object is allowed based on the type
 	// or not
-	if len(config) > 0 {
-		allDisallow := true
+	allDisallow := true
 
-		for _, validator := range validators {
-			if validator.ConfigAllowed() {
-				allDisallow = false
-				break
-			}
+	for _, validator := range validators {
+		if validator.ConfigAllowed() {
+			allDisallow = false
+			break
 		}
+	}
 
-		if allDisallow {
-			return []rules.ValidationResult{{
-				Reference: reference,
-				Message:   "config is not allowed for the specified type(s)",
-			}}
-		}
+	if allDisallow {
+		return []rules.ValidationResult{{
+			Reference: reference,
+			Message:   "config is not allowed for the specified type(s)",
+		}}
 	}
 
 	var results []rules.ValidationResult

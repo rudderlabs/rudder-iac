@@ -29,41 +29,18 @@ func (n *NumberTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 		return nil, ErrFieldNotSupported
 	}
 
-	// Special handling for enum
-	if fieldname == "enum" {
-		enumArray, ok := fieldval.([]any)
-		if !ok {
+	switch fieldname {
+	case "enum":
+		return validateEnum(fieldname, fieldval)
+
+	case "multipleOf":
+		if !isNumber(fieldval) {
 			return []rules.ValidationResult{{
 				Reference: fieldname,
-				Message:   "'enum' must be an array",
+				Message:   fmt.Sprintf("'%s' must be a number", fieldname),
 			}}, nil
 		}
 
-		// Check for duplicates and create result for each duplicate index
-		duplicateIndices := findDuplicateIndices(enumArray)
-		if len(duplicateIndices) > 0 {
-			var results []rules.ValidationResult
-			for _, idx := range duplicateIndices {
-				results = append(results, rules.ValidationResult{
-					Reference: fmt.Sprintf("%s/%d", fieldname, idx),
-					Message:   fmt.Sprintf("'%v' is a duplicate value", enumArray[idx]),
-				})
-			}
-			return results, nil
-		}
-
-		return nil, nil
-	}
-
-	// All other number fields must be numbers
-	if !isNumber(fieldval) {
-		return []rules.ValidationResult{{
-			Reference: fieldname,
-			Message:   fmt.Sprintf("'%s' must be a number", fieldname),
-		}}, nil
-	}
-
-	if fieldname == "multipleOf" {
 		val, _ := toNumber(fieldval)
 		if val <= 0 {
 			return []rules.ValidationResult{{
@@ -71,9 +48,19 @@ func (n *NumberTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 				Message:   "'multipleOf' must be > 0",
 			}}, nil
 		}
-	}
 
-	return nil, nil
+		return nil, nil
+
+	default:
+		if !isNumber(fieldval) {
+			return []rules.ValidationResult{{
+				Reference: fieldname,
+				Message:   fmt.Sprintf("'%s' must be a number", fieldname),
+			}}, nil
+		}
+
+		return nil, nil
+	}
 }
 
 // ValidateCrossFields validates relationships between number config fields

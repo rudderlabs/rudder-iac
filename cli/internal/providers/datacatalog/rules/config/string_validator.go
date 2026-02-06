@@ -33,25 +33,7 @@ func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 	// Validate field value based on field name
 	switch fieldname {
 	case "enum":
-		enumArray, ok := fieldval.([]any)
-		if !ok {
-			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'enum' must be an array",
-			}}, nil
-		}
-		// Check for duplicates and create result for each duplicate index
-		duplicateIndices := findDuplicateIndices(enumArray)
-		if len(duplicateIndices) > 0 {
-			var results []rules.ValidationResult
-			for _, idx := range duplicateIndices {
-				results = append(results, rules.ValidationResult{
-					Reference: fmt.Sprintf("%s/%d", fieldname, idx),
-					Message:   fmt.Sprintf("'%v' is a duplicate value", enumArray[idx]),
-				})
-			}
-			return results, nil
-		}
+		return validateEnum(fieldname, fieldval)
 
 	case "minLength", "maxLength":
 		if !isInteger(fieldval) {

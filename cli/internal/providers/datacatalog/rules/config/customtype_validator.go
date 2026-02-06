@@ -7,7 +7,7 @@ import (
 // CustomTypeConfig validates config for custom types (types starting with uppercase)
 type CustomTypeConfig struct{}
 
-// ConfigAllowed returns true for custom types
+// ConfigAllowed returns false for custom types
 func (c *CustomTypeConfig) ConfigAllowed() bool {
 	return false
 }

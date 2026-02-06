@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var (
@@ -118,6 +119,31 @@ func isValidFormat(format string) bool {
 // isValidPrimitiveType checks if type is a valid primitive
 func isValidPrimitiveType(typeName string) bool {
 	return slices.Contains(catalogRules.ValidPrimitiveTypes, typeName)
+}
+
+// validateEnum validates an enum field value: must be an array with no duplicates
+func validateEnum(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
+	enumArray, ok := fieldval.([]any)
+	if !ok {
+		return []rules.ValidationResult{{
+			Reference: fieldname,
+			Message:   "'enum' must be an array",
+		}}, nil
+	}
+
+	duplicateIndices := findDuplicateIndices(enumArray)
+	if len(duplicateIndices) > 0 {
+		var results []rules.ValidationResult
+		for _, idx := range duplicateIndices {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d", fieldname, idx),
+				Message:   fmt.Sprintf("'%v' is a duplicate value", enumArray[idx]),
+			})
+		}
+		return results, nil
+	}
+
+	return nil, nil
 }
 
 // findDuplicateIndices checks for duplicate values in an array using reflection
