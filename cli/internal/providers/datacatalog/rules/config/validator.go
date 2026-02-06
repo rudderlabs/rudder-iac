@@ -28,7 +28,6 @@ type TypeConfigValidator interface {
 // Sentinel errors for field validation
 var (
 	ErrFieldNotSupported = errors.New("field not supported for this type")
-	ErrFieldInvalid      = errors.New("field value is invalid")
 )
 
 // ValidateConfig validates config map for given type(s)
