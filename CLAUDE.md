@@ -54,6 +54,15 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - **Unit tests**: Mandatory. Use `testify` (assert/require) exclusively
 - **E2E tests**: Required when changes affect the apply cycle or add new providers. Located in `cli/tests/`, interacts with binary via `os.Exec`
 - **Integration tests**: Based on scope for new capabilities
+- **Struct comparisons**: Prefer comparing entire structs over field-by-field assertions:
+  ```go
+  // Preferred
+  assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
+
+  // Avoid
+  assert.Equal(t, "dg-123", result.ID)
+  assert.Equal(t, "Test", result.Name)
+  ```
 
 ### Logging
 - Use `logger.New("pkg-name")` wrapper (writes to `~/.rudder/cli.log`)
@@ -69,6 +78,7 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - SOLID principles
 - Concise, well-defined variable names fitting existing ecosystem
 - Consistent patterns with existing codebase
+- **ID Naming Convention**: Use fully capitalized "ID" in identifiers (Go convention for initialisms), e.g., `ExternalID` not `ExternalId`, `WorkspaceID` not `WorkspaceId`
 
 ### Comments
 - **Focus on "why"**, not "what" - explain the reasoning, not the mechanics
