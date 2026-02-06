@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -88,7 +89,7 @@ func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 		if !isValidFormat(formatStr) {
 			return []rules.ValidationResult{{
 				Reference: fieldname,
-				Message:   fmt.Sprintf("'format' must be one of: %v", validFormatValues),
+				Message:   fmt.Sprintf("'format' must be one of: %v", catalogRules.ValidFormatValues),
 			}}, nil
 		}
 	}

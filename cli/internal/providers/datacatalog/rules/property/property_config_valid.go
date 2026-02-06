@@ -6,6 +6,7 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
@@ -99,7 +100,7 @@ var validatePropertyConfig = func(Kind string, Version string, Metadata map[stri
 func parsePropertyType(typeStr string) []string {
 	// If empty, default to wildcard types
 	if typeStr == "" {
-		return []string{"string", "integer", "number", "array"}
+		return catalogRules.ValidPrimitiveTypes
 	}
 
 	return lo.Map(strings.Split(typeStr, ","), func(t string, _ int) string {

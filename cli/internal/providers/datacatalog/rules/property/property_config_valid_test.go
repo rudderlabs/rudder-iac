@@ -696,3 +696,26 @@ func TestPropertyConfigValidRule_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePropertyType(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		typeStr  string
+		expected []string
+	}{
+		{"single type", "string", []string{"string"}},
+		{"multi-type", "string,null", []string{"string", "null"}},
+		{"empty string", "", []string{"string", "integer", "number", "array"}},
+		{"custom type", "Address", []string{"Address"}},
+		{"multi with spaces", "string, null, integer", []string{"string", "null", "integer"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := parsePropertyType(tc.typeStr)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

@@ -5,19 +5,14 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 )
 
 var (
-	validFormatValues = []string{
-		"date-time", "date", "time", "email", "uuid", "hostname", "ipv4", "ipv6",
-	}
-
-	validPrimitiveTypes = []string{
-		"string", "number", "integer", "boolean", "null", "array", "object",
-	}
-
 	// Legacy custom type reference pattern
-	customTypeLegacyReferenceRegex = regexp.MustCompile(`^#/custom-types/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`)
+	customTypeLegacyReferenceRegex = regexp.MustCompile(
+		catalogRules.CustomTypeLegacyReferenceRegex)
 )
 
 // isNumber checks if value is any numeric type
@@ -117,12 +112,12 @@ func toInteger(val any) (int64, bool) {
 
 // isValidFormat checks if format value is recognized
 func isValidFormat(format string) bool {
-	return slices.Contains(validFormatValues, format)
+	return slices.Contains(catalogRules.ValidFormatValues, format)
 }
 
 // isValidPrimitiveType checks if type is a valid primitive
 func isValidPrimitiveType(typeName string) bool {
-	return slices.Contains(validPrimitiveTypes, typeName)
+	return slices.Contains(catalogRules.ValidPrimitiveTypes, typeName)
 }
 
 // findDuplicateIndices checks for duplicate values in an array using reflection

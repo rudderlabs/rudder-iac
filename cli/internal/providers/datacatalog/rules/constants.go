@@ -38,55 +38,63 @@ const (
 )
 
 var (
-	customTypeLegacyReferenceRegex = fmt.Sprintf(
-		legacyRegexPattern,
+	CustomTypeLegacyReferenceRegex = fmt.Sprintf(
+		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindCustomTypes,
 	)
 
-	customTypeReferenceRegex = fmt.Sprintf(
-		referenceRegexPattern,
+	CustomTypeReferenceRegex = fmt.Sprintf(
+		`^#(%s):([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindCustomTypes,
 	)
 
-	propertyLegacyReferenceRegex = fmt.Sprintf(
-		legacyRegexPattern,
+	PropertyLegacyReferenceRegex = fmt.Sprintf(
+		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindProperties,
 	)
 
-	propertyReferenceRegex = fmt.Sprintf(
-		referenceRegexPattern,
+	PropertyReferenceRegex = fmt.Sprintf(
+		`^#(%s):([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindProperties,
 	)
 
-	eventLegacyReferenceRegex = fmt.Sprintf(
-		legacyRegexPattern,
+	EventLegacyReferenceRegex = fmt.Sprintf(
+		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindEvents,
 	)
 
-	eventReferenceRegex = fmt.Sprintf(
-		referenceRegexPattern,
+	EventReferenceRegex = fmt.Sprintf(
+		`^#(%s):([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindEvents,
 	)
 
-	categoryLegacyReferenceRegex = fmt.Sprintf(
-		legacyRegexPattern,
+	CategoryLegacyReferenceRegex = fmt.Sprintf(
+		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindCategories,
 	)
 
-	categoryReferenceRegex = fmt.Sprintf(
-		referenceRegexPattern,
+	CategoryReferenceRegex = fmt.Sprintf(
+		`^#(%s):([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindCategories,
 	)
 
-	trackingPlanLegacyReferenceRegex = fmt.Sprintf(
-		legacyRegexPattern,
+	TrackingPlanLegacyReferenceRegex = fmt.Sprintf(
+		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindTrackingPlans,
 	)
 
-	trackingPlanReferenceRegex = fmt.Sprintf(
-		referenceRegexPattern,
+	TrackingPlanReferenceRegex = fmt.Sprintf(
+		`^#(%s):([a-zA-Z0-9_-]+)$`,
 		localcatalog.KindTrackingPlansV1,
 	)
+
+	ValidPrimitiveTypes = []string{
+		"string", "number", "integer", "boolean", "null", "array", "object",
+	}
+
+	ValidFormatValues = []string{
+		"date-time", "date", "time", "email", "uuid", "hostname", "ipv4", "ipv6",
+	}
 )
 
 // In the init function of this package, we will be registering all the
@@ -97,70 +105,70 @@ func init() {
 	// #/custom-types/<group>/<id>
 	funcs.NewPattern(
 		customTypeLegacyReferenceTag,
-		customTypeLegacyReferenceRegex,
+		CustomTypeLegacyReferenceRegex,
 		customTypeLegacyReferenceMessage,
 	)
 
 	// #custom-types:<id>
 	funcs.NewPattern(
 		customTypeReferenceTag,
-		customTypeReferenceRegex,
+		CustomTypeReferenceRegex,
 		customTypeReferenceMessage,
 	)
 
 	// #/properties/<group>/<id>
 	funcs.NewPattern(
 		propertyLegacyReferenceTag,
-		propertyLegacyReferenceRegex,
+		PropertyLegacyReferenceRegex,
 		propertyLegacyReferenceMessage,
 	)
 
 	// #properties:<id>
 	funcs.NewPattern(
 		propertyReferenceTag,
-		propertyReferenceRegex,
+		PropertyReferenceRegex,
 		propertyReferenceMessage,
 	)
 
 	// #/events/<group>/<id>
 	funcs.NewPattern(
 		eventLegacyReferenceTag,
-		eventLegacyReferenceRegex,
+		EventLegacyReferenceRegex,
 		eventLegacyReferenceMessage,
 	)
 
 	// #events:<id>
 	funcs.NewPattern(
 		eventReferenceTag,
-		eventReferenceRegex,
+		EventReferenceRegex,
 		eventReferenceMessage,
 	)
 
 	// #/categories/<group>/<id>
 	funcs.NewPattern(
 		categoryLegacyReferenceTag,
-		categoryLegacyReferenceRegex,
+		CategoryLegacyReferenceRegex,
 		categoryLegacyReferenceMessage,
 	)
 
 	// #categories:<id>
 	funcs.NewPattern(
 		categoryReferenceTag,
-		categoryReferenceRegex,
+		CategoryReferenceRegex,
 		categoryReferenceMessage,
 	)
 
 	// #/tp/<group>/<id>
 	funcs.NewPattern(
 		trackingPlanLegacyReferenceTag,
-		trackingPlanLegacyReferenceRegex,
+		TrackingPlanLegacyReferenceRegex,
 		trackingPlanLegacyReferenceMessage,
 	)
 
 	// #tracking-plan:<id>
 	funcs.NewPattern(
 		trackingPlanReferenceTag,
-		trackingPlanReferenceRegex,
+		TrackingPlanReferenceRegex,
 		trackingPlanReferenceMessage,
 	)
 }

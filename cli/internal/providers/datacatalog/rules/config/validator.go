@@ -169,33 +169,6 @@ func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[s
 	return results
 }
 
-// parseTypes parses type string into slice of type names
-// Examples:
-//
-//	"string" → ["string"]
-//	"string,null" → ["string", "null"]
-//	"" → ["string", "integer", "number", "array"]
-//	"Address" → ["Address"]
-func parseTypes(typeStr string) []string {
-	// Handle empty string (wildcard)
-	if typeStr == "" {
-		return []string{"string", "integer", "number", "array"}
-	}
-
-	// Handle comma-separated types
-	if strings.Contains(typeStr, ",") {
-		types := strings.Split(typeStr, ",")
-		// Trim whitespace from each type
-		for i, t := range types {
-			types[i] = strings.TrimSpace(t)
-		}
-		return types
-	}
-
-	// Single type
-	return []string{typeStr}
-}
-
 // getValidatorForType returns validator for given type name
 func getValidatorForType(typeName string) TypeConfigValidator {
 	switch typeName {
