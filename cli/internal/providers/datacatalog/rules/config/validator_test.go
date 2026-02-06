@@ -615,7 +615,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		results := ValidateConfig([]string{"string"}, config, "/test")
 		require.Len(t, results, 1)
-		assert.Equal(t, "/test/", results[0].Reference)
+		assert.Equal(t, "/test", results[0].Reference)
 		assert.Contains(t, results[0].Message, "minLength cannot be greater than maxLength")
 	})
 

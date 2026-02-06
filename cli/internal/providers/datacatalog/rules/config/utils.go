@@ -121,6 +121,14 @@ func isValidPrimitiveType(typeName string) bool {
 	return slices.Contains(catalogRules.ValidPrimitiveTypes, typeName)
 }
 
+// joinReference joins base and suffix with "/" but avoids a trailing slash when suffix is empty
+func joinReference(base, suffix string) string {
+	if suffix == "" {
+		return base
+	}
+	return fmt.Sprintf("%s/%s", base, suffix)
+}
+
 // validateEnum validates an enum field value: must be an array with no duplicates
 func validateEnum(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
 	enumArray, ok := fieldval.([]any)

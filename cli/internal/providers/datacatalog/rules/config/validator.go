@@ -120,7 +120,7 @@ func validateFieldUnion(
 
 		for i := range results {
 			if !strings.HasPrefix(results[i].Reference, baseRef) {
-				results[i].Reference = fmt.Sprintf("%s/%s", baseRef, results[i].Reference)
+				results[i].Reference = joinReference(baseRef, results[i].Reference)
 			}
 		}
 
@@ -150,7 +150,7 @@ func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[s
 		crossResults := validator.ValidateCrossFields(config)
 
 		for _, result := range crossResults {
-			result.Reference = fmt.Sprintf("%s/%s", baseRef, result.Reference)
+			result.Reference = joinReference(baseRef, result.Reference)
 
 			key := errorKey{
 				Reference: result.Reference,
