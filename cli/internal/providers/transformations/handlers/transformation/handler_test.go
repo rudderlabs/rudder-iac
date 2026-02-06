@@ -12,6 +12,7 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -394,6 +395,55 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reading code file")
 		assert.Nil(t, resources)
+	})
+
+	t.Run("with tests - SpecDir enrichment and defaults", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		spec := &model.TransformationSpec{
+			ID:       "test-trans",
+			Name:     "Test Transformation",
+			Language: "javascript",
+			Code:     "export function transformEvent(event, metadata) { return event; }",
+			Tests: []specs.TransformationTest{
+				{
+					Name: "Test with defaults",
+					// Input and Output not specified - should get defaults
+				},
+				{
+					Name:   "Test with custom paths",
+					Input:  "./custom-input",
+					Output: "./custom-output",
+				},
+			},
+		}
+
+		specPath := "/path/to/transformations/spec.yaml"
+		resources, err := handler.Impl.ExtractResourcesFromSpec(specPath, spec)
+
+		require.NoError(t, err)
+		require.NotNil(t, resources)
+		require.Len(t, resources, 1)
+
+		resource := resources["test-trans"]
+		require.NotNil(t, resource)
+		require.Len(t, resource.Tests, 2)
+
+		// Verify SpecDir is populated correctly
+		expectedSpecDir := "/path/to/transformations"
+		assert.Equal(t, expectedSpecDir, resource.Tests[0].SpecDir)
+		assert.Equal(t, expectedSpecDir, resource.Tests[1].SpecDir)
+
+		// Verify defaults are applied for first test
+		assert.Equal(t, transformation.DefaultInputPath, resource.Tests[0].Input)
+		assert.Equal(t, transformation.DefaultOutputPath, resource.Tests[0].Output)
+
+		// Verify custom values are preserved for second test
+		assert.Equal(t, "./custom-input", resource.Tests[1].Input)
+		assert.Equal(t, "./custom-output", resource.Tests[1].Output)
 	})
 }
 

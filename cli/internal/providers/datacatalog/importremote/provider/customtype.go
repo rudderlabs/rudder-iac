@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -27,16 +28,18 @@ var (
 )
 
 type CustomTypeImportProvider struct {
-	client   catalog.DataCatalog
-	log      logger.Logger
-	filepath string
+	client        catalog.DataCatalog
+	log           logger.Logger
+	filepath      string
+	v1SpecSupport bool
 }
 
 func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *CustomTypeImportProvider {
 	return &CustomTypeImportProvider{
-		log:      log,
-		filepath: filepath.Join(importDir, CustomTypesRelativePath),
-		client:   client,
+		log:           log,
+		filepath:      filepath.Join(importDir, CustomTypesRelativePath),
+		client:        client,
+		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -93,11 +96,7 @@ func (p *CustomTypeImportProvider) idResources(
 		}
 
 		customType.ExternalID = externalID
-		customType.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindCustomTypes,
-			MetadataNameCustomTypes,
-			externalID,
-		)
+		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
 	}
 	return nil
 }
@@ -134,8 +133,15 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			RemoteID: customType.ID,
 		})
 
-		importableCustomType := &model.ImportableCustomType{}
-		formatted, err := importableCustomType.ForExport(customType.ExternalID, data, resolver)
+		var formatted map[string]any
+		var err error
+		if p.v1SpecSupport {
+			importableCustomType := &model.ImportableCustomTypeV1{}
+			formatted, err = importableCustomType.ForExport(customType.ExternalID, data, resolver)
+		} else {
+			importableCustomType := &model.ImportableCustomType{}
+			formatted, err = importableCustomType.ForExport(customType.ExternalID, data, resolver)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("formatting custom type: %w", err)
 		}

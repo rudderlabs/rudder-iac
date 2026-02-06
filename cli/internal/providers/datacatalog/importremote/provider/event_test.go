@@ -136,4 +136,98 @@ func TestEventFormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 2, len(events))
 	})
+
+	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+		categoryID := "cat1"
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.CategoryResourceType: {
+					"cat1": "#/categories/default/ecommerce_category",
+				},
+			},
+		}
+
+		mockClient := &mockEventCatalog{
+			events: []*catalog.Event{
+				{
+					ID:          "evt1",
+					Name:        "Product Purchased",
+					EventType:   "track",
+					WorkspaceId: "ws1",
+					CategoryId:  &categoryID,
+				},
+			},
+		}
+
+		provider := &EventImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: false,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		events, ok := spec.Spec["events"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, events, 1)
+		require.NotNil(t, events[0]["category"])
+		assert.Contains(t, *events[0]["category"].(*string), "#/categories/")
+	})
+
+	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
+		categoryID := "cat1"
+		mockResolver := &mockResolver{
+			references: map[string]map[string]string{
+				types.CategoryResourceType: {
+					"cat1": "#category:ecommerce_category",
+				},
+			},
+		}
+
+		mockClient := &mockEventCatalog{
+			events: []*catalog.Event{
+				{
+					ID:          "evt1",
+					Name:        "Product Purchased",
+					EventType:   "track",
+					WorkspaceId: "ws1",
+					CategoryId:  &categoryID,
+				},
+			},
+		}
+
+		provider := &EventImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.NoError(t, err)
+
+		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		spec, ok := result[0].Content.(*specs.Spec)
+		require.True(t, ok)
+
+		events, ok := spec.Spec["events"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, events, 1)
+		require.NotNil(t, events[0]["category"])
+		assert.Contains(t, *events[0]["category"].(*string), "#category:")
+	})
 }

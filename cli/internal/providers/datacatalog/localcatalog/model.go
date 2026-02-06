@@ -19,13 +19,22 @@ func strictUnmarshal(data []byte, v any) error {
 type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
 	Name        string                 `mapstructure:"name" json:"name" validate:"required"`
-	Description string                 `mapstructure:"description,omitempty" json:"description"`
-	Type        string                 `mapstructure:"type,omitempty" json:"type"`
+	Description string                 `mapstructure:"description,omitempty" json:"description" validate:"omitempty,gte=3,lte=2000"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type" validate:"omitempty,primitive_or_reference"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`
 }
 
 type PropertySpec struct {
-	Properties []Property `json:"properties" validate:"required,dive"`
+	Properties []Property `json:"properties" validate:"dive"`
+}
+
+// Event represents a user-defined event (V0 spec)
+type Event struct {
+	LocalID     string  `json:"id" mapstructure:"id"`
+	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type"`
+	Description string  `json:"description" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
 // This method is used to extract the entity from the byte representation of it
@@ -54,9 +63,7 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 	return v1Properties, nil
 }
 
-
-
-type Event struct {
+type EventV1 struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
 	Type        string  `json:"event_type" mapstructure:"event_type"`
@@ -64,14 +71,14 @@ type Event struct {
 	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
-type EventSpec struct {
-	Events []Event `json:"events"`
+type EventSpecV1 struct {
+	Events []EventV1 `json:"events"`
 }
 
 // ExtractEvents simply parses the whole file defined as resource definition
 // and returns the events from it.
-func ExtractEvents(s *specs.Spec) ([]Event, error) {
-	spec := EventSpec{}
+func ExtractEvents(s *specs.Spec) ([]EventV1, error) {
+	spec := EventSpecV1{}
 
 	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
@@ -85,20 +92,26 @@ func ExtractEvents(s *specs.Spec) ([]Event, error) {
 	return spec.Events, nil
 }
 
-// Category represents a user-defined category
+// CategoryV1 represents a user-defined category
+type CategoryV1 struct {
+	LocalID string `mapstructure:"id" json:"id"`
+	Name    string `mapstructure:"name" json:"name"`
+}
+
+// Category represents a user-defined category (V0 spec)
 type Category struct {
 	LocalID string `mapstructure:"id" json:"id"`
 	Name    string `mapstructure:"name" json:"name"`
 }
 
-// CategorySpec represents the spec section of a categories resource
-type CategorySpec struct {
-	Categories []Category `json:"categories"`
+// CategorySpecV1 represents the spec section of a categories resource
+type CategorySpecV1 struct {
+	Categories []CategoryV1 `json:"categories"`
 }
 
 // ExtractCategories parses a resource definition and extracts categories
-func ExtractCategories(s *specs.Spec) ([]Category, error) {
-	spec := CategorySpec{}
+func ExtractCategories(s *specs.Spec) ([]CategoryV1, error) {
+	spec := CategorySpecV1{}
 
 	jsonByt, err := json.Marshal(s.Spec)
 	if err != nil {
@@ -135,7 +148,7 @@ type CustomTypeSpec struct {
 }
 
 // ExtractCustomTypes parses a resource definition and extracts custom types
-func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
+func ExtractCustomTypes(s *specs.Spec) ([]CustomTypeV1, error) {
 	spec := CustomTypeSpec{}
 
 	jsonByt, err := json.Marshal(s.Spec)
@@ -154,5 +167,16 @@ func ExtractCustomTypes(s *specs.Spec) ([]CustomType, error) {
 		}
 	}
 
-	return spec.Types, nil
+	// Convert V0 to V1
+	v1CustomTypes := make([]CustomTypeV1, 0, len(spec.Types))
+	for _, customType := range spec.Types {
+		v1CustomType := CustomTypeV1{}
+		err := v1CustomType.FromV0(customType)
+		if err != nil {
+			return nil, fmt.Errorf("converting custom type to v1: %w", err)
+		}
+		v1CustomTypes = append(v1CustomTypes, v1CustomType)
+	}
+
+	return v1CustomTypes, nil
 }

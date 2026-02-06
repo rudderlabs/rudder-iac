@@ -103,30 +103,30 @@ func TestCustomTypeArgsFromResourceData(t *testing.T) {
 
 func TestFromCatalogCustomType(t *testing.T) {
 	// Create a catalog custom type
-	customType := &localcatalog.CustomType{
+	customType := &localcatalog.CustomTypeV1{
 		LocalID:     "ObjectType",
 		Name:        "Object Type",
 		Description: "Object type with properties",
 		Type:        "object",
 		Config:      map[string]any{},
-		Properties: []localcatalog.CustomTypeProperty{
+		Properties: []localcatalog.CustomTypePropertyV1{
 			{
-				Ref:      "#/properties/group/prop1",
+				Property: "#property:prop1",
 				Required: true,
 			},
 			{
-				Ref:      "#/properties/group/prop2",
+				Property: "#property:prop2",
 				Required: false,
 			},
 		},
 	}
 
 	// Create a mock function to return URNs
-	getURN := func(ref string) string {
+	urnFromRef := func(ref string) string {
 		switch ref {
-		case "#/properties/group/prop1":
+		case "#property:prop1":
 			return "property:prop1"
-		case "#/properties/group/prop2":
+		case "#property:prop2":
 			return "property:prop2"
 		}
 		return ""
@@ -134,7 +134,7 @@ func TestFromCatalogCustomType(t *testing.T) {
 
 	// Create an empty args instance and populate it
 	args := CustomTypeArgs{}
-	args.FromCatalogCustomType(customType, getURN)
+	args.FromCatalogCustomType(customType, urnFromRef)
 
 	// Verify basic fields
 	assert.Equal(t, "ObjectType", args.LocalID)

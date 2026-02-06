@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -28,16 +29,18 @@ var (
 )
 
 type CategoryImportProvider struct {
-	client   catalog.DataCatalog
-	log      logger.Logger
-	filepath string
+	client        catalog.DataCatalog
+	log           logger.Logger
+	filepath      string
+	v1SpecSupport bool
 }
 
 func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *CategoryImportProvider {
 	return &CategoryImportProvider{
-		log:      log,
-		filepath: filepath.Join(importDir, CategoriesRelativePath),
-		client:   client,
+		log:           log,
+		filepath:      filepath.Join(importDir, CategoriesRelativePath),
+		client:        client,
+		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -99,11 +102,7 @@ func (p *CategoryImportProvider) idResources(
 		}
 
 		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindCategories,
-			MetadataNameCategories,
-			externalID,
-		)
+		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
 	}
 	return nil
 }
@@ -140,8 +139,15 @@ func (p *CategoryImportProvider) FormatForExport(
 			RemoteID: category.ID,
 		})
 
-		importableCategory := &model.ImportableCategory{}
-		formatted, err := importableCategory.ForExport(category.ExternalID, data, resolver)
+		var formatted map[string]any
+		var err error
+		if p.v1SpecSupport {
+			importableCategory := &model.ImportableCategoryV1{}
+			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
+		} else {
+			importableCategory := &model.ImportableCategory{}
+			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("formatting category: %w", err)
 		}
