@@ -39,52 +39,52 @@ const (
 
 var (
 	CustomTypeLegacyReferenceRegex = fmt.Sprintf(
-		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
+		legacyRegexPattern,
 		localcatalog.KindCustomTypes,
 	)
 
 	CustomTypeReferenceRegex = fmt.Sprintf(
-		`^#(%s):([a-zA-Z0-9_-]+)$`,
+		referenceRegexPattern,
 		localcatalog.KindCustomTypes,
 	)
 
 	PropertyLegacyReferenceRegex = fmt.Sprintf(
-		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
+		legacyRegexPattern,
 		localcatalog.KindProperties,
 	)
 
 	PropertyReferenceRegex = fmt.Sprintf(
-		`^#(%s):([a-zA-Z0-9_-]+)$`,
+		referenceRegexPattern,
 		localcatalog.KindProperties,
 	)
 
 	EventLegacyReferenceRegex = fmt.Sprintf(
-		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
+		legacyRegexPattern,
 		localcatalog.KindEvents,
 	)
 
 	EventReferenceRegex = fmt.Sprintf(
-		`^#(%s):([a-zA-Z0-9_-]+)$`,
+		referenceRegexPattern,
 		localcatalog.KindEvents,
 	)
 
 	CategoryLegacyReferenceRegex = fmt.Sprintf(
-		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
+		legacyRegexPattern,
 		localcatalog.KindCategories,
 	)
 
 	CategoryReferenceRegex = fmt.Sprintf(
-		`^#(%s):([a-zA-Z0-9_-]+)$`,
+		referenceRegexPattern,
 		localcatalog.KindCategories,
 	)
 
 	TrackingPlanLegacyReferenceRegex = fmt.Sprintf(
-		`^#/(%s)/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)$`,
+		legacyRegexPattern,
 		localcatalog.KindTrackingPlans,
 	)
 
 	TrackingPlanReferenceRegex = fmt.Sprintf(
-		`^#(%s):([a-zA-Z0-9_-]+)$`,
+		referenceRegexPattern,
 		localcatalog.KindTrackingPlansV1,
 	)
 
