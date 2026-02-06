@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
@@ -707,7 +708,7 @@ func TestParsePropertyType(t *testing.T) {
 	}{
 		{"single type", "string", []string{"string"}},
 		{"multi-type", "string,null", []string{"string", "null"}},
-		{"empty string", "", []string{"string", "integer", "number", "array"}},
+		{"empty string", "", catalogRules.ValidPrimitiveTypes},
 		{"custom type", "Address", []string{"Address"}},
 		{"multi with spaces", "string, null, integer", []string{"string", "null", "integer"}},
 	}
