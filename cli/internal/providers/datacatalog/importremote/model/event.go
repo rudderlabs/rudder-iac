@@ -11,7 +11,7 @@ import (
 )
 
 type ImportableEvent struct {
-	localcatalog.Event
+	localcatalog.EventV1
 }
 
 // ForExport loads the event from the upstream and returns it in a format
@@ -26,7 +26,7 @@ func (e *ImportableEvent) ForExport(
 	}
 
 	toReturn := make(map[string]any)
-	if err := mapstructure.Decode(e.Event, &toReturn); err != nil {
+	if err := mapstructure.Decode(e.EventV1, &toReturn); err != nil {
 		return nil, fmt.Errorf("decoding event: %w", err)
 	}
 
@@ -34,10 +34,10 @@ func (e *ImportableEvent) ForExport(
 }
 
 func (e *ImportableEvent) fromUpstream(externalID string, upstream *catalog.Event, resolver resolver.ReferenceResolver) error {
-	e.Event.LocalID = externalID
-	e.Event.Name = upstream.Name
-	e.Event.Description = upstream.Description
-	e.Event.Type = upstream.EventType
+	e.EventV1.LocalID = externalID
+	e.EventV1.Name = upstream.Name
+	e.EventV1.Description = upstream.Description
+	e.EventV1.Type = upstream.EventType
 
 	// Resolve category reference if categoryId is set
 	if upstream.CategoryId != nil {
@@ -46,14 +46,63 @@ func (e *ImportableEvent) fromUpstream(externalID string, upstream *catalog.Even
 			*upstream.CategoryId,
 		)
 		if err != nil {
-			return fmt.Errorf("category reference resolution for event %s: %w", e.Event.LocalID, err)
+			return fmt.Errorf("category reference resolution for event %s: %w", e.EventV1.LocalID, err)
 		}
 
 		if categoryRef == "" {
-			return fmt.Errorf("resolved category reference is empty for event %s", e.Event.LocalID)
+			return fmt.Errorf("resolved category reference is empty for event %s", e.EventV1.LocalID)
 		}
 
-		e.Event.CategoryRef = &categoryRef
+		e.EventV1.CategoryRef = &categoryRef
+	}
+
+	return nil
+}
+
+type ImportableEventV1 struct {
+	localcatalog.EventV1
+}
+
+// ForExport loads the event from the upstream and returns it in a format
+// that can be exported to a file.
+func (e *ImportableEventV1) ForExport(
+	externalID string,
+	upstream *catalog.Event,
+	resolver resolver.ReferenceResolver,
+) (map[string]any, error) {
+	if err := e.fromUpstream(externalID, upstream, resolver); err != nil {
+		return nil, fmt.Errorf("loading event from upstream: %w", err)
+	}
+
+	toReturn := make(map[string]any)
+	if err := mapstructure.Decode(e.EventV1, &toReturn); err != nil {
+		return nil, fmt.Errorf("decoding event: %w", err)
+	}
+
+	return toReturn, nil
+}
+
+func (e *ImportableEventV1) fromUpstream(externalID string, upstream *catalog.Event, resolver resolver.ReferenceResolver) error {
+	e.EventV1.LocalID = externalID
+	e.EventV1.Name = upstream.Name
+	e.EventV1.Description = upstream.Description
+	e.EventV1.Type = upstream.EventType
+
+	// Resolve category reference if categoryId is set
+	if upstream.CategoryId != nil {
+		categoryRef, err := resolver.ResolveToReference(
+			types.CategoryResourceType,
+			*upstream.CategoryId,
+		)
+		if err != nil {
+			return fmt.Errorf("category reference resolution for event %s: %w", e.EventV1.LocalID, err)
+		}
+
+		if categoryRef == "" {
+			return fmt.Errorf("resolved category reference is empty for event %s", e.EventV1.LocalID)
+		}
+
+		e.EventV1.CategoryRef = &categoryRef
 	}
 
 	return nil

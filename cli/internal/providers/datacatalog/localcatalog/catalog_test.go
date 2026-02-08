@@ -10,11 +10,11 @@ import (
 
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
-		Events:         []Event{},
+		Events:         []EventV1{},
 		Properties:     []PropertyV1{},
-		TrackingPlans:  []*TrackingPlan{},
-		CustomTypes:    []CustomType{},
-		Categories:     []Category{},
+		TrackingPlans:  []*TrackingPlanV1{},
+		CustomTypes:    []CustomTypeV1{},
+		Categories:     []CategoryV1{},
 		ReferenceMap:   make(map[string]string),
 		ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 	}
@@ -80,7 +80,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, 1, len(emptyCatalog.Events))
-		assert.Equal(t, Event{
+		assert.Equal(t, EventV1{
 			LocalID:     "user_signed_up",
 			Name:        "User Signed Up",
 			Type:        "track",
@@ -91,7 +91,6 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan entities are extracted from yaml successfully", func(t *testing.T) {
 
-		falseVal := false
 		byt := []byte(`
         version: rudder/0.1
         kind: events
@@ -196,46 +195,46 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(emptyCatalog.TrackingPlans))
-		assert.Equal(t, &TrackingPlan{
+
+		falseVal := false
+		assert.Equal(t, &TrackingPlanV1{
 			Name:        "Rudderstack First Tracking Plan",
 			LocalID:     "my_first_tp",
 			Description: "This is my first tracking plan",
-			Rules: []*TPRule{
+			Rules: []*TPRuleV1{
 				{
-					LocalID: "rule_01",
-					Type:    "event_rule",
-					Event: &TPRuleEvent{
-						Ref:            "#/events/mobile_events/user_signed_up",
-						AllowUnplanned: true,
-					},
-					Properties: []*TPRuleProperty{
+					LocalID:              "rule_01",
+					Type:                 "event_rule",
+					Event:                "#/events/mobile_events/user_signed_up",
+					AdditionalProperties: true,
+					Properties: []*TPRulePropertyV1{
 						{
-							Ref:      "#/properties/base_mobile_props/username",
+							Property: "#/properties/base_mobile_props/username",
 							Required: true,
 						},
 						{
-							Ref:      "#/properties/base_mobile_props/button_signin",
+							Property: "#/properties/base_mobile_props/button_signin",
 							Required: false,
-							Properties: []*TPRuleProperty{
+							Properties: []*TPRulePropertyV1{
 								{
-									Ref:      "#/properties/base_mobile_props/username",
+									Property: "#/properties/base_mobile_props/username",
 									Required: true,
 								},
 								{
-									Ref:      "#/properties/base_mobile_props/remember_me_checkbox_clicked",
+									Property: "#/properties/base_mobile_props/remember_me_checkbox_clicked",
 									Required: false,
 								},
 								{
-									Ref:                  "#/properties/base_mobile_props/captcha",
+									Property:             "#/properties/base_mobile_props/captcha",
 									AdditionalProperties: &falseVal,
 									Required:             false,
-									Properties: []*TPRuleProperty{
+									Properties: []*TPRulePropertyV1{
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_solved",
+											Property: "#/properties/base_mobile_props/captcha_solved",
 											Required: false,
 										},
 										{
-											Ref:      "#/properties/base_mobile_props/captcha_type",
+											Property: "#/properties/base_mobile_props/captcha_type",
 											Required: false,
 										},
 									},
@@ -245,6 +244,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 					},
 				},
 			},
+			EventProps: nil,
 		}, emptyCatalog.TrackingPlans[0])
 
 		byt = []byte(`
@@ -270,11 +270,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("tracking plan with variants is extracted successfully", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:         []Event{},
+			Events:         []EventV1{},
 			Properties:     []PropertyV1{},
-			TrackingPlans:  []*TrackingPlan{},
-			CustomTypes:    []CustomType{},
-			Categories:     []Category{},
+			TrackingPlans:  []*TrackingPlanV1{},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
 			ReferenceMap:   make(map[string]string),
 			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 		}
@@ -344,7 +344,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, []any{"search", "search_bar"}, variant.Cases[0].Match)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
 		assert.Equal(t, []any{"product", "search", "1"}, variant.Cases[1].Match)
-		assert.Equal(t, 1, len(variant.Default))
+		assert.Equal(t, 1, len(variant.Default.Properties))
 	})
 
 	t.Run("custom types are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -365,6 +365,7 @@ func TestExtractCatalogEntity(t *testing.T) {
                 minLength: 5
                 maxLength: 255
                 pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                unsupportedConfig: "some-value"
             - id: "ProductIdType"
               name: "Product ID Type"
               description: "Custom type for product identifiers"
@@ -384,30 +385,31 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 		// Verify first custom type (EmailType)
 		assert.Equal(t, "EmailType", emptyCatalog.CustomTypes[0].LocalID)
-		assert.Equal(t, CustomType{
+		assert.Equal(t, CustomTypeV1{
 			LocalID:     "EmailType",
 			Name:        "Email Type",
 			Description: "Custom type for email validation",
 			Type:        "string",
 			Config: map[string]interface{}{
-				"format":    "email",
-				"minLength": float64(5),
-				"maxLength": float64(255),
-				"pattern":   "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+				"format":            "email",
+				"min_length":        float64(5),
+				"max_length":        float64(255),
+				"pattern":           "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+				"unsupportedConfig": "some-value",
 			},
 		}, emptyCatalog.CustomTypes[0])
 
 		// Verify second custom type (ProductIdType)
 		assert.Equal(t, "ProductIdType", emptyCatalog.CustomTypes[1].LocalID)
-		assert.Equal(t, CustomType{
+		assert.Equal(t, CustomTypeV1{
 			LocalID:     "ProductIdType",
 			Name:        "Product ID Type",
 			Description: "Custom type for product identifiers",
 			Type:        "string",
 			Config: map[string]interface{}{
-				"minLength": float64(10),
-				"maxLength": float64(20),
-				"pattern":   "^PROD-[0-9]{7}$",
+				"min_length": float64(10),
+				"max_length": float64(20),
+				"pattern":    "^PROD-[0-9]{7}$",
 			},
 		}, emptyCatalog.CustomTypes[1])
 	})
@@ -472,7 +474,7 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, []any{"premium", "vip"}, variant.Cases[0].Match)
 		assert.Equal(t, "Basic User", variant.Cases[1].DisplayName)
 		assert.Equal(t, []any{"basic", "free"}, variant.Cases[1].Match)
-		assert.Equal(t, 1, len(variant.Default))
+		assert.Equal(t, 1, len(variant.Default.Properties))
 	})
 
 	t.Run("custom types with property references are extracted successfully", func(t *testing.T) {
@@ -515,10 +517,10 @@ func TestExtractCatalogEntity(t *testing.T) {
 		require.Equal(t, 4, len(customType.Properties))
 
 		// Check each property reference
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/street", Required: true}, customType.Properties[0])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/city", Required: true}, customType.Properties[1])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/state", Required: false}, customType.Properties[2])
-		assert.Equal(t, CustomTypeProperty{Ref: "#/properties/address/zip", Required: true}, customType.Properties[3])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/street", Required: true}, customType.Properties[0])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/city", Required: true}, customType.Properties[1])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/state", Required: false}, customType.Properties[2])
+		assert.Equal(t, CustomTypePropertyV1{Property: "#/properties/address/zip", Required: true}, customType.Properties[3])
 	})
 
 	t.Run("categories are extracted from customer defined yaml successfully", func(t *testing.T) {
@@ -547,19 +549,19 @@ func TestExtractCatalogEntity(t *testing.T) {
 		assert.Equal(t, 3, len(emptyCatalog.Categories))
 
 		// Verify first category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "user_actions",
 			Name:    "User Actions",
 		}, emptyCatalog.Categories[0])
 
 		// Verify second category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "system_events",
 			Name:    "System Events",
 		}, emptyCatalog.Categories[1])
 
 		// Verify third category
-		assert.Equal(t, Category{
+		assert.Equal(t, CategoryV1{
 			LocalID: "payment_events",
 			Name:    "Payment Events",
 		}, emptyCatalog.Categories[2])
@@ -567,11 +569,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("events defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
-			Categories:    []Category{},
+			TrackingPlans: []*TrackingPlanV1{},
+			CustomTypes:   []CustomTypeV1{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First events file with metadata.name "shared_events"
@@ -635,11 +637,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("properties defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
-			Categories:    []Category{},
+			TrackingPlans: []*TrackingPlanV1{},
+			CustomTypes:   []CustomTypeV1{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First properties file
@@ -693,11 +695,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("categories defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
-			Categories:    []Category{},
+			TrackingPlans: []*TrackingPlanV1{},
+			CustomTypes:   []CustomTypeV1{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First categories file
@@ -745,11 +747,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("custom-types defined in separate files with the same metadata.name should merge correctly", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
-			Categories:    []Category{},
+			TrackingPlans: []*TrackingPlanV1{},
+			CustomTypes:   []CustomTypeV1{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First custom-types file
@@ -803,11 +805,11 @@ func TestExtractCatalogEntity(t *testing.T) {
 
 	t.Run("duplicate tracking plan metadata.name should return error", func(t *testing.T) {
 		catalog := DataCatalog{
-			Events:        []Event{},
+			Events:        []EventV1{},
 			Properties:    []PropertyV1{},
-			TrackingPlans: []*TrackingPlan{},
-			CustomTypes:   []CustomType{},
-			Categories:    []Category{},
+			TrackingPlans: []*TrackingPlanV1{},
+			CustomTypes:   []CustomTypeV1{},
+			Categories:    []CategoryV1{},
 		}
 
 		// First tracking plan file
@@ -1586,17 +1588,17 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		require.NotNil(t, rule.Variants)
 		require.Equal(t, 1, len(rule.Variants))
 
-		assert.Equal(t, "#event:user_signed_up", rule.Event.Ref)
-		assert.Equal(t, "#property:page_name", rule.Properties[0].Ref)
+		assert.Equal(t, "#event:user_signed_up", rule.Event)
+		assert.Equal(t, "#property:page_name", rule.Properties[0].Property)
 
 		variant := (rule.Variants)[0]
 		assert.Equal(t, "discriminator", variant.Type)
 		assert.Equal(t, "page_name", variant.Discriminator)
 		assert.Equal(t, 2, len(variant.Cases))
 		assert.Equal(t, "Search Page", variant.Cases[0].DisplayName)
-		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Ref)
+		assert.Equal(t, "#property:search_term", variant.Cases[0].Properties[0].Property)
 		assert.Equal(t, "Product Page", variant.Cases[1].DisplayName)
-		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Ref)
-		assert.Equal(t, "#property:page_url", variant.Default[0].Ref)
+		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Property)
+		assert.Equal(t, "#property:page_url", variant.Default.Properties[0].Property)
 	})
 }

@@ -1,8 +1,9 @@
-package rules
+package property
 
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -91,6 +92,40 @@ func TestPropertySpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "properties array is nil",
+			spec: localcatalog.PropertySpec{
+				Properties: nil,
+			},
+		},
+		{
+			name: "properties array is empty",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{},
+			},
+		},
+		{
+			name: "property with name at minimum length (1 character)",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "id",
+						Name:    "A",
+					},
+				},
+			},
+		},
+		{
+			name: "property with name at maximum length (65 characters)",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "id",
+						Name:    "A Property Name That Is Exactly 65 Characters Including Spaces...",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -111,15 +146,6 @@ func TestPropertySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
-		{
-			name: "missing properties array",
-			spec: localcatalog.PropertySpec{
-				Properties: nil,
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/properties"},
-			expectedMsgs:   []string{"'properties' is required"},
-		},
 		{
 			name: "property missing id",
 			spec: localcatalog.PropertySpec{
@@ -173,6 +199,34 @@ func TestPropertySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			expectedRefs:   []string{"/properties/1/id", "/properties/2/name"},
 			expectedMsgs:   []string{"'id' is required", "'name' is required"},
 		},
+		{
+			name: "property with empty name",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "user_id",
+						Name:    "",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/properties/0/name"},
+			expectedMsgs:   []string{"'name' is required"},
+		},
+		{
+			name: "property with name exceeding 65 characters",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "user_id",
+						Name:    "This is a very long name that exceeds the maximum allowed length of sixty five characters for a property name",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/properties/0/name"},
+			expectedMsgs:   []string{"'name' length must be less than or equal to 65"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -202,15 +256,6 @@ func TestPropertySpecSyntaxValidRule_EdgeCases(t *testing.T) {
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
-		{
-			name: "empty properties array is considered valid by go-validator",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{},
-			},
-			expectedErrors: 0,
-			expectedRefs:   []string{},
-			expectedMsgs:   []string{},
-		},
 		{
 			name: "property with all fields empty",
 			spec: localcatalog.PropertySpec{
@@ -249,7 +294,12 @@ func TestPropertySpecSyntaxValidRule_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertySpec("properties", "rudder/v1", map[string]any{}, tt.spec)
+			results := validatePropertySpec(
+				localcatalog.KindProperties,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				tt.spec,
+			)
 
 			assert.Len(t, results, tt.expectedErrors, "Unexpected number of validation errors")
 

@@ -20,6 +20,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
+const (
+	// default directories for test input and output files
+	DefaultInputPath  = "./input"
+	DefaultOutputPath = "./output"
+)
+
 type TransformationHandler = handler.BaseHandler[
 	model.TransformationSpec,
 	model.TransformationResource,
@@ -74,21 +80,20 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {
-	specDir := filepath.Dir(path)
-
-	// Enrich tests with SpecDir and apply defaults
-	enrichedTests := enrichTestsWithSpecDir(spec.Tests, specDir)
+	// Extract and enrich tests with SpecDir and apply defaults
+	tests := extractTestsFromSpec(path, spec)
 
 	resource := &model.TransformationResource{
 		ID:          spec.ID,
 		Name:        spec.Name,
 		Description: spec.Description,
 		Language:    spec.Language,
-		Tests:       enrichedTests,
+		Tests:       tests,
 	}
 
 	// Resolve code from file if specified
 	if spec.File != "" {
+		specDir := filepath.Dir(path)
 		codePath := spec.File
 		if !filepath.IsAbs(codePath) {
 			codePath = filepath.Join(specDir, spec.File)
@@ -108,8 +113,11 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.Transfor
 	}, nil
 }
 
-// enrichTestsWithSpecDir populates SpecDir on each test and applies default paths if not specified
-func enrichTestsWithSpecDir(tests []specs.TransformationTest, specDir string) []specs.TransformationTest {
+// extractTestsFromSpec extracts test configurations from the spec,
+// enriches them with the spec directory path, and applies default values
+// for Input and Output paths if not specified.
+func extractTestsFromSpec(path string, spec *model.TransformationSpec) []specs.TransformationTest {
+	tests := spec.Tests
 	if len(tests) == 0 {
 		return tests
 	}
@@ -117,21 +125,14 @@ func enrichTestsWithSpecDir(tests []specs.TransformationTest, specDir string) []
 	enriched := make([]specs.TransformationTest, len(tests))
 	for i, test := range tests {
 		enriched[i] = test
-		enriched[i].SpecDir = specDir
+		enriched[i].SpecDir = filepath.Dir(path)
 
-		// Apply defaults for Input and Output if empty
+		// Apply defaults if not specified
 		if enriched[i].Input == "" {
-			enriched[i].Input = filepath.Join(specDir, "tests", test.Name, "input")
-		} else if !filepath.IsAbs(enriched[i].Input) {
-			// Resolve relative paths relative to spec directory
-			enriched[i].Input = filepath.Join(specDir, enriched[i].Input)
+			enriched[i].Input = DefaultInputPath
 		}
-
 		if enriched[i].Output == "" {
-			enriched[i].Output = filepath.Join(specDir, "tests", test.Name, "output")
-		} else if !filepath.IsAbs(enriched[i].Output) {
-			// Resolve relative paths relative to spec directory
-			enriched[i].Output = filepath.Join(specDir, enriched[i].Output)
+			enriched[i].Output = DefaultOutputPath
 		}
 	}
 
