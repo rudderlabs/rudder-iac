@@ -95,6 +95,10 @@ var (
 	ValidFormatValues = []string{
 		"date-time", "date", "time", "email", "uuid", "hostname", "ipv4", "ipv6",
 	}
+
+	ValidEventTypes = []string{
+		"track", "screen", "identify", "group", "page",
+	}
 )
 
 // In the init function of this package, we will be registering all the

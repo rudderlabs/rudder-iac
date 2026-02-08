@@ -64,6 +64,9 @@ func getErrorMessage(err validator.FieldError) string {
 		}
 		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
 
+	case "oneof":
+		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, err.Param())
+
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {
 			// For string and slice, the gte tag is used to validate the length
