@@ -104,8 +104,12 @@ type CategoryV1 struct {
 
 // Category represents a user-defined category (V0 spec)
 type Category struct {
-	LocalID string `mapstructure:"id" json:"id"`
-	Name    string `mapstructure:"name" json:"name"`
+	LocalID string `mapstructure:"id" json:"id" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=category_name"`
+}
+
+type CategorySpec struct {
+	Categories []Category `json:"categories" validate:"dive"`
 }
 
 // CategorySpecV1 represents the spec section of a categories resource
