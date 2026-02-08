@@ -74,7 +74,7 @@ var validateTrackingPlanSpec = func(
 	if err != nil {
 		return []rules.ValidationResult{
 			{
-				Reference: "/spec",
+				Reference: "/rules",
 				Message:   err.Error(),
 			},
 		}
@@ -100,8 +100,5 @@ func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 
 // getValidateFuncs returns custom validate functions for trackingplan spec validation
 func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	return []rules.CustomValidateFunc{
-		// Reference validator for discriminator and property $ref fields in variants
-		funcs.NewLegacyReferenceValidateFunc([]string{"properties"}),
-	}
+	return []rules.CustomValidateFunc{}
 }

@@ -9,7 +9,7 @@ type Variants []Variant
 
 type Variant struct {
 	Type          string              `json:"type" validate:"required,eq=discriminator"`
-	Discriminator string              `json:"discriminator" validate:"required,reference"`
+	Discriminator string              `json:"discriminator" validate:"required,pattern=legacy_property_ref"`
 	Cases         []VariantCase       `json:"cases" validate:"required,min=1,dive"`
 	Default       []PropertyReference `json:"default,omitempty" validate:"omitempty,dive"`
 }
@@ -22,7 +22,7 @@ type VariantCase struct {
 }
 
 type PropertyReference struct {
-	Ref      string `json:"$ref" validate:"required,reference"`
+	Ref      string `json:"$ref" validate:"required,pattern=legacy_property_ref"`
 	Required bool   `json:"required"`
 }
 
