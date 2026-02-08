@@ -93,7 +93,10 @@ func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, t
 
 	// Build merged input file map (common + specific)
 	commonInputDir := filepath.Join(suite.SpecDir, "tests", "input")
-	inputFiles := mergeInputFiles(commonInputDir, inputDir)
+	inputFiles, err := mergeInputFiles(commonInputDir, inputDir)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(inputFiles) == 0 {
 		inputLog.Debug("No input files found for suite", "suite", suite.Name)
@@ -114,9 +117,9 @@ func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, t
 	var testCases []TestCase
 	suiteName := normalizeSuiteName(suite.Name)
 
-	for filename, filepath := range inputFiles {
+	for filename, fullPath := range inputFiles {
 		// Parse input events
-		inputEvents, err := parseJSONFile(filepath)
+		inputEvents, err := parseJSONFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("parsing input file %s: %w", filename, err)
 		}
@@ -150,30 +153,32 @@ func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, t
 // mergeInputFiles merges common and specific input files.
 // Specific files override common files with the same name.
 // Returns a map of filename (base name) to full path.
-func mergeInputFiles(commonDir, specificDir string) map[string]string {
+func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 	merged := make(map[string]string)
 
 	// Load common files first
 	if dirExists(commonDir) {
 		commonFiles, err := listJSONFiles(commonDir)
-		if err == nil {
-			for name, path := range commonFiles {
-				merged[name] = path
-			}
+		if err != nil {
+			return nil, fmt.Errorf("listing common input files from %s: %w", commonDir, err)
+		}
+		for name, path := range commonFiles {
+			merged[name] = path
 		}
 	}
 
 	// Load specific files (overrides common)
 	if dirExists(specificDir) {
 		specificFiles, err := listJSONFiles(specificDir)
-		if err == nil {
-			for name, path := range specificFiles {
-				merged[name] = path
-			}
+		if err != nil {
+			return nil, fmt.Errorf("listing specific input files from %s: %w", specificDir, err)
+		}
+		for name, path := range specificFiles {
+			merged[name] = path
 		}
 	}
 
-	return merged
+	return merged, nil
 }
 
 // buildDefaultTestCases creates test cases from embedded default events

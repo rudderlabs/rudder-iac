@@ -22,10 +22,10 @@ const (
 
 // TestUnit represents a transformation to test along with its library dependencies
 type TestUnit struct {
-	Transformation          *model.TransformationResource // The transformation to test
-	TransformationResource  *resources.Resource           // The graph resource for the transformation
-	Libraries               []*model.LibraryResource      // All libraries this transformation depends on
-	ModifiedLibraryURNs     map[string]bool               // URNs of modified libraries (for staging)
+	Transformation           *model.TransformationResource // The transformation to test
+	TransformationResource   *resources.Resource           // The graph resource for the transformation
+	Libraries                []*model.LibraryResource      // All libraries this transformation depends on
+	ModifiedLibraryURNs      map[string]bool               // URNs of modified libraries (for staging)
 	IsTransformationModified bool                          // Whether the transformation itself is modified
 }
 
@@ -53,12 +53,9 @@ func NewPlanner(graph *resources.Graph) *Planner {
 
 // BuildPlan determines which transformations to test based on mode and remote graph
 func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
-	// Get all resources from graph
-	allResources := p.getAllResources()
-
 	// Filter by resource type
-	transformations := p.filterByType(allResources, transformation.HandlerMetadata.ResourceType)
-	libraries := p.filterByType(allResources, library.HandlerMetadata.ResourceType)
+	transformations := p.filterByType(transformation.HandlerMetadata.ResourceType)
+	libraries := p.filterByType(library.HandlerMetadata.ResourceType)
 
 	// Compute diff to identify new/updated/unmodified resources
 	// source = remote graph, target = local graph
@@ -67,10 +64,10 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 	})
 
 	// Build set of modified library URNs
-	modifiedLibraryURNs := p.buildModifiedLibrarySet(libraries, diff)
+	modifiedLibraryURNs := p.buildModifiedResourceSet(libraries, diff)
 
 	// Build set of modified transformation URNs
-	modifiedTransformationURNs := p.buildModifiedTransformationSet(transformations, diff)
+	modifiedTransformationURNs := p.buildModifiedResourceSet(transformations, diff)
 
 	// Determine which transformations to test based on mode
 	var transformationsToTest []*resources.Resource
@@ -82,7 +79,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 
 	case ModeModified:
 		// Filter transformations that are new or updated
-		modifiedURNs := append(diff.NewResources, []string{}...)
+		modifiedURNs := append([]string{}, diff.NewResources...)
 		for urn := range diff.UpdatedResources {
 			modifiedURNs = append(modifiedURNs, urn)
 		}
@@ -120,7 +117,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 
 	case ModeSingle:
 		// Find resource by ID - could be transformation or library
-		resource := p.findResourceByID(allResources, targetID)
+		resource := p.findResourceByID(targetID)
 		if resource == nil {
 			return nil, fmt.Errorf("resource with ID '%s' not found", targetID)
 		}
@@ -155,19 +152,10 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 	return &TestPlan{TestUnits: testUnits}, nil
 }
 
-// getAllResources returns all resources from the graph
-func (p *Planner) getAllResources() []*resources.Resource {
-	var allResources []*resources.Resource
-	for _, r := range p.graph.Resources() {
-		allResources = append(allResources, r)
-	}
-	return allResources
-}
-
-// filterByType filters resources by resource type
-func (p *Planner) filterByType(resourceList []*resources.Resource, resourceType string) []*resources.Resource {
+// filterByType filters resources from the graph by resource type
+func (p *Planner) filterByType(resourceType string) []*resources.Resource {
 	filtered := make([]*resources.Resource, 0)
-	for _, r := range resourceList {
+	for _, r := range p.graph.Resources() {
 		if r.Type() == resourceType {
 			filtered = append(filtered, r)
 		}
@@ -191,9 +179,9 @@ func (p *Planner) filterByURNs(resourceList []*resources.Resource, urns []string
 	return filtered
 }
 
-// findResourceByID finds a resource by its ID
-func (p *Planner) findResourceByID(resources []*resources.Resource, id string) *resources.Resource {
-	for _, r := range resources {
+// findResourceByID finds a resource in the graph by its ID
+func (p *Planner) findResourceByID(id string) *resources.Resource {
+	for _, r := range p.graph.Resources() {
 		if r.ID() == id {
 			return r
 		}
@@ -201,54 +189,27 @@ func (p *Planner) findResourceByID(resources []*resources.Resource, id string) *
 	return nil
 }
 
-// buildModifiedLibrarySet creates a map of library URNs that are new or modified
-func (p *Planner) buildModifiedLibrarySet(libraries []*resources.Resource, diff *differ.Diff) map[string]bool {
+// buildModifiedResourceSet creates a map of resource URNs that are new or modified
+func (p *Planner) buildModifiedResourceSet(resourceList []*resources.Resource, diff *differ.Diff) map[string]bool {
+	// Build URN set for O(1) lookup
+	urnSet := make(map[string]bool)
+	for _, r := range resourceList {
+		urnSet[r.URN()] = true
+	}
+
 	modifiedSet := make(map[string]bool)
 
-	// Add new libraries
+	// Add new resources that match this resource type
 	for _, urn := range diff.NewResources {
-		for _, lib := range libraries {
-			if lib.URN() == urn {
-				modifiedSet[urn] = true
-				break
-			}
+		if urnSet[urn] {
+			modifiedSet[urn] = true
 		}
 	}
 
-	// Add updated libraries
+	// Add updated resources that match this resource type
 	for urn := range diff.UpdatedResources {
-		for _, lib := range libraries {
-			if lib.URN() == urn {
-				modifiedSet[urn] = true
-				break
-			}
-		}
-	}
-
-	return modifiedSet
-}
-
-// buildModifiedTransformationSet creates a map of transformation URNs that are new or modified
-func (p *Planner) buildModifiedTransformationSet(transformations []*resources.Resource, diff *differ.Diff) map[string]bool {
-	modifiedSet := make(map[string]bool)
-
-	// Add new transformations
-	for _, urn := range diff.NewResources {
-		for _, trans := range transformations {
-			if trans.URN() == urn {
-				modifiedSet[urn] = true
-				break
-			}
-		}
-	}
-
-	// Add updated transformations
-	for urn := range diff.UpdatedResources {
-		for _, trans := range transformations {
-			if trans.URN() == urn {
-				modifiedSet[urn] = true
-				break
-			}
+		if urnSet[urn] {
+			modifiedSet[urn] = true
 		}
 	}
 
@@ -278,8 +239,8 @@ func (p *Planner) buildTestUnits(transformations []*resources.Resource, allLibra
 	var testUnits []*TestUnit
 
 	for _, transformationRes := range transformations {
-		// Extract transformation resource data
-		transformationData, ok := transformationRes.Data()["transformation"].(*model.TransformationResource)
+		// Extract transformation resource data from RawData (set by BaseHandler via WithRawData)
+		transformationData, ok := transformationRes.RawData().(*model.TransformationResource)
 		if !ok {
 			return nil, fmt.Errorf("failed to extract transformation data for %s", transformationRes.ID())
 		}
@@ -293,7 +254,7 @@ func (p *Planner) buildTestUnits(transformations []*resources.Resource, allLibra
 			// Find the library resource
 			for _, libRes := range allLibraries {
 				if libRes.URN() == depURN {
-					libData, ok := libRes.Data()["library"].(*model.LibraryResource)
+					libData, ok := libRes.RawData().(*model.LibraryResource)
 					if !ok {
 						return nil, fmt.Errorf("failed to extract library data for %s", libRes.ID())
 					}

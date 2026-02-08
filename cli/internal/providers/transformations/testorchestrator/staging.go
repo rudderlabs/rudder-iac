@@ -6,6 +6,7 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
@@ -26,7 +27,7 @@ func NewStagingManager(store transformations.TransformationStore) *StagingManage
 // Returns the versionID of the uploaded transformation.
 func (s *StagingManager) StageTransformation(ctx context.Context, transformation *model.TransformationResource, remoteState *state.State) (string, error) {
 	// Check if transformation exists in remote state
-	transformationURN := fmt.Sprintf("%s::%s", transformation.ID, "transformation")
+	transformationURN := resources.URN(transformation.ID, "transformation")
 	remoteResource := remoteState.GetResource(transformationURN)
 
 	if remoteResource == nil {
@@ -72,7 +73,7 @@ func (s *StagingManager) StageTransformation(ctx context.Context, transformation
 // Returns the versionID of the uploaded library.
 func (s *StagingManager) StageLibrary(ctx context.Context, library *model.LibraryResource, remoteState *state.State) (string, error) {
 	// Check if library exists in remote state
-	libraryURN := fmt.Sprintf("%s::%s", library.ID, "library")
+	libraryURN := resources.URN(library.ID, "transformation-library")
 	remoteResource := remoteState.GetResource(libraryURN)
 
 	if remoteResource == nil {

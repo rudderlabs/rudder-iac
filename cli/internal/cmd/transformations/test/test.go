@@ -3,8 +3,8 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
@@ -17,10 +17,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
+var ErrTestsFailed = errors.New("one or more tests failed")
+
 var (
-	testLog = logger.New("root", logger.Attr{
+	testLog = logger.New("transformations-test", logger.Attr{
 		Key:   "cmd",
-		Value: "transformations-test",
+		Value: "test",
 	})
 )
 
@@ -128,18 +130,18 @@ func NewCmdTest() *cobra.Command {
 			var targetID string
 
 			if all {
-							mode = testorchestrator.ModeAll
+				mode = testorchestrator.ModeAll
 			} else if modified {
-							mode = testorchestrator.ModeModified
+				mode = testorchestrator.ModeModified
 			} else {
-							mode = testorchestrator.ModeSingle
-							targetID = args[0]
+				mode = testorchestrator.ModeSingle
+				targetID = args[0]
 			}
 
 			runner := testorchestrator.NewRunner(deps, trProvider, graph, workspace.ID)
 			results, err := runner.Run(ctx, mode, targetID)
 			if err != nil {
-			    return fmt.Errorf("running tests: %w", err)
+				return fmt.Errorf("running tests: %w", err)
 			}
 
 			// TODO: Format and display results
@@ -147,11 +149,8 @@ func NewCmdTest() *cobra.Command {
 			// formatter.Display(results)
 
 			if results.HasFailures() {
-			    os.Exit(1)
+				return ErrTestsFailed
 			}
-
-			testLog.Info("Test command not yet fully implemented")
-			ui.Println(ui.Color("Test orchestrator implementation pending (Phase 3)", ui.ColorYellow))
 
 			return nil
 		},
