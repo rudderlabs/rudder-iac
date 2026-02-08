@@ -59,6 +59,11 @@ type TransformationTest struct {
 	// Relative paths are resolved relative to the spec file's parent directory.
 	// Default: "./output" (applied in handler logic, not here)
 	Output string `json:"output,omitempty" mapstructure:"output"`
+
+	// SpecDir is the absolute path to the directory containing the spec file.
+	// This is populated at runtime during spec resolution and is NOT part of the YAML spec.
+	// It is used to resolve relative paths for Input and Output directories.
+	SpecDir string `json:"-" mapstructure:"-"`
 }
 
 // TransformationLibrarySpec represents a transformation library resource as defined in YAML.

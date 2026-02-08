@@ -80,3 +80,70 @@ type BatchPublishLibrary struct {
 type SetExternalIDRequest struct {
 	ExternalID string `json:"externalId"`
 }
+
+// Batch Test API Types
+
+// TestDefinition defines the structure of a test case
+type TestDefinition struct {
+	ID             string `json:"id,omitempty"`
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	Input          []any  `json:"input"`
+	ExpectedOutput []any  `json:"expectedOutput,omitempty"`
+}
+
+// TransformationTestInputs represents transformation test input
+type TransformationTestInput struct {
+	VersionID string           `json:"versionId"`
+	TestSuite []TestDefinition `json:"testSuite"`
+}
+
+// TransformationLibraryInput represents library input for transformation testing
+type LibraryTestInput struct {
+	VersionID string `json:"versionId"`
+}
+
+// BatchTestRequest is the request body for batch testing
+type BatchTestRequest struct {
+	Transformations []TransformationTestInput `json:"transformations,omitempty"`
+	Libraries       []LibraryTestInput        `json:"libraries,omitempty"`
+}
+
+// TestRunStatus represents possible test run statuses
+type TestRunStatus string
+
+const (
+	TestRunStatusPass  TestRunStatus = "pass"
+	TestRunStatusFail  TestRunStatus = "fail"
+	TestRunStatusError TestRunStatus = "error"
+)
+
+// TestError represents an error that occurred during test execution
+type TestError struct {
+	Message string `json:"message"`
+	Event   any    `json:"event,omitempty"`
+}
+
+// TestResult represents the result of a single test run
+type TestResult struct {
+	ID           string        `json:"id,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	Status       TestRunStatus `json:"status"`
+	ActualOutput []any         `json:"actualOutput,omitempty"`
+	Errors       []TestError   `json:"errors,omitempty"`
+}
+
+// TestSuiteRunResult represents the aggregate result of running a test suite
+type TestSuiteRunResult struct {
+	Status  TestRunStatus `json:"status"`
+	Results []TestResult  `json:"results"`
+}
+
+// TransformationTestResult represents result for a single transformation's test suite
+type TransformationTestResult struct {
+	Name            string             `json:"name"`
+	VersionID       string             `json:"versionId"`
+	Imports         []string           `json:"imports,omitempty"`
+	TestSuiteResult TestSuiteRunResult `json:"testSuiteResult"`
+}

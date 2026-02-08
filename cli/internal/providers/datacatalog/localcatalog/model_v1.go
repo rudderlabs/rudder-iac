@@ -143,6 +143,55 @@ func extractSpec(spec map[string]any, result any) error {
 	return nil
 }
 
+// CustomTypeSpecV1 represents the spec section of a custom-types resource (V1 spec)
+type CustomTypeSpecV1 struct {
+	Types []CustomTypeV1 `json:"types"`
+}
+
+// CustomTypeV1 represents a user-defined custom type (V1 spec)
+type CustomTypeV1 struct {
+	LocalID     string                 `mapstructure:"id" json:"id"`
+	Name        string                 `mapstructure:"name" json:"name"`
+	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty"`
+	Type        string                 `mapstructure:"type" json:"type"`
+	Config      map[string]any         `mapstructure:"config,omitempty" json:"config,omitempty"`
+	Properties  []CustomTypePropertyV1 `mapstructure:"properties,omitempty" json:"properties,omitempty"`
+	Variants    VariantsV1             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
+}
+
+// CustomTypePropertyV1 represents a property reference within a custom type (V1 spec)
+type CustomTypePropertyV1 struct {
+	Property string `mapstructure:"property" json:"property"`
+	Required bool   `mapstructure:"required" json:"required"`
+}
+
+func (c *CustomTypeV1) FromV0(v0 CustomType) error {
+	c.LocalID = v0.LocalID
+	c.Name = v0.Name
+	c.Description = v0.Description
+	c.Type = v0.Type
+	c.Config = convertConfigKeysToSnakeCase(v0.Config)
+
+	// Convert properties from V0 to V1
+	if len(v0.Properties) > 0 {
+		c.Properties = make([]CustomTypePropertyV1, 0, len(v0.Properties))
+		for _, v0Property := range v0.Properties {
+			c.Properties = append(c.Properties, CustomTypePropertyV1{
+				Property: v0Property.Ref,
+				Required: v0Property.Required,
+			})
+		}
+	}
+
+	// Convert variants from V0 to V1
+	err := c.Variants.FromV0(v0.Variants)
+	if err != nil {
+		return fmt.Errorf("converting variants to v1: %w", err)
+	}
+
+	return nil
+}
+
 func extractEntititesV1(s *specs.Spec, dc *DataCatalog) error {
 	switch s.Kind {
 	case KindProperties:
@@ -151,6 +200,41 @@ func extractEntititesV1(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("extracting the property spec: %w", err)
 		}
 		dc.Properties = append(dc.Properties, pSpec.Properties...)
+
+	case KindEvents:
+		eventSpec := EventSpecV1{}
+		if err := extractSpec(s.Spec, &eventSpec); err != nil {
+			return fmt.Errorf("extracting the event spec: %w", err)
+		}
+		dc.Events = append(dc.Events, eventSpec.Events...)
+
+	case KindCategories:
+		categorySpec := CategorySpecV1{}
+		if err := extractSpec(s.Spec, &categorySpec); err != nil {
+			return fmt.Errorf("extracting the category spec: %w", err)
+		}
+		dc.Categories = append(dc.Categories, categorySpec.Categories...)
+
+	case KindTrackingPlansV1:
+		tpSpec := TrackingPlanV1{}
+		if err := extractSpec(s.Spec, &tpSpec); err != nil {
+			return fmt.Errorf("extracting the tracking plan spec: %w", err)
+		}
+
+		// Check for duplicates
+		for i := range dc.TrackingPlans {
+			if dc.TrackingPlans[i].LocalID == tpSpec.LocalID {
+				return fmt.Errorf("duplicate tracking plan with id '%s' found", tpSpec.LocalID)
+			}
+		}
+		dc.TrackingPlans = append(dc.TrackingPlans, &tpSpec)
+
+	case KindCustomTypes:
+		ctSpec := CustomTypeSpecV1{}
+		if err := extractSpec(s.Spec, &ctSpec); err != nil {
+			return fmt.Errorf("extracting the custom types spec: %w", err)
+		}
+		dc.CustomTypes = append(dc.CustomTypes, ctSpec.Types...)
 
 	default:
 		return fmt.Errorf("unknown kind: %s", s.Kind)

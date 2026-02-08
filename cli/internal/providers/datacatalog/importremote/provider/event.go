@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -28,16 +29,18 @@ var (
 )
 
 type EventImportProvider struct {
-	client   catalog.DataCatalog
-	log      logger.Logger
-	filepath string
+	client        catalog.DataCatalog
+	log           logger.Logger
+	filepath      string
+	v1SpecSupport bool
 }
 
 func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *EventImportProvider {
 	return &EventImportProvider{
-		log:      log,
-		filepath: filepath.Join(importDir, EventsRelativePath),
-		client:   client,
+		log:           log,
+		filepath:      filepath.Join(importDir, EventsRelativePath),
+		client:        client,
+		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -101,11 +104,7 @@ func (p *EventImportProvider) idResources(
 		}
 
 		event.ExternalID = externalID
-		event.Reference = fmt.Sprintf("#/%s/%s/%s",
-			localcatalog.KindEvents,
-			MetadataNameEvents,
-			externalID,
-		)
+		event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
 	}
 	return nil
 }
@@ -142,8 +141,15 @@ func (p *EventImportProvider) FormatForExport(
 			RemoteID: event.ID,
 		})
 
-		importableEvent := &model.ImportableEvent{}
-		formatted, err := importableEvent.ForExport(event.ExternalID, data, resolver)
+		var formatted map[string]any
+		var err error
+		if p.v1SpecSupport {
+			importableEvent := &model.ImportableEventV1{}
+			formatted, err = importableEvent.ForExport(event.ExternalID, data, resolver)
+		} else {
+			importableEvent := &model.ImportableEvent{}
+			formatted, err = importableEvent.ForExport(event.ExternalID, data, resolver)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("formatting event: %w", err)
 		}

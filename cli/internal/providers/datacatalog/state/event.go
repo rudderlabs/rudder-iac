@@ -32,7 +32,7 @@ func (args *EventArgs) FromResourceData(from resources.ResourceData) {
 	}
 }
 
-func (args *EventArgs) FromCatalogEvent(event *localcatalog.Event, getURNFromRef func(ref string) string) {
+func (args *EventArgs) FromCatalogEvent(event *localcatalog.EventV1, getURNFromRef func(ref string) string) {
 	args.Name = event.Name
 	args.Description = event.Description
 	args.EventType = event.Type

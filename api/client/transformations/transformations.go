@@ -34,6 +34,7 @@ type TransformationStore interface {
 
 	// Batch operations
 	BatchPublish(ctx context.Context, req *BatchPublishRequest) error
+	BatchTest(ctx context.Context, req *BatchTestRequest) ([]*TransformationTestResult, error)
 }
 
 type rudderTransformationStore struct {
@@ -279,4 +280,25 @@ func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *Batch
 	}
 
 	return nil
+}
+
+// BatchTest runs tests for multiple transformations
+func (r *rudderTransformationStore) BatchTest(ctx context.Context, req *BatchTestRequest) ([]*TransformationTestResult, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling batch test request: %w", err)
+	}
+
+	path := "/transformations/tests/run"
+	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("running batch tests: %w", err)
+	}
+
+	var results []*TransformationTestResult
+	if err := json.Unmarshal(resp, &results); err != nil {
+		return nil, fmt.Errorf("unmarshalling batch test response: %w", err)
+	}
+
+	return results, nil
 }

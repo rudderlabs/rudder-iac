@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/api/internal/testutils"
@@ -623,6 +624,199 @@ func TestBatchPublish(t *testing.T) {
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
+}
+
+func TestBatchTest(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/tests/run", `{
+					"transformations": [
+						{
+							"versionId": "trans-ver-123",
+							"testSuite": [
+								{
+									"id": "test-1",
+									"name": "Test Case 1",
+									"description": "Test description",
+									"input": [{"type": "track", "event": "Button Clicked"}],
+									"expectedOutput": [{"type": "track", "event": "Button Clicked"}]
+								}
+							]
+						}
+					],
+					"libraries": [
+						{
+							"versionId": "lib-ver-123"
+						}
+					]
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `[
+				{
+					"name": "test-transformation",
+					"versionId": "trans-ver-123",
+					"imports": ["testLibrary"],
+					"testSuiteResult": {
+						"status": "pass",
+						"results": [
+							{
+								"id": "test-1",
+								"name": "Test Case 1",
+								"description": "Test description",
+								"status": "pass",
+								"actualOutput": [{"type": "track", "event": "Button Clicked"}]
+							}
+						]
+					}
+				}
+			]`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	store := transformations.NewRudderTransformationStore(c)
+	req := &transformations.BatchTestRequest{
+		Transformations: []transformations.TransformationTestInput{
+			{
+				VersionID: "trans-ver-123",
+				TestSuite: []transformations.TestDefinition{
+					{
+						ID:             "test-1",
+						Name:           "Test Case 1",
+						Description:    "Test description",
+						Input:          []any{map[string]any{"type": "track", "event": "Button Clicked"}},
+						ExpectedOutput: []any{map[string]any{"type": "track", "event": "Button Clicked"}},
+					},
+				},
+			},
+		},
+		Libraries: []transformations.LibraryTestInput{
+			{
+				VersionID: "lib-ver-123",
+			},
+		},
+	}
+
+	results, err := store.BatchTest(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	expected := &transformations.TransformationTestResult{
+		Name:      "test-transformation",
+		VersionID: "trans-ver-123",
+		Imports:   []string{"testLibrary"},
+		TestSuiteResult: transformations.TestSuiteRunResult{
+			Status: transformations.TestRunStatusPass,
+			Results: []transformations.TestResult{
+				{
+					ID:           "test-1",
+					Name:         "Test Case 1",
+					Description:  "Test description",
+					Status:       transformations.TestRunStatusPass,
+					ActualOutput: []any{map[string]any{"type": "track", "event": "Button Clicked"}},
+				},
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expected, results[0]); diff != "" {
+		t.Errorf("BatchTest result mismatch (-expected +actual):\n%s", diff)
+	}
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestBatchTestErrors(t *testing.T) {
+	tests := []struct {
+		name           string
+		responseStatus int
+		responseBody   string
+		expectedError  string
+	}{
+		{
+			name:           "server error 500",
+			responseStatus: 500,
+			responseBody:   `{"error": "internal server error"}`,
+			expectedError:  "running batch tests",
+		},
+		{
+			name:           "bad request 400",
+			responseStatus: 400,
+			responseBody:   `{"error": "invalid request"}`,
+			expectedError:  "running batch tests",
+		},
+		{
+			name:           "invalid json response",
+			responseStatus: 200,
+			responseBody:   `{invalid json`,
+			expectedError:  "unmarshalling batch test response",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			calls := []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/tests/run", `{
+							"transformations": [
+								{
+									"versionId": "trans-ver-123",
+									"testSuite": [
+										{
+											"id": "test-1",
+											"name": "Test Case 1",
+											"input": [{"event": "test"}],
+											"expectedOutput": [{"event": "test"}]
+										}
+									]
+								}
+							]
+						}`)
+					},
+					ResponseStatus: tt.responseStatus,
+					ResponseBody:   tt.responseBody,
+				},
+			}
+
+			httpClient := testutils.NewMockHTTPClient(t, calls...)
+			c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+			require.NoError(t, err)
+
+			store := transformations.NewRudderTransformationStore(c)
+			req := &transformations.BatchTestRequest{
+				Transformations: []transformations.TransformationTestInput{
+					{
+						VersionID: "trans-ver-123",
+						TestSuite: []transformations.TestDefinition{
+							{
+								ID:             "test-1",
+								Name:           "Test Case 1",
+								Input:          []any{map[string]any{"event": "test"}},
+								ExpectedOutput: []any{map[string]any{"event": "test"}},
+							},
+						},
+					},
+				},
+			}
+
+			results, err := store.BatchTest(ctx, req)
+			require.Error(t, err)
+			require.Nil(t, results)
+			assert.Contains(t, err.Error(), tt.expectedError)
+
+			httpClient.AssertNumberOfCalls()
+		})
+	}
 }
 
 func TestUpdateTransformationClearDescription(t *testing.T) {

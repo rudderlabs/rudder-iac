@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	PropertiesIdentity       = "properties"
-	TraitsIdentity           = "traits"
-	ContextTraitsIdentity    = "context.traits"
+	PropertiesIdentity    = "properties"
+	TraitsIdentity        = "traits"
+	ContextTraitsIdentity = "context.traits"
 )
 
 type TrackingPlanState struct {
@@ -569,7 +569,7 @@ func (args *TrackingPlanPropertyArgs) FromResourceData(propMap map[string]interf
 	}
 }
 
-func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlan, urnFromRef func(string) string) error {
+func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.TrackingPlanV1, urnFromRef func(string) string) error {
 	args.Name = from.Name
 	args.LocalID = from.LocalID
 	args.Description = from.Description
@@ -597,7 +597,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 		for _, localVariant := range event.Variants {
 			variant := &Variant{}
 
-			if err := variant.FromLocalCatalogVariant(
+			if err := variant.FromLocalCatalogVariantV1(
 				localVariant,
 				urnFromRef,
 			); err != nil {

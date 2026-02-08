@@ -448,13 +448,13 @@ func TestCategoryValidation(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		categories     []catalog.Category
+		categories     []catalog.CategoryV1
 		expectedErrors int
 		errorContains  string
 	}{
 		{
 			name: "valid category",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "valid-category",
 					Name:    "Valid Category",
@@ -464,7 +464,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing fields",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "",
 					Name:    "",
@@ -475,7 +475,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing LocalID",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "",
 					Name:    "Valid Name",
@@ -486,7 +486,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with missing Name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "valid-id",
 					Name:    "",
@@ -497,7 +497,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with leading whitespace in name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "leading-space",
 					Name:    " Category With Leading Space",
@@ -508,7 +508,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with trailing whitespace in name",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "trailing-space",
 					Name:    "Category With Trailing Space ",
@@ -519,7 +519,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with invalid name format",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "invalid-format",
 					Name:    "!@#Invalid",
@@ -530,7 +530,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category with valid name formats",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "uppercase-start",
 					Name:    "Uppercase Start",
@@ -556,7 +556,7 @@ func TestCategoryValidation(t *testing.T) {
 		},
 		{
 			name: "category name too short",
-			categories: []catalog.Category{
+			categories: []catalog.CategoryV1{
 				{
 					LocalID: "too-short",
 					Name:    "A",
@@ -603,38 +603,36 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation success", func(t *testing.T) {
 		testCases := []struct {
 			name          string
-			trackingPlans []*catalog.TrackingPlan
-			customTypes   []catalog.CustomType
+			trackingPlans []*catalog.TrackingPlanV1
+			customTypes   []catalog.CustomTypeV1
 		}{
 			{
 				name: "valid variants in tracking plan",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#event:test-event",
-								},
-								Variants: catalog.Variants{
+								Event:   "#event:test-event",
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
 										Discriminator: "page_name",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Search Page",
 												Match:       []any{"search", "search_bar"},
-												Properties: []catalog.PropertyReference{
-													{Ref: "#property:search_term", Required: true},
+												Properties: []catalog.PropertyReferenceV1{
+													{Property: "#property:search_term", Required: true},
 												},
 											},
 										},
-										Default: []catalog.PropertyReference{
-											{Ref: "#property:page_url", Required: true},
-										},
+										Default: catalog.DefaultPropertiesV1{Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:page_url", Required: true},
+										}},
 									},
 								},
 							},
@@ -644,25 +642,25 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants in custom type",
-				customTypes: []catalog.CustomType{
+				customTypes: []catalog.CustomTypeV1{
 					{
 						LocalID:     "TestType",
 						Name:        "TestType",
 						Description: "Test custom type with variants",
 						Type:        "object",
-						Properties: []catalog.CustomTypeProperty{
-							{Ref: "#property:profile_type", Required: true},
+						Properties: []catalog.CustomTypePropertyV1{
+							{Property: "#property:profile_type", Required: true},
 						},
-						Variants: catalog.Variants{
+						Variants: catalog.VariantsV1{
 							{
 								Type:          "discriminator",
 								Discriminator: "profile_type",
-								Cases: []catalog.VariantCase{
+								Cases: []catalog.VariantCaseV1{
 									{
 										DisplayName: "Premium User",
 										Match:       []any{"premium", "vip"},
-										Properties: []catalog.PropertyReference{
-											{Ref: "#property:subscription_tier", Required: true},
+										Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -673,27 +671,25 @@ func TestVariantsValidation(t *testing.T) {
 			},
 			{
 				name: "valid variants with mixed match value types",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
-								},
-								Variants: catalog.Variants{
+								Event:   "#/events/test-group/test-event",
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "discriminator",
 										Discriminator: "user_id",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Admin User",
 												Match:       []any{123, 123.0, true, "admin"},
-												Properties: []catalog.PropertyReference{
-													{Ref: "#/properties/test-group/admin_level", Required: true},
+												Properties: []catalog.PropertyReferenceV1{
+													{Property: "#/properties/test-group/admin_level", Required: true},
 												},
 											},
 										},
@@ -721,44 +717,42 @@ func TestVariantsValidation(t *testing.T) {
 	t.Run("variants validation failures", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			trackingPlans  []*catalog.TrackingPlan
-			customTypes    []catalog.CustomType
+			trackingPlans  []*catalog.TrackingPlanV1
+			customTypes    []catalog.CustomTypeV1
 			expectedErrors int
 			errorContains  []ValidationError
 		}{
 			{
 				name: "structural validation failures",
-				trackingPlans: []*catalog.TrackingPlan{
+				trackingPlans: []*catalog.TrackingPlanV1{
 					{
 						LocalID: "test-tp",
 						Name:    "Test Tracking Plan",
-						Rules: []*catalog.TPRule{
+						Rules: []*catalog.TPRuleV1{
 							{
 								LocalID: "test-rule",
 								Type:    "event_rule",
-								Event: &catalog.TPRuleEvent{
-									Ref: "#/events/test-group/test-event",
-								},
-								Variants: catalog.Variants{
+								Event:   "#/events/test-group/test-event",
+								Variants: catalog.VariantsV1{
 									{
 										Type:          "other_type", // Invalid type
 										Discriminator: "",           // Missing discriminator
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
-												DisplayName: "",                            // Missing display name
-												Match:       []any{},                       // Empty match array
-												Properties:  []catalog.PropertyReference{}, // Empty properties array
+												DisplayName: "",                              // Missing display name
+												Match:       []any{},                         // Empty match array
+												Properties:  []catalog.PropertyReferenceV1{}, // Empty properties array
 											},
 										},
 									},
 									{
 										Type:          "discriminator", // Second variant (should fail length check)
 										Discriminator: "page_name",
-										Cases: []catalog.VariantCase{
+										Cases: []catalog.VariantCaseV1{
 											{
 												DisplayName: "Search Page",
 												Match:       []any{"search"},
-												Properties: []catalog.PropertyReference{
+												Properties: []catalog.PropertyReferenceV1{
 													{Required: true}, // Missing Ref
 												},
 											},
@@ -796,29 +790,29 @@ func TestVariantsValidation(t *testing.T) {
 						Reference: "#tp:test-tp/rules/test-rule",
 					},
 					{
-						error:     fmt.Errorf("$ref field is mandatory for property reference"),
+						error:     fmt.Errorf("property field is mandatory for property reference"),
 						Reference: "#tp:test-tp/rules/test-rule/variants[1]/cases[0]/properties[0]",
 					},
 				},
 			},
 			{
 				name: "custom type validation failures",
-				customTypes: []catalog.CustomType{
+				customTypes: []catalog.CustomTypeV1{
 					{
 						LocalID:     "TestType",
 						Name:        "TestType",
 						Description: "Test custom type with variants",
 						Type:        "string",
-						Variants: catalog.Variants{
+						Variants: catalog.VariantsV1{
 							{
 								Type:          "discriminator",
 								Discriminator: "profile_type",
-								Cases: []catalog.VariantCase{
+								Cases: []catalog.VariantCaseV1{
 									{
 										DisplayName: "Premium User",
 										Match:       []any{"premium"},
-										Properties: []catalog.PropertyReference{
-											{Ref: "#property:subscription_tier", Required: true},
+										Properties: []catalog.PropertyReferenceV1{
+											{Property: "#property:subscription_tier", Required: true},
 										},
 									},
 								},
@@ -921,20 +915,18 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				Description: "Deeply nested property",
 			},
 		},
-		TrackingPlans: []*catalog.TrackingPlan{
+		TrackingPlans: []*catalog.TrackingPlanV1{
 			{
 				LocalID: "test_plan",
 				Name:    "Test Tracking Plan",
-				Rules: []*catalog.TPRule{
+				Rules: []*catalog.TPRuleV1{
 					{
 						LocalID: "valid_non_nested_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
-						Properties: []*catalog.TPRuleProperty{
+						Event:   "#/events/test/signup",
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:                  "#/properties/test_props/user_profile",
+								Property:             "#/properties/test_props/user_profile",
 								Required:             true,
 								AdditionalProperties: &falseVal,
 							},
@@ -943,16 +935,14 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "valid_nested_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
-						Properties: []*catalog.TPRuleProperty{
+						Event:   "#/events/test/signup",
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/user_profile",
+								Property: "#/properties/test_props/user_profile",
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/profile_name",
+										Property: "#/properties/test_props/profile_name",
 										Required: true,
 									},
 								},
@@ -962,16 +952,14 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "invalid_object_type_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
-						Properties: []*catalog.TPRuleProperty{
+						Event:   "#/events/test/signup",
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/button_signin", // string type with nested properties
+								Property: "#/properties/test_props/button_signin", // string type with nested properties
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/user_id",
+										Property: "#/properties/test_props/user_id",
 										Required: true,
 									},
 								},
@@ -981,28 +969,26 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 					{
 						LocalID: "exceed_depth_rule",
 						Type:    "event_rule",
-						Event: &catalog.TPRuleEvent{
-							Ref: "#/events/test/signup",
-						},
-						Properties: []*catalog.TPRuleProperty{
+						Event:   "#/events/test/signup",
+						Properties: []*catalog.TPRulePropertyV1{
 							{
-								Ref:      "#/properties/test_props/user_profile",
+								Property: "#/properties/test_props/user_profile",
 								Required: true,
-								Properties: []*catalog.TPRuleProperty{
+								Properties: []*catalog.TPRulePropertyV1{
 									{
-										Ref:      "#/properties/test_props/profile_settings",
+										Property: "#/properties/test_props/profile_settings",
 										Required: true,
-										Properties: []*catalog.TPRuleProperty{
+										Properties: []*catalog.TPRulePropertyV1{
 											{
-												Ref:      "#/properties/test_props/user_profile",
+												Property: "#/properties/test_props/user_profile",
 												Required: true,
-												Properties: []*catalog.TPRuleProperty{
+												Properties: []*catalog.TPRulePropertyV1{
 													{
-														Ref:      "#/properties/test_props/theme_preference", // 4th level - should exceed limit
+														Property: "#/properties/test_props/theme_preference", // 4th level - should exceed limit
 														Required: true,
-														Properties: []*catalog.TPRuleProperty{
+														Properties: []*catalog.TPRulePropertyV1{
 															{
-																Ref:      "#/properties/test_props/deeply_nested_property",
+																Property: "#/properties/test_props/deeply_nested_property",
 																Required: true,
 															},
 														},
@@ -1018,9 +1004,9 @@ func TestRequiredKeysValidator_NestedPropertiesValidation(t *testing.T) {
 				},
 			},
 		},
-		Events:      []catalog.Event{},
-		CustomTypes: []catalog.CustomType{},
-		Categories:  []catalog.Category{},
+		Events:      []catalog.EventV1{},
+		CustomTypes: []catalog.CustomTypeV1{},
+		Categories:  []catalog.CategoryV1{},
 	}
 
 	validator := &RequiredKeysValidator{}
