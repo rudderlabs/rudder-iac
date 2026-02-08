@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations/test"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
@@ -20,9 +19,7 @@ var inputLog = logger.New("testorchestrator", logger.Attr{
 
 // TestCase represents a single test case with input events and expected output
 type TestCase struct {
-	ID             string // Unique ID: "suite-name/filename" or "default/filename"
-	Name           string // Display name (filename without extension)
-	SuiteName      string // Test suite name
+	Name           string // Relative path to filename excluding extension
 	InputEvents    []any  // Array of input event payloads
 	ExpectedOutput []any  // Expected output (nil if no output file)
 }
@@ -133,11 +130,14 @@ func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, t
 			}
 		}
 
-		// Create test case
+		// Create test case with relative path as name
+		testName := strings.TrimSuffix(filename, ".json")
+		if suiteName != "" && suiteName != "default" {
+			testName = fmt.Sprintf("%s/%s", suiteName, testName)
+		}
+
 		testCase := TestCase{
-			ID:             fmt.Sprintf("%s/%s", suiteName, filename),
-			Name:           strings.TrimSuffix(filename, ".json"),
-			SuiteName:      suiteName,
+			Name:           testName,
 			InputEvents:    inputEvents,
 			ExpectedOutput: expectedOutput,
 		}
@@ -179,7 +179,7 @@ func mergeInputFiles(commonDir, specificDir string) map[string]string {
 // buildDefaultTestCases creates test cases from embedded default events
 // All default events are included in a single test case's InputEvents array
 func (r *InputResolver) buildDefaultTestCases() ([]TestCase, error) {
-	defaultEvents := test.GetDefaultEvents()
+	defaultEvents := GetDefaultEvents()
 
 	// Collect all events into a single array
 	var allEvents []any
@@ -189,11 +189,9 @@ func (r *InputResolver) buildDefaultTestCases() ([]TestCase, error) {
 
 	// Create a single test case containing all default events
 	testCase := TestCase{
-		ID:             "default/all-events",
-		Name:           "All Default Events",
-		SuiteName:      "default",
+		Name:           "default/all-events",
 		InputEvents:    allEvents,
-		ExpectedOutput: nil, // No expected output for default events
+		ExpectedOutput: nil,
 	}
 
 	return []TestCase{testCase}, nil

@@ -1,4 +1,4 @@
-package test
+package testorchestrator
 
 // GetDefaultEvents returns a map of default test event samples.
 // These events are used as fallback when no test input files are found.

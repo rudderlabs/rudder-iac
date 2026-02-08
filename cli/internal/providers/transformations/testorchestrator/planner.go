@@ -22,10 +22,11 @@ const (
 
 // TestUnit represents a transformation to test along with its library dependencies
 type TestUnit struct {
-	Transformation        *model.TransformationResource // The transformation to test
-	TransformationResource *resources.Resource           // The graph resource for the transformation
-	Libraries             []*model.LibraryResource      // All libraries this transformation depends on
-	ModifiedLibraryURNs   map[string]bool               // URNs of modified libraries (for staging)
+	Transformation          *model.TransformationResource // The transformation to test
+	TransformationResource  *resources.Resource           // The graph resource for the transformation
+	Libraries               []*model.LibraryResource      // All libraries this transformation depends on
+	ModifiedLibraryURNs     map[string]bool               // URNs of modified libraries (for staging)
+	IsTransformationModified bool                          // Whether the transformation itself is modified
 }
 
 // IsLibraryModified checks if a library is modified
@@ -67,6 +68,9 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 
 	// Build set of modified library URNs
 	modifiedLibraryURNs := p.buildModifiedLibrarySet(libraries, diff)
+
+	// Build set of modified transformation URNs
+	modifiedTransformationURNs := p.buildModifiedTransformationSet(transformations, diff)
 
 	// Determine which transformations to test based on mode
 	var transformationsToTest []*resources.Resource
@@ -143,7 +147,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 	}
 
 	// Build test units with library dependencies
-	testUnits, err := p.buildTestUnits(transformationsToTest, libraries, modifiedLibraryURNs)
+	testUnits, err := p.buildTestUnits(transformationsToTest, libraries, modifiedTransformationURNs, modifiedLibraryURNs)
 	if err != nil {
 		return nil, fmt.Errorf("building test units: %w", err)
 	}
@@ -224,6 +228,33 @@ func (p *Planner) buildModifiedLibrarySet(libraries []*resources.Resource, diff 
 	return modifiedSet
 }
 
+// buildModifiedTransformationSet creates a map of transformation URNs that are new or modified
+func (p *Planner) buildModifiedTransformationSet(transformations []*resources.Resource, diff *differ.Diff) map[string]bool {
+	modifiedSet := make(map[string]bool)
+
+	// Add new transformations
+	for _, urn := range diff.NewResources {
+		for _, trans := range transformations {
+			if trans.URN() == urn {
+				modifiedSet[urn] = true
+				break
+			}
+		}
+	}
+
+	// Add updated transformations
+	for urn := range diff.UpdatedResources {
+		for _, trans := range transformations {
+			if trans.URN() == urn {
+				modifiedSet[urn] = true
+				break
+			}
+		}
+	}
+
+	return modifiedSet
+}
+
 // findDependentTransformations finds all transformations that depend on a library
 func (p *Planner) findDependentTransformations(libraryResource *resources.Resource, transformations []*resources.Resource) []*resources.Resource {
 	var dependents []*resources.Resource
@@ -243,7 +274,7 @@ func (p *Planner) findDependentTransformations(libraryResource *resources.Resour
 }
 
 // buildTestUnits creates test units with library dependencies from the graph
-func (p *Planner) buildTestUnits(transformations []*resources.Resource, allLibraries []*resources.Resource, modifiedLibraryURNs map[string]bool) ([]*TestUnit, error) {
+func (p *Planner) buildTestUnits(transformations []*resources.Resource, allLibraries []*resources.Resource, modifiedTransformationURNs map[string]bool, modifiedLibraryURNs map[string]bool) ([]*TestUnit, error) {
 	var testUnits []*TestUnit
 
 	for _, transformationRes := range transformations {
@@ -272,12 +303,16 @@ func (p *Planner) buildTestUnits(transformations []*resources.Resource, allLibra
 			}
 		}
 
+		// Check if transformation is modified
+		isTransformationModified := modifiedTransformationURNs[transformationRes.URN()]
+
 		// Create test unit
 		testUnit := &TestUnit{
-			Transformation:         transformationData,
-			TransformationResource: transformationRes,
-			Libraries:              libraryResources,
-			ModifiedLibraryURNs:    modifiedLibraryURNs,
+			Transformation:           transformationData,
+			TransformationResource:   transformationRes,
+			Libraries:                libraryResources,
+			ModifiedLibraryURNs:      modifiedLibraryURNs,
+			IsTransformationModified: isTransformationModified,
 		}
 		testUnits = append(testUnits, testUnit)
 	}

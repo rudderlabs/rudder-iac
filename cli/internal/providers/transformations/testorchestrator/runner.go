@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	transformationsprovider "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -27,7 +28,6 @@ type Runner struct {
 	planner      *Planner
 	inputResolver *InputResolver
 	stagingMgr   *StagingManager
-	apiClient    *APIClient
 	workspaceID  string
 }
 
@@ -43,21 +43,20 @@ func NewRunner(deps app.Deps, provider *transformationsprovider.Provider, graph 
 		planner:      NewPlanner(graph),
 		inputResolver: NewInputResolver(),
 		stagingMgr:   NewStagingManager(store),
-		apiClient:    NewAPIClient(store),
 		workspaceID:  workspaceID,
 	}
 }
 
 // TestResults contains the results of all test executions
 type TestResults struct {
-	Transformations []TransformationTestResult
+	Transformations []*transformations.TransformationTestResult
 }
 
 // HasFailures checks if any tests failed or errored
 func (r *TestResults) HasFailures() bool {
 	for _, tr := range r.Transformations {
-		for _, testResult := range tr.Result.Tests {
-			if testResult.Status == TestRunStatusFail || testResult.Status == TestRunStatusError {
+		for _, testResult := range tr.TestSuiteResult.Results {
+			if testResult.Status == transformations.TestRunStatusFail || testResult.Status == transformations.TestRunStatusError {
 				return true
 			}
 		}
@@ -95,13 +94,19 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 {
 		runnerLog.Info("No transformations to test")
-		return &TestResults{Transformations: []TransformationTestResult{}}, nil
+		return &TestResults{Transformations: []*transformations.TransformationTestResult{}}, nil
 	}
 
 	runnerLog.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
 
+	// Resolve library versions once for all test units (libraries can be shared)
+	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteState)
+	if err != nil {
+		return nil, fmt.Errorf("resolving library versions: %w", err)
+	}
+
 	// Execute tests for each test unit
-	var allResults []TransformationTestResult
+	var allResults []*transformations.TransformationTestResult
 	for _, unit := range testPlan.TestUnits {
 		runnerLog.Info("Testing transformation", "id", unit.Transformation.ID, "name", unit.Transformation.Name)
 
@@ -113,102 +118,163 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 		runnerLog.Debug("Resolved test cases", "transformation", unit.Transformation.ID, "count", len(testCases))
 
-		// Resolve library versions (upload modified libraries, reuse existing for unmodified)
-		libraryVersionMap, err := r.resolveLibraryVersions(ctx, unit, remoteState)
+		// Resolve transformation versionID (upload if modified, reuse existing otherwise)
+		transformationVersionID, err := r.resolveTransformationVersion(ctx, unit, remoteState)
 		if err != nil {
-			return nil, fmt.Errorf("resolving library versions for %s: %w", unit.Transformation.ID, err)
+			return nil, fmt.Errorf("resolving transformation version for %s: %w", unit.Transformation.ID, err)
 		}
 
+		// Get library versionIDs for this transformation's dependencies
+		libraryVersionIDs := r.getLibraryVersionsForUnit(unit, libraryVersionMap)
+
 		// Build test request
-		testReq := r.buildTestRequest(unit, testCases, libraryVersionMap)
+		testReq := r.buildTestRequest(transformationVersionID, testCases, libraryVersionIDs)
 
 		// Run tests via API
 		runnerLog.Debug("Executing tests via API", "transformation", unit.Transformation.ID)
-		result, err := r.apiClient.RunTests(ctx, testReq)
+		results, err := r.store.BatchTest(ctx, testReq)
 		if err != nil {
 			return nil, fmt.Errorf("running tests for %s: %w", unit.Transformation.ID, err)
 		}
 
-		allResults = append(allResults, *result)
+		allResults = append(allResults, results...)
 	}
 
 	return &TestResults{Transformations: allResults}, nil
 }
 
-// resolveLibraryVersions resolves library versionIDs for a test unit
+// resolveTransformationVersion resolves the versionID for a transformation
+// Modified transformations are uploaded as unpublished versions, unmodified transformations reuse existing versionIDs
+func (r *Runner) resolveTransformationVersion(ctx context.Context, unit *TestUnit, remoteState *state.State) (string, error) {
+	transformationURN := fmt.Sprintf("%s::%s", unit.Transformation.ID, "transformation")
+
+	// Check if transformation is modified
+	if unit.IsTransformationModified {
+		// Upload transformation (create or update as unpublished)
+		runnerLog.Debug("Uploading modified transformation", "transformation", unit.Transformation.ID)
+		versionID, err := r.stagingMgr.StageTransformation(ctx, unit.Transformation, remoteState)
+		if err != nil {
+			return "", fmt.Errorf("uploading transformation %s: %w", unit.Transformation.ID, err)
+		}
+		return versionID, nil
+	}
+
+	// Reuse existing versionID from remote state
+	remoteResource := remoteState.GetResource(transformationURN)
+	if remoteResource == nil {
+		return "", fmt.Errorf("unmodified transformation %s not found in remote state", unit.Transformation.ID)
+	}
+
+	versionID, ok := remoteResource.Output["versionId"].(string)
+	if !ok || versionID == "" {
+		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", unit.Transformation.ID)
+	}
+
+	runnerLog.Debug("Reusing existing transformation version", "transformation", unit.Transformation.ID, "versionId", versionID)
+	return versionID, nil
+}
+
+// resolveAllLibraryVersions resolves versionIDs for all unique libraries in the test plan
 // Modified libraries are uploaded as unpublished versions, unmodified libraries reuse existing versionIDs
-func (r *Runner) resolveLibraryVersions(ctx context.Context, unit *TestUnit, remoteState *state.State) (map[string]string, error) {
+// Returns a map of library ID to versionID
+func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
 	versionMap := make(map[string]string)
 
-	for _, lib := range unit.Libraries {
-		libURN := fmt.Sprintf("%s::%s", lib.ID, "library")
+	// Collect all unique libraries from all test units
+	uniqueLibraries := make(map[string]*struct {
+		lib        *model.LibraryResource
+		isModified bool
+	})
 
-		// Check if library is modified
-		if unit.IsLibraryModified(libURN) {
-			// Upload library (create or update as unpublished)
-			runnerLog.Debug("Uploading modified library", "library", lib.ID)
-			versionID, err := r.stagingMgr.UploadLibrary(ctx, lib, remoteState)
-			if err != nil {
-				return nil, fmt.Errorf("uploading library %s: %w", lib.ID, err)
+	for _, unit := range testPlan.TestUnits {
+		for _, lib := range unit.Libraries {
+			libURN := fmt.Sprintf("%s::%s", lib.ID, "library")
+			if _, exists := uniqueLibraries[lib.ID]; !exists {
+				uniqueLibraries[lib.ID] = &struct {
+					lib        *model.LibraryResource
+					isModified bool
+				}{
+					lib:        lib,
+					isModified: unit.IsLibraryModified(libURN),
+				}
 			}
-			versionMap[lib.ImportName] = versionID
+		}
+	}
+
+	// Resolve each unique library once
+	for libID, libInfo := range uniqueLibraries {
+		libURN := fmt.Sprintf("%s::%s", libID, "library")
+
+		if libInfo.isModified {
+			// Upload library (create or update as unpublished)
+			runnerLog.Debug("Uploading modified library", "library", libID)
+			versionID, err := r.stagingMgr.StageLibrary(ctx, libInfo.lib, remoteState)
+			if err != nil {
+				return nil, fmt.Errorf("uploading library %s: %w", libID, err)
+			}
+			versionMap[libID] = versionID
 		} else {
 			// Reuse existing versionID from remote state
 			remoteResource := remoteState.GetResource(libURN)
 			if remoteResource == nil {
-				return nil, fmt.Errorf("unmodified library %s not found in remote state", lib.ID)
+				return nil, fmt.Errorf("unmodified library %s not found in remote state", libID)
 			}
 
 			versionID, ok := remoteResource.Output["versionId"].(string)
 			if !ok || versionID == "" {
-				return nil, fmt.Errorf("library %s in remote state has no valid versionId", lib.ID)
+				return nil, fmt.Errorf("library %s in remote state has no valid versionId", libID)
 			}
 
-			runnerLog.Debug("Reusing existing library version", "library", lib.ID, "versionId", versionID)
-			versionMap[lib.ImportName] = versionID
+			runnerLog.Debug("Reusing existing library version", "library", libID, "versionId", versionID)
+			versionMap[libID] = versionID
 		}
 	}
 
 	return versionMap, nil
 }
 
-// buildTestRequest constructs the batch test API request
-func (r *Runner) buildTestRequest(unit *TestUnit, testCases []TestCase, libraryVersionMap map[string]string) *BatchTestRequest {
+// getLibraryVersionsForUnit extracts library versionIDs for a specific test unit
+func (r *Runner) getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map[string]string) []string {
+	var versionIDs []string
+	for _, lib := range unit.Libraries {
+		if versionID, exists := libraryVersionMap[lib.ID]; exists {
+			versionIDs = append(versionIDs, versionID)
+		}
+	}
+	return versionIDs
+}
+
+// buildTestRequest constructs the batch test API request using client types
+func (r *Runner) buildTestRequest(transformationVersionID string, testCases []TestCase, libraryVersionIDs []string) *transformations.BatchTestRequest {
 	// Build test definitions from test cases
-	testDefinitions := make([]TestDefinition, len(testCases))
+	testDefinitions := make([]transformations.TestDefinition, len(testCases))
 	for i, tc := range testCases {
-		testDefinitions[i] = TestDefinition{
-			Name:          tc.Name,
-			Input:         tc.InputEvents,
+		testDefinitions[i] = transformations.TestDefinition{
+			Name:           tc.Name,
+			Input:          tc.InputEvents,
 			ExpectedOutput: tc.ExpectedOutput,
 		}
 	}
 
-	// Build library inputs from version map
-	var libraryInputs []TransformationLibraryInput
-	for _, versionID := range libraryVersionMap {
-		libraryInputs = append(libraryInputs, TransformationLibraryInput{
+	// Build transformation test input
+	transformationInputs := []transformations.TransformationTestInput{
+		{
+			VersionID: transformationVersionID,
+			TestSuite: testDefinitions,
+		},
+	}
+
+	// Build library inputs from version IDs
+	var libraryInputs []transformations.LibraryTestInput
+	for _, versionID := range libraryVersionIDs {
+		libraryInputs = append(libraryInputs, transformations.LibraryTestInput{
 			VersionID: versionID,
 		})
 	}
 
 	// Build request
-	return &BatchTestRequest{
-		Transformation: MultiTransformationTestInput{
-			Code:        unit.Transformation.Code,
-			Language:    unit.Transformation.Language,
-			Tests:       testDefinitions,
-			LibraryTags: getVersionIDs(libraryInputs),
-		},
-		Libraries: libraryInputs,
+	return &transformations.BatchTestRequest{
+		Transformations: transformationInputs,
+		Libraries:       libraryInputs,
 	}
-}
-
-// getVersionIDs extracts versionIDs from library inputs as an array
-func getVersionIDs(libraries []TransformationLibraryInput) []string {
-	versionIDs := make([]string, len(libraries))
-	for i, lib := range libraries {
-		versionIDs[i] = lib.VersionID
-	}
-	return versionIDs
 }

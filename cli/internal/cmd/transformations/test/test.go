@@ -207,7 +207,7 @@ func validateFlags(args []string, all, modified, show bool) error {
 
 // showDefaultEvents displays the embedded default test events
 func showDefaultEvents() error {
-	events := GetDefaultEvents()
+	events := testorchestrator.GetDefaultEvents()
 
 	ui.Println(ui.Bold("Default Test Events: \n"))
 
