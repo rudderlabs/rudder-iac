@@ -30,7 +30,7 @@ type PropertySpec struct {
 
 // Event represents a user-defined event (V0 spec)
 type Event struct {
-	LocalID     string  `json:"id" mapstructure:"id"`
+	LocalID     string  `json:"id" mapstructure:"id" validate:"required"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
 	Type        string  `json:"event_type" mapstructure:"event_type" validate:"oneof=track screen identify group page"`
 	Description string  `json:"description" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
@@ -70,9 +70,9 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 type EventV1 struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
-	Type        string  `json:"event_type" mapstructure:"event_type" validate:"required"`
-	Description string  `json:"description" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
-	CategoryRef *string `json:"category" mapstructure:"category,omitempty" validate:"omitempty,reference"`
+	Type        string  `json:"event_type" mapstructure:"event_type"`
+	Description string  `json:"description" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
 }
 
 type EventSpecV1 struct {

@@ -162,6 +162,17 @@ func TestEventSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 		expectedMsgs   []string
 	}{
 		{
+			name: "missing id",
+			spec: localcatalog.EventSpec{
+				Events: []localcatalog.Event{
+					{Name: "Page Viewed", Type: "track"},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/events/0/id"},
+			expectedMsgs:   []string{"'id' is required"},
+		},
+		{
 			name: "missing event_type",
 			spec: localcatalog.EventSpec{
 				Events: []localcatalog.Event{

@@ -6,8 +6,8 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
-	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -16,6 +16,7 @@ var examples = rules.Examples{
 		`events:
   - id: page_viewed
     event_type: track
+	name: Page Viewed
     description: User viewed a page
   - id: product_clicked
     name: Product Clicked
