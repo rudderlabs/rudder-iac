@@ -32,9 +32,13 @@ type PropertySpec struct {
 type Event struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
-	Type        string  `json:"event_type" mapstructure:"event_type"`
-	Description string  `json:"description" mapstructure:"description,omitempty"`
-	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type" validate:"oneof=track screen identify group page"`
+	Description string  `json:"description" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty" validate:"omitempty,pattern=legacy_category_ref"`
+}
+
+type EventSpec struct {
+	Events []Event `json:"events" validate:"dive"`
 }
 
 // This method is used to extract the entity from the byte representation of it

@@ -1,8 +1,12 @@
 package rules
 
 import (
+	"fmt"
+	"slices"
+
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -45,7 +49,34 @@ var validateEventSpec = func(Kind string, Version string, Metadata map[string]an
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors)
+
+	// Cross-field: name validation depends on event_type.
+	// Only run when event_type is valid to avoid confusing errors on top of the oneof failure.
+	for i, event := range Spec.Events {
+		if !slices.Contains(drules.ValidEventTypes, event.Type) {
+			continue
+		}
+
+		if event.Type == "track" {
+			if len(event.Name) < 1 || len(event.Name) > 64 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/events/%d/name", i),
+					Message:   "name must be between 1 and 64 characters for track events",
+				})
+			}
+			continue
+		}
+
+		if event.Name != "" {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/events/%d/name", i),
+				Message:   "name should be empty for non-track events",
+			})
+		}
+	}
+
+	return results
 }
 
 func NewEventSpecSyntaxValidRule() rules.Rule {
@@ -62,10 +93,5 @@ func NewEventSpecSyntaxValidRule() rules.Rule {
 // getValidateFuncs returns custom validate functions which the event spec employs
 // by adding requisite tags to fields in the spec struct
 func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	// TODO: we would need to create a different regex for reference validation
-	// based on the version of spec.
-	return []rules.CustomValidateFunc{
-		// reference validation for categories
-		funcs.NewLegacyReferenceValidateFunc([]string{"categories"}),
-	}
+	return nil
 }
