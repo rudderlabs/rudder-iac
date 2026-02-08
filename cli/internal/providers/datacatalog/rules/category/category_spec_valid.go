@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	categoryNameRegexPattern = `^[A-Z_a-z][\s\w,.-]{2,64}$`
+	categoryNameRegexPattern = `^[A-Z_a-z][ \w,.-]{2,64}$`
 	categoryNameRegexTag     = "category_name"
 	categoryNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"
 )
