@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -71,6 +72,46 @@ func TestCategorySpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 			},
 		},
 		{
+			name: "name with minimum length (3 chars)",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "Abc"},
+				},
+			},
+		},
+		{
+			name: "name with maximum length (65 chars)",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "A" + strings.Repeat("b", 64)},
+				},
+			},
+		},
+		{
+			name: "name starting with lowercase letter",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "user actions"},
+				},
+			},
+		},
+		{
+			name: "name starting with underscore",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "_system_events"},
+				},
+			},
+		},
+		{
+			name: "name with all allowed special chars",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "User Actions, v2.0 - beta"},
+				},
+			},
+		},
+		{
 			name: "empty categories array is valid",
 			spec: localcatalog.CategorySpec{
 				Categories: []localcatalog.Category{},
@@ -132,6 +173,61 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
 			expectedMsgs:   []string{"'name' is required"},
+		},
+		{
+			name: "name too short (2 chars)",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "Ab"},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+		},
+		{
+			name: "name too long (66 chars)",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "A" + strings.Repeat("b", 65)},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+		},
+		{
+			name: "name starting with digit",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "1Invalid Name"},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+		},
+		{
+			name: "name starting with special char",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "#Invalid Name"},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+		},
+		{
+			name: "name with disallowed chars",
+			spec: localcatalog.CategorySpec{
+				Categories: []localcatalog.Category{
+					{LocalID: "cat1", Name: "Valid@Name"},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
 		},
 		{
 			name: "category missing both id and name",

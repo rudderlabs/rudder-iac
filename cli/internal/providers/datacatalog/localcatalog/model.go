@@ -105,7 +105,7 @@ type CategoryV1 struct {
 // Category represents a user-defined category (V0 spec)
 type Category struct {
 	LocalID string `mapstructure:"id" json:"id" validate:"required"`
-	Name    string `mapstructure:"name" json:"name" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=category_name"`
 }
 
 type CategorySpec struct {
