@@ -48,15 +48,21 @@ func NewRunner(deps app.Deps, provider *transformationsprovider.Provider, graph 
 	}
 }
 
-// TestResults contains the results of all test executions
+// TransformationTestWithDefinitions combines test results with their original definitions
+type TransformationTestWithDefinitions struct {
+	Result      *transformations.TransformationTestResult
+	Definitions []transformations.TestDefinition
+}
+
+// TestResults contains the results of all test executions with their definitions
 type TestResults struct {
-	Transformations []*transformations.TransformationTestResult
+	Transformations []*TransformationTestWithDefinitions
 }
 
 // HasFailures checks if any tests failed or errored
 func (r *TestResults) HasFailures() bool {
 	for _, tr := range r.Transformations {
-		for _, testResult := range tr.TestSuiteResult.Results {
+		for _, testResult := range tr.Result.TestSuiteResult.Results {
 			if testResult.Status == transformations.TestRunStatusFail || testResult.Status == transformations.TestRunStatusError {
 				return true
 			}
@@ -95,7 +101,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 {
 		runnerLog.Info("No transformations to test")
-		return &TestResults{Transformations: []*transformations.TransformationTestResult{}}, nil
+		return &TestResults{Transformations: []*TransformationTestWithDefinitions{}}, nil
 	}
 
 	runnerLog.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
@@ -109,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	// Execute tests in parallel using WaitGroup
 	var wg sync.WaitGroup
 	resultsMu := sync.Mutex{}
-	var allResults []*transformations.TransformationTestResult
+	var allResults []*TransformationTestWithDefinitions
 	var errors []error
 	errorsMutex := sync.Mutex{}
 
@@ -132,6 +138,16 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 			runnerLog.Debug("Resolved test cases", "transformation", u.Transformation.ID, "count", len(testCases))
 
+			// Build test definitions from test cases
+			testDefinitions := make([]transformations.TestDefinition, len(testCases))
+			for i, tc := range testCases {
+				testDefinitions[i] = transformations.TestDefinition{
+					Name:           tc.Name,
+					Input:          tc.InputEvents,
+					ExpectedOutput: tc.ExpectedOutput,
+				}
+			}
+
 			// Resolve transformation versionID (upload if modified, reuse existing otherwise)
 			transformationVersionID, err := r.resolveTransformationVersion(ctx, u, remoteState)
 			if err != nil {
@@ -145,7 +161,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 			libraryVersionIDs := r.getLibraryVersionsForUnit(u, libraryVersionMap)
 
 			// Build test request
-			testReq := r.buildTestRequest(transformationVersionID, testCases, libraryVersionIDs)
+			testReq := r.buildTestRequest(transformationVersionID, testDefinitions, libraryVersionIDs)
 
 			// Run tests via API
 			runnerLog.Debug("Executing tests via API", "transformation", u.Transformation.ID)
@@ -157,9 +173,14 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 				return
 			}
 
-			// Safely append results
+			// Combine results with test definitions
 			resultsMu.Lock()
-			allResults = append(allResults, results...)
+			for _, result := range results {
+				allResults = append(allResults, &TransformationTestWithDefinitions{
+					Result:      result,
+					Definitions: testDefinitions,
+				})
+			}
 			resultsMu.Unlock()
 		}(unit)
 	}
@@ -276,17 +297,7 @@ func (r *Runner) getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map
 }
 
 // buildTestRequest constructs the batch test API request using client types
-func (r *Runner) buildTestRequest(transformationVersionID string, testCases []TestCase, libraryVersionIDs []string) *transformations.BatchTestRequest {
-	// Build test definitions from test cases
-	testDefinitions := make([]transformations.TestDefinition, len(testCases))
-	for i, tc := range testCases {
-		testDefinitions[i] = transformations.TestDefinition{
-			Name:           tc.Name,
-			Input:          tc.InputEvents,
-			ExpectedOutput: tc.ExpectedOutput,
-		}
-	}
-
+func (r *Runner) buildTestRequest(transformationVersionID string, testDefinitions []transformations.TestDefinition, libraryVersionIDs []string) *transformations.BatchTestRequest {
 	// Build transformation test input
 	transformationInputs := []transformations.TransformationTestInput{
 		{

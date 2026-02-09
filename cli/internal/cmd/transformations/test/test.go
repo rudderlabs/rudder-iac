@@ -144,9 +144,9 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
-			// TODO: Format and display results
-			// formatter := testorchestrator.NewFormatter(verbose)
-			// formatter.Display(results)
+			// Format and display results
+			formatter := testorchestrator.NewFormatter(verbose)
+			formatter.Display(results)
 
 			if results.HasFailures() {
 				return ErrTestsFailed
