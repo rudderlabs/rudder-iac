@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -58,7 +60,7 @@ func TestCategoryLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "cat2"))
 	})
 
-	t.Run("correctly assigns externalId and reference", func(t *testing.T) {
+	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockCategoryCatalog{
 			categories: []*catalog.Category{
 				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
@@ -82,12 +84,45 @@ func TestCategoryLoadImportable(t *testing.T) {
 		cat1, ok := categories["cat1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, cat1.ExternalID)
-		assert.NotEmpty(t, cat1.Reference)
+		assert.Equal(t, cat1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, cat1.ExternalID))
 
 		cat2, ok := categories["cat2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, cat2.ExternalID)
-		assert.NotEmpty(t, cat2.Reference)
+		assert.Equal(t, cat2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, cat2.ExternalID))
+	})
+
+	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
+		mockClient := &mockCategoryCatalog{
+			categories: []*catalog.Category{
+				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
+				{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1"},
+			},
+		}
+
+		provider := &CategoryImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.Nil(t, err)
+
+		categories := collection.GetAll(types.CategoryResourceType)
+		require.Equal(t, 2, len(categories))
+
+		cat1, ok := categories["cat1"]
+		require.True(t, ok)
+		assert.NotEmpty(t, cat1.ExternalID)
+		assert.Equal(t, cat1.Reference, fmt.Sprintf("#%s:%s", types.CategoryResourceType, cat1.ExternalID))
+
+		cat2, ok := categories["cat2"]
+		require.True(t, ok)
+		assert.NotEmpty(t, cat2.ExternalID)
+		assert.Equal(t, cat2.Reference, fmt.Sprintf("#%s:%s", types.CategoryResourceType, cat2.ExternalID))
 	})
 }
 

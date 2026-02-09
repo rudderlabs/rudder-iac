@@ -57,12 +57,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		hasType := prop.Type != ""
 		hasTypes := len(prop.Types) > 0
 
-		if !hasType && !hasTypes {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("either 'type' or 'types' field must be specified"),
-				Reference: reference,
-			})
-		} else if hasType && hasTypes {
+		if hasType && hasTypes {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("'type' and 'types' fields are mutually exclusive, only one can be specified"),
 				Reference: reference,

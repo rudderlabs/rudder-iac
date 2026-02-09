@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
@@ -15,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -23,13 +23,32 @@ import (
 )
 
 type Handler struct {
-	resources map[string]*sourceResource
-	client    esClient.EventStreamStore
-	importDir string
+	resources     map[string]*sourceResource
+	client        esClient.EventStreamStore
+	importDir     string
+	v1SpecSupport bool
 }
 
-func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
-	return &Handler{resources: make(map[string]*sourceResource), client: client, importDir: filepath.Join(importDir, ImportPath)}
+// HandlerOption configures a Handler (e.g. for tests).
+type HandlerOption func(*Handler)
+
+// WithV1SpecSupport sets the v1 spec support flag (used in tests to override config).
+func WithV1SpecSupport() HandlerOption {
+	return func(h *Handler) {
+		h.v1SpecSupport = true
+	}
+}
+
+func NewHandler(client esClient.EventStreamStore, importDir string, opts ...HandlerOption) *Handler {
+	h := &Handler{
+		resources: make(map[string]*sourceResource),
+		client:    client,
+		importDir: filepath.Join(importDir, ImportPath),
+	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -76,6 +95,44 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	sourceResource.addImportMetadata(s)
 	h.resources[spec.LocalId] = sourceResource
 	return nil
+}
+
+// MigrateSpec migrates a event stream source spec
+// It only converts the tracking plan reference from path-based to URN-based format
+func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	spec := &sourceSpec{}
+	// Use strict decoding to reject unknown fields
+	decoderConfig := &mapstructure.DecoderConfig{
+		ErrorUnused: true, // Reject unknown fields
+		Result:      spec,
+	}
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("creating decoder: %w", err)
+	}
+	if err := decoder.Decode(s.Spec); err != nil {
+		return nil, fmt.Errorf("decoding event stream source spec: %w", err)
+	}
+
+	if spec.Governance != nil && spec.Governance.TrackingPlan != nil && spec.Governance.TrackingPlan.Ref != "" {
+		matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(spec.Governance.TrackingPlan.Ref)
+		if len(matches) != 2 {
+			return nil, fmt.Errorf("invalid ref format: %s", spec.Governance.TrackingPlan.Ref)
+		}
+		trackingPlanID := matches[1]
+		migratedRef := fmt.Sprintf("#%s:%s", types.TrackingPlanResourceType, trackingPlanID)
+
+		gov, ok := s.Spec[GovernanceYAMLKey].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s not found in spec", GovernanceYAMLKey)
+		}
+		validations, ok := gov[ValidationsYAMLKey].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s not found in spec.%s", ValidationsYAMLKey, GovernanceYAMLKey)
+		}
+		validations[TrackingPlanRefYAMLKey] = migratedRef
+	}
+	return s, nil
 }
 
 func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
@@ -190,8 +247,12 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
 		}
+		ref := getFileMetadata(s.LocalId)
+		if h.v1SpecSupport {
+			ref = fmt.Sprintf("#%s:%s", ResourceType, s.LocalId)
+		}
 		opts := []resources.ResourceOpts{
-			resources.WithResourceFileMetadata(getFileMetadata(s.LocalId)),
+			resources.WithResourceFileMetadata(ref),
 		}
 		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
 			opts = []resources.ResourceOpts{
@@ -541,10 +602,14 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
 		}
+		ref := getFileMetadata(externalID)
+		if h.v1SpecSupport {
+			ref = fmt.Sprintf("#%s:%s", ResourceType, externalID)
+		}
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
-			Reference:  getFileMetadata(externalID),
+			Reference:  ref,
 			Data:       &source,
 		}
 		resourceMap[source.ID] = remoteResource
@@ -639,8 +704,12 @@ func (p *Handler) toImportSpec(
 		}
 	}
 
+	version := specs.SpecVersionV0_1Variant
+	if p.v1SpecSupport {
+		version = specs.SpecVersionV1
+	}
 	return &specs.Spec{
-		Version:  specs.SpecVersionV0_1Variant,
+		Version:  version,
 		Kind:     ResourceKind,
 		Metadata: metadataMap,
 		Spec:     specMap,
@@ -754,16 +823,14 @@ func toResourceData(sourceID string, trackingPlanID string) *resources.ResourceD
 }
 
 func parseTrackingPlanRef(ref string) (*resources.PropertyRef, error) {
-	// Format: #/tp/group/id
-	parts := strings.Split(ref, "/")
-	if len(parts) < 4 {
+	// Format: #/tp/group/id(old) or #tracking-plan:id(new)
+	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(ref)
+	if len(matches) != 2 {
 		return nil, fmt.Errorf("invalid ref format: %s", ref)
 	}
-	if parts[1] != "tp" {
-		return nil, fmt.Errorf("invalid entity type: %s", parts[1])
-	}
+	trackingPlanID := matches[1]
 	return &resources.PropertyRef{
-		URN:      resources.URN(parts[3], types.TrackingPlanResourceType),
+		URN:      resources.URN(trackingPlanID, types.TrackingPlanResourceType),
 		Property: "id",
 	}, nil
 }

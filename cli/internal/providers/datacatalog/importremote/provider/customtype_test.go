@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -58,7 +60,7 @@ func TestCustomTypeLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "ct2"))
 	})
 
-	t.Run("correctly assigns externalId and reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockCustomTypeDataCatalog{
 			customTypes: []*catalog.CustomType{
 				{ID: "ct1", Name: "Address Type", Type: "object", WorkspaceId: "ws1"},
@@ -82,12 +84,45 @@ func TestCustomTypeLoadImportable(t *testing.T) {
 		ct1, ok := customTypes["ct1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, ct1.ExternalID)
-		assert.NotEmpty(t, ct1.Reference)
+		assert.Equal(t, ct1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, ct1.ExternalID))
 
 		ct2, ok := customTypes["ct2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, ct2.ExternalID)
-		assert.NotEmpty(t, ct2.Reference)
+		assert.Equal(t, ct2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, ct2.ExternalID))
+	})
+
+	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
+		mockClient := &mockCustomTypeDataCatalog{
+			customTypes: []*catalog.CustomType{
+				{ID: "ct1", Name: "Address Type", Type: "object", WorkspaceId: "ws1"},
+				{ID: "ct2", Name: "Product Type", Type: "object", WorkspaceId: "ws1"},
+			},
+		}
+
+		provider := &CustomTypeImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "custom-types",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.Nil(t, err)
+
+		customTypes := collection.GetAll(types.CustomTypeResourceType)
+		require.Equal(t, 2, len(customTypes))
+
+		ct1, ok := customTypes["ct1"]
+		require.True(t, ok)
+		assert.NotEmpty(t, ct1.ExternalID)
+		assert.Equal(t, ct1.Reference, fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, ct1.ExternalID))
+
+		ct2, ok := customTypes["ct2"]
+		require.True(t, ok)
+		assert.NotEmpty(t, ct2.ExternalID)
+		assert.Equal(t, ct2.Reference, fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, ct2.ExternalID))
 	})
 }
 

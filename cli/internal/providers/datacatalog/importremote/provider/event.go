@@ -104,7 +104,7 @@ func (p *EventImportProvider) idResources(
 		}
 
 		event.ExternalID = externalID
-		event.Reference = fmt.Sprintf("#%s/%s/%s", types.EventResourceType, MetadataNameEvents, externalID)
+		event.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindEvents, MetadataNameEvents, externalID)
 		if p.v1SpecSupport {
 			event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
 		}

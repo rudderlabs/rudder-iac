@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -71,7 +73,7 @@ func TestLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "prop2"))
 	})
 
-	t.Run("correctly assigns externalId and reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockDataCatalog{
 			properties: []*catalog.Property{
 				{ID: "prop1", Name: "User Email", Type: "string", WorkspaceId: "ws1"},
@@ -95,7 +97,40 @@ func TestLoadImportable(t *testing.T) {
 		prop1, ok := properties["prop1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, prop1.ExternalID)
-		assert.NotEmpty(t, prop1.Reference)
+		assert.Equal(t, prop1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, prop1.ExternalID))
+
+		prop2, ok := properties["prop2"]
+		require.True(t, ok)
+		assert.NotEmpty(t, prop2.ExternalID)
+		assert.Equal(t, prop2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, prop2.ExternalID))
+	})
+
+	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
+		mockClient := &mockDataCatalog{
+			properties: []*catalog.Property{
+				{ID: "prop1", Name: "User Email", Type: "string", WorkspaceId: "ws1"},
+				{ID: "prop2", Name: "User Age", Type: "number", WorkspaceId: "ws1"},
+			},
+		}
+
+		provider := &PropertyImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			filepath:      "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.Nil(t, err)
+
+		properties := collection.GetAll(types.PropertyResourceType)
+		require.Equal(t, 2, len(properties))
+
+		prop1, ok := properties["prop1"]
+		require.True(t, ok)
+		assert.NotEmpty(t, prop1.ExternalID)
+		assert.Equal(t, prop1.Reference, fmt.Sprintf("#%s:%s", types.PropertyResourceType, prop1.ExternalID))
 
 		prop2, ok := properties["prop2"]
 		require.True(t, ok)

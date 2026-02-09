@@ -70,6 +70,7 @@ func (p *Provider) SupportedKinds() []string {
 		localcatalog.KindProperties,
 		localcatalog.KindEvents,
 		localcatalog.KindTrackingPlans,
+		localcatalog.KindTrackingPlansV1,
 		localcatalog.KindCustomTypes,
 		localcatalog.KindCategories,
 	}

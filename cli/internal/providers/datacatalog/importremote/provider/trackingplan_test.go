@@ -84,12 +84,12 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		tp1, ok := trackingPlans["tp1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, tp1.ExternalID)
-		assert.Equal(t, tp1.Reference, fmt.Sprintf("#%s/%s/%s", localcatalog.KindTrackingPlans, tp1.ExternalID, tp1.ExternalID))
+		assert.Equal(t, tp1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, tp1.ExternalID, tp1.ExternalID))
 
 		tp2, ok := trackingPlans["tp2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, tp2.ExternalID)
-		assert.Equal(t, tp2.Reference, fmt.Sprintf("#%s/%s/%s", localcatalog.KindTrackingPlans, tp2.ExternalID, tp2.ExternalID))
+		assert.Equal(t, tp2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, tp2.ExternalID, tp2.ExternalID))
 	})
 
 	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {

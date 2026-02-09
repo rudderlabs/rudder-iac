@@ -230,7 +230,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 
-	case KindTrackingPlans:
+	case KindTrackingPlans, KindTrackingPlansV1:
 		trackingPlans, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)

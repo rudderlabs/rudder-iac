@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -17,6 +18,7 @@ import (
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
@@ -51,7 +53,11 @@ func New(client esClient.EventStreamStore) *Provider {
 		},
 		handlers: make(map[string]handler),
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	options := []sourceHandler.HandlerOption{}
+	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
+		options = append(options, sourceHandler.WithV1SpecSupport())
+	}
+	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir, options...)
 	return p
 }
 
@@ -96,8 +102,19 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
-	// Empty implementation for now
-	return fmt.Errorf("not implemented")
+	return p.LoadSpec(path, s)
+}
+
+func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported kind: %s", s.Kind)
+	}
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+	return handler.MigrateSpec(s)
 }
 
 func (p *Provider) Validate(graph *resources.Graph) error {
