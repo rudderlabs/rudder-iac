@@ -30,7 +30,7 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 	p.LocalID = v0.LocalID
 	p.Name = v0.Name
 	p.Description = v0.Description
-	p.Config = convertConfigKeysToSnakeCase(v0.Config)
+	p.Config = ConvertConfigKeysToSnakeCase(v0.Config)
 
 	// Parse the v0 type field to determine if it's single or multiple types
 	if strings.Contains(v0.Type, ",") {
@@ -96,9 +96,9 @@ var SupportedV0ConfigKeys = []string{
 	"uniqueItems",
 }
 
-// convertConfigKeysToSnakeCase converts camelCase config keys to snake_case
+// ConvertConfigKeysToSnakeCase converts camelCase config keys to snake_case
 // for v1 spec format. This handles the migration from v0 to v1 config format.
-func convertConfigKeysToSnakeCase(config map[string]interface{}) map[string]interface{} {
+func ConvertConfigKeysToSnakeCase(config map[string]interface{}) map[string]interface{} {
 	if config == nil {
 		return nil
 	}
@@ -170,7 +170,7 @@ func (c *CustomTypeV1) FromV0(v0 CustomType) error {
 	c.Name = v0.Name
 	c.Description = v0.Description
 	c.Type = v0.Type
-	c.Config = convertConfigKeysToSnakeCase(v0.Config)
+	c.Config = ConvertConfigKeysToSnakeCase(v0.Config)
 
 	// Convert properties from V0 to V1
 	if len(v0.Properties) > 0 {

@@ -12,6 +12,7 @@ const (
 )
 
 func toImportSpec(
+	version string,
 	kind string,
 	metadataName string,
 	workspaceMetadata specs.WorkspaceImportMetadata,
@@ -30,7 +31,7 @@ func toImportSpec(
 	}
 
 	return &specs.Spec{
-		Version:  specs.SpecVersionV0_1,
+		Version:  version,
 		Kind:     kind,
 		Metadata: metadataMap,
 		Spec:     data,

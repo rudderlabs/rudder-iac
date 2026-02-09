@@ -165,6 +165,7 @@ func TestCategoryFormatForExport(t *testing.T) {
 
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
+		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
 
 		categories, ok := spec.Spec["categories"].([]map[string]any)
 		require.True(t, ok)
@@ -201,6 +202,7 @@ func TestCategoryFormatForExport(t *testing.T) {
 
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 
 		categories, ok := spec.Spec["categories"].([]map[string]any)
 		require.True(t, ok)

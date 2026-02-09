@@ -104,7 +104,10 @@ func (p *EventImportProvider) idResources(
 		}
 
 		event.ExternalID = externalID
-		event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
+		event.Reference = fmt.Sprintf("#%s/%s/%s", types.EventResourceType, MetadataNameEvents, externalID)
+		if p.v1SpecSupport {
+			event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
+		}
 	}
 	return nil
 }
@@ -124,6 +127,10 @@ func (p *EventImportProvider) FormatForExport(
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
+	}
+	version := specs.SpecVersionV0_1
+	if p.v1SpecSupport {
+		version = specs.SpecVersionV1
 	}
 
 	formattedEvents := make([]map[string]any, 0)
@@ -157,6 +164,7 @@ func (p *EventImportProvider) FormatForExport(
 	}
 
 	spec, err := toImportSpec(
+		version,
 		localcatalog.KindEvents,
 		MetadataNameEvents,
 		workspaceMetadata,

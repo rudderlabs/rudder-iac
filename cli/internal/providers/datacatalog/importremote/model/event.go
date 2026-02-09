@@ -83,27 +83,10 @@ func (e *ImportableEventV1) ForExport(
 }
 
 func (e *ImportableEventV1) fromUpstream(externalID string, upstream *catalog.Event, resolver resolver.ReferenceResolver) error {
-	e.EventV1.LocalID = externalID
-	e.EventV1.Name = upstream.Name
-	e.EventV1.Description = upstream.Description
-	e.EventV1.Type = upstream.EventType
-
-	// Resolve category reference if categoryId is set
-	if upstream.CategoryId != nil {
-		categoryRef, err := resolver.ResolveToReference(
-			types.CategoryResourceType,
-			*upstream.CategoryId,
-		)
-		if err != nil {
-			return fmt.Errorf("category reference resolution for event %s: %w", e.EventV1.LocalID, err)
-		}
-
-		if categoryRef == "" {
-			return fmt.Errorf("resolved category reference is empty for event %s", e.EventV1.LocalID)
-		}
-
-		e.EventV1.CategoryRef = &categoryRef
+	v0Event := ImportableEvent{}
+	if err := v0Event.fromUpstream(externalID, upstream, resolver); err != nil {
+		return fmt.Errorf("loading event from upstream: %w", err)
 	}
-
+	e.EventV1 = v0Event.EventV1
 	return nil
 }

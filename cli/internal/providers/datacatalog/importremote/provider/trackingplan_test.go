@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -58,7 +60,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "tp2"))
 	})
 
-	t.Run("correctly assigns externalId and reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
@@ -82,14 +84,45 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		tp1, ok := trackingPlans["tp1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, tp1.ExternalID)
-		assert.NotEmpty(t, tp1.Reference)
-		assert.Contains(t, tp1.Reference, tp1.ExternalID)
+		assert.Equal(t, tp1.Reference, fmt.Sprintf("#%s/%s/%s", localcatalog.KindTrackingPlans, tp1.ExternalID, tp1.ExternalID))
 
 		tp2, ok := trackingPlans["tp2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, tp2.ExternalID)
-		assert.NotEmpty(t, tp2.Reference)
-		assert.Contains(t, tp2.Reference, tp2.ExternalID)
+		assert.Equal(t, tp2.Reference, fmt.Sprintf("#%s/%s/%s", localcatalog.KindTrackingPlans, tp2.ExternalID, tp2.ExternalID))
+	})
+
+	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
+		mockClient := &mockTrackingPlanDataCatalog{
+			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
+				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"}},
+			},
+		}
+
+		provider := &TrackingPlanImportProvider{
+			client:        mockClient,
+			log:           *logger.New("test"),
+			baseImportDir: "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.Nil(t, err)
+
+		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
+		require.Equal(t, 2, len(trackingPlans))
+
+		tp1, ok := trackingPlans["tp1"]
+		require.True(t, ok)
+		assert.NotEmpty(t, tp1.ExternalID)
+		assert.Equal(t, tp1.Reference, fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, tp1.ExternalID))
+
+		tp2, ok := trackingPlans["tp2"]
+		require.True(t, ok)
+		assert.NotEmpty(t, tp2.ExternalID)
+		assert.Equal(t, tp2.Reference, fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, tp2.ExternalID))
 	})
 }
 
@@ -252,6 +285,8 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
+		assert.Equal(t, "tp", spec.Kind)
+		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
 
 		rules, ok := spec.Spec["rules"].([]any)
 		require.True(t, ok)
@@ -327,6 +362,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
 		assert.Equal(t, "tracking-plan", spec.Kind)
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 
 		rules, ok := spec.Spec["rules"].([]any)
 		require.True(t, ok)
