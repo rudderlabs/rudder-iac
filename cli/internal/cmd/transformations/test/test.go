@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -124,10 +125,7 @@ func NewCmdTest() *cobra.Command {
 			// formatter := testorchestrator.NewFormatter(verbose)
 			// formatter.Display(results)
 
-			// TODO: Exit with code 1 if any tests failed
-			// if results.HasFailures() {
-			//     os.Exit(1)
-			// }
+			// TODO: Exit with error if any tests failed
 
 			testLog.Info("Test command not yet fully implemented")
 			ui.Println(ui.Color("Test orchestrator implementation pending (Phase 3)", ui.ColorYellow))
@@ -186,7 +184,7 @@ func validateFlags(args []string, all, modified, show bool) error {
 
 // showDefaultEvents displays the embedded default test events
 func showDefaultEvents() error {
-	events := GetDefaultEvents()
+	events := testorchestrator.GetDefaultEvents()
 
 	ui.Println(ui.Bold("Default Test Events: \n"))
 
