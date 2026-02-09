@@ -3,6 +3,7 @@ package test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -156,7 +157,7 @@ func TestShowDefaultEvents(t *testing.T) {
 func TestGetDefaultEvents(t *testing.T) {
 	t.Parallel()
 
-	events := GetDefaultEvents()
+	events := testorchestrator.GetDefaultEvents()
 
 	// Verify we have the expected default events
 	require.NotEmpty(t, events)

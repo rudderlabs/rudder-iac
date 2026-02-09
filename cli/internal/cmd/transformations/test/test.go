@@ -20,7 +20,7 @@ import (
 var ErrTestsFailed = errors.New("one or more tests failed")
 
 var (
-	testLog = logger.New("transformations-test", logger.Attr{
+	testLog = logger.New("transformations", logger.Attr{
 		Key:   "cmd",
 		Value: "test",
 	})
