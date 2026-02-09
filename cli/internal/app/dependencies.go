@@ -92,13 +92,16 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
+	cfg := config.GetConfig()
+
 	providerMap := map[string]provider.Provider{
 		"datacatalog": p.DataCatalog,
 		"retl":        p.RETL,
 		"eventstream": p.EventStream,
 	}
 
-	if p.Transformations != nil {
+	// Only attach transformations provider to composite provider when experimental flag is enabled
+	if cfg.ExperimentalFlags.Transformations {
 		providerMap["transformations"] = p.Transformations
 	}
 
@@ -137,12 +140,8 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	dcp := datacatalog.New(catalogClient)
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
+	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
-
-	var trp *transformations.Provider
-	if cfg.ExperimentalFlags.Transformations {
-		trp = transformations.NewProvider(c)
-	}
 
 	return &Providers{
 		DataCatalog:     dcp,
