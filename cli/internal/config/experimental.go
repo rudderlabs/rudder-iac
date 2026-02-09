@@ -18,6 +18,8 @@ type ExperimentalConfig struct {
 	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
 	// ValidationFramework enables the new validation framework with rule-based validation
 	ValidationFramework bool `mapstructure:"validationFramework"`
+	// Transformations enables transformations provider and related features
+	Transformations bool `mapstructure:"transformations"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
