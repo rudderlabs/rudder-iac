@@ -293,6 +293,134 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 	}
 }
 
+func TestCustomTypeSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil variants is valid", func(t *testing.T) {
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID:  "address",
+					Name:     "Address",
+					Type:     "object",
+					Variants: nil,
+				},
+			},
+		}
+
+		results := validateCustomTypeSpec(
+			localcatalog.KindCustomTypes,
+			specs.SpecVersionV0_1,
+			map[string]any{},
+			spec,
+		)
+		assert.Empty(t, results, "Nil variants should produce no errors")
+	})
+
+	t.Run("empty variants is valid", func(t *testing.T) {
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID:  "address",
+					Name:     "Address",
+					Type:     "object",
+					Variants: localcatalog.Variants{},
+				},
+			},
+		}
+
+		results := validateCustomTypeSpec(
+			localcatalog.KindCustomTypes,
+			specs.SpecVersionV0_1,
+			map[string]any{},
+			spec,
+		)
+		assert.Empty(t, results, "Empty variants should produce no errors")
+	})
+
+	t.Run("valid variant produces no errors", func(t *testing.T) {
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID: "address",
+					Name:    "Address",
+					Type:    "object",
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#/properties/address-props/country",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "US Address",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#/properties/address-props/zip_code", Required: true},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSpec(
+			localcatalog.KindCustomTypes,
+			specs.SpecVersionV0_1,
+			map[string]any{},
+			spec,
+		)
+		assert.Empty(t, results, "Valid variant should produce no errors")
+	})
+
+	t.Run("invalid variant generates correct reference paths", func(t *testing.T) {
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID: "address",
+					Name:    "Address",
+					Type:    "object",
+					Variants: localcatalog.Variants{
+						{
+							Type:          "wrong_type",
+							Discriminator: "bad_ref",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "bad_prop_ref"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSpec(
+			localcatalog.KindCustomTypes,
+			specs.SpecVersionV0_1,
+			map[string]any{},
+			spec,
+		)
+
+		expectedRefs := []string{
+			"/types/0/variants/0/type",
+			"/types/0/variants/0/discriminator",
+			"/types/0/variants/0/cases/0/properties/0/$ref",
+		}
+		expectedMsgs := []string{
+			"'type' must equal 'discriminator'",
+			"'discriminator' is not valid: must be of pattern #/properties/<group>/<id>",
+			"'$ref' is not valid: must be of pattern #/properties/<group>/<id>",
+		}
+
+		assert.Len(t, results, 3)
+		assert.ElementsMatch(t, expectedRefs, extractRefs(results))
+		assert.ElementsMatch(t, expectedMsgs, extractMsgs(results))
+	})
+}
+
 func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 	t.Parallel()
 
