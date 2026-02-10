@@ -8,15 +8,16 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 // validDiscriminatorTypes are the primitive types allowed for discriminator properties.
 var validDiscriminatorTypes = []string{"string", "integer", "boolean"}
 
 // ValidateVariantDiscriminators checks all variants' discriminators for:
-// 1. Type validity — discriminator property must be string, integer, or boolean.
-//    For custom type refs, the referenced custom type's own type is validated.
-// 2. Ownership — discriminator must reference a property in the parent's own properties.
+//  1. Type validity — discriminator property must be string, integer, or boolean.
+//     For custom type refs, the referenced custom type's own type is validated.
+//  2. Ownership — discriminator must reference a property in the parent's own properties.
 func ValidateVariantDiscriminators(
 	variants localcatalog.Variants,
 	ownPropertyRefs []string,
@@ -32,7 +33,7 @@ func ValidateVariantDiscriminators(
 		if !slices.Contains(ownPropertyRefs, variant.Discriminator) {
 			results = append(results, rules.ValidationResult{
 				Reference: discriminatorPath,
-				Message:   fmt.Sprintf(
+				Message: fmt.Sprintf(
 					"discriminator '%s' must reference a property defined in the parent's own properties",
 					variant.Discriminator,
 				),
@@ -45,14 +46,14 @@ func ValidateVariantDiscriminators(
 				variant.Discriminator,
 				discriminatorPath,
 				graph,
-				)...)
+			)...)
 	}
 
 	return results
 }
 
 // validateDiscriminatorType looks up the discriminator property in the graph
-// and checks that its type is string, integer, or boolean. 
+// and checks that its type is string, integer, or boolean.
 func validateDiscriminatorType(discriminator, jsonPointer string, graph *resources.Graph) []rules.ValidationResult {
 	resourceType, localID, err := ParseURNRef(discriminator)
 	if err != nil {
@@ -73,8 +74,10 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 
 	switch t := propType.(type) {
 	case string:
-		for _, valid := range validDiscriminatorTypes {
-			if strings.Contains(t, valid) {
+		validTypes := strings.Split(t, ",")
+
+		for _, validType := range validDiscriminatorTypes {
+			if lo.Contains(validTypes, validType) {
 				return nil
 			}
 		}
@@ -82,6 +85,7 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 			Reference: jsonPointer,
 			Message:   fmt.Sprintf("discriminator property type '%s' is invalid, must be one of: string, integer, boolean", t),
 		}}
+
 	case resources.PropertyRef:
 		// Resolve the custom type from the graph and validate its type
 		ctResource, exists := graph.GetResource(t.URN)
@@ -97,9 +101,10 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 		if !ok {
 			return nil
 		}
+		ctTypes := strings.Split(ctType, ",")
 
 		for _, vt := range validDiscriminatorTypes {
-			if strings.Contains(ctType,vt) {
+			if lo.Contains(ctTypes, vt) {
 				return nil
 			}
 		}
