@@ -14,8 +14,8 @@ import (
 type PropertyV1 struct {
 	LocalID     string                 `mapstructure:"id" json:"id"`
 	Name        string                 `mapstructure:"name" json:"name"`
-	Description string                 `mapstructure:"description,omitempty" json:"description"`
-	Type        string                 `mapstructure:"type,omitempty" json:"type"`
+	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty"`
 	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
 	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
 	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`

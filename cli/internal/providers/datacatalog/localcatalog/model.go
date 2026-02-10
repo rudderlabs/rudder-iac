@@ -69,10 +69,10 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 
 type EventV1 struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
-	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Name        string  `json:"name,omitempty" mapstructure:"name,omitempty"`
 	Type        string  `json:"event_type" mapstructure:"event_type"`
-	Description string  `json:"description" mapstructure:"description,omitempty"`
-	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
+	Description string  `json:"description,omitempty" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category,omitempty" mapstructure:"category,omitempty"`
 }
 
 type EventSpecV1 struct {
