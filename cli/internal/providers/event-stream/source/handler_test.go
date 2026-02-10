@@ -193,7 +193,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				errorMessage: "invalid entity type: invalid-entity",
+				errorMessage: "invalid ref format: #/invalid-entity/group/tp-123",
 			},
 			{
 				name: "with tracking plan config missing",
