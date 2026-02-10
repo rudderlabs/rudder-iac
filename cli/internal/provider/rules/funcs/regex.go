@@ -53,13 +53,13 @@ func getPatternErrorMessage(patternName string) (string, bool) {
 
 // NewPattern registers a named pattern in the global pattern registry
 // Usage: NewPattern("customtype_name", "^[a-zA-Z_][a-zA-Z0-9_]*$", "must be valid identifier")
-// Then use in struct tags: validate:"pattern:customtype_name"
+// Then use in struct tags: validate:"pattern=customtype_name"
 func NewPattern(name string, pattern string, errorMessage string) {
 	registry.Register(name, pattern, errorMessage)
 }
 
 // GetPatternValidator returns the global pattern validator that should be registered
-// in ValidateStruct. This validator handles all validate:"pattern:name" tags.
+// in ValidateStruct. This validator handles all validate:"pattern=name" tags.
 func GetPatternValidator() rules.CustomValidateFunc {
 	fn := validator.Func(func(fl validator.FieldLevel) bool {
 		patternName := fl.Param()

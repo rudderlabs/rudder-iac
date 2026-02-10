@@ -104,6 +104,28 @@ func TestPropertySpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				Properties: []localcatalog.Property{},
 			},
 		},
+		{
+			name: "property with name at minimum length (1 character)",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "id",
+						Name:    "A",
+					},
+				},
+			},
+		},
+		{
+			name: "property with name at maximum length (65 characters)",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "id",
+						Name:    "A Property Name That Is Exactly 65 Characters Including Spaces...",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -176,6 +198,34 @@ func TestPropertySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			expectedErrors: 2,
 			expectedRefs:   []string{"/properties/1/id", "/properties/2/name"},
 			expectedMsgs:   []string{"'id' is required", "'name' is required"},
+		},
+		{
+			name: "property with empty name",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "user_id",
+						Name:    "",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/properties/0/name"},
+			expectedMsgs:   []string{"'name' is required"},
+		},
+		{
+			name: "property with name exceeding 65 characters",
+			spec: localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{
+						LocalID: "user_id",
+						Name:    "This is a very long name that exceeds the maximum allowed length of sixty five characters for a property name",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/properties/0/name"},
+			expectedMsgs:   []string{"'name' length must be less than or equal to 65"},
 		},
 	}
 

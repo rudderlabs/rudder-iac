@@ -13,7 +13,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
+	categoryRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/category"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
+	eventRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/event"
 	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
@@ -336,7 +338,11 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 func (p *Provider) SyntacticRules() []rules.Rule {
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
+		propertyRules.NewPropertyConfigValidRule(),
 		customtypeRules.NewCustomTypeSpecSyntaxValidRule(),
+		customtypeRules.NewCustomTypeConfigValidRule(),
+		eventRules.NewEventSpecSyntaxValidRule(),
+		categoryRules.NewCategorySpecSyntaxValidRule(),
 	}
 
 	return syntactic

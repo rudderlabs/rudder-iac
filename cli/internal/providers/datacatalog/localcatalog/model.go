@@ -18,7 +18,7 @@ func strictUnmarshal(data []byte, v any) error {
 
 type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
-	Name        string                 `mapstructure:"name" json:"name" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
 	Description string                 `mapstructure:"description,omitempty" json:"description" validate:"omitempty,gte=3,lte=2000"`
 	Type        string                 `mapstructure:"type,omitempty" json:"type" validate:"omitempty,primitive_or_reference"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`
@@ -30,11 +30,15 @@ type PropertySpec struct {
 
 // Event represents a user-defined event (V0 spec)
 type Event struct {
-	LocalID     string  `json:"id" mapstructure:"id"`
+	LocalID     string  `json:"id" mapstructure:"id" validate:"required"`
 	Name        string  `json:"name" mapstructure:"name,omitempty"`
-	Type        string  `json:"event_type" mapstructure:"event_type"`
-	Description string  `json:"description" mapstructure:"description,omitempty"`
-	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type" validate:"oneof=track screen identify group page"`
+	Description string  `json:"description" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	CategoryRef *string `json:"category" mapstructure:"category,omitempty" validate:"omitempty,pattern=legacy_category_ref"`
+}
+
+type EventSpec struct {
+	Events []Event `json:"events" validate:"dive"`
 }
 
 // This method is used to extract the entity from the byte representation of it
@@ -100,8 +104,12 @@ type CategoryV1 struct {
 
 // Category represents a user-defined category (V0 spec)
 type Category struct {
-	LocalID string `mapstructure:"id" json:"id"`
-	Name    string `mapstructure:"name" json:"name"`
+	LocalID string `mapstructure:"id" json:"id" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=category_name"`
+}
+
+type CategorySpec struct {
+	Categories []Category `json:"categories" validate:"dive"`
 }
 
 // CategorySpecV1 represents the spec section of a categories resource
