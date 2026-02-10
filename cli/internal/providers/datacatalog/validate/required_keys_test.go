@@ -410,6 +410,19 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 			expectedErrors: 1,
 			errorContains:  "id and name fields on property are mandatory",
 		},
+		{
+			name: "v1 property should not allow a multi type string for the type field(they must be added through the types fields)",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "invalid-prop-with-multi-type-string-in-type-field",
+					Name:        "Invalid Property With Multi Type String In Type Field",
+					Description: "Property with multi type string in type field",
+					Type:        "string, boolean, array",
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "multiple types are not allowed in the type field, use the types field instead",
+		},
 	}
 
 	for _, tc := range testCases {
