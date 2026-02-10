@@ -17,6 +17,7 @@ import (
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
 	eventRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/event"
 	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
+	trackingplanRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/trackingplan"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
@@ -343,6 +344,7 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 		customtypeRules.NewCustomTypeConfigValidRule(),
 		eventRules.NewEventSpecSyntaxValidRule(),
 		categoryRules.NewCategorySpecSyntaxValidRule(),
+		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(),
 	}
 
 	return syntactic
