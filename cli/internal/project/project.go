@@ -323,6 +323,7 @@ func (p *project) registry() (rules.Registry, error) {
 				specs.SpecVersionV0_1Variant,
 			},
 		),
+		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 

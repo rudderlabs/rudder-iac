@@ -860,11 +860,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name          string
-		spec          *specs.Spec
-		expectedIDs   []string
-		expectedError bool
-		errorContains string
+		name             string
+		spec             *specs.Spec
+		expectedIDs      []string
+		expectedLocalIDs []specs.LocalID
+		expectedError    bool
+		errorContains    string
 	}{
 		{
 			name: "success - parse properties spec with multiple IDs",
@@ -878,8 +879,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"prop1", "prop2", "prop3"},
-			expectedError: false,
+			expectedIDs: []string{"prop1", "prop2", "prop3"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "prop1", Reference: "/spec/properties/0/id"},
+				{ID: "prop2", Reference: "/spec/properties/1/id"},
+				{ID: "prop3", Reference: "/spec/properties/2/id"},
+			},
 		},
 		{
 			name: "success - parse events spec with multiple IDs",
@@ -892,8 +897,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"event1", "event2"},
-			expectedError: false,
+			expectedIDs: []string{"event1", "event2"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "event1", Reference: "/spec/events/0/id"},
+				{ID: "event2", Reference: "/spec/events/1/id"},
+			},
 		},
 		{
 			name: "success - parse tracking plan spec",
@@ -904,8 +912,10 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"display_name": "My Tracking Plan",
 				},
 			},
-			expectedIDs:   []string{"my_tracking_plan"},
-			expectedError: false,
+			expectedIDs: []string{"my_tracking_plan"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "my_tracking_plan", Reference: "/spec/id"},
+			},
 		},
 		{
 			name: "success - parse custom types spec with multiple IDs",
@@ -918,8 +928,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"type1", "type2"},
-			expectedError: false,
+			expectedIDs: []string{"type1", "type2"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "type1", Reference: "/spec/types/0/id"},
+				{ID: "type2", Reference: "/spec/types/1/id"},
+			},
 		},
 		{
 			name: "success - parse categories spec with multiple IDs",
@@ -933,8 +946,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"cat1", "cat2", "cat3"},
-			expectedError: false,
+			expectedIDs: []string{"cat1", "cat2", "cat3"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "cat1", Reference: "/spec/categories/0/id"},
+				{ID: "cat2", Reference: "/spec/categories/1/id"},
+				{ID: "cat3", Reference: "/spec/categories/2/id"},
+			},
 		},
 		{
 			name: "error - properties not found in spec",
@@ -1147,6 +1164,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
 				assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 			}
 		})
 	}

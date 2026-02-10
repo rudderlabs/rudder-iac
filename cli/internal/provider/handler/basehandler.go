@@ -109,18 +109,26 @@ func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.Work
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	// First, try to extract a single "id" field
 	if id, ok := s.Spec["id"].(string); ok {
-		return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+		return &specs.ParsedSpec{
+			ExternalIDs: []string{id},
+			LocalIDs:    []specs.LocalID{{ID: id, Reference: "/spec/id"}},
+		}, nil
 	}
 
 	// If the spec has a single field that is an array, extract IDs from array elements
 	if len(s.Spec) == 1 {
-		for _, value := range s.Spec {
-			if arr, ok := value.([]interface{}); ok {
+		for arrayKey, value := range s.Spec {
+			if arr, ok := value.([]any); ok {
 				externalIDs := make([]string, 0, len(arr))
+				localIDs := make([]specs.LocalID, 0, len(arr))
 				for i, item := range arr {
-					if itemMap, ok := item.(map[string]interface{}); ok {
+					if itemMap, ok := item.(map[string]any); ok {
 						if id, ok := itemMap["id"].(string); ok {
 							externalIDs = append(externalIDs, id)
+							localIDs = append(localIDs, specs.LocalID{
+								ID:        id,
+								Reference: fmt.Sprintf("/spec/%s/%d/id", arrayKey, i),
+							})
 						} else {
 							return nil, fmt.Errorf("array item at index %d does not have an 'id' field", i)
 						}
@@ -128,7 +136,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 						return nil, fmt.Errorf("array item at index %d is not a map", i)
 					}
 				}
-				return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
+				return &specs.ParsedSpec{ExternalIDs: externalIDs, LocalIDs: localIDs}, nil
 			}
 		}
 	}
