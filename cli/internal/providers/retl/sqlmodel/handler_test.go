@@ -383,6 +383,20 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
 		})
+
+		t.Run("uses rudder/v1 when v1SpecSupport enabled", func(t *testing.T) {
+			t.Parallel()
+			s1 := mkSource("rid-1", "Orders Model", "orders-model", "ws-1", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
+			mockClient := &mockRETLClient{}
+			h := sqlmodel.NewHandler(mockClient, "retl", sqlmodel.WithV1SpecSupport())
+			collection := mkCollection(s1)
+			entities, err := h.FormatForExport(collection, idNamer, nil)
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			assert.Equal(t, specs.SpecVersionV1, spec.Version)
+		})
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {

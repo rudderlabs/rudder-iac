@@ -74,9 +74,13 @@ func (v *VariantV1) FromV0(v0 Variant) error {
 						Required: v0Property.Required,
 					})
 				}
+			} else {
+				vc.Properties = []PropertyReferenceV1{}
 			}
 			v.Cases = append(v.Cases, vc)
 		}
+	} else {
+		v.Cases = []VariantCaseV1{}
 	}
 
 	// Convert default from V0 to V1
@@ -88,6 +92,8 @@ func (v *VariantV1) FromV0(v0 Variant) error {
 				Required: v0Default.Required,
 			})
 		}
+	} else {
+		v.Default.Properties = []PropertyReferenceV1{}
 	}
 
 	return nil

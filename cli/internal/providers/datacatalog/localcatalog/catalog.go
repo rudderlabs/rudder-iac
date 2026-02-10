@@ -230,7 +230,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 
-	case KindTrackingPlans:
+	case KindTrackingPlans, KindTrackingPlansV1:
 		trackingPlans, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
@@ -363,11 +363,16 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
+		// use KindTrackingPlansV1 to store import metadata for tracking plans
+		kind := s.Kind
+		if kind == KindTrackingPlans {
+			kind = KindTrackingPlansV1
+		}
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				dc.ImportMetadata[resources.URN(kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
 					WorkspaceID: workspace.WorkspaceID,
 					RemoteID:    resource.RemoteID,
 				}

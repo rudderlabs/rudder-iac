@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1520,6 +1521,48 @@ func TestDataCatalog_LoadSpec(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "extracting data catalog entity")
 		assert.Contains(t, err.Error(), "test.yaml")
+	})
+
+	t.Run("stores import metadata for tracking plans under tracking-plan kind(instead of tp) for provider lookup", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    KindTrackingPlansV1,
+			Metadata: map[string]any{
+				"name": "my-tracking-plan",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "tp-imported",
+									"remote_id": "remote-tp-id",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]any{
+				"id":           "tp-imported",
+				"display_name": "Imported Plan",
+				"rules":        []any{},
+			},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("tracking-plan.yaml", spec)
+
+		require.NoError(t, err)
+		require.Len(t, dc.TrackingPlans, 1)
+		// Provider looks up with KindTrackingPlans ("tp"), not KindTrackingPlansV1 ("tracking-plan")
+		urn := resources.URN(KindTrackingPlansV1, "tp-imported")
+		meta, ok := dc.ImportMetadata[urn]
+		require.True(t, ok, "ImportMetadata should be stored under tracking-plan:localId for provider lookup")
+		assert.Equal(t, "ws-123", meta.WorkspaceID)
+		assert.Equal(t, "remote-tp-id", meta.RemoteID)
 	})
 }
 

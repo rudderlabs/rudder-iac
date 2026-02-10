@@ -2,14 +2,12 @@ package model
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 )
 
 type ImportableProperty struct {
@@ -108,52 +106,15 @@ func (p *ImportablePropertyV1) ForExport(
 }
 
 func (p *ImportablePropertyV1) fromUpstream(externalID string, upstream *catalog.Property, resolver resolver.ReferenceResolver) error {
-	p.PropertyV1.LocalID = externalID
-	p.PropertyV1.Name = upstream.Name
-	p.PropertyV1.Description = upstream.Description
-	p.PropertyV1.Type = upstream.Type
-	// convert camelCase keys to snake_case
-	p.PropertyV1.Config = make(map[string]interface{})
-	for key, value := range upstream.Config {
-		snakeKey := utils.ToSnakeCase(key)
-		p.PropertyV1.Config[snakeKey] = value
+	v0Prop := ImportableProperty{}
+	if err := v0Prop.fromUpstream(externalID, upstream, resolver); err != nil {
+		return fmt.Errorf("loading property from upstream: %w", err)
 	}
 
-	switch {
-	// If the type not matches the valid types, it means it's a customType ID
-	// reference which needs to be resolved to a custom type reference
-	case isCustomType(upstream):
-		customTypeRef, err := resolver.ResolveToReference(
-			types.CustomTypeResourceType,
-			upstream.DefinitionId)
-		if err != nil {
-			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.PropertyV1.LocalID, err)
-		}
-
-		if customTypeRef == "" {
-			return fmt.Errorf("resolved custom type reference is empty")
-		}
-		p.PropertyV1.Type = customTypeRef
-		// Hardcode the config to nil when property references a custom type
-		// other we receive $ref data in it
-		p.PropertyV1.Config = nil
-	case upstream.Type == "array" && upstream.ItemDefinitionId != "":
-		customTypeRef, err := resolver.ResolveToReference(
-			types.CustomTypeResourceType,
-			upstream.ItemDefinitionId)
-		if err != nil {
-			return fmt.Errorf("custom type reference resolution for resource: %s: %w", p.PropertyV1.LocalID, err)
-		}
-
-		if customTypeRef == "" {
-			return fmt.Errorf("resolved custom type reference is empty")
-		}
-		p.PropertyV1.ItemType = customTypeRef
-	case strings.Contains(upstream.Type, ","):
-		p.PropertyV1.Types = utils.SplitMultiTypeString(upstream.Type)
-		p.PropertyV1.Type = ""
+	err := p.FromV0(v0Prop.Property)
+	if err != nil {
+		return fmt.Errorf("converting property to v1: %w", err)
 	}
-
 	return nil
 }
 

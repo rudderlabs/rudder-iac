@@ -72,6 +72,7 @@ func (p *Provider) SupportedKinds() []string {
 		localcatalog.KindProperties,
 		localcatalog.KindEvents,
 		localcatalog.KindTrackingPlans,
+		localcatalog.KindTrackingPlansV1,
 		localcatalog.KindCustomTypes,
 		localcatalog.KindCategories,
 	}
@@ -290,7 +291,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			types.TrackingPlanResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
-			getResourceImportMetadata(localcatalog.KindTrackingPlans, tp.LocalID),
+			getResourceImportMetadata(localcatalog.KindTrackingPlansV1, tp.LocalID),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
 				localcatalog.KindTrackingPlans,
 				tp.LocalID,

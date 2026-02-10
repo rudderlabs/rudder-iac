@@ -114,87 +114,14 @@ func (iv *ImportableVariantsV1) fromUpstream(
 	remoteVariants catalog.Variants,
 	resolver resolver.ReferenceResolver,
 ) error {
-	if len(remoteVariants) == 0 {
-		iv.VariantsV1 = nil
-		return nil
+	v0Variants := ImportableVariants{}
+	if err := v0Variants.fromUpstream(remoteVariants, resolver); err != nil {
+		return fmt.Errorf("loading variants from upstream: %w", err)
 	}
 
-	iv.VariantsV1 = make([]localcatalog.VariantV1, 0, len(remoteVariants))
-
-	for i := range remoteVariants {
-		remoteVariant := &remoteVariants[i]
-		localVariant := localcatalog.VariantV1{
-			Type:          remoteVariant.Type,
-			Discriminator: remoteVariant.Discriminator,
-			Cases:         make([]localcatalog.VariantCaseV1, 0, len(remoteVariant.Cases)),
-			Default: localcatalog.DefaultPropertiesV1{
-				Properties: make([]localcatalog.PropertyReferenceV1, 0, len(remoteVariant.Default)),
-			},
-		}
-
-		discriminatorRef, err := resolver.ResolveToReference(
-			types.PropertyResourceType,
-			remoteVariant.Discriminator,
-		)
-		if err != nil {
-			return fmt.Errorf("resolving reference for discriminator: %s: %w",
-				remoteVariant.Discriminator, err)
-		}
-		if discriminatorRef == "" {
-			return fmt.Errorf("resolved reference is empty for discriminator: %s", remoteVariant.Discriminator)
-		}
-		localVariant.Discriminator = discriminatorRef
-
-		for _, remoteCase := range remoteVariant.Cases {
-			localCase := localcatalog.VariantCaseV1{
-				DisplayName: remoteCase.DisplayName,
-				Match:       remoteCase.Match,
-				Description: remoteCase.Description,
-				Properties:  make([]localcatalog.PropertyReferenceV1, 0, len(remoteCase.Properties)),
-			}
-
-			for _, remoteProp := range remoteCase.Properties {
-				propRef, err := resolver.ResolveToReference(
-					types.PropertyResourceType,
-					remoteProp.ID,
-				)
-				if err != nil {
-					return fmt.Errorf("resolving reference for property %s in variant case %s: %w", remoteProp.ID, remoteCase.DisplayName, err)
-				}
-				if propRef == "" {
-					return fmt.Errorf("resolved reference is empty for property %s in variant case %s", remoteProp.ID, remoteCase.DisplayName)
-				}
-
-				localCase.Properties = append(localCase.Properties, localcatalog.PropertyReferenceV1{
-					Property: propRef,
-					Required: remoteProp.Required,
-				})
-			}
-
-			localVariant.Cases = append(localVariant.Cases, localCase)
-		}
-
-		for _, remoteProp := range remoteVariant.Default {
-			propRef, err := resolver.ResolveToReference(
-				types.PropertyResourceType,
-				remoteProp.ID,
-			)
-			if err != nil {
-				return fmt.Errorf("resolving reference for property %s in variant default: %w",
-					remoteProp.ID, err)
-			}
-			if propRef == "" {
-				return fmt.Errorf("resolved reference is empty for property %s in variant default", remoteProp.ID)
-			}
-
-			localVariant.Default.Properties = append(localVariant.Default.Properties, localcatalog.PropertyReferenceV1{
-				Property: propRef,
-				Required: remoteProp.Required,
-			})
-		}
-
-		iv.VariantsV1 = append(iv.VariantsV1, localVariant)
+	err := iv.VariantsV1.FromV0(v0Variants.Variants)
+	if err != nil {
+		return fmt.Errorf("converting variants to v1: %w", err)
 	}
-
 	return nil
 }
