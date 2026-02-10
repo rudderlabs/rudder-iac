@@ -106,11 +106,13 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			if prop.Type != "" {
 				switch {
-				case catalog.CustomTypeRegex.Match([]byte(prop.Type)) && prop.Config != nil:
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
-						Reference: reference,
-					})
+				case catalog.CustomTypeRegex.Match([]byte(prop.Type)):
+					if prop.Config != nil {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+							Reference: reference,
+						})
+					}
 				case strings.Contains(prop.Type, ","):
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("type '%s' is invalid, multiple types are not allowed in the type field, use the types field instead", prop.Type),
