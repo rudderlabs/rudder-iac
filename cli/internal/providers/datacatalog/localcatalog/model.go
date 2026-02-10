@@ -105,7 +105,7 @@ type CategoryV1 struct {
 // Category represents a user-defined category (V0 spec)
 type Category struct {
 	LocalID string `mapstructure:"id" json:"id" validate:"required"`
-	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=category_name"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=display_name"`
 }
 
 type CategorySpec struct {
@@ -141,7 +141,7 @@ type CustomType struct {
 	Type        string               `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
 	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
-	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
+	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type
