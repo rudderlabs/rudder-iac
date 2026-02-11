@@ -33,10 +33,7 @@ func ValidateVariantDiscriminators(
 		if !slices.Contains(ownPropertyRefs, variant.Discriminator) {
 			results = append(results, rules.ValidationResult{
 				Reference: discriminatorPath,
-				Message: fmt.Sprintf(
-					"discriminator '%s' must reference a property defined in the parent's own properties",
-					variant.Discriminator,
-				),
+				Message:   "discriminator must reference a property defined in the parent's own properties",
 			})
 		}
 
@@ -74,16 +71,18 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 
 	switch t := propType.(type) {
 	case string:
-		validTypes := strings.Split(t, ",")
+		inputTypes := lo.Map(strings.Split(t, ","), func(item string, _ int) string {
+			return strings.TrimSpace(item)
+		})
 
 		for _, validType := range validDiscriminatorTypes {
-			if lo.Contains(validTypes, validType) {
+			if lo.Contains(inputTypes, validType) {
 				return nil
 			}
 		}
 		return []rules.ValidationResult{{
 			Reference: jsonPointer,
-			Message:   fmt.Sprintf("discriminator property type '%s' is invalid, must be one of: string, integer, boolean", t),
+			Message:   fmt.Sprintf("discriminator property type '%s' must contain one of: string, integer, boolean", t),
 		}}
 
 	case resources.PropertyRef:
@@ -101,7 +100,9 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 		if !ok {
 			return nil
 		}
-		ctTypes := strings.Split(ctType, ",")
+		ctTypes := lo.Map(strings.Split(ctType, ","), func(item string, _ int) string {
+			return strings.TrimSpace(item)
+		})
 
 		for _, vt := range validDiscriminatorTypes {
 			if lo.Contains(ctTypes, vt) {

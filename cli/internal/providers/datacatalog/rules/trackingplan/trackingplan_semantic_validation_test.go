@@ -302,8 +302,7 @@ func TestTrackingPlanSemanticValid_VariantDiscriminator(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/rules/0/variants/0/discriminator", results[0].Reference)
-		assert.Contains(t, results[0].Message, "invalid")
-		assert.Contains(t, results[0].Message, "must be one of")
+		assert.Contains(t, results[0].Message, "discriminator property type 'object' must contain one of: string, integer, boolean")
 	})
 
 	t.Run("custom type ref discriminator — allowed", func(t *testing.T) {

@@ -110,8 +110,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
-		assert.Contains(t, results[0].Message, "invalid")
-		assert.Contains(t, results[0].Message, "must be one of")
+		assert.Contains(t, results[0].Message, "discriminator property type 'object' must contain one of: string, integer, boolean")
 	})
 
 	t.Run("invalid discriminator type — array", func(t *testing.T) {
@@ -133,7 +132,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 		results := ValidateVariantDiscriminators(variants, []string{"#property:tags"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "invalid")
+		assert.Contains(t, results[0].Message, "discriminator property type 'array' must contain one of: string, integer, boolean")
 	})
 
 	t.Run("custom type ref — valid underlying type", func(t *testing.T) {
