@@ -392,9 +392,8 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 // the default value for additional properties is true for the following cases -
 // 1. Object type properties
 // 2. Multi-type properties with one of them "object" and no "array" type included
-// 3. Array properties with no item types defined
-// 4. Array properties where item type is object
-// 5. Array properties with multiple item types where at least one is object
+// 3. Array properties where item type is object
+// 4. Array properties with multiple item types where at least one is object
 func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
 	// if the property's type is a custom type, additional properties should be false
 	if strings.HasPrefix(prop.Type, "#custom-type:") {
@@ -417,8 +416,8 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 	if hasArray {
 		itemTypes, ok := prop.Config["item_types"]
 		if !ok {
-			// Case 3: Array properties with no item types defined
-			return true
+			// array properties with no item types defined -> false
+			return false
 		}
 
 		itemTypesSlice, ok := itemTypes.([]any)
@@ -426,8 +425,8 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 			return false
 		}
 		if len(itemTypesSlice) == 0 {
-			// Case 3: Empty itemTypes array
-			return true
+			// empty itemTypes array -> false
+			return false
 		}
 
 		// Cases 4 & 5: Check if any itemType is "object"
