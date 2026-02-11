@@ -18,7 +18,7 @@ func NewDuplicateLocalIDRule(parseSpec ParseSpecFunc) rules.Rule {
 	return &duplicateLocalIDRule{parseSpec: parseSpec}
 }
 
-func (r *duplicateLocalIDRule) ID() string          { return "project/duplicate-local-id" }
+func (r *duplicateLocalIDRule) ID() string               { return "project/duplicate-local-id" }
 func (r *duplicateLocalIDRule) Severity() rules.Severity { return rules.Error }
 func (r *duplicateLocalIDRule) Description() string {
 	return "local IDs must be unique within each kind"
@@ -37,12 +37,12 @@ func (r *duplicateLocalIDRule) Validate(_ *rules.ValidationContext) []rules.Vali
 // It calls ParseSpec on each spec to extract local IDs with their JSON Pointer paths.
 func (r *duplicateLocalIDRule) ValidateProject(allSpecs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 	type occurrence struct {
-		filePath  string
-		reference string
+		filePath string
+		jsonPath string
 	}
 
 	// kind -> id -> all occurrences
-	idsByKind := make(map[string]map[string][]occurrence)
+	occurrences := make(map[string]map[string][]occurrence)
 
 	for filePath, ctx := range allSpecs {
 		parsed, err := r.parseSpec(filePath, &specs.Spec{
@@ -53,34 +53,44 @@ func (r *duplicateLocalIDRule) ValidateProject(allSpecs map[string]*rules.Valida
 		})
 		if err != nil {
 			// ParseSpec failure on a syntactically valid spec is unexpected.
-			// Skip this spec — other validation rules will catch structural issues.
+			// Skip this spec — other validation rules
+			// will catch structural issues.
 			continue
 		}
 
-		if idsByKind[ctx.Kind] == nil {
-			idsByKind[ctx.Kind] = make(map[string][]occurrence)
+		if occurrences[ctx.Kind] == nil {
+			occurrences[ctx.Kind] = make(map[string][]occurrence)
 		}
 
 		for _, localID := range parsed.LocalIDs {
-			idsByKind[ctx.Kind][localID.ID] = append(
-				idsByKind[ctx.Kind][localID.ID],
-				occurrence{filePath: filePath, reference: localID.Reference},
+			occurrences[ctx.Kind][localID.ID] = append(
+				occurrences[ctx.Kind][localID.ID],
+				occurrence{
+					filePath: filePath,
+					jsonPath: localID.JSONPointerPath,
+				},
 			)
 		}
 	}
 
 	results := make(map[string][]rules.ValidationResult)
 
-	for kind, ids := range idsByKind {
-		for id, locations := range ids {
+	for kind, occurrence := range occurrences {
+		for id, locations := range occurrence {
 			if len(locations) <= 1 {
+				// No duplicates found
+				// for this id in this kind
 				continue
 			}
 
 			for _, loc := range locations {
 				results[loc.filePath] = append(results[loc.filePath], rules.ValidationResult{
-					Reference: loc.reference,
-					Message: fmt.Sprintf("duplicate local id '%s' for kind '%s'",id, kind),
+					Reference: loc.jsonPath,
+					Message: fmt.Sprintf(
+						"duplicate local id '%s' for kind '%s'",
+						id,
+						kind,
+					),
 				})
 			}
 		}

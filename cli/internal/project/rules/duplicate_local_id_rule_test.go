@@ -33,8 +33,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 					if m, ok := p.(map[string]any); ok {
 						if id, ok := m["id"].(string); ok {
 							parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-								ID:        id,
-								Reference: fmt.Sprintf("/spec/properties/%d/id", i),
+								ID:              id,
+								JSONPointerPath: fmt.Sprintf("/spec/properties/%d/id", i),
 							})
 						}
 					}
@@ -46,8 +46,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 					if m, ok := e.(map[string]any); ok {
 						if id, ok := m["id"].(string); ok {
 							parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-								ID:        id,
-								Reference: fmt.Sprintf("/spec/events/%d/id", i),
+								ID:              id,
+								JSONPointerPath: fmt.Sprintf("/spec/events/%d/id", i),
 							})
 						}
 					}
@@ -56,7 +56,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		case "tp":
 			if id, ok := s.Spec["id"].(string); ok {
 				parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-					ID: id, Reference: "/spec/id",
+					ID:              id,
+					JSONPointerPath: "/spec/id",
 				})
 			}
 		}

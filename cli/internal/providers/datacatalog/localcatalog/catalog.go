@@ -239,8 +239,8 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, tpID)
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:        tpID,
-			Reference: "/spec/id",
+			ID:              tpID,
+			JSONPointerPath: "/spec/id",
 		})
 		return &parsedSpec, nil
 
@@ -272,8 +272,8 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:        id,
-			Reference: fmt.Sprintf("%s/%d/id", basePath, i),
+			ID:              id,
+			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
 		})
 	}
 

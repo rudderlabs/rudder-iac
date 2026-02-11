@@ -881,9 +881,9 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			},
 			expectedIDs: []string{"prop1", "prop2", "prop3"},
 			expectedLocalIDs: []specs.LocalID{
-				{ID: "prop1", Reference: "/spec/properties/0/id"},
-				{ID: "prop2", Reference: "/spec/properties/1/id"},
-				{ID: "prop3", Reference: "/spec/properties/2/id"},
+				{ID: "prop1", JSONPointerPath: "/spec/properties/0/id"},
+				{ID: "prop2", JSONPointerPath: "/spec/properties/1/id"},
+				{ID: "prop3", JSONPointerPath: "/spec/properties/2/id"},
 			},
 		},
 		{
@@ -899,8 +899,8 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			},
 			expectedIDs: []string{"event1", "event2"},
 			expectedLocalIDs: []specs.LocalID{
-				{ID: "event1", Reference: "/spec/events/0/id"},
-				{ID: "event2", Reference: "/spec/events/1/id"},
+				{ID: "event1", JSONPointerPath: "/spec/events/0/id"},
+				{ID: "event2", JSONPointerPath: "/spec/events/1/id"},
 			},
 		},
 		{
@@ -914,7 +914,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			},
 			expectedIDs: []string{"my_tracking_plan"},
 			expectedLocalIDs: []specs.LocalID{
-				{ID: "my_tracking_plan", Reference: "/spec/id"},
+				{ID: "my_tracking_plan", JSONPointerPath: "/spec/id"},
 			},
 		},
 		{
@@ -930,8 +930,8 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			},
 			expectedIDs: []string{"type1", "type2"},
 			expectedLocalIDs: []specs.LocalID{
-				{ID: "type1", Reference: "/spec/types/0/id"},
-				{ID: "type2", Reference: "/spec/types/1/id"},
+				{ID: "type1", JSONPointerPath: "/spec/types/0/id"},
+				{ID: "type2", JSONPointerPath: "/spec/types/1/id"},
 			},
 		},
 		{
@@ -948,9 +948,9 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			},
 			expectedIDs: []string{"cat1", "cat2", "cat3"},
 			expectedLocalIDs: []specs.LocalID{
-				{ID: "cat1", Reference: "/spec/categories/0/id"},
-				{ID: "cat2", Reference: "/spec/categories/1/id"},
-				{ID: "cat3", Reference: "/spec/categories/2/id"},
+				{ID: "cat1", JSONPointerPath: "/spec/categories/0/id"},
+				{ID: "cat2", JSONPointerPath: "/spec/categories/1/id"},
+				{ID: "cat3", JSONPointerPath: "/spec/categories/2/id"},
 			},
 		},
 		{

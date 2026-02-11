@@ -72,7 +72,7 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	}
 
 	// Phase 2: project-wide validation
-	projectDiags, err := e.runProjectRules(rawSpecs)
+	projectDiags, err := e.runProjectValidationRules(rawSpecs)
 	if err != nil {
 		return nil, fmt.Errorf("project-wide validation: %w", err)
 	}
@@ -82,11 +82,11 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	return toReturn, nil
 }
 
-// runProjectRules discovers rules implementing ProjectRule from the wildcard bucket
+// runProjectValidationRules discovers rules implementing ProjectRule from the wildcard bucket
 // and executes them with all specs at once.
-func (e *validationEngine) runProjectRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
-	// ProjectRules are registered with AppliesTo: ["*"], so they live in the
-	// wildcard bucket. Using an empty kind returns only wildcard rules.
+func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
+	// ProjectValidationRules are registered with AppliesTo: ["*"],
+	// so they live in the wildcard bucket.
 	var projectRules []rules.ProjectRule
 	for _, rule := range e.registry.SyntacticRulesForKind("") {
 		if pr, ok := rule.(rules.ProjectRule); ok {

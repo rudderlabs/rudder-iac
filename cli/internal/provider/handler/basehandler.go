@@ -111,13 +111,13 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 	if id, ok := s.Spec["id"].(string); ok {
 		return &specs.ParsedSpec{
 			ExternalIDs: []string{id},
-			LocalIDs:    []specs.LocalID{{ID: id, Reference: "/spec/id"}},
+			LocalIDs:    []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
 		}, nil
 	}
 
 	// If the spec has a single field that is an array, extract IDs from array elements
 	if len(s.Spec) == 1 {
-		for arrayKey, value := range s.Spec {
+		for specKey, value := range s.Spec {
 			if arr, ok := value.([]any); ok {
 				externalIDs := make([]string, 0, len(arr))
 				localIDs := make([]specs.LocalID, 0, len(arr))
@@ -126,8 +126,8 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 						if id, ok := itemMap["id"].(string); ok {
 							externalIDs = append(externalIDs, id)
 							localIDs = append(localIDs, specs.LocalID{
-								ID:        id,
-								Reference: fmt.Sprintf("/spec/%s/%d/id", arrayKey, i),
+								ID:              id,
+								JSONPointerPath: fmt.Sprintf("/spec/%s/%d/id", specKey, i),
 							})
 						} else {
 							return nil, fmt.Errorf("array item at index %d does not have an 'id' field", i)
