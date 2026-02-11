@@ -1,11 +1,15 @@
 package trackingplan
 
 import (
+	"fmt"
+
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
+
+const maxNestingDepth = 3
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -65,6 +69,9 @@ var validateTrackingPlanSpec = func(
 	Metadata map[string]any,
 	Spec localcatalog.TrackingPlan,
 ) []rules.ValidationResult {
+	// validate the spec using struct tags through go-playground/validator
+	// majority of the validation is done here, remaining spec validation
+	// will be done in subsequent steps.
 	validationErrors, err := rules.ValidateStruct(Spec, "")
 
 	if err != nil {
@@ -76,7 +83,56 @@ var validateTrackingPlanSpec = func(
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors)
+
+	// validate the rules on the trackingplan spec
+	results = append(results, validateRules(Spec.Rules)...)
+
+	return results
+}
+
+func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, rule := range tpRules {
+		for j, prop := range rule.Properties {
+			if len(prop.Properties) == 0 {
+				continue
+			}
+
+			// recursively validate the nesting depth of the properties
+			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
+			results = append(
+				results,
+				validateNestingDepth(prop.Properties, 1, ref)...,
+			)
+		}
+	}
+
+	return results
+}
+
+// validateNestingDepth walks nested properties recursively and reports an error
+// at the root property reference when nesting exceeds maxNestingDepth (3 levels).
+func validateNestingDepth(properties []*localcatalog.TPRuleProperty, currentDepth int, rootRef string) []rules.ValidationResult {
+	if currentDepth > maxNestingDepth {
+		return []rules.ValidationResult{{
+			Reference: rootRef,
+			Message:   fmt.Sprintf("maximum property nesting depth of %d levels exceeded", maxNestingDepth),
+		}}
+	}
+
+	var results []rules.ValidationResult
+	for _, prop := range properties {
+
+		if len(prop.Properties) > 0 {
+			results = append(
+				results,
+				validateNestingDepth(prop.Properties, currentDepth+1, rootRef)...)
+		}
+	}
+
+	return results
 }
 
 // NewTrackingPlanSpecSyntaxValidRule creates a spec syntax validation rule

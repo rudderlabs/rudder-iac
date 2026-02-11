@@ -39,6 +39,7 @@ func TestVariantsSyntaxValid_ValidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Search",
+						Match:       []any{"search"},
 						Description: "Search page",
 						Properties: []localcatalog.PropertyReference{
 							{Ref: "#/properties/group/search_term", Required: true},
@@ -55,6 +56,7 @@ func TestVariantsSyntaxValid_ValidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Ecommerce",
+						Match:       []any{"ecommerce"},
 						Description: "E-commerce events",
 						Properties: []localcatalog.PropertyReference{
 							{Ref: "#/properties/group/product_id"},
@@ -63,6 +65,7 @@ func TestVariantsSyntaxValid_ValidSpecs(t *testing.T) {
 					},
 					{
 						DisplayName: "Content",
+						Match:       []any{"content"},
 						Properties: []localcatalog.PropertyReference{
 							{Ref: "#/properties/group/article_id"},
 						},
@@ -70,6 +73,22 @@ func TestVariantsSyntaxValid_ValidSpecs(t *testing.T) {
 				},
 				Default: []localcatalog.PropertyReference{
 					{Ref: "#/properties/group/user_id", Required: true},
+				},
+			},
+		},
+		{
+			name: "match with mixed valid types (string, bool, integer)",
+			variant: localcatalog.Variant{
+				Type:          "discriminator",
+				Discriminator: "#/properties/group/page_type",
+				Cases: []localcatalog.VariantCase{
+					{
+						DisplayName: "Mixed",
+						Match:       []any{"email", true, float64(42)},
+						Properties: []localcatalog.PropertyReference{
+							{Ref: "#/properties/group/search_term", Required: true},
+						},
+					},
 				},
 			},
 		},
@@ -100,6 +119,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
@@ -115,6 +135,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
@@ -130,6 +151,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
@@ -155,12 +177,76 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
 			},
 			expectedRefs: []string{"/cases/0/display_name"},
 			expectedMsgs: []string{"'display_name' is required"},
+		},
+		{
+			name: "case match empty",
+			variant: localcatalog.Variant{
+				Type:          "discriminator",
+				Discriminator: "#/properties/group/field",
+				Cases: []localcatalog.VariantCase{
+					{
+						DisplayName: "Case1",
+						Match:       []any{},
+						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
+					},
+				},
+			},
+			expectedRefs: []string{"/cases/0/match"},
+			expectedMsgs: []string{"'match' length must be greater than or equal to 1"},
+		},
+		{
+			name: "case match nil",
+			variant: localcatalog.Variant{
+				Type:          "discriminator",
+				Discriminator: "#/properties/group/field",
+				Cases: []localcatalog.VariantCase{
+					{
+						DisplayName: "Case1",
+						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
+					},
+				},
+			},
+			expectedRefs: []string{"/cases/0/match"},
+			expectedMsgs: []string{"'match' is required"},
+		},
+		{
+			name: "match with float value is invalid",
+			variant: localcatalog.Variant{
+				Type:          "discriminator",
+				Discriminator: "#/properties/group/field",
+				Cases: []localcatalog.VariantCase{
+					{
+						DisplayName: "Case1",
+						Match:       []any{3.14},
+						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
+					},
+				},
+			},
+			expectedRefs: []string{"/cases/0/match"},
+			expectedMsgs: []string{"'match' values must be one of [string bool integer]"},
+		},
+		{
+			name: "match with unsupported type is invalid",
+			variant: localcatalog.Variant{
+				Type:          "discriminator",
+				Discriminator: "#/properties/group/field",
+				Cases: []localcatalog.VariantCase{
+					{
+						DisplayName: "Case1",
+						Match:       []any{"valid", []any{"nested"}},
+						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
+					},
+				},
+			},
+			expectedRefs: []string{"/cases/0/match"},
+			expectedMsgs: []string{"'match' values must be one of [string bool integer]"},
 		},
 		{
 			name: "case properties empty",
@@ -170,6 +256,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{},
 					},
 				},
@@ -185,6 +272,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: ""}},
 					},
 				},
@@ -200,6 +288,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "invalid_ref"}},
 					},
 				},
@@ -215,6 +304,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
@@ -231,6 +321,7 @@ func TestVariantsSyntaxValid_InvalidSpecs(t *testing.T) {
 				Cases: []localcatalog.VariantCase{
 					{
 						DisplayName: "Case1",
+						Match:       []any{"value"},
 						Properties:  []localcatalog.PropertyReference{{Ref: "#/properties/group/p1"}},
 					},
 				},
