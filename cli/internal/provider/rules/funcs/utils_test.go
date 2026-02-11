@@ -252,6 +252,24 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'Type' must equal 'discriminator'",
 		},
 		{
+			name: "excluded_unless tag",
+			err: mockFieldError{
+				field:     "variants",
+				actualTag: "excluded_unless",
+				param:     "Type object",
+			},
+			expected: "'variants' is not allowed unless 'Type object'",
+		},
+		{
+			name: "value_types tag",
+			err: mockFieldError{
+				field:     "match",
+				actualTag: "value_types",
+				param:     "string bool integer",
+			},
+			expected: "'match' values must be one of [string bool integer]",
+		},
+		{
 			name: "unknown tag",
 			err: mockFieldError{
 				field:     "Field",
