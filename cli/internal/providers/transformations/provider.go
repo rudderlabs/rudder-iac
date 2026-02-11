@@ -60,10 +60,7 @@ func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*sta
 	handleNameToURN := make(map[string]string)
 
 	for _, remoteLib := range libraryResources {
-		lib, ok := remoteLib.Data.(*model.RemoteLibrary)
-		if !ok || lib.ExternalID == "" {
-			continue
-		}
+		lib := remoteLib.Data.(*model.RemoteLibrary)
 		libraryURN := resources.URN(lib.ExternalID, library.HandlerMetadata.ResourceType)
 		handleNameToURN[lib.ImportName] = libraryURN
 	}
@@ -72,16 +69,9 @@ func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*sta
 	transformationResources := collection.GetAll(transformation.HandlerMetadata.ResourceType)
 
 	for _, remoteTrans := range transformationResources {
-		trans, ok := remoteTrans.Data.(*model.RemoteTransformation)
-		if !ok || trans.ExternalID == "" {
-			continue
-		}
-
+		trans := remoteTrans.Data.(*model.RemoteTransformation)
 		transURN := resources.URN(trans.ExternalID, transformation.HandlerMetadata.ResourceType)
 		resourceState := st.GetResource(transURN)
-		if resourceState == nil {
-			continue
-		}
 
 		// Resolve imports to library URNs
 		dependencies := make([]string, 0, len(trans.Imports))
