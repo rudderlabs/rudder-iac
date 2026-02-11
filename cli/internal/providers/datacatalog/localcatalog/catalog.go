@@ -388,7 +388,7 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 			resourceType = "event"
 		case KindCustomTypes:
 			resourceType = "custom-type"
-		case KindTrackingPlans:
+		case KindTrackingPlans, KindTrackingPlansV1:
 			resourceType = "tracking-plan"
 		case KindCategories:
 			resourceType = "category"
