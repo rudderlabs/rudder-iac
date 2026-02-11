@@ -491,9 +491,10 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			return nil, fmt.Errorf("unable to cast resource to retl source")
 		}
 		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
+		urn := resources.URN(source.ExternalID, ResourceType)
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
-				LocalID:  source.ExternalID,
+				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}

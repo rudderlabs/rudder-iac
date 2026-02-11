@@ -641,9 +641,10 @@ func (h *Handler) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
+		urn := resources.URN(source.ExternalID, ResourceType)
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
-				LocalID:  source.ExternalID,
+				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}
