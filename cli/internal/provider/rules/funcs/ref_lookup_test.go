@@ -259,19 +259,19 @@ func TestExtractLegacyPattern(t *testing.T) {
 	tests := []struct {
 		name     string
 		tag      string
-		expected string
+		expected bool
 	}{
-		{"property ref", "required,pattern=legacy_property_ref", "legacy_property_ref"},
-		{"event ref", "required,pattern=legacy_event_ref", "legacy_event_ref"},
-		{"category ref", "omitempty,pattern=legacy_category_ref", "legacy_category_ref"},
-		{"non-legacy pattern", "required,pattern=display_name", ""},
-		{"no pattern", "required,gte=3", ""},
-		{"empty tag", "", ""},
+		{"property ref", "required,pattern=legacy_property_ref", true},
+		{"event ref", "required,pattern=legacy_event_ref", true},
+		{"category ref", "omitempty,pattern=legacy_category_ref", true},
+		{"non-legacy pattern", "required,pattern=display_name", false},
+		{"no pattern", "required,gte=3", false},
+		{"empty tag", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, extractLegacyPattern(tt.tag))
+			assert.Equal(t, tt.expected, hasReferencePattern(tt.tag))
 		})
 	}
 }

@@ -75,12 +75,9 @@ func walkStruct(val reflect.Value, typ reflect.Type, basePath string, graph *res
 		}
 
 		if validateTag != "" && actualKind == reflect.String {
-			patternName := extractLegacyPattern(validateTag)
-			if patternName == "" {
+			if !hasReferencePattern(validateTag) {
 				// return early if there is no legacy pattern
 				// present on the field
-				// TODO we would need to update it with the
-				// new pattern name
 				continue
 			}
 
@@ -162,13 +159,15 @@ func checkRefInGraph(refValue, fieldPath string, graph *resources.Graph) (rules.
 // Input:  "required,pattern=legacy_property_ref"
 // Output: "legacy_property_ref"
 // Returns "" if no legacy pattern is found.
-func extractLegacyPattern(validateTag string) string {
+func hasReferencePattern(validateTag string) bool {
 	for part := range strings.SplitSeq(validateTag, ",") {
-		if strings.HasPrefix(part, "pattern=legacy_") {
-			return strings.TrimPrefix(part, "pattern=")
+		if strings.HasPrefix(part, "pattern=") {
+			// reference pattern is of the form
+			// "pattern=<name>_ref"
+			return strings.HasSuffix(part, "_ref")
 		}
 	}
-	return ""
+	return false
 }
 
 // ParseURNRef extracts the resource type and local ID from a URN-format reference.

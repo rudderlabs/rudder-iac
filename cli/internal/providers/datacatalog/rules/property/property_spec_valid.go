@@ -70,7 +70,7 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 			if !customTypeLegacyRefRegex.MatchString(prop.Type) {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/properties/%d/type", i),
-					Message:   "'%s' is invalid: must be of pattern #/custom-types/<group>/<id>",
+					Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #/custom-types/<group>/<id>", prop.Type),
 				})
 			}
 			continue
