@@ -379,16 +379,35 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
-		// use KindTrackingPlansV1 to store import metadata for tracking plans
-		kind := s.Kind
-		if kind == KindTrackingPlans {
-			kind = KindTrackingPlansV1
+		// Map spec kind to resource type
+		var resourceType string
+		switch s.Kind {
+		case KindProperties:
+			resourceType = "property"
+		case KindEvents:
+			resourceType = "event"
+		case KindCustomTypes:
+			resourceType = "custom-type"
+		case KindTrackingPlans:
+			resourceType = "tracking-plan"
+		case KindCategories:
+			resourceType = "category"
+		default:
+			return fmt.Errorf("unknown kind: %s", s.Kind)
 		}
+
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				dc.ImportMetadata[resources.URN(kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resource.URN != "" {
+					urn = resource.URN
+				} else {
+					urn = resources.URN(resource.LocalID, resourceType)
+				}
+				dc.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceID: workspace.WorkspaceID,
 					RemoteID:    resource.RemoteID,
 				}
