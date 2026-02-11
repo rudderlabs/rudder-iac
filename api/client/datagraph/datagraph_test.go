@@ -15,16 +15,10 @@ import (
 
 // Test helpers
 
-func newTestStore(t *testing.T, httpClient client.HTTPClient) datagraph.DataGraphStore {
+func newTestStore(t *testing.T, httpClient client.HTTPClient) datagraph.DataGraphClient {
 	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
 	require.NoError(t, err)
-	return datagraph.NewRudderDataGraphStore(c)
-}
-
-func newTestStoreWithoutMock(t *testing.T) datagraph.DataGraphStore {
-	c, err := client.New("test-token")
-	require.NoError(t, err)
-	return datagraph.NewRudderDataGraphStore(c)
+	return datagraph.NewRudderDataGraphClient(c)
 }
 
 // Common test timestamps
@@ -395,7 +389,9 @@ func TestSetExternalID(t *testing.T) {
 // Empty ID validation tests (table-driven)
 
 func TestEmptyIDValidation(t *testing.T) {
-	store := newTestStoreWithoutMock(t)
+	// Mock HTTP client is not called since validation happens before HTTP request
+	httpClient := testutils.NewMockHTTPClient(t)
+	store := newTestStore(t, httpClient)
 
 	tests := []struct {
 		name      string
@@ -441,7 +437,7 @@ func TestAPIErrors(t *testing.T) {
 		path           string
 		responseStatus int
 		responseBody   string
-		operation      func(store datagraph.DataGraphStore) error
+		operation      func(store datagraph.DataGraphClient) error
 		expectedError  string
 	}{
 		{
@@ -450,7 +446,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs",
 			responseStatus: 400,
 			responseBody:   `{"error":"Bad Request"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
 					AccountID: "wh-123",
 				})
@@ -464,7 +460,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs/dg-123",
 			responseStatus: 404,
 			responseBody:   `{"error":"Not Found"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.GetDataGraph(context.Background(), "dg-123")
 				return err
 			},
@@ -476,7 +472,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs/dg-123",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				return store.DeleteDataGraph(context.Background(), "dg-123")
 			},
 			expectedError: "deleting data graph",
@@ -487,7 +483,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.ListDataGraphs(context.Background(), 0, 0, nil)
 				return err
 			},
@@ -499,7 +495,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs/dg-123/external-id",
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
 				return err
 			},
@@ -511,7 +507,7 @@ func TestAPIErrors(t *testing.T) {
 			path:           "/v2/data-graphs",
 			responseStatus: 409,
 			responseBody:   `{"error":"Data graph with the same warehouse id already exists"}`,
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
 					AccountID: "wh-123",
 				})
@@ -548,14 +544,14 @@ func TestMalformedResponses(t *testing.T) {
 		name          string
 		method        string
 		path          string
-		operation     func(store datagraph.DataGraphStore) error
+		operation     func(store datagraph.DataGraphClient) error
 		expectedError string
 	}{
 		{
 			name:   "CreateDataGraph",
 			method: "POST",
 			path:   "/v2/data-graphs",
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
 					AccountID: "wh-123",
 				})
@@ -567,7 +563,7 @@ func TestMalformedResponses(t *testing.T) {
 			name:   "GetDataGraph",
 			method: "GET",
 			path:   "/v2/data-graphs/dg-123",
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.GetDataGraph(context.Background(), "dg-123")
 				return err
 			},
@@ -577,7 +573,7 @@ func TestMalformedResponses(t *testing.T) {
 			name:   "ListDataGraphs",
 			method: "GET",
 			path:   "/v2/data-graphs",
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.ListDataGraphs(context.Background(), 0, 0, nil)
 				return err
 			},
@@ -587,7 +583,7 @@ func TestMalformedResponses(t *testing.T) {
 			name:   "SetExternalID",
 			method: "PUT",
 			path:   "/v2/data-graphs/dg-123/external-id",
-			operation: func(store datagraph.DataGraphStore) error {
+			operation: func(store datagraph.DataGraphClient) error {
 				_, err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
 				return err
 			},
