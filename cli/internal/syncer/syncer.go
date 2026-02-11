@@ -390,6 +390,14 @@ func (s *ProjectSyncer) updateOperation(ctx context.Context, r *resources.Resour
 			return err
 		}
 
+		// Dereference old data from state
+		s.stateMutex.RLock()
+		err = state.DereferenceByReflection(sr.InputRaw, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
 		outputRaw, err := s.provider.UpdateRaw(ctx, r, sr.InputRaw, sr.OutputRaw)
 		if err != nil {
 			return err
@@ -440,7 +448,15 @@ func (s *ProjectSyncer) deleteOperation(ctx context.Context, r *resources.Resour
 	}
 
 	if r.RawData() != nil {
-		err := s.provider.DeleteRaw(ctx, r.ID(), r.Type(), sr.InputRaw, sr.OutputRaw)
+		// Dereference old data from state
+		s.stateMutex.RLock()
+		err := state.DereferenceByReflection(sr.InputRaw, st)
+		s.stateMutex.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		err = s.provider.DeleteRaw(ctx, r.ID(), r.Type(), sr.InputRaw, sr.OutputRaw)
 		if err != nil {
 			return err
 		}
