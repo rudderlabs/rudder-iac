@@ -154,6 +154,15 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.BookResource) (*mo
 }
 
 func (h *HandlerImpl) Update(ctx context.Context, newData *model.BookResource, oldData *model.BookResource, oldState *model.BookState) (*model.BookState, error) {
+	// Verify both new and old PropertyRefs were dereferenced
+	// Both should be dereferenced: handlers often need to compare old vs new values
+	if newData.Author == nil || newData.Author.Value == "" {
+		return nil, fmt.Errorf("cannot update book: new author reference not dereferenced (PropertyRef.Value is empty)")
+	}
+	if oldData.Author == nil || oldData.Author.Value == "" {
+		return nil, fmt.Errorf("cannot update book: old author reference not dereferenced (PropertyRef.Value is empty)")
+	}
+
 	remoteBook, err := h.backend.UpdateBook(oldState.ID, newData.Name, newData.Author.Value)
 	if err != nil {
 		return nil, fmt.Errorf("updating book in backend: %w", err)
@@ -205,6 +214,10 @@ func (h *HandlerImpl) MapRemoteToSpec(data map[string]*model.RemoteBook, inputRe
 }
 
 func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.BookResource, oldState *model.BookState) error {
+	// Verify PropertyRef was dereferenced (demonstrates PRO-5272 fix)
+	if oldData.Author == nil || oldData.Author.Value == "" {
+		return fmt.Errorf("cannot delete book: author reference not dereferenced (PropertyRef.Value is empty)")
+	}
 	return h.backend.DeleteBook(oldState.ID)
 }
 
