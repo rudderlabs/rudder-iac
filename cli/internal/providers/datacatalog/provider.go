@@ -354,6 +354,7 @@ func (p *Provider) SemanticRules() []rules.Rule {
 	return []rules.Rule{
 		propertyRules.NewPropertySemanticValidRule(),
 		eventRules.NewEventSemanticValidRule(),
+		categoryRules.NewCategorySemanticValidRule(),
 		customtypeRules.NewCustomTypeSemanticValidRule(),
 		trackingplanRules.NewTrackingPlanSemanticValidRule(),
 	}
