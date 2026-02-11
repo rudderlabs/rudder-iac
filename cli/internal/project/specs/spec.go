@@ -68,8 +68,16 @@ func (s *Spec) Validate() error {
 	return nil
 }
 
+// LocalID represents a local identifier extracted from a spec, paired with its
+// JSON Pointer path for precise error reporting during validation.
+type LocalID struct {
+	ID              string // The local ID value (e.g., "user_email")
+	JSONPointerPath string // JSON Pointer path (e.g., "/spec/properties/2/id")
+}
+
 type ParsedSpec struct {
 	ExternalIDs []string
+	LocalIDs    []LocalID
 }
 
 // New creates and validates a Spec from YAML data
