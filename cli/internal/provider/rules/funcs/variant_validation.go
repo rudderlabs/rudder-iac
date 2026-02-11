@@ -74,10 +74,10 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 
 	switch t := propType.(type) {
 	case string:
-		validTypes := strings.Split(t, ",")
+		inputTypes := strings.Split(t, ",")
 
 		for _, validType := range validDiscriminatorTypes {
-			if lo.Contains(validTypes, validType) {
+			if lo.Contains(inputTypes, validType) {
 				return nil
 			}
 		}
@@ -103,8 +103,8 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 		}
 		ctTypes := strings.Split(ctType, ",")
 
-		for _, vt := range validDiscriminatorTypes {
-			if lo.Contains(ctTypes, vt) {
+		for _, validType := range validDiscriminatorTypes {
+			if lo.Contains(ctTypes, validType) {
 				return nil
 			}
 		}

@@ -27,16 +27,31 @@ func validateTrackingPlanVariants(spec localcatalog.TrackingPlan, graph *resourc
 		if len(rule.Variants) == 0 {
 			continue
 		}
-		ownRefs := make([]string, 0, len(rule.Properties))
-		for _, prop := range rule.Properties {
-			ownRefs = append(ownRefs, prop.Ref)
-		}
+		ownRefs := collectPropertyRefs(rule.Properties)
 		results = append(results, funcs.ValidateVariantDiscriminators(
 			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
 		)...)
 	}
 
 	return results
+}
+
+// collectPropertyRefs recursively collects all $ref values from a TPRuleProperty
+// tree so that nested properties are also recognized as "own" properties of the rule.
+func collectPropertyRefs(props []*localcatalog.TPRuleProperty) []string {
+	var refs []string
+
+	for _, prop := range props {
+		refs = append(refs, prop.Ref)
+
+		if len(prop.Properties) > 0 {
+			refs = append(
+				refs,
+				collectPropertyRefs(prop.Properties)...)
+		}
+	}
+
+	return refs
 }
 
 func validateTrackingPlanNameUniqueness(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
