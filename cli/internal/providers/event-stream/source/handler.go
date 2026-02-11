@@ -257,7 +257,8 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(ref),
 		}
-		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
+		urn := resources.URN(s.LocalId, ResourceType)
+		if importMetadata, ok := s.ImportMetadata[urn]; ok {
 			opts = []resources.ResourceOpts{
 				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
 			}
@@ -728,7 +729,14 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 	if metadata.Import != nil {
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resource.URN != "" {
+					urn = resource.URN
+				} else {
+					urn = resources.URN(resource.LocalID, ResourceType)
+				}
+				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceId: workspace.WorkspaceID,
 					RemoteId:    resource.RemoteID,
 				}
