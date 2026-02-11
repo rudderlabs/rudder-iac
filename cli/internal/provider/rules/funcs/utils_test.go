@@ -94,22 +94,7 @@ func TestGetErrorMessage(t *testing.T) {
 			},
 			expected: "'Name' is required",
 		},
-		{
-			name: "reference tag",
-			err: mockFieldError{
-				field:     "Ref",
-				actualTag: "reference",
-			},
-			expected: "'Ref' is not a valid reference format",
-		},
-		{
-			name: "primitive_or_reference tag",
-			err: mockFieldError{
-				field:     "Type",
-				actualTag: "primitive_or_reference",
-			},
-			expected: "'Type' is not a valid primitive type or reference format",
-		},
+	
 		{
 			name: "gte tag with number",
 			err: mockFieldError{

@@ -1,11 +1,19 @@
 package property
 
 import (
+	"fmt"
+	"regexp"
+	"strings"
+
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
+
+var customTypeLegacyRefRegex = regexp.MustCompile(drules.CustomTypeLegacyReferenceRegex)
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -39,25 +47,56 @@ var examples = rules.Examples{
 	},
 }
 
-// Main validation function for property spec
-// which delegates the validation to the go-validator through struct tags.
-var validatePropertySpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.PropertySpec) []rules.ValidationResult {
-	validationErrors, err := rules.ValidateStruct(
-		Spec,
-		"",
-		getValidateFuncs(Version)..., // attach custom validate funcs specially for property specs
-	)
-
+var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec localcatalog.PropertySpec) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(Spec, "")
 	if err != nil {
-		return []rules.ValidationResult{
-			{
-				Reference: "/properties",
-				Message:   err.Error(),
-			},
+		return []rules.ValidationResult{{
+			Reference: "/properties",
+			Message:   err.Error(),
+		}}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors)
+
+	// validate the type field on the property
+	// which can be a custom type reference or a comma-separated
+	// list of primitive types
+	for i, prop := range Spec.Properties {
+		if prop.Type == "" {
+			continue
+		}
+
+		if strings.HasPrefix(prop.Type, "#") {
+			if !customTypeLegacyRefRegex.MatchString(prop.Type) {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/properties/%d/type", i),
+					Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #/custom-types/<group>/<id>", prop.Type),
+				})
+			}
+			continue
+		}
+
+		typs := lo.Map(strings.Split(prop.Type, ","), func(item string, _ int) string {
+			return strings.TrimSpace(item)
+		})
+
+		if !lo.Every(drules.ValidPrimitiveTypes, typs) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/type", i),
+				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+			})
+			continue
+		}
+
+		if len(lo.Uniq(typs)) != len(typs) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/type", i),
+				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+			})
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	return results
 }
 
 func NewPropertySpecSyntaxValidRule() rules.Rule {
@@ -69,23 +108,4 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 		[]string{"properties"},
 		validatePropertySpec,
 	)
-}
-
-// getValidateFuncs returns custom validate functions which the property spec employs
-// by adding requisite tags to fields in the spec struct
-func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	// TODO: we would need to create a different regex for reference validation
-	// based on the version of spec.
-	return []rules.CustomValidateFunc{
-		// primitive or reference validation on the type
-		funcs.NewPrimitiveOrReference([]string{
-			"string",
-			"number",
-			"integer",
-			"boolean",
-			"array",
-			"object",
-			"null",
-		}, funcs.BuildLegacyReferenceRegex([]string{"custom-types"})),
-	}
 }

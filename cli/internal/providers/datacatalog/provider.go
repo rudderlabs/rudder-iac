@@ -349,3 +349,12 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 
 	return syntactic
 }
+
+func (p *Provider) SemanticRules() []rules.Rule {
+	return []rules.Rule{
+		propertyRules.NewPropertySemanticValidRule(),
+		eventRules.NewEventSemanticValidRule(),
+		customtypeRules.NewCustomTypeSemanticValidRule(),
+		trackingplanRules.NewTrackingPlanSemanticValidRule(),
+	}
+}

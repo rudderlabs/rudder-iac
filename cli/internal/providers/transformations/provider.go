@@ -46,6 +46,53 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 	}
 }
 
+// MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations
+// Dependencies are extracted from the remote transformation's Imports field and resolved to library URNs
+func (p *Provider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+	// Call base implementation to get initial state
+	st, err := p.BaseProvider.MapRemoteToState(collection)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build handleName -> library URN mapping from remote libraries
+	libraryResources := collection.GetAll(library.HandlerMetadata.ResourceType)
+	handleNameToURN := make(map[string]string)
+
+	for _, remoteLib := range libraryResources {
+		lib := remoteLib.Data.(*model.RemoteLibrary)
+		libraryURN := resources.URN(lib.ExternalID, library.HandlerMetadata.ResourceType)
+		handleNameToURN[lib.ImportName] = libraryURN
+	}
+
+	// Populate dependencies for each transformation using the Imports field
+	transformationResources := collection.GetAll(transformation.HandlerMetadata.ResourceType)
+
+	for _, remoteTrans := range transformationResources {
+		trans := remoteTrans.Data.(*model.RemoteTransformation)
+		transURN := resources.URN(trans.ExternalID, transformation.HandlerMetadata.ResourceType)
+		resourceState := st.GetResource(transURN)
+
+		// Resolve imports to library URNs
+		dependencies := make([]string, 0, len(trans.Imports))
+		for _, handleName := range trans.Imports {
+			libraryURN, exists := handleNameToURN[handleName]
+			if !exists {
+				log.Warn("transformation references library not found in managed resources",
+					"transformation", trans.ExternalID,
+					"import_name", handleName)
+				continue
+			}
+			dependencies = append(dependencies, libraryURN)
+		}
+
+		// Update resource state with dependencies
+		resourceState.Dependencies = dependencies
+	}
+
+	return st, nil
+}
+
 // ResourceGraph overrides BaseProvider.ResourceGraph to add transformation→library dependencies
 // by parsing transformation code to extract library imports
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {
