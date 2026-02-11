@@ -49,17 +49,14 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 		args.Config[k] = v
 	}
 
-	// Handle single type field
+	// Handle type field
 	args.Type = prop.Type
 	switch {
 	case len(prop.Types) > 0:
-		// Sort types for consistency and join to comma-separated string
 		sort.Strings(prop.Types)
 		args.Type = strings.Join(prop.Types, ",")
-		return nil
 	case strings.HasPrefix(prop.Type, "#custom-type:"):
 		customTypeURN := urnFromRef(prop.Type)
-
 		if customTypeURN == "" {
 			return fmt.Errorf("unable to resolve custom type reference urn: %s", prop.Type)
 		}
@@ -67,10 +64,11 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 			URN:      customTypeURN,
 			Property: "name",
 		}
-		return nil
-		// Handle item_type and item_types fields - merge into config["item_types"]
+	}
+
+	// Handle item_type and item_types fields — independent of type above
+	switch {
 	case prop.ItemType != "":
-		// Single item type - store as array with one element in config
 		if strings.HasPrefix(prop.ItemType, "#custom-type:") {
 			customTypeURN := urnFromRef(prop.ItemType)
 			if customTypeURN == "" {
@@ -86,8 +84,6 @@ func (args *PropertyArgs) FromCatalogPropertyType(prop localcatalog.PropertyV1, 
 			args.Config["item_types"] = []interface{}{prop.ItemType}
 		}
 	case len(prop.ItemTypes) > 0:
-		// Multiple item types - store as array in config
-		// Sort for consistency before processing
 		sort.Strings(prop.ItemTypes)
 		itemTypes := make([]interface{}, len(prop.ItemTypes))
 		for i, itemType := range prop.ItemTypes {

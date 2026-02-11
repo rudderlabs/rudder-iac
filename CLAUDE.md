@@ -70,6 +70,18 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - Concise, well-defined variable names fitting existing ecosystem
 - Consistent patterns with existing codebase
 - Prefer early `continue`/`return` over `else` to reduce indentation depth (guard clause pattern)
+- When declaring 2+ related variables together, prefer a `var` block over individual `:=` assignments for better visual grouping:
+  ```go
+  // Preferred
+  var (
+      actualVal  = fieldVal
+      actualKind = fieldVal.Kind()
+  )
+
+  // Avoid
+  actualVal := fieldVal
+  actualKind := fieldVal.Kind()
+  ```
 
 ### Comments
 - **Focus on "why"**, not "what" - explain the reasoning, not the mechanics

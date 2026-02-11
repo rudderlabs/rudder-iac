@@ -49,15 +49,6 @@ func getErrorMessage(err validator.FieldError) string {
 	case "required":
 		return fmt.Sprintf("'%s' is required", fieldName)
 
-	case "reference":
-		return fmt.Sprintf("'%s' is not a valid reference format", fieldName)
-
-	case "primitive_or_reference":
-		return fmt.Sprintf("'%s' is not a valid primitive type or reference format", fieldName)
-
-	case "primitive":
-		return fmt.Sprintf("'%s' must be a valid primitive type (string, number, integer, boolean, null, array, or object)", fieldName)
-
 	case "pattern":
 		if msg, ok := getPatternErrorMessage(err.Param()); ok {
 			return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)

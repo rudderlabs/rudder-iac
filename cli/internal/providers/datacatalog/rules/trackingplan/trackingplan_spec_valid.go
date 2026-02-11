@@ -65,11 +65,7 @@ var validateTrackingPlanSpec = func(
 	Metadata map[string]any,
 	Spec localcatalog.TrackingPlan,
 ) []rules.ValidationResult {
-	validationErrors, err := rules.ValidateStruct(
-		Spec,
-		"",
-		getValidateFuncs(Version)...,
-	)
+	validationErrors, err := rules.ValidateStruct(Spec, "")
 
 	if err != nil {
 		return []rules.ValidationResult{
@@ -96,9 +92,4 @@ func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 		[]string{"tp"},
 		validateTrackingPlanSpec,
 	)
-}
-
-// getValidateFuncs returns custom validate functions for trackingplan spec validation
-func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	return []rules.CustomValidateFunc{}
 }
