@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -101,14 +100,4 @@ func getErrorMessage(err validator.FieldError) string {
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
-}
-
-// GraphWith builds a resource graph from alternating (id, resourceType) pairs.
-// Example: GraphWith("user_id", "property", "signup", "event")
-func GraphWith(pairs ...string) *resources.Graph {
-	g := resources.NewGraph()
-	for i := 0; i+1 < len(pairs); i += 2 {
-		g.AddResource(resources.NewResource(pairs[i], pairs[i+1], resources.ResourceData{}, nil))
-	}
-	return g
 }
