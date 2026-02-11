@@ -141,8 +141,9 @@ func (p *CategoryImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
+		urn := resources.URN(category.ExternalID, types.CategoryResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
-			LocalID:  category.ExternalID,
+			URN:      urn,
 			RemoteID: category.ID,
 		})
 

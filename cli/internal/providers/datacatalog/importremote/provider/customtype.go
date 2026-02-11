@@ -135,8 +135,9 @@ func (p *CustomTypeImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the custom types
+		urn := resources.URN(customType.ExternalID, types.CustomTypeResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
-			LocalID:  customType.ExternalID,
+			URN:      urn,
 			RemoteID: customType.ID,
 		})
 

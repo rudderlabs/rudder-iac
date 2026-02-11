@@ -116,7 +116,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},
@@ -204,7 +204,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},
@@ -302,7 +302,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},
@@ -388,7 +388,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},
@@ -444,7 +444,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},
@@ -500,7 +500,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []any{
 									map[string]any{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "remote123",
 									},
 								},

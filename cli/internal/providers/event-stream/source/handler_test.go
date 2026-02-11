@@ -618,7 +618,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []map[string]interface{}{
 									{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "test-source-1-123",
 									},
 								},
@@ -1619,7 +1619,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"workspace_id": "workspace-123",
 						"resources": []any{
 							map[string]any{
-								"local_id":  "test-source-1",
+								"urn":       "event-stream-source:test-source-1",
 								"remote_id": "remote123",
 							},
 						},
@@ -1662,7 +1662,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"workspace_id": "workspace-123",
 						"resources": []any{
 							map[string]any{
-								"local_id":  "test-source-2",
+								"urn":       "event-stream-source:test-source-2",
 								"remote_id": "remote456",
 							},
 						},
