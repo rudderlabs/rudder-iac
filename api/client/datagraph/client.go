@@ -10,6 +10,7 @@ const (
 type DataGraphClient interface {
 	DataGraphStore
 	ModelStore
+	RelationshipStore
 }
 
 // rudderDataGraphClient implements the DataGraphStore interface
