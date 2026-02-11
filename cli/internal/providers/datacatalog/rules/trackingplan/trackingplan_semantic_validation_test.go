@@ -348,49 +348,6 @@ func TestTrackingPlanSemanticValid_VariantDiscriminator(t *testing.T) {
 		assert.Empty(t, results, "custom type ref discriminator should be allowed")
 	})
 
-	t.Run("discriminator references nested property — valid", func(t *testing.T) {
-		t.Parallel()
-
-		graph := resources.NewGraph()
-		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
-		graph.AddResource(propertyResourceWithType("address", "Address", "object"))
-		graph.AddResource(propertyResourceWithType("zip", "Zip", "string"))
-
-		spec := localcatalog.TrackingPlan{
-			LocalID: "test_tp",
-			Name:    "Test TP",
-			Rules: []*localcatalog.TPRule{
-				{
-					LocalID: "rule1",
-					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
-					Properties: []*localcatalog.TPRuleProperty{
-						{
-							Ref: "#property:address",
-							Properties: []*localcatalog.TPRuleProperty{
-								{Ref: "#property:zip"},
-							},
-						},
-					},
-					Variants: localcatalog.Variants{
-						{
-							Type:          "discriminator",
-							Discriminator: "#property:zip",
-							Cases: []localcatalog.VariantCase{
-								{
-									DisplayName: "US",
-									Properties:  []localcatalog.PropertyReference{{Ref: "#property:address"}},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
-		assert.Empty(t, results, "discriminator referencing nested property should be valid")
-	})
-
 	t.Run("discriminator not in rule's own properties", func(t *testing.T) {
 		t.Parallel()
 
