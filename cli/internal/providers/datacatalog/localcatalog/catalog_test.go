@@ -1197,6 +1197,90 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	}
 }
 
+func TestDataCatalog_ParseSpec_LegacyResourceType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                     string
+		spec                     *specs.Spec
+		expectedResourceType     string
+	}{
+		{
+			name: "tracking plan sets LegacyResourceType to tracking-plan",
+			spec: &specs.Spec{
+				Kind: KindTrackingPlans,
+				Spec: map[string]any{
+					"id":           "my_tp",
+					"display_name": "My TP",
+				},
+			},
+			expectedResourceType: "tracking-plan",
+		},
+		{
+			name: "properties sets LegacyResourceType to property",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{
+						map[string]any{"id": "prop1"},
+					},
+				},
+			},
+			expectedResourceType: "property",
+		},
+		{
+			name: "events sets LegacyResourceType to event",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": []any{
+						map[string]any{"id": "event1"},
+					},
+				},
+			},
+			expectedResourceType: "event",
+		},
+		{
+			name: "custom types sets LegacyResourceType to custom-type",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"types": []any{
+						map[string]any{"id": "type1"},
+					},
+				},
+			},
+			expectedResourceType: "custom-type",
+		},
+		{
+			name: "categories sets LegacyResourceType to category",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"categories": []any{
+						map[string]any{"id": "cat1"},
+					},
+				},
+			},
+			expectedResourceType: "category",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dc := New()
+			parsedSpec, err := dc.ParseSpec("test/path.yaml", tc.spec)
+
+			require.NoError(t, err)
+			require.NotNil(t, parsedSpec)
+			assert.Equal(t, tc.expectedResourceType, parsedSpec.LegacyResourceType)
+		})
+	}
+}
+
 func TestStrictSpecUnmarshal(t *testing.T) {
 	t.Parallel()
 

@@ -244,7 +244,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			ID:              tpID,
 			JSONPointerPath: "/spec/id",
 		})
-		return &parsedSpec, nil
+		resourceType = "tracking-plan"
 
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
@@ -265,6 +265,8 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		resourceType = "category"
 	}
 
+	// Array-based resources populate idArray and basePath for bulk processing.
+	// Single-resource types (tracking plans) set URNs directly and skip this loop.
 	for i, item := range idArray {
 		idMap, ok := item.(map[string]any)
 		if !ok {
