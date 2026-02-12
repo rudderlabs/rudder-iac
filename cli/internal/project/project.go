@@ -324,7 +324,7 @@ func (p *project) registry() (rules.Registry, error) {
 			validVersions,
 		),
 		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
-		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
+		prules.NewDuplicateURNRule(p.provider.ParseSpec),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
@@ -358,8 +358,8 @@ func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 
 	// Build URN lookup set from parsed spec
 	specURNs := make(map[string]bool)
-	for _, urn := range parsed.URNs {
-		specURNs[urn] = true
+	for _, entry := range parsed.URNs {
+		specURNs[entry.URN] = true
 	}
 
 	for _, workspace := range metadata.Import.Workspaces {

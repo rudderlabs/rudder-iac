@@ -239,9 +239,8 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
-		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(tpID, "tracking-plan"))
-		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:              tpID,
+		parsedSpec.URNs = append(parsedSpec.URNs, specs.URNEntry{
+			URN:             resources.URN(tpID, "tracking-plan"),
 			JSONPointerPath: "/spec/id",
 		})
 		resourceType = "tracking-plan"
@@ -276,9 +275,8 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(id, resourceType))
-		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:              id,
+		parsedSpec.URNs = append(parsedSpec.URNs, specs.URNEntry{
+			URN:             resources.URN(id, resourceType),
 			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
 		})
 	}

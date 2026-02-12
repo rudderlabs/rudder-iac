@@ -296,13 +296,16 @@ func TestProject_ValidateSpec(t *testing.T) {
 	// Test resource type for URN construction
 	const testResourceType = "test-resource"
 
-	// Helper to construct URNs for test IDs
-	toURNs := func(ids ...string) []string {
-		urns := make([]string, len(ids))
+	// Helper to construct URNEntries for test IDs
+	toURNs := func(ids ...string) []specs.URNEntry {
+		entries := make([]specs.URNEntry, len(ids))
 		for i, id := range ids {
-			urns[i] = resources.URN(id, testResourceType)
+			entries[i] = specs.URNEntry{
+				URN:             resources.URN(id, testResourceType),
+				JSONPointerPath: "/spec/id", // Default path for tests
+			}
 		}
-		return urns
+		return entries
 	}
 
 	cases := []struct {
@@ -413,8 +416,8 @@ func TestProject_ValidateSpec(t *testing.T) {
 					},
 				},
 			},
-		parsedSpec: &specs.ParsedSpec{
-				URNs: []string{},
+			parsedSpec: &specs.ParsedSpec{
+				URNs: []specs.URNEntry{},
 			},
 			expectedError: false,
 		},
@@ -467,7 +470,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-			URNs:               toURNs("id1", "id2", "id3"),
+				URNs:               toURNs("id1", "id2", "id3"),
 				LegacyResourceType: testResourceType,
 			},
 			expectedError: false,
@@ -518,8 +521,8 @@ func TestProject_ValidateSpec(t *testing.T) {
 				Kind:     "Source",
 				Metadata: map[string]any{},
 			},
-		parsedSpec: &specs.ParsedSpec{
-				URNs: []string{},
+			parsedSpec: &specs.ParsedSpec{
+				URNs: []specs.URNEntry{},
 			},
 			expectedError: false,
 		},

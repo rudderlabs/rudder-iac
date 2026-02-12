@@ -32,11 +32,11 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name             string
-			spec             *specs.Spec
-			expectedLocalIDs []specs.LocalID
-			expectedError    bool
-			errorContains    string
+			name          string
+			spec          *specs.Spec
+			expectedIDs   []string
+			expectedError bool
+			errorContains string
 		}{
 			{
 				name: "success - parse spec with id",
@@ -48,7 +48,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"type": "javascript",
 					},
 				},
-				expectedLocalIDs: []specs.LocalID{{ID: "test-source-1", JSONPointerPath: "/spec/id"}},
+				expectedIDs: []string{"test-source-1"},
 				expectedError:    false,
 			},
 			{
@@ -103,14 +103,16 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					// Convert expected IDs to URNs for comparison
-					expectedURNs := make([]string, len(tc.expectedLocalIDs))
-					for i, localID := range tc.expectedLocalIDs {
-						expectedURNs[i] = resources.URN(localID.ID, source.ResourceType)
+					// Convert expected IDs to URNEntries for comparison
+					expectedURNs := make([]specs.URNEntry, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = specs.URNEntry{
+							URN:             resources.URN(id, source.ResourceType),
+							JSONPointerPath: "/spec/id",
+						}
 					}
 					assert.Equal(t, expectedURNs, parsedSpec.URNs)
 					assert.Equal(t, source.ResourceType, parsedSpec.LegacyResourceType)
-					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 				}
 			})
 		}
