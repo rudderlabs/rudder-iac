@@ -139,9 +139,9 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
-			expectedMsgs:   []string{"'local_id' is required"},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id", "/metadata/import/workspaces/0/resources/0/urn"},
+			expectedMsgs:   []string{"'local_id' is required when 'urn' is not supplied", "'urn' is required when 'local_id' is not supplied"},
 		},
 		{
 			name:      "import with missing remote_id in resource",
