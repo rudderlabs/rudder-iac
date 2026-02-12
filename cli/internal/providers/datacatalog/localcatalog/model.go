@@ -141,7 +141,7 @@ type CustomType struct {
 	Type        string               `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
 	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
-	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"omitempty,max=1,dive"`
+	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"excluded_unless=Type object,omitempty,max=1,dive"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type

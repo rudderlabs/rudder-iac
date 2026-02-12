@@ -94,7 +94,7 @@ func TestGetErrorMessage(t *testing.T) {
 			},
 			expected: "'Name' is required",
 		},
-	
+
 		{
 			name: "gte tag with number",
 			err: mockFieldError{
@@ -250,6 +250,24 @@ func TestGetErrorMessage(t *testing.T) {
 				param:     "discriminator",
 			},
 			expected: "'Type' must equal 'discriminator'",
+		},
+		{
+			name: "excluded_unless tag",
+			err: mockFieldError{
+				field:     "variants",
+				actualTag: "excluded_unless",
+				param:     "Type object",
+			},
+			expected: "'variants' is not allowed unless 'Type object'",
+		},
+		{
+			name: "array_item_types tag",
+			err: mockFieldError{
+				field:     "match",
+				actualTag: "array_item_types",
+				param:     "string bool integer",
+			},
+			expected: "'match' values must be one of [string bool integer]",
 		},
 		{
 			name: "unknown tag",

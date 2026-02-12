@@ -74,8 +74,8 @@ type TPEventProperty struct {
 
 type TPRule struct {
 	Type       string            `json:"type"`
-	LocalID    string            `json:"id"`
-	Event      *TPRuleEvent      `json:"event"`
+	LocalID    string            `json:"id" validate:"required"`
+	Event      *TPRuleEvent      `json:"event" validate:"required"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`

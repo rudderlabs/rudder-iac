@@ -414,6 +414,231 @@ func TestTrackingPlanSemanticValid_VariantDiscriminator(t *testing.T) {
 	})
 }
 
+func TestTrackingPlanSemanticValid_PropertyNesting(t *testing.T) {
+	t.Parallel()
+
+	boolTrue := true
+
+	t.Run("object type allows nesting", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("address", "Address", "object"))
+		graph.AddResource(propertyResourceWithType("city", "City", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:address",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:city"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.Empty(t, results, "object type should allow nesting")
+	})
+
+	t.Run("string type does not allow nesting", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("domain", "Domain", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:email",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:domain"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		require.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/properties/0", results[0].Reference)
+		assert.Contains(t, results[0].Message, "nested properties are not allowed for property 'email'")
+	})
+
+	t.Run("string type does not allow additionalProperties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref:                  "#property:email",
+							AdditionalProperties: &boolTrue,
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		require.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/properties/0/additionalProperties", results[0].Reference)
+		assert.Contains(t, results[0].Message, "additional_properties is not allowed for property 'email'")
+	})
+
+	t.Run("object type allows additionalProperties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("address", "Address", "object"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref:                  "#property:address",
+							AdditionalProperties: &boolTrue,
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.Empty(t, results, "object type should allow additionalProperties")
+	})
+
+	t.Run("array type with object item_types allows nesting", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("items", "property", resources.ResourceData{
+			"name":   "Items",
+			"type":   "array",
+			"config": map[string]any{"item_types": []any{"object"}},
+		}, nil))
+		graph.AddResource(propertyResourceWithType("name", "Name", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:items",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:name"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.Empty(t, results, "array with object item_types should allow nesting")
+	})
+
+	t.Run("array type with string item_types does not allow nesting", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("tags", "property", resources.ResourceData{
+			"name":   "Tags",
+			"type":   "array",
+			"config": map[string]any{"item_types": []any{"string"}},
+		}, nil))
+		graph.AddResource(propertyResourceWithType("label", "Label", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:tags",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:label"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		require.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/properties/0", results[0].Reference)
+		assert.Contains(t, results[0].Message, "nested properties are not allowed for property 'tags'")
+	})
+
+	t.Run("property without nesting or additionalProperties produces no error", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#event:signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{Ref: "#property:email"},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.Empty(t, results)
+	})
+}
+
 func TestTrackingPlanSemanticValid_Uniqueness(t *testing.T) {
 	t.Parallel()
 

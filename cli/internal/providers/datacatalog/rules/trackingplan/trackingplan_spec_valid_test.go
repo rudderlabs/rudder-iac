@@ -93,13 +93,16 @@ func TestTrackingPlanSpecSyntaxValidRule_ValidEventAndPropertyRefs(t *testing.T)
 			},
 		},
 		{
-			name: "rule with nil event and nil properties",
+			name: "rule with event ref and nil properties",
 			spec: localcatalog.TrackingPlan{
 				LocalID: "test_tp",
 				Name:    "Test TP",
 				Rules: []*localcatalog.TPRule{
 					{
 						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref: "#/events/user-events/signup",
+						},
 					},
 				},
 			},
@@ -167,6 +170,36 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 		expectedRefs []string
 		expectedMsgs []string
 	}{
+		{
+			name: "rule local id missing",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Event: &localcatalog.TPRuleEvent{
+							Ref: "#/events/user-events/signup",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/id"},
+			expectedMsgs: []string{"'id' is required"},
+		},
+		{
+			name: "rule event missing",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{"'event' is required"},
+		},
 		{
 			name: "event ref missing",
 			spec: localcatalog.TrackingPlan{
@@ -518,7 +551,10 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 			Name:    "Test TP",
 			Rules: []*localcatalog.TPRule{
 				{
-					LocalID:  "rule1",
+					LocalID: "rule1",
+					Event: &localcatalog.TPRuleEvent{
+						Ref: "#/events/user-events/signup",
+					},
 					Variants: nil,
 				},
 			},
@@ -538,7 +574,10 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 			Name:    "Test TP",
 			Rules: []*localcatalog.TPRule{
 				{
-					LocalID:  "rule1",
+					LocalID: "rule1",
+					Event: &localcatalog.TPRuleEvent{
+						Ref: "#/events/user-events/signup",
+					},
 					Variants: localcatalog.Variants{},
 				},
 			},
@@ -565,6 +604,7 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 							Cases: []localcatalog.VariantCase{
 								{
 									DisplayName: "Email Signup",
+									Match:       []any{"email"},
 									Properties: []localcatalog.PropertyReference{
 										{Ref: "#/properties/signup-props/email", Required: true},
 									},
@@ -581,6 +621,39 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 
 		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
 		assert.Empty(t, results, "Valid variant should produce no errors")
+	})
+
+	t.Run("more than one variant is invalid", func(t *testing.T) {
+		validVariant := localcatalog.Variant{
+			Type:          "discriminator",
+			Discriminator: "#/properties/signup-props/method",
+			Cases: []localcatalog.VariantCase{
+				{
+					DisplayName: "Case1",
+					Match:       []any{"value"},
+					Properties: []localcatalog.PropertyReference{
+						{Ref: "#/properties/signup-props/email", Required: true},
+					},
+				},
+			},
+		}
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"},
+					Variants: localcatalog.Variants{validVariant, validVariant},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
+		assert.NotEmpty(t, results)
+		assert.Contains(t, extractRefs(results), "/rules/0/variants")
+		assert.Contains(t, extractMsgs(results), "'variants' length must be less than or equal to 1")
 	})
 
 	t.Run("invalid variant generates correct reference paths", func(t *testing.T) {
@@ -600,6 +673,7 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 							Cases: []localcatalog.VariantCase{
 								{
 									DisplayName: "Case1",
+									Match:       []any{"value"},
 									Properties: []localcatalog.PropertyReference{
 										{Ref: "bad_prop_ref"},
 									},
@@ -628,6 +702,86 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 		assert.ElementsMatch(t, expectedRefs, extractRefs(results))
 		assert.ElementsMatch(t, expectedMsgs, extractMsgs(results))
 	})
+}
+
+func TestTrackingPlanSpecSyntaxValidRule_NestingDepth(t *testing.T) {
+	t.Parallel()
+
+	t.Run("3 levels of nesting is valid", func(t *testing.T) {
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#/properties/props/address",
+							Properties: []*localcatalog.TPRuleProperty{
+								{
+									Ref: "#/properties/props/city",
+									Properties: []*localcatalog.TPRuleProperty{
+										{
+											Ref: "#/properties/props/district",
+											Properties: []*localcatalog.TPRuleProperty{
+												{Ref: "#/properties/props/zone"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
+		assert.Empty(t, results, "3 levels of nesting should produce no errors")
+	})
+
+	t.Run("4 levels of nesting exceeds max depth", func(t *testing.T) {
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "rule1",
+					Event:   &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"},
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#/properties/props/address",
+							Properties: []*localcatalog.TPRuleProperty{
+								{
+									Ref: "#/properties/props/city",
+									Properties: []*localcatalog.TPRuleProperty{
+										{
+											Ref: "#/properties/props/district",
+											Properties: []*localcatalog.TPRuleProperty{
+												{
+													Ref: "#/properties/props/zone",
+													Properties: []*localcatalog.TPRuleProperty{
+														{Ref: "#/properties/props/block"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/properties/0", extractRefs(results)[0])
+		assert.Equal(t, "maximum property nesting depth of 3 levels exceeded", extractMsgs(results)[0])
+	})
+
 }
 
 // Helper functions to extract references and messages from validation results

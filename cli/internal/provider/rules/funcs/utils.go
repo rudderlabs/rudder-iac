@@ -97,6 +97,12 @@ func getErrorMessage(err validator.FieldError) string {
 	case "eq":
 		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
 
+	case "excluded_unless":
+		return fmt.Sprintf("'%s' is not allowed unless '%s'", fieldName, err.Param())
+
+	case "array_item_types":
+		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
+
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
