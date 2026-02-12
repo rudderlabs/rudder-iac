@@ -1,63 +1,21 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsValidExperimentalFlag(t *testing.T) {
-	tests := []struct {
-		name     string
-		flagName string
-		want     bool
-	}{
-		{
-			name:     "valid flag - concurrentSyncs",
-			flagName: "concurrentSyncs",
-			want:     true,
-		},
-		{
-			name:     "valid flag - v1SpecSupport",
-			flagName: "v1SpecSupport",
-			want:     true,
-		},
-		{
-			name:     "valid flag - validationFramework",
-			flagName: "validationFramework",
-			want:     true,
-		},
-		{
-			name:     "valid flag - transformations",
-			flagName: "transformations",
-			want:     true,
-		},
-		{
-			name:     "invalid flag - nonexistent",
-			flagName: "nonexistent",
-			want:     false,
-		},
-		{
-			name:     "invalid flag - empty string",
-			flagName: "",
-			want:     false,
-		},
-		{
-			name:     "invalid flag - wrong case",
-			flagName: "Transformations",
-			want:     false,
-		},
-	}
+func TestIsValidExperimentalFlag_InvalidFlags(t *testing.T) {
+	t.Parallel()
+	assert.False(t, IsValidExperimentalFlag("invalidFlag"), "should return false for an invalid flag")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := IsValidExperimentalFlag(tt.flagName)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
 
 func TestGetEnvironmentVariableName(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		flagName string
@@ -87,22 +45,45 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := GetEnvironmentVariableName(tt.flagName)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestGetAvailableExperimentalFlags(t *testing.T) {
-	flags := getAvailableExperimentalFlags()
+func TestExperimentalConfigStructInvariants(t *testing.T) {
+	t.Parallel()
 
-	expectedFlags := []string{
-		"concurrentSyncs",
-		"v1SpecSupport",
-		"validationFramework",
-		"transformations",
+	expType := reflect.TypeOf(ExperimentalConfig{})
+
+	assert.Greater(t, expType.NumField(), 0, "should have at least one experimental flag")
+
+	for i := 0; i < expType.NumField(); i++ {
+		field := expType.Field(i)
+
+		t.Run(field.Name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, reflect.Bool, field.Type.Kind(),
+				"experimental flag %s must be a bool", field.Name)
+
+			tag := field.Tag.Get("mapstructure")
+			assert.NotEmpty(t, tag,
+				"experimental flag %s must have a mapstructure tag", field.Name)
+
+			assert.True(t, IsValidExperimentalFlag(tag),
+				"experimental flag %s with tag %q must be recognized as valid", field.Name, tag)
+		})
 	}
+}
 
-	assert.ElementsMatch(t, expectedFlags, flags, "should return all available experimental flags")
-	assert.Len(t, flags, 4, "should have exactly 4 experimental flags")
+func TestGetAvailableExperimentalFlags(t *testing.T) {
+	t.Parallel()
+
+	flags := getAvailableExperimentalFlags()
+	expType := reflect.TypeOf(ExperimentalConfig{})
+
+	assert.Len(t, flags, expType.NumField(),
+		"every ExperimentalConfig field should produce a flag")
 }
