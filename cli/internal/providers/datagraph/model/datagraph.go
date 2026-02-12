@@ -8,8 +8,8 @@ import (
 // DataGraphSpec represents the configuration for a data graph resource from YAML
 // Maps to the "data-graph" kind YAML structure
 type DataGraphSpec struct {
-	ID        string `json:"id"`
-	AccountID string `json:"account_id"`
+	ID        string `json:"id" mapstructure:"id"`
+	AccountID string `json:"account_id" mapstructure:"account_id"`
 }
 
 // DataGraphResource represents the input data for a data graph
