@@ -100,7 +100,7 @@ func NewMockProvider(supportedKinds, supportedTypes []string) *MockProvider {
 	return &MockProvider{
 		supportedKinds:          supportedKinds,
 		supportedTypes:          supportedTypes,
-		ParseSpecVal:            &specs.ParsedSpec{ExternalIDs: []string{}},
+		ParseSpecVal:            &specs.ParsedSpec{URNs: []string{}},
 		LoadSpecCalledWithArgs:  make([]LoadSpecArgs, 0),
 		ParseSpecCalledWithArgs: make([]ParseSpecArgs, 0),
 	}

@@ -103,7 +103,13 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+					// Convert expected IDs to URNs for comparison
+					expectedURNs := make([]string, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = resources.URN(id, source.ResourceType)
+					}
+					assert.Equal(t, expectedURNs, parsedSpec.URNs)
+					assert.Equal(t, source.ResourceType, parsedSpec.LegacyResourceType)
 				}
 			})
 		}
@@ -353,6 +359,89 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				expectedError: true,
 				errorContains: "invalid ref format: invalid-ref",
 			},
+			{
+				name: "success - migrates import metadata from LocalID to URN format",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Metadata: map[string]any{
+						"name": "test-source",
+						"import": map[string]any{
+							"workspaces": []any{
+								map[string]any{
+									"workspace_id": "ws-123",
+									"resources": []any{
+										map[string]any{
+											"local_id":  "source1",
+											"remote_id": "remote-source-1",
+										},
+									},
+								},
+							},
+						},
+					},
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			},
+			{
+				name: "success - skips migration when URN is already set",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Metadata: map[string]any{
+						"name": "test-source",
+						"import": map[string]any{
+							"workspaces": []any{
+								map[string]any{
+									"workspace_id": "ws-123",
+									"resources": []any{
+										map[string]any{
+											"urn":       "event-stream-source:source1",
+											"remote_id": "remote-source-1",
+										},
+									},
+								},
+							},
+						},
+					},
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			},
+			{
+				name: "success - handles spec with no import metadata",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Metadata: map[string]any{
+						"name": "test-source",
+					},
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			},
 		}
 
 		for _, tc := range cases {
@@ -376,6 +465,137 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("MigrateSpec - Import Metadata", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("migrates import metadata from LocalID to URN format", func(t *testing.T) {
+			t.Parallel()
+
+			spec := &specs.Spec{
+				Kind: "event-stream-source",
+				Metadata: map[string]any{
+					"name": "test-source",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "source1",
+										"remote_id": "remote-source-1",
+									},
+									map[string]any{
+										"local_id":  "source2",
+										"remote_id": "remote-source-2",
+									},
+								},
+							},
+						},
+					},
+				},
+				Spec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			}
+
+			mockClient := source.NewMockSourceClient()
+			handler := source.NewHandler(mockClient, importDir)
+
+			got, err := handler.MigrateSpec(spec)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+
+			metadata, err := got.CommonMetadata()
+			require.NoError(t, err)
+			require.NotNil(t, metadata.Import)
+			require.Len(t, metadata.Import.Workspaces, 1)
+			require.Len(t, metadata.Import.Workspaces[0].Resources, 2)
+
+			// Verify URN field is set and LocalID is cleared
+			assert.Equal(t, "event-stream-source:source1", metadata.Import.Workspaces[0].Resources[0].URN)
+			assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+			assert.Equal(t, "remote-source-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+
+			assert.Equal(t, "event-stream-source:source2", metadata.Import.Workspaces[0].Resources[1].URN)
+			assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[1].LocalID)
+			assert.Equal(t, "remote-source-2", metadata.Import.Workspaces[0].Resources[1].RemoteID)
+		})
+
+		t.Run("skips migration when URN is already set", func(t *testing.T) {
+			t.Parallel()
+
+			spec := &specs.Spec{
+				Kind: "event-stream-source",
+				Metadata: map[string]any{
+					"name": "test-source",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"urn":       "event-stream-source:source1",
+										"remote_id": "remote-source-1",
+									},
+								},
+							},
+						},
+					},
+				},
+				Spec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			}
+
+			mockClient := source.NewMockSourceClient()
+			handler := source.NewHandler(mockClient, importDir)
+
+			got, err := handler.MigrateSpec(spec)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+
+			metadata, err := got.CommonMetadata()
+			require.NoError(t, err)
+			require.NotNil(t, metadata.Import)
+
+			// URN should remain unchanged, LocalID should remain empty
+			assert.Equal(t, "event-stream-source:source1", metadata.Import.Workspaces[0].Resources[0].URN)
+			assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+			assert.Equal(t, "remote-source-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+		})
+
+		t.Run("handles spec with no import metadata", func(t *testing.T) {
+			t.Parallel()
+
+			spec := &specs.Spec{
+				Kind: "event-stream-source",
+				Metadata: map[string]any{
+					"name": "test-source",
+				},
+				Spec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			}
+
+			mockClient := source.NewMockSourceClient()
+			handler := source.NewHandler(mockClient, importDir)
+
+			got, err := handler.MigrateSpec(spec)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+
+			metadata, err := got.CommonMetadata()
+			require.NoError(t, err)
+			assert.Nil(t, metadata.Import)
+		})
 	})
 
 	t.Run("Validate", func(t *testing.T) {
@@ -573,7 +793,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 								"workspace_id": "workspace-123",
 								"resources": []map[string]interface{}{
 									{
-										"local_id":  "test-source-1",
+										"urn":       "event-stream-source:test-source-1",
 										"remote_id": "test-source-1-123",
 									},
 								},
@@ -1574,7 +1794,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"workspace_id": "workspace-123",
 						"resources": []any{
 							map[string]any{
-								"local_id":  "test-source-1",
+								"urn":       "event-stream-source:test-source-1",
 								"remote_id": "remote123",
 							},
 						},
@@ -1617,7 +1837,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"workspace_id": "workspace-123",
 						"resources": []any{
 							map[string]any{
-								"local_id":  "test-source-2",
+								"urn":       "event-stream-source:test-source-2",
 								"remote_id": "remote456",
 							},
 						},

@@ -56,7 +56,10 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 	if !ok {
 		return nil, fmt.Errorf("id not found in event stream source spec")
 	}
-	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+	return &specs.ParsedSpec{
+		URNs:               []string{resources.URN(id, ResourceType)},
+		LegacyResourceType: ResourceType,
+	}, nil
 }
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
@@ -98,8 +101,13 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 }
 
 // MigrateSpec migrates a event stream source spec
-// It only converts the tracking plan reference from path-based to URN-based format
+// It converts import metadata from LocalID to URN format and tracking plan references from path-based to URN-based format
 func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	// Migrate import metadata to URN format
+	if err := specs.MigrateImportMetadataToURN(s, ResourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
 	spec := &sourceSpec{}
 	// Use strict decoding to reject unknown fields
 	decoderConfig := &mapstructure.DecoderConfig{
@@ -254,7 +262,8 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(ref),
 		}
-		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
+		urn := resources.URN(s.LocalId, ResourceType)
+		if importMetadata, ok := s.ImportMetadata[urn]; ok {
 			opts = []resources.ResourceOpts{
 				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
 			}
@@ -637,9 +646,10 @@ func (h *Handler) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
+		urn := resources.URN(source.ExternalID, ResourceType)
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
-				LocalID:  source.ExternalID,
+				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}
@@ -725,7 +735,14 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 	if metadata.Import != nil {
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resource.URN != "" {
+					urn = resource.URN
+				} else {
+					urn = resources.URN(resource.LocalID, ResourceType)
+				}
+				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceId: workspace.WorkspaceID,
 					RemoteId:    resource.RemoteID,
 				}

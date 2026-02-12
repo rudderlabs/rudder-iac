@@ -302,11 +302,12 @@ func (h *HandlerImpl) FormatForExport(
 		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
 
 		// Build import metadata
+		urn := resources.URN(externalID, HandlerMetadata.ResourceType)
 		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: remote.WorkspaceID,
 			Resources: []specs.ImportIds{
 				{
-					LocalID:  externalID,
+					URN:      urn,
 					RemoteID: remote.ID,
 				},
 			},

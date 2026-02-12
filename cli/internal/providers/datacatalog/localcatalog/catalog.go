@@ -208,11 +208,11 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	var parsedSpec specs.ParsedSpec
-
 	var (
-		idArray  []any
-		basePath string
+		parsedSpec   specs.ParsedSpec
+		idArray      []any
+		basePath     string
+		resourceType string
 	)
 
 	switch s.Kind {
@@ -223,6 +223,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = properties
 		basePath = "/spec/properties"
+		resourceType = "property"
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -231,13 +232,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 		basePath = "/spec/events"
+		resourceType = "event"
 
 	case KindTrackingPlans, KindTrackingPlansV1:
 		tpID, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
-		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, tpID)
+		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(tpID, "tracking-plan"))
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
 			ID:              tpID,
 			JSONPointerPath: "/spec/id",
@@ -251,6 +253,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = customTypes
 		basePath = "/spec/types"
+		resourceType = "custom-type"
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -259,6 +262,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = categories
 		basePath = "/spec/categories"
+		resourceType = "category"
 	}
 
 	for i, item := range idArray {
@@ -270,13 +274,14 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
+		parsedSpec.URNs = append(parsedSpec.URNs, resources.URN(id, resourceType))
 		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
 			ID:              id,
 			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
 		})
 	}
 
+	parsedSpec.LegacyResourceType = resourceType
 	return &parsedSpec, nil
 }
 
@@ -311,6 +316,29 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	// Map spec kind to resource type for import metadata migration
+	var resourceType string
+	switch s.Kind {
+	case KindProperties:
+		resourceType = "property"
+	case KindEvents:
+		resourceType = "event"
+	case KindCustomTypes:
+		resourceType = "custom-type"
+	case KindCategories:
+		resourceType = "category"
+	case KindTrackingPlans, KindTrackingPlansV1:
+		resourceType = "tracking-plan"
+	default:
+		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
+	}
+
+	// Migrate import metadata to URN format before other transformations
+	if err := specs.MigrateImportMetadataToURN(s, resourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
+	// Perform provider-specific spec transformations
 	var resourceSpec any
 	switch s.Kind {
 	case KindProperties:
@@ -345,7 +373,7 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = CategorySpecV1{
 			Categories: categories,
 		}
-	case KindTrackingPlans:
+	case KindTrackingPlans, KindTrackingPlansV1:
 		trackingPlan, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return nil, fmt.Errorf("extracting tracking plans: %w", err)
@@ -353,8 +381,6 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = trackingPlan
 		// change kind for tracking plans from "tp" to "tracking-plan"
 		s.Kind = KindTrackingPlansV1
-	default:
-		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
 
 	jsonByt, err := json.Marshal(resourceSpec)
@@ -374,16 +400,35 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
-		// use KindTrackingPlansV1 to store import metadata for tracking plans
-		kind := s.Kind
-		if kind == KindTrackingPlans {
-			kind = KindTrackingPlansV1
+		// Map spec kind to resource type
+		var resourceType string
+		switch s.Kind {
+		case KindProperties:
+			resourceType = "property"
+		case KindEvents:
+			resourceType = "event"
+		case KindCustomTypes:
+			resourceType = "custom-type"
+		case KindTrackingPlans, KindTrackingPlansV1:
+			resourceType = "tracking-plan"
+		case KindCategories:
+			resourceType = "category"
+		default:
+			return fmt.Errorf("unknown kind: %s", s.Kind)
 		}
+
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				dc.ImportMetadata[resources.URN(kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resource.URN != "" {
+					urn = resource.URN
+				} else {
+					urn = resources.URN(resource.LocalID, resourceType)
+				}
+				dc.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceID: workspace.WorkspaceID,
 					RemoteID:    resource.RemoteID,
 				}

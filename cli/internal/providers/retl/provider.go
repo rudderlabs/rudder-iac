@@ -100,8 +100,18 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 }
 
 // MigrateSpec migrates a spec for the given kind
-// No-op for RETL resources
+// Converts import metadata from LocalID to URN format
 func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return s, nil
+	}
+
+	// Migrate import metadata to URN format
+	if err := specs.MigrateImportMetadataToURN(s, resourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
 	return s, nil
 }
 

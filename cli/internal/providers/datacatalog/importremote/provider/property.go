@@ -136,8 +136,9 @@ func (p *PropertyImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
+		urn := resources.URN(property.ExternalID, types.PropertyResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
-			LocalID:  property.ExternalID,
+			URN:      urn,
 			RemoteID: property.ID,
 		})
 

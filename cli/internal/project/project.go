@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
@@ -16,7 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
-	"github.com/samber/lo"
 )
 
 var log = logger.New("project")
@@ -345,7 +343,6 @@ func (p *project) registry() (rules.Registry, error) {
 }
 
 func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
-	var metadataIds []string
 	metadata, err := spec.CommonMetadata()
 	if err != nil {
 		return err
@@ -356,16 +353,34 @@ func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 		return fmt.Errorf("invalid spec metadata: %w", err)
 	}
 
-	if metadata.Import != nil {
-		for _, workspace := range metadata.Import.Workspaces {
-			for _, resource := range workspace.Resources {
-				metadataIds = append(metadataIds, resource.LocalID)
-			}
-		}
+	if metadata.Import == nil {
+		return nil
+	}
 
-		_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
-		if len(missingInSpec) > 0 {
-			return fmt.Errorf("local_id from import metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
+	// Build URN lookup set from parsed spec
+	specURNs := make(map[string]bool)
+	for _, urn := range parsed.URNs {
+		specURNs[urn] = true
+	}
+
+	for _, workspace := range metadata.Import.Workspaces {
+		for _, resource := range workspace.Resources {
+			var urn string
+
+			if resource.URN != "" {
+				// Modern: use URN directly
+				urn = resource.URN
+			} else if resource.LocalID != "" {
+				// Legacy: construct URN from local_id + LegacyResourceType
+				if parsed.LegacyResourceType == "" {
+					return fmt.Errorf("local_id %q used but spec only supports urn", resource.LocalID)
+				}
+				urn = resources.URN(resource.LocalID, parsed.LegacyResourceType)
+			}
+
+			if urn != "" && !specURNs[urn] {
+				return fmt.Errorf("import metadata URN %q not found in spec", urn)
+			}
 		}
 	}
 

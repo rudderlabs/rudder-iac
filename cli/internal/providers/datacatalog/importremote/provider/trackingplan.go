@@ -128,11 +128,12 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			return nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
 		}
 
+		urn := resources.URN(trackingPlan.ExternalID, types.TrackingPlanResourceType)
 		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: data.WorkspaceID,
 			Resources: []specs.ImportIds{
 				{
-					LocalID:  trackingPlan.ExternalID,
+					URN:      urn,
 					RemoteID: trackingPlan.ID,
 				},
 			},

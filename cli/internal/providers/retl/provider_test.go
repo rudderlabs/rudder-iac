@@ -595,7 +595,7 @@ func TestProviderParseSpec(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported kind")
 	})
 
-	t.Run("DelegatesToHandlerAndReturnsExternalIDs", func(t *testing.T) {
+	t.Run("DelegatesToHandlerAndReturnsURNs", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
 		parsed, err := provider.ParseSpec("test.yaml", &specs.Spec{
@@ -612,7 +612,9 @@ func TestProviderParseSpec(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, parsed)
-		assert.ElementsMatch(t, []string{"orders-model"}, parsed.ExternalIDs)
+		expectedURN := resources.URN("orders-model", sqlmodel.ResourceType)
+		assert.ElementsMatch(t, []string{expectedURN}, parsed.URNs)
+		assert.Equal(t, sqlmodel.ResourceType, parsed.LegacyResourceType)
 	})
 }
 
@@ -1037,5 +1039,166 @@ func TestProviderFormatForExport(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, entities)
 		assert.Contains(t, err.Error(), "formatting for export for handler")
+	})
+}
+
+func TestProviderMigrateSpec(t *testing.T) {
+	t.Run("Migrates import metadata from LocalID to URN format", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Kind: "retl-source-sql-model",
+			Metadata: map[string]any{
+				"name": "test-model",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "model1",
+									"remote_id": "remote-model-1",
+								},
+								map[string]any{
+									"local_id":  "model2",
+									"remote_id": "remote-model-2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]any{
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"description":       "Test description",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		}
+
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		migratedSpec, err := provider.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 2)
+
+		// Verify URN field is set and LocalID is cleared
+		assert.Equal(t, "retl-source-sql-model:model1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-model-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+
+		assert.Equal(t, "retl-source-sql-model:model2", metadata.Import.Workspaces[0].Resources[1].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[1].LocalID)
+		assert.Equal(t, "remote-model-2", metadata.Import.Workspaces[0].Resources[1].RemoteID)
+	})
+
+	t.Run("Skips migration when URN is already set", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Kind: "retl-source-sql-model",
+			Metadata: map[string]any{
+				"name": "test-model",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"urn":       "retl-source-sql-model:model1",
+									"remote_id": "remote-model-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]any{
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		}
+
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		migratedSpec, err := provider.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+
+		// URN should remain unchanged, LocalID should remain empty
+		assert.Equal(t, "retl-source-sql-model:model1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-model-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Handles spec with no import metadata", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Kind: "retl-source-sql-model",
+			Metadata: map[string]any{
+				"name": "test-model",
+			},
+			Spec: map[string]any{
+				"id":                "test-model",
+				"display_name":      "Test Model",
+				"sql":               "SELECT * FROM users",
+				"account_id":        "acc123",
+				"primary_key":       "id",
+				"source_definition": "postgres",
+			},
+		}
+
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		migratedSpec, err := provider.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		assert.Nil(t, metadata.Import)
+	})
+
+	t.Run("Returns spec unchanged for unsupported kind", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Kind: "unsupported-kind",
+			Metadata: map[string]any{
+				"name": "test",
+			},
+			Spec: map[string]any{
+				"id": "test",
+			},
+		}
+
+		mockClient := newDefaultMockClient()
+		provider := retl.New(mockClient)
+
+		migratedSpec, err := provider.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+		assert.Equal(t, spec, migratedSpec)
 	})
 }
