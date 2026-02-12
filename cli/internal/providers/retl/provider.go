@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -109,7 +108,7 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	}
 
 	// Migrate import metadata to URN format
-	if err := migrator.MigrateImportMetadataToURN(s, resourceType); err != nil {
+	if err := specs.MigrateImportMetadataToURN(s, resourceType); err != nil {
 		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
 	}
 

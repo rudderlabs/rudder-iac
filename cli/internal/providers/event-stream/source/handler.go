@@ -12,7 +12,6 @@ import (
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -105,7 +104,7 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 // It converts import metadata from LocalID to URN format and tracking plan references from path-based to URN-based format
 func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	// Migrate import metadata to URN format
-	if err := migrator.MigrateImportMetadataToURN(s, ResourceType); err != nil {
+	if err := specs.MigrateImportMetadataToURN(s, ResourceType); err != nil {
 		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
 	}
 
