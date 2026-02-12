@@ -94,7 +94,7 @@ func TestGetErrorMessage(t *testing.T) {
 			},
 			expected: "'Name' is required",
 		},
-	
+
 		{
 			name: "gte tag with number",
 			err: mockFieldError{
@@ -261,10 +261,10 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'variants' is not allowed unless 'Type object'",
 		},
 		{
-			name: "value_types tag",
+			name: "array_item_types tag",
 			err: mockFieldError{
 				field:     "match",
-				actualTag: "value_types",
+				actualTag: "array_item_types",
 				param:     "string bool integer",
 			},
 			expected: "'match' values must be one of [string bool integer]",

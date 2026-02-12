@@ -9,17 +9,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// GetValueTypesValidator returns a default validator for the "value_types" tag.
+// GetArrayItemTypesValidator returns a default validator for the "array_item_types" tag.
 // It validates that each element in a []any slice matches one of the allowed types
 // specified as space-separated params.
 //
-// Usage: validate:"value_types=string bool integer"
+// Usage: validate:"array_item_types=string bool integer"
 //
 // Supported type names:
 //   - "string"  — Go string
 //   - "bool"    — Go bool
 //   - "integer" — Go float64 with no fractional part (JSON/YAML numbers are float64)
-func GetValueTypesValidator() rules.CustomValidateFunc {
+func GetArrayItemTypesValidator() rules.CustomValidateFunc {
 	fn := validator.Func(func(fl validator.FieldLevel) bool {
 		field := fl.Field()
 		if field.Kind() != reflect.Slice {
@@ -39,7 +39,7 @@ func GetValueTypesValidator() rules.CustomValidateFunc {
 	})
 
 	return rules.CustomValidateFunc{
-		Tag:  "value_types",
+		Tag:  "array_item_types",
 		Func: fn,
 	}
 }

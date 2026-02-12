@@ -16,7 +16,7 @@ type Variant struct {
 
 type VariantCase struct {
 	DisplayName string              `json:"display_name" validate:"required"`
-	Match       []any               `json:"match" validate:"required,min=1,value_types=string bool integer"`
+	Match       []any               `json:"match" validate:"required,min=1,array_item_types=string bool integer"`
 	Description string              `json:"description"`
 	Properties  []PropertyReference `json:"properties" validate:"required,min=1,dive"`
 }
