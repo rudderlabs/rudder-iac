@@ -57,7 +57,10 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 		return nil, fmt.Errorf("id not found in event stream source spec")
 	}
 	return &specs.ParsedSpec{
-		URNs:               []string{resources.URN(id, ResourceType)},
+		URNs: []specs.URNEntry{{
+			URN:             resources.URN(id, ResourceType),
+			JSONPointerPath: "/spec/id",
+		}},
 		LegacyResourceType: ResourceType,
 	}, nil
 }

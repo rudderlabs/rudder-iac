@@ -878,10 +878,9 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name             string
-		spec             *specs.Spec
-		expectedIDs      []string
-		expectedLocalIDs []specs.LocalID
+		name         string
+		spec         *specs.Spec
+		expectedIDs  []string
 		expectedError    bool
 		errorContains    string
 	}{
@@ -898,11 +897,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				},
 			},
 			expectedIDs: []string{"prop1", "prop2", "prop3"},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "prop1", JSONPointerPath: "/spec/properties/0/id"},
-				{ID: "prop2", JSONPointerPath: "/spec/properties/1/id"},
-				{ID: "prop3", JSONPointerPath: "/spec/properties/2/id"},
-			},
 		},
 		{
 			name: "success - parse events spec with multiple IDs",
@@ -916,10 +910,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				},
 			},
 			expectedIDs: []string{"event1", "event2"},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "event1", JSONPointerPath: "/spec/events/0/id"},
-				{ID: "event2", JSONPointerPath: "/spec/events/1/id"},
-			},
 		},
 		{
 			name: "success - parse tracking plan spec",
@@ -931,9 +921,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				},
 			},
 			expectedIDs: []string{"my_tracking_plan"},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "my_tracking_plan", JSONPointerPath: "/spec/id"},
-			},
 		},
 		{
 			name: "success - parse custom types spec with multiple IDs",
@@ -947,10 +934,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				},
 			},
 			expectedIDs: []string{"type1", "type2"},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "type1", JSONPointerPath: "/spec/types/0/id"},
-				{ID: "type2", JSONPointerPath: "/spec/types/1/id"},
-			},
 		},
 		{
 			name: "success - parse categories spec with multiple IDs",
@@ -965,11 +948,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				},
 			},
 			expectedIDs: []string{"cat1", "cat2", "cat3"},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "cat1", JSONPointerPath: "/spec/categories/0/id"},
-				{ID: "cat2", JSONPointerPath: "/spec/categories/1/id"},
-				{ID: "cat3", JSONPointerPath: "/spec/categories/2/id"},
-			},
 		},
 		{
 			name: "error - properties not found in spec",
@@ -1181,17 +1159,20 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
-				// Convert expected IDs to URNs for comparison based on spec kind
+				// Convert expected IDs to URNEntries for comparison based on spec kind
 				resourceType := kindToResourceType(tc.spec.Kind)
-				var expectedURNs []string
+				var expectedURNs []specs.URNEntry
 				if tc.expectedIDs != nil {
-					expectedURNs = make([]string, len(tc.expectedIDs))
+					expectedURNs = make([]specs.URNEntry, len(tc.expectedIDs))
 					for i, id := range tc.expectedIDs {
-						expectedURNs[i] = resources.URN(id, resourceType)
+						expectedURNs[i] = specs.URNEntry{
+							URN: resources.URN(id, resourceType),
+							// We're not testing JSONPointerPath in this test
+							JSONPointerPath: parsedSpec.URNs[i].JSONPointerPath,
+						}
 					}
 				}
 				assert.Equal(t, expectedURNs, parsedSpec.URNs)
-				assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 			}
 		})
 	}

@@ -613,7 +613,7 @@ func TestProviderParseSpec(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, parsed)
 		expectedURN := resources.URN("orders-model", sqlmodel.ResourceType)
-		assert.ElementsMatch(t, []string{expectedURN}, parsed.URNs)
+		assert.ElementsMatch(t, []specs.URNEntry{{URN: expectedURN, JSONPointerPath: "/spec/id"}}, parsed.URNs)
 		assert.Equal(t, sqlmodel.ResourceType, parsed.LegacyResourceType)
 	})
 }

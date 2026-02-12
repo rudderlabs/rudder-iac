@@ -10,18 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDuplicateLocalIDRule_Metadata(t *testing.T) {
+func TestDuplicateURNRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewDuplicateLocalIDRule(nil)
+	rule := NewDuplicateURNRule(nil)
 
-	assert.Equal(t, "project/duplicate-local-id", rule.ID())
+	assert.Equal(t, "project/duplicate-urn", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, []string{"*"}, rule.AppliesTo())
 	assert.Nil(t, rule.Validate(nil))
 }
 
-func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
+func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Parallel()
 
 	parseSpec := func(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -32,8 +32,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 				for i, p := range props {
 					if m, ok := p.(map[string]any); ok {
 						if id, ok := m["id"].(string); ok {
-							parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-								ID:              id,
+							parsed.URNs = append(parsed.URNs, specs.URNEntry{
+								URN:             fmt.Sprintf("property:%s", id),
 								JSONPointerPath: fmt.Sprintf("/spec/properties/%d/id", i),
 							})
 						}
@@ -45,8 +45,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 				for i, e := range events {
 					if m, ok := e.(map[string]any); ok {
 						if id, ok := m["id"].(string); ok {
-							parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-								ID:              id,
+							parsed.URNs = append(parsed.URNs, specs.URNEntry{
+								URN:             fmt.Sprintf("event:%s", id),
 								JSONPointerPath: fmt.Sprintf("/spec/events/%d/id", i),
 							})
 						}
@@ -55,8 +55,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 			}
 		case "tp":
 			if id, ok := s.Spec["id"].(string); ok {
-				parsed.LocalIDs = append(parsed.LocalIDs, specs.LocalID{
-					ID:              id,
+				parsed.URNs = append(parsed.URNs, specs.URNEntry{
+					URN:             fmt.Sprintf("tracking-plan:%s", id),
 					JSONPointerPath: "/spec/id",
 				})
 			}
@@ -67,7 +67,7 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 	t.Run("no duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -87,10 +87,10 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
-	t.Run("duplicate across files", func(t *testing.T) {
+	t.Run("duplicate URN across files", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -109,14 +109,14 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		require.Len(t, results, 2)
 		assert.Len(t, results["props1.yaml"], 1)
 		assert.Len(t, results["props2.yaml"], 1)
-		assert.Contains(t, results["props1.yaml"][0].Message, "duplicate local id 'email'")
-		assert.Contains(t, results["props2.yaml"][0].Message, "duplicate local id 'email'")
+		assert.Contains(t, results["props1.yaml"][0].Message, "duplicate URN 'property:email'")
+		assert.Contains(t, results["props2.yaml"][0].Message, "duplicate URN 'property:email'")
 	})
 
-	t.Run("duplicate within same file", func(t *testing.T) {
+	t.Run("duplicate URN within same file", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -134,10 +134,10 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		assert.Equal(t, "/spec/properties/1/id", results["props.yaml"][1].Reference)
 	})
 
-	t.Run("same ID across different kinds is allowed", func(t *testing.T) {
+	t.Run("same local ID across different resource types is allowed", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -153,13 +153,14 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 			}},
 		})
 
+		// Should pass because URNs are different: "property:user_id" vs "event:user_id"
 		assert.Empty(t, results)
 	})
 
-	t.Run("three files with same ID", func(t *testing.T) {
+	t.Run("three files with same URN", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -183,7 +184,7 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 	t.Run("mixed duplicates and unique", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -206,10 +207,10 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		assert.Contains(t, results, "b.yaml")
 	})
 
-	t.Run("tracking plan duplicate IDs", func(t *testing.T) {
+	t.Run("tracking plan duplicate URNs", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateLocalIDRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{

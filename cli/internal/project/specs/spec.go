@@ -68,17 +68,16 @@ func (s *Spec) Validate() error {
 	return nil
 }
 
-// LocalID represents a local identifier extracted from a spec, paired with its
+// URNEntry represents a URN extracted from a spec, paired with its
 // JSON Pointer path for precise error reporting during validation.
-type LocalID struct {
-	ID              string // The local ID value (e.g., "user_email")
+type URNEntry struct {
+	URN             string // The URN (e.g., "property:user_email")
 	JSONPointerPath string // JSON Pointer path (e.g., "/spec/properties/2/id")
 }
 
 type ParsedSpec struct {
-	URNs               []string
+	URNs               []URNEntry
 	LegacyResourceType string // For backward compatibility with local_id imports
-	LocalIDs           []LocalID
 }
 
 // New creates and validates a Spec from YAML data
