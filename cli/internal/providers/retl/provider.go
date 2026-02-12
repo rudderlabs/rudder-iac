@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -100,8 +101,18 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 }
 
 // MigrateSpec migrates a spec for the given kind
-// No-op for RETL resources
+// Converts import metadata from LocalID to URN format
 func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	resourceType, ok := p.kindToType[s.Kind]
+	if !ok {
+		return s, nil
+	}
+
+	// Migrate import metadata to URN format
+	if err := migrator.MigrateImportMetadataToURN(s, resourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
 	return s, nil
 }
 

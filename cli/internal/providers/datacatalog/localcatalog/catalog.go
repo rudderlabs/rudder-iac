@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -316,6 +317,29 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	// Map spec kind to resource type for import metadata migration
+	var resourceType string
+	switch s.Kind {
+	case KindProperties:
+		resourceType = "property"
+	case KindEvents:
+		resourceType = "event"
+	case KindCustomTypes:
+		resourceType = "custom-type"
+	case KindCategories:
+		resourceType = "category"
+	case KindTrackingPlans, KindTrackingPlansV1:
+		resourceType = "tracking-plan"
+	default:
+		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
+	}
+
+	// Migrate import metadata to URN format before other transformations
+	if err := migrator.MigrateImportMetadataToURN(s, resourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
+	// Perform provider-specific spec transformations
 	var resourceSpec any
 	switch s.Kind {
 	case KindProperties:
@@ -350,7 +374,7 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = CategorySpecV1{
 			Categories: categories,
 		}
-	case KindTrackingPlans:
+	case KindTrackingPlans, KindTrackingPlansV1:
 		trackingPlan, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return nil, fmt.Errorf("extracting tracking plans: %w", err)
@@ -358,8 +382,6 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = trackingPlan
 		// change kind for tracking plans from "tp" to "tracking-plan"
 		s.Kind = KindTrackingPlansV1
-	default:
-		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
 
 	jsonByt, err := json.Marshal(resourceSpec)
