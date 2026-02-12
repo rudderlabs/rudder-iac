@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
@@ -335,7 +334,7 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	}
 
 	// Migrate import metadata to URN format before other transformations
-	if err := migrator.MigrateImportMetadataToURN(s, resourceType); err != nil {
+	if err := specs.MigrateImportMetadataToURN(s, resourceType); err != nil {
 		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
 	}
 
