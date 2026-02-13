@@ -315,7 +315,7 @@ func (p *project) registry() (rules.Registry, error) {
 	// syntactic rules from each provider.
 	syntactic := []rules.Rule{
 		prules.NewSpecSyntaxValidRule(),
-		prules.NewMetadataSyntaxValidRule(),
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec),
 		prules.NewSpecSemanticValidRule(
 			p.provider.SupportedKinds(),
 			[]string{
@@ -323,6 +323,7 @@ func (p *project) registry() (rules.Registry, error) {
 				specs.SpecVersionV0_1Variant,
 			},
 		),
+		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 

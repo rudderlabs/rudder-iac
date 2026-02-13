@@ -57,12 +57,7 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 		hasType := prop.Type != ""
 		hasTypes := len(prop.Types) > 0
 
-		if !hasType && !hasTypes {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("either 'type' or 'types' field must be specified"),
-				Reference: reference,
-			})
-		} else if hasType && hasTypes {
+		if hasType && hasTypes {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("'type' and 'types' fields are mutually exclusive, only one can be specified"),
 				Reference: reference,
@@ -108,11 +103,24 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				typeSet[typeVal] = true
 			}
 		} else {
-			// Validate single type field
-			if catalog.CustomTypeRegex.Match([]byte(prop.Type)) {
-				if prop.Config != nil {
+
+			if prop.Type != "" {
+				switch {
+				case catalog.CustomTypeRegex.Match([]byte(prop.Type)):
+					if prop.Config != nil {
+						errors = append(errors, ValidationError{
+							error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+							Reference: reference,
+						})
+					}
+				case strings.Contains(prop.Type, ","):
 					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("property config not allowed if the type matches custom-type"),
+						error:     fmt.Errorf("type '%s' is invalid, multiple types are not allowed in the type field, use the types field instead", prop.Type),
+						Reference: reference,
+					})
+				case !slices.Contains(ValidTypes, prop.Type):
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("type '%s' is invalid, valid type values are: %s", prop.Type, strings.Join(ValidTypes, ", ")),
 						Reference: reference,
 					})
 				}

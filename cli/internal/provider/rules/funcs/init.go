@@ -6,6 +6,7 @@ import (
 
 func init() {
 	rules.RegisterDefaultValidator(GetPatternValidator())
+	rules.RegisterDefaultValidator(GetArrayItemTypesValidator())
 
 	// Register the default patterns for the pattern validator
 	// These patterns can be used by callers downstream to validate fields in struct

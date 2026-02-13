@@ -8,6 +8,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
+
+	// Trigger display_name pattern registration from parent rules package
+	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 )
 
 // extractRefs extracts Reference fields from ValidationResults

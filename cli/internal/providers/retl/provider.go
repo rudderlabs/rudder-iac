@@ -7,6 +7,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -39,7 +40,11 @@ func New(client retlClient.RETLStore) *Provider {
 	}
 
 	// Register handlers
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
+	options := []sqlmodel.HandlerOption{}
+	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
+		options = append(options, sqlmodel.WithV1SpecSupport())
+	}
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir, options...)
 
 	return p
 }
@@ -91,8 +96,13 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 // LoadLegacySpec loads a legacy spec (rudder/0.1) for the given kind
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
-	// Empty implementation for now
-	return fmt.Errorf("not implemented")
+	return p.LoadSpec(path, s)
+}
+
+// MigrateSpec migrates a spec for the given kind
+// No-op for RETL resources
+func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	return s, nil
 }
 
 // Validate validates all loaded specs

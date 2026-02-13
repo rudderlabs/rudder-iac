@@ -485,3 +485,147 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 		})
 	})
 }
+
+// mockProjectRule implements both Rule and ProjectRule
+type mockProjectRule struct {
+	mockRule
+	validateProjectFn func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult
+}
+
+func (m *mockProjectRule) ValidateProject(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	if m.validateProjectFn != nil {
+		return m.validateProjectFn(specs)
+	}
+	return nil
+}
+
+func TestValidationEngine_ProjectRules(t *testing.T) {
+	t.Parallel()
+
+	t.Run("project rule runs after per-spec rules pass", func(t *testing.T) {
+		t.Parallel()
+
+		rawSpecs := map[string]*specs.RawSpec{
+			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
+		}
+
+		pr := &mockProjectRule{
+			mockRule: mockRule{
+				id:        "project-rule",
+				severity:  rules.Error,
+				appliesTo: []string{"*"},
+			},
+			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				return map[string][]rules.ValidationResult{
+					"/path/to/test.yaml": {
+						{Reference: "/spec/group", Message: "project-wide error"},
+					},
+				}
+			},
+		}
+
+		registry := rules.NewRegistry()
+		require.NoError(t, registry.RegisterSyntactic(pr))
+
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSyntax(context.Background(), rawSpecs)
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+
+		assert.Equal(t, "project-rule", diagnostics[0].RuleID)
+		assert.Equal(t, "project-wide error", diagnostics[0].Message)
+		assert.Greater(t, diagnostics[0].Position.Line, 0)
+	})
+
+	t.Run("project rule skipped when per-spec errors exist", func(t *testing.T) {
+		t.Parallel()
+
+		rawSpecs := map[string]*specs.RawSpec{
+			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
+		}
+
+		projectRuleCalled := false
+
+		failingPerSpec := &mockRule{
+			id:        "failing-rule",
+			severity:  rules.Error,
+			appliesTo: []string{"properties"},
+			validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
+				return []rules.ValidationResult{
+					{Reference: "/spec/group", Message: "syntax error"},
+				}
+			},
+		}
+
+		pr := &mockProjectRule{
+			mockRule: mockRule{
+				id:        "project-rule",
+				severity:  rules.Error,
+				appliesTo: []string{"*"},
+			},
+			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				projectRuleCalled = true
+				return map[string][]rules.ValidationResult{
+					"/path/to/test.yaml": {
+						{Reference: "/spec/group", Message: "should not appear"},
+					},
+				}
+			},
+		}
+
+		registry := rules.NewRegistry()
+		require.NoError(t, registry.RegisterSyntactic(failingPerSpec))
+		require.NoError(t, registry.RegisterSyntactic(pr))
+
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSyntax(context.Background(), rawSpecs)
+		require.NoError(t, err)
+
+		assert.False(t, projectRuleCalled)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, "syntax error", diagnostics[0].Message)
+	})
+
+	t.Run("project rule receives all specs", func(t *testing.T) {
+		t.Parallel()
+
+		rawSpecs := map[string]*specs.RawSpec{
+			"/path/to/props.yaml":  newRawSpec(t, validPropertiesYAML),
+			"/path/to/events.yaml": newRawSpec(t, validEventsYAML),
+		}
+
+		var receivedPaths []string
+
+		pr := &mockProjectRule{
+			mockRule: mockRule{
+				id:        "capture-rule",
+				severity:  rules.Error,
+				appliesTo: []string{"*"},
+			},
+			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				for path := range specs {
+					receivedPaths = append(receivedPaths, path)
+				}
+				return nil
+			},
+		}
+
+		registry := rules.NewRegistry()
+		require.NoError(t, registry.RegisterSyntactic(pr))
+
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		_, err = engine.ValidateSyntax(context.Background(), rawSpecs)
+		require.NoError(t, err)
+
+		assert.Len(t, receivedPaths, 2)
+		assert.Contains(t, receivedPaths, "/path/to/props.yaml")
+		assert.Contains(t, receivedPaths, "/path/to/events.yaml")
+	})
+
+}

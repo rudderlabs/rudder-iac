@@ -96,7 +96,10 @@ func (p *CustomTypeImportProvider) idResources(
 		}
 
 		customType.ExternalID = externalID
-		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
+		customType.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, externalID)
+		if p.v1SpecSupport {
+			customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
+		}
 	}
 	return nil
 }
@@ -116,6 +119,10 @@ func (p *CustomTypeImportProvider) FormatForExport(
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
+	}
+	version := specs.SpecVersionV0_1
+	if p.v1SpecSupport {
+		version = specs.SpecVersionV1
 	}
 
 	formattedTypes := make([]map[string]any, 0)
@@ -149,6 +156,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 	}
 
 	spec, err := toImportSpec(
+		version,
 		localcatalog.KindCustomTypes,
 		MetadataNameCustomTypes,
 		workspaceMetadata,

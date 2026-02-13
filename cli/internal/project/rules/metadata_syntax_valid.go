@@ -12,10 +12,13 @@ import (
 )
 
 type MetadataSyntaxValidRule struct {
+	parseSpec ParseSpecFunc
 }
 
-func NewMetadataSyntaxValidRule() rules.Rule {
-	return &MetadataSyntaxValidRule{}
+func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc) rules.Rule {
+	return &MetadataSyntaxValidRule{
+		parseSpec: parseSpec,
+	}
 }
 
 func (r *MetadataSyntaxValidRule) ID() string {
@@ -107,14 +110,64 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 	results := funcs.ParseValidationErrors(validationErrors)
 	// Before returning the results, simply prepend the metadata
 	// path to the reference to allow for unique identification.
-	return lo.Map(results, func(result rules.ValidationResult, _ int) rules.ValidationResult {
-
+	results = lo.Map(results, func(result rules.ValidationResult, _ int) rules.ValidationResult {
 		return rules.ValidationResult{
 			Reference: "/metadata" + result.Reference,
 			Message:   result.Message,
 		}
 	})
 
+	// If struct-level validation already has errors, return early
+	// to avoid confusing errors from the import cross-check.
+	if len(results) > 0 {
+		return results
+	}
+
+	results = append(results, r.validateImportIDs(ctx, metadata)...)
+
+	return results
+}
+
+// validateImportIDs checks that every local_id in the metadata import block
+// exists as an external ID in the spec. This ensures that imported resources
+// are actually defined in the spec body.
+func (r *MetadataSyntaxValidRule) validateImportIDs(ctx *rules.ValidationContext, metadata *specs.Metadata) []rules.ValidationResult {
+	if metadata.Import == nil {
+		return nil
+	}
+
+	parsed, err := r.parseSpec(ctx.FilePath, &specs.Spec{
+		Version:  ctx.Version,
+		Kind:     ctx.Kind,
+		Metadata: ctx.Metadata,
+		Spec:     ctx.Spec,
+	})
+	if err != nil {
+		return nil
+	}
+
+	externalIDSet := make(map[string]struct{}, len(parsed.ExternalIDs))
+	for _, id := range parsed.ExternalIDs {
+		externalIDSet[id] = struct{}{}
+	}
+
+	var results []rules.ValidationResult
+	for i, workspace := range metadata.Import.Workspaces {
+		for j, resource := range workspace.Resources {
+			_, exists := externalIDSet[resource.LocalID]
+
+			if exists {
+				continue
+			}
+
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/metadata/import/workspaces/%d/resources/%d/local_id", i, j),
+				Message:   fmt.Sprintf("local_id '%s' from import metadata not found in spec", resource.LocalID),
+			})
+		}
+	}
+
+	return results
 }
 
 func decodeMetadata(m map[string]any) (*specs.Metadata, error) {

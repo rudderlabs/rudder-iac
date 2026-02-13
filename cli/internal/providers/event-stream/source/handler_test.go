@@ -193,7 +193,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						},
 					},
 				},
-				errorMessage: "invalid entity type: invalid-entity",
+				errorMessage: "invalid ref format: #/invalid-entity/group/tp-123",
 			},
 			{
 				name: "with tracking plan config missing",
@@ -227,6 +227,153 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				err := handler.LoadSpec("", tc.spec)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errorMessage)
+			})
+		}
+	})
+
+	t.Run("MigrateSpec", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name          string
+			spec          *specs.Spec
+			expectedSpec  map[string]any
+			expectedError bool
+			errorContains string
+		}{
+			{
+				name: "success - spec without governance",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+				},
+			},
+			{
+				name: "success - spec with governance but empty tracking plan ref",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+						"governance": map[string]any{
+							"validations": map[string]any{
+								"tracking_plan": "",
+							},
+						},
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+					"governance": map[string]any{
+						"validations": map[string]any{
+							"tracking_plan": "",
+						},
+					},
+				},
+			},
+			{
+				name: "success - migrates #/tp/group/ ref to #tracking-plan:id format",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+						"governance": map[string]any{
+							"validations": map[string]any{
+								"tracking_plan": "#/tp/group/tp-abc123",
+							},
+						},
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+					"governance": map[string]any{
+						"validations": map[string]any{
+							"tracking_plan": "#tracking-plan:tp-abc123",
+						},
+					},
+				},
+			},
+			{
+				name: "success - keeps #tracking-plan:id format unchanged",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+						"governance": map[string]any{
+							"validations": map[string]any{
+								"tracking_plan": "#tracking-plan:tp-xyz789",
+							},
+						},
+					},
+				},
+				expectedSpec: map[string]any{
+					"id":   "test-source",
+					"name": "Test Source",
+					"type": "javascript",
+					"governance": map[string]any{
+						"validations": map[string]any{
+							"tracking_plan": "#tracking-plan:tp-xyz789",
+						},
+					},
+				},
+			},
+			{
+				name: "error - invalid ref format",
+				spec: &specs.Spec{
+					Kind: "event-stream-source",
+					Spec: map[string]any{
+						"id":   "test-source",
+						"name": "Test Source",
+						"type": "javascript",
+						"governance": map[string]any{
+							"validations": map[string]any{
+								"tracking_plan": "invalid-ref",
+							},
+						},
+					},
+				},
+				expectedError: true,
+				errorContains: "invalid ref format: invalid-ref",
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				mockClient := source.NewMockSourceClient()
+				handler := source.NewHandler(mockClient, importDir)
+
+				got, err := handler.MigrateSpec(tc.spec)
+
+				if tc.expectedError {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errorContains)
+					assert.Nil(t, got)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, got)
+					assert.Equal(t, tc.expectedSpec, got.Spec)
+				}
 			})
 		}
 	})
@@ -1478,6 +1625,77 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, spec2.Metadata)
+	})
+
+	t.Run("v1SpecSupport", func(t *testing.T) {
+		t.Run("LoadImportable uses new ref format when enabled", func(t *testing.T) {
+			t.Parallel()
+			mockClient := source.NewMockSourceClient()
+			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+				return []sourceClient.EventStreamSource{
+					{
+						ID:         "remote456",
+						ExternalID: "",
+						Name:       "Test Source 2",
+						Type:       "python",
+						Enabled:    false,
+					},
+				}, nil
+			})
+			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+
+			collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
+			require.NoError(t, err)
+			esResources := collection.GetAll(source.ResourceType)
+			require.Len(t, esResources, 1)
+			resource := esResources["remote456"]
+			require.NotNil(t, resource)
+			assert.Equal(t, "#event-stream-source:test-source-2", resource.Reference)
+		})
+
+		t.Run("FormatForExport uses rudder/v1 when enabled", func(t *testing.T) {
+			t.Parallel()
+			mockClient := source.NewMockSourceClient()
+			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+			collection := resources.NewRemoteResources()
+			resourceMap := map[string]*resources.RemoteResource{
+				"remote123": {
+					ID:         "remote123",
+					ExternalID: "test-source-1",
+					Data: &sourceClient.EventStreamSource{
+						ID: "remote123", Name: "Test Source 1", Type: "javascript", Enabled: true, WorkspaceID: "ws-1",
+					},
+				},
+			}
+			collection.Set(source.ResourceType, resourceMap)
+
+			entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{})
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			assert.Equal(t, specs.SpecVersionV1, spec.Version)
+		})
+
+		t.Run("GetResources uses new ref for file metadata when enabled", func(t *testing.T) {
+			t.Parallel()
+			mockClient := source.NewMockSourceClient()
+			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+			spec := &specs.Spec{
+				Version: specs.SpecVersionV0_1Variant,
+				Kind:    "event-stream-source",
+				Spec: map[string]interface{}{
+					"id": "test-source-1", "name": "Test Source 1", "type": "javascript",
+				},
+			}
+			err := handler.LoadSpec("", spec)
+			require.NoError(t, err)
+			res, err := handler.GetResources()
+			require.NoError(t, err)
+			require.Len(t, res, 1)
+			require.NotNil(t, res[0].FileMetadata(), "file metadata should be set")
+			assert.Equal(t, "#event-stream-source:test-source-1", res[0].FileMetadata().MetadataRef)
+		})
 	})
 }
 

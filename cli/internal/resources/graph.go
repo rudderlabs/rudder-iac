@@ -77,6 +77,16 @@ func (s *Graph) addDependent(dependency string, dependent string) {
 	s.dependents[dependency] = append(s.dependents[dependency], dependent)
 }
 
+func (s *Graph) ResourcesByType(resourceType string) []*Resource {
+	var result []*Resource
+	for _, r := range s.resources {
+		if r.Type() == resourceType {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
 func (s *Graph) Merge(g *Graph) {
 	for _, r := range g.resources {
 		s.AddResource(r)

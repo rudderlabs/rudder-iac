@@ -94,22 +94,7 @@ func TestGetErrorMessage(t *testing.T) {
 			},
 			expected: "'Name' is required",
 		},
-		{
-			name: "reference tag",
-			err: mockFieldError{
-				field:     "Ref",
-				actualTag: "reference",
-			},
-			expected: "'Ref' is not a valid reference format",
-		},
-		{
-			name: "primitive_or_reference tag",
-			err: mockFieldError{
-				field:     "Type",
-				actualTag: "primitive_or_reference",
-			},
-			expected: "'Type' is not a valid primitive type or reference format",
-		},
+
 		{
 			name: "gte tag with number",
 			err: mockFieldError{
@@ -167,6 +152,122 @@ func TestGetErrorMessage(t *testing.T) {
 				param:     "nonexistent_pattern",
 			},
 			expected: "'Name' does not match the required pattern",
+		},
+		{
+			name: "oneof tag",
+			err: mockFieldError{
+				field:     "EventType",
+				actualTag: "oneof",
+				param:     "track screen identify group page",
+			},
+			expected: "'EventType' must be one of [track screen identify group page]",
+		},
+		{
+			name: "min tag with number",
+			err: mockFieldError{
+				field:     "Priority",
+				actualTag: "min",
+				kind:      reflect.Int,
+				param:     "1",
+			},
+			expected: "'Priority' must be greater than or equal to 1",
+		},
+		{
+			name: "min tag with string",
+			err: mockFieldError{
+				field:     "Label",
+				actualTag: "min",
+				kind:      reflect.String,
+				param:     "3",
+			},
+			expected: "'Label' length must be greater than or equal to 3",
+		},
+		{
+			name: "min tag with slice",
+			err: mockFieldError{
+				field:     "Items",
+				actualTag: "min",
+				kind:      reflect.Slice,
+				param:     "1",
+			},
+			expected: "'Items' length must be greater than or equal to 1",
+		},
+		{
+			name: "min tag with array",
+			err: mockFieldError{
+				field:     "Tags",
+				actualTag: "min",
+				kind:      reflect.Array,
+				param:     "2",
+			},
+			expected: "'Tags' length must be greater than or equal to 2",
+		},
+		{
+			name: "max tag with number",
+			err: mockFieldError{
+				field:     "Retries",
+				actualTag: "max",
+				kind:      reflect.Int,
+				param:     "5",
+			},
+			expected: "'Retries' must be less than or equal to 5",
+		},
+		{
+			name: "max tag with string",
+			err: mockFieldError{
+				field:     "Title",
+				actualTag: "max",
+				kind:      reflect.String,
+				param:     "100",
+			},
+			expected: "'Title' length must be less than or equal to 100",
+		},
+		{
+			name: "max tag with slice",
+			err: mockFieldError{
+				field:     "Variants",
+				actualTag: "max",
+				kind:      reflect.Slice,
+				param:     "1",
+			},
+			expected: "'Variants' length must be less than or equal to 1",
+		},
+		{
+			name: "max tag with array",
+			err: mockFieldError{
+				field:     "Choices",
+				actualTag: "max",
+				kind:      reflect.Array,
+				param:     "10",
+			},
+			expected: "'Choices' length must be less than or equal to 10",
+		},
+		{
+			name: "eq tag",
+			err: mockFieldError{
+				field:     "Type",
+				actualTag: "eq",
+				param:     "discriminator",
+			},
+			expected: "'Type' must equal 'discriminator'",
+		},
+		{
+			name: "excluded_unless tag",
+			err: mockFieldError{
+				field:     "variants",
+				actualTag: "excluded_unless",
+				param:     "Type object",
+			},
+			expected: "'variants' is not allowed unless 'Type object'",
+		},
+		{
+			name: "array_item_types tag",
+			err: mockFieldError{
+				field:     "match",
+				actualTag: "array_item_types",
+				param:     "string bool integer",
+			},
+			expected: "'match' values must be one of [string bool integer]",
 		},
 		{
 			name: "unknown tag",

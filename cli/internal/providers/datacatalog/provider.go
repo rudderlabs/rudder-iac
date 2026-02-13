@@ -17,6 +17,7 @@ import (
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
 	eventRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/event"
 	propertyRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/property"
+	trackingplanRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/trackingplan"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
@@ -72,6 +73,7 @@ func (p *Provider) SupportedKinds() []string {
 		localcatalog.KindProperties,
 		localcatalog.KindEvents,
 		localcatalog.KindTrackingPlans,
+		localcatalog.KindTrackingPlansV1,
 		localcatalog.KindCustomTypes,
 		localcatalog.KindCategories,
 	}
@@ -290,7 +292,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			types.TrackingPlanResourceType,
 			args.ToResourceData(),
 			make([]string, 0),
-			getResourceImportMetadata(localcatalog.KindTrackingPlans, tp.LocalID),
+			getResourceImportMetadata(localcatalog.KindTrackingPlansV1, tp.LocalID),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
 				localcatalog.KindTrackingPlans,
 				tp.LocalID,
@@ -342,7 +344,18 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 		customtypeRules.NewCustomTypeConfigValidRule(),
 		eventRules.NewEventSpecSyntaxValidRule(),
 		categoryRules.NewCategorySpecSyntaxValidRule(),
+		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(),
 	}
 
 	return syntactic
+}
+
+func (p *Provider) SemanticRules() []rules.Rule {
+	return []rules.Rule{
+		propertyRules.NewPropertySemanticValidRule(),
+		eventRules.NewEventSemanticValidRule(),
+		categoryRules.NewCategorySemanticValidRule(),
+		customtypeRules.NewCustomTypeSemanticValidRule(),
+		trackingplanRules.NewTrackingPlanSemanticValidRule(),
+	}
 }

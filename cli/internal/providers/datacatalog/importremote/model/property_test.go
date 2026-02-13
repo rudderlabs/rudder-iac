@@ -152,6 +152,44 @@ func TestPropertyForExport(t *testing.T) {
 			},
 		}, result)
 	})
+
+	t.Run("array with single primitive item type exports item_type not item_types in config", func(t *testing.T) {
+		upstream := &catalog.Property{
+			Name:   "String List",
+			Type:   "array",
+			Config: map[string]interface{}{"itemTypes": []interface{}{"string"}},
+		}
+
+		mockRes := &mockResolver{}
+		prop := &ImportablePropertyV1{}
+		result, err := prop.ForExport("string_list", upstream, mockRes)
+
+		require.Nil(t, err)
+		assert.Equal(t, "string", result["item_type"])
+		assert.NotContains(t, result, "item_types")
+		if config, ok := result["config"].(map[string]interface{}); ok {
+			assert.NotContains(t, config, "item_types")
+		}
+	})
+
+	t.Run("array with multiple primitive item types exports item_types at top level", func(t *testing.T) {
+		upstream := &catalog.Property{
+			Name:   "Multi Type List",
+			Type:   "array",
+			Config: map[string]interface{}{"itemTypes": []interface{}{"string", "number"}},
+		}
+
+		mockRes := &mockResolver{}
+		prop := &ImportablePropertyV1{}
+		result, err := prop.ForExport("multi_type_list", upstream, mockRes)
+
+		require.Nil(t, err)
+		assert.Equal(t, []string{"string", "number"}, result["item_types"])
+		assert.NotContains(t, result, "item_type")
+		if config, ok := result["config"].(map[string]interface{}); ok {
+			assert.NotContains(t, config, "item_types")
+		}
+	})
 }
 
 func TestPropertyForExportV0(t *testing.T) {

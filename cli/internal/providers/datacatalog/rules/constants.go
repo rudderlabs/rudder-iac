@@ -35,6 +35,12 @@ const (
 	trackingPlanReferenceTag           = "tracking_plan_ref"
 	trackingPlanLegacyReferenceMessage = "must be of pattern #/tp/<group>/<id>"
 	trackingPlanReferenceMessage       = "must be of pattern #tracking-plan:<id>"
+
+	// display_name is a shared pattern for human-readable names across resource types
+	// (e.g., category name, tracking plan display_name)
+	displayNameRegexPattern = `^[A-Z_a-z][ \w,.-]{2,64}$`
+	displayNameRegexTag     = "display_name"
+	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"
 )
 
 var (
@@ -174,5 +180,12 @@ func init() {
 		trackingPlanReferenceTag,
 		TrackingPlanReferenceRegex,
 		trackingPlanReferenceMessage,
+	)
+
+	// Shared display name pattern for human-readable resource names
+	funcs.NewPattern(
+		displayNameRegexTag,
+		displayNameRegexPattern,
+		displayNameErrorMessage,
 	)
 }
