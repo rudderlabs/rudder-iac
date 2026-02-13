@@ -71,7 +71,6 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 
 	// Determine which transformations to test based on mode
 	var transformationsToTest []*resources.Resource
-	var err error
 
 	switch mode {
 	case ModeAll:
