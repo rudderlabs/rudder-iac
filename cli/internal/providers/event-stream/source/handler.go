@@ -60,7 +60,7 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 }
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
-	spec := &sourceSpec{}
+	spec := &SourceSpec{}
 	// Use strict decoding to reject unknown fields
 	decoderConfig := &mapstructure.DecoderConfig{
 		ErrorUnused: true, // Reject unknown fields
@@ -73,8 +73,8 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding event stream source spec: %w", err)
 	}
-	if _, exists := h.resources[spec.LocalId]; exists {
-		return fmt.Errorf("event stream source with id %s already exists", spec.LocalId)
+	if _, exists := h.resources[spec.LocalID]; exists {
+		return fmt.Errorf("event stream source with id %s already exists", spec.LocalID)
 	}
 	// Default enabled to true when not specified in the spec
 	enabled := true
@@ -82,7 +82,7 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		enabled = *spec.Enabled
 	}
 	sourceResource := &sourceResource{
-		LocalId:          spec.LocalId,
+		LocalID:          spec.LocalID,
 		Name:             spec.Name,
 		SourceDefinition: spec.SourceDefinition,
 		Enabled:          enabled,
@@ -93,14 +93,14 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		return err
 	}
 	sourceResource.addImportMetadata(s)
-	h.resources[spec.LocalId] = sourceResource
+	h.resources[spec.LocalID] = sourceResource
 	return nil
 }
 
 // MigrateSpec migrates a event stream source spec
 // It only converts the tracking plan reference from path-based to URN-based format
 func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
-	spec := &sourceSpec{}
+	spec := &SourceSpec{}
 	// Use strict decoding to reject unknown fields
 	decoderConfig := &mapstructure.DecoderConfig{
 		ErrorUnused: true, // Reject unknown fields
@@ -135,7 +135,7 @@ func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
-func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceResource) error {
+func (h *Handler) loadTrackingPlanSpec(spec *SourceSpec, sourceResource *sourceResource) error {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
 	}
@@ -187,7 +187,7 @@ func (h *Handler) loadTrackingPlanSpec(spec *sourceSpec, sourceResource *sourceR
 	return nil
 }
 
-func buildEventConfigFromSpec(specConfig *eventConfigSpec) *EventConfigResource {
+func buildEventConfigFromSpec(specConfig *EventConfigSpec) *EventConfigResource {
 	return &EventConfigResource{
 		PropagateViolations:     specConfig.PropagateViolations,
 		DropUnplannedProperties: specConfig.DropUnplannedProperties,
@@ -196,7 +196,7 @@ func buildEventConfigFromSpec(specConfig *eventConfigSpec) *EventConfigResource 
 }
 
 func validateSource(source *sourceResource, graph *resources.Graph) error {
-	if source.LocalId == "" {
+	if source.LocalID == "" {
 		return fmt.Errorf("id is required")
 	}
 	if source.Name == "" {
@@ -247,20 +247,20 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
 		}
-		ref := getFileMetadata(s.LocalId)
+		ref := getFileMetadata(s.LocalID)
 		if h.v1SpecSupport {
-			ref = fmt.Sprintf("#%s:%s", ResourceType, s.LocalId)
+			ref = fmt.Sprintf("#%s:%s", ResourceType, s.LocalID)
 		}
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(ref),
 		}
-		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalId)]; ok {
+		if importMetadata, ok := s.ImportMetadata[resources.URN(ResourceType, s.LocalID)]; ok {
 			opts = []resources.ResourceOpts{
 				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
 			}
 		}
 		r := resources.NewResource(
-			s.LocalId,
+			s.LocalID,
 			ResourceType,
 			data,
 			[]string{},
@@ -725,7 +725,7 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 	if metadata.Import != nil {
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalId)] = &WorkspaceRemoteIDMapping{
+				srcResource.ImportMetadata[resources.URN(s.Kind, srcResource.LocalID)] = &WorkspaceRemoteIDMapping{
 					WorkspaceId: workspace.WorkspaceID,
 					RemoteId:    resource.RemoteID,
 				}
