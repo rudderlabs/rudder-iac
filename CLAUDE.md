@@ -187,9 +187,12 @@ Implementation:
 ## Build & Test Commands
 
 ```bash
+make lint               # Lint (must pass before committing)
 make build              # Build CLI binary
 make test               # Unit tests
 make test-e2e           # E2E tests (apply cycle)
 make test-it            # Integration tests
 make test-all           # All tests
 ```
+
+Always run `make lint` after making changes and before committing.
