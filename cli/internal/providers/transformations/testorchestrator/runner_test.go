@@ -10,15 +10,30 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
+// Helper to convert test cases to test definitions for testing
+func toTestDefinitions(testCases []TestCase) []transformations.TestDefinition {
+	defs := make([]transformations.TestDefinition, len(testCases))
+	for i, tc := range testCases {
+		defs[i] = transformations.TestDefinition{
+			Name:           tc.Name,
+			Input:          tc.InputEvents,
+			ExpectedOutput: tc.ExpectedOutput,
+		}
+	}
+	return defs
+}
+
 func TestHasFailures(t *testing.T) {
 	t.Run("no failures", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*transformations.TransformationTestResult{
+			Transformations: []*TransformationTestWithDefinitions{
 				{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusPass},
-							{Status: transformations.TestRunStatusPass},
+					Result: &transformations.TransformationTestResult{
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Results: []transformations.TestResult{
+								{Status: transformations.TestRunStatusPass},
+								{Status: transformations.TestRunStatusPass},
+							},
 						},
 					},
 				},
@@ -30,12 +45,14 @@ func TestHasFailures(t *testing.T) {
 
 	t.Run("has fail status", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*transformations.TransformationTestResult{
+			Transformations: []*TransformationTestWithDefinitions{
 				{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusPass},
-							{Status: transformations.TestRunStatusFail},
+					Result: &transformations.TransformationTestResult{
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Results: []transformations.TestResult{
+								{Status: transformations.TestRunStatusPass},
+								{Status: transformations.TestRunStatusFail},
+							},
 						},
 					},
 				},
@@ -47,11 +64,13 @@ func TestHasFailures(t *testing.T) {
 
 	t.Run("has error status", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*transformations.TransformationTestResult{
+			Transformations: []*TransformationTestWithDefinitions{
 				{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusError},
+					Result: &transformations.TransformationTestResult{
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Results: []transformations.TestResult{
+								{Status: transformations.TestRunStatusError},
+							},
 						},
 					},
 				},
@@ -63,7 +82,7 @@ func TestHasFailures(t *testing.T) {
 
 	t.Run("empty results", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*transformations.TransformationTestResult{},
+			Transformations: []*TransformationTestWithDefinitions{},
 		}
 
 		assert.False(t, results.HasFailures())
@@ -71,18 +90,22 @@ func TestHasFailures(t *testing.T) {
 
 	t.Run("multiple transformations with mixed results", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*transformations.TransformationTestResult{
+			Transformations: []*TransformationTestWithDefinitions{
 				{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusPass},
+					Result: &transformations.TransformationTestResult{
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Results: []transformations.TestResult{
+								{Status: transformations.TestRunStatusPass},
+							},
 						},
 					},
 				},
 				{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusFail},
+					Result: &transformations.TransformationTestResult{
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Results: []transformations.TestResult{
+								{Status: transformations.TestRunStatusFail},
+							},
 						},
 					},
 				},
@@ -174,7 +197,7 @@ func TestBuildTestRequest(t *testing.T) {
 
 		libraryVersionIDs := []string{"lib-ver-1", "lib-ver-2"}
 
-		req := runner.buildTestRequest("trans-ver-1", testCases, libraryVersionIDs)
+		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), libraryVersionIDs)
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -207,7 +230,7 @@ func TestBuildTestRequest(t *testing.T) {
 			},
 		}
 
-		req := runner.buildTestRequest("trans-ver-1", testCases, []string{})
+		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), []string{})
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -219,7 +242,7 @@ func TestBuildTestRequest(t *testing.T) {
 	t.Run("builds request with empty test cases", func(t *testing.T) {
 		runner := &Runner{}
 
-		req := runner.buildTestRequest("trans-ver-1", []TestCase{}, []string{"lib-ver-1"})
+		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions([]TestCase{}), []string{"lib-ver-1"})
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -238,7 +261,7 @@ func TestBuildTestRequest(t *testing.T) {
 			{Name: "test-c", InputEvents: []any{}},
 		}
 
-		req := runner.buildTestRequest("trans-ver-1", testCases, []string{})
+		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), []string{})
 
 		require.Len(t, req.Transformations[0].TestSuite, 3)
 		assert.Equal(t, "test-a", req.Transformations[0].TestSuite[0].Name)
