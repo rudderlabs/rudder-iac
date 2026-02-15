@@ -1,17 +1,19 @@
-package source
+package sqlmodel
 
 import (
+	"reflect"
+
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
-	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-var validateSourceSpec = func(
+var validateSQLModelSpec = func(
 	_ string,
 	_ string,
 	_ map[string]any,
-	spec esSource.SourceSpec,
+	spec sqlmodel.SQLModelSpec,
 ) []rules.ValidationResult {
 	validationErrors, err := rules.ValidateStruct(spec, "")
 	if err != nil {
@@ -20,16 +22,16 @@ var validateSourceSpec = func(
 		}}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors, nil)
+	return funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
 }
 
-func NewSourceSpecSyntaxValidRule() rules.Rule {
+func NewSQLModelSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
-		"event-stream/source/spec-syntax-valid",
+		"retl/sqlmodel/spec-syntax-valid",
 		rules.Error,
-		"event stream source spec syntax must be valid",
+		"retl sql model spec syntax must be valid",
 		rules.Examples{},
-		[]string{esSource.ResourceKind},
-		validateSourceSpec,
+		[]string{sqlmodel.ResourceKind},
+		validateSQLModelSpec,
 	)
 }

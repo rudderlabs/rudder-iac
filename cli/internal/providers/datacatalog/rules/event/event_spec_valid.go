@@ -50,7 +50,7 @@ var validateEventSpec = func(Kind string, Version string, Metadata map[string]an
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors, nil)
 
 	// Cross-field: name validation depends on event_type.
 	// Only run when event_type is valid to avoid confusing errors on top of the oneof failure.

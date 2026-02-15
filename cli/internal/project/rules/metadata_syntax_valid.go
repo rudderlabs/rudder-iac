@@ -107,7 +107,7 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors, nil)
 	// Before returning the results, simply prepend the metadata
 	// path to the reference to allow for unique identification.
 	results = lo.Map(results, func(result rules.ValidationResult, _ int) rules.ValidationResult {

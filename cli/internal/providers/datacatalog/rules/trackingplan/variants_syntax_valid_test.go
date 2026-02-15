@@ -21,7 +21,7 @@ func validateVariant(variant localcatalog.Variant) []rules.ValidationResult {
 			Message:   err.Error(),
 		}}
 	}
-	return funcs.ParseValidationErrors(validationErrors)
+	return funcs.ParseValidationErrors(validationErrors, nil)
 }
 
 func TestVariantsSyntaxValid_ValidSpecs(t *testing.T) {

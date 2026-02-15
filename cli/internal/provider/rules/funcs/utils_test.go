@@ -11,17 +11,18 @@ import (
 
 // mockFieldError is a mock implementation of validator.FieldError for testing
 type mockFieldError struct {
-	field     string
-	tag       string
-	actualTag string
-	kind      reflect.Kind
-	param     string
+	field           string
+	tag             string
+	actualTag       string
+	kind            reflect.Kind
+	param           string
+	structNamespace string
 }
 
 func (m mockFieldError) Tag() string             { return m.tag }
 func (m mockFieldError) ActualTag() string       { return m.actualTag }
 func (m mockFieldError) Namespace() string       { return "" }
-func (m mockFieldError) StructNamespace() string { return "" }
+func (m mockFieldError) StructNamespace() string { return m.structNamespace }
 func (m mockFieldError) Field() string           { return m.field }
 func (m mockFieldError) StructField() string     { return "" }
 func (m mockFieldError) Value() any              { return nil }
@@ -270,6 +271,26 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'match' values must be one of [string bool integer]",
 		},
 		{
+			name: "required_without tag with nil rootType falls back to struct name",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "required_without",
+				param:           "File",
+				structNamespace: "SQLModelSpec.SQL",
+			},
+			expected: "'sql' is required when 'File' is not specified",
+		},
+		{
+			name: "excluded_with tag with nil rootType falls back to struct name",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "excluded_with",
+				param:           "File",
+				structNamespace: "SQLModelSpec.SQL",
+			},
+			expected: "'sql' and 'File' cannot be specified together",
+		},
+		{
 			name: "unknown tag",
 			err: mockFieldError{
 				field:     "Field",
@@ -281,10 +302,93 @@ func TestGetErrorMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getErrorMessage(tt.err)
+			result := getErrorMessage(tt.err, nil)
 			assert.Contains(t, result, tt.expected)
 		})
 	}
+}
+
+// test structs for resolveFieldDisplayName tests
+type testNestedChild struct {
+	FieldA string `json:"field_a"`
+	FieldB string `json:"field_b"`
+}
+
+type testParentSpec struct {
+	SQL   *string          `json:"sql"`
+	File  *string          `json:"file"`
+	Inner *testNestedChild `json:"inner"`
+}
+
+func TestGetErrorMessage_CrossFieldWithRootType(t *testing.T) {
+	t.Parallel()
+
+	rootType := reflect.TypeOf(testParentSpec{})
+
+	tests := []struct {
+		name     string
+		err      validator.FieldError
+		expected string
+	}{
+		{
+			name: "required_without resolves JSON tag from root type",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "required_without",
+				param:           "File",
+				structNamespace: "testParentSpec.SQL",
+			},
+			expected: "'sql' is required when 'file' is not specified",
+		},
+		{
+			name: "excluded_with resolves JSON tag from root type",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "excluded_with",
+				param:           "File",
+				structNamespace: "testParentSpec.SQL",
+			},
+			expected: "'sql' and 'file' cannot be specified together",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getErrorMessage(tt.err, rootType)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestResolveFieldDisplayName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil rootType falls back to struct name", func(t *testing.T) {
+		err := mockFieldError{structNamespace: "Spec.SQL"}
+		result := resolveFieldDisplayName("File", err, nil)
+		assert.Equal(t, "File", result)
+	})
+
+	t.Run("resolves top-level field JSON tag", func(t *testing.T) {
+		rootType := reflect.TypeOf(testParentSpec{})
+		err := mockFieldError{structNamespace: "testParentSpec.SQL"}
+		result := resolveFieldDisplayName("File", err, rootType)
+		assert.Equal(t, "file", result)
+	})
+
+	t.Run("resolves nested field JSON tag", func(t *testing.T) {
+		rootType := reflect.TypeOf(testParentSpec{})
+		err := mockFieldError{structNamespace: "testParentSpec.Inner.FieldA"}
+		result := resolveFieldDisplayName("FieldB", err, rootType)
+		assert.Equal(t, "field_b", result)
+	})
+
+	t.Run("unknown field falls back to struct name", func(t *testing.T) {
+		rootType := reflect.TypeOf(testParentSpec{})
+		err := mockFieldError{structNamespace: "testParentSpec.SQL"}
+		result := resolveFieldDisplayName("NonExistent", err, rootType)
+		assert.Equal(t, "NonExistent", result)
+	})
 }
 
 // TestParseValidationErrors tests the full validation error parsing flow
@@ -303,7 +407,7 @@ func TestParseValidationErrors(t *testing.T) {
 			},
 		}
 
-		results := ParseValidationErrors(errs)
+		results := ParseValidationErrors(errs, nil)
 		assert.Len(t, results, 2)
 		assert.Contains(t, results[0].Message, "'Name' is required")
 		assert.Contains(t, results[1].Message, "'Email' is required")
@@ -311,7 +415,7 @@ func TestParseValidationErrors(t *testing.T) {
 
 	t.Run("returns empty for no errors", func(t *testing.T) {
 		errs := validator.ValidationErrors{}
-		results := ParseValidationErrors(errs)
+		results := ParseValidationErrors(errs, nil)
 		assert.Empty(t, results)
 	})
 }

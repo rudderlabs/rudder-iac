@@ -77,7 +77,7 @@ var validateCustomTypeSpec = func(Kind string, Version string, Metadata map[stri
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	return funcs.ParseValidationErrors(validationErrors, nil)
 }
 
 func NewCustomTypeSpecSyntaxValidRule() rules.Rule {

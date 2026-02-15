@@ -17,6 +17,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+
+	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
 )
 
 // Provider implements the provider interface for RETL resources
@@ -103,6 +106,12 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 // No-op for RETL resources
 func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
+}
+
+func (p *Provider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{
+		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),
+	}
 }
 
 // Validate validates all loaded specs
