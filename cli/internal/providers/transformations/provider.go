@@ -25,7 +25,7 @@ var log = logger.New("transformationsprovider")
 // transformation still imports it. By deferring deletes until after batch
 // publish in ConsolidateSync, the published dependency graph is updated first.
 type pendingDeletes struct {
-	mu              sync.Mutex
+	mu              sync.RWMutex
 	transformations []string // remote IDs
 	libraries       []string // remote IDs
 }
@@ -239,25 +239,23 @@ func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
 // executePendingDeletes processes all deferred delete operations.
 // Transformations are deleted first since they depend on libraries.
 func (p *Provider) executePendingDeletes(ctx context.Context) error {
-	p.pendingDeletes.mu.Lock()
-	pendingTransformations := p.pendingDeletes.transformations
-	pendingLibraries := p.pendingDeletes.libraries
-	p.pendingDeletes.mu.Unlock()
+	p.pendingDeletes.mu.RLock()
+	defer p.pendingDeletes.mu.RUnlock()
 
-	for _, id := range pendingTransformations {
+	for _, id := range p.pendingDeletes.transformations {
 		if err := p.store.DeleteTransformation(ctx, id); err != nil {
 			return fmt.Errorf("deleting transformation %s: %w", id, err)
 		}
 	}
 
-	for _, id := range pendingLibraries {
+	for _, id := range p.pendingDeletes.libraries {
 		if err := p.store.DeleteLibrary(ctx, id); err != nil {
 			return fmt.Errorf("deleting library %s: %w", id, err)
 		}
 	}
 
 	log.Info("Successfully deleted transformations and libraries",
-		"transformations", len(pendingTransformations), "libraries", len(pendingLibraries))
+		"transformations", len(p.pendingDeletes.transformations), "libraries", len(p.pendingDeletes.libraries))
 	return nil
 }
 
