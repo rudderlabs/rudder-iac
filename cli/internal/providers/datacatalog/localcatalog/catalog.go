@@ -208,12 +208,12 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	var parsedSpec specs.ParsedSpec
 
 	var (
-		parsedSpec specs.ParsedSpec
+		idArray  []any
+		basePath string
 	)
-
-	var idArray []any
 
 	switch s.Kind {
 	case KindProperties:
@@ -222,6 +222,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, properties not found in spec", s.Kind)
 		}
 		idArray = properties
+		basePath = "/spec/properties"
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -229,15 +230,19 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, events not found in spec", s.Kind)
 		}
 		idArray = events
+		basePath = "/spec/events"
 
-	case KindTrackingPlans:
-		trackingPlans, ok := s.Spec["id"].(string)
+	case KindTrackingPlans, KindTrackingPlansV1:
+		tpID, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
-		idArray = []any{map[string]any{
-			"id": trackingPlans,
-		}}
+		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, tpID)
+		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
+			ID:              tpID,
+			JSONPointerPath: "/spec/id",
+		})
+		return &parsedSpec, nil
 
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
@@ -245,6 +250,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, custom types not found in spec", s.Kind)
 		}
 		idArray = customTypes
+		basePath = "/spec/types"
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -252,10 +258,11 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, categories not found in spec", s.Kind)
 		}
 		idArray = categories
+		basePath = "/spec/categories"
 	}
 
-	for _, id := range idArray {
-		idMap, ok := id.(map[string]any)
+	for i, item := range idArray {
+		idMap, ok := item.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("entity is not a map[string]any: %s", s.Kind)
 		}
@@ -264,6 +271,10 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
 		parsedSpec.ExternalIDs = append(parsedSpec.ExternalIDs, id)
+		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
+			ID:              id,
+			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
+		})
 	}
 
 	return &parsedSpec, nil
@@ -363,11 +374,16 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
+		// use KindTrackingPlansV1 to store import metadata for tracking plans
+		kind := s.Kind
+		if kind == KindTrackingPlans {
+			kind = KindTrackingPlansV1
+		}
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				dc.ImportMetadata[resources.URN(s.Kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				dc.ImportMetadata[resources.URN(kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
 					WorkspaceID: workspace.WorkspaceID,
 					RemoteID:    resource.RemoteID,
 				}

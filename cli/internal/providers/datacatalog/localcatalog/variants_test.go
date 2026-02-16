@@ -110,7 +110,7 @@ func TestVariantsV1_FromV0(t *testing.T) {
 		assert.Equal(t, "#property:platform", v1[0].Discriminator)
 		require.Len(t, v1[0].Cases, 1)
 		assert.Equal(t, "iOS", v1[0].Cases[0].DisplayName)
-		assert.Empty(t, v1[0].Default)
+		assert.Empty(t, v1[0].Default.Properties)
 
 		assert.Equal(t, "#property:country", v1[1].Discriminator)
 		require.Len(t, v1[1].Cases, 1)

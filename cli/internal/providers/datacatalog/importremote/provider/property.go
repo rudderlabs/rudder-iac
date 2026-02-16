@@ -97,7 +97,10 @@ func (p *PropertyImportProvider) idResources(
 		}
 
 		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
+		property.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, externalID)
+		if p.v1SpecSupport {
+			property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
+		}
 	}
 	return nil
 }
@@ -117,6 +120,10 @@ func (p *PropertyImportProvider) FormatForExport(
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
+	}
+	version := specs.SpecVersionV0_1
+	if p.v1SpecSupport {
+		version = specs.SpecVersionV1
 	}
 
 	formattedProps := make([]map[string]any, 0)
@@ -150,6 +157,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	}
 
 	spec, err := toImportSpec(
+		version,
 		localcatalog.KindProperties,
 		MetadataNameProperties,
 		workspaceMetadata,

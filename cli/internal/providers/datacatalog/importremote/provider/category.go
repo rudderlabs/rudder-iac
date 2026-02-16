@@ -102,7 +102,10 @@ func (p *CategoryImportProvider) idResources(
 		}
 
 		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
+		category.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, externalID)
+		if p.v1SpecSupport {
+			category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
+		}
 	}
 	return nil
 }
@@ -122,6 +125,10 @@ func (p *CategoryImportProvider) FormatForExport(
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
+	}
+	version := specs.SpecVersionV0_1
+	if p.v1SpecSupport {
+		version = specs.SpecVersionV1
 	}
 
 	formattedCategories := make([]map[string]any, 0)
@@ -155,6 +162,7 @@ func (p *CategoryImportProvider) FormatForExport(
 	}
 
 	spec, err := toImportSpec(
+		version,
 		localcatalog.KindCategories,
 		MetadataNameCategories,
 		workspaceMetadata,

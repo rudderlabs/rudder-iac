@@ -63,8 +63,10 @@ func (c *ImportableCategoryV1) ForExport(
 }
 
 func (c *ImportableCategoryV1) fromUpstream(externalID string, upstream *catalog.Category) error {
-	c.CategoryV1.LocalID = externalID
-	c.CategoryV1.Name = upstream.Name
-
+	v0Category := ImportableCategory{}
+	if err := v0Category.fromUpstream(externalID, upstream); err != nil {
+		return fmt.Errorf("loading category from upstream: %w", err)
+	}
+	c.CategoryV1 = v0Category.CategoryV1
 	return nil
 }

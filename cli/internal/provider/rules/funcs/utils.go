@@ -49,15 +49,6 @@ func getErrorMessage(err validator.FieldError) string {
 	case "required":
 		return fmt.Sprintf("'%s' is required", fieldName)
 
-	case "reference":
-		return fmt.Sprintf("'%s' is not a valid reference format", fieldName)
-
-	case "primitive_or_reference":
-		return fmt.Sprintf("'%s' is not a valid primitive type or reference format", fieldName)
-
-	case "primitive":
-		return fmt.Sprintf("'%s' must be a valid primitive type (string, number, integer, boolean, null, array, or object)", fieldName)
-
 	case "pattern":
 		if msg, ok := getPatternErrorMessage(err.Param()); ok {
 			return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
@@ -90,6 +81,27 @@ func getErrorMessage(err validator.FieldError) string {
 			fieldName,
 			err.Param(),
 		)
+
+	case "min":
+		if err.Kind() == reflect.String || err.Kind() == reflect.Slice || err.Kind() == reflect.Array {
+			return fmt.Sprintf("'%s' length must be greater than or equal to %s", fieldName, err.Param())
+		}
+		return fmt.Sprintf("'%s' must be greater than or equal to %s", fieldName, err.Param())
+
+	case "max":
+		if err.Kind() == reflect.String || err.Kind() == reflect.Slice || err.Kind() == reflect.Array {
+			return fmt.Sprintf("'%s' length must be less than or equal to %s", fieldName, err.Param())
+		}
+		return fmt.Sprintf("'%s' must be less than or equal to %s", fieldName, err.Param())
+
+	case "eq":
+		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
+
+	case "excluded_unless":
+		return fmt.Sprintf("'%s' is not allowed unless '%s'", fieldName, err.Param())
+
+	case "array_item_types":
+		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
 
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())

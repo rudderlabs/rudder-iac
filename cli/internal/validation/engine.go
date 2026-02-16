@@ -45,16 +45,19 @@ func NewValidationEngine(
 }
 
 // ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
-// Rules receive ValidationContext with Graph = nil.
+// It operates in two phases:
+//  1. Per-spec rules: validates each spec individually (ProjectRules return nil here)
+//  2. Project rules: if Phase 1 passes, runs project-wide rules with all specs at once
 func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
 	toReturn := make(Diagnostics, 0)
 
+	// Phase 1: per-spec validation (ProjectRules harmlessly return nil from Validate)
 	for path, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
 			path,
 			e.registry.SyntacticRulesForKind(spec.Parsed().Kind),
 			spec,
-			nil, // No graph for syntactic validation
+			nil,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("syntactic validation for %s: %w", path, err)
@@ -63,8 +66,88 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 		toReturn = append(toReturn, diagnostics...)
 	}
 
+	if toReturn.HasErrors() {
+		toReturn.Sort()
+		return toReturn, nil
+	}
+
+	// Phase 2: project-wide validation
+	projectDiags, err := e.runProjectValidationRules(rawSpecs)
+	if err != nil {
+		return nil, fmt.Errorf("project-wide validation: %w", err)
+	}
+	toReturn = append(toReturn, projectDiags...)
+
 	toReturn.Sort()
 	return toReturn, nil
+}
+
+// runProjectValidationRules discovers rules implementing ProjectRule from the wildcard bucket
+// and executes them with all specs at once.
+func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
+	// ProjectValidationRules are registered with AppliesTo: ["*"],
+	// so they live in the wildcard bucket.
+	var projectRules []rules.ProjectRule
+	for _, rule := range e.registry.SyntacticRulesForKind("") {
+		if pr, ok := rule.(rules.ProjectRule); ok {
+			projectRules = append(projectRules, pr)
+		}
+	}
+
+	if len(projectRules) == 0 {
+		return nil, nil
+	}
+
+	contexts := make(map[string]*rules.ValidationContext, len(rawSpecs))
+	for path, rawSpec := range rawSpecs {
+		contexts[path] = &rules.ValidationContext{
+			FilePath: path,
+			Spec:     rawSpec.Parsed().Spec,
+			Kind:     rawSpec.Parsed().Kind,
+			Version:  rawSpec.Parsed().Version,
+			Metadata: rawSpec.Parsed().Metadata,
+		}
+	}
+
+	diagnostics := make(Diagnostics, 0)
+
+	for _, pr := range projectRules {
+		rule := pr.(rules.Rule)
+		resultsMap := pr.ValidateProject(contexts)
+
+		for filePath, results := range resultsMap {
+			rawSpec, ok := rawSpecs[filePath]
+			if !ok {
+				return nil, fmt.Errorf("project rule %s returned results for unknown file: %s", rule.ID(), filePath)
+			}
+
+			pi, err := pathindex.NewPathIndexer(rawSpec.Data)
+			if err != nil {
+				return nil, fmt.Errorf("building path indexer for %s: %w", filePath, err)
+			}
+
+			for _, result := range results {
+				position, err := pi.PositionLookup(result.Reference)
+				if err != nil {
+					if !errors.Is(err, pathindex.ErrPathNotFound) {
+						return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
+					}
+					position = pi.NearestPosition(result.Reference)
+				}
+
+				diagnostics = append(diagnostics, Diagnostic{
+					RuleID:   rule.ID(),
+					Severity: rule.Severity(),
+					Message:  result.Message,
+					File:     filePath,
+					Position: *position,
+					Examples: rule.Examples(),
+				})
+			}
+		}
+	}
+
+	return diagnostics, nil
 }
 
 // ValidateSemantic runs semantic validation after resource graph is built.

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -859,11 +860,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name          string
-		spec          *specs.Spec
-		expectedIDs   []string
-		expectedError bool
-		errorContains string
+		name             string
+		spec             *specs.Spec
+		expectedIDs      []string
+		expectedLocalIDs []specs.LocalID
+		expectedError    bool
+		errorContains    string
 	}{
 		{
 			name: "success - parse properties spec with multiple IDs",
@@ -877,8 +879,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"prop1", "prop2", "prop3"},
-			expectedError: false,
+			expectedIDs: []string{"prop1", "prop2", "prop3"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "prop1", JSONPointerPath: "/spec/properties/0/id"},
+				{ID: "prop2", JSONPointerPath: "/spec/properties/1/id"},
+				{ID: "prop3", JSONPointerPath: "/spec/properties/2/id"},
+			},
 		},
 		{
 			name: "success - parse events spec with multiple IDs",
@@ -891,8 +897,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"event1", "event2"},
-			expectedError: false,
+			expectedIDs: []string{"event1", "event2"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "event1", JSONPointerPath: "/spec/events/0/id"},
+				{ID: "event2", JSONPointerPath: "/spec/events/1/id"},
+			},
 		},
 		{
 			name: "success - parse tracking plan spec",
@@ -903,8 +912,10 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"display_name": "My Tracking Plan",
 				},
 			},
-			expectedIDs:   []string{"my_tracking_plan"},
-			expectedError: false,
+			expectedIDs: []string{"my_tracking_plan"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "my_tracking_plan", JSONPointerPath: "/spec/id"},
+			},
 		},
 		{
 			name: "success - parse custom types spec with multiple IDs",
@@ -917,8 +928,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"type1", "type2"},
-			expectedError: false,
+			expectedIDs: []string{"type1", "type2"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "type1", JSONPointerPath: "/spec/types/0/id"},
+				{ID: "type2", JSONPointerPath: "/spec/types/1/id"},
+			},
 		},
 		{
 			name: "success - parse categories spec with multiple IDs",
@@ -932,8 +946,12 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs:   []string{"cat1", "cat2", "cat3"},
-			expectedError: false,
+			expectedIDs: []string{"cat1", "cat2", "cat3"},
+			expectedLocalIDs: []specs.LocalID{
+				{ID: "cat1", JSONPointerPath: "/spec/categories/0/id"},
+				{ID: "cat2", JSONPointerPath: "/spec/categories/1/id"},
+				{ID: "cat3", JSONPointerPath: "/spec/categories/2/id"},
+			},
 		},
 		{
 			name: "error - properties not found in spec",
@@ -1146,6 +1164,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
 				assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+				assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 			}
 		})
 	}
@@ -1520,6 +1539,48 @@ func TestDataCatalog_LoadSpec(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "extracting data catalog entity")
 		assert.Contains(t, err.Error(), "test.yaml")
+	})
+
+	t.Run("stores import metadata for tracking plans under tracking-plan kind(instead of tp) for provider lookup", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    KindTrackingPlansV1,
+			Metadata: map[string]any{
+				"name": "my-tracking-plan",
+				"import": map[string]any{
+					"workspaces": []any{
+						map[string]any{
+							"workspace_id": "ws-123",
+							"resources": []any{
+								map[string]any{
+									"local_id":  "tp-imported",
+									"remote_id": "remote-tp-id",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]any{
+				"id":           "tp-imported",
+				"display_name": "Imported Plan",
+				"rules":        []any{},
+			},
+		}
+
+		dc := New()
+		err := dc.LoadSpec("tracking-plan.yaml", spec)
+
+		require.NoError(t, err)
+		require.Len(t, dc.TrackingPlans, 1)
+		// Provider looks up with KindTrackingPlans ("tp"), not KindTrackingPlansV1 ("tracking-plan")
+		urn := resources.URN(KindTrackingPlansV1, "tp-imported")
+		meta, ok := dc.ImportMetadata[urn]
+		require.True(t, ok, "ImportMetadata should be stored under tracking-plan:localId for provider lookup")
+		assert.Equal(t, "ws-123", meta.WorkspaceID)
+		assert.Equal(t, "remote-tp-id", meta.RemoteID)
 	})
 }
 

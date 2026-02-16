@@ -134,6 +134,42 @@ spec:
 		})
 	})
 
+	t.Run("Delete Example Provider Resources", func(t *testing.T) {
+		// Starting state: lotr and hobbit books, tolkien writer
+		// Delete hobbit book by removing it from the spec
+		err := runSync(t, map[string]string{
+			"books/books.yaml": `version: rudder/v0.1
+kind: books
+metadata:
+  name: my_books
+spec:
+  books:
+    - id: "lotr"
+      name: The Lord of the Rings
+      author: "#/writer/common/tolkien"
+`,
+			"writer/tolkien.yaml": `version: rudder/v0.1
+kind: writer
+metadata:
+  name: common
+spec:
+  id: tolkien
+  name: J.R.R. Tolkien
+`,
+		})
+		require.NoError(t, err, "Failed to sync project specs for delete")
+
+		// Verify hobbit book was deleted, lotr remains
+		verifyContents(t, b.AllBooks, []*backend.RemoteBook{
+			{ID: "remote-book-lotr", ExternalID: "lotr", Name: "The Lord of the Rings", AuthorID: "remote-writer-tolkien"},
+		})
+
+		// Verify writer still exists
+		verifyContents(t, b.AllWriters, []*backend.RemoteWriter{
+			{ID: "remote-writer-tolkien", ExternalID: "tolkien", Name: "J.R.R. Tolkien"},
+		})
+	})
+
 }
 
 type mockLoader struct {

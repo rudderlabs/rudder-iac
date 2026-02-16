@@ -25,7 +25,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 			"exclusiveMaximum": 99,
 		}
 
-		result := convertConfigKeysToSnakeCase(config)
+		result := ConvertConfigKeysToSnakeCase(config)
 
 		assert.Equal(t, 5, result["min_length"])
 		assert.Equal(t, 50, result["max_length"])
@@ -50,7 +50,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 	t.Run("returns nil for nil config", func(t *testing.T) {
 		t.Parallel()
 
-		result := convertConfigKeysToSnakeCase(nil)
+		result := ConvertConfigKeysToSnakeCase(nil)
 		assert.Nil(t, result)
 	})
 
@@ -58,7 +58,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		t.Parallel()
 
 		config := map[string]interface{}{}
-		result := convertConfigKeysToSnakeCase(config)
+		result := ConvertConfigKeysToSnakeCase(config)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
@@ -71,7 +71,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 			"max_length": 20,
 		}
 
-		result := convertConfigKeysToSnakeCase(config)
+		result := ConvertConfigKeysToSnakeCase(config)
 
 		assert.Equal(t, 10, result["min_length"])
 		assert.Equal(t, 20, result["max_length"])
@@ -497,8 +497,8 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 					},
 					Properties: []*TPRuleProperty{
 						{
-							Ref:      "#property:login_method",
-							Required: true,
+							Ref:                  "#property:login_method",
+							Required:             true,
 							AdditionalProperties: &trueVal,
 							Properties: []*TPRuleProperty{
 								{
@@ -551,10 +551,12 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 										{
 											Property: "#property:device_id",
 											Required: true,
-											
 										},
 									},
 								},
+							},
+							Default: DefaultPropertiesV1{
+								Properties: []PropertyReferenceV1{},
 							},
 						},
 					},
@@ -567,8 +569,8 @@ func TestTrackingPlanV1_FromV0(t *testing.T) {
 					AdditionalProperties: false,               // allow_unplanned was false
 					Properties: []*TPRulePropertyV1{
 						{
-							Property: "#property:login_method",
-							Required: true,
+							Property:             "#property:login_method",
+							Required:             true,
 							AdditionalProperties: &trueVal,
 							Properties: []*TPRulePropertyV1{
 								{

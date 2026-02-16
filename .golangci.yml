@@ -1,0 +1,37 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - gosec
+  settings:
+    gosec:
+      excludes:
+        - G104  # Errors unhandled (36 findings)
+        - G115  # Integer overflow conversion (2 findings)
+        - G204  # Subprocess with variable (1 finding)
+        - G301  # Directory permissions >0750 (4 findings)
+        - G302  # File permissions >0600 (3 findings)
+        - G304  # File inclusion via variable (10 findings)
+        - G306  # WriteFile permissions >0600 (3 findings)
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
+  new: false
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

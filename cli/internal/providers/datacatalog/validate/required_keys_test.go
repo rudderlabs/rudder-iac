@@ -332,8 +332,7 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 					Name:    "Property Without Type",
 				},
 			},
-			expectedErrors: 1,
-			errorContains:  "either 'type' or 'types' field must be specified",
+			expectedErrors: 0,
 		},
 		{
 			name: "valid property name without whitespace",
@@ -410,6 +409,45 @@ func TestPropertyNameWhitespaceValidation(t *testing.T) {
 			},
 			expectedErrors: 1,
 			errorContains:  "id and name fields on property are mandatory",
+		},
+		{
+			name: "v1 property should not allow a multi type string for the type field(they must be added through the types fields)",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "invalid-prop-with-multi-type-string-in-type-field",
+					Name:        "Invalid Property With Multi Type String In Type Field",
+					Description: "Property with multi type string in type field",
+					Type:        "string, boolean, array",
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "multiple types are not allowed in the type field, use the types field instead",
+		},
+		{
+			name: "property with the type field containing a custom type should be allowed",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "invalid-prop-with-config-field-and-custom-type",
+					Name:        "Invalid Property With Config Field And Custom Type",
+					Description: "Property with config field and custom type",
+					Type:        "#custom-type:TestType",
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "v1 property should not allow a config field if the type matches a custom type",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "invalid-prop-with-config-field-and-custom-type",
+					Name:        "Invalid Property With Config Field And Custom Type",
+					Description: "Property with config field and custom type",
+					Type:        "#custom-type:TestType",
+					Config:      map[string]any{"enum": []any{1, 2, 3}},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "property config not allowed if the type matches custom-type",
 		},
 	}
 

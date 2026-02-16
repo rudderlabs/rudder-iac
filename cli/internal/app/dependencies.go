@@ -92,12 +92,20 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-		"datacatalog":     p.DataCatalog,
-		"retl":            p.RETL,
-		"eventstream":     p.EventStream,
-		"transformations": p.Transformations,
-	})
+	cfg := config.GetConfig()
+
+	providerMap := map[string]provider.Provider{
+		"datacatalog": p.DataCatalog,
+		"retl":        p.RETL,
+		"eventstream": p.EventStream,
+	}
+
+	// Only attach transformations provider to composite provider when experimental flag is enabled
+	if cfg.ExperimentalFlags.Transformations {
+		providerMap["transformations"] = p.Transformations
+	}
+
+	cp, err := provider.NewCompositeProvider(providerMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}

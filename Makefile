@@ -3,6 +3,8 @@ REGISTRY ?= rudderlabs
 IMAGE_NAME ?= rudder-cli
 TELEMETRY_WRITE_KEY ?= ""
 TELEMETRY_DATAPLANE_URL ?= ""
+GO=go
+GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
 
 .PHONY: all
 all: build
@@ -10,6 +12,10 @@ all: build
 .PHONY: help
 help: ## Show the available commands
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: lint
+lint: ## Run linters on all go files
+	$(GO) run $(GOLANGCI) run -v
 
 .PHONY: build
 build:

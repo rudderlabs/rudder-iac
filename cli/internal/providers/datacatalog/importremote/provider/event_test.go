@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -58,7 +60,7 @@ func TestEventLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "evt2"))
 	})
 
-	t.Run("correctly assigns externalId and reference", func(t *testing.T) {
+	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockEventCatalog{
 			events: []*catalog.Event{
 				{ID: "evt1", Name: "Page Viewed", EventType: "track", WorkspaceId: "ws1"},
@@ -82,12 +84,45 @@ func TestEventLoadImportable(t *testing.T) {
 		evt1, ok := events["evt1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, evt1.ExternalID)
-		assert.NotEmpty(t, evt1.Reference)
+		assert.Equal(t, evt1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindEvents, MetadataNameEvents, evt1.ExternalID))
 
 		evt2, ok := events["evt2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, evt2.ExternalID)
-		assert.NotEmpty(t, evt2.Reference)
+		assert.Equal(t, evt2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindEvents, MetadataNameEvents, evt2.ExternalID))
+	})
+
+	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
+		mockClient := &mockEventCatalog{
+			events: []*catalog.Event{
+				{ID: "evt1", Name: "Page Viewed", EventType: "track", WorkspaceId: "ws1"},
+				{ID: "evt2", Name: "Product Purchased", EventType: "track", WorkspaceId: "ws1"},
+			},
+		}
+
+		provider := &EventImportProvider{
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
+			v1SpecSupport: true,
+		}
+
+		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		require.Nil(t, err)
+
+		events := collection.GetAll(types.EventResourceType)
+		require.Equal(t, 2, len(events))
+
+		evt1, ok := events["evt1"]
+		require.True(t, ok)
+		assert.NotEmpty(t, evt1.ExternalID)
+		assert.Equal(t, evt1.Reference, fmt.Sprintf("#%s:%s", types.EventResourceType, evt1.ExternalID))
+
+		evt2, ok := events["evt2"]
+		require.True(t, ok)
+		assert.NotEmpty(t, evt2.ExternalID)
+		assert.Equal(t, evt2.Reference, fmt.Sprintf("#%s:%s", types.EventResourceType, evt2.ExternalID))
 	})
 }
 
@@ -176,6 +211,7 @@ func TestEventFormatForExport(t *testing.T) {
 
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
+		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
 
 		events, ok := spec.Spec["events"].([]map[string]any)
 		require.True(t, ok)
@@ -223,6 +259,7 @@ func TestEventFormatForExport(t *testing.T) {
 
 		spec, ok := result[0].Content.(*specs.Spec)
 		require.True(t, ok)
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 
 		events, ok := spec.Spec["events"].([]map[string]any)
 		require.True(t, ok)

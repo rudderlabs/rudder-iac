@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // extractRefs extracts Reference fields from ValidationResults
@@ -242,6 +243,103 @@ func TestPropertySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				assert.ElementsMatch(t, tt.expectedRefs, actualRefs, "Validation error references don't match")
 				assert.ElementsMatch(t, tt.expectedMsgs, actualMsgs, "Validation error messages don't match")
 			}
+		})
+	}
+}
+
+func TestPropertySpecSyntaxValidRule_ValidTypeField(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		typeVal string
+	}{
+		{"single primitive", "string"},
+		{"comma-separated primitives", "string,number"},
+		{"comma-separated with spaces", "string, number, boolean"},
+		{"all primitives", "string,number,integer,boolean,null,array,object"},
+		{"valid legacy custom type reference", "#/custom-types/common/Address"},
+		{"empty type is valid (omitempty)", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{LocalID: "test_prop", Name: "Test", Type: tt.typeVal},
+				},
+			}
+
+			results := validatePropertySpec(
+				localcatalog.KindProperties,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				spec,
+			)
+
+			assert.Empty(t, results, "type %q should be valid", tt.typeVal)
+		})
+	}
+}
+
+func TestPropertySpecSyntaxValidRule_InvalidTypeField(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		typeVal     string
+		expectedMsg string
+	}{
+		{
+			name:        "invalid primitive",
+			typeVal:     "invalidtype",
+			expectedMsg: "is not a valid primitive type",
+		},
+		{
+			name:        "mixed valid and invalid primitives",
+			typeVal:     "string, xyz",
+			expectedMsg: "is not a valid primitive type",
+		},
+		{
+			name:        "duplicate primitives",
+			typeVal:     "string, string",
+			expectedMsg: "is not a valid primitive type",
+		},
+		{
+			name:        "duplicate among multiple",
+			typeVal:     "string, number, string",
+			expectedMsg: "is not a valid primitive type",
+		},
+		{
+			name:        "invalid custom type ref format",
+			typeVal:     "#/invalid",
+			expectedMsg: "must be of pattern #/custom-types/<group>/<id>",
+		},
+		{
+			name:        "custom type ref missing id",
+			typeVal:     "#/custom-types/group",
+			expectedMsg: "must be of pattern #/custom-types/<group>/<id>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := localcatalog.PropertySpec{
+				Properties: []localcatalog.Property{
+					{LocalID: "test_prop", Name: "Test", Type: tt.typeVal},
+				},
+			}
+
+			results := validatePropertySpec(
+				localcatalog.KindProperties,
+				specs.SpecVersionV0_1,
+				map[string]any{},
+				spec,
+			)
+
+			require.Len(t, results, 1)
+			assert.Equal(t, "/properties/0/type", results[0].Reference)
+			assert.Contains(t, results[0].Message, tt.expectedMsg)
 		})
 	}
 }

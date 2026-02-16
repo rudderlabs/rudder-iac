@@ -98,7 +98,10 @@ func (p *TrackingPlanImportProvider) idResources(
 		}
 
 		tp.ExternalID = externalID
-		tp.Reference = fmt.Sprintf("#tp:%s", externalID)
+		tp.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, externalID, externalID)
+		if p.v1SpecSupport {
+			tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, externalID)
+		}
 	}
 	return nil
 }
@@ -149,11 +152,14 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		}
 
 		kind := localcatalog.KindTrackingPlans
+		version := specs.SpecVersionV0_1
 		if p.v1SpecSupport {
 			kind = localcatalog.KindTrackingPlansV1
+			version = specs.SpecVersionV1
 		}
 
 		spec, err := toImportSpec(
+			version,
 			kind,
 			trackingPlan.ExternalID,
 			workspaceMetadata,

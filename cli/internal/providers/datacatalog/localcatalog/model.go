@@ -20,7 +20,7 @@ type Property struct {
 	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
 	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
 	Description string                 `mapstructure:"description,omitempty" json:"description" validate:"omitempty,gte=3,lte=2000"`
-	Type        string                 `mapstructure:"type,omitempty" json:"type" validate:"omitempty,primitive_or_reference"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type"`
 	Config      map[string]interface{} `mapstructure:"propConfig,omitempty" json:"propConfig,omitempty"`
 }
 
@@ -69,10 +69,10 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 
 type EventV1 struct {
 	LocalID     string  `json:"id" mapstructure:"id"`
-	Name        string  `json:"name" mapstructure:"name,omitempty"`
+	Name        string  `json:"name,omitempty" mapstructure:"name,omitempty"`
 	Type        string  `json:"event_type" mapstructure:"event_type"`
-	Description string  `json:"description" mapstructure:"description,omitempty"`
-	CategoryRef *string `json:"category" mapstructure:"category,omitempty"`
+	Description string  `json:"description,omitempty" mapstructure:"description,omitempty"`
+	CategoryRef *string `json:"category,omitempty" mapstructure:"category,omitempty"`
 }
 
 type EventSpecV1 struct {
@@ -105,7 +105,7 @@ type CategoryV1 struct {
 // Category represents a user-defined category (V0 spec)
 type Category struct {
 	LocalID string `mapstructure:"id" json:"id" validate:"required"`
-	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=category_name"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=display_name"`
 }
 
 type CategorySpec struct {
@@ -141,7 +141,7 @@ type CustomType struct {
 	Type        string               `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any       `mapstructure:"config,omitempty" json:"config,omitempty"`
 	Properties  []CustomTypeProperty `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
-	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
+	Variants    Variants             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"excluded_unless=Type object,omitempty,max=1,dive"`
 }
 
 // CustomTypeProperty represents a property reference within a custom type

@@ -3,22 +3,39 @@ package rules
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
+
+// parseSpecWithExternalIDs returns a ParseSpecFunc that always returns the given external IDs.
+func parseSpecWithExternalIDs(ids ...string) ParseSpecFunc {
+	return func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
+		return &specs.ParsedSpec{ExternalIDs: ids}, nil
+	}
+}
+
+// noopParseSpec returns an empty ParsedSpec — used when import ID validation
+// is not the focus of a test case.
+func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
+	// noop parse spec, simply return an empty parsed spec
+	return parseSpecWithExternalIDs()(path, spec)
+}
 
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
+		parseSpec      ParseSpecFunc
 		ctx            *rules.ValidationContext
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
-			name: "empty metadata returns nil",
+			name:      "empty metadata returns nil",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{},
 			},
@@ -27,7 +44,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{},
 		},
 		{
-			name: "valid metadata with name only",
+			name:      "valid metadata with name only",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{"name": "test-project"},
 			},
@@ -36,7 +54,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{},
 		},
 		{
-			name: "missing required name field",
+			name:      "missing required name field",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{"something": "else"},
 			},
@@ -45,7 +64,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{"'name' is required"},
 		},
 		{
-			name: "valid metadata with complete import structure",
+			name:      "valid metadata with complete import structure",
+			parseSpec: parseSpecWithExternalIDs("local-1"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -69,7 +89,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{},
 		},
 		{
-			name: "import with missing workspace_id",
+			name:      "import with missing workspace_id",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -87,7 +108,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{"'workspace_id' is required"},
 		},
 		{
-			name: "import with missing local_id in resource",
+			name:      "import with missing local_id in resource",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -110,7 +132,8 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{"'local_id' is required"},
 		},
 		{
-			name: "import with missing remote_id in resource",
+			name:      "import with missing remote_id in resource",
+			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -132,11 +155,65 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/remote_id"},
 			expectedMsgs:   []string{"'remote_id' is required"},
 		},
+		{
+			name:      "import local_id missing from spec external IDs",
+			parseSpec: parseSpecWithExternalIDs("other-id"),
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "missing-id",
+										"remote_id": "remote-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
+			expectedMsgs:   []string{"local_id 'missing-id' from import metadata not found in spec"},
+		},
+		{
+			name:      "all import local_ids present in spec",
+			parseSpec: parseSpecWithExternalIDs("id1", "id2", "id3"),
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "id1",
+										"remote_id": "remote-1",
+									},
+									map[string]any{
+										"local_id":  "id2",
+										"remote_id": "remote-2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 0,
+			expectedRefs:   []string{},
+			expectedMsgs:   []string{},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewMetadataSyntaxValidRule()
+			rule := NewMetadataSyntaxValidRule(tt.parseSpec)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -159,7 +236,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 func TestMetadataSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewMetadataSyntaxValidRule()
+	rule := NewMetadataSyntaxValidRule(noopParseSpec)
 
 	assert.Equal(t, "project/metadata-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
