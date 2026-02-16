@@ -10,19 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
-// Helper to convert test cases to test definitions for testing
-func toTestDefinitions(testCases []TestCase) []transformations.TestDefinition {
-	defs := make([]transformations.TestDefinition, len(testCases))
-	for i, tc := range testCases {
-		defs[i] = transformations.TestDefinition{
-			Name:           tc.Name,
-			Input:          tc.InputEvents,
-			ExpectedOutput: tc.ExpectedOutput,
-		}
-	}
-	return defs
-}
-
 func TestHasFailures(t *testing.T) {
 	t.Run("no failures", func(t *testing.T) {
 		results := &TestResults{
@@ -81,8 +68,26 @@ func TestHasFailures(t *testing.T) {
 	})
 
 	t.Run("empty results", func(t *testing.T) {
+		results := &TestResults{}
+
+		assert.False(t, results.HasFailures())
+	})
+
+	t.Run("library failure", func(t *testing.T) {
 		results := &TestResults{
-			Transformations: []*TransformationTestWithDefinitions{},
+			Libraries: []transformations.LibraryTestResult{
+				{HandleName: "myLib", Pass: false, Message: "syntax error"},
+			},
+		}
+
+		assert.True(t, results.HasFailures())
+	})
+
+	t.Run("library passes", func(t *testing.T) {
+		results := &TestResults{
+			Libraries: []transformations.LibraryTestResult{
+				{HandleName: "myLib", Pass: true},
+			},
 		}
 
 		assert.False(t, results.HasFailures())
@@ -197,7 +202,7 @@ func TestBuildTestRequest(t *testing.T) {
 
 		libraryVersionIDs := []string{"lib-ver-1", "lib-ver-2"}
 
-		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), libraryVersionIDs)
+		req := runner.buildTestRequest("trans-ver-1", testCases, libraryVersionIDs)
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -230,7 +235,7 @@ func TestBuildTestRequest(t *testing.T) {
 			},
 		}
 
-		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), []string{})
+		req := runner.buildTestRequest("trans-ver-1", testCases, []string{})
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -242,7 +247,7 @@ func TestBuildTestRequest(t *testing.T) {
 	t.Run("builds request with empty test cases", func(t *testing.T) {
 		runner := &Runner{}
 
-		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions([]TestCase{}), []string{"lib-ver-1"})
+		req := runner.buildTestRequest("trans-ver-1", []TestCase{}, []string{"lib-ver-1"})
 
 		require.NotNil(t, req)
 		require.Len(t, req.Transformations, 1)
@@ -261,7 +266,7 @@ func TestBuildTestRequest(t *testing.T) {
 			{Name: "test-c", InputEvents: []any{}},
 		}
 
-		req := runner.buildTestRequest("trans-ver-1", toTestDefinitions(testCases), []string{})
+		req := runner.buildTestRequest("trans-ver-1", testCases, []string{})
 
 		require.Len(t, req.Transformations[0].TestSuite, 3)
 		assert.Equal(t, "test-a", req.Transformations[0].TestSuite[0].Name)

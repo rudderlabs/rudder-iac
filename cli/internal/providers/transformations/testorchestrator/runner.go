@@ -52,11 +52,19 @@ type TransformationTestWithDefinitions struct {
 
 // TestResults contains the results of all test executions with their definitions
 type TestResults struct {
+	Pass            bool
+	Message         string
+	Libraries       []transformations.LibraryTestResult
 	Transformations []*TransformationTestWithDefinitions
 }
 
 // HasFailures checks if any tests failed or errored
 func (r *TestResults) HasFailures() bool {
+	for _, lib := range r.Libraries {
+		if !lib.Pass {
+			return true
+		}
+	}
 	for _, tr := range r.Transformations {
 		for _, testResult := range tr.Result.TestSuiteResult.Results {
 			if testResult.Status == transformations.TestRunStatusFail || testResult.Status == transformations.TestRunStatusError {
@@ -97,7 +105,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 {
 		log.Info("No transformations to test")
-		return &TestResults{Transformations: []*transformations.TransformationTestResult{}}, nil
+		return &TestResults{}, nil
 	}
 
 	log.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
@@ -120,63 +128,67 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	}
 
 	// Execute tests in parallel using WaitGroup
-	var wg sync.WaitGroup
-	resultsMu := sync.Mutex{}
-	var allResults []*transformations.TransformationTestResult
-	var errs []error
-	errorsMutex := sync.Mutex{}
+	var (
+		wg        sync.WaitGroup
+		resultsMu sync.Mutex
+		errorsMu  sync.Mutex
+		allResults []*TransformationTestWithDefinitions
+		allLibs    []transformations.LibraryTestResult
+		errs       []error
+	)
 
 	for _, unit := range testPlan.TestUnits {
-		unit := unit // Capture loop variable
 		wg.Add(1)
 		go func(u *TestUnit) {
 			defer wg.Done()
 
 			log.Info("Testing transformation", "id", u.Transformation.ID, "name", u.Transformation.Name)
 
-			// Build test definitions from test cases
-			testDefinitions := make([]transformations.TestDefinition, len(testCases))
-			for i, tc := range testCases {
-				testDefinitions[i] = transformations.TestDefinition{
-					Name:           tc.Name,
-					Input:          tc.InputEvents,
-					ExpectedOutput: tc.ExpectedOutput,
-				}
-			}
+			testCases := unitTestCases[u.Transformation.ID]
 
 			// Resolve transformation versionID (upload if modified, reuse existing otherwise)
 			transformationVersionID, err := r.resolveTransformationVersion(ctx, u, remoteState)
 			if err != nil {
-				errorsMutex.Lock()
+				errorsMu.Lock()
 				errs = append(errs, fmt.Errorf("resolving transformation version for %s: %w", u.Transformation.ID, err))
-				errorsMutex.Unlock()
+				errorsMu.Unlock()
 				return
 			}
 
 			// Get library versionIDs for this transformation's dependencies
 			libraryVersionIDs := r.getLibraryVersionsForUnit(u, libraryVersionMap)
 
-			// Build test request
-			testReq := r.buildTestRequest(transformationVersionID, unitTestCases[u.Transformation.ID], libraryVersionIDs)
+			// Build and run test request
+			testReq := r.buildTestRequest(transformationVersionID, testCases, libraryVersionIDs)
 
-			// Run tests via API
 			log.Debug("Executing tests via API", "transformation", u.Transformation.ID)
-			results, err := r.store.BatchTest(ctx, testReq)
+			resp, err := r.store.BatchTest(ctx, testReq)
 			if err != nil {
-				errorsMutex.Lock()
+				errorsMu.Lock()
 				errs = append(errs, fmt.Errorf("running tests for %s: %w", u.Transformation.ID, err))
-				errorsMutex.Unlock()
+				errorsMu.Unlock()
 				return
 			}
 
-			// Combine results with test definitions
+			// Build test definitions for formatter (expected output matching)
+			testDefs := make([]transformations.TestDefinition, len(testCases))
+			for i, tc := range testCases {
+				testDefs[i] = transformations.TestDefinition{
+					Name:           tc.Name,
+					Input:          tc.InputEvents,
+					ExpectedOutput: tc.ExpectedOutput,
+				}
+			}
+
+			// Collect results
 			resultsMu.Lock()
-			for _, result := range results {
+			for i := range resp.ValidationOutput.Transformations {
 				allResults = append(allResults, &TransformationTestWithDefinitions{
-					Result:      result,
-					Definitions: testDefinitions,
+					Result:      &resp.ValidationOutput.Transformations[i],
+					Definitions: testDefs,
 				})
 			}
+			allLibs = append(allLibs, resp.ValidationOutput.Libraries...)
 			resultsMu.Unlock()
 		}(unit)
 	}
@@ -184,12 +196,14 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	// Wait for all tests to complete
 	wg.Wait()
 
-	// Check if any errors occurred
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
 
-	return &TestResults{Transformations: allResults}, nil
+	return &TestResults{
+		Libraries:       allLibs,
+		Transformations: allResults,
+	}, nil
 }
 
 // resolveTransformationVersion resolves the versionID for a transformation
@@ -293,7 +307,17 @@ func (r *Runner) getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map
 }
 
 // buildTestRequest constructs the batch test API request using client types
-func (r *Runner) buildTestRequest(transformationVersionID string, testDefinitions []transformations.TestDefinition, libraryVersionIDs []string) *transformations.BatchTestRequest {
+func (r *Runner) buildTestRequest(transformationVersionID string, testCases []TestCase, libraryVersionIDs []string) *transformations.BatchTestRequest {
+	// Convert test cases to test definitions
+	testDefinitions := make([]transformations.TestDefinition, len(testCases))
+	for i, tc := range testCases {
+		testDefinitions[i] = transformations.TestDefinition{
+			Name:           tc.Name,
+			Input:          tc.InputEvents,
+			ExpectedOutput: tc.ExpectedOutput,
+		}
+	}
+
 	// Build transformation test input
 	transformationInputs := []transformations.TransformationTestInput{
 		{

@@ -42,6 +42,24 @@ func (f *Formatter) Display(results *TestResults) {
 	errors := 0
 	var failures []failureDetail
 
+	// Display library results first
+	if len(results.Libraries) > 0 {
+		ui.Printf("  %s\n", ui.Bold("Libraries"))
+		for _, lib := range results.Libraries {
+			if lib.Pass {
+				ui.Printf("    %s %s\n", ui.Color("✓", ui.ColorGreen), lib.HandleName)
+			} else {
+				msg := lib.HandleName
+				if lib.Message != "" {
+					msg = fmt.Sprintf("%s: %s", lib.HandleName, lib.Message)
+				}
+				ui.Printf("    %s %s\n", ui.Color("✗", ui.ColorRed), msg)
+				failed++
+			}
+		}
+		ui.Println()
+	}
+
 	// Iterate through all transformation results
 	for _, trWithDef := range results.Transformations {
 		tr := trWithDef.Result

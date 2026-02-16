@@ -638,7 +638,6 @@ func TestBatchTest(t *testing.T) {
 							"versionId": "trans-ver-123",
 							"testSuite": [
 								{
-									"id": "test-1",
 									"name": "Test Case 1",
 									"description": "Test description",
 									"input": [{"type": "track", "event": "Button Clicked"}],
@@ -655,25 +654,30 @@ func TestBatchTest(t *testing.T) {
 				}`)
 			},
 			ResponseStatus: 200,
-			ResponseBody: `[
-				{
-					"name": "test-transformation",
-					"versionId": "trans-ver-123",
-					"imports": ["testLibrary"],
-					"testSuiteResult": {
-						"status": "pass",
-						"results": [
-							{
-								"id": "test-1",
-								"name": "Test Case 1",
-								"description": "Test description",
+			ResponseBody: `{
+				"pass": true,
+				"validationOutput": {
+					"transformations": [
+						{
+							"name": "test-transformation",
+							"versionId": "trans-ver-123",
+							"imports": ["testLibrary"],
+							"pass": true,
+							"testResult": {
 								"status": "pass",
-								"actualOutput": [{"type": "track", "event": "Button Clicked"}]
+								"results": [
+									{
+										"name": "Test Case 1",
+										"description": "Test description",
+										"status": "pass",
+										"actualOutput": [{"type": "track", "event": "Button Clicked"}]
+									}
+								]
 							}
-						]
-					}
+						}
+					]
 				}
-			]`,
+			}`,
 		},
 	}
 
@@ -688,7 +692,6 @@ func TestBatchTest(t *testing.T) {
 				VersionID: "trans-ver-123",
 				TestSuite: []transformations.TestDefinition{
 					{
-						ID:             "test-1",
 						Name:           "Test Case 1",
 						Description:    "Test description",
 						Input:          []any{map[string]any{"type": "track", "event": "Button Clicked"}},
@@ -704,19 +707,20 @@ func TestBatchTest(t *testing.T) {
 		},
 	}
 
-	results, err := store.BatchTest(ctx, req)
+	resp, err := store.BatchTest(ctx, req)
 	require.NoError(t, err)
-	require.Len(t, results, 1)
+	require.True(t, resp.Pass)
+	require.Len(t, resp.ValidationOutput.Transformations, 1)
 
-	expected := &transformations.TransformationTestResult{
+	expected := transformations.TransformationTestResult{
 		Name:      "test-transformation",
 		VersionID: "trans-ver-123",
 		Imports:   []string{"testLibrary"},
+		Pass:      true,
 		TestSuiteResult: transformations.TestSuiteRunResult{
 			Status: transformations.TestRunStatusPass,
 			Results: []transformations.TestResult{
 				{
-					ID:           "test-1",
 					Name:         "Test Case 1",
 					Description:  "Test description",
 					Status:       transformations.TestRunStatusPass,
@@ -726,7 +730,7 @@ func TestBatchTest(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(expected, results[0]); diff != "" {
+	if diff := cmp.Diff(expected, resp.ValidationOutput.Transformations[0]); diff != "" {
 		t.Errorf("BatchTest result mismatch (-expected +actual):\n%s", diff)
 	}
 
@@ -773,7 +777,6 @@ func TestBatchTestErrors(t *testing.T) {
 									"versionId": "trans-ver-123",
 									"testSuite": [
 										{
-											"id": "test-1",
 											"name": "Test Case 1",
 											"input": [{"event": "test"}],
 											"expectedOutput": [{"event": "test"}]
@@ -799,7 +802,6 @@ func TestBatchTestErrors(t *testing.T) {
 						VersionID: "trans-ver-123",
 						TestSuite: []transformations.TestDefinition{
 							{
-								ID:             "test-1",
 								Name:           "Test Case 1",
 								Input:          []any{map[string]any{"event": "test"}},
 								ExpectedOutput: []any{map[string]any{"event": "test"}},
@@ -809,9 +811,9 @@ func TestBatchTestErrors(t *testing.T) {
 				},
 			}
 
-			results, err := store.BatchTest(ctx, req)
+			resp, err := store.BatchTest(ctx, req)
 			require.Error(t, err)
-			require.Nil(t, results)
+			require.Nil(t, resp)
 			assert.Contains(t, err.Error(), tt.expectedError)
 
 			httpClient.AssertNumberOfCalls()
