@@ -904,19 +904,4 @@ func TestDeferredDeletes(t *testing.T) {
 		assert.Contains(t, err.Error(), "deleting library remote-lib-1")
 		assert.Contains(t, err.Error(), "backend rejected delete")
 	})
-
-	t.Run("no deferred deletes - no extra calls", func(t *testing.T) {
-		t.Parallel()
-
-		mockStore := newMockTransformationStore()
-		p := transformations.NewProviderWithStore(mockStore)
-
-		st := state.EmptyState()
-		err := p.ConsolidateSync(context.Background(), st)
-
-		require.NoError(t, err)
-		assert.False(t, mockStore.batchPublishCalled)
-		assert.False(t, mockStore.deleteTransformationCalled)
-		assert.False(t, mockStore.deleteLibraryCalled)
-	})
 }

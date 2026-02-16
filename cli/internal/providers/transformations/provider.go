@@ -230,7 +230,7 @@ func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
 
 	// Phase 2: Execute deferred deletes (now safe — published state is current)
 	if err := p.executePendingDeletes(ctx); err != nil {
-		return err
+		return fmt.Errorf("executing pending deletes: %w", err)
 	}
 
 	return nil
@@ -243,10 +243,6 @@ func (p *Provider) executePendingDeletes(ctx context.Context) error {
 	pendingTransformations := p.pendingDeletes.transformations
 	pendingLibraries := p.pendingDeletes.libraries
 	p.pendingDeletes.mu.Unlock()
-
-	if len(pendingTransformations) == 0 && len(pendingLibraries) == 0 {
-		return nil
-	}
 
 	for _, id := range pendingTransformations {
 		if err := p.store.DeleteTransformation(ctx, id); err != nil {
