@@ -300,3 +300,62 @@ invalid_field: "error"
 		assert.Nil(t, cached)
 	})
 }
+
+func TestRawSpec_PathIndexer(t *testing.T) {
+	validYAML := []byte(`version: rudder/v1
+kind: properties
+metadata:
+  name: TestProperties
+spec:
+  properties:
+    - id: user_email
+      type: string
+`)
+
+	invalidYAML := []byte("\t\tinvalid: [yaml: {")
+
+	t.Run("builds path indexer successfully", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+
+		pi, err := rawSpec.PathIndexer()
+		require.NoError(t, err)
+		require.NotNil(t, pi)
+
+		pos, err := pi.PositionLookup("/spec")
+		require.NoError(t, err)
+		assert.Greater(t, pos.Line, 0)
+	})
+
+	t.Run("caches on subsequent calls", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: validYAML}
+
+		pi1, err1 := rawSpec.PathIndexer()
+		require.NoError(t, err1)
+
+		pi2, err2 := rawSpec.PathIndexer()
+		require.NoError(t, err2)
+
+		assert.Equal(t, pi1, pi2)
+	})
+
+	t.Run("returns error for invalid YAML", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: invalidYAML}
+
+		pi, err := rawSpec.PathIndexer()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "building path indexer")
+		assert.Nil(t, pi)
+	})
+
+	t.Run("caches error on subsequent calls", func(t *testing.T) {
+		rawSpec := &RawSpec{Data: invalidYAML}
+
+		_, err1 := rawSpec.PathIndexer()
+		require.Error(t, err1)
+
+		_, err2 := rawSpec.PathIndexer()
+		require.Error(t, err2)
+
+		assert.Equal(t, err1, err2)
+	})
+}
