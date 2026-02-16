@@ -98,11 +98,16 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type) string {
 	case "eq":
 		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
 
-	case "excluded_unless":
-		return fmt.Sprintf("'%s' is not allowed unless '%s'", fieldName, err.Param())
-
 	case "array_item_types":
 		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
+
+	case "excluded_unless":
+		// `validate:"excluded_unless=Type value"`
+		params := strings.Split(err.Param(), " ")
+
+		// We need to resolve the "Type"
+		otherField := resolveFieldDisplayName(params[0], err, rootType)
+		return fmt.Sprintf("'%s' is not allowed unless '%s %s'", fieldName, otherField, params[1])
 
 	case "required_without":
 		otherField := resolveFieldDisplayName(err.Param(), err, rootType)
@@ -117,10 +122,28 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type) string {
 	}
 }
 
-// resolveFieldDisplayName resolves a struct field name (e.g., "File") to its JSON tag
-// display name (e.g., "file") by walking the StructNamespace from rootType to the parent
-// struct, then looking up the field's JSON tag. Falls back to the raw struct name if
-// rootType is nil or the field cannot be resolved.
+// resolveFieldDisplayName is a helper function to help resolve the field display name
+// from the struct to using json tag name. This is required because in cross-field tags like
+// `required_without`, `excluded_unless` etc the go-validator doesn't make use of the registered tag name func
+// and therefore the error message contains the actual field name (contained in param) on the struct which the
+// customer may be not be aware of
+// Example:
+//
+//	struct ABCSpec {
+//	  FieldA string `json:"field_a" validate:"required_without=FieldB"`
+//	  FieldB string `json:"field_b"`
+//	}
+//
+// If FieldA is required without FieldB, the error message will be:
+// "'field_a' is required when 'FieldB' is not specified"
+//
+//	instead of
+//
+// "'field_a' is required when 'field_b' is not specified"
+//
+// To solve for this, we leverage the StructNamespace on the field error
+// which in example would be "ABCSpec.FieldA" and then locate the parent struct type
+// and we then use reflection to get the desired structFieldName and extract it's json tag name
 func resolveFieldDisplayName(structFieldName string, err validator.FieldError, rootType reflect.Type) string {
 	if rootType == nil {
 		return structFieldName
