@@ -150,7 +150,8 @@ func resolveFieldDisplayName(structFieldName string, err validator.FieldError, r
 	}
 
 	// Walk StructNamespace to find the parent struct type.
-	// e.g., "OuterSpec.Inner.FieldA" → walk to InnerSpec, then look up param there.
+	// e.g., "OuterSpec.Inner.FieldA" → walk to InnerSpec,
+	// then look up param there.
 	parts := strings.Split(err.StructNamespace(), ".")
 
 	currentType := derefType(rootType)
@@ -160,7 +161,8 @@ func resolveFieldDisplayName(structFieldName string, err validator.FieldError, r
 	for i := 1; i < len(parts)-1; i++ {
 		fieldName := parts[i]
 
-		// Strip array index suffix if present (e.g., "Items[0]" → "Items")
+		// Strip array index suffix if present
+		// (e.g., "Items[0]" → "Items")
 		if idx := strings.Index(fieldName, "["); idx != -1 {
 			fieldName = fieldName[:idx]
 		}
@@ -171,7 +173,8 @@ func resolveFieldDisplayName(structFieldName string, err validator.FieldError, r
 		}
 
 		currentType = derefType(field.Type)
-		if currentType.Kind() == reflect.Slice || currentType.Kind() == reflect.Array {
+		if currentType.Kind() == reflect.Slice ||
+			currentType.Kind() == reflect.Array {
 			currentType = derefType(currentType.Elem())
 		}
 
@@ -192,7 +195,8 @@ func resolveFieldDisplayName(structFieldName string, err validator.FieldError, r
 	return structFieldName
 }
 
-// derefType unwraps pointer types to their underlying element type.
+// derefType unwraps pointer types to their underlying
+// element type, otherwise it returns type as is.
 func derefType(t reflect.Type) reflect.Type {
 	if t.Kind() == reflect.Ptr {
 		return t.Elem()
