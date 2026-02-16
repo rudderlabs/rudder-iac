@@ -8,8 +8,26 @@ import (
 // DataGraphSpec represents the configuration for a data graph resource from YAML
 // Maps to the "data-graph" kind YAML structure
 type DataGraphSpec struct {
-	ID        string `json:"id" mapstructure:"id"`
-	AccountID string `json:"account_id" mapstructure:"account_id"`
+	ID        string      `json:"id" mapstructure:"id"`
+	AccountID string      `json:"account_id" mapstructure:"account_id"`
+	Models    []ModelSpec `json:"models,omitempty" mapstructure:"models"` // Inline models
+}
+
+// ModelSpec represents configuration for both entity and event models from YAML
+// This is part of the DataGraphSpec, not a standalone spec kind
+type ModelSpec struct {
+	ID          string `json:"id" mapstructure:"id"`
+	DisplayName string `json:"display_name" mapstructure:"display_name"`
+	Type        string `json:"type" mapstructure:"type"` // "entity" or "event"
+	Table       string `json:"table" mapstructure:"table"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
+
+	// Entity model fields (only used when Type == "entity")
+	PrimaryID string `json:"primary_id,omitempty" mapstructure:"primary_id"`
+	Root      bool   `json:"root,omitempty" mapstructure:"root"`
+
+	// Event model fields (only used when Type == "event")
+	Timestamp string `json:"timestamp,omitempty" mapstructure:"timestamp"`
 }
 
 // DataGraphResource represents the input data for a data graph

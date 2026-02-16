@@ -59,6 +59,16 @@ func (h *BaseHandler[Spec, Res, State, Remote]) SpecKind() string {
 	return h.metadata.SpecKind
 }
 
+// AddResource registers a resource with the handler
+// This is used when resources are extracted from inline definitions
+func (h *BaseHandler[Spec, Res, State, Remote]) AddResource(id string, resource *Res) error {
+	if _, ok := h.resources[id]; ok {
+		return fmt.Errorf("a resource of type '%s' with id '%s' already exists", h.metadata.ResourceType, id)
+	}
+	h.resources[id] = resource
+	return nil
+}
+
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 

@@ -88,17 +88,17 @@ assert.Equal(t, "Test", result.Name)
 - Prefer early `continue`/`return` over `else` to reduce indentation depth (guard clause pattern)
 - When declaring 2+ related variables together, prefer a `var` block over individual `:=` assignments for better visual grouping:
 
-  ```go
-  // Preferred
-  var (
-      actualVal  = fieldVal
-      actualKind = fieldVal.Kind()
-  )
+```go
+// Preferred
+var (
+    actualVal  = fieldVal
+    actualKind = fieldVal.Kind()
+)
 
-  // Avoid
-  actualVal := fieldVal
-  actualKind := fieldVal.Kind()
-  ```
+// Avoid
+actualVal := fieldVal
+actualKind := fieldVal.Kind()
+```
 
 - **ID Naming Convention**: Use fully capitalized "ID" in identifiers (Go convention for initialisms), e.g., `ExternalID` not `ExternalId`, `WorkspaceID` not `WorkspaceId`
 

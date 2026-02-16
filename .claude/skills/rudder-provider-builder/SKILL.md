@@ -56,6 +56,37 @@ For each resource type:
    - `State`: Output state (computed fields only)
    - `Remote`: API response wrapper implementing `RemoteResource`
 
+   **CRITICAL: Mapstructure Tags Required for Spec Structs**
+
+   All `Spec` structs **must** include `mapstructure` tags alongside `json` tags. This is required because providers use `mapstructure.Decode()` to parse YAML specs into Go structs (see `provider.go` line 55).
+
+   Without mapstructure tags, the decoder cannot map YAML field names (especially those with underscores like `account_id`) to struct fields, causing validation errors even when fields are present in the YAML.
+
+   ```go
+   // ✅ CORRECT - Include both json and mapstructure tags
+   type DataGraphSpec struct {
+       ID        string      `json:"id" mapstructure:"id"`
+       Name      string      `json:"name" mapstructure:"name"`
+       AccountID string      `json:"account_id" mapstructure:"account_id"`  // Snake case in YAML
+       Models    []ModelSpec `json:"models,omitempty" mapstructure:"models"`
+   }
+
+   type ModelSpec struct {
+       ID          string `json:"id" mapstructure:"id"`
+       DisplayName string `json:"display_name" mapstructure:"display_name"`
+       Type        string `json:"type" mapstructure:"type"`
+   }
+
+   // ❌ WRONG - Missing mapstructure tags will cause decoding to fail
+   type DataGraphSpec struct {
+       ID        string      `json:"id"`
+       Name      string      `json:"name"`
+       AccountID string      `json:"account_id"`  // Won't decode from YAML without mapstructure tag
+   }
+   ```
+
+   **Rule**: Every field in a `Spec` struct needs both tags with matching field names. The `mapstructure` tag should match the YAML field name exactly (including snake_case).
+
 2. **Implement Handler** in `handlers/<resource>/handler.go`:
    - Create `HandlerImpl` struct with API client
    - Implement all `HandlerImpl[Spec, Res, State, Remote]` methods
@@ -100,6 +131,7 @@ func NewProvider(apiClient *client.Client) *Provider {
 Register the provider in `cli/internal/app/dependencies.go`:
 
 1. **Add to Providers struct** - Use pointer to concrete type, not interface:
+
 ```go
 type Providers struct {
     // ... existing providers ...
@@ -108,6 +140,7 @@ type Providers struct {
 ```
 
 2. **Initialize in setupProviders()** - Conditionally if using experimental flag:
+
 ```go
 func setupProviders(c *client.Client) (*Providers, error) {
     cfg := config.GetConfig()
@@ -129,6 +162,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 ```
 
 3. **Add to composite provider** - In `NewDeps()`:
+
 ```go
 providers := map[string]provider.Provider{
     "datacatalog": p.DataCatalog,
@@ -196,12 +230,175 @@ Resource-specific implementation providing:
 
 ### Resource References
 
-Resources reference each other using URNs and PropertyRefs:
+**CRITICAL**: Resources must **NEVER** reference other resources using direct ID strings. Always use `*resources.PropertyRef` for cross-resource references.
 
-1. **In Spec**: `'#/writer/common/tolkien'` (reference string)
-2. **Parse to URN**: `writer.ParseWriterReference(ref)` → `"example_writer:tolkien"`
-3. **Create PropertyRef**: `writer.CreateWriterReference(urn)`
-4. **Use in CRUD**: `authorRemoteID := data.Author.Value` (resolved at runtime)
+#### Why PropertyRef is Required
+
+Remote IDs are not known until resources are created. Using direct ID strings would cause:
+- Create operations to fail (referenced resource doesn't exist yet)
+- Invalid references during the apply cycle
+- Incorrect dependency tracking
+
+#### How to Use PropertyRef
+
+1. **In Resource struct** - Use `*resources.PropertyRef`, not `string`:
+```go
+type ModelResource struct {
+    ID           string
+    DisplayName  string
+    DataGraphRef *resources.PropertyRef  // ✅ CORRECT
+    // DataGraphID  string                // ❌ WRONG - Don't use direct IDs
+}
+```
+
+2. **In Spec Parsing** - Create PropertyRef from external ID using URN:
+```go
+func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *ModelSpec) (map[string]*ModelResource, error) {
+    // Create URN for the parent resource
+    dataGraphURN := resources.URN(spec.DataGraphID, datagraph.HandlerMetadata.ResourceType)
+
+    // Create PropertyRef to the parent resource using URN
+    dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
+
+    resource := &ModelResource{
+        DataGraphRef: dataGraphRef,  // Store PropertyRef, not ID
+    }
+    return map[string]*ModelResource{spec.ID: resource}, nil
+}
+```
+
+**CRITICAL**: Always use `resources.URN()` to construct URNs. Never use `fmt.Sprintf` or string concatenation. Always use `HandlerMetadata.ResourceType` instead of hardcoding resource type strings.
+
+3. **Create Reference Helper** - Provide in parent handler:
+```go
+// In the parent resource's handler (e.g., datagraph/handler.go)
+// IMPORTANT: The urn parameter is a full URN (e.g., "data-graph:my-dg"), not just an ID
+func CreateDataGraphReference(urn string) *resources.PropertyRef {
+    return handler.CreatePropertyRef[DataGraphState](
+        urn,  // Use URN directly, don't construct it here
+        func(state *DataGraphState) (string, error) {
+            return state.ID, nil  // Extract remote ID from state
+        },
+    )
+}
+```
+
+4. **In CRUD Operations** - Access resolved value:
+```go
+func (h *HandlerImpl) Create(ctx context.Context, data *ModelResource) (*ModelState, error) {
+    // PropertyRef is resolved by the syncer before Create is called
+    dataGraphRemoteID := data.DataGraphRef.Value  // Resolved remote ID
+
+    req := &CreateModelRequest{
+        Name: data.DisplayName,
+        // ... other fields
+    }
+    remote, err := h.client.CreateModel(ctx, dataGraphRemoteID, req)
+    // ...
+}
+```
+
+5. **In MapRemoteToState** - Convert remote ID to PropertyRef:
+```go
+func (h *HandlerImpl) MapRemoteToState(remote *RemoteModel, urnResolver handler.URNResolver) (*ModelResource, *ModelState, error) {
+    // Resolve the parent's URN from its remote ID
+    // IMPORTANT: Always use HandlerMetadata.ResourceType, never hardcode resource type strings
+    parentURN, err := urnResolver.GetURNByID(datagraph.HandlerMetadata.ResourceType, remote.DataGraphID)
+    if err != nil {
+        return nil, nil, fmt.Errorf("resolving data graph URN: %w", err)
+    }
+
+    // Create PropertyRef to the parent using the resolved URN
+    // IMPORTANT: Never parse or split URNs - use them as-is
+    parentRef := datagraph.CreateDataGraphReference(parentURN)
+
+    resource := &ModelResource{
+        DataGraphRef: parentRef,  // Store PropertyRef
+        // ...
+    }
+    return resource, state, nil
+}
+```
+
+**CRITICAL RULES**:
+- ❌ **NEVER** parse URNs by splitting on `:` or using string manipulation
+- ❌ **NEVER** hardcode resource type strings (e.g., `"data-graph"`)
+- ✅ **ALWAYS** use `HandlerMetadata.ResourceType` for resource types
+- ✅ **ALWAYS** use `resources.URN(id, resourceType)` to construct URNs
+- ✅ **ALWAYS** pass URNs directly to Create*Reference functions
+
+#### Complete Reference Example
+
+**Spec (YAML)**:
+```yaml
+spec:
+  id: "my-dg"
+  name: "My Data Graph"
+  models:
+    - id: "user"
+      display_name: "User"
+      # DataGraphID is set during extraction, not in YAML
+```
+
+**Parent Handler (datagraph/handler.go)** - Provide reference helper:
+```go
+// CreateDataGraphReference creates a PropertyRef for data graph references
+// The urn parameter is a full URN (e.g., "data-graph:my-dg")
+func CreateDataGraphReference(urn string) *resources.PropertyRef {
+    return handler.CreatePropertyRef(
+        urn,
+        func(state *DataGraphState) (string, error) {
+            return state.ID, nil
+        },
+    )
+}
+```
+
+**Child Handler (model/handler.go)** - Use references:
+```go
+// ExtractResourcesFromSpec - Create PropertyRef from parent external ID
+func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *ModelSpec) (map[string]*ModelResource, error) {
+    // Construct URN using resources.URN and HandlerMetadata
+    dataGraphURN := resources.URN(spec.DataGraphID, datagraph.HandlerMetadata.ResourceType)
+    dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
+
+    resource := &ModelResource{DataGraphRef: dataGraphRef}
+    return map[string]*ModelResource{spec.ID: resource}, nil
+}
+
+// ValidateResource - Check reference exists using URN
+func (h *HandlerImpl) ValidateResource(resource *ModelResource, graph *resources.Graph) error {
+    if resource.DataGraphRef == nil {
+        return fmt.Errorf("data_graph reference is required")
+    }
+    if _, exists := graph.GetResource(resource.DataGraphRef.URN); !exists {
+        return fmt.Errorf("referenced data graph does not exist")
+    }
+    return nil
+}
+
+// Create - Use resolved value (syncer resolves refs before calling Create)
+func (h *HandlerImpl) Create(ctx context.Context, data *ModelResource) (*ModelState, error) {
+    dataGraphRemoteID := data.DataGraphRef.Value  // Resolved by syncer
+    remote, err := h.client.CreateModel(ctx, dataGraphRemoteID, req)
+    // ...
+}
+
+// MapRemoteToState - Convert remote ID to PropertyRef using URN resolver
+func (h *HandlerImpl) MapRemoteToState(remote *RemoteModel, urnResolver handler.URNResolver) (*ModelResource, *ModelState, error) {
+    // Resolve parent's URN from its remote ID
+    parentURN, err := urnResolver.GetURNByID(datagraph.HandlerMetadata.ResourceType, remote.DataGraphID)
+    if err != nil {
+        return nil, nil, fmt.Errorf("resolving data graph URN: %w", err)
+    }
+
+    // Use the resolved URN directly - don't parse it!
+    parentRef := datagraph.CreateDataGraphReference(parentURN)
+
+    resource := &ModelResource{DataGraphRef: parentRef}
+    return resource, state, nil
+}
+```
 
 ### Export Strategies
 
@@ -228,6 +425,7 @@ Two-phase validation:
 ### Per Handler
 
 - [ ] Data types defined (Spec, Res, State, Remote)
+- [ ] Spec structs include both `json` and `mapstructure` tags for all fields
 - [ ] Remote implements `RemoteResource` with value receiver
 - [ ] HandlerMetadata configured (ResourceType, SpecKind, SpecMetadataName)
 - [ ] All HandlerImpl methods implemented:
@@ -255,8 +453,53 @@ Two-phase validation:
 ### Naming
 
 - Use fully capitalized "ID" (not "Id"): `ExternalID`, `WorkspaceID`
-- Resource types: kebab-case `<provider>-<resource>` (e.g., `data-graph-schema`)
-- Spec kinds: match YAML `kind` field (e.g., `schema`)
+- Resource types: kebab-case `<provider>-<resource>` (e.g., `data-graph-model`)
+- Spec kinds: match YAML `kind` field (e.g., `data-graph`)
+
+### URN Construction and Resource References
+
+**CRITICAL RULES** - Follow these strictly:
+
+1. **Always use `resources.URN()`** to construct URNs:
+   ```go
+   // ✅ CORRECT
+   urn := resources.URN(externalID, HandlerMetadata.ResourceType)
+
+   // ❌ WRONG
+   urn := fmt.Sprintf("%s:%s", "data-graph", externalID)
+   urn := "data-graph:" + externalID
+   ```
+
+2. **Always use `HandlerMetadata.ResourceType`**, never hardcode:
+   ```go
+   // ✅ CORRECT
+   urn := resources.URN(id, datagraph.HandlerMetadata.ResourceType)
+   dataGraphURN, err := urnResolver.GetURNByID(datagraph.HandlerMetadata.ResourceType, remoteID)
+
+   // ❌ WRONG
+   urn := resources.URN(id, "data-graph")
+   dataGraphURN, err := urnResolver.GetURNByID("data-graph", remoteID)
+   ```
+
+3. **Never parse or split URNs**:
+   ```go
+   // ❌ WRONG - Don't parse URNs
+   externalID := urn[len("data-graph:"):]
+   parts := strings.Split(urn, ":")
+
+   // ✅ CORRECT - Use URNs as opaque identifiers
+   ref := datagraph.CreateDataGraphReference(urn)  // Pass URN directly
+   ```
+
+4. **Create*Reference functions take URNs**, not external IDs:
+   ```go
+   // ✅ CORRECT
+   urn := resources.URN(externalID, datagraph.HandlerMetadata.ResourceType)
+   ref := datagraph.CreateDataGraphReference(urn)
+
+   // ❌ WRONG
+   ref := datagraph.CreateDataGraphReference(externalID)
+   ```
 
 ### Error Handling
 
