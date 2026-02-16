@@ -75,6 +75,43 @@ func TestCreateDataGraph(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestCreateDataGraphWithExternalID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"accountId":"wh-123","externalId":"ext-123"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs", expected)
+		},
+		ResponseStatus: 201,
+		ResponseBody: `{
+			"id": "dg-123",
+			"workspaceId": "ws-456",
+			"accountId": "wh-123",
+			"externalId": "ext-123",
+			"createdAt": "2024-01-15T12:00:00Z",
+			"updatedAt": "2024-01-15T12:00:00Z"
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.CreateDataGraph(context.Background(), &datagraph.CreateDataGraphRequest{
+		AccountID:  "wh-123",
+		ExternalID: "ext-123",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.DataGraph{
+		ID:          "dg-123",
+		WorkspaceID: "ws-456",
+		AccountID:   "wh-123",
+		ExternalID:  "ext-123",
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime1,
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestGetDataGraph(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -340,8 +377,17 @@ func TestSetExternalID(t *testing.T) {
 
 	store := newTestStore(t, httpClient)
 
-	err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
+	result, err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
 	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.DataGraph{
+		ID:          "dg-123",
+		WorkspaceID: "ws-456",
+		AccountID:   "wh-123",
+		ExternalID:  "ext-123",
+		CreatedAt:   &testTime1,
+		UpdatedAt:   &testTime2,
+	}, result)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -371,7 +417,8 @@ func TestEmptyIDValidation(t *testing.T) {
 		{
 			name: "SetExternalID",
 			operation: func() error {
-				return store.SetExternalID(context.Background(), "", "ext-123")
+				_, err := store.SetExternalID(context.Background(), "", "ext-123")
+				return err
 			},
 		},
 	}
@@ -453,7 +500,8 @@ func TestAPIErrors(t *testing.T) {
 			responseStatus: 500,
 			responseBody:   `{"error":"Internal Server Error"}`,
 			operation: func(store datagraph.DataGraphStore) error {
-				return store.SetExternalID(context.Background(), "dg-123", "ext-123")
+				_, err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
+				return err
 			},
 			expectedError: "setting external ID",
 		},
@@ -531,6 +579,16 @@ func TestMalformedResponses(t *testing.T) {
 			path:   "/v2/data-graphs",
 			operation: func(store datagraph.DataGraphStore) error {
 				_, err := store.ListDataGraphs(context.Background(), 0, 0, nil)
+				return err
+			},
+			expectedError: "unmarshalling response",
+		},
+		{
+			name:   "SetExternalID",
+			method: "PUT",
+			path:   "/v2/data-graphs/dg-123/external-id",
+			operation: func(store datagraph.DataGraphStore) error {
+				_, err := store.SetExternalID(context.Background(), "dg-123", "ext-123")
 				return err
 			},
 			expectedError: "unmarshalling response",
