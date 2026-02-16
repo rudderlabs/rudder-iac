@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 )
 
 const (
@@ -15,9 +17,11 @@ const (
 )
 
 type RawSpec struct {
-	Data    []byte
-	parsed  *Spec
-	errored error
+	Data      []byte
+	parsed    *Spec
+	errored   error
+	pathIndex pathindex.PathIndexer
+	piErr     error
 }
 
 func (r *RawSpec) Parse() (*Spec, error) {
@@ -36,6 +40,21 @@ func (r *RawSpec) Parse() (*Spec, error) {
 
 func (r *RawSpec) Parsed() *Spec {
 	return r.parsed
+}
+
+func (r *RawSpec) PathIndexer() (pathindex.PathIndexer, error) {
+	if r.pathIndex != nil || r.piErr != nil {
+		return r.pathIndex, r.piErr
+	}
+
+	pi, err := pathindex.NewPathIndexer(r.Data)
+	if err != nil {
+		r.piErr = fmt.Errorf("building path indexer: %w", err)
+		return nil, r.piErr
+	}
+
+	r.pathIndex = pi
+	return r.pathIndex, nil
 }
 
 type Spec struct {
