@@ -3,6 +3,7 @@ package transformations
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
@@ -18,10 +19,22 @@ import (
 
 var log = logger.New("transformationsprovider")
 
+// pendingDeletes collects delete intents for deferred execution.
+// Deletes are deferred because the backend enforces referential integrity
+// against published state — a library cannot be deleted while a published
+// transformation still imports it. By deferring deletes until after batch
+// publish in ConsolidateSync, the published dependency graph is updated first.
+type pendingDeletes struct {
+	mu              sync.Mutex
+	transformations []string // remote IDs
+	libraries       []string // remote IDs
+}
+
 // Provider wraps BaseProvider and adds transformations-specific functionality
 type Provider struct {
 	*provider.BaseProvider
-	store transformations.TransformationStore
+	store          transformations.TransformationStore
+	pendingDeletes pendingDeletes
 }
 
 // NewProvider creates a new transformations provider with all resource handlers
@@ -168,27 +181,87 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
+// DeleteRaw overrides BaseProvider.DeleteRaw to defer deletion until ConsolidateSync.
+// Instead of immediately deleting resources, it records the delete intent so that
+// batch publish can update the published dependency graph first.
+func (p *Provider) DeleteRaw(_ context.Context, _ string, resourceType string, _ any, oldState any) error {
+	switch resourceType {
+	case transformation.HandlerMetadata.ResourceType:
+		st, ok := oldState.(*model.TransformationState)
+		if !ok {
+			return fmt.Errorf("invalid state type for transformation delete")
+		}
+		p.pendingDeletes.mu.Lock()
+		p.pendingDeletes.transformations = append(p.pendingDeletes.transformations, st.ID)
+		p.pendingDeletes.mu.Unlock()
+
+	case library.HandlerMetadata.ResourceType:
+		st, ok := oldState.(*model.LibraryState)
+		if !ok {
+			return fmt.Errorf("invalid state type for library delete")
+		}
+		p.pendingDeletes.mu.Lock()
+		p.pendingDeletes.libraries = append(p.pendingDeletes.libraries, st.ID)
+		p.pendingDeletes.mu.Unlock()
+
+	default:
+		return fmt.Errorf("unsupported resource type for delete: %s", resourceType)
+	}
+	return nil
+}
+
 // ConsolidateSync implements batch publishing of all transformations and libraries
 // This is called after all Create/Update operations to publish changes in a single batch
 func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
-	// Build batch publish request by extracting versions from state
+	// Phase 1: Batch publish all draft versions
 	req, err := p.buildBatchPublishRequest(st)
 	if err != nil {
-		return fmt.Errorf("building batch public request: %w", err)
+		return fmt.Errorf("building batch publish request: %w", err)
 	}
 
-	// If no versions to publish, we're done
-	if len(req.Transformations) == 0 && len(req.Libraries) == 0 {
+	if len(req.Transformations) > 0 || len(req.Libraries) > 0 {
+		if err := p.store.BatchPublish(ctx, req); err != nil {
+			return fmt.Errorf("batch publishing %d transformations and %d libraries: %w",
+				len(req.Transformations), len(req.Libraries), err)
+		}
+		log.Info("Successfully published transformations and libraries",
+			"transformations", len(req.Transformations), "libraries", len(req.Libraries))
+	}
+
+	// Phase 2: Execute deferred deletes (now safe — published state is current)
+	if err := p.executePendingDeletes(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// executePendingDeletes processes all deferred delete operations.
+// Transformations are deleted first since they depend on libraries.
+func (p *Provider) executePendingDeletes(ctx context.Context) error {
+	p.pendingDeletes.mu.Lock()
+	pendingTransformations := p.pendingDeletes.transformations
+	pendingLibraries := p.pendingDeletes.libraries
+	p.pendingDeletes.mu.Unlock()
+
+	if len(pendingTransformations) == 0 && len(pendingLibraries) == 0 {
 		return nil
 	}
 
-	// Batch publish all versions
-	if err := p.store.BatchPublish(ctx, req); err != nil {
-		return fmt.Errorf("batch publishing %d transformations and %d libraries: %w",
-			len(req.Transformations), len(req.Libraries), err)
+	for _, id := range pendingTransformations {
+		if err := p.store.DeleteTransformation(ctx, id); err != nil {
+			return fmt.Errorf("deleting transformation %s: %w", id, err)
+		}
 	}
 
-	log.Info("Successfully published transformations and libraries", "transformations", len(req.Transformations), "libraries", len(req.Libraries))
+	for _, id := range pendingLibraries {
+		if err := p.store.DeleteLibrary(ctx, id); err != nil {
+			return fmt.Errorf("deleting library %s: %w", id, err)
+		}
+	}
+
+	log.Info("Successfully deleted transformations and libraries",
+		"transformations", len(pendingTransformations), "libraries", len(pendingLibraries))
 	return nil
 }
 

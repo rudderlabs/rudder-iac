@@ -20,8 +20,12 @@ import (
 
 // mockTransformationStore implements the TransformationStore interface for testing
 type mockTransformationStore struct {
-	batchPublishCalled bool
-	batchPublishFunc   func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error
+	batchPublishCalled          bool
+	deleteTransformationCalled  bool
+	deleteLibraryCalled         bool
+	batchPublishFunc            func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error
+	deleteTransformationFunc    func(ctx context.Context, id string) error
+	deleteLibraryFunc           func(ctx context.Context, id string) error
 }
 
 func newMockTransformationStore() *mockTransformationStore {
@@ -57,7 +61,11 @@ func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*t
 }
 
 func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
-	return fmt.Errorf("not implemented")
+	m.deleteTransformationCalled = true
+	if m.deleteTransformationFunc != nil {
+		return m.deleteTransformationFunc(ctx, id)
+	}
+	return nil
 }
 
 func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
@@ -81,7 +89,11 @@ func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transfo
 }
 
 func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
-	return fmt.Errorf("not implemented")
+	m.deleteLibraryCalled = true
+	if m.deleteLibraryFunc != nil {
+		return m.deleteLibraryFunc(ctx, id)
+	}
+	return nil
 }
 
 func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
@@ -758,5 +770,153 @@ func TestMapRemoteToState(t *testing.T) {
 		resourceState := st.GetResource("transformation:trans-1")
 		require.NotNil(t, resourceState)
 		assert.Len(t, resourceState.Dependencies, 0)
+	})
+}
+
+func TestDeferredDeletes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("deferred deletes execute after batch publish", func(t *testing.T) {
+		t.Parallel()
+
+		var callOrder []string
+
+		mockStore := newMockTransformationStore()
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+			callOrder = append(callOrder, "batch_publish")
+			return nil
+		}
+		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+			callOrder = append(callOrder, "delete_library:"+id)
+			return nil
+		}
+
+		p := transformations.NewProviderWithStore(mockStore)
+
+		// Record a deferred library delete via DeleteRaw
+		err := p.DeleteRaw(context.Background(), "lib-1", "transformation-library",
+			&model.LibraryResource{ID: "lib-1"},
+			&model.LibraryState{ID: "remote-lib-1", VersionID: "ver-1"})
+		require.NoError(t, err)
+
+		// State has a transformation that was updated (needs publishing)
+		st := state.EmptyState()
+		st.Resources = map[string]*state.ResourceState{
+			"transformation:trans-1": {
+				Type: transformation.HandlerMetadata.ResourceType,
+				OutputRaw: &model.TransformationState{
+					ID:        "remote-trans-1",
+					VersionID: "ver-2",
+				},
+			},
+		}
+
+		err = p.ConsolidateSync(context.Background(), st)
+		require.NoError(t, err)
+
+		require.Equal(t, []string{
+			"batch_publish",
+			"delete_library:remote-lib-1",
+		}, callOrder)
+	})
+
+	t.Run("deferred deletes only - nothing to publish", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.deleteTransformationFunc = func(ctx context.Context, id string) error {
+			return nil
+		}
+
+		p := transformations.NewProviderWithStore(mockStore)
+
+		err := p.DeleteRaw(context.Background(), "trans-1", "transformation",
+			&model.TransformationResource{ID: "trans-1"},
+			&model.TransformationState{ID: "remote-trans-1", VersionID: "ver-1"})
+		require.NoError(t, err)
+
+		st := state.EmptyState()
+		err = p.ConsolidateSync(context.Background(), st)
+
+		require.NoError(t, err)
+		assert.False(t, mockStore.batchPublishCalled)
+		assert.True(t, mockStore.deleteTransformationCalled)
+	})
+
+	t.Run("transformations deleted before libraries", func(t *testing.T) {
+		t.Parallel()
+
+		var deleteOrder []string
+
+		mockStore := newMockTransformationStore()
+		mockStore.deleteTransformationFunc = func(ctx context.Context, id string) error {
+			deleteOrder = append(deleteOrder, "transformation:"+id)
+			return nil
+		}
+		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+			deleteOrder = append(deleteOrder, "library:"+id)
+			return nil
+		}
+
+		p := transformations.NewProviderWithStore(mockStore)
+
+		// Record library delete first, then transformation
+		err := p.DeleteRaw(context.Background(), "lib-1", "transformation-library",
+			&model.LibraryResource{ID: "lib-1"},
+			&model.LibraryState{ID: "remote-lib-1", VersionID: "ver-1"})
+		require.NoError(t, err)
+
+		err = p.DeleteRaw(context.Background(), "trans-1", "transformation",
+			&model.TransformationResource{ID: "trans-1"},
+			&model.TransformationState{ID: "remote-trans-1", VersionID: "ver-1"})
+		require.NoError(t, err)
+
+		st := state.EmptyState()
+		err = p.ConsolidateSync(context.Background(), st)
+
+		require.NoError(t, err)
+		// Transformations must be deleted before libraries regardless of recording order
+		require.Equal(t, []string{
+			"transformation:remote-trans-1",
+			"library:remote-lib-1",
+		}, deleteOrder)
+	})
+
+	t.Run("deferred delete failure propagates from ConsolidateSync", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+			return fmt.Errorf("backend rejected delete")
+		}
+
+		p := transformations.NewProviderWithStore(mockStore)
+
+		err := p.DeleteRaw(context.Background(), "lib-1", "transformation-library",
+			&model.LibraryResource{ID: "lib-1"},
+			&model.LibraryState{ID: "remote-lib-1", VersionID: "ver-1"})
+		require.NoError(t, err)
+
+		st := state.EmptyState()
+		err = p.ConsolidateSync(context.Background(), st)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "deleting library remote-lib-1")
+		assert.Contains(t, err.Error(), "backend rejected delete")
+	})
+
+	t.Run("no deferred deletes - no extra calls", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		p := transformations.NewProviderWithStore(mockStore)
+
+		st := state.EmptyState()
+		err := p.ConsolidateSync(context.Background(), st)
+
+		require.NoError(t, err)
+		assert.False(t, mockStore.batchPublishCalled)
+		assert.False(t, mockStore.deleteTransformationCalled)
+		assert.False(t, mockStore.deleteLibraryCalled)
 	})
 }
