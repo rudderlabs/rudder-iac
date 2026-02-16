@@ -83,7 +83,7 @@ var validateTrackingPlanSpec = func(
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors, nil)
 
 	// validate the rules on the trackingplan spec
 	results = append(results, validateRules(Spec.Rules)...)

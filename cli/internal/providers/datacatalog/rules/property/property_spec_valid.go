@@ -56,7 +56,7 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 		}}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors, nil)
 
 	// validate the type field on the property
 	// which can be a custom type reference or a comma-separated

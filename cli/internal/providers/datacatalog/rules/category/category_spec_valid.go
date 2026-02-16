@@ -41,7 +41,7 @@ var validateCategorySpec = func(Kind string, Version string, Metadata map[string
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	return funcs.ParseValidationErrors(validationErrors, nil)
 }
 
 func NewCategorySpecSyntaxValidRule() rules.Rule {

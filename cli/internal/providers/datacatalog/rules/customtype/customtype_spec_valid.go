@@ -1,6 +1,8 @@
 package customtype
 
 import (
+	"reflect"
+
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -60,14 +62,13 @@ var examples = rules.Examples{
 }
 
 // Main validation function for custom type spec
-// which delegates the validation to the go-validator through struct tags.
+// which delegates the validation to the go-validator
+// through struct tags.
 var validateCustomTypeSpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CustomTypeSpec) []rules.ValidationResult {
-	validationErrors, err := rules.ValidateStruct(
-		Spec,
-		"",
-		getValidateFuncs(Version)..., // attach custom validate funcs specially for custom type specs
-	)
+	validationErrors, err := rules.ValidateStruct(Spec, "")
 
+	// If any error on running the validate struct command
+	// we report that at top `/types` layer
 	if err != nil {
 		return []rules.ValidationResult{
 			{
@@ -77,7 +78,10 @@ var validateCustomTypeSpec = func(Kind string, Version string, Metadata map[stri
 		}
 	}
 
-	return funcs.ParseValidationErrors(validationErrors)
+	return funcs.ParseValidationErrors(
+		validationErrors,
+		reflect.TypeOf(Spec),
+	)
 }
 
 func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
@@ -89,10 +93,4 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 		[]string{"custom-types"},
 		validateCustomTypeSpec,
 	)
-}
-
-// getValidateFuncs returns custom validate functions which the custom type spec employs
-// by adding requisite tags to fields in the spec struct
-func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	return []rules.CustomValidateFunc{}
 }
