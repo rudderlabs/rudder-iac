@@ -14,14 +14,12 @@ import (
 
 func TestResolveTestCases(t *testing.T) {
 	t.Run("no tests defined - uses defaults", func(t *testing.T) {
-		resolver := NewInputResolver()
-
 		transformation := &model.TransformationResource{
 			ID:    "test-trans",
 			Tests: []specs.TransformationTest{},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 1)
@@ -43,7 +41,6 @@ func TestResolveTestCases(t *testing.T) {
 		err = os.WriteFile(inputFile, []byte(inputData), 0644)
 		require.NoError(t, err)
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -56,7 +53,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 1)
@@ -82,7 +79,6 @@ func TestResolveTestCases(t *testing.T) {
 		err = os.WriteFile(filepath.Join(outputDir, "test1.json"), []byte(outputData), 0644)
 		require.NoError(t, err)
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -95,7 +91,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 1)
@@ -105,40 +101,9 @@ func TestResolveTestCases(t *testing.T) {
 		assert.Len(t, testCases[0].ExpectedOutput, 1)
 	})
 
-	t.Run("test suite without SpecDir - error", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		inputDir := filepath.Join(tmpDir, "input")
-		err := os.MkdirAll(inputDir, 0755)
-		require.NoError(t, err)
-
-		// Create input file
-		inputData := `[{"type":"track"}]`
-		err = os.WriteFile(filepath.Join(inputDir, "test1.json"), []byte(inputData), 0644)
-		require.NoError(t, err)
-
-		resolver := NewInputResolver()
-		transformation := &model.TransformationResource{
-			ID: "test-trans",
-			Tests: []specs.TransformationTest{
-				{
-					Name:    "Test Suite",
-					SpecDir: "", // Missing SpecDir
-					Input:   inputDir,
-				},
-			},
-		}
-
-		testCases, err := resolver.ResolveTestCases(transformation)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "SpecDir not populated")
-		assert.Nil(t, testCases)
-	})
-
 	t.Run("test suite with missing input directory - falls back to defaults", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -150,7 +115,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 1)
@@ -174,7 +139,6 @@ func TestResolveTestCases(t *testing.T) {
 		err = os.WriteFile(filepath.Join(suite2Dir, "test2.json"), []byte(`[{"type":"identify"}]`), 0644)
 		require.NoError(t, err)
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -191,7 +155,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 2)
@@ -223,7 +187,6 @@ func TestResolveTestCases(t *testing.T) {
 		err = os.WriteFile(filepath.Join(specificDir, "specific-only.json"), []byte(`[{"source":"specific"}]`), 0644)
 		require.NoError(t, err)
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -235,7 +198,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 3)
@@ -282,7 +245,6 @@ func TestResolveTestCases(t *testing.T) {
 		err = os.WriteFile(filepath.Join(inputDir, "invalid.json"), []byte(`{invalid json`), 0644)
 		require.NoError(t, err)
 
-		resolver := NewInputResolver()
 		transformation := &model.TransformationResource{
 			ID: "test-trans",
 			Tests: []specs.TransformationTest{
@@ -294,7 +256,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := resolver.ResolveTestCases(transformation)
+		testCases, err := ResolveTestCases(transformation)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid JSON")
@@ -575,11 +537,9 @@ func TestListJSONFiles(t *testing.T) {
 	})
 }
 
-func TestBuildDefaultTestCases(t *testing.T) {
+func TestDefaultTestCases(t *testing.T) {
 	t.Run("creates single test case with all events", func(t *testing.T) {
-		resolver := NewInputResolver()
-
-		testCases, err := resolver.buildDefaultTestCases()
+		testCases, err := defaultTestCases()
 
 		require.NoError(t, err)
 		require.Len(t, testCases, 1)

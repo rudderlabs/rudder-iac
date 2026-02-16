@@ -2,6 +2,7 @@ package testorchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -15,21 +16,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 )
 
-var runnerLog = logger.New("testorchestrator", logger.Attr{
-	Key:   "component",
-	Value: "runner",
-})
+var log = logger.New("testorchestrator")
 
 // Runner orchestrates the entire test execution flow
 type Runner struct {
-	deps          app.Deps
-	provider      *transformationsprovider.Provider
-	graph         *resources.Graph
-	store         transformations.TransformationStore
-	planner       *Planner
-	inputResolver *InputResolver
-	stagingMgr    *StagingManager
-	workspaceID   string
+	deps        app.Deps
+	provider    *transformationsprovider.Provider
+	graph       *resources.Graph
+	store       transformations.TransformationStore
+	planner     *Planner
+	stagingMgr  *StagingManager
+	workspaceID string
 }
 
 // NewRunner creates a new test runner
@@ -37,14 +34,13 @@ func NewRunner(deps app.Deps, provider *transformationsprovider.Provider, graph 
 	store := transformations.NewRudderTransformationStore(deps.Client())
 
 	return &Runner{
-		deps:          deps,
-		provider:      provider,
-		graph:         graph,
-		store:         store,
-		planner:       NewPlanner(graph),
-		inputResolver: NewInputResolver(),
-		stagingMgr:    NewStagingManager(store),
-		workspaceID:   workspaceID,
+		deps:        deps,
+		provider:    provider,
+		graph:       graph,
+		store:       store,
+		planner:     NewPlanner(graph),
+		stagingMgr:  NewStagingManager(store),
+		workspaceID: workspaceID,
 	}
 }
 
@@ -67,17 +63,17 @@ func (r *TestResults) HasFailures() bool {
 
 // Run executes tests based on the specified mode and returns results
 func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResults, error) {
-	runnerLog.Info("Starting test run", "mode", mode, "targetID", targetID)
+	log.Info("Starting test run", "mode", mode, "targetID", targetID)
 
 	// Load remote resources
-	runnerLog.Debug("Loading remote resources")
+	log.Debug("Loading remote resources")
 	remoteResources, err := r.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
 	}
 
 	// Build remote state
-	runnerLog.Debug("Building remote state")
+	log.Debug("Building remote state")
 	remoteState, err := r.provider.MapRemoteToState(remoteResources)
 	if err != nil {
 		return nil, fmt.Errorf("building remote state: %w", err)
@@ -87,18 +83,18 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	remoteGraph := syncer.StateToGraph(remoteState)
 
 	// Build test plan
-	runnerLog.Debug("Building test plan")
+	log.Debug("Building test plan")
 	testPlan, err := r.planner.BuildPlan(ctx, remoteGraph, mode, targetID, r.workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("building test plan: %w", err)
 	}
 
 	if len(testPlan.TestUnits) == 0 {
-		runnerLog.Info("No transformations to test")
+		log.Info("No transformations to test")
 		return &TestResults{Transformations: []*transformations.TransformationTestResult{}}, nil
 	}
 
-	runnerLog.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
+	log.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
 
 	// Resolve library versions once for all test units (libraries can be shared)
 	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteState)
@@ -106,11 +102,22 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		return nil, fmt.Errorf("resolving library versions: %w", err)
 	}
 
+	// Resolve test cases for all units before parallel execution
+	unitTestCases := make(map[string][]TestCase)
+	for _, unit := range testPlan.TestUnits {
+		testCases, err := ResolveTestCases(unit.Transformation)
+		if err != nil {
+			return nil, fmt.Errorf("resolving test cases for %s: %w", unit.Transformation.ID, err)
+		}
+		log.Debug("Resolved test cases", "transformation", unit.Transformation.ID, "count", len(testCases))
+		unitTestCases[unit.Transformation.ID] = testCases
+	}
+
 	// Execute tests in parallel using WaitGroup
 	var wg sync.WaitGroup
 	resultsMu := sync.Mutex{}
 	var allResults []*transformations.TransformationTestResult
-	var errors []error
+	var errs []error
 	errorsMutex := sync.Mutex{}
 
 	for _, unit := range testPlan.TestUnits {
@@ -119,24 +126,13 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		go func(u *TestUnit) {
 			defer wg.Done()
 
-			runnerLog.Info("Testing transformation", "id", u.Transformation.ID, "name", u.Transformation.Name)
-
-			// Resolve test cases
-			testCases, err := r.inputResolver.ResolveTestCases(u.Transformation)
-			if err != nil {
-				errorsMutex.Lock()
-				errors = append(errors, fmt.Errorf("resolving test cases for %s: %w", u.Transformation.ID, err))
-				errorsMutex.Unlock()
-				return
-			}
-
-			runnerLog.Debug("Resolved test cases", "transformation", u.Transformation.ID, "count", len(testCases))
+			log.Info("Testing transformation", "id", u.Transformation.ID, "name", u.Transformation.Name)
 
 			// Resolve transformation versionID (upload if modified, reuse existing otherwise)
 			transformationVersionID, err := r.resolveTransformationVersion(ctx, u, remoteState)
 			if err != nil {
 				errorsMutex.Lock()
-				errors = append(errors, fmt.Errorf("resolving transformation version for %s: %w", u.Transformation.ID, err))
+				errs = append(errs, fmt.Errorf("resolving transformation version for %s: %w", u.Transformation.ID, err))
 				errorsMutex.Unlock()
 				return
 			}
@@ -145,14 +141,14 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 			libraryVersionIDs := r.getLibraryVersionsForUnit(u, libraryVersionMap)
 
 			// Build test request
-			testReq := r.buildTestRequest(transformationVersionID, testCases, libraryVersionIDs)
+			testReq := r.buildTestRequest(transformationVersionID, unitTestCases[u.Transformation.ID], libraryVersionIDs)
 
 			// Run tests via API
-			runnerLog.Debug("Executing tests via API", "transformation", u.Transformation.ID)
+			log.Debug("Executing tests via API", "transformation", u.Transformation.ID)
 			results, err := r.store.BatchTest(ctx, testReq)
 			if err != nil {
 				errorsMutex.Lock()
-				errors = append(errors, fmt.Errorf("running tests for %s: %w", u.Transformation.ID, err))
+				errs = append(errs, fmt.Errorf("running tests for %s: %w", u.Transformation.ID, err))
 				errorsMutex.Unlock()
 				return
 			}
@@ -168,8 +164,8 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	wg.Wait()
 
 	// Check if any errors occurred
-	if len(errors) > 0 {
-		return nil, errors[0]
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	return &TestResults{Transformations: allResults}, nil
@@ -183,7 +179,7 @@ func (r *Runner) resolveTransformationVersion(ctx context.Context, unit *TestUni
 	// Check if transformation is modified
 	if unit.IsTransformationModified {
 		// Upload transformation (create or update as unpublished)
-		runnerLog.Debug("Uploading modified transformation", "transformation", unit.Transformation.ID)
+		log.Debug("Uploading modified transformation", "transformation", unit.Transformation.ID)
 		versionID, err := r.stagingMgr.StageTransformation(ctx, unit.Transformation, remoteState)
 		if err != nil {
 			return "", fmt.Errorf("uploading transformation %s: %w", unit.Transformation.ID, err)
@@ -202,7 +198,7 @@ func (r *Runner) resolveTransformationVersion(ctx context.Context, unit *TestUni
 		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", unit.Transformation.ID)
 	}
 
-	runnerLog.Debug("Reusing existing transformation version", "transformation", unit.Transformation.ID, "versionId", versionID)
+	log.Debug("Reusing existing transformation version", "transformation", unit.Transformation.ID, "versionId", versionID)
 	return versionID, nil
 }
 
@@ -238,7 +234,7 @@ func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPl
 
 		if libInfo.isModified {
 			// Upload library (create or update as unpublished)
-			runnerLog.Debug("Uploading modified library", "library", libID)
+			log.Debug("Uploading modified library", "library", libID)
 			versionID, err := r.stagingMgr.StageLibrary(ctx, libInfo.lib, remoteState)
 			if err != nil {
 				return nil, fmt.Errorf("uploading library %s: %w", libID, err)
@@ -256,7 +252,7 @@ func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPl
 				return nil, fmt.Errorf("library %s in remote state has no valid versionId", libID)
 			}
 
-			runnerLog.Debug("Reusing existing library version", "library", libID, "versionId", versionID)
+			log.Debug("Reusing existing library version", "library", libID, "versionId", versionID)
 			versionMap[libID] = versionID
 		}
 	}

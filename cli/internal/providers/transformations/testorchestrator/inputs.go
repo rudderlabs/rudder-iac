@@ -7,15 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
-
-var inputLog = logger.New("testorchestrator", logger.Attr{
-	Key:   "component",
-	Value: "inputs",
-})
 
 // TestCase represents a single test case with input events and expected output
 type TestCase struct {
@@ -24,21 +18,13 @@ type TestCase struct {
 	ExpectedOutput []any  // Expected output (nil if no output file)
 }
 
-// InputResolver resolves test cases from file system or falls back to defaults
-type InputResolver struct{}
-
-// NewInputResolver creates a new input resolver
-func NewInputResolver() *InputResolver {
-	return &InputResolver{}
-}
-
 // ResolveTestCases resolves test cases for a transformation.
 // It merges common and transformation-specific inputs, falling back to defaults if needed.
-func (r *InputResolver) ResolveTestCases(transformation *model.TransformationResource) ([]TestCase, error) {
+func ResolveTestCases(transformation *model.TransformationResource) ([]TestCase, error) {
 	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
-		inputLog.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
-		return r.buildDefaultTestCases()
+		log.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
+		return defaultTestCases()
 	}
 
 	// Check if any suite has input files
@@ -53,14 +39,14 @@ func (r *InputResolver) ResolveTestCases(transformation *model.TransformationRes
 
 	// If no input files found, use defaults with warning
 	if !hasInputFiles {
-		inputLog.Warn("No test input files found for transformation, using default events", "transformationID", transformation.ID)
-		return r.buildDefaultTestCases()
+		log.Warn("No test input files found for transformation, using default events", "transformationID", transformation.ID)
+		return defaultTestCases()
 	}
 
 	// Build test cases from all suites
 	var allTestCases []TestCase
 	for _, suite := range transformation.Tests {
-		testCases, err := r.buildTestCasesForSuite(suite, transformation.ID)
+		testCases, err := buildTestCasesForSuite(suite)
 		if err != nil {
 			return nil, fmt.Errorf("building test cases for suite %s: %w", suite.Name, err)
 		}
@@ -68,26 +54,22 @@ func (r *InputResolver) ResolveTestCases(transformation *model.TransformationRes
 	}
 
 	if len(allTestCases) == 0 {
-		inputLog.Warn("No test cases found, using default events", "transformationID", transformation.ID)
-		return r.buildDefaultTestCases()
+		log.Warn("No test cases found, using default events", "transformationID", transformation.ID)
+		return defaultTestCases()
 	}
 
 	return allTestCases, nil
 }
 
 // buildTestCasesForSuite builds test cases for a single suite
-func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, transformationID string) ([]TestCase, error) {
+func buildTestCasesForSuite(suite specs.TransformationTest) ([]TestCase, error) {
 	// SpecDir is populated by handler during spec resolution (Phase 1)
-	if suite.SpecDir == "" {
-		return nil, fmt.Errorf("SpecDir not populated for test suite %s", suite.Name)
-	}
-
 	inputDir := suite.Input
 	outputDir := suite.Output
 
 	// If input directory doesn't exist, skip this suite
 	if !dirExists(inputDir) {
-		inputLog.Debug("Input directory does not exist", "suite", suite.Name, "dir", inputDir)
+		log.Debug("Input directory does not exist", "suite", suite.Name, "dir", inputDir)
 		return nil, nil
 	}
 
@@ -99,7 +81,7 @@ func (r *InputResolver) buildTestCasesForSuite(suite specs.TransformationTest, t
 	}
 
 	if len(inputFiles) == 0 {
-		inputLog.Debug("No input files found for suite", "suite", suite.Name)
+		log.Debug("No input files found for suite", "suite", suite.Name)
 		return nil, nil
 	}
 
@@ -181,9 +163,9 @@ func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 	return merged, nil
 }
 
-// buildDefaultTestCases creates test cases from embedded default events
+// defaultTestCases creates test cases from embedded default events
 // All default events are included in a single test case's InputEvents array
-func (r *InputResolver) buildDefaultTestCases() ([]TestCase, error) {
+func defaultTestCases() ([]TestCase, error) {
 	defaultEvents := GetDefaultEvents()
 
 	// Collect all events into a single array
