@@ -57,13 +57,26 @@ from another.lib.sub import func
 			expected: []string{"mylib", "another"},
 		},
 		{
-			name: "Ignore comments",
+			name: "Ignore single-line comments",
 			code: `
 # import fake_lib
 import real_lib
+# from fake_lib2 import something
+from real_lib2 import func
+`,
+			expected: []string{"real_lib", "real_lib2"},
+		},
+		{
+			name: "Ignore multi-line string comments",
+			code: `
 """
-import another_fake
+import fake_lib
+from another_fake import something
 """
+import real_lib
+'''
+import yet_another_fake
+'''
 from real_lib2 import func
 `,
 			expected: []string{"real_lib", "real_lib2"},
@@ -199,6 +212,73 @@ validate_imports = True
 `,
 			expected: []string{"mylib", "another_lib"},
 		},
+		{
+			name: "Multi-line import with parentheses",
+			code: `
+from mylib import (
+    func1,
+    func2,
+    func3
+)
+import another_lib
+`,
+			expected: []string{"mylib", "another_lib"},
+		},
+		{
+			name: "Multi-line import with backslash",
+			code: `
+from mylib import func1, \
+    func2, \
+    func3
+import another_lib
+`,
+			expected: []string{"mylib", "another_lib"},
+		},
+		{
+			name: "Complex multi-line imports",
+			code: `
+from mylib import (
+    ClassA,
+    ClassB,
+    function_c,
+)
+from another import (item1, item2)
+import third_lib
+`,
+			expected: []string{"mylib", "another", "third_lib"},
+		},
+		{
+			name: "Import inside inline comment should be ignored",
+			code: `
+import real_lib  # import fake_lib
+from real_lib2 import func  # from fake import something
+`,
+			expected: []string{"real_lib", "real_lib2"},
+		},
+		{
+			name: "String containing import should be ignored",
+			code: `
+import real_lib
+code = "import fake_lib"
+template = 'from fake import something'
+`,
+			expected: []string{"real_lib"},
+		},
+		{
+			name: "Semicolon-separated imports",
+			code: `import json; import mylib`,
+			expected: []string{"mylib"},
+		},
+		{
+			name: "Import followed by statement with semicolon",
+			code: `import mylib; x = 1`,
+			expected: []string{"mylib"},
+		},
+		{
+			name: "Multiple semicolon-separated imports",
+			code: `import lib1; import lib2; from lib3 import func`,
+			expected: []string{"lib1", "lib2", "lib3"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -219,21 +299,32 @@ func TestPythonParser_ExtractImports_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "Invalid syntax - missing colon",
-			code: `def func()
-    pass`,
-			expectedErr: "expected ':'",
+			name:        "Relative import with single dot",
+			code:        `from . import util`,
+			expectedErr: "relative imports (from . or from ..) are not supported",
 		},
 		{
-			name:        "Invalid syntax - incomplete statement",
-			code:        `import`,
-			expectedErr: "invalid syntax",
+			name:        "Relative import with double dot",
+			code:        `from .. import config`,
+			expectedErr: "relative imports (from . or from ..) are not supported",
 		},
 		{
-			name: "Invalid syntax - bad indentation",
-			code: `def func():
-pass`,
-			expectedErr: "expected an indented block",
+			name:        "Relative import with submodule",
+			code:        `from ..pkg import mod`,
+			expectedErr: "relative imports (from . or from ..) are not supported",
+		},
+		{
+			name:        "Relative import with .module",
+			code:        `from .utils import helper`,
+			expectedErr: "relative imports (from . or from ..) are not supported",
+		},
+		{
+			name: "Mixed valid and relative imports",
+			code: `
+import mylib
+from . import util
+`,
+			expectedErr: "relative imports (from . or from ..) are not supported",
 		},
 	}
 
@@ -247,99 +338,7 @@ pass`,
 	}
 }
 
-func TestPythonParser_ValidateSyntax(t *testing.T) {
-	parser := &PythonParser{}
-
-	tests := []struct {
-		name    string
-		code    string
-		wantErr bool
-	}{
-		{
-			name:    "Valid Python - simple statement",
-			code:    `x = 1`,
-			wantErr: false,
-		},
-		{
-			name: "Valid Python - function definition",
-			code: `def transform_event(event):
-    return event`,
-			wantErr: false,
-		},
-		{
-			name: "Valid Python - complex code",
-			code: `
-import json
-
-def transform_event(event):
-    """Transform event data"""
-    data = json.loads(event)
-    return data
-`,
-			wantErr: false,
-		},
-		{
-			name: "Valid Python - class definition",
-			code: `class MyClass:
-    def __init__(self):
-        self.value = 42`,
-			wantErr: false,
-		},
-		{
-			name:    "Valid Python - list comprehension",
-			code:    `result = [x * 2 for x in range(10)]`,
-			wantErr: false,
-		},
-		{
-			name:    "Valid Python - dictionary",
-			code:    `data = {"key": "value", "number": 123}`,
-			wantErr: false,
-		},
-		{
-			name: "Invalid Python - missing colon",
-			code: `def func()
-    pass`,
-			wantErr: true,
-		},
-		{
-			name: "Invalid Python - bad indentation",
-			code: `def func():
-pass`,
-			wantErr: true,
-		},
-		{
-			name:    "Invalid Python - incomplete statement",
-			code:    `x = `,
-			wantErr: true,
-		},
-		{
-			name:    "Invalid Python - mismatched brackets",
-			code:    `data = [1, 2, 3`,
-			wantErr: true,
-		},
-		{
-			name: "Invalid Python - invalid syntax",
-			code: `def func():
-    return
-  invalid_indent`,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := parser.ValidateSyntax(tt.code)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "syntax error")
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestPythonParser_isPythonBaseWhitelist(t *testing.T) {
+func TestPythonParser_isPythonBuiltinModule(t *testing.T) {
 	tests := []struct {
 		module   string
 		expected bool
@@ -357,7 +356,7 @@ func TestPythonParser_isPythonBaseWhitelist(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.module, func(t *testing.T) {
-			result := isPythonBaseWhitelist(tt.module)
+			result := isPythonBuiltinModule(tt.module)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
