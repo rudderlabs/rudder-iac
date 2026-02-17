@@ -155,26 +155,6 @@ from mylib.submodule import func3
 			expected: []string{"mylib"},
 		},
 		{
-			name: "All base whitelist modules filtered",
-			code: `
-import ast
-import base64
-import collections
-import datetime
-import hashlib
-import json
-import math
-import random
-import re
-import string
-import time
-import uuid
-import copy
-import typing
-`,
-			expected: []string{},
-		},
-		{
 			name: "Constants and variables not included in imports",
 			code: `
 import json
@@ -265,18 +245,23 @@ template = 'from fake import something'
 			expected: []string{"real_lib"},
 		},
 		{
-			name: "Semicolon-separated imports",
-			code: `import json; import mylib`,
+			name:     "Semicolon-separated imports",
+			code:     `import json; import mylib`,
 			expected: []string{"mylib"},
 		},
 		{
-			name: "Import followed by statement with semicolon",
-			code: `import mylib; x = 1`,
+			name:     "Semicolon inside string should not split",
+			code:     `var a = "abc; import parse"`,
+			expected: []string{},
+		},
+		{
+			name:     "Import followed by statement with semicolon",
+			code:     `import mylib; x = 1`,
 			expected: []string{"mylib"},
 		},
 		{
-			name: "Multiple semicolon-separated imports",
-			code: `import lib1; import lib2; from lib3 import func`,
+			name:     "Multiple semicolon-separated imports",
+			code:     `import lib1; import lib2; from lib3 import func`,
 			expected: []string{"lib1", "lib2", "lib3"},
 		},
 	}
@@ -358,6 +343,263 @@ func TestPythonParser_isPythonBuiltinModule(t *testing.T) {
 		t.Run(tt.module, func(t *testing.T) {
 			result := isPythonBuiltinModule(tt.module)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSanitizeCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Remove single-line comment",
+			input:    "import mylib  # this is a comment",
+			expected: "import mylib  ",
+		},
+		{
+			name:     "Remove comment on its own line",
+			input:    "# comment\nimport mylib",
+			expected: "\nimport mylib",
+		},
+		{
+			name: "Remove triple double-quote docstring",
+			input: `"""
+This is a docstring
+"""
+import mylib`,
+			expected: "\nimport mylib",
+		},
+		{
+			name: "Remove triple single-quote docstring",
+			input: `'''
+This is a docstring
+'''
+import mylib`,
+			expected: "\nimport mylib",
+		},
+		{
+			name: "Remove inline triple double-quote",
+			input: `x = """some string"""
+import mylib`,
+			expected: "x = \nimport mylib",
+		},
+		{
+			name: "Remove inline triple single-quote",
+			input: `x = '''some string'''
+import mylib`,
+			expected: "x = \nimport mylib",
+		},
+		{
+			name: "Multiple comments removed",
+			input: `# first comment
+import lib1  # inline comment
+# another comment
+import lib2`,
+			expected: "\nimport lib1  \n\nimport lib2",
+		},
+		{
+			name: "Docstring with import inside should be removed",
+			input: `"""
+import fake_lib
+from another import something
+"""
+import real_lib`,
+			expected: "\nimport real_lib",
+		},
+		{
+			name:     "No comments - unchanged",
+			input:    "import mylib\nfrom another import func",
+			expected: "import mylib\nfrom another import func",
+		},
+		{
+			name:     "Double-quoted string content replaced",
+			input:    `x = "import fake; something"`,
+			expected: `x = ""`,
+		},
+		{
+			name:     "Single-quoted string content replaced",
+			input:    `x = 'import fake; something'`,
+			expected: `x = ''`,
+		},
+		{
+			name:     "Escaped quotes in string preserved",
+			input:    `x = "hello \"world\""`,
+			expected: `x = ""`,
+		},
+		{
+			name: "Multi-line string variable assignment",
+			input: `x = """
+import fake_lib
+from another import something
+"""
+import real_lib`,
+			expected: "x = \nimport real_lib",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeCode(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestNormalizeMultilineImports(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Single line import unchanged",
+			input:    "import mylib\n",
+			expected: "import mylib\n",
+		},
+		{
+			name:     "Backslash continuation joined",
+			input:    "from mylib import func1, \\\n    func2, \\\n    func3\n",
+			expected: "from mylib import func1,  func2,  func3\n",
+		},
+		{
+			name:     "Parentheses continuation joined",
+			input:    "from mylib import (\n    func1,\n    func2\n)\n",
+			expected: "from mylib import (     func1,     func2 )\n",
+		},
+		{
+			name:     "Mixed imports",
+			input:    "import simple\nfrom mylib import (\n    a,\n    b\n)\nimport another\n",
+			expected: "import simple\nfrom mylib import (     a,     b )\nimport another\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeMultilineImports(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseFromImport(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    string
+		expectedErr string
+	}{
+		{
+			name:     "Simple from import",
+			input:    "from mylib import func",
+			expected: "mylib",
+		},
+		{
+			name:     "From import with submodule",
+			input:    "from mylib.sub import func",
+			expected: "mylib.sub",
+		},
+		{
+			name:     "From import with multiple items",
+			input:    "from mylib import func1, func2",
+			expected: "mylib",
+		},
+		{
+			name:     "From import with star",
+			input:    "from mylib import *",
+			expected: "mylib",
+		},
+		{
+			name:     "From import with parentheses",
+			input:    "from mylib import (func1, func2)",
+			expected: "mylib",
+		},
+		{
+			name:     "Not a from import",
+			input:    "import mylib",
+			expected: "",
+		},
+		{
+			name:        "Relative import with dot",
+			input:       "from . import util",
+			expectedErr: "relative imports",
+		},
+		{
+			name:        "Relative import with double dot",
+			input:       "from ..pkg import mod",
+			expectedErr: "relative imports",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseFromImport(tt.input)
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestParseSimpleImport(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    []string
+		expectedErr string
+	}{
+		{
+			name:     "Single import",
+			input:    "import mylib",
+			expected: []string{"mylib"},
+		},
+		{
+			name:     "Multiple imports",
+			input:    "import lib1, lib2, lib3",
+			expected: []string{"lib1", "lib2", "lib3"},
+		},
+		{
+			name:     "Import with alias",
+			input:    "import mylib as ml",
+			expected: []string{"mylib"},
+		},
+		{
+			name:     "Multiple imports with aliases",
+			input:    "import lib1 as l1, lib2 as l2",
+			expected: []string{"lib1", "lib2"},
+		},
+		{
+			name:     "Import with submodule",
+			input:    "import mylib.submodule",
+			expected: []string{"mylib.submodule"},
+		},
+		{
+			name:     "Not an import statement",
+			input:    "from mylib import func",
+			expected: nil,
+		},
+		{
+			name:        "Relative import",
+			input:       "import .mylib",
+			expectedErr: "relative imports",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseSimpleImport(tt.input)
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
 		})
 	}
 }

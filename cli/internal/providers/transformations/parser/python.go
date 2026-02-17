@@ -20,13 +20,13 @@ func (p *PythonParser) ValidateSyntax(code string) error {
 // Uses regex-based extraction after stripping comments.
 // Handles multi-line imports with parentheses and backslash continuations.
 func (p *PythonParser) ExtractImports(code string) ([]string, error) {
-	// Step 1: Remove comments to avoid false positives
-	cleanCode := removeComments(code)
+	// Sanitize code to avoid false positives
+	cleanCode := sanitizeCode(code)
 
-	// Step 2: Normalize multi-line imports and split semicolon-separated statements
+	// Normalize multi-line imports and split semicolon-separated statements
 	normalizedCode := normalizeMultilineImports(cleanCode)
 
-	// Step 3: Extract imports using regex
+	// Extract imports using regex
 	modules, err := extractImportStatements(normalizedCode)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,6 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 		}
 	}
 
-	// Convert set to slice
 	var externalImports []string
 	for module := range moduleSet {
 		externalImports = append(externalImports, module)
@@ -50,165 +49,51 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 	return externalImports, nil
 }
 
-// removeComments strips Python comments from code
-// Handles: # single-line comments, """ and ''' multi-line strings/docstrings
-func removeComments(code string) string {
-	var result strings.Builder
-	lines := strings.Split(code, "\n")
+var (
+	tripleDoubleQuoteRe = regexp.MustCompile(`"""[\s\S]*?"""`)
+	tripleSingleQuoteRe = regexp.MustCompile(`'''[\s\S]*?'''`)
+	doubleQuoteStringRe = regexp.MustCompile(`"(?:[^"\\]|\\.)*"`)
+	singleQuoteStringRe = regexp.MustCompile(`'(?:[^'\\]|\\.)*'`)
+	singleLineCommentRe = regexp.MustCompile(`#[^\r\n]*`)
+)
 
-	inMultilineString := false
-	multilineDelimiter := ""
+// sanitizeCode removes comments and string contents that could contain false import statements.
+// Processing order matters: triple-quoted strings before single-quoted to handle nested quotes.
+func sanitizeCode(code string) string {
+	// Step 1: Remove triple-quoted strings (""" and ''')
+	code = tripleDoubleQuoteRe.ReplaceAllString(code, "")
+	code = tripleSingleQuoteRe.ReplaceAllString(code, "")
 
-	for _, line := range lines {
-		if inMultilineString {
-			// Check if this line ends the multi-line string
-			if idx := strings.Index(line, multilineDelimiter); idx != -1 {
-				inMultilineString = false
-				// Keep content after the closing delimiter
-				line = line[idx+3:]
-			} else {
-				// Skip entire line - still in multi-line string
-				result.WriteString("\n")
-				continue
-			}
-		}
+	// Step 2: Empty out single/double-quoted string contents (preserve quotes for structure)
+	code = doubleQuoteStringRe.ReplaceAllString(code, "\"\"")
+	code = singleQuoteStringRe.ReplaceAllString(code, "''")
 
-		// Process the line for comments and multi-line strings
-		processedLine := processLine(line, &inMultilineString, &multilineDelimiter)
-		result.WriteString(processedLine)
-		result.WriteString("\n")
-	}
+	// Step 3: Remove single-line comments (#...)
+	code = singleLineCommentRe.ReplaceAllString(code, "")
 
-	return result.String()
+	return code
 }
 
-// processLine handles single-line comment removal and multi-line string detection
-func processLine(line string, inMultilineString *bool, multilineDelimiter *string) string {
-	var result strings.Builder
-	i := 0
-	inString := false
-	stringChar := byte(0)
+var (
+	// Matches: from X import (\n...\n) - parentheses spanning multiple lines
+	parenImportRe = regexp.MustCompile(`(?m)((?:from|import)\s+[^(]*\([^)]*)\n([^)]*\))`)
 
-	for i < len(line) {
-		// Check for multi-line string start (""" or ''')
-		if !inString && i+2 < len(line) {
-			if (line[i] == '"' && line[i+1] == '"' && line[i+2] == '"') ||
-				(line[i] == '\'' && line[i+1] == '\'' && line[i+2] == '\'') {
-				delimiter := line[i : i+3]
-				// Check if it closes on the same line
-				closeIdx := strings.Index(line[i+3:], delimiter)
-				if closeIdx != -1 {
-					// Multi-line string opens and closes on same line - skip it
-					i = i + 3 + closeIdx + 3
-					continue
-				}
-				// Starts multi-line string that continues to next line
-				*inMultilineString = true
-				*multilineDelimiter = delimiter
-				return result.String()
-			}
-		}
+	// Matches: line ending with backslash continuation
+	backslashContinueRe = regexp.MustCompile(`(?m)\\\n\s*`)
+)
 
-		// Check for single-line string
-		if !inString && (line[i] == '"' || line[i] == '\'') {
-			inString = true
-			stringChar = line[i]
-			result.WriteByte(line[i])
-			i++
-			continue
-		}
-
-		// Check for end of single-line string
-		if inString && line[i] == stringChar {
-			// Check it's not escaped
-			escaped := false
-			j := i - 1
-			for j >= 0 && line[j] == '\\' {
-				escaped = !escaped
-				j--
-			}
-			if !escaped {
-				inString = false
-			}
-			result.WriteByte(line[i])
-			i++
-			continue
-		}
-
-		// Check for comment (only if not in string)
-		if !inString && line[i] == '#' {
-			// Rest of line is comment - stop processing
-			return result.String()
-		}
-
-		result.WriteByte(line[i])
-		i++
-	}
-
-	return result.String()
-}
-
-// normalizeMultilineImports joins multi-line imports into single lines
-// Handles: parentheses () and backslash \ continuations
+// normalizeMultilineImports joins multi-line imports into single lines.
+// Handles: parentheses () and backslash \ continuations.
 func normalizeMultilineImports(code string) string {
-	var result strings.Builder
-	lines := strings.Split(code, "\n")
+	// Join backslash-continued lines
+	code = backslashContinueRe.ReplaceAllString(code, " ")
 
-	i := 0
-	for i < len(lines) {
-		line := strings.TrimSpace(lines[i])
-
-		// Check if this is an import statement with parentheses
-		if (strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "from ")) &&
-			strings.Contains(line, "(") && !strings.Contains(line, ")") {
-			// Multi-line import with parentheses - collect until closing )
-			var combined strings.Builder
-			combined.WriteString(line)
-			i++
-			for i < len(lines) {
-				nextLine := strings.TrimSpace(lines[i])
-				combined.WriteString(" ")
-				combined.WriteString(nextLine)
-				if strings.Contains(nextLine, ")") {
-					break
-				}
-				i++
-			}
-			result.WriteString(combined.String())
-			result.WriteString("\n")
-			i++
-			continue
-		}
-
-		// Check for backslash continuation
-		if (strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "from ")) &&
-			strings.HasSuffix(line, "\\") {
-			var combined strings.Builder
-			combined.WriteString(strings.TrimSuffix(line, "\\"))
-			i++
-			for i < len(lines) {
-				nextLine := strings.TrimSpace(lines[i])
-				combined.WriteString(" ")
-				if before, ok := strings.CutSuffix(nextLine, "\\"); ok  {
-					combined.WriteString(before)
-					i++
-				} else {
-					combined.WriteString(nextLine)
-					break
-				}
-			}
-			result.WriteString(combined.String())
-			result.WriteString("\n")
-			i++
-			continue
-		}
-
-		result.WriteString(line)
-		result.WriteString("\n")
-		i++
+	// Join parentheses-continued imports (may need multiple passes for deeply nested)
+	for parenImportRe.MatchString(code) {
+		code = parenImportRe.ReplaceAllString(code, "$1 $2")
 	}
 
-	return result.String()
+	return code
 }
 
 // Regex patterns for Python imports
@@ -227,59 +112,78 @@ var (
 // extractImportStatements extracts module names from import statements
 func extractImportStatements(code string) ([]string, error) {
 	var modules []string
-	lines := strings.SplitSeq(code, "\n")
 
-	for line := range lines {
+	for line := range strings.SplitSeq(code, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" {
+
+		// Early skip: only process lines containing import statements
+		if !strings.Contains(line, "import") {
 			continue
 		}
 
 		// Split on semicolons to handle multiple statements on one line
 		for stmt := range strings.SplitSeq(line, ";") {
 			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
 
-			// Check for "from X import Y" pattern
-			if matches := fromImportPattern.FindStringSubmatch(stmt); matches != nil {
-				module := matches[1]
-				// Check for relative imports
-				if isRelativeImport(module) {
-					return nil, fmt.Errorf("relative imports (from . or from ..) are not supported")
+			switch {
+			case strings.HasPrefix(stmt, "from "):
+				module, err := parseFromImport(stmt)
+				if err != nil {
+					return nil, err
 				}
-				modules = append(modules, module)
-				continue
-			}
-
-			// Check for "import X, Y, Z" pattern
-			if matches := simpleImportPattern.FindStringSubmatch(stmt); matches != nil {
-				// Parse the imports (handles "import a, b as alias, c")
-				importPart := matches[1]
-				importPart = strings.ReplaceAll(importPart, "(", "")
-				importPart = strings.ReplaceAll(importPart, ")", "")
-
-				parts := strings.SplitSeq(importPart, ",")
-				for part := range parts {
-					part = strings.TrimSpace(part)
-					// Handle "module as alias" - extract just the module name
-					if asIdx := strings.Index(part, " as "); asIdx != -1 {
-						part = part[:asIdx]
-					}
-					part = strings.TrimSpace(part)
-					if part != "" {
-						// Check for relative imports
-						if isRelativeImport(part) {
-							return nil, fmt.Errorf("relative imports (from . or from ..) are not supported")
-						}
-						modules = append(modules, part)
-					}
+				if module != "" {
+					modules = append(modules, module)
 				}
+
+			case strings.HasPrefix(stmt, "import "):
+				parsed, err := parseSimpleImport(stmt)
+				if err != nil {
+					return nil, err
+				}
+				modules = append(modules, parsed...)
 			}
 		}
 	}
 
+	return modules, nil
+}
+
+// parseFromImport extracts the module name from "from X import Y" statement.
+func parseFromImport(stmt string) (string, error) {
+	matches := fromImportPattern.FindStringSubmatch(stmt)
+	if matches == nil {
+		return "", nil
+	}
+	module := matches[1]
+	if isRelativeImport(module) {
+		return "", fmt.Errorf("relative imports (from . or from ..) are not supported")
+	}
+	return module, nil
+}
+
+// parseSimpleImport extracts module names from "import X, Y as alias, Z" statement.
+func parseSimpleImport(stmt string) ([]string, error) {
+	matches := simpleImportPattern.FindStringSubmatch(stmt)
+	if matches == nil {
+		return nil, nil
+	}
+
+	importPart := strings.NewReplacer("(", "", ")", "").Replace(matches[1])
+
+	var modules []string
+	for part := range strings.SplitSeq(importPart, ",") {
+		part = strings.TrimSpace(part)
+		if idx := strings.Index(part, " as "); idx != -1 {
+			part = part[:idx]
+		}
+		if part == "" {
+			continue
+		}
+		if isRelativeImport(part) {
+			return nil, fmt.Errorf("relative imports (from . or from ..) are not supported")
+		}
+		modules = append(modules, part)
+	}
 	return modules, nil
 }
 
