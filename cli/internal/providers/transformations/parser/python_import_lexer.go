@@ -2,14 +2,16 @@ package parser
 
 import "strings"
 
-// importCandidate is a cleaned, single-statement line that contains the word "import".
+// importCandidate is a cleaned, single-statement line that contains a real import statement.
+// line is 1-based and refers to the first line of the original statement.
 type importCandidate struct {
 	text string
+	line int
 }
 
 // scanImportCandidates walks Python source code character-by-character, safely skipping
-// string literals (including all prefix variants: r, f, b, u, rb, br, etc.) and # comments,
-// then emits every logical statement that contains the word "import" as a candidate.
+// string literals (including all prefix variants: r, f, b, u, rb, br, rf, fr) and # comments,
+// then emits every logical statement that starts with "import" or "from" as a candidate.
 //
 // It handles:
 //   - Triple-quoted strings (""" / ''') with any string prefix
@@ -18,6 +20,7 @@ type importCandidate struct {
 //   - Implicit line continuation inside parentheses/brackets/braces
 //   - Explicit backslash line continuation
 //   - Semicolon-separated statements on a single line
+//   - One-line suites (if cond: import x → import x)
 func scanImportCandidates(code string) []importCandidate {
 	var candidates []importCandidate
 
@@ -26,76 +29,31 @@ func scanImportCandidates(code string) []importCandidate {
 
 	var buf strings.Builder
 	parenDepth := 0
+	line := 1
+	stmtLine := 1 // line where the current statement started
 	i := 0
-
-	flushStatement := func() {
-		stmt := strings.TrimSpace(buf.String())
-		buf.Reset()
-		if strings.Contains(stmt, "import") {
-			candidates = append(candidates, importCandidate{text: stmt})
-		}
-	}
 
 	for i < n {
 		ch := runes[i]
 
-		// --- String prefix detection (r, f, b, u, rb, br, rf, fr, ...) ---
-		// A string prefix is one or two letters immediately before a quote character.
-		// We detect it here so we can skip into the string body correctly.
-		if isStringPrefixStart(runes, i, n) {
-			// Consume prefix letters without adding them to buf
-			for i < n && isStringPrefixChar(runes[i]) {
-				i++
-			}
-			// Fall through to quote handling below
-			ch = runes[i]
+		// String prefix detection (r, f, b, u, rb, br, rf, fr, ...).
+		// Must be checked before quote handling so the prefix chars are consumed
+		// without entering the buffer, and the string body is properly skipped.
+		if isStringStart(runes, i, n) {
+			i = skipString(runes, i, n)
+			continue
 		}
 
 		switch {
-		// Triple-quoted string
-		case (ch == '"' || ch == '\'') && i+2 < n && runes[i+1] == ch && runes[i+2] == ch:
-			quote := ch
-			i += 3 // skip opening triple quote
-			for i < n {
-				if runes[i] == '\\' {
-					i += 2 // skip escaped char
-					continue
-				}
-				if runes[i] == quote && i+2 < n && runes[i+1] == quote && runes[i+2] == quote {
-					i += 3 // skip closing triple quote
-					break
-				}
-				i++
-			}
-
-		// Single-quoted string
-		case ch == '"' || ch == '\'':
-			quote := ch
-			i++ // skip opening quote
-			for i < n {
-				if runes[i] == '\\' {
-					i += 2 // skip escaped char
-					continue
-				}
-				if runes[i] == quote {
-					i++ // skip closing quote
-					break
-				}
-				i++
-			}
-
-		// Comment: skip to end of line
 		case ch == '#':
-			for i < n && runes[i] != '\n' {
-				i++
-			}
+			i = skipComment(runes, i, n)
 
-		// Backslash continuation: join with next line
 		case ch == '\\' && i+1 < n && runes[i+1] == '\n':
-			i += 2 // skip \ and newline — logical line continues
+			// Explicit backslash continuation: join with next line.
+			i += 2
+			line++
 			buf.WriteRune(' ')
 
-		// Open paren/bracket/brace: implicit continuation
 		case ch == '(' || ch == '[' || ch == '{':
 			parenDepth++
 			buf.WriteRune(ch)
@@ -108,19 +66,23 @@ func scanImportCandidates(code string) []importCandidate {
 			buf.WriteRune(ch)
 			i++
 
-		// Semicolon at depth 0: statement boundary
 		case ch == ';' && parenDepth == 0:
-			flushStatement()
+			candidates = emitCandidate(candidates, buf.String(), stmtLine)
+			buf.Reset()
+			stmtLine = line
 			i++
 
-		// Newline at depth 0: statement boundary
 		case ch == '\n' && parenDepth == 0:
-			flushStatement()
+			candidates = emitCandidate(candidates, buf.String(), stmtLine)
+			buf.Reset()
+			line++
+			stmtLine = line
 			i++
 
-		// Newline inside parens: implicit continuation — replace with space
 		case ch == '\n' && parenDepth > 0:
+			// Implicit continuation inside brackets: fold newline into space.
 			buf.WriteRune(' ')
+			line++
 			i++
 
 		default:
@@ -129,30 +91,142 @@ func scanImportCandidates(code string) []importCandidate {
 		}
 	}
 
-	// Flush any remaining content
-	flushStatement()
+	// Flush any statement not terminated by a newline or semicolon.
+	candidates = emitCandidate(candidates, buf.String(), stmtLine)
 
 	return candidates
 }
 
-// isStringPrefixStart returns true when position i is the start of a string prefix
-// (e.g. r, f, b, u, rb, br, rf, fr) immediately followed by a quote character,
-// but is NOT itself already inside a keyword or identifier (preceded by an alnum/_).
-func isStringPrefixStart(runes []rune, i, n int) bool {
+// emitCandidate converts a raw statement buffer into a candidate, if it is a valid
+// import statement. It filters out false positives (identifiers or strings containing
+// the word "import") and handles one-line suites (if cond: import x → import x).
+func emitCandidate(candidates []importCandidate, raw string, line int) []importCandidate {
+	text := strings.TrimSpace(raw)
+	if text == "" || !strings.Contains(text, "import") {
+		return candidates
+	}
+
+	// Extract the import statement from a one-line suite header (if cond: import x).
+	if !strings.HasPrefix(text, "import ") && !strings.HasPrefix(text, "from ") {
+		if idx := strings.LastIndex(text, ": "); idx != -1 {
+			after := strings.TrimSpace(text[idx+2:])
+			if strings.HasPrefix(after, "import ") || strings.HasPrefix(after, "from ") {
+				text = after
+			}
+		}
+	}
+
+	// Only emit real import statements — prevents false positives from identifiers
+	// like "importlib.load_module()" or assignments like "reimport = ...".
+	if strings.HasPrefix(text, "import ") || strings.HasPrefix(text, "from ") {
+		candidates = append(candidates, importCandidate{text: text, line: line})
+	}
+
+	return candidates
+}
+
+// isStringStart returns true when position i begins a Python string literal,
+// with or without a prefix (r, f, b, u, rb, br, rf, fr and their uppercase variants).
+//
+// Invalid prefix combinations (bu, uf, fb, etc.) are rejected to avoid false-matching
+// identifiers that happen to start with a prefix character (e.g. "buffer", "format").
+func isStringStart(runes []rune, i, n int) bool {
 	ch := runes[i]
-	if !isStringPrefixChar(ch) {
+
+	// Direct quote.
+	if ch == '"' || ch == '\'' {
+		return true
+	}
+
+	// Must not be mid-identifier — prefix chars preceded by an ident char are not prefixes.
+	if !isStringPrefixChar(ch) || (i > 0 && isIdentChar(runes[i-1])) {
 		return false
 	}
-	// Must not be mid-identifier
-	if i > 0 && isIdentChar(runes[i-1]) {
-		return false
+
+	// Single prefix + quote (e.g. r", f', b").
+	if i+1 < n && (runes[i+1] == '"' || runes[i+1] == '\'') {
+		return true
 	}
-	// Look ahead: up to 2 prefix chars followed by a quote
-	j := i
-	for j < n && j-i < 2 && isStringPrefixChar(runes[j]) {
-		j++
+
+	// Double prefix + quote (e.g. rb", rf', br").
+	if i+2 < n && isStringPrefixChar(runes[i+1]) && isValidDoublePrefix(ch, runes[i+1]) &&
+		(runes[i+2] == '"' || runes[i+2] == '\'') {
+		return true
 	}
-	return j < n && (runes[j] == '"' || runes[j] == '\'')
+
+	return false
+}
+
+// skipString advances past an entire Python string literal starting at i,
+// returning the position immediately after the closing quote.
+// It handles triple-quoted and single-quoted strings, with or without prefix chars.
+func skipString(runes []rune, i, n int) int {
+	// Consume string prefix chars (r, f, b, u, etc.) without adding to buffer.
+	for i < n && isStringPrefixChar(runes[i]) {
+		i++
+	}
+
+	if i >= n {
+		return i
+	}
+
+	quote := runes[i]
+
+	// Triple-quoted string.
+	if i+2 < n && runes[i+1] == quote && runes[i+2] == quote {
+		i += 3 // skip opening triple quote
+		for i < n {
+			if runes[i] == '\\' {
+				i += 2 // skip escape sequence (works for raw strings too)
+				continue
+			}
+			if runes[i] == quote && i+2 < n && runes[i+1] == quote && runes[i+2] == quote {
+				return i + 3 // skip closing triple quote
+			}
+			i++
+		}
+		return i
+	}
+
+	// Single-quoted string.
+	i++ // skip opening quote
+	for i < n {
+		if runes[i] == '\\' {
+			i += 2 // skip escape sequence
+			continue
+		}
+		if runes[i] == quote {
+			return i + 1 // skip closing quote
+		}
+		i++
+	}
+	return i
+}
+
+// skipComment advances past a # comment to the end of the line (leaving the \n for the
+// main loop to handle as a statement boundary).
+func skipComment(runes []rune, i, n int) int {
+	for i < n && runes[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+// isValidDoublePrefix reports whether (a, b) form a valid Python 3 two-char string prefix.
+// Valid pairs are: rb, br, rf, fr (and their uppercase variants).
+// Invalid combos like bu, uf, fb are rejected to avoid false-matching identifiers.
+func isValidDoublePrefix(a, b rune) bool {
+	al := toLower(a)
+	bl := toLower(b)
+	return (al == 'r' && bl == 'b') || (al == 'b' && bl == 'r') ||
+		(al == 'r' && bl == 'f') || (al == 'f' && bl == 'r')
+}
+
+func toLower(ch rune) rune {
+	if ch >= 'A' && ch <= 'Z' {
+		return ch + 32
+	}
+	return ch
 }
 
 func isStringPrefixChar(ch rune) bool {

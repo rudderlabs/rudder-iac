@@ -50,8 +50,10 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 }
 
 var (
-	tripleDoubleQuoteRe = regexp.MustCompile(`"""[\s\S]*?"""`)
-	tripleSingleQuoteRe = regexp.MustCompile(`'''[\s\S]*?'''`)
+	// Matches triple-quoted strings with optional string prefixes (r, f, b, u, rb, br, rf, fr, etc.)
+	// Examples: """abc""", r"""abc""", b"""abc""", rb"""abc""", f"""abc"""
+	tripleDoubleQuoteRe = regexp.MustCompile(`(?:[rRfFbBuU]{1,2})?"""[\s\S]*?"""`)
+	tripleSingleQuoteRe = regexp.MustCompile(`(?:[rRfFbBuU]{1,2})?'''[\s\S]*?'''`)
 	doubleQuoteStringRe = regexp.MustCompile(`"(?:[^"\\]|\\.)*"`)
 	singleQuoteStringRe = regexp.MustCompile(`'(?:[^'\\]|\\.)*'`)
 	singleLineCommentRe = regexp.MustCompile(`#[^\r\n]*`)
@@ -59,8 +61,9 @@ var (
 
 // sanitizeCode removes comments and string contents that could contain false import statements.
 // Processing order matters: triple-quoted strings before single-quoted to handle nested quotes.
+// Handles string prefixes: r, f, b, u, rb, br, rf, fr, etc. (e.g., r"""abc""", b"""abc""")
 func sanitizeCode(code string) string {
-	// Step 1: Remove triple-quoted strings (""" and ''')
+	// Step 1: Remove triple-quoted strings (""" and ''') with optional string prefixes
 	code = tripleDoubleQuoteRe.ReplaceAllString(code, "")
 	code = tripleSingleQuoteRe.ReplaceAllString(code, "")
 

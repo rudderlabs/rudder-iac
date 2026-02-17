@@ -18,7 +18,7 @@ func (p *PythonParser) ValidateSyntax(code string) error {
 }
 
 // ExtractImports parses Python source and returns the deduplicated, sorted list of
-// top-level external module names referenced by import statements.
+// top-level module names referenced by import statements.
 //
 // Relative imports are rejected with an error because transformations must use
 // absolute imports. Builtin/stdlib filtering is delegated to the provider layer.
@@ -27,11 +27,11 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 
 	moduleSet := make(map[string]struct{})
 	for _, c := range candidates {
-		text := trimSuitePrefix(c.text)
-		stmt, err := importParser.ParseString("", text)
+		stmt, err := importParser.ParseString("", c.text)
 		if err != nil {
-			// Not a valid import statement (e.g. "import" appears in an identifier
-			// or assignment). Skip rather than hard-fail.
+			// Candidate contains "import" but is not a valid import statement
+			// (e.g. "importlib.load_module()" slipped through the scanner filter).
+			// Skip rather than hard-fail.
 			continue
 		}
 
@@ -53,22 +53,6 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 	return result, nil
 }
 
-// trimSuitePrefix strips the compound-statement header that precedes an import
-// in a one-line suite (e.g. "if True: import x" → "import x").
-// Python allows any simple statement after a colon on the same line.
-func trimSuitePrefix(s string) string {
-	if strings.HasPrefix(s, "import ") || strings.HasPrefix(s, "from ") {
-		return s
-	}
-	if idx := strings.LastIndex(s, ":"); idx != -1 {
-		rest := strings.TrimSpace(s[idx+1:])
-		if strings.HasPrefix(rest, "import ") || strings.HasPrefix(rest, "from ") {
-			return rest
-		}
-	}
-	return s
-}
-
 // extractModules pulls top-level module names out of a parsed ImportStatement.
 // Returns an error when a relative import is detected.
 func extractModules(stmt *ImportStatement) ([]string, error) {
@@ -86,7 +70,7 @@ func extractFromImportModules(fi *FromImport) ([]string, error) {
 		return nil, fmt.Errorf("relative imports (from . or from ..) are not supported")
 	}
 	if fi.Module == nil {
-		// "from import ..." — malformed, skip
+		// Malformed statement — skip.
 		return nil, nil
 	}
 	// Return only the top-level package name (e.g. "mylib" from "mylib.sub").
@@ -100,8 +84,8 @@ func extractSimpleImportModules(si *SimpleImport) ([]string, error) {
 			continue
 		}
 		top := ma.Path.Parts[0]
-		// Relative simple imports (import .foo) are not valid Python syntax, but
-		// guard here for safety — the scanner won't emit them, but belt-and-suspenders.
+		// Relative simple imports (import .foo) are not valid Python syntax, but guard
+		// for safety since the scanner operates on text, not a verified AST.
 		if strings.HasPrefix(top, ".") {
 			return nil, fmt.Errorf("relative imports (from . or from ..) are not supported")
 		}

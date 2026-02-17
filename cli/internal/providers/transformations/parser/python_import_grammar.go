@@ -5,12 +5,13 @@ import (
 	"github.com/alecthomas/participle/v2/lexer"
 )
 
-// pythonImportLexer defines tokens for Python import statement syntax.
-// Keywords must appear before Ident so they are not consumed as identifiers.
+// pythonImportLexer uses a single Ident rule for all identifiers, including keywords.
+//
+// Keywords (from, import, as) are matched as literal values in the grammar rather than
+// as separate token types. This prevents the lexer from greedily splitting identifiers
+// like "importlib" into Import("import") + Ident("lib"), which would break parsing of
+// "import importlib".
 var pythonImportLexer = lexer.MustSimple([]lexer.SimpleRule{
-	{Name: "From", Pattern: `from`},
-	{Name: "Import", Pattern: `import`},
-	{Name: "As", Pattern: `as`},
 	{Name: "Ident", Pattern: `[a-zA-Z_]\w*`},
 	{Name: "Dot", Pattern: `\.`},
 	{Name: "Star", Pattern: `\*`},
@@ -20,10 +21,17 @@ var pythonImportLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: "Whitespace", Pattern: `\s+`},
 })
 
-// importParser is built once at init time and is safe for concurrent use.
+// importParser is built once and is safe for concurrent use.
+//
+// UseLookahead(MaxLookahead) enables full backtracking, which is needed for
+// FromImport: the optional @@? (ModulePath) may greedily consume "import" as an
+// identifier before the following "import" literal fails, requiring a backtrack.
+// Example: "from . import util" — ModulePath grabs "import", then "import" literal
+// fails, so participle must backtrack to Module=nil and re-match "import" correctly.
 var importParser = participle.MustBuild[ImportStatement](
 	participle.Lexer(pythonImportLexer),
 	participle.Elide("Whitespace"),
+	participle.UseLookahead(participle.MaxLookahead),
 )
 
 // ImportStatement is the top-level grammar node. Every candidate line is either
@@ -35,12 +43,17 @@ type ImportStatement struct {
 
 // FromImport represents: from [.]* [module] import (names | *)
 //
-// Dots is non-empty for relative imports (from . import x, from .. import y).
-// Module is nil when importing directly from a package (from . import x).
+// Dots captures leading dots for relative imports (e.g. from . or from ..).
+// Module is nil for bare relative imports like "from . import x".
+//
+// The grammar uses two alternatives to distinguish "from . import x" (no module)
+// from "from .pkg import x" or "from mylib import x" (with module path).
+// This avoids the ambiguity where @@? would consume "import" as a module name
+// before the following "import" literal fails.
 type FromImport struct {
 	Dots   []string    `"from" @Dot*`
-	Module *ModulePath `@@?`
-	Names  *ImportList `"import" @@`
+	Module *ModulePath `( @@ "import" | "import" )`
+	Names  *ImportList `@@`
 }
 
 // SimpleImport represents: import module1 [as alias], module2 ...
@@ -48,7 +61,7 @@ type SimpleImport struct {
 	Modules []ModuleAlias `"import" @@ ("," @@)*`
 }
 
-// ModulePath captures a dotted name such as "mylib", "mylib.sub.deep".
+// ModulePath captures a dotted name such as "mylib" or "mylib.sub.deep".
 type ModulePath struct {
 	Parts []string `@Ident ("." @Ident)*`
 }
@@ -60,7 +73,7 @@ type ModuleAlias struct {
 }
 
 // ImportList is what follows "import" in a from-import: either "*" or a
-// parenthesized/bare list of names, each optionally aliased.
+// parenthesized or bare list of names, each optionally aliased.
 type ImportList struct {
 	Star  bool         `( @"*"`
 	Names []ImportName `| "("? @@ ("," @@)* ","? ")"? )`

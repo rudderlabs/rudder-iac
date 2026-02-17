@@ -417,6 +417,25 @@ func TestScanImportCandidates(t *testing.T) {
 			input:    "x = 1\ny = 2\nz = x + y",
 			wantText: []string{},
 		},
+		// Prefixed triple-quoted strings (Python 3.11)
+		{
+			// Single prefix + triple: r/f/b + """ or '''
+			name:     "r-prefixed triple-quote string skipped",
+			input:    "x = r\"\"\"\nimport fake\n\"\"\"\nimport real",
+			wantText: []string{"import real"},
+		},
+		{
+			// Valid double prefix + triple: rb, br, rf, fr
+			name:     "rb-prefixed triple-quote string skipped",
+			input:    "x = rb\"\"\"\nimport fake\n\"\"\"\nimport real",
+			wantText: []string{"import real"},
+		},
+		{
+			// Invalid double prefix (bu) must not match — "buffer" is an identifier
+			name:     "identifier starting with prefix chars not mistaken for string",
+			input:    "buffer = 42\nimport real",
+			wantText: []string{"import real"},
+		},
 	}
 
 	for _, tt := range tests {
