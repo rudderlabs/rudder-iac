@@ -19,7 +19,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
-	transformationscmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -59,6 +59,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
+	transformationsCmd *cobra.Command
 )
 
 func init() {
@@ -95,7 +96,9 @@ func init() {
 	rootCmd.AddCommand(experimentalCmd)
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
-	rootCmd.AddCommand(transformationscmd.NewCmdTransformations())
+
+	transformationsCmd = transformations.NewCmdTransformations()
+	rootCmd.AddCommand(transformationsCmd)
 }
 
 func initConfig() {
@@ -110,6 +113,10 @@ func initConfig() {
 	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
 	if viper.GetBool("experimental") {
 		experimentalCmd.Hidden = false
+	}
+
+	if viper.GetBool("flags.transformations") {
+		transformationsCmd.Hidden = false
 	}
 }
 
