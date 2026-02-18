@@ -122,3 +122,77 @@ type ListModelsResponse struct {
 	Data   []Model       `json:"data"`
 	Paging client.Paging `json:"paging"`
 }
+
+// Relationship represents a relationship in the data graph
+type Relationship struct {
+	ID            string     `json:"id,omitempty"`
+	Name          string     `json:"name"`
+	Cardinality   string     `json:"cardinality"`
+	SourceModelID string     `json:"sourceModelId"`
+	TargetModelID string     `json:"targetModelId"`
+	SourceJoinKey string     `json:"sourceJoinKey"`
+	TargetJoinKey string     `json:"targetJoinKey"`
+	DataGraphID   string     `json:"dataGraphId,omitempty"`
+	WorkspaceID   string     `json:"workspaceId,omitempty"`
+	ExternalID    string     `json:"externalId,omitempty"`
+	CreatedAt     *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time `json:"updatedAt,omitempty"`
+}
+
+// ListRelationshipsRequest is the request for listing relationships
+type ListRelationshipsRequest struct {
+	DataGraphID   string
+	Page          int
+	PageSize      int
+	SourceModelID *string
+	HasExternalID *bool
+}
+
+// GetRelationshipRequest is the request for getting a relationship
+type GetRelationshipRequest struct {
+	DataGraphID    string
+	RelationshipID string
+}
+
+// CreateRelationshipRequest is the request for creating a relationship
+type CreateRelationshipRequest struct {
+	DataGraphID   string `json:"-"` // Path parameter
+	Name          string `json:"name"`
+	Cardinality   string `json:"cardinality"`
+	SourceModelID string `json:"sourceModelId"`
+	TargetModelID string `json:"targetModelId"`
+	SourceJoinKey string `json:"sourceJoinKey"`
+	TargetJoinKey string `json:"targetJoinKey"`
+	ExternalID    string `json:"externalId,omitempty"`
+}
+
+// UpdateRelationshipRequest is the request for updating a relationship
+type UpdateRelationshipRequest struct {
+	DataGraphID    string `json:"-"` // Path parameter
+	RelationshipID string `json:"-"` // Path parameter
+	Name           string `json:"name"`
+	Cardinality    string `json:"cardinality"`
+	SourceModelID  string `json:"sourceModelId"`
+	TargetModelID  string `json:"targetModelId"`
+	SourceJoinKey  string `json:"sourceJoinKey"`
+	TargetJoinKey  string `json:"targetJoinKey"`
+}
+
+// DeleteRelationshipRequest is the request for deleting a relationship
+type DeleteRelationshipRequest struct {
+	DataGraphID    string
+	RelationshipID string
+}
+
+// SetRelationshipExternalIDRequest is the request for setting a relationship's external ID
+type SetRelationshipExternalIDRequest struct {
+	DataGraphID    string
+	RelationshipID string
+	ExternalID     string
+}
+
+// ListRelationshipsResponse represents the paginated response from listing relationships
+type ListRelationshipsResponse struct {
+	Data   []Relationship `json:"data"`
+	Paging client.Paging  `json:"paging"`
+}

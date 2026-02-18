@@ -68,6 +68,17 @@ assert.Equal(t, "dg-123", result.ID)
 assert.Equal(t, "Test", result.Name)
 ```
 
+```go
+// Preferred
+assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
+
+// Avoid
+assert.Equal(t, "dg-123", result.ID)
+assert.Equal(t, "Test", result.Name)
+```
+
+> > > > > > > 03ec8f27 (feat(api): initial data-graph API client)
+
 ### Logging
 
 - Use `logger.New("pkg-name")` wrapper (writes to `~/.rudder/cli.log`)

@@ -230,13 +230,6 @@ func TestImport(t *testing.T) {
 				ExternalID: externalID,
 			}, nil
 		},
-		GetDataGraphFunc: func(ctx context.Context, id string) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "remote-1", id)
-			return &dgClient.DataGraph{
-				ID:         id,
-				ExternalID: "test-dg",
-			}, nil
-		},
 	}
 
 	h := &HandlerImpl{client: mockClient}
