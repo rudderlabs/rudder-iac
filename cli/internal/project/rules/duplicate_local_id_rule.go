@@ -87,7 +87,7 @@ func (r *duplicateLocalIDRule) ValidateProject(allSpecs map[string]*rules.Valida
 				results[loc.filePath] = append(results[loc.filePath], rules.ValidationResult{
 					Reference: loc.jsonPath,
 					Message: fmt.Sprintf(
-						"duplicate local id '%s' for kind '%s'",
+						"duplicate id '%s' for kind '%s'",
 						id,
 						kind,
 					),

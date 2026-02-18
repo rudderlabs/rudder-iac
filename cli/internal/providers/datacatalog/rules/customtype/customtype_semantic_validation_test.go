@@ -268,7 +268,7 @@ func TestCustomTypeSemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("single in graph — no false positive", func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestCustomTypeSemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "custom type with name 'ContactInfo' is not unique")
+		assert.Contains(t, results[0].Message, "duplicate name 'ContactInfo' within kind 'custom-types'")
 	})
 }
 

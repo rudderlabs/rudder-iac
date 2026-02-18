@@ -34,28 +34,28 @@ func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.Val
 	if ctx.Kind == "" {
 		results = append(results, rules.ValidationResult{
 			Reference: "/kind",
-			Message:   "kind is required",
+			Message:   "'kind' is required",
 		})
 	}
 
 	if ctx.Version == "" {
 		results = append(results, rules.ValidationResult{
 			Reference: "/version",
-			Message:   "version is required",
+			Message:   "'version' is required",
 		})
 	}
 
 	if len(ctx.Metadata) == 0 {
 		results = append(results, rules.ValidationResult{
 			Reference: "/metadata",
-			Message:   "metadata is required",
+			Message:   "'metadata' is required",
 		})
 	}
 
 	if len(ctx.Spec) == 0 {
 		results = append(results, rules.ValidationResult{
 			Reference: "/spec",
-			Message:   "spec is required",
+			Message:   "'spec' is required",
 		})
 	}
 

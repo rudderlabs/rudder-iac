@@ -19,31 +19,51 @@ var validateSourceSemantic = func(
 	spec esSource.SourceSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	results = append(results, validateTrackingPlanExists(spec, graph)...)
+	results = append(results, validateSourceNameUniqueness(spec, graph)...)
+
+	return results
+}
+
+// validateTrackingPlanExists checks that the referenced tracking plan exists in the graph.
+// Ref format is already validated by syntactic rules, so we only need to verify existence.
+func validateTrackingPlanExists(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
 	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
 		return nil
 	}
 
-	ref := spec.Governance.TrackingPlan.Ref
-	if ref == "" {
-		return nil
-	}
-
-	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(ref)
+	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(spec.Governance.TrackingPlan.Ref)
 	if len(matches) != 2 {
-		return []rules.ValidationResult{{
-			Reference: "/governance/validations/tracking_plan",
-			Message:   fmt.Sprintf("invalid tracking plan reference format: %s", ref),
-		}}
+		return nil
 	}
 
 	trackingPlanID := matches[1]
 	urn := resources.URN(trackingPlanID, types.TrackingPlanResourceType)
 
-	_, ok := graph.GetResource(urn)
-	if !ok {
+	if _, ok := graph.GetResource(urn); !ok {
 		return []rules.ValidationResult{{
 			Reference: "/governance/validations/tracking_plan",
 			Message:   fmt.Sprintf("tracking plan '%s' not found in the project", trackingPlanID),
+		}}
+	}
+
+	return nil
+}
+
+func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
+	countMap := make(map[string]int)
+	for _, resource := range graph.ResourcesByType(esSource.ResourceType) {
+		data := resource.Data()
+		name, _ := data["name"].(string)
+		countMap[name]++
+	}
+
+	if countMap[spec.Name] > 1 {
+		return []rules.ValidationResult{{
+			Reference: "/name",
+			Message:   fmt.Sprintf("duplicate name '%s' within kind 'event-stream-source'", spec.Name),
 		}}
 	}
 

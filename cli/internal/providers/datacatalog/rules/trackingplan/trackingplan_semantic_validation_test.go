@@ -674,7 +674,7 @@ func TestTrackingPlanSemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/display_name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "tracking plan with name 'Onboarding Plan' is not unique")
+		assert.Contains(t, results[0].Message, "duplicate display_name 'Onboarding Plan' within kind 'tp'")
 	})
 
 	t.Run("single in graph — no false positive", func(t *testing.T) {

@@ -58,7 +58,7 @@ func TestCategorySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/categories/0/name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("single category in graph — no false positive", func(t *testing.T) {
@@ -97,9 +97,9 @@ func TestCategorySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 2)
 		assert.Equal(t, "/categories/0/name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 		assert.Equal(t, "/categories/1/name", results[1].Reference)
-		assert.Contains(t, results[1].Message, "not unique across the catalog")
+		assert.Contains(t, results[1].Message, "duplicate name")
 	})
 
 	t.Run("mixed unique and duplicate — only duplicate flagged", func(t *testing.T) {
@@ -121,6 +121,6 @@ func TestCategorySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/categories/0/name", results[0].Reference)
-		assert.Contains(t, results[0].Message, "category with name 'User Actions' is not unique")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 }

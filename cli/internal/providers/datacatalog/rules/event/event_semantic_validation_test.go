@@ -167,7 +167,7 @@ func TestEventSemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/events/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("single track event in graph — no false positive", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestEventSemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/events/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("different non-track types — not duplicates", func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestEventSemanticValid_Uniqueness(t *testing.T) {
 		results := validateEventSemantic(localcatalog.KindEvents, specs.SpecVersionV0_1, nil, spec, graph)
 
 		require.Len(t, results, 2)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
-		assert.Contains(t, results[1].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
+		assert.Contains(t, results[1].Message, "duplicate name")
 	})
 }
