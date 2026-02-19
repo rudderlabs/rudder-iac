@@ -142,6 +142,68 @@ func TestCustomTypeValidation(t *testing.T) {
 				expectedErrs:  1,
 				errorContains: []string{"item_types must be an array"},
 			},
+			{
+				name: "object type with additionalProperties false is valid",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type",
+						Type:        "object",
+						Config: map[string]any{
+							"additionalProperties": false,
+						},
+					},
+				},
+				expectedErrs: 0,
+			},
+			{
+				name: "object type with additionalProperties true is valid",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type",
+						Type:        "object",
+						Config: map[string]any{
+							"additionalProperties": true,
+						},
+					},
+				},
+				expectedErrs: 0,
+			},
+			{
+				name: "object type with non-boolean additionalProperties is invalid",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type",
+						Type:        "object",
+						Config: map[string]any{
+							"additionalProperties": "false",
+						},
+					},
+				},
+				expectedErrs:  1,
+				errorContains: []string{"additionalProperties must be a boolean"},
+			},
+			{
+				name: "object type with disallowed config key is invalid",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type",
+						Type:        "object",
+						Config: map[string]any{
+							"someKey": "value",
+						},
+					},
+				},
+				expectedErrs:  1,
+				errorContains: []string{`config key "someKey" is not allowed on custom type of type object`},
+			},
 		}
 
 		for _, tc := range testCases {
