@@ -88,6 +88,7 @@ var validatePropertyConfig = func(Kind string, Version string, Metadata map[stri
 			types,
 			property.Config,
 			reference,
+			nil,
 		)
 
 		results = append(results, configResults...)
