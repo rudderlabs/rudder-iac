@@ -551,7 +551,7 @@ func TestValidateConfig(t *testing.T) {
 			"minLength": 5,
 			"maxLength": 10,
 		}
-		results := ValidateConfig([]string{"string"}, config, "/test")
+		results := ValidateConfig([]string{"string"}, config, "/test", nil)
 		assert.Empty(t, results)
 	})
 
@@ -562,7 +562,7 @@ func TestValidateConfig(t *testing.T) {
 				"minLength": 5,  // valid for string
 			}
 			// Both fields should be valid because union semantics
-			results := ValidateConfig([]string{"string", "integer"}, config, "/test")
+			results := ValidateConfig([]string{"string", "integer"}, config, "/test", nil)
 			assert.Empty(t, results)
 		})
 
@@ -570,7 +570,7 @@ func TestValidateConfig(t *testing.T) {
 			config := map[string]any{
 				"invalidKey": "value",
 			}
-			results := ValidateConfig([]string{"string", "integer"}, config, "/test")
+			results := ValidateConfig([]string{"string", "integer"}, config, "/test", nil)
 			require.Len(t, results, 1)
 			assert.Contains(t, results[0].Message, "'invalidKey' is not applicable")
 		})
@@ -580,7 +580,7 @@ func TestValidateConfig(t *testing.T) {
 		config := map[string]any{
 			"someKey": "value",
 		}
-		results := ValidateConfig([]string{"object"}, config, "/test")
+		results := ValidateConfig([]string{"object"}, config, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "config is not allowed")
 	})
@@ -589,13 +589,13 @@ func TestValidateConfig(t *testing.T) {
 		config := map[string]any{
 			"someKey": "value",
 		}
-		results := ValidateConfig([]string{"object", "null"}, config, "/test")
+		results := ValidateConfig([]string{"object", "null"}, config, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "config is not allowed")
 	})
 
 	t.Run("empty config is valid", func(t *testing.T) {
-		results := ValidateConfig([]string{"object"}, map[string]any{}, "/test")
+		results := ValidateConfig([]string{"object"}, map[string]any{}, "/test", nil)
 		assert.Empty(t, results)
 	})
 
@@ -603,7 +603,7 @@ func TestValidateConfig(t *testing.T) {
 		config := map[string]any{
 			"minLength": "invalid",
 		}
-		results := ValidateConfig([]string{"string"}, config, "/types/0/config")
+		results := ValidateConfig([]string{"string"}, config, "/types/0/config", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/config/minLength", results[0].Reference)
 	})
@@ -614,7 +614,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 		// Both string and integer validators recognize "enum" and report the same duplicate error.
 		// Without dedup, we'd get duplicate results.
-		results := ValidateConfig([]string{"string", "integer"}, config, "/test")
+		results := ValidateConfig([]string{"string", "integer"}, config, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/test/enum/2", results[0].Reference)
 		assert.Contains(t, results[0].Message, "'1' is a duplicate value")
@@ -624,7 +624,7 @@ func TestValidateConfig(t *testing.T) {
 		config := map[string]any{
 			"enum": "not-array",
 		}
-		results := ValidateConfig([]string{"string", "integer", "boolean"}, config, "/test")
+		results := ValidateConfig([]string{"string", "integer", "boolean"}, config, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "'enum' must be an array")
 	})
@@ -634,10 +634,43 @@ func TestValidateConfig(t *testing.T) {
 			"minLength": 10,
 			"maxLength": 5,
 		}
-		results := ValidateConfig([]string{"string"}, config, "/test")
+		results := ValidateConfig([]string{"string"}, config, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/test", results[0].Reference)
 		assert.Contains(t, results[0].Message, "minLength cannot be greater than maxLength")
 	})
 
+	t.Run("validator override replaces default for specified type", func(t *testing.T) {
+		// Override the object type with a string type validator that allows the 'format' field
+		overrides := map[string]TypeConfigValidator{
+			"object": &StringTypeConfig{},
+		}
+		config := map[string]any{
+			"format": "date",
+		}
+		results := ValidateConfig([]string{"object"}, config, "/test", overrides)
+		assert.Empty(t, results)
+	})
+
+	t.Run("validator override does not affect other types", func(t *testing.T) {
+		// add an override for object type but validate a number type
+		overrides := map[string]TypeConfigValidator{
+			"object": &StringTypeConfig{},
+		}
+		config := map[string]any{
+			"multipleOf": 5,
+		}
+		results := ValidateConfig([]string{"number"}, config, "/test", overrides)
+		assert.Empty(t, results)
+	})
+
+	t.Run("nil override falls back to default validators", func(t *testing.T) {
+		config := map[string]any{
+			"someKey": "value",
+		}
+		// object with nil override uses default ObjectTypeConfig — config not allowed
+		results := ValidateConfig([]string{"object"}, config, "/test", nil)
+		require.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "config is not allowed")
+	})
 }
