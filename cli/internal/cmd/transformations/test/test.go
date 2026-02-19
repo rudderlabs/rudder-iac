@@ -138,7 +138,7 @@ func NewCmdTest() *cobra.Command {
 				targetID = args[0]
 			}
 
-			runner := testorchestrator.NewRunner(deps, trProvider, graph, workspace.ID)
+			runner := testorchestrator.NewRunner(deps.Client(), trProvider, graph, workspace.ID)
 			results, err := runner.Run(ctx, mode, targetID)
 			if err != nil {
 				return fmt.Errorf("running tests: %w", err)

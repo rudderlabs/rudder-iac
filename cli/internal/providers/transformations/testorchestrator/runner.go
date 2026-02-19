@@ -4,304 +4,345 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/samber/lo"
+
+	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	transformationsprovider "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 var log = logger.New("testorchestrator")
 
 // Runner orchestrates the entire test execution flow
 type Runner struct {
-	deps        app.Deps
 	provider    *transformationsprovider.Provider
-	graph       *resources.Graph
 	store       transformations.TransformationStore
 	planner     *Planner
-	stagingMgr  *StagingManager
 	workspaceID string
 }
 
 // NewRunner creates a new test runner
-func NewRunner(deps app.Deps, provider *transformationsprovider.Provider, graph *resources.Graph, workspaceID string) *Runner {
-	store := transformations.NewRudderTransformationStore(deps.Client())
+func NewRunner(client *client.Client, provider *transformationsprovider.Provider, graph *resources.Graph, workspaceID string) *Runner {
+	store := transformations.NewRudderTransformationStore(client)
 
 	return &Runner{
-		deps:        deps,
 		provider:    provider,
-		graph:       graph,
 		store:       store,
 		planner:     NewPlanner(graph),
-		stagingMgr:  NewStagingManager(store),
 		workspaceID: workspaceID,
 	}
 }
 
-// TestResults contains the results of all test executions
-type TestResults struct {
-	Transformations []*transformations.TransformationTestResult
+// TransformationTestWithDefinitions combines test results with their original definitions
+type TransformationTestWithDefinitions struct {
+	Result      *transformations.TransformationTestResult
+	Definitions []*transformations.TestDefinition
 }
 
-// HasFailures checks if any tests failed or errored
+// TestResults contains the results of all test executions with their definitions
+type TestResults struct {
+	Pass            bool
+	Message         string
+	Libraries       []transformations.LibraryTestResult
+	Transformations []*TransformationTestWithDefinitions
+}
+
+// HasFailures computes whether any tests failed or errored
 func (r *TestResults) HasFailures() bool {
-	for _, tr := range r.Transformations {
-		for _, testResult := range tr.TestSuiteResult.Results {
-			if testResult.Status == transformations.TestRunStatusFail || testResult.Status == transformations.TestRunStatusError {
-				return true
-			}
-		}
+	if lo.ContainsBy(r.Libraries, func(lib transformations.LibraryTestResult) bool {
+		return !lib.Pass
+	}) {
+		return true
 	}
-	return false
+
+	return lo.ContainsBy(r.Transformations, func(tr *TransformationTestWithDefinitions) bool {
+		return lo.ContainsBy(tr.Result.TestSuiteResult.Results, func(res transformations.TestResult) bool {
+			return res.Status == transformations.TestRunStatusFail || res.Status == transformations.TestRunStatusError
+		})
+	})
 }
 
 // Run executes tests based on the specified mode and returns results
 func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResults, error) {
 	log.Info("Starting test run", "mode", mode, "targetID", targetID)
 
-	// Load remote resources
-	log.Debug("Loading remote resources")
+	// build remote resources graph
 	remoteResources, err := r.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
 	}
 
-	// Build remote state
-	log.Debug("Building remote state")
 	remoteState, err := r.provider.MapRemoteToState(remoteResources)
 	if err != nil {
 		return nil, fmt.Errorf("building remote state: %w", err)
 	}
 
-	// Convert remote state to graph for diffing
 	remoteGraph := syncer.StateToGraph(remoteState)
 
-	// Build test plan
 	log.Debug("Building test plan")
 	testPlan, err := r.planner.BuildPlan(ctx, remoteGraph, mode, targetID, r.workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("building test plan: %w", err)
 	}
 
-	if len(testPlan.TestUnits) == 0 {
-		log.Info("No transformations to test")
-		return &TestResults{Transformations: []*transformations.TransformationTestResult{}}, nil
+	if len(testPlan.TestUnits) == 0 && len(testPlan.StandaloneLibraries) == 0 {
+		log.Info("No resources to test")
+		return &TestResults{Pass: true}, nil
 	}
 
-	log.Info("Test plan created", "testUnits", len(testPlan.TestUnits))
+	log.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
 
-	// Resolve library versions once for all test units (libraries can be shared)
+	// Resolve library and transformation versions once before parallel execution
 	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteState)
 	if err != nil {
 		return nil, fmt.Errorf("resolving library versions: %w", err)
 	}
 
-	// Resolve test cases for all units before parallel execution
-	unitTestCases := make(map[string][]TestCase)
+	transformationVersionMap, err := r.resolveAllTransformationVersions(ctx, testPlan, remoteState)
+	if err != nil {
+		return nil, fmt.Errorf("resolving transformation versions: %w", err)
+	}
+
+	// Build test unit tasks with pre-resolved versions and test definitions
+	unitTasks := make([]*testUnitTask, 0, len(testPlan.TestUnits))
 	for _, unit := range testPlan.TestUnits {
-		testCases, err := ResolveTestCases(unit.Transformation)
+		testDefs, err := ResolveTestCases(unit.Transformation)
 		if err != nil {
 			return nil, fmt.Errorf("resolving test cases for %s: %w", unit.Transformation.ID, err)
 		}
-		log.Debug("Resolved test cases", "transformation", unit.Transformation.ID, "count", len(testCases))
-		unitTestCases[unit.Transformation.ID] = testCases
+		log.Debug("Resolved test definitions", "transformation", unit.Transformation.ID, "count", len(testDefs))
+
+		transformationVersionID, ok := transformationVersionMap[unit.Transformation.ID]
+		if !ok {
+			return nil, fmt.Errorf("transformation version not resolved for %s", unit.Transformation.ID)
+		}
+
+		unitTasks = append(unitTasks, &testUnitTask{
+			unit:                  unit,
+			testDefs:              testDefs,
+			transformationVersion: transformationVersionID,
+			libraryVersionIDs:     getLibraryVersionsForUnit(unit, libraryVersionMap),
+		})
 	}
 
-	// Execute tests in parallel using WaitGroup
-	var wg sync.WaitGroup
-	resultsMu := sync.Mutex{}
-	var allResults []*transformations.TransformationTestResult
-	var errs []error
-	errorsMutex := sync.Mutex{}
-
-	for _, unit := range testPlan.TestUnits {
-		unit := unit // Capture loop variable
-		wg.Add(1)
-		go func(u *TestUnit) {
-			defer wg.Done()
-
-			log.Info("Testing transformation", "id", u.Transformation.ID, "name", u.Transformation.Name)
-
-			// Resolve transformation versionID (upload if modified, reuse existing otherwise)
-			transformationVersionID, err := r.resolveTransformationVersion(ctx, u, remoteState)
-			if err != nil {
-				errorsMutex.Lock()
-				errs = append(errs, fmt.Errorf("resolving transformation version for %s: %w", u.Transformation.ID, err))
-				errorsMutex.Unlock()
-				return
-			}
-
-			// Get library versionIDs for this transformation's dependencies
-			libraryVersionIDs := r.getLibraryVersionsForUnit(u, libraryVersionMap)
-
-			// Build test request
-			testReq := r.buildTestRequest(transformationVersionID, unitTestCases[u.Transformation.ID], libraryVersionIDs)
-
-			// Run tests via API
-			log.Debug("Executing tests via API", "transformation", u.Transformation.ID)
-			results, err := r.store.BatchTest(ctx, testReq)
-			if err != nil {
-				errorsMutex.Lock()
-				errs = append(errs, fmt.Errorf("running tests for %s: %w", u.Transformation.ID, err))
-				errorsMutex.Unlock()
-				return
-			}
-
-			// Safely append results
-			resultsMu.Lock()
-			allResults = append(allResults, results...)
-			resultsMu.Unlock()
-		}(unit)
-	}
-
-	// Wait for all tests to complete
-	wg.Wait()
-
-	// Check if any errors occurred
+	unitResults, errs := r.runTestUnitTasks(ctx, unitTasks)
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
 
-	return &TestResults{Transformations: allResults}, nil
-}
+	var (
+		allResults []*TransformationTestWithDefinitions
+		allLibs    []transformations.LibraryTestResult
+	)
+	for _, ur := range unitResults {
+		allResults = append(allResults, ur.Transformations...)
+		allLibs = append(allLibs, ur.Libraries...)
+	}
 
-// resolveTransformationVersion resolves the versionID for a transformation
-// Modified transformations are uploaded as unpublished versions, unmodified transformations reuse existing versionIDs
-func (r *Runner) resolveTransformationVersion(ctx context.Context, unit *TestUnit, remoteState *state.State) (string, error) {
-	transformationURN := resources.URN(unit.Transformation.ID, "transformation")
-
-	// Check if transformation is modified
-	if unit.IsTransformationModified {
-		// Upload transformation (create or update as unpublished)
-		log.Debug("Uploading modified transformation", "transformation", unit.Transformation.ID)
-		versionID, err := r.stagingMgr.StageTransformation(ctx, unit.Transformation, remoteState)
+	// Execute standalone library tests (libraries not connected to any transformation)
+	if len(testPlan.StandaloneLibraries) > 0 {
+		libResults, trResults, err := r.testStandaloneLibraries(ctx, testPlan.StandaloneLibraries, libraryVersionMap)
 		if err != nil {
-			return "", fmt.Errorf("uploading transformation %s: %w", unit.Transformation.ID, err)
+			return nil, fmt.Errorf("testing standalone libraries: %w", err)
 		}
-		return versionID, nil
+		allLibs = append(allLibs, libResults...)
+		allResults = append(allResults, trResults...)
 	}
 
-	// Reuse existing versionID from remote state
-	remoteResource := remoteState.GetResource(transformationURN)
-	if remoteResource == nil {
-		return "", fmt.Errorf("unmodified transformation %s not found in remote state", unit.Transformation.ID)
+	results := &TestResults{
+		Libraries:       allLibs,
+		Transformations: allResults,
 	}
+	results.Pass = !results.HasFailures()
 
-	versionID, ok := remoteResource.Output["versionId"].(string)
-	if !ok || versionID == "" {
-		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", unit.Transformation.ID)
-	}
-
-	log.Debug("Reusing existing transformation version", "transformation", unit.Transformation.ID, "versionId", versionID)
-	return versionID, nil
+	return results, nil
 }
 
-type libraryInfo struct {
-	lib        *model.LibraryResource
-	isModified bool
-}
-
-// resolveAllLibraryVersions resolves versionIDs for all unique libraries in the test plan
-// Modified libraries are uploaded as unpublished versions, unmodified libraries reuse existing versionIDs
-// Returns a map of library ID to versionID
-func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
-	versionMap := make(map[string]string)
-
-	// Collect all unique libraries from all test units
-	uniqueLibraries := make(map[string]*libraryInfo)
+// resolveAllTransformationVersions resolves versionIDs for all unique transformations in the test plan.
+// Modified transformations are staged as unpublished versions; unmodified ones reuse existing versionIDs.
+// Returns a map of transformation ID to versionID.
+func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
+	seen := make(map[string]struct{})
+	tasks := make([]*transformationVersionTask, 0, len(testPlan.TestUnits))
 
 	for _, unit := range testPlan.TestUnits {
-		for _, lib := range unit.Libraries {
-			libURN := resources.URN(lib.ID, "transformation-library")
-			if _, exists := uniqueLibraries[lib.ID]; !exists {
-				uniqueLibraries[lib.ID] = &libraryInfo{
-					lib:        lib,
-					isModified: unit.IsLibraryModified(libURN),
-				}
-			}
+		if _, exists := seen[unit.Transformation.ID]; exists {
+			continue
 		}
-	}
+		seen[unit.Transformation.ID] = struct{}{}
 
-	// Resolve each unique library once
-	for libID, libInfo := range uniqueLibraries {
-		libURN := resources.URN(libID, "transformation-library")
+		transformationURN := resources.URN(unit.Transformation.ID, "transformation")
+		remoteResource := remoteState.GetResource(transformationURN)
+		isModified := testPlan.IsTransformationModified(transformationURN)
 
-		if libInfo.isModified {
-			// Upload library (create or update as unpublished)
-			log.Debug("Uploading modified library", "library", libID)
-			versionID, err := r.stagingMgr.StageLibrary(ctx, libInfo.lib, remoteState)
-			if err != nil {
-				return nil, fmt.Errorf("uploading library %s: %w", libID, err)
-			}
-			versionMap[libID] = versionID
-		} else {
-			// Reuse existing versionID from remote state
-			remoteResource := remoteState.GetResource(libURN)
-			if remoteResource == nil {
-				return nil, fmt.Errorf("unmodified library %s not found in remote state", libID)
-			}
-
-			versionID, ok := remoteResource.Output["versionId"].(string)
-			if !ok || versionID == "" {
-				return nil, fmt.Errorf("library %s in remote state has no valid versionId", libID)
-			}
-
-			log.Debug("Reusing existing library version", "library", libID, "versionId", versionID)
-			versionMap[libID] = versionID
-		}
-	}
-
-	return versionMap, nil
-}
-
-// getLibraryVersionsForUnit extracts library versionIDs for a specific test unit
-func (r *Runner) getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map[string]string) []string {
-	var versionIDs []string
-	for _, lib := range unit.Libraries {
-		if versionID, exists := libraryVersionMap[lib.ID]; exists {
-			versionIDs = append(versionIDs, versionID)
-		}
-	}
-	return versionIDs
-}
-
-// buildTestRequest constructs the batch test API request using client types
-func (r *Runner) buildTestRequest(transformationVersionID string, testCases []TestCase, libraryVersionIDs []string) *transformations.BatchTestRequest {
-	// Build test definitions from test cases
-	testDefinitions := make([]transformations.TestDefinition, len(testCases))
-	for i, tc := range testCases {
-		testDefinitions[i] = transformations.TestDefinition{
-			Name:           tc.Name,
-			Input:          tc.InputEvents,
-			ExpectedOutput: tc.ExpectedOutput,
-		}
-	}
-
-	// Build transformation test input
-	transformationInputs := []transformations.TransformationTestInput{
-		{
-			VersionID: transformationVersionID,
-			TestSuite: testDefinitions,
-		},
-	}
-
-	// Build library inputs from version IDs
-	var libraryInputs []transformations.LibraryTestInput
-	for _, versionID := range libraryVersionIDs {
-		libraryInputs = append(libraryInputs, transformations.LibraryTestInput{
-			VersionID: versionID,
+		tasks = append(tasks, &transformationVersionTask{
+			transformation: unit.Transformation,
+			isModified:     isModified,
+			remoteResource: remoteResource,
 		})
 	}
 
-	// Build request
-	return &transformations.BatchTestRequest{
-		Transformations: transformationInputs,
-		Libraries:       libraryInputs,
+	return runTransformationVersionTasks(ctx, r.store, tasks)
+}
+
+// resolveTransformationVersionFromTask resolves a single transformation's versionID
+// resolveAllLibraryVersions resolves versionIDs for all unique libraries in the test plan,
+// including both transformation-dependent and standalone libraries.
+// Returns a map of library ID to versionID.
+func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
+	allLibs := lo.FlatMap(testPlan.TestUnits, func(u *TestUnit, _ int) []*model.LibraryResource {
+		return u.Libraries
+	})
+	allLibs = append(allLibs, testPlan.StandaloneLibraries...)
+
+	uniqueLibraries := make(map[string]struct{})
+	libraryTasks := make([]*libraryVersionTask, 0, len(allLibs))
+
+	for _, lib := range allLibs {
+		if _, exists := uniqueLibraries[lib.ID]; exists {
+			continue
+		}
+		uniqueLibraries[lib.ID] = struct{}{}
+
+		libURN := resources.URN(lib.ID, "transformation-library")
+		remoteResource := remoteState.GetResource(libURN)
+		isModified := testPlan.IsLibraryModified(libURN)
+
+		libraryTasks = append(libraryTasks, &libraryVersionTask{
+			lib:            lib,
+			isModified:     isModified,
+			remoteResource: remoteResource,
+		})
 	}
+
+	return runLibraryVersionTasks(ctx, r.store, libraryTasks)
+}
+
+// getLibraryVersionsForUnit extracts library versionIDs for a specific test unit
+func getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map[string]string) []string {
+	return lo.FilterMap(unit.Libraries, func(lib *model.LibraryResource, _ int) (string, bool) {
+		versionID, exists := libraryVersionMap[lib.ID]
+		return versionID, exists
+	})
+}
+
+// buildTestRequest constructs the batch test API request
+func buildTestRequest(transformationVersionID string, testDefs []*transformations.TestDefinition, libraryVersionIDs []string) *transformations.BatchTestRequest {
+	libraryInputs := lo.Map(libraryVersionIDs, func(vid string, _ int) transformations.LibraryTestInput {
+		return transformations.LibraryTestInput{VersionID: vid}
+	})
+
+	// Convert pointers to values for JSON serialization
+	testSuite := lo.Map(testDefs, func(td *transformations.TestDefinition, _ int) transformations.TestDefinition {
+		return *td
+	})
+
+	return &transformations.BatchTestRequest{
+		Transformations: []transformations.TransformationTestInput{
+			{
+				VersionID: transformationVersionID,
+				TestSuite: testSuite,
+			},
+		},
+		Libraries: libraryInputs,
+	}
+}
+
+// runTestUnitTasks executes all test units concurrently via the tasker framework.
+// Returns per-unit results and any errors encountered.
+func (r *Runner) runTestUnitTasks(ctx context.Context, unitTasks []*testUnitTask) ([]*testUnitResult, []error) {
+	tasks := make([]tasker.Task, 0, len(unitTasks))
+	for _, t := range unitTasks {
+		tasks = append(tasks, t)
+	}
+
+	results := tasker.NewResults[*testUnitResult]()
+	errs := tasker.RunTasks(
+		ctx,
+		tasks,
+		concurrency,
+		true, // continue on failure so all units run
+		r.runTestUnitTask(ctx, results),
+	)
+
+	unitResults := make([]*testUnitResult, 0, len(unitTasks))
+	for _, key := range results.GetKeys() {
+		result, ok := results.Get(key)
+		if ok {
+			unitResults = append(unitResults, result)
+		}
+	}
+
+	return unitResults, errs
+}
+
+func (r *Runner) runTestUnitTask(ctx context.Context, results *tasker.Results[*testUnitResult]) func(task tasker.Task) error {
+	return func(task tasker.Task) error {
+		unitTask, ok := task.(*testUnitTask)
+		if !ok {
+			return fmt.Errorf("task is not a test unit task")
+		}
+
+		log.Info("Testing transformation", "id", unitTask.unit.Transformation.ID, "name", unitTask.unit.Transformation.Name)
+
+		testReq := buildTestRequest(unitTask.transformationVersion, unitTask.testDefs, unitTask.libraryVersionIDs)
+
+		log.Debug("Executing tests via API", "transformation", unitTask.unit.Transformation.ID)
+		resp, err := r.store.BatchTest(ctx, testReq)
+		if err != nil {
+			return fmt.Errorf("running tests for %s: %w", unitTask.unit.Transformation.ID, err)
+		}
+
+		result := &testUnitResult{
+			Libraries: resp.ValidationOutput.Libraries,
+		}
+		for i := range resp.ValidationOutput.Transformations {
+			result.Transformations = append(result.Transformations, &TransformationTestWithDefinitions{
+				Result:      &resp.ValidationOutput.Transformations[i],
+				Definitions: unitTask.testDefs,
+			})
+		}
+
+		results.Store(unitTask.Id(), result)
+		return nil
+	}
+}
+
+// testStandaloneLibraries executes a batch test for libraries not connected to any transformation.
+// The API may return transformation results for remote transformations connected to these libraries.
+func (r *Runner) testStandaloneLibraries(ctx context.Context, libs []*model.LibraryResource, libraryVersionMap map[string]string) ([]transformations.LibraryTestResult, []*TransformationTestWithDefinitions, error) {
+	libInputs := lo.FilterMap(libs, func(lib *model.LibraryResource, _ int) (transformations.LibraryTestInput, bool) {
+		versionID, exists := libraryVersionMap[lib.ID]
+		return transformations.LibraryTestInput{VersionID: versionID}, exists
+	})
+
+	if len(libInputs) == 0 {
+		return nil, nil, nil
+	}
+
+	log.Info("Testing standalone libraries", "count", len(libInputs))
+
+	resp, err := r.store.BatchTest(ctx, &transformations.BatchTestRequest{
+		Libraries: libInputs,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("running standalone library tests: %w", err)
+	}
+
+	// Collect transformation results from the API response (remote transformations connected to these libraries)
+	var trResults []*TransformationTestWithDefinitions
+	for i := range resp.ValidationOutput.Transformations {
+		trResults = append(trResults, &TransformationTestWithDefinitions{
+			Result: &resp.ValidationOutput.Transformations[i],
+		})
+	}
+
+	return resp.ValidationOutput.Libraries, trResults, nil
 }
