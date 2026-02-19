@@ -363,7 +363,8 @@ func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
 			}
 		}
 
-		_, missingInSpec := lo.Difference(parsed.ExternalIDs, metadataIds)
+		specIDs := lo.Map(parsed.LocalIDs, func(l specs.LocalID, _ int) string { return l.ID })
+		_, missingInSpec := lo.Difference(specIDs, metadataIds)
 		if len(missingInSpec) > 0 {
 			return fmt.Errorf("local_id from import metadata missing in spec: %s", strings.Join(missingInSpec, ", "))
 		}

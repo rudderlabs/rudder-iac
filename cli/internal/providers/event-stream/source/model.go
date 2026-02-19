@@ -63,46 +63,48 @@ var sourceDefinitions = []string{
 	"unity",
 }
 
-// YAML structs
-type sourceSpec struct {
-	LocalId          string                `mapstructure:"id"`
-	Name             string                `mapstructure:"name"`
-	SourceDefinition string                `mapstructure:"type"`
-	Enabled          *bool                 `mapstructure:"enabled"`
-	Governance       *sourceGovernanceSpec `mapstructure:"governance"`
+// SourceSpec mirrors the YAML spec structure. JSON tags enable the typed rule engine's
+// json.Marshal/Unmarshal round-trip; validate tags drive go-playground/validator checks.
+// Pointer fields let the validator skip inner required tags when the parent block is absent.
+type SourceSpec struct {
+	LocalID          string                `json:"id"         mapstructure:"id"         validate:"required"`
+	Name             string                `json:"name"       mapstructure:"name"       validate:"required"`
+	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity"`
+	Enabled          *bool                 `json:"enabled"    mapstructure:"enabled"`
+	Governance       *SourceGovernanceSpec `json:"governance" mapstructure:"governance"`
 }
 
-type sourceGovernanceSpec struct {
-	TrackingPlan *trackingPlanSpec `mapstructure:"validations"`
+type SourceGovernanceSpec struct {
+	TrackingPlan *TrackingPlanSpec `json:"validations" mapstructure:"validations"`
 }
 
-type trackingPlanSpec struct {
-	Ref    string                  `mapstructure:"tracking_plan"`
-	Config *trackingPlanConfigSpec `mapstructure:"config"`
+type TrackingPlanSpec struct {
+	Ref    string                  `json:"tracking_plan" mapstructure:"tracking_plan" validate:"required,pattern=legacy_tracking_plan_ref"`
+	Config *TrackingPlanConfigSpec `json:"config"        mapstructure:"config"        validate:"required"`
 }
 
-type trackingPlanConfigSpec struct {
-	Track    *trackConfigSpec `mapstructure:"track"`
-	Identify *eventConfigSpec `mapstructure:"identify"`
-	Group    *eventConfigSpec `mapstructure:"group"`
-	Page     *eventConfigSpec `mapstructure:"page"`
-	Screen   *eventConfigSpec `mapstructure:"screen"`
+type TrackingPlanConfigSpec struct {
+	Track    *TrackConfigSpec `json:"track"    mapstructure:"track"`
+	Identify *EventConfigSpec `json:"identify" mapstructure:"identify"`
+	Group    *EventConfigSpec `json:"group"    mapstructure:"group"`
+	Page     *EventConfigSpec `json:"page"     mapstructure:"page"`
+	Screen   *EventConfigSpec `json:"screen"   mapstructure:"screen"`
 }
 
-type eventConfigSpec struct {
-	PropagateViolations     *bool `mapstructure:"propagate_violations"`
-	DropUnplannedProperties *bool `mapstructure:"drop_unplanned_properties"`
-	DropOtherViolations     *bool `mapstructure:"drop_other_violations"`
+type EventConfigSpec struct {
+	PropagateViolations     *bool `json:"propagate_violations"      mapstructure:"propagate_violations"`
+	DropUnplannedProperties *bool `json:"drop_unplanned_properties" mapstructure:"drop_unplanned_properties"`
+	DropOtherViolations     *bool `json:"drop_other_violations"     mapstructure:"drop_other_violations"`
 }
 
-type trackConfigSpec struct {
-	eventConfigSpec     `mapstructure:",squash"`
+type TrackConfigSpec struct {
+	EventConfigSpec         `mapstructure:",squash"`
 	DropUnplannedEvents *bool `json:"drop_unplanned_events" mapstructure:"drop_unplanned_events"`
 }
 
 // Resource structs
 type sourceResource struct {
-	LocalId          string
+	LocalID          string
 	Name             string
 	SourceDefinition string
 	Enabled          bool

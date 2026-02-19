@@ -121,7 +121,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 				return nil, fmt.Errorf("project rule %s returned results for unknown file: %s", rule.ID(), filePath)
 			}
 
-			pi, err := pathindex.NewPathIndexer(rawSpec.Data)
+			pi, err := rawSpec.PathIndexer()
 			if err != nil {
 				return nil, fmt.Errorf("building path indexer for %s: %w", filePath, err)
 			}
@@ -179,10 +179,7 @@ func (e *validationEngine) runValidationRules(
 	graph *resources.Graph,
 ) ([]Diagnostic, error) {
 
-	// The path indexer only works on the raw spec data
-	// from the input spec, it is not necessary the path resolves to filesystem path.
-	// It could also be a path over the network
-	pi, err := pathindex.NewPathIndexer(rawSpec.Data)
+	pi, err := rawSpec.PathIndexer()
 	if err != nil {
 		return nil, fmt.Errorf("building path indexer: %w", err)
 	}

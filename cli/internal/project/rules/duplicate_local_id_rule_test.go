@@ -109,8 +109,8 @@ func TestDuplicateLocalIDRule_ValidateProject(t *testing.T) {
 		require.Len(t, results, 2)
 		assert.Len(t, results["props1.yaml"], 1)
 		assert.Len(t, results["props2.yaml"], 1)
-		assert.Contains(t, results["props1.yaml"][0].Message, "duplicate local id 'email'")
-		assert.Contains(t, results["props2.yaml"][0].Message, "duplicate local id 'email'")
+		assert.Contains(t, results["props1.yaml"][0].Message, "duplicate id 'email'")
+		assert.Contains(t, results["props2.yaml"][0].Message, "duplicate id 'email'")
 	})
 
 	t.Run("duplicate within same file", func(t *testing.T) {

@@ -59,14 +59,25 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - **Integration tests**: Based on scope for new capabilities
 - **Struct comparisons**: Prefer comparing entire structs over field-by-field assertions:
 
-  ```go
-  // Preferred
-  assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
+```go
+// Preferred
+assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
 
-  // Avoid
-  assert.Equal(t, "dg-123", result.ID)
-  assert.Equal(t, "Test", result.Name)
-  ```
+// Avoid
+assert.Equal(t, "dg-123", result.ID)
+assert.Equal(t, "Test", result.Name)
+```
+
+```go
+// Preferred
+assert.Equal(t, &DataGraph{ID: "dg-123", Name: "Test"}, result)
+
+// Avoid
+assert.Equal(t, "dg-123", result.ID)
+assert.Equal(t, "Test", result.Name)
+```
+
+> > > > > > > 03ec8f27 (feat(api): initial data-graph API client)
 
 ### Logging
 
@@ -88,17 +99,17 @@ Similar to Terraform: loads local specs -> fetches remote state -> computes diff
 - Prefer early `continue`/`return` over `else` to reduce indentation depth (guard clause pattern)
 - When declaring 2+ related variables together, prefer a `var` block over individual `:=` assignments for better visual grouping:
 
-  ```go
-  // Preferred
-  var (
-      actualVal  = fieldVal
-      actualKind = fieldVal.Kind()
-  )
+```go
+// Preferred
+var (
+    actualVal  = fieldVal
+    actualKind = fieldVal.Kind()
+)
 
-  // Avoid
-  actualVal := fieldVal
-  actualKind := fieldVal.Kind()
-  ```
+// Avoid
+actualVal := fieldVal
+actualKind := fieldVal.Kind()
+```
 
 - **ID Naming Convention**: Use fully capitalized "ID" in identifiers (Go convention for initialisms), e.g., `ExternalID` not `ExternalId`, `WorkspaceID` not `WorkspaceId`
 

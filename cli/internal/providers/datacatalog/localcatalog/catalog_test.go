@@ -862,7 +862,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	cases := []struct {
 		name             string
 		spec             *specs.Spec
-		expectedIDs      []string
 		expectedLocalIDs []specs.LocalID
 		expectedError    bool
 		errorContains    string
@@ -879,7 +878,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs: []string{"prop1", "prop2", "prop3"},
 			expectedLocalIDs: []specs.LocalID{
 				{ID: "prop1", JSONPointerPath: "/spec/properties/0/id"},
 				{ID: "prop2", JSONPointerPath: "/spec/properties/1/id"},
@@ -897,7 +895,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs: []string{"event1", "event2"},
 			expectedLocalIDs: []specs.LocalID{
 				{ID: "event1", JSONPointerPath: "/spec/events/0/id"},
 				{ID: "event2", JSONPointerPath: "/spec/events/1/id"},
@@ -912,7 +909,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"display_name": "My Tracking Plan",
 				},
 			},
-			expectedIDs: []string{"my_tracking_plan"},
 			expectedLocalIDs: []specs.LocalID{
 				{ID: "my_tracking_plan", JSONPointerPath: "/spec/id"},
 			},
@@ -928,7 +924,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs: []string{"type1", "type2"},
 			expectedLocalIDs: []specs.LocalID{
 				{ID: "type1", JSONPointerPath: "/spec/types/0/id"},
 				{ID: "type2", JSONPointerPath: "/spec/types/1/id"},
@@ -946,7 +941,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedIDs: []string{"cat1", "cat2", "cat3"},
 			expectedLocalIDs: []specs.LocalID{
 				{ID: "cat1", JSONPointerPath: "/spec/categories/0/id"},
 				{ID: "cat2", JSONPointerPath: "/spec/categories/1/id"},
@@ -1110,7 +1104,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"properties": []any{},
 				},
 			},
-			expectedIDs:   nil,
 			expectedError: false,
 		},
 		{
@@ -1121,7 +1114,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"events": []any{},
 				},
 			},
-			expectedIDs:   nil,
 			expectedError: false,
 		},
 		{
@@ -1132,7 +1124,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"types": []any{},
 				},
 			},
-			expectedIDs:   nil,
 			expectedError: false,
 		},
 		{
@@ -1143,7 +1134,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"categories": []any{},
 				},
 			},
-			expectedIDs:   nil,
 			expectedError: false,
 		},
 	}
@@ -1163,7 +1153,6 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
-				assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
 				assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 			}
 		})

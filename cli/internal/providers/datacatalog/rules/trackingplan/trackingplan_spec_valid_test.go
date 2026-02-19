@@ -93,6 +93,69 @@ func TestTrackingPlanSpecSyntaxValidRule_ValidEventAndPropertyRefs(t *testing.T)
 			},
 		},
 		{
+			name: "rule with identity_section properties",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref:             "#/events/user-events/signup",
+							IdentitySection: "properties",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "rule with identity_section traits",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref:             "#/events/user-events/signup",
+							IdentitySection: "traits",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "rule with identity_section context.traits",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref:             "#/events/user-events/signup",
+							IdentitySection: "context.traits",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "rule with empty identity_section",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref: "#/events/user-events/signup",
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "rule with event ref and nil properties",
 			spec: localcatalog.TrackingPlan{
 				LocalID: "test_tp",
@@ -170,6 +233,24 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 		expectedRefs []string
 		expectedMsgs []string
 	}{
+		{
+			name: "rule with invalid identity_section",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref:             "#/events/user-events/signup",
+							IdentitySection: "invalid_section",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event/identity_section"},
+			expectedMsgs: []string{"'identity_section' must be one of [properties traits context.traits]"},
+		},
 		{
 			name: "rule local id missing",
 			spec: localcatalog.TrackingPlan{
@@ -438,6 +519,14 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 		expectedRefs []string
 		expectedMsgs []string
 	}{
+		{
+			name: "id missing",
+			spec: localcatalog.TrackingPlan{
+				Name: "Test Plan",
+			},
+			expectedRefs: []string{"/id"},
+			expectedMsgs: []string{"'id' is required"},
+		},
 		{
 			name: "name missing",
 			spec: localcatalog.TrackingPlan{

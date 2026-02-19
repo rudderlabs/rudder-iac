@@ -8,18 +8,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// parseSpecWithExternalIDs returns a ParseSpecFunc that always returns the given external IDs.
-func parseSpecWithExternalIDs(ids ...string) ParseSpecFunc {
+// parseSpecWithLocalIDs returns a ParseSpecFunc that always returns the given IDs as LocalIDs.
+func parseSpecWithLocalIDs(ids ...string) ParseSpecFunc {
 	return func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
-		return &specs.ParsedSpec{ExternalIDs: ids}, nil
+		localIDs := make([]specs.LocalID, len(ids))
+		for i, id := range ids {
+			localIDs[i] = specs.LocalID{ID: id, JSONPointerPath: "/spec/id"}
+		}
+		return &specs.ParsedSpec{LocalIDs: localIDs}, nil
 	}
 }
 
 // noopParseSpec returns an empty ParsedSpec — used when import ID validation
 // is not the focus of a test case.
 func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
-	// noop parse spec, simply return an empty parsed spec
-	return parseSpecWithExternalIDs()(path, spec)
+	return parseSpecWithLocalIDs()(path, spec)
 }
 
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
@@ -65,7 +68,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 		},
 		{
 			name:      "valid metadata with complete import structure",
-			parseSpec: parseSpecWithExternalIDs("local-1"),
+			parseSpec: parseSpecWithLocalIDs("local-1"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -157,7 +160,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 		},
 		{
 			name:      "import local_id missing from spec external IDs",
-			parseSpec: parseSpecWithExternalIDs("other-id"),
+			parseSpec: parseSpecWithLocalIDs("other-id"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -182,7 +185,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 		},
 		{
 			name:      "all import local_ids present in spec",
-			parseSpec: parseSpecWithExternalIDs("id1", "id2", "id3"),
+			parseSpec: parseSpecWithLocalIDs("id1", "id2", "id3"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",

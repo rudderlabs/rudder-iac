@@ -60,7 +60,7 @@ func validateCustomTypeNameUniqueness(spec localcatalog.CustomTypeSpec, graph *r
 		if countMap[ct.Name] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/types/%d/name", i),
-				Message:   fmt.Sprintf("custom type with name '%s' is not unique across the catalog", ct.Name),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'custom-types'", ct.Name),
 			})
 		}
 	}
