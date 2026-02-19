@@ -107,7 +107,7 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors)
+	results := funcs.ParseValidationErrors(validationErrors, nil)
 	// Before returning the results, simply prepend the metadata
 	// path to the reference to allow for unique identification.
 	results = lo.Map(results, func(result rules.ValidationResult, _ int) rules.ValidationResult {
@@ -146,9 +146,9 @@ func (r *MetadataSyntaxValidRule) validateImportIDs(ctx *rules.ValidationContext
 		return nil
 	}
 
-	externalIDSet := make(map[string]struct{}, len(parsed.ExternalIDs))
-	for _, id := range parsed.ExternalIDs {
-		externalIDSet[id] = struct{}{}
+	externalIDSet := make(map[string]struct{}, len(parsed.LocalIDs))
+	for _, localID := range parsed.LocalIDs {
+		externalIDSet[localID.ID] = struct{}{}
 	}
 
 	var results []rules.ValidationResult

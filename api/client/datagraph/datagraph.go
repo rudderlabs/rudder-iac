@@ -7,15 +7,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-
-	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
-const (
-	dataGraphsBasePath = "/v2/data-graphs"
-)
-
-// DataGraphStore is the interface for Data Graph operations
 type DataGraphStore interface {
 	// ListDataGraphs lists all data graphs with optional pagination and filtering
 	ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error)
@@ -29,24 +22,12 @@ type DataGraphStore interface {
 	// DeleteDataGraph deletes a data graph by ID
 	DeleteDataGraph(ctx context.Context, id string) error
 
-	// SetExternalID sets the external ID for a data graph
-	SetExternalID(ctx context.Context, id string, externalID string) error
-}
-
-// rudderDataGraphStore implements the DataGraphStore interface
-type rudderDataGraphStore struct {
-	client *client.Client
-}
-
-// NewRudderDataGraphStore creates a new DataGraphStore implementation
-func NewRudderDataGraphStore(c *client.Client) DataGraphStore {
-	return &rudderDataGraphStore{
-		client: c,
-	}
+	// SetExternalID sets the external ID for a data graph and returns the updated data graph
+	SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error)
 }
 
 // ListDataGraphs lists all data graphs with optional pagination and filtering
-func (s *rudderDataGraphStore) ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error) {
+func (s *rudderDataGraphClient) ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error) {
 	path := dataGraphsBasePath
 
 	query := url.Values{}
@@ -78,7 +59,7 @@ func (s *rudderDataGraphStore) ListDataGraphs(ctx context.Context, page, pageSiz
 }
 
 // GetDataGraph retrieves a data graph by ID
-func (s *rudderDataGraphStore) GetDataGraph(ctx context.Context, id string) (*DataGraph, error) {
+func (s *rudderDataGraphClient) GetDataGraph(ctx context.Context, id string) (*DataGraph, error) {
 	if id == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
@@ -98,7 +79,7 @@ func (s *rudderDataGraphStore) GetDataGraph(ctx context.Context, id string) (*Da
 }
 
 // CreateDataGraph creates a new data graph
-func (s *rudderDataGraphStore) CreateDataGraph(ctx context.Context, req *CreateDataGraphRequest) (*DataGraph, error) {
+func (s *rudderDataGraphClient) CreateDataGraph(ctx context.Context, req *CreateDataGraphRequest) (*DataGraph, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)
@@ -118,7 +99,7 @@ func (s *rudderDataGraphStore) CreateDataGraph(ctx context.Context, req *CreateD
 }
 
 // DeleteDataGraph deletes a data graph by ID
-func (s *rudderDataGraphStore) DeleteDataGraph(ctx context.Context, id string) error {
+func (s *rudderDataGraphClient) DeleteDataGraph(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("data graph ID cannot be empty")
 	}
@@ -132,22 +113,27 @@ func (s *rudderDataGraphStore) DeleteDataGraph(ctx context.Context, id string) e
 	return nil
 }
 
-// SetExternalID sets the external ID for a data graph
-func (s *rudderDataGraphStore) SetExternalID(ctx context.Context, id string, externalID string) error {
+// SetExternalID sets the external ID for a data graph and returns the updated data graph
+func (s *rudderDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error) {
 	if id == "" {
-		return fmt.Errorf("data graph ID cannot be empty")
+		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
 
 	path := fmt.Sprintf("%s/%s/external-id", dataGraphsBasePath, id)
 	data, err := json.Marshal(map[string]string{"externalId": externalID})
 	if err != nil {
-		return fmt.Errorf("marshalling external ID: %w", err)
+		return nil, fmt.Errorf("marshalling external ID: %w", err)
 	}
 
-	_, err = s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
+	resp, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("setting external ID: %w", err)
+		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
 
-	return nil
+	var result DataGraph
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling response: %w", err)
+	}
+
+	return &result, nil
 }

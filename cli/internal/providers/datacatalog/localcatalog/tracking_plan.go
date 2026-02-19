@@ -30,7 +30,7 @@ type CatalogResourceFetcher interface {
 
 type TrackingPlan struct {
 	Name        string    `json:"display_name" validate:"required,pattern=display_name"`
-	LocalID     string    `json:"id"`
+	LocalID     string    `json:"id" validate:"required"`
 	Description string    `json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
 	Rules       []*TPRule `json:"rules,omitempty" validate:"omitempty,dive"`
 	// Event and Props underneath event on the tracking plan
@@ -84,7 +84,7 @@ type TPRule struct {
 type TPRuleEvent struct {
 	Ref             string `json:"$ref" validate:"required,pattern=legacy_event_ref"`
 	AllowUnplanned  bool   `json:"allow_unplanned"`
-	IdentitySection string `json:"identity_section"`
+	IdentitySection string `json:"identity_section" validate:"omitempty,oneof=properties traits context.traits"`
 }
 
 type TPRuleProperty struct {

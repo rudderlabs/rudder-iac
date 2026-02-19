@@ -39,7 +39,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			},
 			expectedErrors: 4,
 			expectedRefs:   []string{"/kind", "/version", "/metadata", "/spec"},
-			expectedMsgs:   []string{"kind is required", "version is required", "metadata is required", "spec is required"},
+			expectedMsgs:   []string{"'kind' is required", "'version' is required", "'metadata' is required", "'spec' is required"},
 		},
 		{
 			name: "empty metadata map fails validation",
@@ -51,7 +51,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/metadata"},
-			expectedMsgs:   []string{"metadata is required"},
+			expectedMsgs:   []string{"'metadata' is required"},
 		},
 		{
 			name: "empty spec map fails validation",
@@ -63,7 +63,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/spec"},
-			expectedMsgs:   []string{"spec is required"},
+			expectedMsgs:   []string{"'spec' is required"},
 		},
 	}
 

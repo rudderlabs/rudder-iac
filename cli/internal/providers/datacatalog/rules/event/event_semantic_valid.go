@@ -43,7 +43,7 @@ func validateEventNameUniqueness(spec localcatalog.EventSpec, graph *resources.G
 		if countMap[key] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/events/%d", i),
-				Message:   fmt.Sprintf("event with name '%s' and type '%s' is not unique across the catalog", event.Name, event.Type),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'events'", event.Name),
 			})
 		}
 	}

@@ -212,11 +212,11 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name          string
-			spec          *specs.Spec
-			expectedIDs   []string
-			expectedError bool
-			errorContains string
+			name             string
+			spec             *specs.Spec
+			expectedLocalIDs []specs.LocalID
+			expectedError    bool
+			errorContains    string
 		}{
 			{
 				name: "success - parse spec with id",
@@ -228,8 +228,8 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedIDs:   []string{"test-model"},
-				expectedError: false,
+				expectedLocalIDs: []specs.LocalID{{ID: "test-model", JSONPointerPath: "/spec/id"}},
+				expectedError:    false,
 			},
 			{
 				name: "error - id not found in spec",
@@ -240,9 +240,9 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedIDs:   nil,
-				expectedError: true,
-				errorContains: "id not found in sql model spec",
+				expectedLocalIDs: nil,
+				expectedError:    true,
+				errorContains:    "id not found in sql model spec",
 			},
 			{
 				name: "error - id is not a string",
@@ -254,9 +254,9 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedIDs:   nil,
-				expectedError: true,
-				errorContains: "id not found in sql model spec",
+				expectedLocalIDs: nil,
+				expectedError:    true,
+				errorContains:    "id not found in sql model spec",
 			},
 			{
 				name: "error - empty spec",
@@ -264,9 +264,9 @@ func TestSQLModelHandler(t *testing.T) {
 					Kind: "retl-source-sql-model",
 					Spec: map[string]any{},
 				},
-				expectedIDs:   nil,
-				expectedError: true,
-				errorContains: "id not found in sql model spec",
+				expectedLocalIDs: nil,
+				expectedError:    true,
+				errorContains:    "id not found in sql model spec",
 			},
 		}
 
@@ -287,7 +287,7 @@ func TestSQLModelHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 				}
 			})
 		}

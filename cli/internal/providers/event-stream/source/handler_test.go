@@ -32,11 +32,11 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name          string
-			spec          *specs.Spec
-			expectedIDs   []string
-			expectedError bool
-			errorContains string
+			name             string
+			spec             *specs.Spec
+			expectedLocalIDs []specs.LocalID
+			expectedError    bool
+			errorContains    string
 		}{
 			{
 				name: "success - parse spec with id",
@@ -48,8 +48,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"type": "javascript",
 					},
 				},
-				expectedIDs:   []string{"test-source-1"},
-				expectedError: false,
+				expectedLocalIDs: []specs.LocalID{{ID: "test-source-1", JSONPointerPath: "/spec/id"}},
+				expectedError:    false,
 			},
 			{
 				name: "error - id not found in spec",
@@ -103,7 +103,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 				}
 			})
 		}
@@ -111,7 +111,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 
 	t.Run("LoadSpec", func(t *testing.T) {
 		t.Parallel()
-
 		testCases := []struct {
 			name         string
 			spec         *specs.Spec
@@ -131,21 +130,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					},
 				},
 				errorMessage: "'id' expected type 'string'",
-			},
-			{
-				name:      "error with duplicate id",
-				loadTwice: true,
-				spec: &specs.Spec{
-					Version: "rudder/v0.1",
-					Kind:    "event-stream-source",
-					Spec: map[string]interface{}{
-						"id":      "test-source",
-						"name":    "Test Source",
-						"type":    "javascript",
-						"enabled": true,
-					},
-				},
-				errorMessage: "event stream source with id test-source already exists",
 			},
 			{
 				name: "with invalid tracking plan ref format",
@@ -524,6 +508,60 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 				expectedError: true,
 				errorMessage:  "validating event stream source spec: tracking plan with URN 'tracking-plan:non-existent-tp' not found in the project",
+			},
+			{
+				name: "Duplicate source ID",
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":      "test-source",
+							"name":    "Test Source 1",
+							"type":    "javascript",
+							"enabled": true,
+						},
+					},
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":      "test-source",
+							"name":    "Test Source 2",
+							"type":    "python",
+							"enabled": true,
+						},
+					},
+				},
+				expectedError: true,
+				errorMessage:  "event stream source with id 'test-source' already exists",
+			},
+			{
+				name: "Duplicate source name",
+				specs: []*specs.Spec{
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":      "test-source-1",
+							"name":    "Same Name",
+							"type":    "javascript",
+							"enabled": true,
+						},
+					},
+					{
+						Version: "rudder/v0.1",
+						Kind:    "event-stream-source",
+						Spec: map[string]interface{}{
+							"id":      "test-source-2",
+							"name":    "Same Name",
+							"type":    "python",
+							"enabled": true,
+						},
+					},
+				},
+				expectedError: true,
+				errorMessage:  "source with name 'Same Name' is not unique",
 			},
 		}
 

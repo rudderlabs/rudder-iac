@@ -10,10 +10,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type handler interface {
@@ -236,4 +238,16 @@ func (p *Provider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
+}
+
+func (p *Provider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{
+		sourceRules.NewSourceSpecSyntaxValidRule(),
+	}
+}
+
+func (p *Provider) SemanticRules() []rules.Rule {
+	return []rules.Rule{
+		sourceRules.NewSourceSemanticValidRule(),
+	}
 }
