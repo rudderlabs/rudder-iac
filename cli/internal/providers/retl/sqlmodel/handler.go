@@ -19,9 +19,9 @@ import (
 
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
-	client    retlClient.RETLStore
-	resources map[string]*SQLModelResource
-	importDir string
+	client        retlClient.RETLStore
+	resources     map[string]*SQLModelResource
+	importDir     string
 	v1SpecSupport bool
 }
 
@@ -54,14 +54,7 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 		return nil, fmt.Errorf("id not found in sql model spec")
 	}
 	return &specs.ParsedSpec{
-<<<<<<< Updated upstream
-		ExternalIDs: []string{id},
-		LocalIDs: []specs.LocalID{
-			{ID: id, JSONPointerPath: "/spec/id"},
-		},
-=======
 		LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
->>>>>>> Stashed changes
 	}, nil
 }
 
