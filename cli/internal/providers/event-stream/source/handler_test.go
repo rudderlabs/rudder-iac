@@ -32,11 +32,11 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name          string
-			spec          *specs.Spec
-			expectedIDs   []string
-			expectedError bool
-			errorContains string
+			name             string
+			spec             *specs.Spec
+			expectedLocalIDs []specs.LocalID
+			expectedError    bool
+			errorContains    string
 		}{
 			{
 				name: "success - parse spec with id",
@@ -48,8 +48,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 						"type": "javascript",
 					},
 				},
-				expectedIDs:   []string{"test-source-1"},
-				expectedError: false,
+				expectedLocalIDs: []specs.LocalID{{ID: "test-source-1", JSONPointerPath: "/spec/id"}},
+				expectedError:    false,
 			},
 			{
 				name: "error - id not found in spec",
@@ -103,7 +103,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedIDs, parsedSpec.ExternalIDs)
+					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
 				}
 			})
 		}

@@ -595,7 +595,7 @@ func TestProviderParseSpec(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported kind")
 	})
 
-	t.Run("DelegatesToHandlerAndReturnsExternalIDs", func(t *testing.T) {
+	t.Run("DelegatesToHandlerAndReturnsLocalIDs", func(t *testing.T) {
 		t.Parallel()
 		provider := retl.New(newDefaultMockClient())
 		parsed, err := provider.ParseSpec("test.yaml", &specs.Spec{
@@ -612,7 +612,7 @@ func TestProviderParseSpec(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, parsed)
-		assert.ElementsMatch(t, []string{"orders-model"}, parsed.ExternalIDs)
+		assert.ElementsMatch(t, []specs.LocalID{{ID: "orders-model", JSONPointerPath: "/spec/id"}}, parsed.LocalIDs)
 	})
 }
 

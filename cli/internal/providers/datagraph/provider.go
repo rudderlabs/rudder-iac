@@ -73,23 +73,26 @@ func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedS
 		return nil, fmt.Errorf("decoding data graph spec: %w", err)
 	}
 
-	// Start with the data graph ID
-	externalIDs := []string{dgSpec.ID}
+	localIDs := []specs.LocalID{{ID: dgSpec.ID, JSONPointerPath: "/spec/id"}}
 
-	// Add all inline model IDs and relationship IDs
-	for _, modelSpec := range dgSpec.Models {
+	for i, modelSpec := range dgSpec.Models {
 		if modelSpec.ID != "" {
-			externalIDs = append(externalIDs, modelSpec.ID)
+			localIDs = append(localIDs, specs.LocalID{
+				ID:              modelSpec.ID,
+				JSONPointerPath: fmt.Sprintf("/spec/models/%d/id", i),
+			})
 		}
-		// Add inline relationship IDs
-		for _, relSpec := range modelSpec.Relationships {
+		for j, relSpec := range modelSpec.Relationships {
 			if relSpec.ID != "" {
-				externalIDs = append(externalIDs, relSpec.ID)
+				localIDs = append(localIDs, specs.LocalID{
+					ID:              relSpec.ID,
+					JSONPointerPath: fmt.Sprintf("/spec/models/%d/relationships/%d/id", i, j),
+				})
 			}
 		}
 	}
 
-	return &specs.ParsedSpec{ExternalIDs: externalIDs}, nil
+	return &specs.ParsedSpec{LocalIDs: localIDs}, nil
 }
 
 func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {

@@ -95,8 +95,7 @@ type LocalID struct {
 }
 
 type ParsedSpec struct {
-	ExternalIDs []string
-	LocalIDs    []LocalID
+	LocalIDs []LocalID
 }
 
 // New creates and validates a Spec from YAML data
