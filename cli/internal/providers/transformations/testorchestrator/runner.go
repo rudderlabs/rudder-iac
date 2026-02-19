@@ -119,13 +119,15 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		}
 		log.Debug("Resolved test definitions", "transformation", unit.Transformation.ID, "count", len(testDefs))
 
-		transformationVersionID, ok := transformationVersionMap[unit.Transformation.ID]
+		transformationID := unit.Transformation.ID
+		transformationVersionID, ok := transformationVersionMap[transformationID]
 		if !ok {
-			return nil, fmt.Errorf("transformation version not resolved for %s", unit.Transformation.ID)
+			return nil, fmt.Errorf("transformation version not resolved for %s", transformationID)
 		}
 
 		unitTasks = append(unitTasks, &testUnitTask{
-			unit:                  unit,
+			ID:                    transformationID,
+			Name:                  unit.Transformation.Name,
 			testDefs:              testDefs,
 			transformationVersion: transformationVersionID,
 			libraryVersionIDs:     getLibraryVersionsForUnit(unit, libraryVersionMap),
@@ -160,7 +162,6 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		Libraries:       allLibs,
 		Transformations: allResults,
 	}
-	results.Pass = !results.HasFailures()
 
 	return results, nil
 }
@@ -290,14 +291,14 @@ func (r *Runner) runTestUnitTask(ctx context.Context, results *tasker.Results[*t
 			return fmt.Errorf("task is not a test unit task")
 		}
 
-		log.Info("Testing transformation", "id", unitTask.unit.Transformation.ID, "name", unitTask.unit.Transformation.Name)
+		log.Info("Testing transformation", "id", unitTask.ID, "name", unitTask.Name)
 
 		testReq := buildTestRequest(unitTask.transformationVersion, unitTask.testDefs, unitTask.libraryVersionIDs)
 
-		log.Debug("Executing tests via API", "transformation", unitTask.unit.Transformation.ID)
+		log.Debug("Executing tests via API", "transformation", unitTask.ID)
 		resp, err := r.store.BatchTest(ctx, testReq)
 		if err != nil {
-			return fmt.Errorf("running tests for %s: %w", unitTask.unit.Transformation.ID, err)
+			return fmt.Errorf("running tests for %s: %w", unitTask.ID, err)
 		}
 
 		result := &testUnitResult{

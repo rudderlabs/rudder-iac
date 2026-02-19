@@ -6,8 +6,6 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -24,9 +22,8 @@ const (
 
 // TestUnit represents a transformation to test along with its library dependencies
 type TestUnit struct {
-	Transformation           *model.TransformationResource
-	Libraries                []*model.LibraryResource
-	IsTransformationModified bool
+	Transformation *model.TransformationResource
+	Libraries      []*model.LibraryResource
 }
 
 // TestPlan contains all test units to execute
@@ -49,20 +46,24 @@ func (tp *TestPlan) IsTransformationModified(urn string) bool {
 
 // Planner determines what resources to test based on mode and diff
 type Planner struct {
-	graph *resources.Graph
+	graph              *resources.Graph
+	transformationType string
+	libraryType        string
 }
 
 // NewPlanner creates a new test planner
 func NewPlanner(graph *resources.Graph) *Planner {
 	return &Planner{
-		graph: graph,
+		graph:              graph,
+		transformationType: "transformation",
+		libraryType:        "transformation-library",
 	}
 }
 
 // BuildPlan determines which transformations to test based on mode and remote graph
 func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
-	transformations := p.graph.ResourcesByType(transformation.HandlerMetadata.ResourceType)
-	libraries := p.graph.ResourcesByType(library.HandlerMetadata.ResourceType)
+	transformations := p.graph.ResourcesByType(p.transformationType)
+	libraries := p.graph.ResourcesByType(p.libraryType)
 
 	// Compute diff to identify new/updated/unmodified resources
 	diff := differ.ComputeDiff(remoteGraph, p.graph, differ.DiffOptions{
@@ -74,52 +75,18 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 	var (
 		transformationsToTest []*resources.Resource
 		standaloneLibs        []*resources.Resource
+		err                   error
 	)
 
 	switch mode {
 	case ModeAll:
-		transformationsToTest = transformations
-
-		// Identify standalone libraries (not depended on by any transformation)
-		dependedLibURNs := lo.FlatMap(transformations, func(t *resources.Resource, _ int) []string {
-			return p.graph.GetDependencies(t.URN())
-		})
-		standaloneLibs = lo.Filter(libraries, func(lib *resources.Resource, _ int) bool {
-			return !lo.Contains(dependedLibURNs, lib.URN())
-		})
-
+		transformationsToTest, standaloneLibs = p.planAll(transformations, libraries)
 	case ModeModified:
-		transformationsToTest = p.filterByURNs(transformations, lo.Keys(modifiedTransformationURNs))
-
-		// Also add transformations that depend on modified libraries
-		for modifiedLibURN := range modifiedLibraryURNs {
-			library, _ := p.graph.GetResource(modifiedLibURN)
-
-			dependents := p.findDependentTransformations(library, transformations)
-			transformationsToTest = append(transformationsToTest, dependents...)
-			// Modified library with no dependents — test it standalone
-			if len(dependents) == 0 {
-				standaloneLibs = append(standaloneLibs, library)
-			}
-		}
-		transformationsToTest = lo.UniqBy(transformationsToTest, func(r *resources.Resource) string {
-			return r.URN()
-		})
-
+		transformationsToTest, standaloneLibs = p.planModified(transformations, modifiedTransformationURNs, modifiedLibraryURNs)
 	case ModeSingle:
-		resource := p.findResourceByID(targetID)
-		if resource == nil {
-			return nil, fmt.Errorf("resource with ID '%s' not found", targetID)
-		}
-
-		transformationsToTest = []*resources.Resource{resource}
-		if resource.Type() == library.HandlerMetadata.ResourceType {
-			dependents := p.findDependentTransformations(resource, transformations)
-			transformationsToTest = dependents
-			// Add library with no dependents to standalone list
-			if len(dependents) == 0 {
-				standaloneLibs = []*resources.Resource{resource}
-			}
+		transformationsToTest, standaloneLibs, err = p.planSingle(targetID, transformations)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -134,7 +101,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 		return lib, ok
 	})
 
-	testUnits, err := p.buildTestUnits(transformationsToTest, libByURN, modifiedTransformationURNs)
+	testUnits, err := p.buildTestUnits(transformationsToTest, libByURN)
 	if err != nil {
 		return nil, fmt.Errorf("building test units: %w", err)
 	}
@@ -145,6 +112,54 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 		ModifiedLibraryURNs:        modifiedLibraryURNs,
 		ModifiedTransformationURNs: modifiedTransformationURNs,
 	}, nil
+}
+
+func (p *Planner) planAll(transformations, libraries []*resources.Resource) (transformationsToTest, standaloneLibs []*resources.Resource) {
+	dependedLibURNs := lo.FlatMap(transformations, func(t *resources.Resource, _ int) []string {
+		return p.graph.GetDependencies(t.URN())
+	})
+	standaloneLibs = lo.Filter(libraries, func(lib *resources.Resource, _ int) bool {
+		return !lo.Contains(dependedLibURNs, lib.URN())
+	})
+	return transformations, standaloneLibs
+}
+
+func (p *Planner) planModified(transformations []*resources.Resource, modifiedTransformationURNs, modifiedLibraryURNs map[string]bool) (transformationsToTest, standaloneLibs []*resources.Resource) {
+	transformationsToTest = p.filterByURNs(transformations, lo.Keys(modifiedTransformationURNs))
+
+	// Also add transformations that depend on modified libraries
+	for modifiedLibURN := range modifiedLibraryURNs {
+		library, _ := p.graph.GetResource(modifiedLibURN)
+
+		dependents := p.findDependentTransformations(library, transformations)
+		transformationsToTest = append(transformationsToTest, dependents...)
+		// Modified library with no dependents — test it standalone
+		if len(dependents) == 0 {
+			standaloneLibs = append(standaloneLibs, library)
+		}
+	}
+	transformationsToTest = lo.UniqBy(transformationsToTest, func(r *resources.Resource) string {
+		return r.URN()
+	})
+	return transformationsToTest, standaloneLibs
+}
+
+func (p *Planner) planSingle(targetID string, transformations []*resources.Resource) (transformationsToTest, standaloneLibs []*resources.Resource, err error) {
+	resource := p.findResourceByID(targetID)
+	if resource == nil {
+		return nil, nil, fmt.Errorf("resource with ID '%s' not found", targetID)
+	}
+
+	transformationsToTest = []*resources.Resource{resource}
+	if resource.Type() == p.libraryType {
+		dependents := p.findDependentTransformations(resource, transformations)
+		transformationsToTest = dependents
+		// Add library with no dependents to standalone list
+		if len(dependents) == 0 {
+			standaloneLibs = []*resources.Resource{resource}
+		}
+	}
+	return transformationsToTest, standaloneLibs, nil
 }
 
 // filterByURNs filters resources to only those with URNs in the provided list
@@ -164,65 +179,59 @@ func (p *Planner) findResourceByID(id string) *resources.Resource {
 	return nil
 }
 
-
 // buildModifiedResourceSets identifies modified transformation and library URNs.
 // New resources are always considered modified. Updated and importable resources
 // are only considered modified if their code or name has changed.
 func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *resources.Graph) (modifiedTransformationURNs, modifiedLibraryURNs map[string]bool) {
-	modifiedTransformationURNs = make(map[string]bool)
-	modifiedLibraryURNs = make(map[string]bool)
+	var (
+		transformationURNs = make(map[string]bool)
+		libraryURNs        = make(map[string]bool)
+	)
 
-	addModified := func(urn string, resourceType string) {
-		switch resourceType {
-		case transformation.HandlerMetadata.ResourceType:
-			modifiedTransformationURNs[urn] = true
-		case library.HandlerMetadata.ResourceType:
-			modifiedLibraryURNs[urn] = true
-		}
-	}
-
-	// New resources are always modified
 	for _, urn := range diff.NewResources {
-		r, exists := p.graph.GetResource(urn)
-		if !exists {
-			continue
+		r, _ := p.graph.GetResource(urn)
+
+		switch r.Type() {
+		case p.transformationType:
+			transformationURNs[urn] = true
+
+		case p.libraryType:
+			libraryURNs[urn] = true
 		}
-		addModified(urn, r.Type())
 	}
 
 	// Updated and importable resources are modified only if code or name changed
 	candidateURNs := append(lo.Keys(diff.UpdatedResources), diff.ImportableResources...)
 	for _, urn := range candidateURNs {
-		resource, exists := p.graph.GetResource(urn)
-		remote, remoteExists := remoteGraph.GetResource(urn)
-		if !exists || !remoteExists {
-			continue
-		}
+		resource, _ := p.graph.GetResource(urn)
+		remote, _ := remoteGraph.GetResource(urn)
 
-		if isModified(resource, remote, resource.Type()) {
-			addModified(urn, resource.Type())
+		if p.isModified(resource, remote, resource.Type()) {
+			switch resource.Type() {
+			case p.transformationType:
+				transformationURNs[urn] = true
+
+			case p.libraryType:
+				libraryURNs[urn] = true
+			}
 		}
 	}
 
-	return modifiedTransformationURNs, modifiedLibraryURNs
+	return transformationURNs, libraryURNs
 }
 
-func isModified(resource, remote *resources.Resource, resourceType string) bool {
+func (p *Planner) isModified(resource, remote *resources.Resource, resourceType string) bool {
 	switch resourceType {
-	case transformation.HandlerMetadata.ResourceType:
-		resourceData, lok := resource.RawData().(*model.TransformationResource)
-		remoteData, rok := remote.RawData().(*model.TransformationResource)
-		if !lok || !rok {
-			return true
-		}
+	case p.transformationType:
+		resourceData, _ := resource.RawData().(*model.TransformationResource)
+		remoteData, _ := remote.RawData().(*model.TransformationResource)
+
 		return resourceData.Name != remoteData.Name || resourceData.Code != remoteData.Code
 
-	case library.HandlerMetadata.ResourceType:
-		resourceData, lok := resource.RawData().(*model.LibraryResource)
-		remoteData, rok := remote.RawData().(*model.LibraryResource)
-		if !lok || !rok {
-			return true
-		}
+	case p.libraryType:
+		resourceData, _ := resource.RawData().(*model.LibraryResource)
+		remoteData, _ := remote.RawData().(*model.LibraryResource)
+
 		return resourceData.Name != remoteData.Name || resourceData.Code != remoteData.Code
 	}
 
@@ -235,7 +244,6 @@ func (p *Planner) findDependentTransformations(libraryResource *resources.Resour
 		return lo.Contains(p.graph.GetDependencies(t.URN()), libraryResource.URN())
 	})
 }
-
 
 // buildLibraryLookup extracts model data from library resources into a URN-keyed map
 func (p *Planner) buildLibraryLookup(libraries []*resources.Resource) (map[string]*model.LibraryResource, error) {
@@ -251,7 +259,7 @@ func (p *Planner) buildLibraryLookup(libraries []*resources.Resource) (map[strin
 }
 
 // buildTestUnits creates test units with library dependencies from the graph
-func (p *Planner) buildTestUnits(transformations []*resources.Resource, libByURN map[string]*model.LibraryResource, modifiedTransformationURNs map[string]bool) ([]*TestUnit, error) {
+func (p *Planner) buildTestUnits(transformations []*resources.Resource, libByURN map[string]*model.LibraryResource) ([]*TestUnit, error) {
 	testUnits := make([]*TestUnit, 0, len(transformations))
 	for _, transformationRes := range transformations {
 		transformationData, ok := transformationRes.RawData().(*model.TransformationResource)
@@ -266,9 +274,8 @@ func (p *Planner) buildTestUnits(transformations []*resources.Resource, libByURN
 		})
 
 		testUnits = append(testUnits, &TestUnit{
-			Transformation:           transformationData,
-			Libraries:                libs,
-			IsTransformationModified: modifiedTransformationURNs[transformationRes.URN()],
+			Transformation: transformationData,
+			Libraries:      libs,
 		})
 	}
 

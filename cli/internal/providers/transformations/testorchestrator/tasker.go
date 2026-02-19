@@ -48,14 +48,15 @@ type testUnitResult struct {
 }
 
 type testUnitTask struct {
-	unit                  *TestUnit
+	ID                    string
+	Name                  string
 	testDefs              []*transformations.TestDefinition
 	transformationVersion string
 	libraryVersionIDs     []string
 }
 
 func (t *testUnitTask) Id() string {
-	return t.unit.Transformation.ID
+	return t.ID
 }
 
 func (t *testUnitTask) Dependencies() []string {
@@ -107,7 +108,7 @@ func runTransformationVersionTask(
 			return fmt.Errorf("task is not a transformation version task")
 		}
 
-		versionID, err := resolveTransformationVersion(
+		versionID, err := getTransformationVersionID(
 			ctx,
 			store,
 			transformationTask.transformation,
@@ -123,7 +124,7 @@ func runTransformationVersionTask(
 	}
 }
 
-func resolveTransformationVersion(
+func getTransformationVersionID(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	transformation *model.TransformationResource,
@@ -197,7 +198,7 @@ func runLibraryVersionTask(
 			return fmt.Errorf("task is not a library version task")
 		}
 
-		versionID, err := resolveLibraryVersion(
+		versionID, err := getLibraryVersionID(
 			ctx,
 			store,
 			libraryTask.lib,
@@ -213,7 +214,7 @@ func runLibraryVersionTask(
 	}
 }
 
-func resolveLibraryVersion(
+func getLibraryVersionID(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	library *model.LibraryResource,
