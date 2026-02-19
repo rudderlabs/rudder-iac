@@ -24,6 +24,7 @@ import (
 
 type Handler struct {
 	resources     map[string]*sourceResource
+	seenIDs       []string
 	client        esClient.EventStreamStore
 	importDir     string
 	v1SpecSupport bool
@@ -42,6 +43,7 @@ func WithV1SpecSupport() HandlerOption {
 func NewHandler(client esClient.EventStreamStore, importDir string, opts ...HandlerOption) *Handler {
 	h := &Handler{
 		resources: make(map[string]*sourceResource),
+		seenIDs:   make([]string, 0),
 		client:    client,
 		importDir: filepath.Join(importDir, ImportPath),
 	}
@@ -56,7 +58,9 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 	if !ok {
 		return nil, fmt.Errorf("id not found in event stream source spec")
 	}
-	return &specs.ParsedSpec{ExternalIDs: []string{id}}, nil
+	return &specs.ParsedSpec{
+		LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
+	}, nil
 }
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
@@ -73,9 +77,7 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding event stream source spec: %w", err)
 	}
-	if _, exists := h.resources[spec.LocalID]; exists {
-		return fmt.Errorf("event stream source with id %s already exists", spec.LocalID)
-	}
+	h.seenIDs = append(h.seenIDs, spec.LocalID)
 	// Default enabled to true when not specified in the spec
 	enabled := true
 	if spec.Enabled != nil {
@@ -227,6 +229,30 @@ func validateSource(source *sourceResource, graph *resources.Graph) error {
 }
 
 func (h *Handler) Validate(graph *resources.Graph) error {
+	// Duplicate IDs are checked first using seenIDs (not h.resources) because
+	// the resources map is keyed by LocalID and overwrites on collision.
+	idCount := make(map[string]int)
+	for _, id := range h.seenIDs {
+		idCount[id]++
+	}
+	for id, count := range idCount {
+		if count > 1 {
+			return fmt.Errorf("validating event stream source spec: event stream source with id '%s' already exists", id)
+		}
+	}
+
+	// Safe to check names from h.resources: if we reach here, all IDs are unique
+	// so no entries were overwritten during loading.
+	nameCount := make(map[string]int)
+	for _, source := range h.resources {
+		nameCount[source.Name]++
+	}
+	for _, source := range h.resources {
+		if nameCount[source.Name] > 1 {
+			return fmt.Errorf("validating event stream source spec: source with name '%s' is not unique", source.Name)
+		}
+	}
+
 	for _, source := range h.resources {
 		if err := validateSource(source, graph); err != nil {
 			return fmt.Errorf("validating event stream source spec: %w", err)

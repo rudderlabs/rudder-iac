@@ -52,7 +52,7 @@ func validateTrackingPlanNameUniqueness(spec localcatalog.TrackingPlan, graph *r
 	if countMap[spec.Name] > 1 {
 		return []rules.ValidationResult{{
 			Reference: "/display_name",
-			Message:   fmt.Sprintf("tracking plan with name '%s' is not unique across the project", spec.Name),
+			Message:   fmt.Sprintf("duplicate display_name '%s' within kind 'tp'", spec.Name),
 		}}
 	}
 

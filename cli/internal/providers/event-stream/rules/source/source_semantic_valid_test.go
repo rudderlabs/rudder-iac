@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSourceSemanticValidRule_Metadata(t *testing.T) {
@@ -89,6 +90,66 @@ func TestSourceSemanticValid(t *testing.T) {
 		}
 
 		graph := resources.NewGraph()
+		results := validateSourceSemantic("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+}
+
+func sourceResource(id, name string) *resources.Resource {
+	return resources.NewResource(id, esSource.ResourceType, resources.ResourceData{"name": name}, nil)
+}
+
+func TestSourceSemanticValid_NameUniqueness(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unique source names", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Source Alpha"))
+		graph.AddResource(sourceResource("src-2", "Source Beta"))
+
+		spec := esSource.SourceSpec{
+			LocalID:          "src-1",
+			Name:             "Source Alpha",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemantic("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate source name detected", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Same Name"))
+		graph.AddResource(sourceResource("src-2", "Same Name"))
+
+		spec := esSource.SourceSpec{
+			LocalID:          "src-1",
+			Name:             "Same Name",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemantic("", "", nil, spec, graph)
+		require.Len(t, results, 1)
+		assert.Equal(t, "/name", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate name 'Same Name' within kind 'event-stream-source'")
+	})
+
+	t.Run("single source in graph — no false positive", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Only Source"))
+
+		spec := esSource.SourceSpec{
+			LocalID:          "src-1",
+			Name:             "Only Source",
+			SourceDefinition: "javascript",
+		}
+
 		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})

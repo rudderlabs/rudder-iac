@@ -30,7 +30,7 @@ func validateCategoryNameUniqueness(spec localcatalog.CategorySpec, graph *resou
 		if countMap[category.Name] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/categories/%d/name", i),
-				Message:   fmt.Sprintf("category with name '%s' is not unique across the catalog", category.Name),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'categories'", category.Name),
 			})
 		}
 	}

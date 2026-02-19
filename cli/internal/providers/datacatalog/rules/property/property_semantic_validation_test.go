@@ -255,7 +255,7 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("single in graph — no false positive", func(t *testing.T) {
@@ -295,7 +295,7 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("comma-separated type order ignored", func(t *testing.T) {
@@ -317,7 +317,7 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("same name and type but different itemTypes — not a duplicate", func(t *testing.T) {
@@ -365,7 +365,7 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("itemTypes order ignored in uniqueness check", func(t *testing.T) {
@@ -390,7 +390,7 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 		results := validatePropertySemantic(localcatalog.KindProperties, specs.SpecVersionV0_1, nil, spec, graph)
 
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 
 	t.Run("itemTypes with custom type ref — duplicate detected", func(t *testing.T) {
@@ -421,6 +421,6 @@ func TestPropertySemanticValid_Uniqueness(t *testing.T) {
 		results := validatePropertySemantic(localcatalog.KindProperties, specs.SpecVersionV0_1, nil, spec, graph)
 
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "not unique across the catalog")
+		assert.Contains(t, results[0].Message, "duplicate name")
 	})
 }

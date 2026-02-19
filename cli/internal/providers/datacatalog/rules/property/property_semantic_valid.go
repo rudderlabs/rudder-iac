@@ -114,7 +114,7 @@ func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources
 		if countMap[key] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d", i),
-				Message:   fmt.Sprintf("property with name '%s' and type '%s' is not unique across the catalog", prop.Name, prop.Type),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'properties'", prop.Name),
 			})
 		}
 	}

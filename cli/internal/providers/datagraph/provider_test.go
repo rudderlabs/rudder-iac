@@ -499,8 +499,15 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	require.NotNil(t, parsed)
 
 	// Should return data graph ID plus all inline model IDs and relationship IDs
-	expectedIDs := []string{"my-data-graph", "user", "order", "purchase", "user-orders", "purchase-user"}
-	assert.ElementsMatch(t, expectedIDs, parsed.ExternalIDs)
+	expectedLocalIDs := []specs.LocalID{
+		{ID: "my-data-graph", JSONPointerPath: "/spec/id"},
+		{ID: "user", JSONPointerPath: "/spec/models/0/id"},
+		{ID: "order", JSONPointerPath: "/spec/models/1/id"},
+		{ID: "purchase", JSONPointerPath: "/spec/models/2/id"},
+		{ID: "user-orders", JSONPointerPath: "/spec/models/0/relationships/0/id"},
+		{ID: "purchase-user", JSONPointerPath: "/spec/models/2/relationships/0/id"},
+	}
+	assert.ElementsMatch(t, expectedLocalIDs, parsed.LocalIDs)
 }
 
 func TestLoadSpec_RelationshipCardinalityConstraints(t *testing.T) {
