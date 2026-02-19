@@ -120,8 +120,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 	// First, try to extract a single "id" field
 	if id, ok := s.Spec["id"].(string); ok {
 		return &specs.ParsedSpec{
-			ExternalIDs: []string{id},
-			LocalIDs:    []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
+			LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
 		}, nil
 	}
 
@@ -129,12 +128,10 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 	if len(s.Spec) == 1 {
 		for specKey, value := range s.Spec {
 			if arr, ok := value.([]any); ok {
-				externalIDs := make([]string, 0, len(arr))
 				localIDs := make([]specs.LocalID, 0, len(arr))
 				for i, item := range arr {
 					if itemMap, ok := item.(map[string]any); ok {
 						if id, ok := itemMap["id"].(string); ok {
-							externalIDs = append(externalIDs, id)
 							localIDs = append(localIDs, specs.LocalID{
 								ID:              id,
 								JSONPointerPath: fmt.Sprintf("/spec/%s/%d/id", specKey, i),
@@ -146,7 +143,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 						return nil, fmt.Errorf("array item at index %d is not a map", i)
 					}
 				}
-				return &specs.ParsedSpec{ExternalIDs: externalIDs, LocalIDs: localIDs}, nil
+				return &specs.ParsedSpec{LocalIDs: localIDs}, nil
 			}
 		}
 	}

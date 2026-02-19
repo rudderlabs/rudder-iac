@@ -325,7 +325,10 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+					{ID: "id2", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: false,
 		},
@@ -358,7 +361,10 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+					{ID: "id2", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: true,
 			errorContains: "local_id from import metadata missing in spec: id3",
@@ -384,7 +390,11 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2", "id3"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+					{ID: "id2", JSONPointerPath: "/spec/id"},
+					{ID: "id3", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: false,
 		},
@@ -398,9 +408,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 					},
 				},
 			},
-			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
-			},
+			parsedSpec: &specs.ParsedSpec{},
 			expectedError: false,
 		},
 		{
@@ -412,7 +420,9 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: true,
 			errorContains: "failed to decode metadata",
@@ -451,7 +461,11 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1", "id2", "id3"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+					{ID: "id2", JSONPointerPath: "/spec/id"},
+					{ID: "id3", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: false,
 		},
@@ -489,7 +503,9 @@ func TestProject_ValidateSpec(t *testing.T) {
 				},
 			},
 			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{"id1"},
+				LocalIDs: []specs.LocalID{
+					{ID: "id1", JSONPointerPath: "/spec/id"},
+				},
 			},
 			expectedError: true,
 			errorContains: "local_id from import metadata missing in spec: id2, id3",
@@ -500,9 +516,7 @@ func TestProject_ValidateSpec(t *testing.T) {
 				Kind:     "Source",
 				Metadata: map[string]any{},
 			},
-			parsedSpec: &specs.ParsedSpec{
-				ExternalIDs: []string{},
-			},
+			parsedSpec:    &specs.ParsedSpec{},
 			expectedError: false,
 		},
 	}
