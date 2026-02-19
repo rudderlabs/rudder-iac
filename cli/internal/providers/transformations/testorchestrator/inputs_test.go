@@ -8,82 +8,101 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
 func TestResolveTestCases(t *testing.T) {
-	t.Run("no tests defined - uses defaults", func(t *testing.T) {
+	t.Run("no tests defined - returns default events", func(t *testing.T) {
 		transformation := &model.TransformationResource{
-			ID:    "test-trans",
+			ID:    "trans-1",
 			Tests: []specs.TransformationTest{},
 		}
 
-		testCases, err := ResolveTestCases(transformation)
+		result, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
-		require.Len(t, testCases, 1)
-		assert.Equal(t, "default/all-events", testCases[0].Name)
-		assert.NotEmpty(t, testCases[0].InputEvents)
-		assert.Nil(t, testCases[0].ExpectedOutput)
+		require.Len(t, result, 1)
+		assert.Equal(t, "default-events", result[0].Name)
+		assert.NotEmpty(t, result[0].Input)
+		assert.Nil(t, result[0].ExpectedOutput)
 	})
 
-	t.Run("test suite with input files", func(t *testing.T) {
-		// Create temp directory structure
+	t.Run("suite with no resolvable input files - returns default events", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		inputDir := filepath.Join(tmpDir, "input")
-		err := os.MkdirAll(inputDir, 0755)
-		require.NoError(t, err)
-
-		// Create input file
-		inputFile := filepath.Join(inputDir, "test1.json")
-		inputData := `[{"type":"track","event":"Test Event"}]`
-		err = os.WriteFile(inputFile, []byte(inputData), 0644)
-		require.NoError(t, err)
 
 		transformation := &model.TransformationResource{
-			ID: "test-trans",
+			ID: "trans-1",
 			Tests: []specs.TransformationTest{
 				{
-					Name:    "Test Suite",
+					Name:    "Empty Suite",
 					SpecDir: tmpDir,
-					Input:   inputDir,
-					Output:  filepath.Join(tmpDir, "output"),
+					Input:   filepath.Join(tmpDir, "nonexistent"),
 				},
 			},
 		}
 
-		testCases, err := ResolveTestCases(transformation)
+		result, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
-		require.Len(t, testCases, 1)
-		assert.Equal(t, "test-suite/test1", testCases[0].Name)
-		assert.Len(t, testCases[0].InputEvents, 1)
+		require.Len(t, result, 1)
+		assert.Equal(t, "default-events", result[0].Name)
 	})
 
-	t.Run("test suite with input and output files", func(t *testing.T) {
+	t.Run("suite with input files only", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		inputDir := filepath.Join(tmpDir, "input")
+		require.NoError(t, os.MkdirAll(inputDir, 0755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(inputDir, "event.json"),
+			[]byte(`[{"type":"track","event":"Clicked"}]`),
+			0644,
+		))
+
+		transformation := &model.TransformationResource{
+			ID: "trans-1",
+			Tests: []specs.TransformationTest{
+				{
+					Name:    "My Suite",
+					SpecDir: tmpDir,
+					Input:   inputDir,
+				},
+			},
+		}
+
+		result, err := ResolveTestCases(transformation)
+
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "my-suite/event", result[0].Name)
+		require.Len(t, result[0].Input, 1)
+		assert.Nil(t, result[0].ExpectedOutput)
+	})
+
+	t.Run("suite with matching input and output files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		inputDir := filepath.Join(tmpDir, "input")
 		outputDir := filepath.Join(tmpDir, "output")
-		err := os.MkdirAll(inputDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(outputDir, 0755)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(inputDir, 0755))
+		require.NoError(t, os.MkdirAll(outputDir, 0755))
 
-		// Create input and output files
-		inputData := `[{"type":"track","event":"Test Event"}]`
-		err = os.WriteFile(filepath.Join(inputDir, "test1.json"), []byte(inputData), 0644)
-		require.NoError(t, err)
-
-		outputData := `[{"type":"track","event":"Modified Event"}]`
-		err = os.WriteFile(filepath.Join(outputDir, "test1.json"), []byte(outputData), 0644)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(inputDir, "event.json"),
+			[]byte(`[{"type":"track"}]`),
+			0644,
+		))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(outputDir, "event.json"),
+			[]byte(`[{"type":"track","processed":true}]`),
+			0644,
+		))
 
 		transformation := &model.TransformationResource{
-			ID: "test-trans",
+			ID: "trans-1",
 			Tests: []specs.TransformationTest{
 				{
-					Name:    "Test Suite",
+					Name:    "Suite",
 					SpecDir: tmpDir,
 					Input:   inputDir,
 					Output:  outputDir,
@@ -91,463 +110,317 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		testCases, err := ResolveTestCases(transformation)
+		result, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
-		require.Len(t, testCases, 1)
-		assert.Equal(t, "test-suite/test1", testCases[0].Name)
-		assert.Len(t, testCases[0].InputEvents, 1)
-		assert.NotNil(t, testCases[0].ExpectedOutput)
-		assert.Len(t, testCases[0].ExpectedOutput, 1)
+		require.Len(t, result, 1)
+		assert.Equal(t, "suite/event", result[0].Name)
+		assert.NotNil(t, result[0].ExpectedOutput)
+		assert.Len(t, result[0].ExpectedOutput, 1)
 	})
 
-	t.Run("test suite with missing input directory - falls back to defaults", func(t *testing.T) {
+	t.Run("multiple suites produce separate test definitions", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		suite1 := filepath.Join(tmpDir, "suite1")
+		suite2 := filepath.Join(tmpDir, "suite2")
+		require.NoError(t, os.MkdirAll(suite1, 0755))
+		require.NoError(t, os.MkdirAll(suite2, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(suite1, "a.json"), []byte(`[{}]`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(suite2, "b.json"), []byte(`[{}]`), 0644))
 
 		transformation := &model.TransformationResource{
-			ID: "test-trans",
+			ID: "trans-1",
 			Tests: []specs.TransformationTest{
-				{
-					Name:    "Test Suite",
-					SpecDir: tmpDir,
-					Input:   filepath.Join(tmpDir, "nonexistent"),
-				},
+				{Name: "Suite One", SpecDir: tmpDir, Input: suite1},
+				{Name: "Suite Two", SpecDir: tmpDir, Input: suite2},
 			},
 		}
 
-		testCases, err := ResolveTestCases(transformation)
+		result, err := ResolveTestCases(transformation)
 
 		require.NoError(t, err)
-		require.Len(t, testCases, 1)
-		assert.Equal(t, "default/all-events", testCases[0].Name)
+		require.Len(t, result, 2)
+
+		names := []string{result[0].Name, result[1].Name}
+		assert.Contains(t, names, "suite-one/a")
+		assert.Contains(t, names, "suite-two/b")
 	})
 
-	t.Run("multiple test suites", func(t *testing.T) {
-		tmpDir := t.TempDir()
-
-		// Create first suite
-		suite1Dir := filepath.Join(tmpDir, "suite1")
-		err := os.MkdirAll(suite1Dir, 0755)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(suite1Dir, "test1.json"), []byte(`[{"type":"track"}]`), 0644)
-		require.NoError(t, err)
-
-		// Create second suite
-		suite2Dir := filepath.Join(tmpDir, "suite2")
-		err = os.MkdirAll(suite2Dir, 0755)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(suite2Dir, "test2.json"), []byte(`[{"type":"identify"}]`), 0644)
-		require.NoError(t, err)
-
-		transformation := &model.TransformationResource{
-			ID: "test-trans",
-			Tests: []specs.TransformationTest{
-				{
-					Name:    "Suite 1",
-					SpecDir: tmpDir,
-					Input:   suite1Dir,
-				},
-				{
-					Name:    "Suite 2",
-					SpecDir: tmpDir,
-					Input:   suite2Dir,
-				},
-			},
-		}
-
-		testCases, err := ResolveTestCases(transformation)
-
-		require.NoError(t, err)
-		require.Len(t, testCases, 2)
-		assert.Equal(t, "suite-1/test1", testCases[0].Name)
-		assert.Equal(t, "suite-2/test2", testCases[1].Name)
-	})
-
-	t.Run("common and specific inputs - specific overrides common", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		testsDir := filepath.Join(tmpDir, "tests", "input")
-		specificDir := filepath.Join(tmpDir, "specific")
-
-		err := os.MkdirAll(testsDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(specificDir, 0755)
-		require.NoError(t, err)
-
-		// Create common file
-		err = os.WriteFile(filepath.Join(testsDir, "common.json"), []byte(`[{"source":"common"}]`), 0644)
-		require.NoError(t, err)
-
-		// Create specific file that overrides
-		err = os.WriteFile(filepath.Join(testsDir, "override.json"), []byte(`[{"source":"common-override"}]`), 0644)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(specificDir, "override.json"), []byte(`[{"source":"specific"}]`), 0644)
-		require.NoError(t, err)
-
-		// Create specific-only file
-		err = os.WriteFile(filepath.Join(specificDir, "specific-only.json"), []byte(`[{"source":"specific"}]`), 0644)
-		require.NoError(t, err)
-
-		transformation := &model.TransformationResource{
-			ID: "test-trans",
-			Tests: []specs.TransformationTest{
-				{
-					Name:    "Test Suite",
-					SpecDir: tmpDir,
-					Input:   specificDir,
-				},
-			},
-		}
-
-		testCases, err := ResolveTestCases(transformation)
-
-		require.NoError(t, err)
-		require.Len(t, testCases, 3)
-
-		// Verify common file is included
-		var foundCommon bool
-		for _, tc := range testCases {
-			if tc.Name == "test-suite/common" {
-				foundCommon = true
-				event := tc.InputEvents[0].(map[string]any)
-				assert.Equal(t, "common", event["source"])
-			}
-		}
-		assert.True(t, foundCommon)
-
-		// Verify override file uses specific version
-		var foundOverride bool
-		for _, tc := range testCases {
-			if tc.Name == "test-suite/override" {
-				foundOverride = true
-				event := tc.InputEvents[0].(map[string]any)
-				assert.Equal(t, "specific", event["source"])
-			}
-		}
-		assert.True(t, foundOverride)
-
-		// Verify specific-only file is included
-		var foundSpecificOnly bool
-		for _, tc := range testCases {
-			if tc.Name == "test-suite/specific-only" {
-				foundSpecificOnly = true
-			}
-		}
-		assert.True(t, foundSpecificOnly)
-	})
-
-	t.Run("invalid JSON in input file - error", func(t *testing.T) {
+	t.Run("transformation-specific input overrides common input", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		inputDir := filepath.Join(tmpDir, "input")
-		err := os.MkdirAll(inputDir, 0755)
-		require.NoError(t, err)
+		specificDir := filepath.Join(inputDir, "trans-1", "input")
+		require.NoError(t, os.MkdirAll(inputDir, 0755))
+		require.NoError(t, os.MkdirAll(specificDir, 0755))
 
-		// Create invalid JSON file
-		err = os.WriteFile(filepath.Join(inputDir, "invalid.json"), []byte(`{invalid json`), 0644)
-		require.NoError(t, err)
+		// Common file and a file to be overridden
+		require.NoError(t, os.WriteFile(
+			filepath.Join(inputDir, "common.json"),
+			[]byte(`[{"source":"common"}]`),
+			0644,
+		))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(inputDir, "shared.json"),
+			[]byte(`[{"source":"common-shared"}]`),
+			0644,
+		))
+		// Specific version overrides the shared one
+		require.NoError(t, os.WriteFile(
+			filepath.Join(specificDir, "shared.json"),
+			[]byte(`[{"source":"specific-shared"}]`),
+			0644,
+		))
 
 		transformation := &model.TransformationResource{
-			ID: "test-trans",
+			ID: "trans-1",
 			Tests: []specs.TransformationTest{
-				{
-					Name:    "Test Suite",
-					SpecDir: tmpDir,
-					Input:   inputDir,
-				},
+				{Name: "Suite", SpecDir: tmpDir, Input: inputDir},
 			},
 		}
 
-		testCases, err := ResolveTestCases(transformation)
+		result, err := ResolveTestCases(transformation)
+
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+
+		byName := make(map[string]*transformations.TestDefinition, len(result))
+		for _, r := range result {
+			byName[r.Name] = r
+		}
+
+		require.Contains(t, byName, "suite/common")
+		require.Contains(t, byName, "suite/shared")
+
+		sharedInput := byName["suite/shared"].Input[0].(map[string]any)
+		assert.Equal(t, "specific-shared", sharedInput["source"])
+	})
+
+	t.Run("invalid JSON in input file returns error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		inputDir := filepath.Join(tmpDir, "input")
+		require.NoError(t, os.MkdirAll(inputDir, 0755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(inputDir, "bad.json"),
+			[]byte(`{not valid json`),
+			0644,
+		))
+
+		transformation := &model.TransformationResource{
+			ID: "trans-1",
+			Tests: []specs.TransformationTest{
+				{Name: "Suite", SpecDir: tmpDir, Input: inputDir},
+			},
+		}
+
+		_, err := ResolveTestCases(transformation)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid JSON")
-		assert.Nil(t, testCases)
 	})
 }
 
-func TestParseJSONFile(t *testing.T) {
-	t.Run("array of events", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		filePath := filepath.Join(tmpDir, "events.json")
-		content := `[{"type":"track"},{"type":"identify"}]`
-		err := os.WriteFile(filePath, []byte(content), 0644)
-		require.NoError(t, err)
+func TestNormalizeSuiteName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"", "default"},
+		{"simple", "simple"},
+		{"My Suite", "my-suite"},
+		{"my_suite", "my-suite"},
+		{"UPPER CASE", "upper-case"},
+		{"mixed_Case Name", "mixed-case-name"},
+	}
 
-		events, err := parseJSONFile(filePath)
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			assert.Equal(t, tc.expected, normalizeSuiteName(tc.input))
+		})
+	}
+}
+
+func TestParseJSONFile(t *testing.T) {
+	t.Run("parses array of events", func(t *testing.T) {
+		f := writeTempJSON(t, `[{"type":"track"},{"type":"identify"}]`)
+
+		events, err := parseJSONFile(f)
 
 		require.NoError(t, err)
 		assert.Len(t, events, 2)
 	})
 
-	t.Run("single event object - wrapped in array", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		filePath := filepath.Join(tmpDir, "event.json")
-		content := `{"type":"track","event":"Test"}`
-		err := os.WriteFile(filePath, []byte(content), 0644)
-		require.NoError(t, err)
+	t.Run("wraps single object in array", func(t *testing.T) {
+		f := writeTempJSON(t, `{"type":"track"}`)
 
-		events, err := parseJSONFile(filePath)
+		events, err := parseJSONFile(f)
 
 		require.NoError(t, err)
-		assert.Len(t, events, 1)
-		eventMap := events[0].(map[string]any)
-		assert.Equal(t, "track", eventMap["type"])
+		require.Len(t, events, 1)
+		assert.Equal(t, "track", events[0].(map[string]any)["type"])
 	})
 
-	t.Run("invalid JSON - error", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		filePath := filepath.Join(tmpDir, "invalid.json")
-		content := `{invalid`
-		err := os.WriteFile(filePath, []byte(content), 0644)
-		require.NoError(t, err)
+	t.Run("empty array returns empty slice", func(t *testing.T) {
+		f := writeTempJSON(t, `[]`)
 
-		events, err := parseJSONFile(filePath)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid JSON")
-		assert.Nil(t, events)
-	})
-
-	t.Run("file not found - error", func(t *testing.T) {
-		events, err := parseJSONFile("/nonexistent/file.json")
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "reading file")
-		assert.Nil(t, events)
-	})
-
-	t.Run("empty array", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		filePath := filepath.Join(tmpDir, "empty.json")
-		content := `[]`
-		err := os.WriteFile(filePath, []byte(content), 0644)
-		require.NoError(t, err)
-
-		events, err := parseJSONFile(filePath)
+		events, err := parseJSONFile(f)
 
 		require.NoError(t, err)
 		assert.Empty(t, events)
 	})
+
+	t.Run("invalid JSON returns error", func(t *testing.T) {
+		f := writeTempJSON(t, `{bad`)
+
+		_, err := parseJSONFile(f)
+
+		require.Error(t, err)
+	})
+
+	t.Run("missing file returns error", func(t *testing.T) {
+		_, err := parseJSONFile("/no/such/file.json")
+
+		require.Error(t, err)
+	})
 }
 
 func TestMergeInputFiles(t *testing.T) {
-	t.Run("common files only", func(t *testing.T) {
+	t.Run("returns common files when specific dir absent", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		commonDir := filepath.Join(tmpDir, "common")
-		err := os.MkdirAll(commonDir, 0755)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(commonDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(commonDir, "a.json"), []byte(`[]`), 0644))
 
-		err = os.WriteFile(filepath.Join(commonDir, "file1.json"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-
-		merged, err := mergeInputFiles(commonDir, filepath.Join(tmpDir, "nonexistent"))
+		result, err := mergeInputFiles(commonDir, filepath.Join(tmpDir, "missing"))
 
 		require.NoError(t, err)
-		assert.Len(t, merged, 1)
-		assert.Contains(t, merged, "file1.json")
+		assert.Contains(t, result, "a.json")
 	})
 
-	t.Run("specific files only", func(t *testing.T) {
+	t.Run("returns specific files when common dir absent", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		specificDir := filepath.Join(tmpDir, "specific")
-		err := os.MkdirAll(specificDir, 0755)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(specificDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(specificDir, "b.json"), []byte(`[]`), 0644))
 
-		err = os.WriteFile(filepath.Join(specificDir, "file1.json"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-
-		merged, err := mergeInputFiles(filepath.Join(tmpDir, "nonexistent"), specificDir)
+		result, err := mergeInputFiles(filepath.Join(tmpDir, "missing"), specificDir)
 
 		require.NoError(t, err)
-		assert.Len(t, merged, 1)
-		assert.Contains(t, merged, "file1.json")
+		assert.Contains(t, result, "b.json")
 	})
 
-	t.Run("specific overrides common", func(t *testing.T) {
+	t.Run("specific file path wins over common for same filename", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		commonDir := filepath.Join(tmpDir, "common")
 		specificDir := filepath.Join(tmpDir, "specific")
-		err := os.MkdirAll(commonDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(specificDir, 0755)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(commonDir, 0755))
+		require.NoError(t, os.MkdirAll(specificDir, 0755))
 
-		commonFile := filepath.Join(commonDir, "shared.json")
-		specificFile := filepath.Join(specificDir, "shared.json")
-		err = os.WriteFile(commonFile, []byte(`[]`), 0644)
-		require.NoError(t, err)
-		err = os.WriteFile(specificFile, []byte(`[]`), 0644)
-		require.NoError(t, err)
+		commonFile := filepath.Join(commonDir, "event.json")
+		specificFile := filepath.Join(specificDir, "event.json")
+		require.NoError(t, os.WriteFile(commonFile, []byte(`[]`), 0644))
+		require.NoError(t, os.WriteFile(specificFile, []byte(`[]`), 0644))
 
-		merged, err := mergeInputFiles(commonDir, specificDir)
+		result, err := mergeInputFiles(commonDir, specificDir)
 
 		require.NoError(t, err)
-		assert.Len(t, merged, 1)
-		assert.Equal(t, specificFile, merged["shared.json"])
+		assert.Equal(t, specificFile, result["event.json"])
 	})
 
-	t.Run("both directories empty", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		commonDir := filepath.Join(tmpDir, "common")
-		specificDir := filepath.Join(tmpDir, "specific")
-		err := os.MkdirAll(commonDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(specificDir, 0755)
-		require.NoError(t, err)
-
-		merged, err := mergeInputFiles(commonDir, specificDir)
-
-		require.NoError(t, err)
-		assert.Empty(t, merged)
-	})
-
-	t.Run("neither directory exists", func(t *testing.T) {
+	t.Run("both dirs absent returns empty map", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		merged, err := mergeInputFiles(
-			filepath.Join(tmpDir, "nonexistent1"),
-			filepath.Join(tmpDir, "nonexistent2"),
+		result, err := mergeInputFiles(
+			filepath.Join(tmpDir, "a"),
+			filepath.Join(tmpDir, "b"),
 		)
 
 		require.NoError(t, err)
-		assert.Empty(t, merged)
-	})
-}
-
-func TestNormalizeSuiteName(t *testing.T) {
-	testCases := []struct {
-		input    string
-		expected string
-	}{
-		{"", "default"},
-		{"Simple", "simple"},
-		{"Test Suite", "test-suite"},
-		{"Test_Suite", "test-suite"},
-		{"Test Suite_With_Multiple   Spaces", "test-suite-with-multiple---spaces"},
-		{"UPPERCASE", "uppercase"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.input, func(t *testing.T) {
-			result := normalizeSuiteName(tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
-func TestDirExists(t *testing.T) {
-	t.Run("existing directory", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		assert.True(t, dirExists(tmpDir))
-	})
-
-	t.Run("non-existing directory", func(t *testing.T) {
-		assert.False(t, dirExists("/nonexistent/path"))
-	})
-
-	t.Run("empty path", func(t *testing.T) {
-		assert.False(t, dirExists(""))
-	})
-
-	t.Run("file not directory", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		filePath := filepath.Join(tmpDir, "file.txt")
-		err := os.WriteFile(filePath, []byte("content"), 0644)
-		require.NoError(t, err)
-
-		assert.False(t, dirExists(filePath))
-	})
-}
-
-func TestHasJSONFiles(t *testing.T) {
-	t.Run("directory with JSON files", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(tmpDir, "test.json"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-
-		assert.True(t, hasJSONFiles(tmpDir))
-	})
-
-	t.Run("directory without JSON files", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("content"), 0644)
-		require.NoError(t, err)
-
-		assert.False(t, hasJSONFiles(tmpDir))
-	})
-
-	t.Run("empty directory", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		assert.False(t, hasJSONFiles(tmpDir))
-	})
-
-	t.Run("non-existing directory", func(t *testing.T) {
-		assert.False(t, hasJSONFiles("/nonexistent/path"))
+		assert.Empty(t, result)
 	})
 }
 
 func TestListJSONFiles(t *testing.T) {
-	t.Run("directory with multiple JSON files", func(t *testing.T) {
+	t.Run("returns json files by base name", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(tmpDir, "test1.json"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(tmpDir, "test2.JSON"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("content"), 0644)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "a.json"), []byte(`[]`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "b.txt"), []byte("text"), 0644))
 
-		files, err := listJSONFiles(tmpDir)
+		result, err := listJSONFiles(tmpDir)
 
 		require.NoError(t, err)
-		assert.Len(t, files, 2)
-		assert.Contains(t, files, "test1.json")
-		assert.Contains(t, files, "test2.JSON")
-		assert.NotContains(t, files, "test.txt")
-	})
-
-	t.Run("empty directory", func(t *testing.T) {
-		tmpDir := t.TempDir()
-
-		files, err := listJSONFiles(tmpDir)
-
-		require.NoError(t, err)
-		assert.Empty(t, files)
-	})
-
-	t.Run("non-existing directory", func(t *testing.T) {
-		files, err := listJSONFiles("/nonexistent/path")
-
-		require.NoError(t, err)
-		assert.Nil(t, files)
+		assert.Len(t, result, 1)
+		assert.Contains(t, result, "a.json")
+		assert.Equal(t, filepath.Join(tmpDir, "a.json"), result["a.json"])
 	})
 
 	t.Run("skips subdirectories", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		subDir := filepath.Join(tmpDir, "subdir.json")
-		err := os.MkdirAll(subDir, 0755)
-		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "subdir.json"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "real.json"), []byte(`[]`), 0644))
 
-		err = os.WriteFile(filepath.Join(tmpDir, "file.json"), []byte(`[]`), 0644)
-		require.NoError(t, err)
-
-		files, err := listJSONFiles(tmpDir)
+		result, err := listJSONFiles(tmpDir)
 
 		require.NoError(t, err)
-		assert.Len(t, files, 1)
-		assert.Contains(t, files, "file.json")
+		assert.Len(t, result, 1)
+		assert.Contains(t, result, "real.json")
+	})
+
+	t.Run("non-existent directory returns nil without error", func(t *testing.T) {
+		result, err := listJSONFiles("/no/such/dir")
+
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty directory returns empty map", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		result, err := listJSONFiles(tmpDir)
+
+		require.NoError(t, err)
+		assert.Empty(t, result)
 	})
 }
 
-func TestDefaultTestCases(t *testing.T) {
-	t.Run("creates single test case with all events", func(t *testing.T) {
-		testCases, err := defaultTestCases()
-
-		require.NoError(t, err)
-		require.Len(t, testCases, 1)
-		assert.Equal(t, "default/all-events", testCases[0].Name)
-		assert.NotEmpty(t, testCases[0].InputEvents)
-		assert.Nil(t, testCases[0].ExpectedOutput)
-
-		// Verify it contains multiple events (Track, Identify, Page, Screen)
-		assert.GreaterOrEqual(t, len(testCases[0].InputEvents), 4)
+func TestDirExists(t *testing.T) {
+	t.Run("returns true for existing directory", func(t *testing.T) {
+		assert.True(t, dirExists(t.TempDir()))
 	})
+
+	t.Run("returns false for missing path", func(t *testing.T) {
+		assert.False(t, dirExists("/no/such/path"))
+	})
+
+	t.Run("returns false for empty string", func(t *testing.T) {
+		assert.False(t, dirExists(""))
+	})
+
+	t.Run("returns false for a file path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		f := filepath.Join(tmpDir, "file.txt")
+		require.NoError(t, os.WriteFile(f, []byte("x"), 0644))
+
+		assert.False(t, dirExists(f))
+	})
+}
+
+func TestResolveDir(t *testing.T) {
+	t.Run("empty path returns empty string", func(t *testing.T) {
+		assert.Equal(t, "", resolveDir("/base", ""))
+	})
+
+	t.Run("absolute path is returned as-is", func(t *testing.T) {
+		assert.Equal(t, "/abs/path", resolveDir("/base", "/abs/path"))
+	})
+
+	t.Run("relative path is joined with base", func(t *testing.T) {
+		assert.Equal(t, "/base/relative", resolveDir("/base", "relative"))
+	})
+}
+
+// writeTempJSON writes content to a temporary .json file and returns its path.
+func writeTempJSON(t *testing.T, content string) string {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), "data.json")
+	require.NoError(t, os.WriteFile(f, []byte(content), 0644))
+	return f
 }

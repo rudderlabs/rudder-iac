@@ -3,104 +3,76 @@ package testorchestrator
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 
+	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
-// TestCase represents a single test case with input events and expected output
-type TestCase struct {
-	Name           string // Relative path to filename excluding extension
-	InputEvents    []any  // Array of input event payloads
-	ExpectedOutput []any  // Expected output (nil if no output file)
-}
-
 // ResolveTestCases resolves test cases for a transformation.
 // It merges common and transformation-specific inputs, falling back to defaults if needed.
-func ResolveTestCases(transformation *model.TransformationResource) ([]TestCase, error) {
+func ResolveTestCases(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
 		log.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
 		return defaultTestCases()
 	}
 
-	// Check if any suite has input files
-	hasInputFiles := false
+	// Build test definitions from all suites
+	var allTestDefs []*transformations.TestDefinition
 	for _, suite := range transformation.Tests {
-		inputDir := suite.Input
-		if inputDir != "" && dirExists(inputDir) && hasJSONFiles(inputDir) {
-			hasInputFiles = true
-			break
-		}
-	}
-
-	// If no input files found, use defaults with warning
-	if !hasInputFiles {
-		log.Warn("No test input files found for transformation, using default events", "transformationID", transformation.ID)
-		return defaultTestCases()
-	}
-
-	// Build test cases from all suites
-	var allTestCases []TestCase
-	for _, suite := range transformation.Tests {
-		testCases, err := buildTestCasesForSuite(suite)
+		testDefs, err := buildTestCasesForSuite(suite, transformation.ID)
 		if err != nil {
 			return nil, fmt.Errorf("building test cases for suite %s: %w", suite.Name, err)
 		}
-		allTestCases = append(allTestCases, testCases...)
+		allTestDefs = append(allTestDefs, testDefs...)
 	}
 
-	if len(allTestCases) == 0 {
+	// If no test definitions found, use defaults with warning
+	if len(allTestDefs) == 0 {
 		log.Warn("No test cases found, using default events", "transformationID", transformation.ID)
 		return defaultTestCases()
 	}
 
-	return allTestCases, nil
+	return allTestDefs, nil
 }
 
 // buildTestCasesForSuite builds test cases for a single suite
-func buildTestCasesForSuite(suite specs.TransformationTest) ([]TestCase, error) {
-	// SpecDir is populated by handler during spec resolution (Phase 1)
-	inputDir := suite.Input
-	outputDir := suite.Output
+// 1. Common: specDir/suite.Input/
+// 2. Transformation-specific: specDir/suite.Input/<transformationID>/input/
+// Files in transformation-specific directory override common files with the same name.
+func buildTestCasesForSuite(suite specs.TransformationTest, transformationID string) ([]*transformations.TestDefinition, error) {
+	// Resolve relative paths against SpecDir (set during spec loading)
+	inputDir := resolveDir(suite.SpecDir, suite.Input)
+	outputDir := resolveDir(suite.SpecDir, suite.Output)
 
-	// If input directory doesn't exist, skip this suite
-	if !dirExists(inputDir) {
-		log.Debug("Input directory does not exist", "suite", suite.Name, "dir", inputDir)
-		return nil, nil
-	}
-
-	// Build merged input file map (common + specific)
-	commonInputDir := filepath.Join(suite.SpecDir, "tests", "input")
-	inputFiles, err := mergeInputFiles(commonInputDir, inputDir)
+	transformationInputDir := filepath.Join(inputDir, transformationID, "input")
+	inputFiles, err := mergeInputFiles(inputDir, transformationInputDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("merging input files: %w", err)
 	}
 
 	if len(inputFiles) == 0 {
-		log.Debug("No input files found for suite", "suite", suite.Name)
+		log.Debug("No input files found for suite", "suite", suite.Name, "transformationID", transformationID)
 		return nil, nil
 	}
 
-	// Load output files if directory exists
-	outputFiles := make(map[string]string)
-	if dirExists(outputDir) {
-		files, err := listJSONFiles(outputDir)
-		if err != nil {
-			return nil, fmt.Errorf("listing output files: %w", err)
-		}
-		outputFiles = files
+	// Output files
+	transformationOutputDir := filepath.Join(outputDir, transformationID, "output")
+	outputFiles, err := mergeInputFiles(outputDir, transformationOutputDir)
+	if err != nil {
+		return nil, fmt.Errorf("merging output files: %w", err)
 	}
 
-	// Build test cases
-	var testCases []TestCase
+	// Build test definitions
+	var testDefs []*transformations.TestDefinition
 	suiteName := normalizeSuiteName(suite.Name)
 
 	for filename, fullPath := range inputFiles {
-		// Parse input events
 		inputEvents, err := parseJSONFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("parsing input file %s: %w", filename, err)
@@ -115,25 +87,22 @@ func buildTestCasesForSuite(suite specs.TransformationTest) ([]TestCase, error) 
 			}
 		}
 
-		// Create test case with relative path as name
 		testName := strings.TrimSuffix(filename, ".json")
 		if suiteName != "" && suiteName != "default" {
 			testName = fmt.Sprintf("%s/%s", suiteName, testName)
 		}
 
-		testCase := TestCase{
+		testDef := &transformations.TestDefinition{
 			Name:           testName,
-			InputEvents:    inputEvents,
+			Input:          inputEvents,
 			ExpectedOutput: expectedOutput,
 		}
-		testCases = append(testCases, testCase)
+		testDefs = append(testDefs, testDef)
 	}
 
-	return testCases, nil
+	return testDefs, nil
 }
 
-// mergeInputFiles merges common and specific input files.
-// Specific files override common files with the same name.
 // Returns a map of filename (base name) to full path.
 func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 	merged := make(map[string]string)
@@ -144,9 +113,7 @@ func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("listing common input files from %s: %w", commonDir, err)
 		}
-		for name, path := range commonFiles {
-			merged[name] = path
-		}
+		maps.Copy(merged, commonFiles)
 	}
 
 	// Load specific files (overrides common)
@@ -155,17 +122,14 @@ func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("listing specific input files from %s: %w", specificDir, err)
 		}
-		for name, path := range specificFiles {
-			merged[name] = path
-		}
+		maps.Copy(merged, specificFiles)
 	}
 
 	return merged, nil
 }
 
 // defaultTestCases creates test cases from embedded default events
-// All default events are included in a single test case's InputEvents array
-func defaultTestCases() ([]TestCase, error) {
+func defaultTestCases() ([]*transformations.TestDefinition, error) {
 	defaultEvents := GetDefaultEvents()
 
 	// Collect all events into a single array
@@ -174,14 +138,14 @@ func defaultTestCases() ([]TestCase, error) {
 		allEvents = append(allEvents, eventData)
 	}
 
-	// Create a single test case containing all default events
-	testCase := TestCase{
-		Name:           "default/all-events",
-		InputEvents:    allEvents,
+	// Create a single test definition containing all default events
+	testDef := &transformations.TestDefinition{
+		Name:           "default-events",
+		Input:          allEvents,
 		ExpectedOutput: nil,
 	}
 
-	return []TestCase{testCase}, nil
+	return []*transformations.TestDefinition{testDef}, nil
 }
 
 // parseJSONFile reads and parses a JSON file as an array of events
@@ -196,10 +160,8 @@ func parseJSONFile(path string) ([]any, error) {
 		// Try parsing as single event (not an array)
 		var singleEvent any
 		if err2 := json.Unmarshal(data, &singleEvent); err2 != nil {
-			// Invalid JSON - fail immediately as per requirements
 			return nil, fmt.Errorf("invalid JSON in file %s: %w", filepath.Base(path), err)
 		}
-		// Wrap single event in array
 		events = []any{singleEvent}
 	}
 
@@ -216,27 +178,6 @@ func normalizeSuiteName(name string) string {
 	name = strings.ReplaceAll(name, " ", "-")
 	name = strings.ReplaceAll(name, "_", "-")
 	return name
-}
-
-// dirExists checks if a directory exists
-func dirExists(path string) bool {
-	if path == "" {
-		return false
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}
-
-// hasJSONFiles checks if a directory contains any .json files
-func hasJSONFiles(dir string) bool {
-	files, err := listJSONFiles(dir)
-	if err != nil {
-		return false
-	}
-	return len(files) > 0
 }
 
 // listJSONFiles lists all .json files in a directory
@@ -264,4 +205,25 @@ func listJSONFiles(dir string) (map[string]string, error) {
 	}
 
 	return files, nil
+}
+
+func resolveDir(baseDir, path string) string {
+	if path == "" {
+		return ""
+	}
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(baseDir, path)
+}
+
+func dirExists(path string) bool {
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
