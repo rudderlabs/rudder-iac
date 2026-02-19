@@ -11,7 +11,7 @@ import (
 )
 
 // Helper function to wrap test results with definitions
-func wrapResults(result *transformations.TransformationTestResult, definitions []transformations.TestDefinition) *TransformationTestWithDefinitions {
+func wrapResults(result *transformations.TransformationTestResult, definitions []*transformations.TestDefinition) *TransformationTestWithDefinitions {
 	return &TransformationTestWithDefinitions{
 		Result:      result,
 		Definitions: definitions,
@@ -137,7 +137,7 @@ func TestFormatter_Display_VerboseMode_WithExpectedOutput(t *testing.T) {
 	formatter := NewFormatter(true)
 
 	// Define test definitions with expected output
-	testDefinitions := []transformations.TestDefinition{
+	testDefinitions := []*transformations.TestDefinition{
 		{
 			Name:           "test-with-expected",
 			Input:          []any{map[string]any{"type": "track"}},
