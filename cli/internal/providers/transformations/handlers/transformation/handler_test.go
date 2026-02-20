@@ -510,6 +510,64 @@ func TestValidateResource(t *testing.T) {
 			expectedError: true,
 			errorContains: "language must be javascript or python",
 		},
+		{
+			name: "valid test names with allowed characters",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: "Suite-1"},
+					{Name: "Suite_1"},
+					{Name: "Suite/1"},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "empty test name",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: ""},
+				},
+			},
+			expectedError: true,
+			errorContains: "test name is required",
+		},
+		{
+			name: "whitespace-only test name",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "    "},
+				},
+			},
+			expectedError: true,
+			errorContains: "test name is required",
+		},
+		{
+			name: "invalid test name character",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite@1"},
+				},
+			},
+			expectedError: true,
+			errorContains: "invalid test name",
+		},
 	}
 
 	for _, tc := range testCases {

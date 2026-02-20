@@ -13,19 +13,21 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
+var JsonExt = ".json"
+
 // ResolveTestCases resolves test cases for a transformation.
 // It merges common and transformation-specific inputs, falling back to defaults if needed.
-func ResolveTestCases(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
+func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
 		log.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
-		return defaultTestCases()
+		return defaultTestDefinitions()
 	}
 
 	// Build test definitions from all suites
 	var allTestDefs []*transformations.TestDefinition
 	for _, suite := range transformation.Tests {
-		testDefs, err := buildTestCasesForSuite(suite, transformation.ID)
+		testDefs, err := buildTestDefinitionsForSuite(suite, transformation.ID)
 		if err != nil {
 			return nil, fmt.Errorf("building test cases for suite %s: %w", suite.Name, err)
 		}
@@ -35,7 +37,7 @@ func ResolveTestCases(transformation *model.TransformationResource) ([]*transfor
 	// If no test definitions found, use defaults with warning
 	if len(allTestDefs) == 0 {
 		log.Warn("No test cases found, using default events", "transformationID", transformation.ID)
-		return defaultTestCases()
+		return defaultTestDefinitions()
 	}
 
 	return allTestDefs, nil
@@ -45,7 +47,7 @@ func ResolveTestCases(transformation *model.TransformationResource) ([]*transfor
 // 1. Common: specDir/suite.Input/
 // 2. Transformation-specific: specDir/suite.Input/<transformationID>/input/
 // Files in transformation-specific directory override common files with the same name.
-func buildTestCasesForSuite(suite specs.TransformationTest, transformationID string) ([]*transformations.TestDefinition, error) {
+func buildTestDefinitionsForSuite(suite specs.TransformationTest, transformationID string) ([]*transformations.TestDefinition, error) {
 	// Resolve relative paths against SpecDir (set during spec loading)
 	inputDir := resolveDir(suite.SpecDir, suite.Input)
 	outputDir := resolveDir(suite.SpecDir, suite.Output)
@@ -61,16 +63,13 @@ func buildTestCasesForSuite(suite specs.TransformationTest, transformationID str
 		return nil, nil
 	}
 
-	// Output files
 	transformationOutputDir := filepath.Join(outputDir, transformationID, "output")
 	outputFiles, err := mergeInputFiles(outputDir, transformationOutputDir)
 	if err != nil {
 		return nil, fmt.Errorf("merging output files: %w", err)
 	}
 
-	// Build test definitions
 	var testDefs []*transformations.TestDefinition
-	suiteName := normalizeSuiteName(suite.Name)
 
 	for filename, fullPath := range inputFiles {
 		inputEvents, err := parseJSONFile(fullPath)
@@ -78,7 +77,6 @@ func buildTestCasesForSuite(suite specs.TransformationTest, transformationID str
 			return nil, fmt.Errorf("parsing input file %s: %w", filename, err)
 		}
 
-		// Parse expected output if exists
 		var expectedOutput []any
 		if outputPath, exists := outputFiles[filename]; exists {
 			expectedOutput, err = parseJSONFile(outputPath)
@@ -87,13 +85,9 @@ func buildTestCasesForSuite(suite specs.TransformationTest, transformationID str
 			}
 		}
 
-		testName := strings.TrimSuffix(filename, ".json")
-		if suiteName != "" && suiteName != "default" {
-			testName = fmt.Sprintf("%s/%s", suiteName, testName)
-		}
-
+		testName := strings.TrimSuffix(filename, JsonExt)
 		testDef := &transformations.TestDefinition{
-			Name:           testName,
+			Name:           fmt.Sprintf("%s/%s", suite.Name, testName),
 			Input:          inputEvents,
 			ExpectedOutput: expectedOutput,
 		}
@@ -128,17 +122,14 @@ func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
 	return merged, nil
 }
 
-// defaultTestCases creates test cases from embedded default events
-func defaultTestCases() ([]*transformations.TestDefinition, error) {
+func defaultTestDefinitions() ([]*transformations.TestDefinition, error) {
 	defaultEvents := GetDefaultEvents()
 
-	// Collect all events into a single array
 	var allEvents []any
 	for _, eventData := range defaultEvents {
 		allEvents = append(allEvents, eventData)
 	}
 
-	// Create a single test definition containing all default events
 	testDef := &transformations.TestDefinition{
 		Name:           "default-events",
 		Input:          allEvents,
@@ -148,7 +139,6 @@ func defaultTestCases() ([]*transformations.TestDefinition, error) {
 	return []*transformations.TestDefinition{testDef}, nil
 }
 
-// parseJSONFile reads and parses a JSON file as an array of events
 func parseJSONFile(path string) ([]any, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -166,18 +156,6 @@ func parseJSONFile(path string) ([]any, error) {
 	}
 
 	return events, nil
-}
-
-// normalizeSuiteName converts a suite name to lowercase-with-dashes format
-func normalizeSuiteName(name string) string {
-	if name == "" {
-		return "default"
-	}
-	// Replace spaces and underscores with dashes, convert to lowercase
-	name = strings.ToLower(name)
-	name = strings.ReplaceAll(name, " ", "-")
-	name = strings.ReplaceAll(name, "_", "-")
-	return name
 }
 
 // listJSONFiles lists all .json files in a directory
@@ -199,7 +177,7 @@ func listJSONFiles(dir string) (map[string]string, error) {
 		}
 
 		name := entry.Name()
-		if strings.HasSuffix(strings.ToLower(name), ".json") {
+		if strings.HasSuffix(strings.ToLower(name), JsonExt) {
 			files[name] = filepath.Join(dir, name)
 		}
 	}

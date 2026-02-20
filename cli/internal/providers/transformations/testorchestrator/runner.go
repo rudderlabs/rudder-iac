@@ -20,7 +20,6 @@ import (
 
 var log = logger.New("testorchestrator")
 
-// Runner orchestrates the entire test execution flow
 type Runner struct {
 	provider    *transformationsprovider.Provider
 	store       transformations.TransformationStore
@@ -28,7 +27,6 @@ type Runner struct {
 	workspaceID string
 }
 
-// NewRunner creates a new test runner
 func NewRunner(client *client.Client, provider *transformationsprovider.Provider, graph *resources.Graph, workspaceID string) *Runner {
 	store := transformations.NewRudderTransformationStore(client)
 
@@ -41,6 +39,7 @@ func NewRunner(client *client.Client, provider *transformationsprovider.Provider
 }
 
 // TransformationTestWithDefinitions combines test results with their original definitions
+// Uses definitions to display the input and output events for the test
 type TransformationTestWithDefinitions struct {
 	Result      *transformations.TransformationTestResult
 	Definitions []*transformations.TestDefinition
@@ -113,9 +112,9 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	// Build test unit tasks with pre-resolved versions and test definitions
 	unitTasks := make([]*testUnitTask, 0, len(testPlan.TestUnits))
 	for _, unit := range testPlan.TestUnits {
-		testDefs, err := ResolveTestCases(unit.Transformation)
+		testDefs, err := ResolveTestDefinitions(unit.Transformation)
 		if err != nil {
-			return nil, fmt.Errorf("resolving test cases for %s: %w", unit.Transformation.ID, err)
+			return nil, fmt.Errorf("resolving test definitions for %s: %w", unit.Transformation.ID, err)
 		}
 		log.Debug("Resolved test definitions", "transformation", unit.Transformation.ID, "count", len(testDefs))
 
@@ -130,7 +129,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 			Name:                  unit.Transformation.Name,
 			testDefs:              testDefs,
 			transformationVersion: transformationVersionID,
-			libraryVersionIDs:     getLibraryVersionsForUnit(unit, libraryVersionMap),
+			libraryVersionIDs:     getVersionIDsForUnitLibraries(unit.Libraries, libraryVersionMap),
 		})
 	}
 
@@ -193,8 +192,7 @@ func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan 
 	return runTransformationVersionTasks(ctx, r.store, tasks)
 }
 
-// resolveTransformationVersionFromTask resolves a single transformation's versionID
-// resolveAllLibraryVersions resolves versionIDs for all unique libraries in the test plan,
+// resolveAllLibraryVersions fetches versionIDs for all unique libraries in the test plan,
 // including both transformation-dependent and standalone libraries.
 // Returns a map of library ID to versionID.
 func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
@@ -227,8 +225,8 @@ func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPl
 }
 
 // getLibraryVersionsForUnit extracts library versionIDs for a specific test unit
-func getLibraryVersionsForUnit(unit *TestUnit, libraryVersionMap map[string]string) []string {
-	return lo.FilterMap(unit.Libraries, func(lib *model.LibraryResource, _ int) (string, bool) {
+func getVersionIDsForUnitLibraries(libraries []*model.LibraryResource, libraryVersionMap map[string]string) []string {
+	return lo.FilterMap(libraries, func(lib *model.LibraryResource, _ int) (string, bool) {
 		versionID, exists := libraryVersionMap[lib.ID]
 		return versionID, exists
 	})

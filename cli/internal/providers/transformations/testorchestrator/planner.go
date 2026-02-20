@@ -62,8 +62,10 @@ func NewPlanner(graph *resources.Graph) *Planner {
 
 // BuildPlan determines which transformations to test based on mode and remote graph
 func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
-	transformations := p.graph.ResourcesByType(p.transformationType)
-	libraries := p.graph.ResourcesByType(p.libraryType)
+	var (
+		transformations = p.graph.ResourcesByType(p.transformationType)
+		libraries       = p.graph.ResourcesByType(p.libraryType)
+	)
 
 	// Compute diff to identify new/updated/unmodified resources
 	diff := differ.ComputeDiff(remoteGraph, p.graph, differ.DiffOptions{
@@ -96,7 +98,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 		return nil, err
 	}
 
-	standaloneLibraryModels := lo.FilterMap(standaloneLibs, func(r *resources.Resource, _ int) (*model.LibraryResource, bool) {
+	standaloneLibraries := lo.FilterMap(standaloneLibs, func(r *resources.Resource, _ int) (*model.LibraryResource, bool) {
 		lib, ok := libByURN[r.URN()]
 		return lib, ok
 	})
@@ -108,7 +110,7 @@ func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, m
 
 	return &TestPlan{
 		TestUnits:                  testUnits,
-		StandaloneLibraries:        standaloneLibraryModels,
+		StandaloneLibraries:        standaloneLibraries,
 		ModifiedLibraryURNs:        modifiedLibraryURNs,
 		ModifiedTransformationURNs: modifiedTransformationURNs,
 	}, nil
@@ -238,22 +240,21 @@ func (p *Planner) isModified(resource, remote *resources.Resource, resourceType 
 	return true
 }
 
-// findDependentTransformations finds all transformations that depend on a library
-func (p *Planner) findDependentTransformations(libraryResource *resources.Resource, transformations []*resources.Resource) []*resources.Resource {
+func (p *Planner) findDependentTransformations(library *resources.Resource, transformations []*resources.Resource) []*resources.Resource {
 	return lo.Filter(transformations, func(t *resources.Resource, _ int) bool {
-		return lo.Contains(p.graph.GetDependencies(t.URN()), libraryResource.URN())
+		return lo.Contains(p.graph.GetDependencies(t.URN()), library.URN())
 	})
 }
 
-// buildLibraryLookup extracts model data from library resources into a URN-keyed map
+// URN to LibraryResource map
 func (p *Planner) buildLibraryLookup(libraries []*resources.Resource) (map[string]*model.LibraryResource, error) {
 	libByURN := make(map[string]*model.LibraryResource, len(libraries))
-	for _, libRes := range libraries {
-		libData, ok := libRes.RawData().(*model.LibraryResource)
+	for _, library := range libraries {
+		libData, ok := library.RawData().(*model.LibraryResource)
 		if !ok {
-			return nil, fmt.Errorf("extracting library data for %s", libRes.ID())
+			return nil, fmt.Errorf("extracting library data for %s", library.ID())
 		}
-		libByURN[libRes.URN()] = libData
+		libByURN[library.URN()] = libData
 	}
 	return libByURN, nil
 }
@@ -261,20 +262,20 @@ func (p *Planner) buildLibraryLookup(libraries []*resources.Resource) (map[strin
 // buildTestUnits creates test units with library dependencies from the graph
 func (p *Planner) buildTestUnits(transformations []*resources.Resource, libByURN map[string]*model.LibraryResource) ([]*TestUnit, error) {
 	testUnits := make([]*TestUnit, 0, len(transformations))
-	for _, transformationRes := range transformations {
-		transformationData, ok := transformationRes.RawData().(*model.TransformationResource)
+	for _, transformation := range transformations {
+		transData, ok := transformation.RawData().(*model.TransformationResource)
 		if !ok {
-			return nil, fmt.Errorf("extracting transformation data for %s", transformationRes.ID())
+			return nil, fmt.Errorf("extracting transformation data for %s", transformation.ID())
 		}
 
-		deps := p.graph.GetDependencies(transformationRes.URN())
+		deps := p.graph.GetDependencies(transformation.URN())
 		libs := lo.FilterMap(deps, func(depURN string, _ int) (*model.LibraryResource, bool) {
 			lib, ok := libByURN[depURN]
 			return lib, ok
 		})
 
 		testUnits = append(testUnits, &TestUnit{
-			Transformation: transformationData,
+			Transformation: transData,
 			Libraries:      libs,
 		})
 	}
