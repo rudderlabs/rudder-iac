@@ -85,7 +85,6 @@ type SetExternalIDRequest struct {
 
 // TestDefinition defines the structure of a test case
 type TestDefinition struct {
-	ID             string `json:"id,omitempty"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
 	Input          []any  `json:"input"`
@@ -126,7 +125,6 @@ type TestError struct {
 
 // TestResult represents the result of a single test run
 type TestResult struct {
-	ID           string        `json:"id,omitempty"`
 	Name         string        `json:"name"`
 	Description  string        `json:"description,omitempty"`
 	Status       TestRunStatus `json:"status"`
@@ -142,8 +140,31 @@ type TestSuiteRunResult struct {
 
 // TransformationTestResult represents result for a single transformation's test suite
 type TransformationTestResult struct {
-	Name            string             `json:"name"`
-	VersionID       string             `json:"versionId"`
-	Imports         []string           `json:"imports,omitempty"`
-	TestSuiteResult TestSuiteRunResult `json:"testSuiteResult"`
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	VersionID  string             `json:"versionId"`
+	Imports    []string           `json:"imports,omitempty"`
+	Pass       bool               `json:"pass"`
+	TestSuiteResult TestSuiteRunResult `json:"testResult"`
+	Message    string             `json:"message,omitempty"`
+}
+
+// LibraryTestResult represents validation result for a library in batch test response
+type LibraryTestResult struct {
+	HandleName string `json:"handleName"`
+	VersionID  string `json:"versionId"`
+	Pass       bool   `json:"pass"`
+	Message    string `json:"message,omitempty"`
+}
+
+// ValidationOutput contains validation details for libraries and transformations
+type ValidationOutput struct {
+	Libraries       []LibraryTestResult        `json:"libraries,omitempty"`
+	Transformations []TransformationTestResult `json:"transformations,omitempty"`
+}
+
+type BatchTestResponse struct {
+	Pass             bool             `json:"pass"`
+	Message          string           `json:"message,omitempty"`
+	ValidationOutput ValidationOutput `json:"validationOutput"`
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -25,6 +27,8 @@ const (
 	DefaultInputPath  = "./input"
 	DefaultOutputPath = "./output"
 )
+
+var TestNameRegex = regexp.MustCompile(`^[A-Za-z0-9 _/\-]+$`)
 
 type TransformationHandler = handler.BaseHandler[
 	model.TransformationSpec,
@@ -156,6 +160,16 @@ func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, g
 
 	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
 		return fmt.Errorf("validating code syntax: %w", err)
+	}
+
+	for _, test := range resource.Tests {
+		if strings.TrimSpace(test.Name) == "" {
+			return fmt.Errorf("test name is required")
+		}
+
+		if !TestNameRegex.MatchString(test.Name) {
+			return fmt.Errorf("invalid test name %q: use only letters, numbers, spaces, '-', '_', or '/'", test.Name)
+		}
 	}
 
 	return nil
