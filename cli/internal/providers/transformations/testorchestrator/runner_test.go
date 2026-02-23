@@ -18,9 +18,9 @@ import (
 // --- Mock Implementations ---
 
 type mockTransformationStore struct {
-	batchTestFunc         func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
+	batchTestFunc        func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
 	createTransformation func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
-	createLibraryFunc     func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
+	createLibraryFunc    func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
 }
 
 func newMockStore() *mockTransformationStore {
@@ -96,107 +96,6 @@ func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transfo
 
 func newTestState() *state.State {
 	return state.EmptyState()
-}
-
-// --- HasFailures ---
-
-func TestHasFailures(t *testing.T) {
-	t.Run("returns false when all transformation tests pass", func(t *testing.T) {
-		results := &TestResults{
-			Transformations: []*TransformationTestWithDefinitions{
-				{Result: &transformations.TransformationTestResult{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusPass},
-							{Status: transformations.TestRunStatusPass},
-						},
-					},
-				}},
-			},
-		}
-
-		assert.False(t, results.HasFailures())
-	})
-
-	t.Run("returns true when any transformation test has fail status", func(t *testing.T) {
-		results := &TestResults{
-			Transformations: []*TransformationTestWithDefinitions{
-				{Result: &transformations.TransformationTestResult{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusPass},
-							{Status: transformations.TestRunStatusFail},
-						},
-					},
-				}},
-			},
-		}
-
-		assert.True(t, results.HasFailures())
-	})
-
-	t.Run("returns true when any transformation test has error status", func(t *testing.T) {
-		results := &TestResults{
-			Transformations: []*TransformationTestWithDefinitions{
-				{Result: &transformations.TransformationTestResult{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{
-							{Status: transformations.TestRunStatusError},
-						},
-					},
-				}},
-			},
-		}
-
-		assert.True(t, results.HasFailures())
-	})
-
-	t.Run("returns true when any library test did not pass", func(t *testing.T) {
-		results := &TestResults{
-			Libraries: []transformations.LibraryTestResult{
-				{Pass: true},
-				{Pass: false},
-			},
-		}
-
-		assert.True(t, results.HasFailures())
-	})
-
-	t.Run("returns false when all library tests pass", func(t *testing.T) {
-		results := &TestResults{
-			Libraries: []transformations.LibraryTestResult{
-				{Pass: true},
-				{Pass: true},
-			},
-		}
-
-		assert.False(t, results.HasFailures())
-	})
-
-	t.Run("returns false for empty results", func(t *testing.T) {
-		results := &TestResults{}
-
-		assert.False(t, results.HasFailures())
-	})
-
-	t.Run("returns true when one of many transformations has a failed test", func(t *testing.T) {
-		results := &TestResults{
-			Transformations: []*TransformationTestWithDefinitions{
-				{Result: &transformations.TransformationTestResult{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{{Status: transformations.TestRunStatusPass}},
-					},
-				}},
-				{Result: &transformations.TransformationTestResult{
-					TestSuiteResult: transformations.TestSuiteRunResult{
-						Results: []transformations.TestResult{{Status: transformations.TestRunStatusFail}},
-					},
-				}},
-			},
-		}
-
-		assert.True(t, results.HasFailures())
-	})
 }
 
 // --- buildTestRequest ---

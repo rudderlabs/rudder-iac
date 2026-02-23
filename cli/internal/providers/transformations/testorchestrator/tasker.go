@@ -132,7 +132,7 @@ func getTransformationVersionID(
 	remoteResource *state.ResourceState,
 ) (string, error) {
 	if isModified {
-		log.Debug("Uploading modified transformation", "transformation", transformation.ID)
+		testLogger.Debug("Uploading modified transformation", "transformation", transformation.ID)
 		versionID, err := StageTransformation(ctx, store, transformation, remoteResource)
 		if err != nil {
 			return "", fmt.Errorf("staging transformation %s: %w", transformation.ID, err)
@@ -149,7 +149,7 @@ func getTransformationVersionID(
 		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", transformation.ID)
 	}
 
-	log.Debug("Reusing existing transformation version", "transformation", transformation.ID, "versionId", transState.VersionID)
+	testLogger.Debug("Reusing existing transformation version", "transformation", transformation.ID, "versionId", transState.VersionID)
 	return transState.VersionID, nil
 }
 
@@ -222,7 +222,7 @@ func getLibraryVersionID(
 	remoteResource *state.ResourceState,
 ) (string, error) {
 	if isModified {
-		log.Debug("Uploading modified library", "library", library.ID)
+		testLogger.Debug("Uploading modified library", "library", library.ID)
 		versionID, err := StageLibrary(ctx, store, library, remoteResource)
 		if err != nil {
 			return "", fmt.Errorf("uploading library %s: %w", library.ID, err)
@@ -239,6 +239,6 @@ func getLibraryVersionID(
 		return "", fmt.Errorf("library %s in remote state has no valid versionId", library.ID)
 	}
 
-	log.Debug("Reusing existing library version", "library", library.ID, "versionId", libState.VersionID)
+	testLogger.Debug("Reusing existing library version", "library", library.ID, "versionId", libState.VersionID)
 	return libState.VersionID, nil
 }

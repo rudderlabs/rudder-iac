@@ -20,12 +20,12 @@ import (
 
 // mockTransformationStore implements the TransformationStore interface for testing
 type mockTransformationStore struct {
-	batchPublishCalled          bool
-	deleteTransformationCalled  bool
-	deleteLibraryCalled         bool
-	batchPublishFunc            func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error
-	deleteTransformationFunc    func(ctx context.Context, id string) error
-	deleteLibraryFunc           func(ctx context.Context, id string) error
+	batchPublishCalled         bool
+	deleteTransformationCalled bool
+	deleteLibraryCalled        bool
+	batchPublishFunc           func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error
+	deleteTransformationFunc   func(ctx context.Context, id string) error
+	deleteLibraryFunc          func(ctx context.Context, id string) error
 }
 
 func newMockTransformationStore() *mockTransformationStore {

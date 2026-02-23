@@ -20,7 +20,7 @@ var JsonExt = ".json"
 func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
-		log.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
+		testLogger.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
 		return defaultTestDefinitions()
 	}
 
@@ -36,7 +36,7 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 
 	// If no test definitions found, use defaults with warning
 	if len(allTestDefs) == 0 {
-		log.Warn("No test cases found, using default events", "transformationID", transformation.ID)
+		testLogger.Warn("No test cases found, using default events", "transformationID", transformation.ID)
 		return defaultTestDefinitions()
 	}
 
@@ -59,7 +59,7 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest, transformation
 	}
 
 	if len(inputFiles) == 0 {
-		log.Debug("No input files found for suite", "suite", suite.Name, "transformationID", transformationID)
+		testLogger.Debug("No input files found for suite", "suite", suite.Name, "transformationID", transformationID)
 		return nil, nil
 	}
 

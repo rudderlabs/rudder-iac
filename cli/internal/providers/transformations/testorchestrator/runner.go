@@ -18,7 +18,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-var log = logger.New("testorchestrator")
+// Type aliases for backwards compatibility
+type (
+	TransformationTestWithDefinitions = transformationsprovider.TransformationTestWithDefinitions
+	TestResults                       = transformationsprovider.TestResults
+)
+
+var testLogger = logger.New("testorchestrator")
 
 type Runner struct {
 	provider    *transformationsprovider.Provider
@@ -38,39 +44,9 @@ func NewRunner(client *client.Client, provider *transformationsprovider.Provider
 	}
 }
 
-// TransformationTestWithDefinitions combines test results with their original definitions
-// Uses definitions to display the input and output events for the test
-type TransformationTestWithDefinitions struct {
-	Result      *transformations.TransformationTestResult
-	Definitions []*transformations.TestDefinition
-}
-
-// TestResults contains the results of all test executions with their definitions
-type TestResults struct {
-	Pass            bool
-	Message         string
-	Libraries       []transformations.LibraryTestResult
-	Transformations []*TransformationTestWithDefinitions
-}
-
-// HasFailures computes whether any tests failed or errored
-func (r *TestResults) HasFailures() bool {
-	if lo.ContainsBy(r.Libraries, func(lib transformations.LibraryTestResult) bool {
-		return !lib.Pass
-	}) {
-		return true
-	}
-
-	return lo.ContainsBy(r.Transformations, func(tr *TransformationTestWithDefinitions) bool {
-		return lo.ContainsBy(tr.Result.TestSuiteResult.Results, func(res transformations.TestResult) bool {
-			return res.Status == transformations.TestRunStatusFail || res.Status == transformations.TestRunStatusError
-		})
-	})
-}
-
 // Run executes tests based on the specified mode and returns results
 func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResults, error) {
-	log.Info("Starting test run", "mode", mode, "targetID", targetID)
+	testLogger.Info("Starting test run", "mode", mode, "targetID", targetID)
 
 	// build remote resources graph
 	remoteResources, err := r.provider.LoadResourcesFromRemote(ctx)
@@ -85,18 +61,18 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	remoteGraph := syncer.StateToGraph(remoteState)
 
-	log.Debug("Building test plan")
+	testLogger.Debug("Building test plan")
 	testPlan, err := r.planner.BuildPlan(ctx, remoteGraph, mode, targetID, r.workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("building test plan: %w", err)
 	}
 
 	if len(testPlan.TestUnits) == 0 && len(testPlan.StandaloneLibraries) == 0 {
-		log.Info("No resources to test")
+		testLogger.Info("No resources to test")
 		return &TestResults{Pass: true}, nil
 	}
 
-	log.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
+	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
 
 	// Resolve library and transformation versions once before parallel execution
 	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteState)
@@ -116,7 +92,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		if err != nil {
 			return nil, fmt.Errorf("resolving test definitions for %s: %w", unit.Transformation.ID, err)
 		}
-		log.Debug("Resolved test definitions", "transformation", unit.Transformation.ID, "count", len(testDefs))
+		testLogger.Debug("Resolved test definitions", "transformation", unit.Transformation.ID, "count", len(testDefs))
 
 		transformationID := unit.Transformation.ID
 		transformationVersionID, ok := transformationVersionMap[transformationID]
@@ -289,11 +265,11 @@ func (r *Runner) runTestUnitTask(ctx context.Context, results *tasker.Results[*t
 			return fmt.Errorf("task is not a test unit task")
 		}
 
-		log.Info("Testing transformation", "id", unitTask.ID, "name", unitTask.Name)
+		testLogger.Info("Testing transformation", "id", unitTask.ID, "name", unitTask.Name)
 
 		testReq := buildTestRequest(unitTask.transformationVersion, unitTask.testDefs, unitTask.libraryVersionIDs)
 
-		log.Debug("Executing tests via API", "transformation", unitTask.ID)
+		testLogger.Debug("Executing tests via API", "transformation", unitTask.ID)
 		resp, err := r.store.BatchTest(ctx, testReq)
 		if err != nil {
 			return fmt.Errorf("running tests for %s: %w", unitTask.ID, err)
@@ -326,7 +302,7 @@ func (r *Runner) testStandaloneLibraries(ctx context.Context, libs []*model.Libr
 		return nil, nil, nil
 	}
 
-	log.Info("Testing standalone libraries", "count", len(libInputs))
+	testLogger.Info("Testing standalone libraries", "count", len(libInputs))
 
 	resp, err := r.store.BatchTest(ctx, &transformations.BatchTestRequest{
 		Libraries: libInputs,

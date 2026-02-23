@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -13,11 +12,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
-
-var ErrTestsFailed = errors.New("one or more tests failed")
 
 var (
 	testLog = logger.New("transformations", logger.Attr{
@@ -138,19 +136,20 @@ func NewCmdTest() *cobra.Command {
 				targetID = args[0]
 			}
 
+			spinner := ui.NewSpinner("Running tests...")
+			spinner.Start()
+
 			runner := testorchestrator.NewRunner(deps.Client(), trProvider, graph, workspace.ID)
 			results, err := runner.Run(ctx, mode, targetID)
+
+			spinner.Stop()
+
 			if err != nil {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
-			// TODO: Format and display results
-			// formatter := testorchestrator.NewFormatter(verbose)
-			// formatter.Display(results)
-
-			if results.HasFailures() {
-				return ErrTestsFailed
-			}
+			formatter := transformations.NewFormatter(verbose)
+			formatter.Display(results)
 
 			return nil
 		},
