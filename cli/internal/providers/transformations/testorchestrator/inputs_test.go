@@ -13,14 +13,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
-func TestResolveTestCases(t *testing.T) {
+func TestResolveTestDefinitions(t *testing.T) {
 	t.Run("no tests defined - returns default events", func(t *testing.T) {
 		transformation := &model.TransformationResource{
 			ID:    "trans-1",
 			Tests: []specs.TransformationTest{},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
@@ -43,7 +43,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
@@ -71,11 +71,11 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		assert.Equal(t, "my-suite/event", result[0].Name)
+		assert.Equal(t, "My Suite/event", result[0].Name)
 		require.Len(t, result[0].Input, 1)
 		assert.Nil(t, result[0].ExpectedOutput)
 	})
@@ -110,11 +110,11 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		assert.Equal(t, "suite/event", result[0].Name)
+		assert.Equal(t, "Suite/event", result[0].Name)
 		assert.NotNil(t, result[0].ExpectedOutput)
 		assert.Len(t, result[0].ExpectedOutput, 1)
 	})
@@ -136,14 +136,14 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
 
 		names := []string{result[0].Name, result[1].Name}
-		assert.Contains(t, names, "suite-one/a")
-		assert.Contains(t, names, "suite-two/b")
+		assert.Contains(t, names, "Suite One/a")
+		assert.Contains(t, names, "Suite Two/b")
 	})
 
 	t.Run("transformation-specific input overrides common input", func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		result, err := ResolveTestCases(transformation)
+		result, err := ResolveTestDefinitions(transformation)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -188,10 +188,10 @@ func TestResolveTestCases(t *testing.T) {
 			byName[r.Name] = r
 		}
 
-		require.Contains(t, byName, "suite/common")
-		require.Contains(t, byName, "suite/shared")
+		require.Contains(t, byName, "Suite/common")
+		require.Contains(t, byName, "Suite/shared")
 
-		sharedInput := byName["suite/shared"].Input[0].(map[string]any)
+		sharedInput := byName["Suite/shared"].Input[0].(map[string]any)
 		assert.Equal(t, "specific-shared", sharedInput["source"])
 	})
 
@@ -212,30 +212,10 @@ func TestResolveTestCases(t *testing.T) {
 			},
 		}
 
-		_, err := ResolveTestCases(transformation)
+		_, err := ResolveTestDefinitions(transformation)
 
 		require.Error(t, err)
 	})
-}
-
-func TestNormalizeSuiteName(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"", "default"},
-		{"simple", "simple"},
-		{"My Suite", "my-suite"},
-		{"my_suite", "my-suite"},
-		{"UPPER CASE", "upper-case"},
-		{"mixed_Case Name", "mixed-case-name"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.input, func(t *testing.T) {
-			assert.Equal(t, tc.expected, normalizeSuiteName(tc.input))
-		})
-	}
 }
 
 func TestParseJSONFile(t *testing.T) {

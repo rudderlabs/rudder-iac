@@ -24,7 +24,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 		}
 		trans := &model.TransformationResource{ID: "t1", Name: "T1", Code: "code"}
 
-		versionID, err := resolveTransformationVersion(context.Background(), store, trans, true, nil)
+		versionID, err := getTransformationVersionID(context.Background(), store, trans, true, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, "staged-ver", versionID)
@@ -37,7 +37,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 			OutputRaw: &model.TransformationState{ID: "remote-id", VersionID: "existing-ver"},
 		}
 
-		versionID, err := resolveTransformationVersion(context.Background(), store, trans, false, remote)
+		versionID, err := getTransformationVersionID(context.Background(), store, trans, false, remote)
 
 		require.NoError(t, err)
 		assert.Equal(t, "existing-ver", versionID)
@@ -47,7 +47,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 		store := &stubStore{}
 		trans := &model.TransformationResource{ID: "t1"}
 
-		_, err := resolveTransformationVersion(context.Background(), store, trans, false, nil)
+		_, err := getTransformationVersionID(context.Background(), store, trans, false, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in remote state")
@@ -60,7 +60,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 			OutputRaw: &model.TransformationState{ID: "remote-id", VersionID: ""},
 		}
 
-		_, err := resolveTransformationVersion(context.Background(), store, trans, false, remote)
+		_, err := getTransformationVersionID(context.Background(), store, trans, false, remote)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no valid versionId")
@@ -74,7 +74,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 		}
 		trans := &model.TransformationResource{ID: "t1"}
 
-		_, err := resolveTransformationVersion(context.Background(), store, trans, true, nil)
+		_, err := getTransformationVersionID(context.Background(), store, trans, true, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stage failed")
@@ -92,7 +92,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 		}
 		lib := &model.LibraryResource{ID: "lib-1", Name: "L1", Code: "code"}
 
-		versionID, err := resolveLibraryVersion(context.Background(), store, lib, true, nil)
+		versionID, err := getLibraryVersionID(context.Background(), store, lib, true, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, "lib-staged-ver", versionID)
@@ -105,7 +105,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 			OutputRaw: &model.LibraryState{ID: "remote-lib-id", VersionID: "lib-existing-ver"},
 		}
 
-		versionID, err := resolveLibraryVersion(context.Background(), store, lib, false, remote)
+		versionID, err := getLibraryVersionID(context.Background(), store, lib, false, remote)
 
 		require.NoError(t, err)
 		assert.Equal(t, "lib-existing-ver", versionID)
@@ -115,7 +115,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 		store := &stubStore{}
 		lib := &model.LibraryResource{ID: "lib-1"}
 
-		_, err := resolveLibraryVersion(context.Background(), store, lib, false, nil)
+		_, err := getLibraryVersionID(context.Background(), store, lib, false, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in remote state")
@@ -128,7 +128,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 			OutputRaw: &model.LibraryState{ID: "remote-lib-id", VersionID: ""},
 		}
 
-		_, err := resolveLibraryVersion(context.Background(), store, lib, false, remote)
+		_, err := getLibraryVersionID(context.Background(), store, lib, false, remote)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no valid versionId")
@@ -142,7 +142,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 		}
 		lib := &model.LibraryResource{ID: "lib-1"}
 
-		_, err := resolveLibraryVersion(context.Background(), store, lib, true, nil)
+		_, err := getLibraryVersionID(context.Background(), store, lib, true, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "lib stage failed")
@@ -258,7 +258,8 @@ func TestTaskIDs(t *testing.T) {
 
 	t.Run("testUnitTask ID matches transformation ID", func(t *testing.T) {
 		task := &testUnitTask{
-			unit: &TestUnit{Transformation: &model.TransformationResource{ID: "t-7"}},
+			ID:   "t-7",
+			Name: "T7",
 		}
 		assert.Equal(t, "t-7", task.Id())
 		assert.Nil(t, task.Dependencies())

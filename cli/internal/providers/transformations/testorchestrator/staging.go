@@ -14,8 +14,8 @@ import (
 // Returns the versionID of the uploaded transformation.
 func StageTransformation(
 	ctx context.Context,
-	store transformations.TransformationStore, 
-	transformation *model.TransformationResource, 
+	store transformations.TransformationStore,
+	transformation *model.TransformationResource,
 	remoteResource *state.ResourceState,
 ) (string, error) {
 	if remoteResource == nil {
@@ -87,9 +87,9 @@ func StageLibrary(
 	}
 
 	updateReq := &transformations.UpdateLibraryRequest{
-		Name:        library.Name,
-		Code:        library.Code,
-		Language:    library.Language,
+		Name:     library.Name,
+		Code:     library.Code,
+		Language: library.Language,
 	}
 
 	result, err := store.UpdateLibrary(ctx, libState.ID, updateReq, false)

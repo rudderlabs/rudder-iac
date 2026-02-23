@@ -48,14 +48,15 @@ type testUnitResult struct {
 }
 
 type testUnitTask struct {
-	unit                  *TestUnit
+	ID                    string
+	Name                  string
 	testDefs              []*transformations.TestDefinition
 	transformationVersion string
 	libraryVersionIDs     []string
 }
 
 func (t *testUnitTask) Id() string {
-	return t.unit.Transformation.ID
+	return t.ID
 }
 
 func (t *testUnitTask) Dependencies() []string {
@@ -107,7 +108,7 @@ func runTransformationVersionTask(
 			return fmt.Errorf("task is not a transformation version task")
 		}
 
-		versionID, err := resolveTransformationVersion(
+		versionID, err := getTransformationVersionID(
 			ctx,
 			store,
 			transformationTask.transformation,
@@ -123,7 +124,7 @@ func runTransformationVersionTask(
 	}
 }
 
-func resolveTransformationVersion(
+func getTransformationVersionID(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	transformation *model.TransformationResource,
@@ -131,7 +132,7 @@ func resolveTransformationVersion(
 	remoteResource *state.ResourceState,
 ) (string, error) {
 	if isModified {
-		log.Debug("Uploading modified transformation", "transformation", transformation.ID)
+		testLogger.Debug("Uploading modified transformation", "transformation", transformation.ID)
 		versionID, err := StageTransformation(ctx, store, transformation, remoteResource)
 		if err != nil {
 			return "", fmt.Errorf("staging transformation %s: %w", transformation.ID, err)
@@ -148,7 +149,7 @@ func resolveTransformationVersion(
 		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", transformation.ID)
 	}
 
-	log.Debug("Reusing existing transformation version", "transformation", transformation.ID, "versionId", transState.VersionID)
+	testLogger.Debug("Reusing existing transformation version", "transformation", transformation.ID, "versionId", transState.VersionID)
 	return transState.VersionID, nil
 }
 
@@ -197,7 +198,7 @@ func runLibraryVersionTask(
 			return fmt.Errorf("task is not a library version task")
 		}
 
-		versionID, err := resolveLibraryVersion(
+		versionID, err := getLibraryVersionID(
 			ctx,
 			store,
 			libraryTask.lib,
@@ -213,7 +214,7 @@ func runLibraryVersionTask(
 	}
 }
 
-func resolveLibraryVersion(
+func getLibraryVersionID(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	library *model.LibraryResource,
@@ -221,7 +222,7 @@ func resolveLibraryVersion(
 	remoteResource *state.ResourceState,
 ) (string, error) {
 	if isModified {
-		log.Debug("Uploading modified library", "library", library.ID)
+		testLogger.Debug("Uploading modified library", "library", library.ID)
 		versionID, err := StageLibrary(ctx, store, library, remoteResource)
 		if err != nil {
 			return "", fmt.Errorf("uploading library %s: %w", library.ID, err)
@@ -238,6 +239,6 @@ func resolveLibraryVersion(
 		return "", fmt.Errorf("library %s in remote state has no valid versionId", library.ID)
 	}
 
-	log.Debug("Reusing existing library version", "library", library.ID, "versionId", libState.VersionID)
+	testLogger.Debug("Reusing existing library version", "library", library.ID, "versionId", libState.VersionID)
 	return libState.VersionID, nil
 }

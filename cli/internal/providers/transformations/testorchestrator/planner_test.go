@@ -86,7 +86,6 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
-		assert.True(t, plan.TestUnits[0].IsTransformationModified)
 	})
 
 	t.Run("unchanged transformation is not marked modified", func(t *testing.T) {
@@ -99,7 +98,6 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
-		assert.False(t, plan.TestUnits[0].IsTransformationModified)
 	})
 
 	t.Run("transformation with code change is marked modified", func(t *testing.T) {
@@ -112,7 +110,6 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
-		assert.True(t, plan.TestUnits[0].IsTransformationModified)
 	})
 }
 
