@@ -10,7 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	transformationsprovider "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -18,26 +18,40 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-// Type aliases for backwards compatibility
-type (
-	TransformationTestWithDefinitions = transformationsprovider.TransformationTestWithDefinitions
-	TestResults                       = transformationsprovider.TestResults
-)
+// TransformationTestWithDefinitions combines test results with their original definitions
+type TransformationTestWithDefinitions struct {
+	Result      *transformations.TransformationTestResult
+	Definitions []*transformations.TestDefinition
+}
+
+// TestResults contains the results of all test executions with their definitions
+type TestResults struct {
+	Pass            bool
+	Message         string
+	Libraries       []transformations.LibraryTestResult
+	Transformations []*TransformationTestWithDefinitions
+}
 
 var testLogger = logger.New("testorchestrator")
 
+// remoteStateLoader abstracts provider methods needed by the runner
+type remoteStateLoader interface {
+	provider.ManagedRemoteResourceLoader
+	provider.StateLoader
+}
+
 type Runner struct {
-	provider    *transformationsprovider.Provider
+	loader      remoteStateLoader
 	store       transformations.TransformationStore
 	planner     *Planner
 	workspaceID string
 }
 
-func NewRunner(client *client.Client, provider *transformationsprovider.Provider, graph *resources.Graph, workspaceID string) *Runner {
+func NewRunner(client *client.Client, loader remoteStateLoader, graph *resources.Graph, workspaceID string) *Runner {
 	store := transformations.NewRudderTransformationStore(client)
 
 	return &Runner{
-		provider:    provider,
+		loader:      loader,
 		store:       store,
 		planner:     NewPlanner(graph),
 		workspaceID: workspaceID,
@@ -49,14 +63,22 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	testLogger.Info("Starting test run", "mode", mode, "targetID", targetID)
 
 	// build remote resources graph
-	remoteResources, err := r.provider.LoadResourcesFromRemote(ctx)
+	remoteResources, err := r.loader.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
 	}
 
-	remoteState, err := r.provider.MapRemoteToState(remoteResources)
+	remoteState, err := r.loader.MapRemoteToState(remoteResources)
 	if err != nil {
 		return nil, fmt.Errorf("building remote state: %w", err)
+	}
+
+	for urn, resource := range remoteState.Resources {
+		fmt.Println("Remote resource", "urn", urn, "type", resource.Type, "id", resource.ID)
+	}
+
+	for urn, resource := range remoteResources.GetAll("transformation-library") {
+		fmt.Println("Remote resource", "urn", urn, "externalId", resource.ExternalID, "id", resource.ID)
 	}
 
 	remoteGraph := syncer.StateToGraph(remoteState)

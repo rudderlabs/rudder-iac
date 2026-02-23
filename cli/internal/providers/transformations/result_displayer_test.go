@@ -23,7 +23,7 @@ func TestFormatter_Display_AllPassed(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -57,7 +57,7 @@ func TestFormatter_Display_WithFailures_NonVerbose(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	testDefinitions := []*transformations.TestDefinition{
 		{
 			Name:           "test-with-expected",
@@ -108,7 +108,7 @@ func TestFormatter_Display_WithFailures_Verbose(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(true)
+	formatter := NewResultDisplayer(true)
 	testDefinitions := []*transformations.TestDefinition{
 		{
 			Name:           "test-with-expected",
@@ -152,7 +152,7 @@ func TestFormatter_Display_WithImportedLibraries(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -183,7 +183,7 @@ func TestFormatter_Display_WithErrors(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -221,7 +221,7 @@ func TestFormatter_Display_WithLibraries(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-pass", Pass: true},
@@ -239,7 +239,7 @@ func TestFormatter_Display_WithLibraries(t *testing.T) {
 }
 
 func TestFormatter_FormatJSON(t *testing.T) {
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 
 	t.Run("nil value", func(t *testing.T) {
 		result := formatter.formatJSON(nil)

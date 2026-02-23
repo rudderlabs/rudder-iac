@@ -1288,7 +1288,7 @@ func TestFormatForExport(t *testing.T) {
 		assert.Equal(t, "Test library", spec.Spec["description"])
 		assert.Equal(t, "javascript", spec.Spec["language"])
 		assert.Equal(t, "myLibrary", spec.Spec["import_name"])
-		assert.Equal(t, "transformations/javascript/my-library.js", spec.Spec["file"])
+		assert.Equal(t, "javascript/my-library.js", spec.Spec["file"])
 
 		// Check code file
 		assert.Equal(t, "transformations/javascript/my-library.js", result[1].RelativePath)
@@ -1329,7 +1329,7 @@ func TestFormatForExport(t *testing.T) {
 		// Check YAML spec has .py extension
 		spec := result[0].Content.(*specs.Spec)
 		assert.Equal(t, "python", spec.Spec["language"])
-		assert.Equal(t, "transformations/python/my-py-lib.py", spec.Spec["file"])
+		assert.Equal(t, "python/my-py-lib.py", spec.Spec["file"])
 
 		// Check code file path
 		assert.Equal(t, "transformations/python/my-py-lib.py", result[1].RelativePath)

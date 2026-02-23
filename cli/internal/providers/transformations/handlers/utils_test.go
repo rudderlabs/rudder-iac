@@ -29,7 +29,7 @@ func TestToImportSpec(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.Equal(t, specs.SpecVersionV1, result.Version)
+		assert.Equal(t, specs.SpecVersionV0_1, result.Version)
 		assert.Equal(t, "transformation", result.Kind)
 		assert.Equal(t, specData, result.Spec)
 		assert.Equal(t, "my-transformation", result.Metadata["name"])

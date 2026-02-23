@@ -280,6 +280,7 @@ func (p *Provider) buildBatchPublishRequest(st *state.State) (*transformations.B
 			req.Libraries = append(req.Libraries, transformations.BatchPublishLibrary{
 				VersionID: libState.VersionID,
 			})
+			fmt.Println("Adding library", "urn", urn, "versionID", libState.VersionID, "id", libState.ID)
 
 		case transformation.HandlerMetadata.ResourceType:
 			transState, ok := resource.OutputRaw.(*model.TransformationState)

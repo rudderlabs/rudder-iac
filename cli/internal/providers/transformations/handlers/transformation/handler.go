@@ -338,8 +338,8 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path: transformations/<language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+		// Code file path: <language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
 		// Build import metadata
 		workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -387,7 +387,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Add code file entity
 		formattables = append(formattables, writer.FormattableEntity{
 			Content:      remote.Code,
-			RelativePath: codeFilePath,
+			RelativePath: filepath.Join(handlers.TransformationsDir, codeFilePath),
 		})
 	}
 

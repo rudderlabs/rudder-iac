@@ -140,13 +140,18 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteL
 		return nil, fmt.Errorf("listing libraries: %w", err)
 	}
 
+	fmt.Println("Listed libraries from remote, total:", len(libraries))
+
 	// Filter only managed resources (those with external IDs)
 	result := make([]*model.RemoteLibrary, 0)
 	for _, l := range libraries {
+		fmt.Printf("Library: name=%s, id=%s, externalID=%s\n", l.Name, l.ID, l.ExternalID)
 		if l.ExternalID != "" {
 			result = append(result, &model.RemoteLibrary{TransformationLibrary: l})
 		}
 	}
+
+	fmt.Println("Filtered managed libraries, count:", len(result))
 	return result, nil
 }
 
@@ -298,8 +303,8 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path: transformations/<language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+		// Code file path: <language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
 		// Build import metadata
 		workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -348,7 +353,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Add code file entity
 		formattables = append(formattables, writer.FormattableEntity{
 			Content:      remote.Code,
-			RelativePath: codeFilePath,
+			RelativePath: filepath.Join(handlers.TransformationsDir, codeFilePath),
 		})
 	}
 
