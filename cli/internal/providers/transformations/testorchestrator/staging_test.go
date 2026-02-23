@@ -308,7 +308,7 @@ func (s *stubStore) DeleteLibrary(_ context.Context, _ string) error {
 func (s *stubStore) SetLibraryExternalID(_ context.Context, _, _ string) error {
 	panic("not used in staging tests")
 }
-func (s *stubStore) BatchPublish(_ context.Context, _ *transformations.BatchPublishRequest) error {
+func (s *stubStore) BatchPublish(_ context.Context, _ *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
 	panic("not used in staging tests")
 }
 func (s *stubStore) BatchTest(_ context.Context, _ *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {

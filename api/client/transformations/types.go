@@ -68,8 +68,8 @@ type BatchPublishRequest struct {
 
 // BatchPublishTransformation represents a transformation to publish
 type BatchPublishTransformation struct {
-	VersionID string `json:"versionId"`
-	TestInput []any  `json:"testInput,omitempty"`
+	VersionID string           `json:"versionId"`
+	TestSuite []TestDefinition `json:"testSuite,omitempty"`
 }
 
 // BatchPublishLibrary represents a library to publish
@@ -165,6 +165,12 @@ type ValidationOutput struct {
 
 type BatchTestResponse struct {
 	Pass             bool             `json:"pass"`
+	Message          string           `json:"message,omitempty"`
+	ValidationOutput ValidationOutput `json:"validationOutput"`
+}
+
+type BatchPublishResponse struct {
+	Published        bool             `json:"published"`
 	Message          string           `json:"message,omitempty"`
 	ValidationOutput ValidationOutput `json:"validationOutput"`
 }

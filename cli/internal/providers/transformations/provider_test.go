@@ -23,7 +23,7 @@ type mockTransformationStore struct {
 	batchPublishCalled         bool
 	deleteTransformationCalled bool
 	deleteLibraryCalled        bool
-	batchPublishFunc           func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error
+	batchPublishFunc           func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error)
 	deleteTransformationFunc   func(ctx context.Context, id string) error
 	deleteLibraryFunc          func(ctx context.Context, id string) error
 }
@@ -32,12 +32,12 @@ func newMockTransformationStore() *mockTransformationStore {
 	return &mockTransformationStore{}
 }
 
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 	m.batchPublishCalled = true
 	if m.batchPublishFunc != nil {
 		return m.batchPublishFunc(ctx, req)
 	}
-	return nil
+	return &transformationsClient.BatchPublishResponse{Published: true}, nil
 }
 
 func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformationsClient.BatchTestRequest) (*transformationsClient.BatchTestResponse, error) {
@@ -395,9 +395,9 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
-			return nil
+			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -444,9 +444,9 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
-			return nil
+			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -493,9 +493,9 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
-			return nil
+			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -535,8 +535,8 @@ func TestConsolidateSync(t *testing.T) {
 		t.Parallel()
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
-			return fmt.Errorf("API error")
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+			return nil, fmt.Errorf("API error")
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -656,9 +656,9 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
-			return nil
+			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -782,9 +782,9 @@ func TestDeferredDeletes(t *testing.T) {
 		var callOrder []string
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) error {
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			callOrder = append(callOrder, "batch_publish")
-			return nil
+			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
 		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
 			callOrder = append(callOrder, "delete_library:"+id)
