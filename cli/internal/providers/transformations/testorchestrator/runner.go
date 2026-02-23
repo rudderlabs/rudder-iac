@@ -18,6 +18,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
+// Type aliases for backwards compatibility
+type (
+	TransformationTestWithDefinitions = transformationsprovider.TransformationTestWithDefinitions
+	TestResults                       = transformationsprovider.TestResults
+)
+
 var testLogger = logger.New("testorchestrator")
 
 type Runner struct {
@@ -36,36 +42,6 @@ func NewRunner(client *client.Client, provider *transformationsprovider.Provider
 		planner:     NewPlanner(graph),
 		workspaceID: workspaceID,
 	}
-}
-
-// TransformationTestWithDefinitions combines test results with their original definitions
-// Uses definitions to display the input and output events for the test
-type TransformationTestWithDefinitions struct {
-	Result      *transformations.TransformationTestResult
-	Definitions []*transformations.TestDefinition
-}
-
-// TestResults contains the results of all test executions with their definitions
-type TestResults struct {
-	Pass            bool
-	Message         string
-	Libraries       []transformations.LibraryTestResult
-	Transformations []*TransformationTestWithDefinitions
-}
-
-// HasFailures computes whether any tests failed or errored
-func (r *TestResults) HasFailures() bool {
-	if lo.ContainsBy(r.Libraries, func(lib transformations.LibraryTestResult) bool {
-		return !lib.Pass
-	}) {
-		return true
-	}
-
-	return lo.ContainsBy(r.Transformations, func(tr *TransformationTestWithDefinitions) bool {
-		return lo.ContainsBy(tr.Result.TestSuiteResult.Results, func(res transformations.TestResult) bool {
-			return res.Status == transformations.TestRunStatusFail || res.Status == transformations.TestRunStatusError
-		})
-	})
 }
 
 // Run executes tests based on the specified mode and returns results
