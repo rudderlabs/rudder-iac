@@ -190,7 +190,6 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		libraryURNs        = make(map[string]bool)
 	)
 
-	// New resources and importable resources are always considered modified
 	for _, urn := range diff.NewResources {
 		r, _ := p.graph.GetResource(urn)
 
