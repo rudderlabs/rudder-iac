@@ -273,7 +273,7 @@ func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *Batch
 		return nil, fmt.Errorf("marshalling batch publish request: %w", err)
 	}
 
-	path := "/transformations/libraries/publish"
+	path := "/transformations/publish"
 	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("batch publishing: %w", err)

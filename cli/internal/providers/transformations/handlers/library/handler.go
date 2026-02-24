@@ -299,9 +299,6 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path relative to spec file: <language-folder>/<external-id>.<ext>
-		// For the file field in spec, we need the path relative to transformations/ dir
-		codeFilePathInSpec := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
 		// For the actual file entity, we need just <language-folder>/<external-id>.<ext>
 		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
@@ -326,7 +323,7 @@ func (h *HandlerImpl) FormatForExport(
 				"name":        remote.Name,
 				"description": remote.Description,
 				"language":    remote.Language,
-				"file":        codeFilePathInSpec,
+				"file":        codeFilePath,
 				"import_name": remote.ImportName,
 			},
 		)

@@ -243,23 +243,18 @@ func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 
 // printFailureOutput prints expected vs actual output comparison
 func (rd *ResultDisplayer) printFailureOutput(detail failureDetail) {
-	if len(detail.expectedOutput) == 0 {
-		return
-	}
-
-	if !rd.verbose {
+	if !rd.verbose || len(detail.expectedOutput) == 0 {
 		ui.Println(ui.Color(indent(1, "Actual output mismatched from expected output"), ui.ColorYellow))
 		return
-	} else {
-
-		diff := rd.generateDiff(
-			rd.formatJSON(detail.expectedOutput),
-			rd.formatJSON(detail.actualOutput),
-		)
-		if diff != "" {
-			ui.Println(ui.Color(indent(1, "Diff:"), ui.ColorYellow))
-			ui.Print(indentMultiline(diff, indentLevel2))
-		}
+	}
+	
+	diff := rd.generateDiff(
+		rd.formatJSON(detail.expectedOutput),
+		rd.formatJSON(detail.actualOutput),
+	)
+	if diff != "" {
+		ui.Println(ui.Color(indent(1, "Diff:"), ui.ColorYellow))
+		ui.Print(indentMultiline(diff, indentLevel2))
 	}
 }
 
