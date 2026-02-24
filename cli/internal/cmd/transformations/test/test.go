@@ -148,8 +148,8 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
-			formatter := transformations.NewFormatter(verbose)
-			formatter.Display(results)
+			displayer := transformations.NewResultDisplayer(verbose)
+			displayer.Display(results)
 
 			return nil
 		},

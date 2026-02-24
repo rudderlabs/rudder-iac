@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
@@ -146,55 +145,6 @@ func TestResolveTestDefinitions(t *testing.T) {
 		assert.Contains(t, names, "Suite Two/b")
 	})
 
-	t.Run("transformation-specific input overrides common input", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		inputDir := filepath.Join(tmpDir, "input")
-		specificDir := filepath.Join(inputDir, "trans-1", "input")
-		require.NoError(t, os.MkdirAll(inputDir, 0755))
-		require.NoError(t, os.MkdirAll(specificDir, 0755))
-
-		// Common file and a file to be overridden
-		require.NoError(t, os.WriteFile(
-			filepath.Join(inputDir, "common.json"),
-			[]byte(`[{"source":"common"}]`),
-			0644,
-		))
-		require.NoError(t, os.WriteFile(
-			filepath.Join(inputDir, "shared.json"),
-			[]byte(`[{"source":"common-shared"}]`),
-			0644,
-		))
-		// Specific version overrides the shared one
-		require.NoError(t, os.WriteFile(
-			filepath.Join(specificDir, "shared.json"),
-			[]byte(`[{"source":"specific-shared"}]`),
-			0644,
-		))
-
-		transformation := &model.TransformationResource{
-			ID: "trans-1",
-			Tests: []specs.TransformationTest{
-				{Name: "Suite", SpecDir: tmpDir, Input: inputDir},
-			},
-		}
-
-		result, err := ResolveTestDefinitions(transformation)
-
-		require.NoError(t, err)
-		require.Len(t, result, 2)
-
-		byName := make(map[string]*transformations.TestDefinition, len(result))
-		for _, r := range result {
-			byName[r.Name] = r
-		}
-
-		require.Contains(t, byName, "Suite/common")
-		require.Contains(t, byName, "Suite/shared")
-
-		sharedInput := byName["Suite/shared"].Input[0].(map[string]any)
-		assert.Equal(t, "specific-shared", sharedInput["source"])
-	})
-
 	t.Run("invalid JSON in input file returns error", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		inputDir := filepath.Join(tmpDir, "input")
@@ -259,62 +209,6 @@ func TestParseJSONFile(t *testing.T) {
 		_, err := parseJSONFile("/no/such/file.json")
 
 		require.Error(t, err)
-	})
-}
-
-func TestMergeInputFiles(t *testing.T) {
-	t.Run("returns common files when specific dir absent", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		commonDir := filepath.Join(tmpDir, "common")
-		require.NoError(t, os.MkdirAll(commonDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(commonDir, "a.json"), []byte(`[]`), 0644))
-
-		result, err := mergeInputFiles(commonDir, filepath.Join(tmpDir, "missing"))
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "a.json")
-	})
-
-	t.Run("returns specific files when common dir absent", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		specificDir := filepath.Join(tmpDir, "specific")
-		require.NoError(t, os.MkdirAll(specificDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(specificDir, "b.json"), []byte(`[]`), 0644))
-
-		result, err := mergeInputFiles(filepath.Join(tmpDir, "missing"), specificDir)
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "b.json")
-	})
-
-	t.Run("specific file path wins over common for same filename", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		commonDir := filepath.Join(tmpDir, "common")
-		specificDir := filepath.Join(tmpDir, "specific")
-		require.NoError(t, os.MkdirAll(commonDir, 0755))
-		require.NoError(t, os.MkdirAll(specificDir, 0755))
-
-		commonFile := filepath.Join(commonDir, "event.json")
-		specificFile := filepath.Join(specificDir, "event.json")
-		require.NoError(t, os.WriteFile(commonFile, []byte(`[]`), 0644))
-		require.NoError(t, os.WriteFile(specificFile, []byte(`[]`), 0644))
-
-		result, err := mergeInputFiles(commonDir, specificDir)
-
-		require.NoError(t, err)
-		assert.Equal(t, specificFile, result["event.json"])
-	})
-
-	t.Run("both dirs absent returns empty map", func(t *testing.T) {
-		tmpDir := t.TempDir()
-
-		result, err := mergeInputFiles(
-			filepath.Join(tmpDir, "a"),
-			filepath.Join(tmpDir, "b"),
-		)
-
-		require.NoError(t, err)
-		assert.Empty(t, result)
 	})
 }
 

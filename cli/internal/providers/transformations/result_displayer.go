@@ -8,6 +8,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -16,6 +17,12 @@ const (
 	indentLevel2  = "    "
 	indentLevel3  = "      "
 	separatorLine = "------------------------------------------------------------"
+)
+
+// Type aliases for backwards compatibility
+type (
+	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
+	TestResults                       = model.TestResults
 )
 
 // indent returns a string with the specified indentation level applied
@@ -32,28 +39,14 @@ func indent(level int, s string) string {
 	}
 }
 
-// TransformationTestWithDefinitions combines test results with their original definitions
-type TransformationTestWithDefinitions struct {
-	Result      *transformations.TransformationTestResult
-	Definitions []*transformations.TestDefinition
-}
-
-// TestResults contains the results of all test executions with their definitions
-type TestResults struct {
-	Pass            bool
-	Message         string
-	Libraries       []transformations.LibraryTestResult
-	Transformations []*TransformationTestWithDefinitions
-}
-
-// Formatter formats and displays test results
-type Formatter struct {
+// ResultDisplayer formats and displays test results
+type ResultDisplayer struct {
 	verbose bool
 }
 
-// NewFormatter creates a new result formatter
-func NewFormatter(verbose bool) *Formatter {
-	return &Formatter{
+// NewResultDisplayer creates a new result displayer
+func NewResultDisplayer(verbose bool) *ResultDisplayer {
+	return &ResultDisplayer{
 		verbose: verbose,
 	}
 }
@@ -77,19 +70,19 @@ type testCounts struct {
 }
 
 // Display formats and displays test results
-func (f *Formatter) Display(results *TestResults) {
+func (rd *ResultDisplayer) Display(results *TestResults) {
 	ui.Println(ui.Bold("\nTransformation Test Results\n"))
 
-	counts := f.displayLibraries(results.Libraries)
-	counts = f.displayTransformations(results.Transformations, counts)
+	counts := rd.displayLibraries(results.Libraries)
+	counts = rd.displayTransformations(results.Transformations, counts)
 
 	ui.Println(separatorLine)
-	f.printSummary(counts)
-	f.printFailures(counts.failures)
+	rd.printSummary(counts)
+	rd.printFailures(counts.failures)
 }
 
 // displayLibraries displays library test results and returns updated counts
-func (f *Formatter) displayLibraries(libraries []transformations.LibraryTestResult) testCounts {
+func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryTestResult) testCounts {
 	counts := testCounts{}
 
 	if len(libraries) == 0 {
@@ -116,16 +109,16 @@ func (f *Formatter) displayLibraries(libraries []transformations.LibraryTestResu
 }
 
 // displayTransformations displays transformation test results and returns updated counts
-func (f *Formatter) displayTransformations(transformations []*TransformationTestWithDefinitions, counts testCounts) testCounts {
+func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions, counts testCounts) testCounts {
 	for _, trWithDef := range transformations {
 		expectedOutputMap := buildExpectedOutputMap(trWithDef.Definitions)
-		counts = f.displayTransformation(trWithDef.Result, expectedOutputMap, counts)
+		counts = rd.displayTransformation(trWithDef.Result, expectedOutputMap, counts)
 	}
 	return counts
 }
 
 // displayTransformation displays a single transformation's test results
-func (f *Formatter) displayTransformation(
+func (rd *ResultDisplayer) displayTransformation(
 	result *transformations.TransformationTestResult,
 	expectedOutputMap map[string][]any,
 	counts testCounts,
@@ -141,7 +134,7 @@ func (f *Formatter) displayTransformation(
 
 	for _, testResult := range result.TestSuiteResult.Results {
 		expectedOutput := expectedOutputMap[testResult.Name]
-		counts = f.displayTestResult(result.Name, testResult, expectedOutput, counts)
+		counts = rd.displayTestResult(result.Name, testResult, expectedOutput, counts)
 	}
 
 	ui.Println()
@@ -149,7 +142,7 @@ func (f *Formatter) displayTransformation(
 }
 
 // displayTestResult displays a single test result and updates counts
-func (f *Formatter) displayTestResult(
+func (rd *ResultDisplayer) displayTestResult(
 	transformationName string,
 	testResult transformations.TestResult,
 	expectedOutput []any,
@@ -187,7 +180,7 @@ func (f *Formatter) displayTestResult(
 }
 
 // printSummary prints the test summary with colored counts
-func (f *Formatter) printSummary(counts testCounts) {
+func (rd *ResultDisplayer) printSummary(counts testCounts) {
 	total := counts.passed + counts.failed + counts.errors
 
 	var parts []string
@@ -207,72 +200,67 @@ func (f *Formatter) printSummary(counts testCounts) {
 }
 
 // printFailures prints detailed failure information
-func (f *Formatter) printFailures(failures []failureDetail) {
+func (rd *ResultDisplayer) printFailures(failures []failureDetail) {
 	if len(failures) == 0 {
 		return
 	}
 
 	ui.Println(ui.Bold("\nFailure Details:\n"))
 	for _, failure := range failures {
-		f.printFailureDetail(failure)
+		rd.printFailureDetail(failure)
 	}
 
-	if !f.verbose {
+	if !rd.verbose {
 		ui.Printf("\n%s\n", ui.GreyedOut("Use --verbose to see additional event details"))
 	}
 }
 
 // printFailureDetail prints detailed information about a single failure
-func (f *Formatter) printFailureDetail(detail failureDetail) {
+func (rd *ResultDisplayer) printFailureDetail(detail failureDetail) {
 	ui.Printf("%s\n", ui.Bold(fmt.Sprintf("%s > %s", detail.transformationName, detail.testName)))
 
 	if detail.status == transformations.TestRunStatusError {
-		f.printErrorDetail(detail)
+		rd.printErrorDetail(detail)
 		return
 	}
 
-	f.printFailureOutput(detail)
-	f.printFailureErrors(detail)
+	rd.printFailureOutput(detail)
+	rd.printFailureErrors(detail)
 	ui.Println()
 }
 
 // printErrorDetail prints error information for tests with error status
-func (f *Formatter) printErrorDetail(detail failureDetail) {
+func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 	ui.Println(ui.Color(indent(1, "Error:"), ui.ColorRed))
 	for _, err := range detail.errors {
 		ui.Printf("%s%s\n", indentLevel2, err.Message)
-		if f.verbose && err.Event != nil {
-			ui.Printf("%sEvent: %s\n", indentLevel2, f.formatJSON(err.Event))
+		if rd.verbose && err.Event != nil {
+			ui.Printf("%sEvent: %s\n", indentLevel2, rd.formatJSON(err.Event))
 		}
 	}
 	ui.Println()
 }
 
 // printFailureOutput prints expected vs actual output comparison
-func (f *Formatter) printFailureOutput(detail failureDetail) {
-	if len(detail.expectedOutput) == 0 {
-		return
-	}
-
-	if !f.verbose {
+func (rd *ResultDisplayer) printFailureOutput(detail failureDetail) {
+	if !rd.verbose || len(detail.expectedOutput) == 0 {
 		ui.Println(ui.Color(indent(1, "Actual output mismatched from expected output"), ui.ColorYellow))
 		return
-	} else {
-
-		diff := f.generateDiff(
-			f.formatJSON(detail.expectedOutput),
-			f.formatJSON(detail.actualOutput),
-		)
-		if diff != "" {
-			ui.Println(ui.Color(indent(1, "Diff:"), ui.ColorYellow))
-			ui.Print(indentMultiline(diff, indentLevel2))
-		}
+	}
+	
+	diff := rd.generateDiff(
+		rd.formatJSON(detail.expectedOutput),
+		rd.formatJSON(detail.actualOutput),
+	)
+	if diff != "" {
+		ui.Println(ui.Color(indent(1, "Diff:"), ui.ColorYellow))
+		ui.Print(indentMultiline(diff, indentLevel2))
 	}
 }
 
 // printFailureErrors prints error messages for failed tests (verbose mode only)
-func (f *Formatter) printFailureErrors(detail failureDetail) {
-	if len(detail.errors) == 0 || !f.verbose {
+func (rd *ResultDisplayer) printFailureErrors(detail failureDetail) {
+	if len(detail.errors) == 0 || !rd.verbose {
 		return
 	}
 
@@ -280,13 +268,13 @@ func (f *Formatter) printFailureErrors(detail failureDetail) {
 	for _, err := range detail.errors {
 		ui.Printf("%s%s\n", indentLevel2, err.Message)
 		if err.Event != nil {
-			ui.Printf("%sEvent: %s\n", indentLevel2, f.formatJSON(err.Event))
+			ui.Printf("%sEvent: %s\n", indentLevel2, rd.formatJSON(err.Event))
 		}
 	}
 }
 
 // formatJSON converts any value to a pretty-printed JSON string
-func (f *Formatter) formatJSON(v any) string {
+func (rd *ResultDisplayer) formatJSON(v any) string {
 	if v == nil {
 		return "null"
 	}
@@ -299,7 +287,7 @@ func (f *Formatter) formatJSON(v any) string {
 }
 
 // generateDiff generates a unified diff between expected and actual output
-func (f *Formatter) generateDiff(expected, actual string) string {
+func (rd *ResultDisplayer) generateDiff(expected, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 

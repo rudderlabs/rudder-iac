@@ -180,7 +180,7 @@ type ConsolidateSyncer interface {
 	// ConsolidateSync is called after executePlan completes successfully
 	// For transformations: batch publishes all modified resources
 	// For other providers: no-op (return nil)
-	ConsolidateSync(ctx context.Context, state *state.State) error
+	ConsolidateSync(ctx context.Context, graph *resources.Graph, state *state.State) error
 }
 
 // RuleProvider is an optional interface that providers can implement

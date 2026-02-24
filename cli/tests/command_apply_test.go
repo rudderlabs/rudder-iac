@@ -17,6 +17,8 @@ import (
 const concurrencyForTest = 1
 
 func TestProjectApply(t *testing.T) {
+	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
+
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 

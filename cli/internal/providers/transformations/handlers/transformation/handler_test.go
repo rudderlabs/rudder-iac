@@ -128,8 +128,8 @@ func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id s
 	return fmt.Errorf("not implemented")
 }
 
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) error {
-	return fmt.Errorf("not implemented")
+func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {

@@ -202,13 +202,29 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		}
 	}
 
-	// Updated and importable resources are modified only if code or name changed
-	candidateURNs := append(lo.Keys(diff.UpdatedResources), diff.ImportableResources...)
-	for _, urn := range candidateURNs {
+	// Importable resources are considered modified if remote resource do not exist or
+	// if they exist in the remote graph and code or name has changed
+	for _, urn := range diff.ImportableResources {
 		resource, _ := p.graph.GetResource(urn)
 		remote, _ := remoteGraph.GetResource(urn)
 
-		if p.isModified(resource, remote, resource.Type()) {
+		if remote == nil || p.modified(resource, remote) {
+			switch resource.Type() {
+			case p.transformationType:
+				transformationURNs[urn] = true
+
+			case p.libraryType:
+				libraryURNs[urn] = true
+			}
+		}
+	}
+
+	// Updated resources are modified only if code or name changed
+	for _, urn := range lo.Keys(diff.UpdatedResources) {
+		resource, _ := p.graph.GetResource(urn)
+		remote, _ := remoteGraph.GetResource(urn)
+
+		if p.modified(resource, remote) {
 			switch resource.Type() {
 			case p.transformationType:
 				transformationURNs[urn] = true
@@ -222,8 +238,8 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 	return transformationURNs, libraryURNs
 }
 
-func (p *Planner) isModified(resource, remote *resources.Resource, resourceType string) bool {
-	switch resourceType {
+func (p *Planner) modified(resource, remote *resources.Resource) bool {
+	switch resource.Type() {
 	case p.transformationType:
 		resourceData, _ := resource.RawData().(*model.TransformationResource)
 		remoteData, _ := remote.RawData().(*model.TransformationResource)

@@ -14,7 +14,7 @@ type importCandidate struct {
 // then emits every logical statement that starts with "import" or "from" as a candidate.
 //
 // It handles:
-//   - Triple-quoted strings (""" / ''') with any string prefix
+//   - Triple-quoted strings (""" / ”') with any string prefix
 //   - Single/double-quoted strings with escape sequences
 //   - Inline # comments
 //   - Implicit line continuation inside parentheses/brackets/braces

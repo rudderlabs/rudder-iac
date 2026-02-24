@@ -68,13 +68,18 @@ type BatchPublishRequest struct {
 
 // BatchPublishTransformation represents a transformation to publish
 type BatchPublishTransformation struct {
-	VersionID string `json:"versionId"`
-	TestInput []any  `json:"testInput,omitempty"`
+	VersionID string           `json:"versionId"`
+	TestSuite []TestDefinition `json:"testSuite,omitempty"`
 }
 
 // BatchPublishLibrary represents a library to publish
 type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
+}
+
+type BatchPublishResponse struct {
+	Published        bool             `json:"published"`
+	ValidationOutput ValidationOutput `json:"validationOutput"`
 }
 
 type SetExternalIDRequest struct {
