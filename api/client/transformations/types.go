@@ -77,6 +77,11 @@ type BatchPublishLibrary struct {
 	VersionID string `json:"versionId"`
 }
 
+type BatchPublishResponse struct {
+	Published        bool             `json:"published"`
+	ValidationOutput ValidationOutput `json:"validationOutput"`
+}
+
 type SetExternalIDRequest struct {
 	ExternalID string `json:"externalId"`
 }
@@ -165,12 +170,6 @@ type ValidationOutput struct {
 
 type BatchTestResponse struct {
 	Pass             bool             `json:"pass"`
-	Message          string           `json:"message,omitempty"`
-	ValidationOutput ValidationOutput `json:"validationOutput"`
-}
-
-type BatchPublishResponse struct {
-	Published        bool             `json:"published"`
 	Message          string           `json:"message,omitempty"`
 	ValidationOutput ValidationOutput `json:"validationOutput"`
 }

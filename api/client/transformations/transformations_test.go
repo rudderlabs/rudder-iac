@@ -570,11 +570,21 @@ func TestBatchPublish(t *testing.T) {
 					"transformations": [
 						{
 							"versionId": "trans-ver-1",
-							"testInput": [{"event": "test1"}]
+							"testSuite": [
+								{
+									"name": "Test 1",
+									"input": [{"event": "test1"}]
+								}
+							]
 						},
 						{
 							"versionId": "trans-ver-2",
-							"testInput": [{"event": "test2"}]
+							"testSuite": [
+								{
+									"name": "Test 2",
+									"input": [{"event": "test2"}]
+								}
+							]
 						}
 					],
 					"libraries": [
@@ -589,7 +599,11 @@ func TestBatchPublish(t *testing.T) {
 			},
 			ResponseStatus: 200,
 			ResponseBody: `{
-				"published": true
+				"published": true,
+				"validationOutput": {
+					"transformations": [],
+					"libraries": []
+				}
 			}`,
 		},
 	}
@@ -603,11 +617,21 @@ func TestBatchPublish(t *testing.T) {
 		Transformations: []transformations.BatchPublishTransformation{
 			{
 				VersionID: "trans-ver-1",
-				TestInput: []any{map[string]string{"event": "test1"}},
+				TestSuite: []transformations.TestDefinition{
+					{
+						Name:  "Test 1",
+						Input: []any{map[string]string{"event": "test1"}},
+					},
+				},
 			},
 			{
 				VersionID: "trans-ver-2",
-				TestInput: []any{map[string]string{"event": "test2"}},
+				TestSuite: []transformations.TestDefinition{
+					{
+						Name:  "Test 2",
+						Input: []any{map[string]string{"event": "test2"}},
+					},
+				},
 			},
 		},
 		Libraries: []transformations.BatchPublishLibrary{
@@ -620,8 +644,9 @@ func TestBatchPublish(t *testing.T) {
 		},
 	}
 
-	err = store.BatchPublish(ctx, req)
+	resp, err := store.BatchPublish(ctx, req)
 	require.NoError(t, err)
+	require.NotNil(t, resp)
 
 	httpClient.AssertNumberOfCalls()
 }

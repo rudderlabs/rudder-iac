@@ -383,7 +383,7 @@ func TestConsolidateSync(t *testing.T) {
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		st := state.EmptyState()
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
 		assert.False(t, mockStore.batchPublishCalled)
@@ -402,26 +402,53 @@ func TestConsolidateSync(t *testing.T) {
 
 		provider := transformations.NewProviderWithStore(mockStore)
 
+		// Build graph with transformations
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+		graph.AddResource(resources.NewResource(
+			"trans-2",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-2",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// Build state with transformations
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "ver-1",
+					Modified:  true,
 				},
 			},
 			"transformation:trans-2": {
+				ID:   "trans-2",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-2",
 					VersionID: "ver-2",
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
 		assert.True(t, mockStore.batchPublishCalled)
@@ -455,22 +482,26 @@ func TestConsolidateSync(t *testing.T) {
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation-library:lib-1": {
+				ID:   "lib-1",
 				Type: library.HandlerMetadata.ResourceType,
 				OutputRaw: &model.LibraryState{
 					ID:        "remote-lib-1",
 					VersionID: "lib-ver-1",
+					Modified:  true,
 				},
 			},
 			"transformation-library:lib-2": {
+				ID:   "lib-2",
 				Type: library.HandlerMetadata.ResourceType,
 				OutputRaw: &model.LibraryState{
 					ID:        "remote-lib-2",
 					VersionID: "lib-ver-2",
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
 		assert.True(t, mockStore.batchPublishCalled)
@@ -500,26 +531,43 @@ func TestConsolidateSync(t *testing.T) {
 
 		provider := transformations.NewProviderWithStore(mockStore)
 
+		// Build graph with transformation and library
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// Build state with both transformations and libraries
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "ver-1",
+					Modified:  true,
 				},
 			},
 			"transformation-library:lib-1": {
+				ID:   "lib-1",
 				Type: library.HandlerMetadata.ResourceType,
 				OutputRaw: &model.LibraryState{
 					ID:        "remote-lib-1",
 					VersionID: "lib-ver-1",
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
 		assert.True(t, mockStore.batchPublishCalled)
@@ -541,19 +589,34 @@ func TestConsolidateSync(t *testing.T) {
 
 		provider := transformations.NewProviderWithStore(mockStore)
 
+		// Build graph with transformation
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// Build state with a transformation
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "ver-1",
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "batch publishing 1 transformations and 0 libraries")
@@ -567,18 +630,21 @@ func TestConsolidateSync(t *testing.T) {
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Build state with wrong OutputRaw type
+		// With the new Modified flag approach, invalid types are silently skipped in buildConnectedSubgraph
+		// So this test no longer expects an error
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:        "trans-1",
 				Type:      transformation.HandlerMetadata.ResourceType,
-				OutputRaw: "invalid-type", // Should be *model.TransformationState
+				OutputRaw: "invalid-type", // Wrong type - will be skipped, no error
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid OutputRaw type for transformation")
+		// With Modified flag approach, invalid types are silently skipped - no error expected
+		require.NoError(t, err)
 	})
 
 	t.Run("invalid state - wrong OutputRaw type for library", func(t *testing.T) {
@@ -591,15 +657,16 @@ func TestConsolidateSync(t *testing.T) {
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation-library:lib-1": {
+				ID:        "lib-1",
 				Type:      library.HandlerMetadata.ResourceType,
-				OutputRaw: "invalid-type", // Should be *model.LibraryState
+				OutputRaw: "invalid-type", // Wrong type - will be skipped, no error
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid OutputRaw type for library")
+		// With Modified flag approach, invalid types are silently skipped - no error expected
+		require.NoError(t, err)
 	})
 
 	t.Run("invalid state - empty version ID for transformation", func(t *testing.T) {
@@ -608,19 +675,34 @@ func TestConsolidateSync(t *testing.T) {
 		mockStore := newMockTransformationStore()
 		provider := transformations.NewProviderWithStore(mockStore)
 
+		// Build graph with transformation
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// Build state with empty version ID
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "", // Empty version ID
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has empty version ID")
@@ -636,15 +718,17 @@ func TestConsolidateSync(t *testing.T) {
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation-library:lib-1": {
+				ID:   "lib-1",
 				Type: library.HandlerMetadata.ResourceType,
 				OutputRaw: &model.LibraryState{
 					ID:        "remote-lib-1",
 					VersionID: "", // Empty version ID
+					Modified:  true,
 				},
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has empty version ID")
@@ -663,14 +747,29 @@ func TestConsolidateSync(t *testing.T) {
 
 		provider := transformations.NewProviderWithStore(mockStore)
 
+		// Build graph with transformation
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// Build state with transformation and unrelated resource
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "ver-1",
+					Modified:  true,
 				},
 			},
 			"some-other-type:other-1": {
@@ -679,7 +778,7 @@ func TestConsolidateSync(t *testing.T) {
 			},
 		}
 
-		err := provider.ConsolidateSync(context.Background(), st)
+		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
 		assert.True(t, mockStore.batchPublishCalled)
@@ -799,19 +898,34 @@ func TestDeferredDeletes(t *testing.T) {
 			&model.LibraryState{ID: "remote-lib-1", VersionID: "ver-1"})
 		require.NoError(t, err)
 
+		// Build graph with transformation
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "trans-1",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
 		// State has a transformation that was updated (needs publishing)
 		st := state.EmptyState()
 		st.Resources = map[string]*state.ResourceState{
 			"transformation:trans-1": {
+				ID:   "trans-1",
 				Type: transformation.HandlerMetadata.ResourceType,
 				OutputRaw: &model.TransformationState{
 					ID:        "remote-trans-1",
 					VersionID: "ver-2",
+					Modified:  true,
 				},
 			},
 		}
 
-		err = p.ConsolidateSync(context.Background(), st)
+		err = p.ConsolidateSync(context.Background(), graph, st)
 		require.NoError(t, err)
 
 		require.Equal(t, []string{
@@ -836,7 +950,7 @@ func TestDeferredDeletes(t *testing.T) {
 		require.NoError(t, err)
 
 		st := state.EmptyState()
-		err = p.ConsolidateSync(context.Background(), st)
+		err = p.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
 		assert.False(t, mockStore.batchPublishCalled)
@@ -872,7 +986,7 @@ func TestDeferredDeletes(t *testing.T) {
 		require.NoError(t, err)
 
 		st := state.EmptyState()
-		err = p.ConsolidateSync(context.Background(), st)
+		err = p.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
 		// Transformations must be deleted before libraries regardless of recording order
@@ -898,7 +1012,7 @@ func TestDeferredDeletes(t *testing.T) {
 		require.NoError(t, err)
 
 		st := state.EmptyState()
-		err = p.ConsolidateSync(context.Background(), st)
+		err = p.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "deleting library remote-lib-1")

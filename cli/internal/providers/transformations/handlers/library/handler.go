@@ -179,6 +179,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 	state := &model.LibraryState{
 		ID:        remote.ID,
 		VersionID: remote.VersionID,
+		Modified:  false,
 	}
 
 	return resource, state, nil
@@ -298,8 +299,11 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path: transformations/<language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+		// Code file path relative to spec file: <language-folder>/<external-id>.<ext>
+		// For the file field in spec, we need the path relative to transformations/ dir
+		codeFilePathInSpec := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+		// For the actual file entity, we need just <language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
 		// Build import metadata
 		workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -322,7 +326,7 @@ func (h *HandlerImpl) FormatForExport(
 				"name":        remote.Name,
 				"description": remote.Description,
 				"language":    remote.Language,
-				"file":        codeFilePath,
+				"file":        codeFilePathInSpec,
 				"import_name": remote.ImportName,
 			},
 		)
@@ -348,7 +352,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Add code file entity
 		formattables = append(formattables, writer.FormattableEntity{
 			Content:      remote.Code,
-			RelativePath: codeFilePath,
+			RelativePath: filepath.Join(handlers.TransformationsDir, codeFilePath),
 		})
 	}
 

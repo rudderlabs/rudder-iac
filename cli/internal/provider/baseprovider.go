@@ -245,7 +245,7 @@ func (p *BaseProvider) GetHandler(resourceType string) (Handler, bool) {
 
 // ConsolidateSync default implementation (no-op)
 // Providers that need post-execution consolidation should override this method
-func (p *BaseProvider) ConsolidateSync(ctx context.Context, st *state.State) error {
+func (p *BaseProvider) ConsolidateSync(ctx context.Context, graph *resources.Graph, st *state.State) error {
 	// Default: no consolidation needed
 	return nil
 }

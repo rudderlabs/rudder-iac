@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -17,26 +18,18 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-// TransformationTestWithDefinitions combines test results with their original definitions
-type TransformationTestWithDefinitions struct {
-	Result      *transformations.TransformationTestResult
-	Definitions []*transformations.TestDefinition
-}
-
-// TestResults contains the results of all test executions with their definitions
-type TestResults struct {
-	Pass            bool
-	Message         string
-	Libraries       []transformations.LibraryTestResult
-	Transformations []*TransformationTestWithDefinitions
-}
+// Type aliases for backwards compatibility
+type (
+	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
+	TestResults                       = model.TestResults
+)
 
 var testLogger = logger.New("testorchestrator")
 
 // remoteStateLoader abstracts provider methods needed by the runner
 type remoteStateLoader interface {
-	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
-	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
+	provider.ManagedRemoteResourceLoader
+	provider.StateLoader
 }
 
 type Runner struct {

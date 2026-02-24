@@ -202,9 +202,26 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		}
 	}
 
-	// Updated and importable resources are modified only if code or name changed
-	candidateURNs := append(lo.Keys(diff.UpdatedResources), diff.ImportableResources...)
-	for _, urn := range candidateURNs {
+	// Importable resources are considered modified if remote resource do not exist or
+	// if they exist in the remote graph and code or name has changed
+	for _, urn := range diff.ImportableResources {
+		resource, _ := p.graph.GetResource(urn)
+		remote, _ := remoteGraph.GetResource(urn)
+
+		modified := remote != nil && p.isModified(resource, remote, resource.Type())
+		if remote == nil || modified {
+			switch resource.Type() {
+			case p.transformationType:
+				transformationURNs[urn] = true
+
+			case p.libraryType:
+				libraryURNs[urn] = true
+			}
+		}
+	}
+
+	// Updated resources are modified only if code or name changed
+	for _, urn := range lo.Keys(diff.UpdatedResources) {
 		resource, _ := p.graph.GetResource(urn)
 		remote, _ := remoteGraph.GetResource(urn)
 

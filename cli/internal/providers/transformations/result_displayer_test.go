@@ -18,12 +18,12 @@ func wrapResults(result *transformations.TransformationTestResult, definitions [
 	}
 }
 
-func TestFormatter_Display_AllPassed(t *testing.T) {
+func TestResultDisplayer_Display_AllPassed(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -52,12 +52,12 @@ func TestFormatter_Display_AllPassed(t *testing.T) {
 	assert.NotContains(t, output, "Failure Details")
 }
 
-func TestFormatter_Display_WithFailures_NonVerbose(t *testing.T) {
+func TestResultDisplayer_Display_WithFailures_NonVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	testDefinitions := []*transformations.TestDefinition{
 		{
 			Name:           "test-with-expected",
@@ -103,12 +103,12 @@ func TestFormatter_Display_WithFailures_NonVerbose(t *testing.T) {
 	assert.NotContains(t, output, `"failed"`)
 }
 
-func TestFormatter_Display_WithFailures_Verbose(t *testing.T) {
+func TestResultDisplayer_Display_WithFailures_Verbose(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(true)
+	formatter := NewResultDisplayer(true)
 	testDefinitions := []*transformations.TestDefinition{
 		{
 			Name:           "test-with-expected",
@@ -147,12 +147,12 @@ func TestFormatter_Display_WithFailures_Verbose(t *testing.T) {
 	assert.NotContains(t, output, "Use --verbose")
 }
 
-func TestFormatter_Display_WithImportedLibraries(t *testing.T) {
+func TestResultDisplayer_Display_WithImportedLibraries(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -178,12 +178,12 @@ func TestFormatter_Display_WithImportedLibraries(t *testing.T) {
 	assert.Contains(t, output, "Tests: 1 total")
 }
 
-func TestFormatter_Display_WithErrors(t *testing.T) {
+func TestResultDisplayer_Display_WithErrors(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Transformations: []*TransformationTestWithDefinitions{
 			wrapResults(&transformations.TransformationTestResult{
@@ -216,12 +216,12 @@ func TestFormatter_Display_WithErrors(t *testing.T) {
 	assert.Contains(t, output, "Transformation execution failed")
 }
 
-func TestFormatter_Display_WithLibraries(t *testing.T) {
+func TestResultDisplayer_Display_WithLibraries(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewFormatter(false)
+	formatter := NewResultDisplayer(false)
 	results := &TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-pass", Pass: true},
@@ -238,8 +238,8 @@ func TestFormatter_Display_WithLibraries(t *testing.T) {
 	assert.Contains(t, output, "1 failed")
 }
 
-func TestFormatter_FormatJSON(t *testing.T) {
-	formatter := NewFormatter(false)
+func TestResultDisplayer_FormatJSON(t *testing.T) {
+	formatter := NewResultDisplayer(false)
 
 	t.Run("nil value", func(t *testing.T) {
 		result := formatter.formatJSON(nil)
