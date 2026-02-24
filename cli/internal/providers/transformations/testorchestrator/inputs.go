@@ -3,7 +3,6 @@ package testorchestrator
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,8 +14,7 @@ import (
 
 var JsonExt = ".json"
 
-// ResolveTestCases resolves test cases for a transformation.
-// It merges common and transformation-specific inputs, falling back to defaults if needed.
+// ResolveTestDefinitions resolves test cases for a transformation.
 func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
@@ -27,7 +25,7 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 	// Build test definitions from all suites
 	var allTestDefs []*transformations.TestDefinition
 	for _, suite := range transformation.Tests {
-		testDefs, err := buildTestDefinitionsForSuite(suite, transformation.ID)
+		testDefs, err := buildTestDefinitionsForSuite(suite)
 		if err != nil {
 			return nil, fmt.Errorf("building test cases for suite %s: %w", suite.Name, err)
 		}
@@ -43,30 +41,26 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 	return allTestDefs, nil
 }
 
-// buildTestCasesForSuite builds test cases for a single suite
-// 1. Common: specDir/suite.Input/
-// 2. Transformation-specific: specDir/suite.Input/<transformationID>/input/
-// Files in transformation-specific directory override common files with the same name.
-func buildTestDefinitionsForSuite(suite specs.TransformationTest, transformationID string) ([]*transformations.TestDefinition, error) {
+// buildTestDefinitionsForSuite builds test cases for a single suite by reading
+// input and output files directly from the configured directories.
+func buildTestDefinitionsForSuite(suite specs.TransformationTest) ([]*transformations.TestDefinition, error) {
 	// Resolve relative paths against SpecDir (set during spec loading)
 	inputDir := resolveDir(suite.SpecDir, suite.Input)
 	outputDir := resolveDir(suite.SpecDir, suite.Output)
 
-	transformationInputDir := filepath.Join(inputDir, transformationID, "input")
-	inputFiles, err := mergeInputFiles(inputDir, transformationInputDir)
+	inputFiles, err := listJSONFiles(inputDir)
 	if err != nil {
-		return nil, fmt.Errorf("merging input files: %w", err)
+		return nil, fmt.Errorf("listing input files: %w", err)
 	}
 
 	if len(inputFiles) == 0 {
-		testLogger.Debug("No input files found for suite", "suite", suite.Name, "transformationID", transformationID)
+		testLogger.Debug("No input files found for suite", "suite", suite.Name)
 		return nil, nil
 	}
 
-	transformationOutputDir := filepath.Join(outputDir, transformationID, "output")
-	outputFiles, err := mergeInputFiles(outputDir, transformationOutputDir)
+	outputFiles, err := listJSONFiles(outputDir)
 	if err != nil {
-		return nil, fmt.Errorf("merging output files: %w", err)
+		return nil, fmt.Errorf("listing output files: %w", err)
 	}
 
 	var testDefs []*transformations.TestDefinition
@@ -95,31 +89,6 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest, transformation
 	}
 
 	return testDefs, nil
-}
-
-// Returns a map of filename (base name) to full path.
-func mergeInputFiles(commonDir, specificDir string) (map[string]string, error) {
-	merged := make(map[string]string)
-
-	// Load common files first
-	if dirExists(commonDir) {
-		commonFiles, err := listJSONFiles(commonDir)
-		if err != nil {
-			return nil, fmt.Errorf("listing common input files from %s: %w", commonDir, err)
-		}
-		maps.Copy(merged, commonFiles)
-	}
-
-	// Load specific files (overrides common)
-	if dirExists(specificDir) {
-		specificFiles, err := listJSONFiles(specificDir)
-		if err != nil {
-			return nil, fmt.Errorf("listing specific input files from %s: %w", specificDir, err)
-		}
-		maps.Copy(merged, specificFiles)
-	}
-
-	return merged, nil
 }
 
 func defaultTestDefinitions() ([]*transformations.TestDefinition, error) {

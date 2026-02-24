@@ -208,8 +208,7 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		resource, _ := p.graph.GetResource(urn)
 		remote, _ := remoteGraph.GetResource(urn)
 
-		modified := remote != nil && p.isModified(resource, remote, resource.Type())
-		if remote == nil || modified {
+		if remote == nil || p.modified(resource, remote) {
 			switch resource.Type() {
 			case p.transformationType:
 				transformationURNs[urn] = true
@@ -225,7 +224,7 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		resource, _ := p.graph.GetResource(urn)
 		remote, _ := remoteGraph.GetResource(urn)
 
-		if p.isModified(resource, remote, resource.Type()) {
+		if p.modified(resource, remote) {
 			switch resource.Type() {
 			case p.transformationType:
 				transformationURNs[urn] = true
@@ -239,8 +238,8 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 	return transformationURNs, libraryURNs
 }
 
-func (p *Planner) isModified(resource, remote *resources.Resource, resourceType string) bool {
-	switch resourceType {
+func (p *Planner) modified(resource, remote *resources.Resource) bool {
+	switch resource.Type() {
 	case p.transformationType:
 		resourceData, _ := resource.RawData().(*model.TransformationResource)
 		remoteData, _ := remote.RawData().(*model.TransformationResource)

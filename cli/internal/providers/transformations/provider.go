@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/samber/lo"
-
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -18,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/samber/lo"
 )
 
 var log = logger.New("transformationsprovider")
@@ -275,37 +274,55 @@ func (p *Provider) executePendingDeletes(ctx context.Context) error {
 // Only publishes modified resources and their dependencies/dependents.
 // Includes test suites for transformations when available.
 func (p *Provider) buildBatchPublishRequest(graph *resources.Graph, st *state.State) (*transformations.BatchPublishRequest, error) {
-	modifiedTransformationURNs, modifiedLibraryURNs := p.collectModifiedResources(st)
+	transformationURNs, libraryURNs := p.collectModifiedResources(st)
 
-	transformationsToPublish, requiredLibraries := p.processTransformations(graph, modifiedTransformationURNs)
+	var (
+		transformationsToPublish = make(map[string]struct{})
+		librariesToPublish       = make(map[string]struct{})
+	)
 
-	librariesToPublish := p.processLibraries(graph, modifiedLibraryURNs, transformationsToPublish, requiredLibraries)
+	for _, urn := range transformationURNs {
+		transformationsToPublish[urn] = struct{}{}
+
+		for _, libDep := range graph.GetDependencies(urn) {
+			librariesToPublish[libDep] = struct{}{}
+		}
+	}
+
+	for _, urn := range libraryURNs {
+		librariesToPublish[urn] = struct{}{}
+
+		for _, tranURN := range graph.GetDependents(urn) {
+			// This transformation needs to be published because its library changed
+			transformationsToPublish[tranURN] = struct{}{}
+
+			for _, libURN := range graph.GetDependencies(tranURN) {
+				librariesToPublish[libURN] = struct{}{}
+			}
+		}
+	}
 
 	return p.buildRequestFromURNs(graph, st, transformationsToPublish, librariesToPublish)
 }
 
-// collectModifiedResources iterates over state and collects modified transformations and libraries
 func (p *Provider) collectModifiedResources(st *state.State) (transformationURNs []string, libraryURNs []string) {
 	for _, resource := range st.Resources {
-		var isModified bool
 
 		switch resource.Type {
 		case library.HandlerMetadata.ResourceType:
 			if libState, ok := resource.OutputRaw.(*model.LibraryState); ok {
-				isModified = libState.Modified
-			}
-			if isModified {
-				urn := resources.URN(resource.ID, resource.Type)
-				libraryURNs = append(libraryURNs, urn)
+				if libState.Modified {
+					urn := resources.URN(resource.ID, resource.Type)
+					libraryURNs = append(libraryURNs, urn)
+				}
 			}
 
 		case transformation.HandlerMetadata.ResourceType:
 			if transState, ok := resource.OutputRaw.(*model.TransformationState); ok {
-				isModified = transState.Modified
-			}
-			if isModified {
-				urn := resources.URN(resource.ID, resource.Type)
-				transformationURNs = append(transformationURNs, urn)
+				if transState.Modified {
+					urn := resources.URN(resource.ID, resource.Type)
+					transformationURNs = append(transformationURNs, urn)
+				}
 			}
 		}
 	}
@@ -313,51 +330,12 @@ func (p *Provider) collectModifiedResources(st *state.State) (transformationURNs
 	return transformationURNs, libraryURNs
 }
 
-// processTransformations collects all transformations to publish and their required libraries
-// Returns: transformationsToPublish (modified only), requiredLibraries (dependencies of modified transformations)
-func (p *Provider) processTransformations(graph *resources.Graph, transformationURNs []string) (transformationsToPublish map[string]struct{}, requiredLibraries map[string]struct{}) {
-	transformationsToPublish = make(map[string]struct{})
-	requiredLibraries = make(map[string]struct{})
-
-	for _, transURN := range transformationURNs {
-		transformationsToPublish[transURN] = struct{}{}
-
-		for _, libDep := range graph.GetDependencies(transURN) {
-			requiredLibraries[libDep] = struct{}{}
-		}
-	}
-
-	return transformationsToPublish, requiredLibraries
-}
-
-// processLibraries determines which libraries to publish based on:
-// - Modified libraries (directly changed)
-// - Libraries required by transformations we're publishing
-// - Transformations affected by modified libraries (need to be published too)
-func (p *Provider) processLibraries(graph *resources.Graph, libraryURNs []string, transformationsToPublish map[string]struct{}, requiredLibraries map[string]struct{}) map[string]struct{} {
-	librariesToPublish := make(map[string]struct{})
-
-	for _, libURN := range libraryURNs {
-		librariesToPublish[libURN] = struct{}{}
-
-		for _, transDependent := range graph.GetDependents(libURN) {
-			// This transformation needs to be published because its library changed
-			transformationsToPublish[transDependent] = struct{}{}
-
-			for _, libDep := range graph.GetDependencies(transDependent) {
-				requiredLibraries[libDep] = struct{}{}
-			}
-		}
-	}
-
-	for libURN := range requiredLibraries {
-		librariesToPublish[libURN] = struct{}{}
-	}
-
-	return librariesToPublish
-}
-
-func (p *Provider) buildRequestFromURNs(graph *resources.Graph, st *state.State, transformationURNs map[string]struct{}, libraryURNs map[string]struct{}) (*transformations.BatchPublishRequest, error) {
+func (p *Provider) buildRequestFromURNs(
+	graph *resources.Graph,
+	st *state.State,
+	transformationURNs map[string]struct{},
+	libraryURNs map[string]struct{},
+) (*transformations.BatchPublishRequest, error) {
 	req := &transformations.BatchPublishRequest{
 		Transformations: []transformations.BatchPublishTransformation{},
 		Libraries:       []transformations.BatchPublishLibrary{},
@@ -402,7 +380,6 @@ func (p *Provider) buildLibraryPublishItem(st *state.State, libURN string) (*tra
 	}, nil
 }
 
-// buildTransformationPublishItem creates a transformation publish item from state and graph
 func (p *Provider) buildTransformationPublishItem(graph *resources.Graph, st *state.State, transURN string) (*transformations.BatchPublishTransformation, error) {
 	stateResource := st.GetResource(transURN)
 
@@ -425,7 +402,6 @@ func (p *Provider) buildTransformationPublishItem(graph *resources.Graph, st *st
 	}, nil
 }
 
-// resolveTestSuite extracts test definitions from graph resource
 func (p *Provider) resolveTestSuite(graph *resources.Graph, transURN string) ([]transformations.TestDefinition, error) {
 	graphResource, exists := graph.GetResource(transURN)
 	if !exists {
