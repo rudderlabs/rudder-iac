@@ -270,9 +270,15 @@ func TestRunnerRun(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			require.Len(t, req.Transformations, 1)
-			assert.Equal(t, "trans-ver-1", req.Transformations[0].VersionID)
-			assert.Empty(t, req.Libraries)
+			if len(req.Transformations) != 1 {
+				return nil, errors.New("expected exactly 1 transformation in request")
+			}
+			if req.Transformations[0].VersionID != "trans-ver-1" {
+				return nil, errors.New("expected transformation version ID to be trans-ver-1")
+			}
+			if len(req.Libraries) != 0 {
+				return nil, errors.New("expected no libraries in request")
+			}
 
 			return &transformations.BatchTestResponse{
 				Pass: true,
@@ -328,9 +334,15 @@ func TestRunnerRun(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			assert.Len(t, req.Libraries, 1)
-			assert.Equal(t, "lib-ver-standalone", req.Libraries[0].VersionID)
-			assert.Empty(t, req.Transformations)
+			if len(req.Libraries) != 1 {
+				return nil, errors.New("expected exactly 1 library in request")
+			}
+			if req.Libraries[0].VersionID != "lib-ver-standalone" {
+				return nil, errors.New("expected library version ID to be lib-ver-standalone")
+			}
+			if len(req.Transformations) != 0 {
+				return nil, errors.New("expected no transformations in request")
+			}
 
 			return &transformations.BatchTestResponse{
 				Pass: true,
@@ -533,8 +545,12 @@ func TestRunnerRun(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			require.Len(t, req.Transformations, 1)
-			assert.Equal(t, "ver-updated", req.Transformations[0].VersionID)
+			if len(req.Transformations) != 1 {
+				return nil, errors.New("expected exactly 1 transformation in request")
+			}
+			if req.Transformations[0].VersionID != "ver-updated" {
+				return nil, errors.New("expected version ID to be ver-updated")
+			}
 
 			return &transformations.BatchTestResponse{
 				Pass: true,
@@ -709,10 +725,18 @@ func TestRunTestUnitTask(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			assert.Len(t, req.Transformations, 1)
-			assert.Equal(t, "ver-1", req.Transformations[0].VersionID)
-			assert.Len(t, req.Libraries, 1)
-			assert.Equal(t, "lib-ver-1", req.Libraries[0].VersionID)
+			if len(req.Transformations) != 1 {
+				return nil, errors.New("expected exactly 1 transformation in request")
+			}
+			if req.Transformations[0].VersionID != "ver-1" {
+				return nil, errors.New("expected transformation version ID to be ver-1")
+			}
+			if len(req.Libraries) != 1 {
+				return nil, errors.New("expected exactly 1 library in request")
+			}
+			if req.Libraries[0].VersionID != "lib-ver-1" {
+				return nil, errors.New("expected library version ID to be lib-ver-1")
+			}
 			return expectedResponse, nil
 		}
 
@@ -997,9 +1021,15 @@ func TestTestStandaloneLibraries(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			assert.Len(t, req.Libraries, 2)
-			assert.Equal(t, "ver-1", req.Libraries[0].VersionID)
-			assert.Equal(t, "ver-2", req.Libraries[1].VersionID)
+			if len(req.Libraries) != 2 {
+				return nil, errors.New("expected exactly 2 libraries in request")
+			}
+			if req.Libraries[0].VersionID != "ver-1" {
+				return nil, errors.New("expected first library version ID to be ver-1")
+			}
+			if req.Libraries[1].VersionID != "ver-2" {
+				return nil, errors.New("expected second library version ID to be ver-2")
+			}
 			return expectedResponse, nil
 		}
 
