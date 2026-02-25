@@ -10,13 +10,12 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 // --- resolveTransformationVersion ---
 
 func TestResolveTransformationVersion(t *testing.T) {
-	t.Run("modified transformation is staged and versionID returned", func(t *testing.T) {
+	t.Run("modified transformation without remoteID is created and versionID returned", func(t *testing.T) {
 		store := &stubStore{
 			createTransformation: func(_ context.Context, req *transformations.CreateTransformationRequest, _ bool) (*transformations.Transformation, error) {
 				return &transformations.Transformation{VersionID: "staged-ver"}, nil
@@ -24,46 +23,35 @@ func TestResolveTransformationVersion(t *testing.T) {
 		}
 		trans := &model.TransformationResource{ID: "t1", Name: "T1", Code: "code"}
 
-		versionID, err := getTransformationVersionID(context.Background(), store, trans, true, nil)
+		versionID, err := getTransformationVersionID(context.Background(), store, trans, true, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, "staged-ver", versionID)
 	})
 
-	t.Run("unmodified transformation reuses remote versionID", func(t *testing.T) {
-		store := &stubStore{}
-		trans := &model.TransformationResource{ID: "t1"}
-		remote := &state.ResourceState{
-			OutputRaw: &model.TransformationState{ID: "remote-id", VersionID: "existing-ver"},
+	t.Run("transformation with remoteID is updated and versionID returned", func(t *testing.T) {
+		store := &stubStore{
+			updateTransformation: func(_ context.Context, id string, _ *transformations.UpdateTransformationRequest, _ bool) (*transformations.Transformation, error) {
+				assert.Equal(t, "remote-id", id)
+				return &transformations.Transformation{VersionID: "updated-ver"}, nil
+			},
 		}
+		trans := &model.TransformationResource{ID: "t1"}
 
-		versionID, err := getTransformationVersionID(context.Background(), store, trans, false, remote)
+		versionID, err := getTransformationVersionID(context.Background(), store, trans, false, "remote-id")
 
 		require.NoError(t, err)
-		assert.Equal(t, "existing-ver", versionID)
+		assert.Equal(t, "updated-ver", versionID)
 	})
 
-	t.Run("unmodified transformation with no remote resource returns error", func(t *testing.T) {
+	t.Run("unmodified transformation with no remoteID returns error", func(t *testing.T) {
 		store := &stubStore{}
 		trans := &model.TransformationResource{ID: "t1"}
 
-		_, err := getTransformationVersionID(context.Background(), store, trans, false, nil)
+		_, err := getTransformationVersionID(context.Background(), store, trans, false, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in remote state")
-	})
-
-	t.Run("unmodified transformation with empty versionID in remote state returns error", func(t *testing.T) {
-		store := &stubStore{}
-		trans := &model.TransformationResource{ID: "t1"}
-		remote := &state.ResourceState{
-			OutputRaw: &model.TransformationState{ID: "remote-id", VersionID: ""},
-		}
-
-		_, err := getTransformationVersionID(context.Background(), store, trans, false, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid versionId")
 	})
 
 	t.Run("staging error is propagated", func(t *testing.T) {
@@ -74,7 +62,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 		}
 		trans := &model.TransformationResource{ID: "t1"}
 
-		_, err := getTransformationVersionID(context.Background(), store, trans, true, nil)
+		_, err := getTransformationVersionID(context.Background(), store, trans, true, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stage failed")
@@ -84,7 +72,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 // --- resolveLibraryVersion ---
 
 func TestResolveLibraryVersion(t *testing.T) {
-	t.Run("modified library is staged and versionID returned", func(t *testing.T) {
+	t.Run("modified library without remoteID is created and versionID returned", func(t *testing.T) {
 		store := &stubStore{
 			createLibrary: func(_ context.Context, req *transformations.CreateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
 				return &transformations.TransformationLibrary{VersionID: "lib-staged-ver"}, nil
@@ -92,46 +80,35 @@ func TestResolveLibraryVersion(t *testing.T) {
 		}
 		lib := &model.LibraryResource{ID: "lib-1", Name: "L1", Code: "code"}
 
-		versionID, err := getLibraryVersionID(context.Background(), store, lib, true, nil)
+		versionID, err := getLibraryVersionID(context.Background(), store, lib, true, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, "lib-staged-ver", versionID)
 	})
 
-	t.Run("unmodified library reuses remote versionID", func(t *testing.T) {
-		store := &stubStore{}
-		lib := &model.LibraryResource{ID: "lib-1"}
-		remote := &state.ResourceState{
-			OutputRaw: &model.LibraryState{ID: "remote-lib-id", VersionID: "lib-existing-ver"},
+	t.Run("library with remoteID is updated and versionID returned", func(t *testing.T) {
+		store := &stubStore{
+			updateLibrary: func(_ context.Context, id string, _ *transformations.UpdateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
+				assert.Equal(t, "remote-lib-id", id)
+				return &transformations.TransformationLibrary{VersionID: "lib-updated-ver"}, nil
+			},
 		}
+		lib := &model.LibraryResource{ID: "lib-1"}
 
-		versionID, err := getLibraryVersionID(context.Background(), store, lib, false, remote)
+		versionID, err := getLibraryVersionID(context.Background(), store, lib, false, "remote-lib-id")
 
 		require.NoError(t, err)
-		assert.Equal(t, "lib-existing-ver", versionID)
+		assert.Equal(t, "lib-updated-ver", versionID)
 	})
 
-	t.Run("unmodified library with no remote resource returns error", func(t *testing.T) {
+	t.Run("unmodified library with no remoteID returns error", func(t *testing.T) {
 		store := &stubStore{}
 		lib := &model.LibraryResource{ID: "lib-1"}
 
-		_, err := getLibraryVersionID(context.Background(), store, lib, false, nil)
+		_, err := getLibraryVersionID(context.Background(), store, lib, false, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in remote state")
-	})
-
-	t.Run("unmodified library with empty versionID in remote state returns error", func(t *testing.T) {
-		store := &stubStore{}
-		lib := &model.LibraryResource{ID: "lib-1"}
-		remote := &state.ResourceState{
-			OutputRaw: &model.LibraryState{ID: "remote-lib-id", VersionID: ""},
-		}
-
-		_, err := getLibraryVersionID(context.Background(), store, lib, false, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid versionId")
 	})
 
 	t.Run("staging error is propagated", func(t *testing.T) {
@@ -142,7 +119,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 		}
 		lib := &model.LibraryResource{ID: "lib-1"}
 
-		_, err := getLibraryVersionID(context.Background(), store, lib, true, nil)
+		_, err := getLibraryVersionID(context.Background(), store, lib, true, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "lib stage failed")

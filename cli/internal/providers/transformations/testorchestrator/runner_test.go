@@ -20,7 +20,9 @@ import (
 type mockTransformationStore struct {
 	batchTestFunc        func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
 	createTransformation func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
+	updateTransformation func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error)
 	createLibraryFunc    func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
+	updateLibraryFunc    func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
 }
 
 func newMockStore() *mockTransformationStore {
@@ -49,6 +51,9 @@ func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transf
 }
 
 func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+	if m.updateTransformation != nil {
+		return m.updateTransformation(ctx, id, req, publish)
+	}
 	return nil, errors.New("not implemented")
 }
 
@@ -69,6 +74,9 @@ func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Contex
 }
 
 func (m *mockTransformationStore) UpdateLibrary(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
+	if m.updateLibraryFunc != nil {
+		return m.updateLibraryFunc(ctx, id, req, publish)
+	}
 	return nil, errors.New("not implemented")
 }
 
@@ -341,14 +349,22 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 		remoteState.AddResource(&state.ResourceState{
 			ID:        "trans-2",
 			Type:      "transformation",
-			OutputRaw: &model.TransformationState{VersionID: "ver-2-existing"},
+			OutputRaw: &model.TransformationState{ID: "remote-trans-2", VersionID: "ver-2-existing"},
 		})
 
 		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
 			return &transformations.Transformation{VersionID: "ver-1-new"}, nil
 		}
 
-		versionMap, err := runner.resolveAllTransformationVersions(ctx, testPlan, remoteState)
+		mockStore.updateTransformation = func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			return &transformations.Transformation{VersionID: "ver-2-existing"}, nil
+		}
+
+		urnToRemoteID := map[string]string{
+			resources.URN("trans-2", "transformation"): "remote-trans-2",
+		}
+
+		versionMap, err := runner.resolveAllTransformationVersions(ctx, testPlan, urnToRemoteID)
 
 		require.NoError(t, err)
 		assert.Equal(t, "ver-1-new", versionMap["trans-1"])
@@ -375,8 +391,6 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 			},
 		}
 
-		remoteState := newTestState()
-
 		callCount := 0
 		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
 			callCount++
@@ -390,7 +404,9 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 			planner: planner,
 		}
 
-		versionMap, err := runner.resolveAllTransformationVersions(ctx, testPlan, remoteState)
+		urnToRemoteID := map[string]string{}
+
+		versionMap, err := runner.resolveAllTransformationVersions(ctx, testPlan, urnToRemoteID)
 
 		require.NoError(t, err)
 		assert.Len(t, versionMap, 1)
@@ -425,16 +441,26 @@ func TestResolveAllLibraryVersions(t *testing.T) {
 		remoteState.AddResource(&state.ResourceState{
 			ID:        "lib-2",
 			Type:      "transformation-library",
-			OutputRaw: &model.LibraryState{VersionID: "ver-2-existing"},
+			OutputRaw: &model.LibraryState{ID: "remote-lib-2", VersionID: "ver-2-existing"},
 		})
 		remoteState.AddResource(&state.ResourceState{
 			ID:        "lib-3",
 			Type:      "transformation-library",
-			OutputRaw: &model.LibraryState{VersionID: "ver-3-existing"},
+			OutputRaw: &model.LibraryState{ID: "remote-lib-3", VersionID: "ver-3-existing"},
 		})
 
 		mockStore.createLibraryFunc = func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
 			return &transformations.TransformationLibrary{VersionID: "ver-1-new"}, nil
+		}
+
+		mockStore.updateLibraryFunc = func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
+			if id == "remote-lib-2" {
+				return &transformations.TransformationLibrary{VersionID: "ver-2-existing"}, nil
+			}
+			if id == "remote-lib-3" {
+				return &transformations.TransformationLibrary{VersionID: "ver-3-existing"}, nil
+			}
+			return nil, errors.New("unexpected library ID")
 		}
 
 		graph := resources.NewGraph()
@@ -444,7 +470,12 @@ func TestResolveAllLibraryVersions(t *testing.T) {
 			planner: planner,
 		}
 
-		versionMap, err := runner.resolveAllLibraryVersions(ctx, testPlan, remoteState)
+		urnToRemoteID := map[string]string{
+			resources.URN("lib-2", "transformation-library"): "remote-lib-2",
+			resources.URN("lib-3", "transformation-library"): "remote-lib-3",
+		}
+
+		versionMap, err := runner.resolveAllLibraryVersions(ctx, testPlan, urnToRemoteID)
 
 		require.NoError(t, err)
 		assert.Len(t, versionMap, 3)

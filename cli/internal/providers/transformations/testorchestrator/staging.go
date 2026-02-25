@@ -6,7 +6,6 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 // StageTransformation uploads a transformation to the workspace as an unpublished version.
@@ -16,9 +15,9 @@ func StageTransformation(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	transformation *model.TransformationResource,
-	remoteResource *state.ResourceState,
+	remoteID string,
 ) (string, error) {
-	if remoteResource == nil {
+	if remoteID == "" {
 		// Transformation doesn't exist remotely - create new
 		req := &transformations.CreateTransformationRequest{
 			Name:       transformation.Name,
@@ -34,19 +33,13 @@ func StageTransformation(
 	}
 
 	// Transformation exists remotely - update it
-	// Extract remote ID from state output
-	transState, ok := remoteResource.OutputRaw.(*model.TransformationState)
-	if !ok || transState.ID == "" {
-		return "", fmt.Errorf("transformation %s exists in remote state but has no valid remote ID", transformation.ID)
-	}
-
 	updateReq := &transformations.UpdateTransformationRequest{
 		Name:     transformation.Name,
 		Code:     transformation.Code,
 		Language: transformation.Language,
 	}
 
-	result, err := store.UpdateTransformation(ctx, transState.ID, updateReq, false)
+	result, err := store.UpdateTransformation(ctx, remoteID, updateReq, false)
 	if err != nil {
 		return "", fmt.Errorf("updating transformation %s: %w", transformation.ID, err)
 	}
@@ -61,10 +54,9 @@ func StageLibrary(
 	ctx context.Context,
 	store transformations.TransformationStore,
 	library *model.LibraryResource,
-	remote *state.ResourceState,
+	remoteID string,
 ) (string, error) {
-
-	if remote == nil {
+	if remoteID == "" {
 		// Library doesn't exist remotely - create new
 		req := &transformations.CreateLibraryRequest{
 			Name:        library.Name,
@@ -81,18 +73,13 @@ func StageLibrary(
 	}
 
 	// Library exists remotely - update it
-	libState, ok := remote.OutputRaw.(*model.LibraryState)
-	if !ok || libState.ID == "" {
-		return "", fmt.Errorf("library %s exists in remote state but has no valid remote ID", library.ID)
-	}
-
 	updateReq := &transformations.UpdateLibraryRequest{
 		Name:     library.Name,
 		Code:     library.Code,
 		Language: library.Language,
 	}
 
-	result, err := store.UpdateLibrary(ctx, libState.ID, updateReq, false)
+	result, err := store.UpdateLibrary(ctx, remoteID, updateReq, false)
 	if err != nil {
 		return "", fmt.Errorf("updating library %s: %w", library.ID, err)
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
@@ -80,13 +79,16 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
 
+	// Build map of remote IDs indexed by URN from source and remote graphs
+	remoteIDByURN := r.buildRemoteIDByURN(r.planner.graph, remoteGraph)
+
 	// Resolve library and transformation versions once before parallel execution
-	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteState)
+	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteIDByURN)
 	if err != nil {
 		return nil, fmt.Errorf("resolving library versions: %w", err)
 	}
 
-	transformationVersionMap, err := r.resolveAllTransformationVersions(ctx, testPlan, remoteState)
+	transformationVersionMap, err := r.resolveAllTransformationVersions(ctx, testPlan, remoteIDByURN)
 	if err != nil {
 		return nil, fmt.Errorf("resolving transformation versions: %w", err)
 	}
@@ -147,10 +149,43 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	return results, nil
 }
 
+// buildRemoteIDByURN builds a map of remote IDs indexed by URN.
+// Extracts remote IDs from:
+// 1. Source graph resources' import metadata (for importable resources)
+// 2. Remote graph resources' raw data (for existing resources)
+func (r *Runner) buildRemoteIDByURN(sourceGraph, remoteGraph *resources.Graph) map[string]string {
+	remoteIDByURN := make(map[string]string)
+
+	for _, resource := range sourceGraph.Resources() {
+		if resource.Type() != "transformation" && resource.Type() != "transformation-library" {
+			continue
+		}
+		if importMeta := resource.ImportMetadata(); importMeta != nil && importMeta.RemoteId != "" {
+			remoteIDByURN[resource.URN()] = importMeta.RemoteId
+		}
+	}
+
+	for urn, resource := range remoteGraph.Resources() {
+		switch resource.Type() {
+		case "transformation":
+			if transData, ok := resource.RawData().(*model.TransformationResource); ok && transData.ID != "" {
+				remoteIDByURN[urn] = transData.ID
+			}
+
+		case "transformation-library":
+			if libData, ok := resource.RawData().(*model.LibraryResource); ok && libData.ID != "" {
+				remoteIDByURN[urn] = libData.ID
+			}
+		}
+	}
+
+	return remoteIDByURN
+}
+
 // resolveAllTransformationVersions resolves versionIDs for all unique transformations in the test plan.
 // Modified transformations are staged as unpublished versions; unmodified ones reuse existing versionIDs.
 // Returns a map of transformation ID to versionID.
-func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
+func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan *TestPlan, remoteIDByURN map[string]string) (map[string]string, error) {
 	seen := make(map[string]struct{})
 	tasks := make([]*transformationVersionTask, 0, len(testPlan.TestUnits))
 
@@ -161,13 +196,13 @@ func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan 
 		seen[unit.Transformation.ID] = struct{}{}
 
 		transformationURN := resources.URN(unit.Transformation.ID, "transformation")
-		remoteResource := remoteState.GetResource(transformationURN)
+		remoteID := remoteIDByURN[transformationURN]
 		isModified := testPlan.IsTransformationModified(transformationURN)
 
 		tasks = append(tasks, &transformationVersionTask{
 			transformation: unit.Transformation,
 			isModified:     isModified,
-			remoteResource: remoteResource,
+			remoteID:       remoteID,
 		})
 	}
 
@@ -177,7 +212,7 @@ func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan 
 // resolveAllLibraryVersions fetches versionIDs for all unique libraries in the test plan,
 // including both transformation-dependent and standalone libraries.
 // Returns a map of library ID to versionID.
-func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteState *state.State) (map[string]string, error) {
+func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPlan, remoteIDByURN map[string]string) (map[string]string, error) {
 	allLibs := lo.FlatMap(testPlan.TestUnits, func(u *TestUnit, _ int) []*model.LibraryResource {
 		return u.Libraries
 	})
@@ -193,13 +228,13 @@ func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPl
 		uniqueLibraries[lib.ID] = struct{}{}
 
 		libURN := resources.URN(lib.ID, "transformation-library")
-		remoteResource := remoteState.GetResource(libURN)
+		remoteID := remoteIDByURN[libURN]
 		isModified := testPlan.IsLibraryModified(libURN)
 
 		libraryTasks = append(libraryTasks, &libraryVersionTask{
-			lib:            lib,
-			isModified:     isModified,
-			remoteResource: remoteResource,
+			lib:        lib,
+			isModified: isModified,
+			remoteID:   remoteID,
 		})
 	}
 
