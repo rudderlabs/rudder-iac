@@ -67,8 +67,10 @@ var configExamples = rules.Examples{
 // Config is allowed, but only 'additionalProperties' is a recognised field.
 type customTypeObjectConfig struct{}
 
+const additionalPropertiesKey = "additionalProperties"
+
 var allowedCustomTypeObjectKeys = map[string]bool{
-	"additionalProperties": true,
+	additionalPropertiesKey: true,
 }
 
 func (c *customTypeObjectConfig) ConfigAllowed() bool { return true }
@@ -76,6 +78,15 @@ func (c *customTypeObjectConfig) ConfigAllowed() bool { return true }
 func (c *customTypeObjectConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
 	if !allowedCustomTypeObjectKeys[fieldname] {
 		return nil, config.ErrFieldNotSupported
+	}
+	switch fieldname {
+	case additionalPropertiesKey:
+		if _, ok := fieldval.(bool); !ok {
+			return []rules.ValidationResult{{
+				Reference: fieldname,
+				Message:   "'additionalProperties' must be a boolean",
+			}}, nil
+		}
 	}
 	return nil, nil
 }

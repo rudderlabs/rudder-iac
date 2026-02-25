@@ -64,6 +64,24 @@ func TestCustomTypeConfigValidRule_ObjectType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
+			name: "object type with additionalProperties non-boolean is invalid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "address",
+						Name:    "Address",
+						Type:    "object",
+						Config: map[string]any{
+							"additionalProperties": "true",
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/additionalProperties"},
+			expectedMsgs:   []string{"'additionalProperties' must be a boolean"},
+		},
+		{
 			name: "object type with unsupported field in config is invalid",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
