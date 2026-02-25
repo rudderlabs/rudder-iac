@@ -11,6 +11,8 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -22,11 +24,6 @@ import (
 type (
 	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
 	TestResults                       = model.TestResults
-)
-
-const (
-	resourceTypeTransformation = "transformation"
-	resourceTypeLibrary        = "transformation-library"
 )
 
 var testLogger = logger.New("testorchestrator")
@@ -163,7 +160,7 @@ func (r *Runner) buildRemoteIDByURN(sourceGraph *resources.Graph, remoteState *s
 	remoteIDByURN := make(map[string]string)
 
 	for _, resource := range sourceGraph.Resources() {
-		if resource.Type() != resourceTypeTransformation && resource.Type() != resourceTypeLibrary {
+		if resource.Type() != transformation.HandlerMetadata.ResourceType && resource.Type() != library.HandlerMetadata.ResourceType {
 			continue
 		}
 		if importMeta := resource.ImportMetadata(); importMeta != nil && importMeta.RemoteId != "" {
@@ -177,17 +174,13 @@ func (r *Runner) buildRemoteIDByURN(sourceGraph *resources.Graph, remoteState *s
 		}
 
 		switch resourceState.Type {
-		case resourceTypeTransformation:
+		case transformation.HandlerMetadata.ResourceType:
 			transState := resourceState.OutputRaw.(*model.TransformationState)
-			if transState.ID != "" {
-				remoteIDByURN[urn] = transState.ID
-			}
+			remoteIDByURN[urn] = transState.ID
 
-		case resourceTypeLibrary:
+		case library.HandlerMetadata.ResourceType:
 			libState := resourceState.OutputRaw.(*model.LibraryState)
-			if libState.ID != "" {
-				remoteIDByURN[urn] = libState.ID
-			}
+			remoteIDByURN[urn] = libState.ID
 		}
 	}
 
@@ -207,7 +200,7 @@ func (r *Runner) resolveAllTransformationVersions(ctx context.Context, testPlan 
 		}
 		seen[unit.Transformation.ID] = struct{}{}
 
-		transformationURN := resources.URN(unit.Transformation.ID, "transformation")
+		transformationURN := resources.URN(unit.Transformation.ID, transformation.HandlerMetadata.ResourceType)
 		remoteID := remoteIDByURN[transformationURN]
 		isModified := testPlan.IsTransformationModified(transformationURN)
 
@@ -239,7 +232,7 @@ func (r *Runner) resolveAllLibraryVersions(ctx context.Context, testPlan *TestPl
 		}
 		uniqueLibraries[lib.ID] = struct{}{}
 
-		libURN := resources.URN(lib.ID, "transformation-library")
+		libURN := resources.URN(lib.ID, library.HandlerMetadata.ResourceType)
 		remoteID := remoteIDByURN[libURN]
 		isModified := testPlan.IsLibraryModified(libURN)
 

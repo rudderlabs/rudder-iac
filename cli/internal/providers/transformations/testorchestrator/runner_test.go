@@ -17,6 +17,25 @@ import (
 
 // --- Mock Implementations ---
 
+type mockRemoteStateLoader struct {
+	loadResourcesFromRemoteFunc func(ctx context.Context) (*resources.RemoteResources, error)
+	mapRemoteToStateFunc        func(collection *resources.RemoteResources) (*state.State, error)
+}
+
+func (m *mockRemoteStateLoader) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	if m.loadResourcesFromRemoteFunc != nil {
+		return m.loadResourcesFromRemoteFunc(ctx)
+	}
+	return resources.NewRemoteResources(), nil
+}
+
+func (m *mockRemoteStateLoader) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
+	if m.mapRemoteToStateFunc != nil {
+		return m.mapRemoteToStateFunc(collection)
+	}
+	return state.EmptyState(), nil
+}
+
 type mockTransformationStore struct {
 	batchTestFunc        func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
 	createTransformation func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
@@ -104,6 +123,439 @@ func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transfo
 
 func newTestState() *state.State {
 	return state.EmptyState()
+}
+
+// --- Runner.Run ---
+
+func TestRunnerRun(t *testing.T) {
+	t.Run("returns empty results when no resources to test", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{
+			loadResourcesFromRemoteFunc: func(ctx context.Context) (*resources.RemoteResources, error) {
+				return resources.NewRemoteResources(), nil
+			},
+			mapRemoteToStateFunc: func(collection *resources.RemoteResources) (*state.State, error) {
+				return state.EmptyState(), nil
+			},
+		}
+
+		graph := resources.NewGraph()
+		runner := &Runner{
+			loader:      mockLoader,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.NoError(t, err)
+		assert.True(t, results.Pass)
+		assert.Empty(t, results.Transformations)
+		assert.Empty(t, results.Libraries)
+	})
+
+	t.Run("returns error when loading remote resources fails", func(t *testing.T) {
+		ctx := context.Background()
+		expectedErr := errors.New("network error")
+		mockLoader := &mockRemoteStateLoader{
+			loadResourcesFromRemoteFunc: func(ctx context.Context) (*resources.RemoteResources, error) {
+				return nil, expectedErr
+			},
+		}
+
+		graph := resources.NewGraph()
+		runner := &Runner{
+			loader:  mockLoader,
+			planner: NewPlanner(graph),
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.Error(t, err)
+		assert.Nil(t, results)
+		assert.Contains(t, err.Error(), "loading remote resources")
+	})
+
+	t.Run("returns error when mapping remote to state fails", func(t *testing.T) {
+		ctx := context.Background()
+		expectedErr := errors.New("mapping error")
+		mockLoader := &mockRemoteStateLoader{
+			loadResourcesFromRemoteFunc: func(ctx context.Context) (*resources.RemoteResources, error) {
+				return resources.NewRemoteResources(), nil
+			},
+			mapRemoteToStateFunc: func(collection *resources.RemoteResources) (*state.State, error) {
+				return nil, expectedErr
+			},
+		}
+
+		graph := resources.NewGraph()
+		runner := &Runner{
+			loader:  mockLoader,
+			planner: NewPlanner(graph),
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.Error(t, err)
+		assert.Nil(t, results)
+		assert.Contains(t, err.Error(), "building remote state")
+	})
+
+	t.Run("returns error when transformation version resolution fails", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{}
+		mockStore := newMockStore()
+
+		graph := resources.NewGraph()
+		trans := resources.NewResource(
+			"trans-1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-1",
+				Name: "Test Transformation",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+		)
+		graph.AddResource(trans)
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		expectedErr := errors.New("version creation failed")
+		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			return nil, expectedErr
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.Error(t, err)
+		assert.Nil(t, results)
+		assert.Contains(t, err.Error(), "resolving transformation versions")
+	})
+
+	t.Run("successfully runs tests for transformation without dependencies", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{}
+		mockStore := newMockStore()
+
+		graph := resources.NewGraph()
+		trans := resources.NewResource(
+			"trans-1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-1",
+				Name: "Test Transformation",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+		)
+		graph.AddResource(trans)
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			return &transformations.Transformation{ID: "remote-trans-1", VersionID: "trans-ver-1"}, nil
+		}
+
+		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+			require.Len(t, req.Transformations, 1)
+			assert.Equal(t, "trans-ver-1", req.Transformations[0].VersionID)
+			assert.Empty(t, req.Libraries)
+
+			return &transformations.BatchTestResponse{
+				Pass: true,
+				ValidationOutput: transformations.ValidationOutput{
+					Transformations: []transformations.TransformationTestResult{
+						{
+							ID:        "remote-trans-1",
+							VersionID: "trans-ver-1",
+							Pass:      true,
+						},
+					},
+				},
+			}, nil
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.NoError(t, err)
+		assert.Len(t, results.Transformations, 1)
+		assert.Empty(t, results.Libraries)
+		assert.Equal(t, "trans-ver-1", results.Transformations[0].Result.VersionID)
+	})
+
+	t.Run("successfully runs tests for standalone libraries", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{}
+		mockStore := newMockStore()
+
+		graph := resources.NewGraph()
+		lib := resources.NewResource(
+			"lib-standalone",
+			"transformation-library",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.LibraryResource{
+				ID:         "lib-standalone",
+				Name:       "Standalone Library",
+				Code:       "function helper() { return true; }",
+				ImportName: "standaloneLib",
+			}),
+		)
+		graph.AddResource(lib)
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		mockStore.createLibraryFunc = func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
+			return &transformations.TransformationLibrary{ID: "remote-lib-standalone", VersionID: "lib-ver-standalone"}, nil
+		}
+
+		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+			assert.Len(t, req.Libraries, 1)
+			assert.Equal(t, "lib-ver-standalone", req.Libraries[0].VersionID)
+			assert.Empty(t, req.Transformations)
+
+			return &transformations.BatchTestResponse{
+				Pass: true,
+				ValidationOutput: transformations.ValidationOutput{
+					Libraries: []transformations.LibraryTestResult{
+						{VersionID: "lib-ver-standalone", Pass: true},
+					},
+				},
+			}, nil
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.NoError(t, err)
+		assert.Empty(t, results.Transformations)
+		assert.Len(t, results.Libraries, 1)
+		assert.Equal(t, "lib-ver-standalone", results.Libraries[0].VersionID)
+	})
+
+	t.Run("aggregates results from multiple test units", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{}
+		mockStore := newMockStore()
+
+		graph := resources.NewGraph()
+
+		trans1 := resources.NewResource(
+			"trans-1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-1",
+				Name: "Transformation 1",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+		)
+		graph.AddResource(trans1)
+
+		trans2 := resources.NewResource(
+			"trans-2",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-2",
+				Name: "Transformation 2",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+		)
+		graph.AddResource(trans2)
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			return &transformations.Transformation{ID: "remote-" + req.Name, VersionID: "ver-" + req.Name}, nil
+		}
+
+		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+			require.Len(t, req.Transformations, 1)
+
+			return &transformations.BatchTestResponse{
+				Pass: true,
+				ValidationOutput: transformations.ValidationOutput{
+					Transformations: []transformations.TransformationTestResult{
+						{
+							ID:        req.Transformations[0].VersionID,
+							VersionID: req.Transformations[0].VersionID,
+							Pass:      true,
+						},
+					},
+				},
+			}, nil
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.NoError(t, err)
+		assert.Len(t, results.Transformations, 2, "should have results from 2 transformations")
+	})
+
+	t.Run("returns error when batch test fails", func(t *testing.T) {
+		ctx := context.Background()
+		mockLoader := &mockRemoteStateLoader{}
+		mockStore := newMockStore()
+
+		graph := resources.NewGraph()
+		trans := resources.NewResource(
+			"trans-1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-1",
+				Name: "Test Transformation",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+		)
+		graph.AddResource(trans)
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			return &transformations.Transformation{ID: "remote-trans-1", VersionID: "ver-1"}, nil
+		}
+
+		expectedErr := errors.New("batch test API failure")
+		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+			return nil, expectedErr
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.Error(t, err)
+		assert.Nil(t, results)
+		assert.Contains(t, err.Error(), "running tests for trans-1")
+	})
+
+	t.Run("uses remote ID from importable resources for version resolution", func(t *testing.T) {
+		ctx := context.Background()
+		mockStore := newMockStore()
+
+		// Create graph with importable transformation (has import metadata)
+		graph := resources.NewGraph()
+		trans := resources.NewResource(
+			"trans-imported",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				ID:   "trans-imported",
+				Name: "Imported Transformation",
+				Code: "function transformEvent(event) { return event; }",
+			}),
+			resources.WithResourceImportMetadata("remote-imported-id", ""),
+		)
+		graph.AddResource(trans)
+
+		// Mock loader that returns remote resources with different ID
+		mockLoader := &mockRemoteStateLoader{
+			loadResourcesFromRemoteFunc: func(ctx context.Context) (*resources.RemoteResources, error) {
+				remoteResources := resources.NewRemoteResources()
+				remoteResources.Set("transformation", map[string]*resources.RemoteResource{
+					"remote-imported-id": {
+						ID:         "remote-imported-id",
+						ExternalID: "trans-imported",
+						Data: &model.RemoteTransformation{
+							Transformation: &transformations.Transformation{
+								ID:         "remote-imported-id",
+								ExternalID: "trans-imported",
+								Name:       "Imported Transformation",
+							},
+						},
+					},
+				})
+				return remoteResources, nil
+			},
+			mapRemoteToStateFunc: func(collection *resources.RemoteResources) (*state.State, error) {
+				st := state.EmptyState()
+				st.AddResource(&state.ResourceState{
+					ID:   "trans-imported",
+					Type: "transformation",
+					OutputRaw: &model.TransformationState{
+						ID:        "remote-different-id", // Different ID to verify import metadata takes precedence
+						VersionID: "ver-existing",
+					},
+				})
+				return st, nil
+			},
+		}
+
+		runner := &Runner{
+			loader:      mockLoader,
+			store:       mockStore,
+			planner:     NewPlanner(graph),
+			workspaceID: "ws-123",
+		}
+
+		// Track which remote ID is used for update
+		var usedRemoteID string
+		mockStore.updateTransformation = func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+			usedRemoteID = id
+			return &transformations.Transformation{
+				ID:         id,
+				VersionID:  "ver-updated",
+				ExternalID: "trans-imported",
+			}, nil
+		}
+
+		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+			require.Len(t, req.Transformations, 1)
+			assert.Equal(t, "ver-updated", req.Transformations[0].VersionID)
+
+			return &transformations.BatchTestResponse{
+				Pass: true,
+				ValidationOutput: transformations.ValidationOutput{
+					Transformations: []transformations.TransformationTestResult{
+						{
+							ID:        "remote-imported-id",
+							VersionID: "ver-updated",
+							Pass:      true,
+						},
+					},
+				},
+			}, nil
+		}
+
+		results, err := runner.Run(ctx, ModeAll, "")
+
+		require.NoError(t, err)
+		assert.Len(t, results.Transformations, 1)
+		assert.Equal(t, "ver-updated", results.Transformations[0].Result.VersionID)
+		// Verify that import metadata's remote ID was used (not the one from remote state)
+		assert.Equal(t, "remote-imported-id", usedRemoteID, "should use remote ID from import metadata, not from remote state")
+	})
 }
 
 // --- buildTestRequest ---
@@ -662,7 +1114,7 @@ func TestBuildRemoteIDByURN(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
-	t.Run("skips remote state resources with empty ID", func(t *testing.T) {
+	t.Run("includes remote state resources with empty ID", func(t *testing.T) {
 		sourceGraph := resources.NewGraph()
 
 		remoteState := &state.State{
@@ -677,7 +1129,8 @@ func TestBuildRemoteIDByURN(t *testing.T) {
 
 		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
 
-		assert.Empty(t, result)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "", result["transformation:t1"], "empty ID should be stored in the map")
 	})
 
 	t.Run("ignores non-transformation and non-library resources", func(t *testing.T) {
