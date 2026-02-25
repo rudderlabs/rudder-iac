@@ -582,3 +582,202 @@ func TestTestStandaloneLibraries(t *testing.T) {
 		assert.Contains(t, err.Error(), "running standalone library tests")
 	})
 }
+
+// --- buildRemoteIDByURN ---
+
+func TestBuildRemoteIDByURN(t *testing.T) {
+	runner := &Runner{}
+
+	t.Run("extracts remoteID from source graph import metadata", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		transResource := resources.NewResource(
+			"t1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{ID: "t1"}),
+			resources.WithResourceImportMetadata("remote-t1", ""),
+		)
+		sourceGraph.AddResource(transResource)
+
+		remoteState := &state.State{Resources: map[string]*state.ResourceState{}}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Equal(t, "remote-t1", result["transformation:t1"])
+	})
+
+	t.Run("extracts remoteID from remote state transformation", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+
+		remoteState := &state.State{
+			Resources: map[string]*state.ResourceState{
+				"transformation:t2": {
+					Type:      "transformation",
+					ID:        "t2",
+					OutputRaw: &model.TransformationState{ID: "remote-t2"},
+				},
+			},
+		}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Equal(t, "remote-t2", result["transformation:t2"])
+	})
+
+	t.Run("extracts remoteID from remote state library", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+
+		remoteState := &state.State{
+			Resources: map[string]*state.ResourceState{
+				"transformation-library:lib1": {
+					Type:      "transformation-library",
+					ID:        "lib1",
+					OutputRaw: &model.LibraryState{ID: "remote-lib1"},
+				},
+			},
+		}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Equal(t, "remote-lib1", result["transformation-library:lib1"])
+	})
+
+	t.Run("skips source graph resources with empty remoteID", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		transResource := resources.NewResource(
+			"t1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{ID: "t1"}),
+			resources.WithResourceImportMetadata("", ""),
+		)
+		sourceGraph.AddResource(transResource)
+
+		remoteState := &state.State{Resources: map[string]*state.ResourceState{}}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("skips remote state resources with empty ID", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+
+		remoteState := &state.State{
+			Resources: map[string]*state.ResourceState{
+				"transformation:t1": {
+					Type:      "transformation",
+					ID:        "t1",
+					OutputRaw: &model.TransformationState{ID: ""},
+				},
+			},
+		}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("ignores non-transformation and non-library resources", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		otherResource := resources.NewResource(
+			"other1",
+			"some-other-type",
+			resources.ResourceData{},
+			nil,
+			resources.WithResourceImportMetadata("remote-other", ""),
+		)
+		sourceGraph.AddResource(otherResource)
+
+		remoteState := &state.State{Resources: map[string]*state.ResourceState{}}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("handles mixed transformations and libraries", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		trans1 := resources.NewResource(
+			"t1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{ID: "t1"}),
+			resources.WithResourceImportMetadata("remote-t1", ""),
+		)
+		sourceGraph.AddResource(trans1)
+
+		lib1 := resources.NewResource(
+			"lib1",
+			"transformation-library",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.LibraryResource{ID: "lib1"}),
+			resources.WithResourceImportMetadata("remote-lib1", ""),
+		)
+		sourceGraph.AddResource(lib1)
+
+		remoteState := &state.State{
+			Resources: map[string]*state.ResourceState{
+				"transformation:t2": {
+					Type:      "transformation",
+					ID:        "t2",
+					OutputRaw: &model.TransformationState{ID: "remote-t2"},
+				},
+				"transformation-library:lib2": {
+					Type:      "transformation-library",
+					ID:        "lib2",
+					OutputRaw: &model.LibraryState{ID: "remote-lib2"},
+				},
+			},
+		}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Equal(t, map[string]string{
+			"transformation:t1":           "remote-t1",
+			"transformation-library:lib1": "remote-lib1",
+			"transformation:t2":           "remote-t2",
+			"transformation-library:lib2": "remote-lib2",
+		}, result)
+	})
+
+	t.Run("source graph import metadata takes precedence over remote state", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		trans1 := resources.NewResource(
+			"t1",
+			"transformation",
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{ID: "t1"}),
+			resources.WithResourceImportMetadata("import-t1", ""),
+		)
+		sourceGraph.AddResource(trans1)
+
+		remoteState := &state.State{
+			Resources: map[string]*state.ResourceState{
+				"transformation:t1": {
+					Type:      "transformation",
+					ID:        "t1",
+					OutputRaw: &model.TransformationState{ID: "remote-t1"},
+				},
+			},
+		}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Equal(t, "import-t1", result["transformation:t1"])
+	})
+
+	t.Run("returns empty map when both are empty", func(t *testing.T) {
+		sourceGraph := resources.NewGraph()
+		remoteState := &state.State{Resources: map[string]*state.ResourceState{}}
+
+		result := runner.buildRemoteIDByURN(sourceGraph, remoteState)
+
+		assert.Empty(t, result)
+	})
+}

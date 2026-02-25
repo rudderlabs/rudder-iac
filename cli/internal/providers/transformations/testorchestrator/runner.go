@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
@@ -21,6 +22,11 @@ import (
 type (
 	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
 	TestResults                       = model.TestResults
+)
+
+const (
+	resourceTypeTransformation = "transformation"
+	resourceTypeLibrary        = "transformation-library"
 )
 
 var testLogger = logger.New("testorchestrator")
@@ -79,8 +85,8 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
 
-	// Build map of remote IDs indexed by URN from source and remote graphs
-	remoteIDByURN := r.buildRemoteIDByURN(r.planner.graph, remoteGraph)
+	// Build map of remote IDs indexed by URN from source graph and remote state
+	remoteIDByURN := r.buildRemoteIDByURN(r.planner.graph, remoteState)
 
 	// Resolve library and transformation versions once before parallel execution
 	libraryVersionMap, err := r.resolveAllLibraryVersions(ctx, testPlan, remoteIDByURN)
@@ -152,12 +158,12 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 // buildRemoteIDByURN builds a map of remote IDs indexed by URN.
 // Extracts remote IDs from:
 // 1. Source graph resources' import metadata (for importable resources)
-// 2. Remote graph resources' raw data (for existing resources)
-func (r *Runner) buildRemoteIDByURN(sourceGraph, remoteGraph *resources.Graph) map[string]string {
+// 2. Remote state resources' output data (for existing resources)
+func (r *Runner) buildRemoteIDByURN(sourceGraph *resources.Graph, remoteState *state.State) map[string]string {
 	remoteIDByURN := make(map[string]string)
 
 	for _, resource := range sourceGraph.Resources() {
-		if resource.Type() != "transformation" && resource.Type() != "transformation-library" {
+		if resource.Type() != resourceTypeTransformation && resource.Type() != resourceTypeLibrary {
 			continue
 		}
 		if importMeta := resource.ImportMetadata(); importMeta != nil && importMeta.RemoteId != "" {
@@ -165,16 +171,22 @@ func (r *Runner) buildRemoteIDByURN(sourceGraph, remoteGraph *resources.Graph) m
 		}
 	}
 
-	for urn, resource := range remoteGraph.Resources() {
-		switch resource.Type() {
-		case "transformation":
-			if transData, ok := resource.RawData().(*model.TransformationResource); ok && transData.ID != "" {
-				remoteIDByURN[urn] = transData.ID
+	for urn, resourceState := range remoteState.Resources {
+		if _, exists := remoteIDByURN[urn]; exists {
+			continue
+		}
+
+		switch resourceState.Type {
+		case resourceTypeTransformation:
+			transState := resourceState.OutputRaw.(*model.TransformationState)
+			if transState.ID != "" {
+				remoteIDByURN[urn] = transState.ID
 			}
 
-		case "transformation-library":
-			if libData, ok := resource.RawData().(*model.LibraryResource); ok && libData.ID != "" {
-				remoteIDByURN[urn] = libData.ID
+		case resourceTypeLibrary:
+			libState := resourceState.OutputRaw.(*model.LibraryState)
+			if libState.ID != "" {
+				remoteIDByURN[urn] = libState.ID
 			}
 		}
 	}
