@@ -395,7 +395,9 @@ func TestRunnerRun(t *testing.T) {
 		}
 
 		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-			require.Len(t, req.Transformations, 1)
+			if len(req.Transformations) != 1 {
+				return nil, errors.New("expected exactly 1 transformation in request")
+			}
 
 			return &transformations.BatchTestResponse{
 				Pass: true,
