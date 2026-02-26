@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -16,6 +17,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
+
+var ErrTestsFailed = errors.New("one or more tests failed")
 
 var (
 	testLog = logger.New("transformations", logger.Attr{
@@ -150,6 +153,10 @@ func NewCmdTest() *cobra.Command {
 
 			displayer := transformations.NewResultDisplayer(verbose)
 			displayer.Display(results)
+
+			if results.HasFailures() {
+				return ErrTestsFailed
+			}
 
 			return nil
 		},

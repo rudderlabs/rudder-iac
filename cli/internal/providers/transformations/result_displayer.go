@@ -247,7 +247,7 @@ func (rd *ResultDisplayer) printFailureOutput(detail failureDetail) {
 		ui.Println(ui.Color(indent(1, "Actual output mismatched from expected output"), ui.ColorYellow))
 		return
 	}
-	
+
 	diff := rd.generateDiff(
 		rd.formatJSON(detail.expectedOutput),
 		rd.formatJSON(detail.actualOutput),

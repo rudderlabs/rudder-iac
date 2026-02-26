@@ -7,16 +7,15 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
 const concurrency = 2
 
 type libraryVersionTask struct {
-	lib            *model.LibraryResource
-	isModified     bool
-	remoteResource *state.ResourceState
+	lib        *model.LibraryResource
+	isModified bool
+	remoteID   string
 }
 
 func (t *libraryVersionTask) Id() string {
@@ -30,7 +29,7 @@ func (t *libraryVersionTask) Dependencies() []string {
 type transformationVersionTask struct {
 	transformation *model.TransformationResource
 	isModified     bool
-	remoteResource *state.ResourceState
+	remoteID       string
 }
 
 func (t *transformationVersionTask) Id() string {
@@ -113,7 +112,7 @@ func runTransformationVersionTask(
 			store,
 			transformationTask.transformation,
 			transformationTask.isModified,
-			transformationTask.remoteResource,
+			transformationTask.remoteID,
 		)
 		if err != nil {
 			return fmt.Errorf("resolving transformation version for %s: %w", transformationTask.transformation.ID, err)
@@ -129,28 +128,19 @@ func getTransformationVersionID(
 	store transformations.TransformationStore,
 	transformation *model.TransformationResource,
 	isModified bool,
-	remoteResource *state.ResourceState,
+	remoteID string,
 ) (string, error) {
-	if isModified {
-		testLogger.Debug("Uploading modified transformation", "transformation", transformation.ID)
-		versionID, err := StageTransformation(ctx, store, transformation, remoteResource)
-		if err != nil {
-			return "", fmt.Errorf("staging transformation %s: %w", transformation.ID, err)
-		}
-		return versionID, nil
-	}
-
-	if remoteResource == nil {
+	if !isModified && remoteID == "" {
 		return "", fmt.Errorf("unmodified transformation %s not found in remote state", transformation.ID)
 	}
 
-	transState, ok := remoteResource.OutputRaw.(*model.TransformationState)
-	if !ok || transState.VersionID == "" {
-		return "", fmt.Errorf("transformation %s in remote state has no valid versionId", transformation.ID)
+	testLogger.Debug("Staging transformation", "transformation", transformation.ID, "isModified", isModified)
+	versionID, err := StageTransformation(ctx, store, transformation, remoteID)
+	if err != nil {
+		return "", fmt.Errorf("staging transformation %s: %w", transformation.ID, err)
 	}
 
-	testLogger.Debug("Reusing existing transformation version", "transformation", transformation.ID, "versionId", transState.VersionID)
-	return transState.VersionID, nil
+	return versionID, nil
 }
 
 func runLibraryVersionTasks(
@@ -203,7 +193,7 @@ func runLibraryVersionTask(
 			store,
 			libraryTask.lib,
 			libraryTask.isModified,
-			libraryTask.remoteResource,
+			libraryTask.remoteID,
 		)
 		if err != nil {
 			return fmt.Errorf("resolving library version for %s: %w", libraryTask.lib.ID, err)
@@ -219,26 +209,17 @@ func getLibraryVersionID(
 	store transformations.TransformationStore,
 	library *model.LibraryResource,
 	isModified bool,
-	remoteResource *state.ResourceState,
+	remoteID string,
 ) (string, error) {
-	if isModified {
-		testLogger.Debug("Uploading modified library", "library", library.ID)
-		versionID, err := StageLibrary(ctx, store, library, remoteResource)
-		if err != nil {
-			return "", fmt.Errorf("uploading library %s: %w", library.ID, err)
-		}
-		return versionID, nil
-	}
-
-	if remoteResource == nil {
+	if !isModified && remoteID == "" {
 		return "", fmt.Errorf("unmodified library %s not found in remote state", library.ID)
 	}
 
-	libState, ok := remoteResource.OutputRaw.(*model.LibraryState)
-	if !ok || libState.VersionID == "" {
-		return "", fmt.Errorf("library %s in remote state has no valid versionId", library.ID)
+	testLogger.Debug("Staging library", "library", library.ID, "isModified", isModified)
+	versionID, err := StageLibrary(ctx, store, library, remoteID)
+	if err != nil {
+		return "", fmt.Errorf("staging library %s: %w", library.ID, err)
 	}
 
-	testLogger.Debug("Reusing existing library version", "library", library.ID, "versionId", libState.VersionID)
-	return libState.VersionID, nil
+	return versionID, nil
 }

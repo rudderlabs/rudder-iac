@@ -10,13 +10,12 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
 // --- StageTransformation ---
 
 func TestStageTransformation(t *testing.T) {
-	t.Run("creates new transformation when remoteResource is nil", func(t *testing.T) {
+	t.Run("creates new transformation when remoteID is empty", func(t *testing.T) {
 		var capturedReq *transformations.CreateTransformationRequest
 		store := &stubStore{
 			createTransformation: func(_ context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
@@ -33,7 +32,7 @@ func TestStageTransformation(t *testing.T) {
 			Language: "javascript",
 		}
 
-		versionID, err := StageTransformation(context.Background(), store, trans, nil)
+		versionID, err := StageTransformation(context.Background(), store, trans, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, "ver-new", versionID)
@@ -44,7 +43,7 @@ func TestStageTransformation(t *testing.T) {
 		assert.Equal(t, "javascript", capturedReq.Language)
 	})
 
-	t.Run("updates existing transformation when remoteResource is present", func(t *testing.T) {
+	t.Run("updates existing transformation when remoteID is present", func(t *testing.T) {
 		var capturedID string
 		var capturedReq *transformations.UpdateTransformationRequest
 		store := &stubStore{
@@ -62,41 +61,14 @@ func TestStageTransformation(t *testing.T) {
 			Code:     "export function transformEvent(e) { return e; }",
 			Language: "javascript",
 		}
-		remote := &state.ResourceState{
-			OutputRaw: &model.TransformationState{ID: "remote-id-123", VersionID: "ver-old"},
-		}
 
-		versionID, err := StageTransformation(context.Background(), store, trans, remote)
+		versionID, err := StageTransformation(context.Background(), store, trans, "remote-id-123")
 
 		require.NoError(t, err)
 		assert.Equal(t, "ver-updated", versionID)
 		assert.Equal(t, "remote-id-123", capturedID)
 		require.NotNil(t, capturedReq)
 		assert.Equal(t, "Updated Trans", capturedReq.Name)
-	})
-
-	t.Run("error when remoteResource has invalid OutputRaw type", func(t *testing.T) {
-		store := &stubStore{}
-		remote := &state.ResourceState{
-			OutputRaw: "not-a-transformation-state",
-		}
-
-		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid remote ID")
-	})
-
-	t.Run("error when remoteResource has empty remote ID", func(t *testing.T) {
-		store := &stubStore{}
-		remote := &state.ResourceState{
-			OutputRaw: &model.TransformationState{ID: ""},
-		}
-
-		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid remote ID")
 	})
 
 	t.Run("propagates create API error", func(t *testing.T) {
@@ -106,7 +78,7 @@ func TestStageTransformation(t *testing.T) {
 			},
 		}
 
-		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, nil)
+		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "upstream error")
@@ -118,11 +90,8 @@ func TestStageTransformation(t *testing.T) {
 				return nil, fmt.Errorf("upstream error")
 			},
 		}
-		remote := &state.ResourceState{
-			OutputRaw: &model.TransformationState{ID: "remote-id"},
-		}
 
-		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, remote)
+		_, err := StageTransformation(context.Background(), store, &model.TransformationResource{ID: "t1"}, "remote-id")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "upstream error")
@@ -132,7 +101,7 @@ func TestStageTransformation(t *testing.T) {
 // --- StageLibrary ---
 
 func TestStageLibrary(t *testing.T) {
-	t.Run("creates new library when remoteResource is nil", func(t *testing.T) {
+	t.Run("creates new library when remoteID is empty", func(t *testing.T) {
 		var capturedReq *transformations.CreateLibraryRequest
 		store := &stubStore{
 			createLibrary: func(_ context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
@@ -150,7 +119,7 @@ func TestStageLibrary(t *testing.T) {
 			Language:    "javascript",
 		}
 
-		versionID, err := StageLibrary(context.Background(), store, lib, nil)
+		versionID, err := StageLibrary(context.Background(), store, lib, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, "lib-ver-new", versionID)
@@ -162,7 +131,7 @@ func TestStageLibrary(t *testing.T) {
 		assert.Equal(t, "javascript", capturedReq.Language)
 	})
 
-	t.Run("updates existing library when remoteResource is present", func(t *testing.T) {
+	t.Run("updates existing library when remoteID is present", func(t *testing.T) {
 		var capturedID string
 		var capturedReq *transformations.UpdateLibraryRequest
 		store := &stubStore{
@@ -180,41 +149,14 @@ func TestStageLibrary(t *testing.T) {
 			Code:     "export function helper() { updated }",
 			Language: "javascript",
 		}
-		remote := &state.ResourceState{
-			OutputRaw: &model.LibraryState{ID: "remote-lib-id", VersionID: "lib-ver-old"},
-		}
 
-		versionID, err := StageLibrary(context.Background(), store, lib, remote)
+		versionID, err := StageLibrary(context.Background(), store, lib, "remote-lib-id")
 
 		require.NoError(t, err)
 		assert.Equal(t, "lib-ver-updated", versionID)
 		assert.Equal(t, "remote-lib-id", capturedID)
 		require.NotNil(t, capturedReq)
 		assert.Equal(t, "Updated Lib", capturedReq.Name)
-	})
-
-	t.Run("error when remoteResource has invalid OutputRaw type", func(t *testing.T) {
-		store := &stubStore{}
-		remote := &state.ResourceState{
-			OutputRaw: "not-a-library-state",
-		}
-
-		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid remote ID")
-	})
-
-	t.Run("error when remoteResource has empty remote ID", func(t *testing.T) {
-		store := &stubStore{}
-		remote := &state.ResourceState{
-			OutputRaw: &model.LibraryState{ID: ""},
-		}
-
-		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, remote)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no valid remote ID")
 	})
 
 	t.Run("propagates create API error", func(t *testing.T) {
@@ -224,7 +166,7 @@ func TestStageLibrary(t *testing.T) {
 			},
 		}
 
-		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, nil)
+		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "upstream error")
@@ -236,11 +178,8 @@ func TestStageLibrary(t *testing.T) {
 				return nil, fmt.Errorf("upstream error")
 			},
 		}
-		remote := &state.ResourceState{
-			OutputRaw: &model.LibraryState{ID: "remote-lib-id"},
-		}
 
-		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, remote)
+		_, err := StageLibrary(context.Background(), store, &model.LibraryResource{ID: "lib-1"}, "remote-lib-id")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "upstream error")
@@ -311,6 +250,6 @@ func (s *stubStore) SetLibraryExternalID(_ context.Context, _, _ string) error {
 func (s *stubStore) BatchPublish(_ context.Context, _ *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
 	panic("not used in staging tests")
 }
-func (s *stubStore) BatchTest(_ context.Context, _ *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+func (s *stubStore) BatchTest(ctx context.Context, _ *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
 	panic("not used in staging tests")
 }
