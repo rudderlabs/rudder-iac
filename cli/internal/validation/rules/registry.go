@@ -40,6 +40,15 @@ type Registry interface {
 	// SemanticRulesForKind returns all semantic rules applicable to the given kind.
 	// This includes both kind-specific rules and rules with wildcard "*".
 	SemanticRulesForKind(kind string) []Rule
+
+	// AllKinds returns all registered kinds (excluding wildcard "*").
+	// This is useful for documentation generation.
+	AllKinds() []string
+
+	// AllRules returns all registered rules (both syntactic and semantic).
+	// Each rule is returned only once, even if it applies to multiple kinds.
+	// This is useful for documentation generation.
+	AllRules() []Rule
 }
 
 // defaultRegistry is the concrete implementation of Registry.
@@ -149,4 +158,50 @@ func (r *defaultRegistry) isDuplicateRule(ruleID string, rulesByKind map[string]
 		}
 	}
 	return false
+}
+
+// AllKinds returns all registered kinds (excluding wildcard "*"), sorted alphabetically.
+func (r *defaultRegistry) AllKinds() []string {
+	kindSet := make(map[string]struct{})
+
+	for kind := range r.syntacticRulesByKind {
+		if kind != "*" {
+			kindSet[kind] = struct{}{}
+		}
+	}
+	for kind := range r.semanticRulesByKind {
+		if kind != "*" {
+			kindSet[kind] = struct{}{}
+		}
+	}
+
+	kinds := make([]string, 0, len(kindSet))
+	for kind := range kindSet {
+		kinds = append(kinds, kind)
+	}
+
+	return lo.Uniq(kinds)
+}
+
+// AllRules returns all registered rules (both syntactic and semantic).
+// Each rule is returned only once, even if it applies to multiple kinds.
+func (r *defaultRegistry) AllRules() []Rule {
+	seen := make(map[string]struct{})
+	var allRules []Rule
+
+	collectRules := func(rulesByKind map[string][]Rule) {
+		for _, rules := range rulesByKind {
+			for _, rule := range rules {
+				if _, exists := seen[rule.ID()]; !exists {
+					seen[rule.ID()] = struct{}{}
+					allRules = append(allRules, rule)
+				}
+			}
+		}
+	}
+
+	collectRules(r.syntacticRulesByKind)
+	collectRules(r.semanticRulesByKind)
+
+	return allRules
 }

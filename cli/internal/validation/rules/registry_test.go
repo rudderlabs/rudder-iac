@@ -232,3 +232,104 @@ func ruleIDs(rules []Rule) []string {
 	}
 	return ids
 }
+
+func TestRegistry_AllKinds(t *testing.T) {
+	t.Run("empty registry returns empty slice", func(t *testing.T) {
+		registry := NewRegistry()
+		kinds := registry.AllKinds()
+		assert.Empty(t, kinds)
+	})
+
+	t.Run("returns all registered kinds excluding wildcard", func(t *testing.T) {
+		registry := NewRegistry()
+
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "rule1",
+			appliesTo: []string{"properties"},
+		}))
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "rule2",
+			appliesTo: []string{"events"},
+		}))
+		require.NoError(t, registry.RegisterSemantic(&mockRule{
+			id:        "rule3",
+			appliesTo: []string{"custom-types"},
+		}))
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "wildcard-rule",
+			appliesTo: []string{"*"},
+		}))
+
+		kinds := registry.AllKinds()
+
+		assert.Len(t, kinds, 3)
+		assert.Contains(t, kinds, "properties")
+		assert.Contains(t, kinds, "events")
+		assert.Contains(t, kinds, "custom-types")
+		assert.NotContains(t, kinds, "*")
+	})
+
+	t.Run("deduplicates kinds across syntactic and semantic", func(t *testing.T) {
+		registry := NewRegistry()
+
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "syntactic-rule",
+			appliesTo: []string{"properties"},
+		}))
+		require.NoError(t, registry.RegisterSemantic(&mockRule{
+			id:        "semantic-rule",
+			appliesTo: []string{"properties"},
+		}))
+
+		kinds := registry.AllKinds()
+		assert.Len(t, kinds, 1)
+		assert.Contains(t, kinds, "properties")
+	})
+}
+
+func TestRegistry_AllRules(t *testing.T) {
+	t.Run("empty registry returns empty slice", func(t *testing.T) {
+		registry := NewRegistry()
+		rules := registry.AllRules()
+		assert.Empty(t, rules)
+	})
+
+	t.Run("returns all rules without duplicates", func(t *testing.T) {
+		registry := NewRegistry()
+
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "syntactic-rule",
+			appliesTo: []string{"properties"},
+		}))
+		require.NoError(t, registry.RegisterSemantic(&mockRule{
+			id:        "semantic-rule",
+			appliesTo: []string{"events"},
+		}))
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "wildcard-rule",
+			appliesTo: []string{"*"},
+		}))
+
+		allRules := registry.AllRules()
+
+		assert.Len(t, allRules, 3)
+		ids := ruleIDs(allRules)
+		assert.Contains(t, ids, "syntactic-rule")
+		assert.Contains(t, ids, "semantic-rule")
+		assert.Contains(t, ids, "wildcard-rule")
+	})
+
+	t.Run("rule with multiple kinds is returned once", func(t *testing.T) {
+		registry := NewRegistry()
+
+		require.NoError(t, registry.RegisterSyntactic(&mockRule{
+			id:        "multi-kind-rule",
+			appliesTo: []string{"properties", "events", "custom-types"},
+		}))
+
+		allRules := registry.AllRules()
+
+		assert.Len(t, allRules, 1)
+		assert.Equal(t, "multi-kind-rule", allRules[0].ID())
+	})
+}
