@@ -14,10 +14,10 @@ type SpecSyntaxValidRule struct {
 	validVersions []string
 }
 
-func NewSpecSyntaxValidRule(appliesToKinds []string, appliesToVersions []string) rules.Rule {
+func NewSpecSyntaxValidRule(validKinds []string, validVersions []string) rules.Rule {
 	return &SpecSyntaxValidRule{
-		validKinds:    appliesToKinds,
-		validVersions: appliesToVersions,
+		validKinds:    validKinds,
+		validVersions: validVersions,
 	}
 }
 
