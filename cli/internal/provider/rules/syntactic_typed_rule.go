@@ -8,12 +8,13 @@ import (
 )
 
 type typedRuleImpl[T any] struct {
-	id           string
-	severity     rules.Severity
-	description  string
-	examples     rules.Examples
-	appliesTo    []string
-	validateFunc func(Kind string, Version string, Metadata map[string]any, Spec T) []rules.ValidationResult
+	id                string
+	severity          rules.Severity
+	description       string
+	examples          rules.Examples
+	appliesToKinds    []string
+	appliesToVersions []string
+	validateFunc      func(Kind string, Version string, Metadata map[string]any, Spec T) []rules.ValidationResult
 }
 
 var _ rules.Rule = &typedRule[any]{}
@@ -27,7 +28,7 @@ func NewTypedRule[T any](
 	severity rules.Severity,
 	description string,
 	examples rules.Examples,
-	appliesTo []string,
+	appliesToKinds []string,
 	validateFunc func(
 		Kind string,
 		Version string,
@@ -36,12 +37,13 @@ func NewTypedRule[T any](
 	) []rules.ValidationResult,
 ) rules.Rule {
 	return &typedRule[T]{rule: typedRuleImpl[T]{
-		id:           id,
-		severity:     severity,
-		description:  description,
-		examples:     examples,
-		appliesTo:    appliesTo,
-		validateFunc: validateFunc,
+		id:                id,
+		severity:          severity,
+		description:       description,
+		examples:          examples,
+		appliesToKinds:    appliesToKinds,
+		appliesToVersions: []string{"*"},
+		validateFunc:      validateFunc,
 	}}
 }
 
@@ -61,8 +63,12 @@ func (w *typedRule[T]) Examples() rules.Examples {
 	return w.rule.examples
 }
 
-func (w *typedRule[T]) AppliesTo() []string {
-	return w.rule.appliesTo
+func (w *typedRule[T]) AppliesToKinds() []string {
+	return w.rule.appliesToKinds
+}
+
+func (w *typedRule[T]) AppliesToVersions() []string {
+	return w.rule.appliesToVersions
 }
 
 func (w *typedRule[T]) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {

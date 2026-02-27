@@ -6,10 +6,13 @@ import (
 )
 
 type SpecSyntaxValidRule struct {
+	appliesToVersions []string
 }
 
-func NewSpecSyntaxValidRule() rules.Rule {
-	return &SpecSyntaxValidRule{}
+func NewSpecSyntaxValidRule(appliesToVersions []string) rules.Rule {
+	return &SpecSyntaxValidRule{
+		appliesToVersions: appliesToVersions,
+	}
 }
 
 func (r *SpecSyntaxValidRule) ID() string {
@@ -24,8 +27,12 @@ func (r *SpecSyntaxValidRule) Description() string {
 	return "spec syntax must be valid"
 }
 
-func (r *SpecSyntaxValidRule) AppliesTo() []string {
+func (r *SpecSyntaxValidRule) AppliesToKinds() []string {
 	return []string{"*"}
+}
+
+func (r *SpecSyntaxValidRule) AppliesToVersions() []string {
+	return r.appliesToVersions
 }
 
 func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {

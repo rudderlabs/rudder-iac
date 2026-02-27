@@ -39,7 +39,7 @@ func TestNewEventSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/events/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "event spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"events"}, rule.AppliesTo())
+	assert.Equal(t, []string{"events"}, rule.AppliesToKinds())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
@@ -307,9 +307,9 @@ func TestEventSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			spec: localcatalog.EventSpec{
 				Events: []localcatalog.Event{
 					{LocalID: "valid_event", Name: "Valid", Type: "track"},
-					{LocalID: "e2", Type: "track"},                   // missing name
-					{LocalID: "e3", Name: "Bad", Type: "identify"},   // name on non-track
-					{LocalID: "e4"},                                   // missing event_type
+					{LocalID: "e2", Type: "track"},                 // missing name
+					{LocalID: "e3", Name: "Bad", Type: "identify"}, // name on non-track
+					{LocalID: "e4"}, // missing event_type
 				},
 			},
 			expectedErrors: 3,

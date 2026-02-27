@@ -19,10 +19,15 @@ type Rule interface {
 	// This should be a complete sentence explaining the rule's purpose.
 	Description() string
 
-	// AppliesTo returns the list of spec kinds this rule validates.
+	// AppliesToKinds returns the list of spec kinds this rule validates.
 	// Use ["*"] to indicate the rule applies to all kinds.
 	// Use specific kinds (e.g., ["properties", "events"]) for kind-specific rules.
-	AppliesTo() []string
+	AppliesToKinds() []string
+
+	// AppliesToVersions returns the list of spec versions this rule validates.
+	// Use ["*"] to indicate the rule applies to all versions.
+	// Use specific versions (e.g., ["rudder/v1", "rudder/v2"]) for version-specific rules.
+	AppliesToVersions() []string
 
 	// Examples returns usage examples for this rule.
 	// Can return nil if no examples are provided.

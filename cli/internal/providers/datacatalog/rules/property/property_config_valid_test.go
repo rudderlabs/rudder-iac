@@ -18,7 +18,7 @@ func TestPropertyConfigValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/properties/config-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "property config must be valid for the given type", rule.Description())
-	assert.Equal(t, []string{"properties"}, rule.AppliesTo())
+	assert.Equal(t, []string{"properties"}, rule.AppliesToKinds())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")

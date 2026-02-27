@@ -133,7 +133,7 @@ func TestSpecSemanticValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "project/spec-values-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "spec kind and version must be valid and supported", rule.Description())
-	assert.Equal(t, []string{"*"}, rule.AppliesTo())
+	assert.Equal(t, []string{"*"}, rule.AppliesToKinds())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

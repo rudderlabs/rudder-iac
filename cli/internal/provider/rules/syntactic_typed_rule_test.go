@@ -69,18 +69,18 @@ func TestTypedRule_Metadata(t *testing.T) {
 	assert.Equal(t, rules.Error, rule.Severity(), "Severity() should return the correct severity")
 	assert.Equal(t, "test rule description", rule.Description(), "Description() should return the correct description")
 	assert.Equal(t, expectedExamples, rule.Examples(), "Examples() should return the correct examples")
-	assert.Equal(t, []string{"testKind"}, rule.AppliesTo(), "AppliesTo() should return the correct applies-to list")
+	assert.Equal(t, []string{"testKind"}, rule.AppliesToKinds(), "AppliesToKinds() should return the correct applies-to list")
 }
 
 func TestTypedRule_Validate(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty validation result", func(t *testing.T){
+	t.Run("empty validation result", func(t *testing.T) {
 
 		var (
-			capturedSpec testSpec
+			capturedSpec                  testSpec
 			capturedKind, capturedVersion string
-			capturedMetadata map[string]any
+			capturedMetadata              map[string]any
 		)
 
 		validateFunc := func(kind string, version string, metadata map[string]any, spec testSpec) []rules.ValidationResult {
@@ -123,10 +123,10 @@ func TestTypedRule_Validate_ReferencePrefixing(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		validateFuncRefs  []string
-		expectedRefs      []string
-		expectedMsgCount  int
+		name             string
+		validateFuncRefs []string
+		expectedRefs     []string
+		expectedMsgCount int
 	}{
 		{
 			name:             "empty reference becomes /spec",

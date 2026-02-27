@@ -310,18 +310,22 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 
 func (p *project) registry() (rules.Registry, error) {
 	baseRegistry := rules.NewRegistry()
+	validVersions := []string{
+		specs.SpecVersionV0_1,
+		specs.SpecVersionV0_1Variant,
+	}
+	if p.loadV1Specs {
+		validVersions = append(validVersions, specs.SpecVersionV1)
+	}
 
 	// Add project-level syntactic rules along with aggregated
 	// syntactic rules from each provider.
 	syntactic := []rules.Rule{
-		prules.NewSpecSyntaxValidRule(),
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec),
+		prules.NewSpecSyntaxValidRule(validVersions),
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
 		prules.NewSpecSemanticValidRule(
 			p.provider.SupportedKinds(),
-			[]string{
-				specs.SpecVersionV0_1,
-				specs.SpecVersionV0_1Variant,
-			},
+			validVersions,
 		),
 		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
 	}

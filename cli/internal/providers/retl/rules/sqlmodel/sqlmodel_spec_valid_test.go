@@ -17,7 +17,7 @@ func TestSQLModelSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "retl sql model spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"retl-source-sql-model"}, rule.AppliesTo())
+	assert.Equal(t, []string{"retl-source-sql-model"}, rule.AppliesToKinds())
 }
 
 func TestSQLModelSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
@@ -210,8 +210,8 @@ func TestSQLModelSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'sql' and 'file' cannot be specified together"},
 		},
 		{
-			name:         "all required fields missing",
-			spec:         sqlmodel.SQLModelSpec{},
+			name: "all required fields missing",
+			spec: sqlmodel.SQLModelSpec{},
 			wantMessages: []string{
 				"'id' is required",
 				"'display_name' is required",

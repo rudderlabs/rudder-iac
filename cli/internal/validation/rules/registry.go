@@ -77,7 +77,7 @@ func (r *defaultRegistry) RegisterSyntactic(rule Rule) error {
 		return fmt.Errorf("%w: %s (already registered as semantic)", ErrDuplicateRule, ruleID)
 	}
 
-	kinds := rule.AppliesTo()
+	kinds := rule.AppliesToKinds()
 
 	if lo.Contains(kinds, "*") {
 		r.syntacticRulesByKind["*"] = append(r.syntacticRulesByKind["*"], rule)
@@ -103,7 +103,7 @@ func (r *defaultRegistry) RegisterSemantic(rule Rule) error {
 		return fmt.Errorf("%w: %s (already registered as syntactic)", ErrDuplicateRule, ruleID)
 	}
 
-	kinds := rule.AppliesTo()
+	kinds := rule.AppliesToKinds()
 
 	if lo.Contains(kinds, "*") {
 		r.semanticRulesByKind["*"] = append(r.semanticRulesByKind["*"], rule)

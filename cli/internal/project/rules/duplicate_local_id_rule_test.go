@@ -17,7 +17,7 @@ func TestDuplicateLocalIDRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "project/duplicate-local-id", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, []string{"*"}, rule.AppliesTo())
+	assert.Equal(t, []string{"*"}, rule.AppliesToKinds())
 	assert.Nil(t, rule.Validate(nil))
 }
 

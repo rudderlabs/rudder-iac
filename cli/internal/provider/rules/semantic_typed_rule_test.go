@@ -31,7 +31,7 @@ func TestSemanticTypedRule_Metadata(t *testing.T) {
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "semantic test rule description", rule.Description())
 	assert.Equal(t, expectedExamples, rule.Examples())
-	assert.Equal(t, []string{"testKind"}, rule.AppliesTo())
+	assert.Equal(t, []string{"testKind"}, rule.AppliesToKinds())
 }
 
 func TestSemanticTypedRule_Validate_PassesGraphToFunc(t *testing.T) {

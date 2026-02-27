@@ -13,18 +13,25 @@ import (
 
 // mockRule is a configurable Rule implementation for testing
 type mockRule struct {
-	id          string
-	severity    rules.Severity
-	description string
-	appliesTo   []string
-	examples    rules.Examples
-	validateFn  func(ctx *rules.ValidationContext) []rules.ValidationResult
+	id                string
+	severity          rules.Severity
+	description       string
+	appliesTo         []string
+	appliesToVersions []string
+	examples          rules.Examples
+	validateFn        func(ctx *rules.ValidationContext) []rules.ValidationResult
 }
 
 func (m *mockRule) ID() string               { return m.id }
 func (m *mockRule) Severity() rules.Severity { return m.severity }
 func (m *mockRule) Description() string      { return m.description }
-func (m *mockRule) AppliesTo() []string      { return m.appliesTo }
+func (m *mockRule) AppliesToKinds() []string { return m.appliesTo }
+func (m *mockRule) AppliesToVersions() []string {
+	if len(m.appliesToVersions) == 0 {
+		return []string{"*"}
+	}
+	return m.appliesToVersions
+}
 func (m *mockRule) Examples() rules.Examples { return m.examples }
 func (m *mockRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {
 	if m.validateFn != nil {

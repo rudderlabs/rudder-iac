@@ -9,12 +9,13 @@ import (
 )
 
 type semanticTypedRuleImpl[T any] struct {
-	id           string
-	severity     rules.Severity
-	description  string
-	examples     rules.Examples
-	appliesTo    []string
-	validateFunc func(Kind string, Version string, Metadata map[string]any, Spec T, Graph *resources.Graph) []rules.ValidationResult
+	id                string
+	severity          rules.Severity
+	description       string
+	examples          rules.Examples
+	appliesToKinds    []string
+	appliesToVersions []string
+	validateFunc      func(Kind string, Version string, Metadata map[string]any, Spec T, Graph *resources.Graph) []rules.ValidationResult
 }
 
 var _ rules.Rule = &semanticTypedRule[any]{}
@@ -31,7 +32,7 @@ func NewSemanticTypedRule[T any](
 	severity rules.Severity,
 	description string,
 	examples rules.Examples,
-	appliesTo []string,
+	appliesToKinds []string,
 	validateFunc func(
 		Kind string,
 		Version string,
@@ -41,12 +42,13 @@ func NewSemanticTypedRule[T any](
 	) []rules.ValidationResult,
 ) rules.Rule {
 	return &semanticTypedRule[T]{rule: semanticTypedRuleImpl[T]{
-		id:           id,
-		severity:     severity,
-		description:  description,
-		examples:     examples,
-		appliesTo:    appliesTo,
-		validateFunc: validateFunc,
+		id:                id,
+		severity:          severity,
+		description:       description,
+		examples:          examples,
+		appliesToKinds:    appliesToKinds,
+		appliesToVersions: []string{"*"},
+		validateFunc:      validateFunc,
 	}}
 }
 
@@ -66,8 +68,12 @@ func (w *semanticTypedRule[T]) Examples() rules.Examples {
 	return w.rule.examples
 }
 
-func (w *semanticTypedRule[T]) AppliesTo() []string {
-	return w.rule.appliesTo
+func (w *semanticTypedRule[T]) AppliesToKinds() []string {
+	return w.rule.appliesToKinds
+}
+
+func (w *semanticTypedRule[T]) AppliesToVersions() []string {
+	return w.rule.appliesToVersions
 }
 
 func (w *semanticTypedRule[T]) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {

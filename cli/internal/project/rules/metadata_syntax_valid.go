@@ -12,12 +12,14 @@ import (
 )
 
 type MetadataSyntaxValidRule struct {
-	parseSpec ParseSpecFunc
+	parseSpec         ParseSpecFunc
+	appliesToVersions []string
 }
 
-func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc) rules.Rule {
+func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, appliesToVersions []string) rules.Rule {
 	return &MetadataSyntaxValidRule{
-		parseSpec: parseSpec,
+		parseSpec:         parseSpec,
+		appliesToVersions: appliesToVersions,
 	}
 }
 
@@ -33,8 +35,12 @@ func (r *MetadataSyntaxValidRule) Description() string {
 	return "metadata syntax must be valid"
 }
 
-func (r *MetadataSyntaxValidRule) AppliesTo() []string {
+func (r *MetadataSyntaxValidRule) AppliesToKinds() []string {
 	return []string{"*"}
+}
+
+func (r *MetadataSyntaxValidRule) AppliesToVersions() []string {
+	return r.appliesToVersions
 }
 
 func (r *MetadataSyntaxValidRule) Examples() rules.Examples {

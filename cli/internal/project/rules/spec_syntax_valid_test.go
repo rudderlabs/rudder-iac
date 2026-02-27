@@ -3,12 +3,18 @@ package rules
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
+
+	appliesToVersions := []string{
+		specs.SpecVersionV0_1,
+		specs.SpecVersionV0_1Variant,
+	}
 
 	tests := []struct {
 		name           string
@@ -69,7 +75,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewSpecSyntaxValidRule()
+			rule := NewSpecSyntaxValidRule(appliesToVersions)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -92,12 +98,17 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 func TestSpecSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewSpecSyntaxValidRule()
+	appliesToVersions := []string{
+		specs.SpecVersionV0_1,
+		specs.SpecVersionV0_1Variant,
+	}
+	rule := NewSpecSyntaxValidRule(appliesToVersions)
 
 	assert.Equal(t, "project/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"*"}, rule.AppliesTo())
+	assert.Equal(t, []string{"*"}, rule.AppliesToKinds())
+	assert.Equal(t, appliesToVersions, rule.AppliesToVersions())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

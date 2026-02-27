@@ -32,7 +32,11 @@ func (r *SpecSemanticValidRule) Description() string {
 	return "spec kind and version must be valid and supported"
 }
 
-func (r *SpecSemanticValidRule) AppliesTo() []string {
+func (r *SpecSemanticValidRule) AppliesToKinds() []string {
+	return []string{"*"}
+}
+
+func (r *SpecSemanticValidRule) AppliesToVersions() []string {
 	return []string{"*"}
 }
 

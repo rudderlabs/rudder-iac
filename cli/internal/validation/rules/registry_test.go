@@ -9,16 +9,23 @@ import (
 
 // mockRule is a simple Rule implementation for testing
 type mockRule struct {
-	id          string
-	severity    Severity
-	description string
-	appliesTo   []string
+	id                string
+	severity          Severity
+	description       string
+	appliesTo         []string
+	appliesToVersions []string
 }
 
-func (m *mockRule) ID() string                                         { return m.id }
-func (m *mockRule) Severity() Severity                                 { return m.severity }
-func (m *mockRule) Description() string                                { return m.description }
-func (m *mockRule) AppliesTo() []string                                { return m.appliesTo }
+func (m *mockRule) ID() string               { return m.id }
+func (m *mockRule) Severity() Severity       { return m.severity }
+func (m *mockRule) Description() string      { return m.description }
+func (m *mockRule) AppliesToKinds() []string { return m.appliesTo }
+func (m *mockRule) AppliesToVersions() []string {
+	if len(m.appliesToVersions) == 0 {
+		return []string{"*"}
+	}
+	return m.appliesToVersions
+}
 func (m *mockRule) Examples() Examples                                 { return Examples{} }
 func (m *mockRule) Validate(ctx *ValidationContext) []ValidationResult { return nil }
 
