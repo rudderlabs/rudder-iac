@@ -39,7 +39,7 @@ func TestNewCategorySpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/categories/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "category spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"categories"}, rule.AppliesToKinds())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("categories")}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")

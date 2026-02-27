@@ -69,7 +69,7 @@ func TestTypedRule_Metadata(t *testing.T) {
 	assert.Equal(t, rules.Error, rule.Severity(), "Severity() should return the correct severity")
 	assert.Equal(t, "test rule description", rule.Description(), "Description() should return the correct description")
 	assert.Equal(t, expectedExamples, rule.Examples(), "Examples() should return the correct examples")
-	assert.Equal(t, []string{"testKind"}, rule.AppliesToKinds(), "AppliesToKinds() should return the correct applies-to list")
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("testKind")}, rule.AppliesTo(), "AppliesTo() should return the correct match patterns")
 }
 
 func TestTypedRule_Validate(t *testing.T) {

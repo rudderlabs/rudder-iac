@@ -33,12 +33,8 @@ func (r *SpecSyntaxValidRule) Description() string {
 	return "spec syntax must be valid"
 }
 
-func (r *SpecSyntaxValidRule) AppliesToKinds() []string {
-	return []string{"*"}
-}
-
-func (r *SpecSyntaxValidRule) AppliesToVersions() []string {
-	return []string{"*"}
+func (r *SpecSyntaxValidRule) AppliesTo() []rules.MatchPattern {
+	return []rules.MatchPattern{rules.MatchAll()}
 }
 
 func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {

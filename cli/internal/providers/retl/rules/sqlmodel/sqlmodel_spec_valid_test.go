@@ -17,7 +17,7 @@ func TestSQLModelSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "retl sql model spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"retl-source-sql-model"}, rule.AppliesToKinds())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("retl-source-sql-model")}, rule.AppliesTo())
 }
 
 func TestSQLModelSpecSyntaxValidRule_ValidSpecs(t *testing.T) {

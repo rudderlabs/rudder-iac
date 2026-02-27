@@ -39,7 +39,7 @@ func TestNewEventSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/events/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "event spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"events"}, rule.AppliesToKinds())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("events")}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")

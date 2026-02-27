@@ -331,17 +331,13 @@ func (p *project) registry() (rules.Registry, error) {
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
-		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
-			return nil, fmt.Errorf("registering syntactic rule %s: %w", rule.ID(), err)
-		}
+		baseRegistry.RegisterSyntactic(rule)
 	}
 
 	semantic := p.provider.SemanticRules()
 
 	for _, rule := range semantic {
-		if err := baseRegistry.RegisterSemantic(rule); err != nil {
-			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
-		}
+		baseRegistry.RegisterSemantic(rule)
 	}
 
 	return baseRegistry, nil

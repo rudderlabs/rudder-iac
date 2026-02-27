@@ -23,9 +23,8 @@ func (r *duplicateLocalIDRule) Severity() rules.Severity { return rules.Error }
 func (r *duplicateLocalIDRule) Description() string {
 	return "local IDs must be unique within each kind"
 }
-func (r *duplicateLocalIDRule) AppliesToKinds() []string { return []string{"*"} }
-func (r *duplicateLocalIDRule) AppliesToVersions() []string {
-	return []string{"*"}
+func (r *duplicateLocalIDRule) AppliesTo() []rules.MatchPattern {
+	return []rules.MatchPattern{rules.MatchAll()}
 }
 func (r *duplicateLocalIDRule) Examples() rules.Examples {
 	return rules.Examples{}

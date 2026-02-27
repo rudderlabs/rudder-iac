@@ -17,7 +17,7 @@ func TestSourceSemanticValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "event-stream/source/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "event stream source references must resolve to existing resources", rule.Description())
-	assert.Equal(t, []string{"event-stream-source"}, rule.AppliesToKinds())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("event-stream-source")}, rule.AppliesTo())
 }
 
 func TestSourceSemanticValid(t *testing.T) {

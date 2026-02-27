@@ -253,8 +253,11 @@ func TestMetadataSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "project/metadata-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "metadata syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"*"}, rule.AppliesToKinds())
-	assert.Equal(t, appliesToVersions, rule.AppliesToVersions())
+	expectedPatterns := make([]rules.MatchPattern, len(appliesToVersions))
+	for i, v := range appliesToVersions {
+		expectedPatterns[i] = rules.MatchPattern{Kind: "*", Version: v}
+	}
+	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

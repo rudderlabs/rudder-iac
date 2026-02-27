@@ -12,14 +12,18 @@ import (
 )
 
 type MetadataSyntaxValidRule struct {
-	parseSpec         ParseSpecFunc
-	appliesToVersions []string
+	parseSpec ParseSpecFunc
+	appliesTo []rules.MatchPattern
 }
 
 func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, appliesToVersions []string) rules.Rule {
+	patterns := make([]rules.MatchPattern, len(appliesToVersions))
+	for i, v := range appliesToVersions {
+		patterns[i] = rules.MatchPattern{Kind: "*", Version: v}
+	}
 	return &MetadataSyntaxValidRule{
-		parseSpec:         parseSpec,
-		appliesToVersions: appliesToVersions,
+		parseSpec: parseSpec,
+		appliesTo: patterns,
 	}
 }
 
@@ -35,12 +39,8 @@ func (r *MetadataSyntaxValidRule) Description() string {
 	return "metadata syntax must be valid"
 }
 
-func (r *MetadataSyntaxValidRule) AppliesToKinds() []string {
-	return []string{"*"}
-}
-
-func (r *MetadataSyntaxValidRule) AppliesToVersions() []string {
-	return r.appliesToVersions
+func (r *MetadataSyntaxValidRule) AppliesTo() []rules.MatchPattern {
+	return r.appliesTo
 }
 
 func (r *MetadataSyntaxValidRule) Examples() rules.Examples {

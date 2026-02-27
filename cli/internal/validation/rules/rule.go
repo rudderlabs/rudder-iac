@@ -1,5 +1,34 @@
 package rules
 
+// MatchPattern defines a (Kind, Version) pair that a rule applies to.
+// Use "*" for either field as a wildcard to match all values.
+type MatchPattern struct {
+	Kind    string // specific kind or "*" for wildcard
+	Version string // specific version or "*" for wildcard
+}
+
+// Matches returns true if this pattern matches the given kind and version.
+// A "*" in either field acts as a wildcard matching any value.
+func (mp MatchPattern) Matches(kind, version string) bool {
+	return (mp.Kind == "*" || mp.Kind == kind) &&
+		(mp.Version == "*" || mp.Version == version)
+}
+
+// MatchAll returns a pattern that matches all kinds and all versions.
+func MatchAll() MatchPattern {
+	return MatchPattern{Kind: "*", Version: "*"}
+}
+
+// MatchKind returns a pattern that matches a specific kind across all versions.
+func MatchKind(kind string) MatchPattern {
+	return MatchPattern{Kind: kind, Version: "*"}
+}
+
+// MatchKindVersion returns a pattern that matches a specific kind and version.
+func MatchKindVersion(kind, version string) MatchPattern {
+	return MatchPattern{Kind: kind, Version: version}
+}
+
 // Rule defines the interface that all validation rules must implement.
 // Rules can be either syntactic (pre-graph, validating spec structure and format)
 // or semantic (post-graph, validating cross-resource relationships and business logic).
@@ -19,15 +48,12 @@ type Rule interface {
 	// This should be a complete sentence explaining the rule's purpose.
 	Description() string
 
-	// AppliesToKinds returns the list of spec kinds this rule validates.
-	// Use ["*"] to indicate the rule applies to all kinds.
-	// Use specific kinds (e.g., ["properties", "events"]) for kind-specific rules.
-	AppliesToKinds() []string
-
-	// AppliesToVersions returns the list of spec versions this rule validates.
-	// Use ["*"] to indicate the rule applies to all versions.
-	// Use specific versions (e.g., ["rudder/v1", "rudder/v2"]) for version-specific rules.
-	AppliesToVersions() []string
+	// AppliesTo returns the list of (Kind, Version) patterns this rule validates.
+	// Use []MatchPattern{MatchAll()} for rules that apply universally.
+	// Use []MatchPattern{MatchKind("properties")} for kind-specific rules across all versions.
+	// Use []MatchPattern{MatchKindVersion("properties", "rudder/v1")} for specific combinations.
+	// A rule is selected if ANY of its patterns match the spec's (kind, version).
+	AppliesTo() []MatchPattern
 
 	// Examples returns usage examples for this rule.
 	// Can return nil if no examples are provided.
