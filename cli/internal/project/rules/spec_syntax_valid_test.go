@@ -11,6 +11,10 @@ import (
 func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
+	appliesToKinds := []string{
+		"properties",
+		"events",
+	}
 	appliesToVersions := []string{
 		specs.SpecVersionV0_1,
 		specs.SpecVersionV0_1Variant,
@@ -27,7 +31,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			name: "all required fields present",
 			ctx: &rules.ValidationContext{
 				Kind:     "properties",
-				Version:  "rudder/v1",
+				Version:  specs.SpecVersionV0_1Variant,
 				Metadata: map[string]any{"name": "test"},
 				Spec:     map[string]any{"properties": []any{}},
 			},
@@ -51,7 +55,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			name: "empty metadata map fails validation",
 			ctx: &rules.ValidationContext{
 				Kind:     "properties",
-				Version:  "rudder/v1",
+				Version:  specs.SpecVersionV0_1Variant,
 				Metadata: map[string]any{},
 				Spec:     map[string]any{"properties": []any{}},
 			},
@@ -63,7 +67,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			name: "empty spec map fails validation",
 			ctx: &rules.ValidationContext{
 				Kind:     "properties",
-				Version:  "rudder/v1",
+				Version:  specs.SpecVersionV0_1Variant,
 				Metadata: map[string]any{"name": "test"},
 				Spec:     map[string]any{},
 			},
@@ -71,11 +75,50 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 			expectedRefs:   []string{"/spec"},
 			expectedMsgs:   []string{"'spec' is required"},
 		},
+		{
+			name: "unsupported kind returns error",
+			ctx: &rules.ValidationContext{
+				Kind:     "tp",
+				Version:  specs.SpecVersionV0_1Variant,
+				Metadata: map[string]any{"name": "test"},
+				Spec:     map[string]any{"tp": []any{}},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/kind"},
+			expectedMsgs:   []string{"'kind' must be one of [properties events]"},
+		},
+		{
+			name: "unsupported version returns error",
+			ctx: &rules.ValidationContext{
+				Kind:     "properties",
+				Version:  specs.SpecVersionV1,
+				Metadata: map[string]any{"name": "test"},
+				Spec:     map[string]any{"properties": []any{}},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/version"},
+			expectedMsgs:   []string{"'version' must be one of [rudder/0.1 rudder/v0.1]"},
+		},
+		{
+			name: "unsupported kind and version return both errors",
+			ctx: &rules.ValidationContext{
+				Kind:     "tp",
+				Version:  specs.SpecVersionV1,
+				Metadata: map[string]any{"name": "test"},
+				Spec:     map[string]any{"tp": []any{}},
+			},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/kind", "/version"},
+			expectedMsgs: []string{
+				"'kind' must be one of [properties events]",
+				"'version' must be one of [rudder/0.1 rudder/v0.1]",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewSpecSyntaxValidRule(appliesToVersions)
+			rule := NewSpecSyntaxValidRule(appliesToKinds, appliesToVersions)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -98,17 +141,21 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 func TestSpecSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
+	appliesToKinds := []string{
+		"properties",
+		"events",
+	}
 	appliesToVersions := []string{
 		specs.SpecVersionV0_1,
 		specs.SpecVersionV0_1Variant,
 	}
-	rule := NewSpecSyntaxValidRule(appliesToVersions)
+	rule := NewSpecSyntaxValidRule(appliesToKinds, appliesToVersions)
 
 	assert.Equal(t, "project/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "spec syntax must be valid", rule.Description())
 	assert.Equal(t, []string{"*"}, rule.AppliesToKinds())
-	assert.Equal(t, appliesToVersions, rule.AppliesToVersions())
+	assert.Equal(t, []string{"*"}, rule.AppliesToVersions())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

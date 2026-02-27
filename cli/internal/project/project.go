@@ -321,12 +321,11 @@ func (p *project) registry() (rules.Registry, error) {
 	// Add project-level syntactic rules along with aggregated
 	// syntactic rules from each provider.
 	syntactic := []rules.Rule{
-		prules.NewSpecSyntaxValidRule(validVersions),
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
-		prules.NewSpecSemanticValidRule(
+		prules.NewSpecSyntaxValidRule(
 			p.provider.SupportedKinds(),
 			validVersions,
 		),
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
 		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
