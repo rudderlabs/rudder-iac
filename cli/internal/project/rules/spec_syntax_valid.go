@@ -1,15 +1,24 @@
 package rules
 
 import (
+	"fmt"
+	"slices"
+	"strings"
+
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type SpecSyntaxValidRule struct {
+	validKinds    []string
+	validVersions []string
 }
 
-func NewSpecSyntaxValidRule() rules.Rule {
-	return &SpecSyntaxValidRule{}
+func NewSpecSyntaxValidRule(validKinds []string, validVersions []string) rules.Rule {
+	return &SpecSyntaxValidRule{
+		validKinds:    validKinds,
+		validVersions: validVersions,
+	}
 }
 
 func (r *SpecSyntaxValidRule) ID() string {
@@ -24,8 +33,8 @@ func (r *SpecSyntaxValidRule) Description() string {
 	return "spec syntax must be valid"
 }
 
-func (r *SpecSyntaxValidRule) AppliesTo() []string {
-	return []string{"*"}
+func (r *SpecSyntaxValidRule) AppliesTo() []rules.MatchPattern {
+	return []rules.MatchPattern{rules.MatchAll()}
 }
 
 func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {
@@ -56,6 +65,20 @@ func (r *SpecSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.Val
 		results = append(results, rules.ValidationResult{
 			Reference: "/spec",
 			Message:   "'spec' is required",
+		})
+	}
+
+	if ctx.Kind != "" && len(r.validKinds) > 0 && !slices.Contains(r.validKinds, ctx.Kind) {
+		results = append(results, rules.ValidationResult{
+			Reference: "/kind",
+			Message:   fmt.Sprintf("'kind' must be one of [%v]", strings.Join(r.validKinds, " ")),
+		})
+	}
+
+	if ctx.Version != "" && len(r.validVersions) > 0 && !slices.Contains(r.validVersions, ctx.Version) {
+		results = append(results, rules.ValidationResult{
+			Reference: "/version",
+			Message:   fmt.Sprintf("'version' must be one of [%v]", strings.Join(r.validVersions, " ")),
 		})
 	}
 

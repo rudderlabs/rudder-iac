@@ -19,7 +19,7 @@ func TestTrackingPlanSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/tracking-plans/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "tracking plan spec syntax must be valid", rule.Description())
-	assert.Equal(t, []string{"tp"}, rule.AppliesTo())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("tp")}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)
@@ -732,8 +732,8 @@ func TestTrackingPlanSpecSyntaxValidRule_VariantReferencePaths(t *testing.T) {
 			Name:    "Test TP",
 			Rules: []*localcatalog.TPRule{
 				{
-					LocalID: "rule1",
-					Event:   &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"},
+					LocalID:  "rule1",
+					Event:    &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"},
 					Variants: localcatalog.Variants{validVariant, validVariant},
 				},
 			},

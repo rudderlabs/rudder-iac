@@ -16,16 +16,16 @@ type mockRule struct {
 	id          string
 	severity    rules.Severity
 	description string
-	appliesTo   []string
+	appliesTo   []rules.MatchPattern
 	examples    rules.Examples
 	validateFn  func(ctx *rules.ValidationContext) []rules.ValidationResult
 }
 
-func (m *mockRule) ID() string               { return m.id }
-func (m *mockRule) Severity() rules.Severity { return m.severity }
-func (m *mockRule) Description() string      { return m.description }
-func (m *mockRule) AppliesTo() []string      { return m.appliesTo }
-func (m *mockRule) Examples() rules.Examples { return m.examples }
+func (m *mockRule) ID() string                      { return m.id }
+func (m *mockRule) Severity() rules.Severity        { return m.severity }
+func (m *mockRule) Description() string             { return m.description }
+func (m *mockRule) AppliesTo() []rules.MatchPattern { return m.appliesTo }
+func (m *mockRule) Examples() rules.Examples        { return m.examples }
 func (m *mockRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {
 	if m.validateFn != nil {
 		return m.validateFn(ctx)
@@ -118,14 +118,14 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			passingRule := &mockRule{
 				id:        "passing-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return nil
 				},
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSyntactic(passingRule))
+			registry.RegisterSyntactic(passingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			propsRule := &mockRule{
 				id:        "props-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "props error 1"},
@@ -159,7 +159,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			eventsRule := &mockRule{
 				id:        "events-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"events"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("events")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "events error 1"},
@@ -169,8 +169,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSyntactic(propsRule))
-			require.NoError(t, registry.RegisterSyntactic(eventsRule))
+			registry.RegisterSyntactic(propsRule)
+			registry.RegisterSyntactic(eventsRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -210,7 +210,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			rule := &mockRule{
 				id:        "position-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "test error"},
@@ -219,7 +219,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSyntactic(rule))
+			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			rule := &mockRule{
 				id:        "sort-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties", "events"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties"), rules.MatchKind("events")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/metadata/name", Message: "error"},
@@ -255,7 +255,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSyntactic(rule))
+			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -280,7 +280,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			rule := &mockRule{
 				id:        "nearest-lookup-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					// Reference a path that doesn't exist exactly - should fall back to nearest
 					return []rules.ValidationResult{
@@ -290,7 +290,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSyntactic(rule))
+			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -343,14 +343,14 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			passingRule := &mockRule{
 				id:        "passing-semantic-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return nil
 				},
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSemantic(passingRule))
+			registry.RegisterSemantic(passingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -372,7 +372,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			failingRule := &mockRule{
 				id:        "failing-semantic-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "semantic error"},
@@ -381,7 +381,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSemantic(failingRule))
+			registry.RegisterSemantic(failingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			graphCheckRule := &mockRule{
 				id:        "graph-check-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					receivedGraph = ctx.Graph
 					return nil
@@ -419,7 +419,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSemantic(graphCheckRule))
+			registry.RegisterSemantic(graphCheckRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -443,7 +443,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			propsRule := &mockRule{
 				id:        "props-semantic-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"properties"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "properties semantic error"},
@@ -454,7 +454,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			eventsRule := &mockRule{
 				id:        "events-semantic-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"events"},
+				appliesTo: []rules.MatchPattern{rules.MatchKind("events")},
 				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 					return []rules.ValidationResult{
 						{Reference: "/spec/group", Message: "events semantic error"},
@@ -463,8 +463,8 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			}
 
 			registry := rules.NewRegistry()
-			require.NoError(t, registry.RegisterSemantic(propsRule))
-			require.NoError(t, registry.RegisterSemantic(eventsRule))
+			registry.RegisterSemantic(propsRule)
+			registry.RegisterSemantic(eventsRule)
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -513,7 +513,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"*"},
+				appliesTo: []rules.MatchPattern{rules.MatchAll()},
 			},
 			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 				return map[string][]rules.ValidationResult{
@@ -525,7 +525,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		}
 
 		registry := rules.NewRegistry()
-		require.NoError(t, registry.RegisterSyntactic(pr))
+		registry.RegisterSyntactic(pr)
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		failingPerSpec := &mockRule{
 			id:        "failing-rule",
 			severity:  rules.Error,
-			appliesTo: []string{"properties"},
+			appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
 			validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 				return []rules.ValidationResult{
 					{Reference: "/spec/group", Message: "syntax error"},
@@ -563,7 +563,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"*"},
+				appliesTo: []rules.MatchPattern{rules.MatchAll()},
 			},
 			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 				projectRuleCalled = true
@@ -576,8 +576,8 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		}
 
 		registry := rules.NewRegistry()
-		require.NoError(t, registry.RegisterSyntactic(failingPerSpec))
-		require.NoError(t, registry.RegisterSyntactic(pr))
+		registry.RegisterSyntactic(failingPerSpec)
+		registry.RegisterSyntactic(pr)
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)
@@ -604,7 +604,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			mockRule: mockRule{
 				id:        "capture-rule",
 				severity:  rules.Error,
-				appliesTo: []string{"*"},
+				appliesTo: []rules.MatchPattern{rules.MatchAll()},
 			},
 			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 				for path := range specs {
@@ -615,7 +615,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		}
 
 		registry := rules.NewRegistry()
-		require.NoError(t, registry.RegisterSyntactic(pr))
+		registry.RegisterSyntactic(pr)
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)

@@ -55,7 +55,7 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	for path, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
 			path,
-			e.registry.SyntacticRulesForKind(spec.Parsed().Kind),
+			e.registry.SyntacticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			nil,
 		)
@@ -88,7 +88,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 	// ProjectValidationRules are registered with AppliesTo: ["*"],
 	// so they live in the wildcard bucket.
 	var projectRules []rules.ProjectRule
-	for _, rule := range e.registry.SyntacticRulesForKind("") {
+	for _, rule := range e.registry.SyntacticRulesFor("", "") {
 		if pr, ok := rule.(rules.ProjectRule); ok {
 			projectRules = append(projectRules, pr)
 		}
@@ -158,7 +158,7 @@ func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[st
 	for path, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
 			path,
-			e.registry.SemanticRulesForKind(spec.Parsed().Kind),
+			e.registry.SemanticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			graph,
 		)
