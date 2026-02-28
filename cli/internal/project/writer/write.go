@@ -11,9 +11,11 @@ import (
 
 // FormattableEntity represents an importable entity with content and path.
 // The path extension is used to determine the formatter to use (e.g .yaml for YAML files).
+// If IsDirectory is true, only the directory at RelativePath will be created (Content is ignored).
 type FormattableEntity struct {
 	Content      any
 	RelativePath string
+	IsDirectory  bool
 }
 
 // Write is a helper function to write the files based on the formattable entities
@@ -22,6 +24,14 @@ func Write(_ context.Context, baseDir string, formatters formatter.Formatters, d
 
 	for _, datum := range data {
 		path := filepath.Join(baseDir, datum.RelativePath)
+
+		// If this is a directory-only entity, create it and skip file writing
+		if datum.IsDirectory {
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmt.Errorf("creating directory %s: %w", path, err)
+			}
+			continue
+		}
 
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", filepath.Dir(path), err)

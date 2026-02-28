@@ -1315,14 +1315,24 @@ func TestFormatForExport(t *testing.T) {
 		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
-		require.Len(t, result, 2)
+		require.Len(t, result, 4) // 2 directories + 1 spec + 1 code file
+
+		// Check input directory
+		assert.Equal(t, "transformations/input", result[0].RelativePath)
+		assert.True(t, result[0].IsDirectory)
+
+		// Check output directory
+		assert.Equal(t, "transformations/output", result[1].RelativePath)
+		assert.True(t, result[1].IsDirectory)
 
 		// Check YAML spec file
-		assert.Equal(t, "transformations/test-trans.yaml", result[0].RelativePath)
+		assert.Equal(t, "transformations/test-trans.yaml", result[2].RelativePath)
+		assert.False(t, result[2].IsDirectory)
 
 		// Check code file
-		assert.Equal(t, "transformations/javascript/test-trans.js", result[1].RelativePath)
-		assert.Equal(t, "export function transformEvent(event, metadata) { return event; }", result[1].Content)
+		assert.Equal(t, "transformations/javascript/test-trans.js", result[3].RelativePath)
+		assert.Equal(t, "export function transformEvent(event, metadata) { return event; }", result[3].Content)
+		assert.False(t, result[3].IsDirectory)
 	})
 
 	t.Run("python transformation exports to python folder", func(t *testing.T) {
@@ -1351,11 +1361,19 @@ func TestFormatForExport(t *testing.T) {
 		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
-		require.Len(t, result, 2)
+		require.Len(t, result, 4) // 2 directories + 1 spec + 1 code file
+
+		// Check input directory
+		assert.Equal(t, "transformations/input", result[0].RelativePath)
+		assert.True(t, result[0].IsDirectory)
+
+		// Check output directory
+		assert.Equal(t, "transformations/output", result[1].RelativePath)
+		assert.True(t, result[1].IsDirectory)
 
 		// Check code file path
-		assert.Equal(t, "transformations/python/test-trans.py", result[1].RelativePath)
-		assert.Equal(t, "def transform(event):\n    return event", result[1].Content)
+		assert.Equal(t, "transformations/python/test-trans.py", result[3].RelativePath)
+		assert.Equal(t, "def transform(event):\n    return event", result[3].Content)
 	})
 
 	t.Run("unsupported language returns error", func(t *testing.T) {
@@ -1455,6 +1473,12 @@ func TestFormatForExport(t *testing.T) {
 		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
-		require.Len(t, result, 4) // 2 specs + 2 code files
+		require.Len(t, result, 6) // 2 directories + 2 specs + 2 code files
+
+		// Check directories are created first
+		assert.Equal(t, "transformations/input", result[0].RelativePath)
+		assert.True(t, result[0].IsDirectory)
+		assert.Equal(t, "transformations/output", result[1].RelativePath)
+		assert.True(t, result[1].IsDirectory)
 	})
 }
