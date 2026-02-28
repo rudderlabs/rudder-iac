@@ -124,8 +124,9 @@ const (
 
 // TestError represents an error that occurred during test execution
 type TestError struct {
-	Message string `json:"message"`
-	Event   any    `json:"event,omitempty"`
+	Message    string `json:"message"`
+	Event      any    `json:"event,omitempty"`
+	EventIndex int    `json:"eventIndex,omitempty"`
 }
 
 // TestResult represents the result of a single test run

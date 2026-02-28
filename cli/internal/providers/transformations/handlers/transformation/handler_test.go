@@ -255,6 +255,36 @@ func TestValidateSpec(t *testing.T) {
 			expectedError: true,
 			errorContains: "either code or file must be specified",
 		},
+		{
+			name: "valid spec with tests containing names",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: "Suite 2"},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple tests with one missing name",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: ""},
+					{Name: "Suite 3"},
+				},
+			},
+			expectedError: true,
+			errorContains: "name is required for each spec tests block",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -847,6 +877,7 @@ func TestMapRemoteToState(t *testing.T) {
 
 		assert.Equal(t, "trans-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.False(t, state.Modified)
 	})
 }
 
@@ -875,6 +906,7 @@ func TestCreate(t *testing.T) {
 
 		assert.Equal(t, "trans-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -979,6 +1011,7 @@ func TestUpdate(t *testing.T) {
 
 		assert.Equal(t, "trans-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -1189,6 +1222,7 @@ func TestImport(t *testing.T) {
 		require.NotNil(t, state)
 		assert.Equal(t, "trans-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 		assert.True(t, mockStore.getTransformationCalled)
 		assert.True(t, mockStore.setTransformationExternalIDCalled)
 		assert.True(t, mockStore.updateCalled)

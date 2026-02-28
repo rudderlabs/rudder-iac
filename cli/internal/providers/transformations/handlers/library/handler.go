@@ -203,6 +203,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.LibraryResource) (
 	return &model.LibraryState{
 		ID:        created.ID,
 		VersionID: created.VersionID,
+		Modified:  true,
 	}, nil
 }
 
@@ -223,6 +224,7 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource
 	return &model.LibraryState{
 		ID:        updated.ID,
 		VersionID: updated.VersionID,
+		Modified:  true,
 	}, nil
 }
 
@@ -253,6 +255,7 @@ func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, r
 	return &model.LibraryState{
 		ID:        updated.ID,
 		VersionID: updated.VersionID,
+		Modified:  true,
 	}, nil
 }
 

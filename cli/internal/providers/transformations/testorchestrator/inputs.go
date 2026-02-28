@@ -79,9 +79,8 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest) ([]*transforma
 			}
 		}
 
-		testName := strings.TrimSuffix(filename, JsonExt)
 		testDef := &transformations.TestDefinition{
-			Name:           fmt.Sprintf("%s/%s", suite.Name, testName),
+			Name:           fmt.Sprintf("%s (%s/%s)", suite.Name, suite.Input, filename),
 			Input:          inputEvents,
 			ExpectedOutput: expectedOutput,
 		}

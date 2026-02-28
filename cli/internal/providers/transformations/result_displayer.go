@@ -17,16 +17,26 @@ const (
 	indentLevel2  = "    "
 	indentLevel3  = "      "
 	separatorLine = "------------------------------------------------------------"
+	detailBoxWidth = 60
+	headerBoxWidth = 78
+	lineWidth = 80
+
+	// Symbols
+	symbolPass     = "✓"
+	symbolMismatch = "⊗"
+	symbolError    = "✕"
+	symbolSuite    = "♦"
+	symbolTreeNode = "└"
+	symbolBullet   = "•"
 )
 
-// Type aliases for backwards compatibility
 type (
 	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
 	TestResults                       = model.TestResults
 )
 
 // indent returns a string with the specified indentation level applied
-func indent(level int, s string) string {
+func indent(s string, level int) string {
 	switch level {
 	case 1:
 		return indentLevel1 + s
@@ -39,19 +49,51 @@ func indent(level int, s string) string {
 	}
 }
 
-// ResultDisplayer formats and displays test results
-type ResultDisplayer struct {
-	verbose bool
-}
-
-// NewResultDisplayer creates a new result displayer
-func NewResultDisplayer(verbose bool) *ResultDisplayer {
-	return &ResultDisplayer{
-		verbose: verbose,
+func printIndentedLine(msg string, level int, newLine bool) {
+	formatted := indent(msg, level)
+	if newLine {
+		ui.Println(formatted)
+		return
 	}
+
+	ui.Printf("%s", formatted)
 }
 
-// failureDetail holds information about a failed test for detailed display
+func center(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	padding := width - len(s)
+	leftPad := padding / 2
+	rightPad := padding - leftPad
+	return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
+}
+
+func printSection(title string, underlineLen int) {
+	ui.Println(ui.Bold(title))
+	ui.Println(strings.Repeat("─", underlineLen))
+	ui.Println()
+}
+
+func printSectionSummary(total int, metrics ...string) {
+	parts := make([]string, 0, len(metrics)+1)
+	parts = append(parts, fmt.Sprintf("Total  %d", total))
+	parts = append(parts, metrics...)
+
+	ui.Println()
+	ui.Println(strings.Join(parts, "  "+symbolBullet+"  "))
+	ui.Println(separatorLine)
+	ui.Println()
+}
+
+func printBox(lines []string, width int) {
+	ui.Println("┌" + strings.Repeat("─", width))
+	for _, line := range lines {
+		ui.Printf("│ %s\n", line)
+	}
+	ui.Println("└" + strings.Repeat("─", width))
+}
+
 type failureDetail struct {
 	transformationName string
 	testName           string
@@ -61,102 +103,168 @@ type failureDetail struct {
 	errors             []transformations.TestError
 }
 
-// testCounts tracks test result statistics
-type testCounts struct {
-	passed   int
-	failed   int
-	errors   int
-	failures []failureDetail
+type suiteCounter struct {
+	passed     int
+	mismatched int
+	errored    int
+	failures   []failureDetail
+}
+
+type libraryCounter struct {
+	passed  int
+	errored int
+}
+
+func (c *suiteCounter) total() int {
+	return c.passed + c.mismatched + c.errored
+}
+
+func (lc *libraryCounter) total() int {
+	return lc.passed + lc.errored
+}
+
+type ResultDisplayer struct {
+	verbose        bool
+	suiteCounter   suiteCounter
+	libraryCounter libraryCounter
+}
+
+func NewResultDisplayer(verbose bool) *ResultDisplayer {
+	return &ResultDisplayer{
+		verbose: verbose,
+	}
 }
 
 // Display formats and displays test results
 func (rd *ResultDisplayer) Display(results *TestResults) {
-	ui.Println(ui.Bold("\nTransformation Test Results\n"))
+	rd.printHeader()
 
-	counts := rd.displayLibraries(results.Libraries)
-	counts = rd.displayTransformations(results.Transformations, counts)
+	rd.displayLibraries(results.Libraries)
+	rd.displayTransformations(results.Transformations)
 
-	ui.Println(separatorLine)
-	rd.printSummary(counts)
-	rd.printFailures(counts.failures)
+	rd.printSummary()
 }
 
-// displayLibraries displays library test results and returns updated counts
-func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryTestResult) testCounts {
-	counts := testCounts{}
+func (rd *ResultDisplayer) printHeader() {
+	ui.Println()
+	ui.Println("┌" + strings.Repeat("─", headerBoxWidth) + "┐")
+	ui.Println("│" + ui.Bold(center("TRANSFORMATION TEST SUITE", headerBoxWidth)) + "│")
+	ui.Println("└" + strings.Repeat("─", headerBoxWidth) + "┘")
+	ui.Println()
+}
 
+func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryTestResult) {
 	if len(libraries) == 0 {
-		return counts
+		return
 	}
 
-	ui.Printf("%s%s\n", indentLevel1, ui.Bold("Libraries"))
+	printSection("LIBRARIES", 10)
+
 	for _, lib := range libraries {
 		if lib.Pass {
-			ui.Printf("%s%s %s\n", indentLevel2, ui.Color("✓", ui.ColorGreen), lib.HandleName)
-			continue
-		}
+			ui.Printf("%s  %s\n", ui.Color(symbolPass, ui.ColorGreen), lib.HandleName)
+			printIndentedLine(ui.Color(symbolPass, ui.ColorGreen)+" syntax ok", 1, true)
 
-		msg := lib.HandleName
-		if lib.Message != "" {
-			msg = fmt.Sprintf("%s: %s", lib.HandleName, lib.Message)
+			rd.libraryCounter.passed++
+		} else {
+			ui.Printf("%s  %s\n", ui.Color(symbolError, ui.ColorRed), lib.HandleName)
+			printIndentedLine(ui.Color(symbolError, ui.ColorRed)+" syntax error", 1, true)
+			if lib.Message != "" {
+				printIndentedLine(lib.Message, 3, true)
+			}
+
+			rd.libraryCounter.errored++
 		}
-		ui.Printf("%s%s %s\n", indentLevel2, ui.Color("✗", ui.ColorRed), msg)
-		counts.failed++
+		ui.Println()
 	}
-	ui.Println()
 
-	return counts
+	total := rd.libraryCounter.total()
+	printSectionSummary(
+		total,
+		fmt.Sprintf("Passed  %d", rd.libraryCounter.passed),
+		fmt.Sprintf("Errored  %d", rd.libraryCounter.errored),
+	)
 }
 
-// displayTransformations displays transformation test results and returns updated counts
-func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions, counts testCounts) testCounts {
+func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions) {
+	if len(transformations) == 0 {
+		return
+	}
+
+	printSection("TEST SUITES", 13)
+
 	for _, trWithDef := range transformations {
 		expectedOutputMap := buildExpectedOutputMap(trWithDef.Definitions)
-		counts = rd.displayTransformation(trWithDef.Result, expectedOutputMap, counts)
+		rd.displayTransformation(trWithDef.Result, expectedOutputMap)
 	}
-	return counts
+
+	total := rd.suiteCounter.total()
+
+	printSectionSummary(
+		total,
+		fmt.Sprintf("Passed  %d", rd.suiteCounter.passed),
+		fmt.Sprintf("Mismatch errors %d", rd.suiteCounter.mismatched),
+		fmt.Sprintf("Execution errors  %d", rd.suiteCounter.errored),
+	)
+
+	rd.printSuiteFailures()
 }
 
-// displayTransformation displays a single transformation's test results
+func (rd *ResultDisplayer) printSummary() {
+	ui.Println(strings.Repeat("=", lineWidth))
+	ui.Println(ui.Bold("SUMMARY"))
+	ui.Println(strings.Repeat("=", lineWidth))
+
+	if rd.libraryCounter.passed > 0 || rd.libraryCounter.errored > 0 {
+		ui.Printf("Libraries       %d passed       %d errored\n",
+			rd.libraryCounter.passed,
+			rd.libraryCounter.errored,
+		)
+	}
+
+	if rd.suiteCounter.passed > 0 || rd.suiteCounter.mismatched > 0 || rd.suiteCounter.errored > 0 {
+		ui.Printf("Suites          %d passed       %d errored       %d mismatched\n",
+			rd.suiteCounter.passed,
+			rd.suiteCounter.errored,
+			rd.suiteCounter.mismatched,
+		)
+	}
+
+	ui.Println(strings.Repeat("─", lineWidth))
+}
+
 func (rd *ResultDisplayer) displayTransformation(
 	result *transformations.TransformationTestResult,
 	expectedOutputMap map[string][]any,
-	counts testCounts,
-) testCounts {
-	ui.Printf("%s%s\n", indentLevel1, ui.Bold(result.Name))
+) {
+	ui.Printf("%s %s\n", symbolSuite, result.Name)
 
 	if len(result.Imports) > 0 {
-		ui.Printf("%sImported libraries: %s\n", indentLevel2, ui.GreyedOut(strings.Join(result.Imports, ", ")))
+		importedLibs := strings.Join(result.Imports, ", ")
+		printIndentedLine(ui.GreyedOut(fmt.Sprintf("imported libraries: %s", importedLibs)), 1, true)
 	}
-
-	testCount := len(result.TestSuiteResult.Results)
-	ui.Printf("%sTests: %d total\n", indentLevel2, testCount)
 
 	for _, testResult := range result.TestSuiteResult.Results {
 		expectedOutput := expectedOutputMap[testResult.Name]
-		counts = rd.displayTestResult(result.Name, testResult, expectedOutput, counts)
+		rd.displayTestResult(result.Name, testResult, expectedOutput)
 	}
-
-	ui.Println()
-	return counts
 }
 
-// displayTestResult displays a single test result and updates counts
 func (rd *ResultDisplayer) displayTestResult(
 	transformationName string,
 	testResult transformations.TestResult,
 	expectedOutput []any,
-	counts testCounts,
-) testCounts {
+) {
 	switch testResult.Status {
 	case transformations.TestRunStatusPass:
-		ui.Printf("%s%s %s\n", indentLevel3, ui.Color("✓", ui.ColorGreen), testResult.Name)
-		counts.passed++
+		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolPass, ui.ColorGreen), testResult.Name)
+		rd.suiteCounter.passed++
 
 	case transformations.TestRunStatusFail:
-		ui.Printf("%s%s %s\n", indentLevel3, ui.Color("✗", ui.ColorYellow), testResult.Name)
-		counts.failed++
-		counts.failures = append(counts.failures, failureDetail{
+		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolMismatch, ui.ColorYellow), testResult.Name)
+		rd.suiteCounter.mismatched++
+
+		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
 			testName:           testResult.Name,
 			status:             testResult.Status,
@@ -166,115 +274,99 @@ func (rd *ResultDisplayer) displayTestResult(
 		})
 
 	case transformations.TestRunStatusError:
-		ui.Printf("%s%s %s\n", indentLevel3, ui.Color("✕", ui.ColorRed), testResult.Name)
-		counts.errors++
-		counts.failures = append(counts.failures, failureDetail{
+		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolError, ui.ColorRed), testResult.Name)
+		rd.suiteCounter.errored++
+
+		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
 			testName:           testResult.Name,
 			status:             testResult.Status,
 			errors:             testResult.Errors,
 		})
 	}
-
-	return counts
 }
 
-// printSummary prints the test summary with colored counts
-func (rd *ResultDisplayer) printSummary(counts testCounts) {
-	total := counts.passed + counts.failed + counts.errors
-
-	var parts []string
-
-	if counts.passed > 0 {
-		parts = append(parts, fmt.Sprintf("%s passed", ui.Color(fmt.Sprintf("%d", counts.passed), ui.ColorGreen)))
-	}
-	if counts.failed > 0 {
-		parts = append(parts, fmt.Sprintf("%s failed", ui.Color(fmt.Sprintf("%d", counts.failed), ui.ColorYellow)))
-	}
-	if counts.errors > 0 {
-		parts = append(parts, fmt.Sprintf("%s error%s", ui.Color(fmt.Sprintf("%d", counts.errors), ui.ColorRed), pluralize(counts.errors)))
-	}
-
-	summary := strings.Join(parts, ", ")
-	ui.Printf("\nTests: %s, %d total\n", summary, total)
-}
-
-// printFailures prints detailed failure information
-func (rd *ResultDisplayer) printFailures(failures []failureDetail) {
-	if len(failures) == 0 {
+func (rd *ResultDisplayer) printSuiteFailures() {
+	if len(rd.suiteCounter.failures) == 0 {
 		return
 	}
 
-	ui.Println(ui.Bold("\nFailure Details:\n"))
-	for _, failure := range failures {
+	printSection("FAILURE DETAILS", 15)
+
+	for _, failure := range rd.suiteCounter.failures {
 		rd.printFailureDetail(failure)
 	}
 
 	if !rd.verbose {
-		ui.Printf("\n%s\n", ui.GreyedOut("Use --verbose to see additional event details"))
+		ui.Printf("%s", ui.GreyedOut("\nTip: run with --verbose to see full event diffs\n"))
 	}
+	ui.Println()
 }
 
-// printFailureDetail prints detailed information about a single failure
 func (rd *ResultDisplayer) printFailureDetail(detail failureDetail) {
-	ui.Printf("%s\n", ui.Bold(fmt.Sprintf("%s > %s", detail.transformationName, detail.testName)))
+	symbol := symbolMismatch
+	if detail.status == transformations.TestRunStatusError {
+		symbol = symbolError
+	}
+
+	ui.Printf("%s  %s  ›  %s\n",
+		ui.Color(symbol, ui.ColorRed),
+		detail.transformationName,
+		detail.testName,
+	)
 
 	if detail.status == transformations.TestRunStatusError {
 		rd.printErrorDetail(detail)
-		return
+	} else {
+		rd.printMismatchedOutput(detail)
 	}
 
-	rd.printFailureOutput(detail)
-	rd.printFailureErrors(detail)
 	ui.Println()
 }
 
-// printErrorDetail prints error information for tests with error status
 func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
-	ui.Println(ui.Color(indent(1, "Error:"), ui.ColorRed))
+	var lines []string
 	for _, err := range detail.errors {
-		ui.Printf("%s%s\n", indentLevel2, err.Message)
+		messageLines := strings.SplitSeq(err.Message, "\n")
+		for line := range messageLines {
+			lines = append(lines, line)
+		}
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("errored input event can be found at index %d in input file", err.EventIndex))
+
 		if rd.verbose && err.Event != nil {
-			ui.Printf("%sEvent: %s\n", indentLevel2, rd.formatJSON(err.Event))
+			eventJSON := formatJSON(err.Event)
+			eventLines := strings.SplitSeq(eventJSON, "\n")
+			for line := range eventLines {
+				lines = append(lines, line)
+			}
 		}
 	}
-	ui.Println()
+
+	printBox(lines, detailBoxWidth)
 }
 
-// printFailureOutput prints expected vs actual output comparison
-func (rd *ResultDisplayer) printFailureOutput(detail failureDetail) {
+func (rd *ResultDisplayer) printMismatchedOutput(detail failureDetail) {
+	var lines []string
 	if !rd.verbose || len(detail.expectedOutput) == 0 {
-		ui.Println(ui.Color(indent(1, "Actual output mismatched from expected output"), ui.ColorYellow))
-		return
-	}
-
-	diff := rd.generateDiff(
-		rd.formatJSON(detail.expectedOutput),
-		rd.formatJSON(detail.actualOutput),
-	)
-	if diff != "" {
-		ui.Println(ui.Color(indent(1, "Diff:"), ui.ColorYellow))
-		ui.Print(indentMultiline(diff, indentLevel2))
-	}
-}
-
-// printFailureErrors prints error messages for failed tests (verbose mode only)
-func (rd *ResultDisplayer) printFailureErrors(detail failureDetail) {
-	if len(detail.errors) == 0 || !rd.verbose {
-		return
-	}
-
-	ui.Println(ui.Color(indent(1, "Errors:"), ui.ColorYellow))
-	for _, err := range detail.errors {
-		ui.Printf("%s%s\n", indentLevel2, err.Message)
-		if err.Event != nil {
-			ui.Printf("%sEvent: %s\n", indentLevel2, rd.formatJSON(err.Event))
+		lines = append(lines, "Actual output mismatched from expected output")
+	} else {
+		diff := generateDiff(
+			formatJSON(detail.expectedOutput),
+			formatJSON(detail.actualOutput),
+		)
+		if diff != "" {
+			diffLines := strings.SplitSeq(diff, "\n")
+			for line := range diffLines {
+				lines = append(lines, line)
+			}
 		}
 	}
+
+	printBox(lines, detailBoxWidth)
 }
 
-// formatJSON converts any value to a pretty-printed JSON string
-func (rd *ResultDisplayer) formatJSON(v any) string {
+func formatJSON(v any) string {
 	if v == nil {
 		return "null"
 	}
@@ -286,8 +378,7 @@ func (rd *ResultDisplayer) formatJSON(v any) string {
 	return string(jsonBytes)
 }
 
-// generateDiff generates a unified diff between expected and actual output
-func (rd *ResultDisplayer) generateDiff(expected, actual string) string {
+func generateDiff(expected, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 
@@ -307,33 +398,10 @@ func (rd *ResultDisplayer) generateDiff(expected, actual string) string {
 	return result
 }
 
-// buildExpectedOutputMap creates a map from test name to expected output
 func buildExpectedOutputMap(definitions []*transformations.TestDefinition) map[string][]any {
 	expectedOutputMap := make(map[string][]any)
 	for _, def := range definitions {
 		expectedOutputMap[def.Name] = def.ExpectedOutput
 	}
 	return expectedOutputMap
-}
-
-// pluralize returns "s" if count != 1, otherwise empty string
-func pluralize(count int) string {
-	if count == 1 {
-		return ""
-	}
-	return "s"
-}
-
-// indentMultiline indents each line of a string with the given prefix
-func indentMultiline(s, indent string) string {
-	if s == "" {
-		return ""
-	}
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		if line != "" || i < len(lines)-1 {
-			lines[i] = indent + line
-		}
-	}
-	return strings.TrimRight(strings.Join(lines, "\n"), " \t")
 }

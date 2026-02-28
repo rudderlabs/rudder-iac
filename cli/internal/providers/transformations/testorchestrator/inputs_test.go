@@ -1,6 +1,7 @@
 package testorchestrator
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -74,7 +75,8 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		assert.Equal(t, "My Suite/event", result[0].Name)
+		expectedName := fmt.Sprintf("My Suite (%s/event.json)", inputDir)
+		assert.Equal(t, expectedName, result[0].Name)
 		require.Len(t, result[0].Input, 1)
 		assert.Nil(t, result[0].ExpectedOutput)
 	})
@@ -113,7 +115,8 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		assert.Equal(t, "Suite/event", result[0].Name)
+		expectedName := fmt.Sprintf("Suite (%s/event.json)", inputDir)
+		assert.Equal(t, expectedName, result[0].Name)
 		assert.NotNil(t, result[0].ExpectedOutput)
 		assert.Len(t, result[0].ExpectedOutput, 1)
 	})
@@ -141,8 +144,10 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.Len(t, result, 2)
 
 		names := []string{result[0].Name, result[1].Name}
-		assert.Contains(t, names, "Suite One/a")
-		assert.Contains(t, names, "Suite Two/b")
+		expectedName1 := fmt.Sprintf("Suite One (%s/a.json)", suite1)
+		expectedName2 := fmt.Sprintf("Suite Two (%s/b.json)", suite2)
+		assert.Contains(t, names, expectedName1)
+		assert.Contains(t, names, expectedName2)
 	})
 
 	t.Run("invalid JSON in input file returns error", func(t *testing.T) {
