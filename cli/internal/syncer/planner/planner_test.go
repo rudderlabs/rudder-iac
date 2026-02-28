@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 )
 
@@ -161,4 +162,44 @@ func newResource(id string, name string, dependency *resources.PropertyRef, opts
 		data["dependency"] = *dependency
 	}
 	return resources.NewResource(id, "some-type", data, []string{}, opts...)
+}
+
+func TestPlanner_WithDiffOptions(t *testing.T) {
+	t.Run("passes diff options to compute diff", func(t *testing.T) {
+		source := newGraph()
+		target := newGraphWithResources(
+			newResource("canvas", "Canvas", nil),
+		)
+
+		// With name matching enabled and matching unmanaged resource
+		p := planner.New("workspace-id", planner.WithDiffOptions(differ.DiffOptions{
+			MatchByName: true,
+			UnmanagedByName: map[string]map[string]differ.UnmanagedResource{
+				"some-type": {
+					"Canvas": {RemoteID: "remote_123", Name: "Canvas"},
+				},
+			},
+		}))
+		plan := p.Plan(source, target)
+
+		// Resource should be in NameMatchedResources, not NewResources
+		assert.Empty(t, plan.Diff.NewResources)
+		assert.Len(t, plan.Diff.NameMatchedResources, 1)
+		assert.Equal(t, "some-type:canvas", plan.Diff.NameMatchedResources[0].LocalURN)
+		assert.Equal(t, "remote_123", plan.Diff.NameMatchedResources[0].RemoteID)
+	})
+
+	t.Run("default options when no diff options provided", func(t *testing.T) {
+		source := newGraph()
+		target := newGraphWithResources(
+			newResource("canvas", "Canvas", nil),
+		)
+
+		// Without name matching, resource should be in NewResources
+		p := planner.New("workspace-id")
+		plan := p.Plan(source, target)
+
+		assert.Len(t, plan.Diff.NewResources, 1)
+		assert.Empty(t, plan.Diff.NameMatchedResources)
+	})
 }

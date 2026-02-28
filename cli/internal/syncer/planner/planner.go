@@ -10,7 +10,19 @@ import (
 )
 
 type Planner struct {
-	workspaceId string
+	workspaceID string
+	diffOptions differ.DiffOptions
+}
+
+type PlannerOption func(*Planner)
+
+// WithDiffOptions sets additional diff options for name matching and other features
+func WithDiffOptions(opts differ.DiffOptions) PlannerOption {
+	return func(p *Planner) {
+		// Preserve workspaceID, merge other options
+		opts.WorkspaceID = p.workspaceID
+		p.diffOptions = opts
+	}
 }
 
 type OperationType int
@@ -51,14 +63,19 @@ type Plan struct {
 	Operations []*Operation
 }
 
-func New(workspaceId string) *Planner {
-	return &Planner{
-		workspaceId: workspaceId,
+func New(workspaceID string, opts ...PlannerOption) *Planner {
+	p := &Planner{
+		workspaceID: workspaceID,
+		diffOptions: differ.DiffOptions{WorkspaceID: workspaceID},
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 func (p *Planner) Plan(source, target *resources.Graph) *Plan {
-	diff := differ.ComputeDiff(source, target, differ.DiffOptions{WorkspaceID: p.workspaceId})
+	diff := differ.ComputeDiff(source, target, p.diffOptions)
 	plan := &Plan{
 		Diff: diff,
 	}
