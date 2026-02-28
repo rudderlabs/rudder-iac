@@ -3,6 +3,7 @@ package testutils
 import (
 	"sync"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 )
 
@@ -11,16 +12,18 @@ type MockReporter struct {
 	mu sync.Mutex
 
 	// Configuration
-	ConfirmResponse bool
-	ConfirmError    error
+	ConfirmResponse           bool
+	ConfirmError              error
+	ConfirmNameMatchesResult  []differ.NameMatchCandidate // What to return from ConfirmNameMatches
 
 	// Call tracking
-	ReportPlanCalls      []*planner.Plan
-	AskConfirmationCalls int
-	SyncStartedCalls     []int
-	SyncCompletedCalls   int
-	TaskStartedCalls     []TaskCall
-	TaskCompletedCalls   []TaskCompletionCall
+	ReportPlanCalls           []*planner.Plan
+	AskConfirmationCalls      int
+	ConfirmNameMatchesCalls   [][]differ.NameMatchCandidate
+	SyncStartedCalls          []int
+	SyncCompletedCalls        int
+	TaskStartedCalls          []TaskCall
+	TaskCompletedCalls        []TaskCompletionCall
 }
 
 type TaskCall struct {
@@ -37,11 +40,12 @@ type TaskCompletionCall struct {
 // NewMockReporter creates a new MockReporter with default confirmation response of true
 func NewMockReporter() *MockReporter {
 	return &MockReporter{
-		ConfirmResponse:      true,
-		ReportPlanCalls:      make([]*planner.Plan, 0),
-		SyncStartedCalls:     make([]int, 0),
-		TaskStartedCalls:     make([]TaskCall, 0),
-		TaskCompletedCalls:   make([]TaskCompletionCall, 0),
+		ConfirmResponse:         true,
+		ReportPlanCalls:         make([]*planner.Plan, 0),
+		ConfirmNameMatchesCalls: make([][]differ.NameMatchCandidate, 0),
+		SyncStartedCalls:        make([]int, 0),
+		TaskStartedCalls:        make([]TaskCall, 0),
+		TaskCompletedCalls:      make([]TaskCompletionCall, 0),
 	}
 }
 
@@ -56,6 +60,17 @@ func (m *MockReporter) AskConfirmation() (bool, error) {
 	defer m.mu.Unlock()
 	m.AskConfirmationCalls++
 	return m.ConfirmResponse, m.ConfirmError
+}
+
+func (m *MockReporter) ConfirmNameMatches(matches []differ.NameMatchCandidate) []differ.NameMatchCandidate {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ConfirmNameMatchesCalls = append(m.ConfirmNameMatchesCalls, matches)
+	if m.ConfirmNameMatchesResult != nil {
+		return m.ConfirmNameMatchesResult
+	}
+	// Default: return all matches (auto-confirm)
+	return matches
 }
 
 func (m *MockReporter) SyncStarted(totalTasks int) {
@@ -95,6 +110,7 @@ func (m *MockReporter) Reset() {
 	defer m.mu.Unlock()
 	m.ReportPlanCalls = make([]*planner.Plan, 0)
 	m.AskConfirmationCalls = 0
+	m.ConfirmNameMatchesCalls = make([][]differ.NameMatchCandidate, 0)
 	m.SyncStartedCalls = make([]int, 0)
 	m.SyncCompletedCalls = 0
 	m.TaskStartedCalls = make([]TaskCall, 0)

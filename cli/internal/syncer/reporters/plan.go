@@ -39,6 +39,10 @@ func renderDiff(diff *differ.Diff) string {
 		listResources(b, "Importable resources", diff.ImportableResources, nil)
 	}
 
+	if len(diff.NameMatchedResources) > 0 {
+		listNameMatches(b, "Name-matched resources (pending confirmation)", diff.NameMatchedResources)
+	}
+
 	if len(diff.NewResources) > 0 {
 		listResources(b, "New resources", diff.NewResources, nil)
 	}
@@ -84,6 +88,19 @@ func listResources(b *strings.Builder, label string, resources []string, detailF
 		if detailFn != nil {
 			fmt.Fprint(b, detailFn(urn))
 		}
+	}
+	fmt.Fprintln(b)
+}
+
+func listNameMatches(b *strings.Builder, label string, matches []differ.NameMatchCandidate) {
+	fmt.Fprintln(b, ui.Bold(label)+":")
+	for _, match := range matches {
+		fmt.Fprintf(b, "  - %s %s %s (remote: %s)\n",
+			ui.Color(match.LocalURN, ui.ColorWhite),
+			ui.Color("→", ui.ColorYellow),
+			ui.Color(match.RemoteName, ui.ColorGreen),
+			ui.Color(match.RemoteID, ui.ColorBlue),
+		)
 	}
 	fmt.Fprintln(b)
 }

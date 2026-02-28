@@ -23,12 +23,13 @@ var (
 
 func NewCmdApply() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		dryRun   bool
-		confirm  bool
+		deps        app.Deps
+		p           project.Project
+		err         error
+		location    string
+		dryRun      bool
+		confirm     bool
+		matchByName bool
 	)
 
 	cmd := &cobra.Command{
@@ -38,11 +39,16 @@ func NewCmdApply() *cobra.Command {
 			Applies the project configuration changes to the RudderStack workspace associated with your access token.
 			This includes creating, updating, or deleting resources based on
 			the differences between local configuration and the workspace resources.
+
+			Use --match-by-name to automatically link local resources to existing remote resources
+			that share the same name but were created through the UI (without external_id).
+			This eliminates the need for manual metadata.import stanzas.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli apply --location </path/to/dir or file>
 			$ rudder-cli apply --location </path/to/dir or file> --dry-run
 			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
+			$ rudder-cli apply --location </path/to/dir or file> --match-by-name
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -60,7 +66,7 @@ func NewCmdApply() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
+			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm, "matchByName", matchByName)
 			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
@@ -68,6 +74,7 @@ func NewCmdApply() *cobra.Command {
 					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
+					{K: "matchByName", V: matchByName},
 				}...)
 			}()
 
@@ -86,6 +93,7 @@ func NewCmdApply() *cobra.Command {
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
+				syncer.WithMatchByName(matchByName),
 			}
 
 			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
@@ -117,6 +125,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
+	cmd.Flags().BoolVar(&matchByName, "match-by-name", false, "Link local resources to unmanaged remote resources by name")
 
 	return cmd
 }
