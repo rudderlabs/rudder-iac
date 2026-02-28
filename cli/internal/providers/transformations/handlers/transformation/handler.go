@@ -324,6 +324,18 @@ func (h *HandlerImpl) FormatForExport(
 
 	formattables := make([]writer.FormattableEntity, 0)
 
+	// Create empty input and output folders in transformations directory
+	formattables = append(formattables,
+		writer.FormattableEntity{
+			RelativePath: filepath.Join(handlers.TransformationsDir, "input"),
+			IsDirectory:  true,
+		},
+		writer.FormattableEntity{
+			RelativePath: filepath.Join(handlers.TransformationsDir, "output"),
+			IsDirectory:  true,
+		},
+	)
+
 	for externalID, remote := range remotes {
 		// Validate language
 		if remote.Language != handlers.JavaScript && remote.Language != handlers.Python {
