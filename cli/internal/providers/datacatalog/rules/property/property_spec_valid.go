@@ -105,7 +105,7 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"property spec syntax must be valid",
 		examples,
-		[]string{"properties"},
+		prules.LegacyVersionPatterns("properties"),
 		validatePropertySpec,
 	)
 }

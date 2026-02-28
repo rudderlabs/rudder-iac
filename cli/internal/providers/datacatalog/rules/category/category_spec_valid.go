@@ -50,7 +50,7 @@ func NewCategorySpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"category spec syntax must be valid",
 		examples,
-		[]string{"categories"},
+		prules.LegacyVersionPatterns("categories"),
 		validateCategorySpec,
 	)
 }

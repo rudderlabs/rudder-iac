@@ -57,7 +57,7 @@ func NewEventSemanticValidRule() rules.Rule {
 		rules.Error,
 		"event references must resolve to existing resources",
 		rules.Examples{},
-		[]string{localcatalog.KindEvents},
+		prules.LegacyVersionPatterns(localcatalog.KindEvents),
 		validateEventSemantic,
 	)
 }

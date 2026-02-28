@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -19,7 +20,7 @@ func TestTrackingPlanSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/tracking-plans/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "tracking plan spec syntax must be valid", rule.Description())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("tp")}, rule.AppliesTo())
+	assert.Equal(t, prules.LegacyVersionPatterns("tp"), rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

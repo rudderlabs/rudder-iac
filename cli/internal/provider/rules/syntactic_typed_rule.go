@@ -27,7 +27,7 @@ func NewTypedRule[T any](
 	severity rules.Severity,
 	description string,
 	examples rules.Examples,
-	appliesToKinds []string,
+	appliesTo []rules.MatchPattern,
 	validateFunc func(
 		Kind string,
 		Version string,
@@ -35,16 +35,12 @@ func NewTypedRule[T any](
 		Spec T,
 	) []rules.ValidationResult,
 ) rules.Rule {
-	patterns := make([]rules.MatchPattern, len(appliesToKinds))
-	for i, kind := range appliesToKinds {
-		patterns[i] = rules.MatchKind(kind)
-	}
 	return &typedRule[T]{rule: typedRuleImpl[T]{
 		id:           id,
 		severity:     severity,
 		description:  description,
 		examples:     examples,
-		appliesTo:    patterns,
+		appliesTo:    appliesTo,
 		validateFunc: validateFunc,
 	}}
 }

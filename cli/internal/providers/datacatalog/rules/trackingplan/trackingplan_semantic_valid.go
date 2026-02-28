@@ -174,7 +174,7 @@ func NewTrackingPlanSemanticValidRule() rules.Rule {
 		rules.Error,
 		"tracking plan references must resolve to existing resources",
 		rules.Examples{},
-		[]string{localcatalog.KindTrackingPlans},
+		prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
 		validateTrackingPlanSemantic,
 	)
 }

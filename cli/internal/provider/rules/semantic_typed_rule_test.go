@@ -21,7 +21,7 @@ func TestSemanticTypedRule_Metadata(t *testing.T) {
 		rules.Error,
 		"semantic test rule description",
 		expectedExamples,
-		[]string{"testKind"},
+		[]rules.MatchPattern{rules.MatchKind("testKind")},
 		func(_ string, _ string, _ map[string]any, _ testSpec, _ *resources.Graph) []rules.ValidationResult {
 			return nil
 		},
@@ -48,7 +48,7 @@ func TestSemanticTypedRule_Validate_PassesGraphToFunc(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		func(_ string, _ string, _ map[string]any, spec testSpec, g *resources.Graph) []rules.ValidationResult {
 			capturedSpec = spec
 			capturedGraph = g
@@ -80,7 +80,7 @@ func TestSemanticTypedRule_Validate_ReferencePrefixing(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		func(_ string, _ string, _ map[string]any, _ testSpec, _ *resources.Graph) []rules.ValidationResult {
 			return []rules.ValidationResult{
 				{Reference: "/field1", Message: "error1"},
@@ -112,7 +112,7 @@ func TestSemanticTypedRule_Validate_MarshalError(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		func(_ string, _ string, _ map[string]any, _ testSpec, _ *resources.Graph) []rules.ValidationResult {
 			return nil
 		},

@@ -31,7 +31,7 @@ func NewSemanticTypedRule[T any](
 	severity rules.Severity,
 	description string,
 	examples rules.Examples,
-	appliesToKinds []string,
+	appliesTo []rules.MatchPattern,
 	validateFunc func(
 		Kind string,
 		Version string,
@@ -40,16 +40,12 @@ func NewSemanticTypedRule[T any](
 		Graph *resources.Graph,
 	) []rules.ValidationResult,
 ) rules.Rule {
-	patterns := make([]rules.MatchPattern, len(appliesToKinds))
-	for i, kind := range appliesToKinds {
-		patterns[i] = rules.MatchKind(kind)
-	}
 	return &semanticTypedRule[T]{rule: semanticTypedRuleImpl[T]{
 		id:           id,
 		severity:     severity,
 		description:  description,
 		examples:     examples,
-		appliesTo:    patterns,
+		appliesTo:    appliesTo,
 		validateFunc: validateFunc,
 	}}
 }

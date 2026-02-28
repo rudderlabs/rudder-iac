@@ -29,7 +29,7 @@ func NewSourceSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"event stream source spec syntax must be valid",
 		rules.Examples{},
-		[]string{esSource.ResourceKind},
+		prules.LegacyVersionPatterns(esSource.ResourceKind),
 		validateSourceSpec,
 	)
 }

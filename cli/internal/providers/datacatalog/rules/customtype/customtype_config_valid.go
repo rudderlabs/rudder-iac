@@ -95,7 +95,7 @@ func NewCustomTypeConfigValidRule() rules.Rule {
 		rules.Error,
 		ruleDescription,
 		configExamples,
-		[]string{"custom-types"},
+		prules.LegacyVersionPatterns("custom-types"),
 		validateCustomTypeConfig,
 	)
 }

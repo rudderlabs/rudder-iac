@@ -3,6 +3,7 @@ package source
 import (
 	"testing"
 
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestSourceSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "event-stream/source/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "event stream source spec syntax must be valid", rule.Description())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("event-stream-source")}, rule.AppliesTo())
+	assert.Equal(t, prules.LegacyVersionPatterns("event-stream-source"), rule.AppliesTo())
 }
 
 func TestSourceSpecSyntaxValidRule_ValidSpecs(t *testing.T) {

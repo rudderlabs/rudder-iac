@@ -61,7 +61,7 @@ func TestTypedRule_Metadata(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		expectedExamples,
-		[]string{"testKind"},
+		[]rules.MatchPattern{rules.MatchKind("testKind")},
 		validateFunc,
 	)
 
@@ -96,7 +96,7 @@ func TestTypedRule_Validate(t *testing.T) {
 			rules.Error,
 			"test rule description",
 			rules.Examples{},
-			[]string{"*"},
+			[]rules.MatchPattern{rules.MatchAll()},
 			validateFunc,
 		)
 
@@ -172,7 +172,7 @@ func TestTypedRule_Validate_ReferencePrefixing(t *testing.T) {
 				rules.Error,
 				"Test rule",
 				rules.Examples{},
-				[]string{"*"},
+				[]rules.MatchPattern{rules.MatchAll()},
 				validateFunc,
 			)
 
@@ -202,7 +202,7 @@ func TestTypedRule_Validate_MarshalError(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		validateFunc,
 	)
 
@@ -232,7 +232,7 @@ func TestTypedRule_Validate_UnmarshalError(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		validateFunc,
 	)
 
@@ -269,7 +269,7 @@ func TestTypedRule_Validate_ParameterPassing(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		[]string{"*"},
+		[]rules.MatchPattern{rules.MatchAll()},
 		validateFunc,
 	)
 
