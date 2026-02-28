@@ -108,6 +108,42 @@ type RemoteResourceLoader interface {
 	UnmanagedRemoteResourceLoader
 }
 
+// NameMatch represents a potential link between a local resource and an unmanaged remote resource
+// that share the same name. Used during the apply cycle when --match-by-name is enabled.
+type NameMatch struct {
+	// LocalURN is the URN of the local resource (e.g., "category:canvas")
+	LocalURN string
+	// RemoteID is the ID of the unmanaged remote resource (e.g., "cat_37tIcdNnXjm90UeONAx737RgfJm")
+	RemoteID string
+	// RemoteName is the display name of the remote resource for user confirmation
+	RemoteName string
+	// ResourceType is the type of resource (e.g., "category", "event")
+	ResourceType string
+}
+
+// NameMatcher is an optional interface that providers can implement to support
+// matching local resources to unmanaged remote resources by name.
+//
+// This enables the --match-by-name flag during apply, which helps resolve the workflow
+// where resources are created in the UI (without external_id) and need to be linked
+// to local definitions without manual metadata.import stanzas.
+type NameMatcher interface {
+	// MatchByName finds unmanaged remote resources that match local resources by name.
+	// It compares resources in the local graph against unmanaged remote resources
+	// and returns potential matches for user confirmation.
+	//
+	// The localGraph contains resources from local specs that don't exist in managed remote state.
+	// The unmanaged collection contains remote resources without external_id (from LoadImportable).
+	//
+	// Returns a slice of NameMatch candidates. The caller is responsible for presenting
+	// these to the user for confirmation before converting them to import operations.
+	MatchByName(
+		ctx context.Context,
+		localGraph *resources.Graph,
+		unmanaged *resources.RemoteResources,
+	) ([]NameMatch, error)
+}
+
 // StateLoader converts remote resources into a state representation.
 // State is used to track what resources are managed and their last known configuration.
 type StateLoader interface {
