@@ -400,6 +400,56 @@ func TestRemoteResources_Merge(t *testing.T) {
 	})
 }
 
+func TestRemoteResources_Types(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns empty slice for empty collection", func(t *testing.T) {
+		collection := NewRemoteResources()
+		types := collection.Types()
+		assert.Empty(t, types)
+	})
+
+	t.Run("returns single type", func(t *testing.T) {
+		collection := NewRemoteResources()
+		collection.Set("events", map[string]*RemoteResource{
+			"event-1": {ID: "event-1", ExternalID: "ext-1", Data: "test"},
+		})
+
+		types := collection.Types()
+		assert.ElementsMatch(t, []string{"events"}, types)
+	})
+
+	t.Run("returns multiple types", func(t *testing.T) {
+		collection := NewRemoteResources()
+		collection.Set("events", map[string]*RemoteResource{
+			"event-1": {ID: "event-1", ExternalID: "ext-1", Data: "test"},
+		})
+		collection.Set("properties", map[string]*RemoteResource{
+			"prop-1": {ID: "prop-1", ExternalID: "ext-2", Data: "test"},
+		})
+		collection.Set("categories", map[string]*RemoteResource{
+			"cat-1": {ID: "cat-1", ExternalID: "ext-3", Data: "test"},
+		})
+
+		types := collection.Types()
+		assert.ElementsMatch(t, []string{"events", "properties", "categories"}, types)
+	})
+
+	t.Run("returns types matching what was Set", func(t *testing.T) {
+		collection := NewRemoteResources()
+		expectedTypes := []string{"type-a", "type-b", "type-c", "type-d"}
+
+		for _, typ := range expectedTypes {
+			collection.Set(typ, map[string]*RemoteResource{
+				"id-1": {ID: "id-1", ExternalID: "ext-1", Data: "test"},
+			})
+		}
+
+		types := collection.Types()
+		assert.ElementsMatch(t, expectedTypes, types)
+	})
+}
+
 func TestRemoteResources_GetURNByID(t *testing.T) {
 	t.Parallel()
 

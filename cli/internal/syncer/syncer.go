@@ -3,12 +3,15 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sort"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -22,6 +25,7 @@ type ProjectSyncer struct {
 	concurrency     int
 	dryRun          bool
 	askConfirmation bool
+	matchByName     bool
 }
 
 type SyncProvider interface {
@@ -96,9 +100,23 @@ func WithAskConfirmation(askConfirmation bool) Option {
 	}
 }
 
+// WithMatchByName enables name-based matching of local resources to unmanaged remote resources.
+// When enabled, resources that would normally be created are checked against unmanaged remote
+// resources (those without external_id) to find potential matches by name.
+func WithMatchByName(matchByName bool) Option {
+	return func(s *ProjectSyncer) error {
+		s.matchByName = matchByName
+		return nil
+	}
+}
+
 type SyncReporter interface {
 	ReportPlan(plan *planner.Plan)
 	AskConfirmation() (bool, error)
+	// ConfirmNameMatches presents name-matched resources to the user and returns
+	// the subset of matches that should be linked (converted to import operations).
+	// In non-interactive mode, this may auto-confirm all matches or return empty.
+	ConfirmNameMatches(matches []differ.NameMatchCandidate) []differ.NameMatchCandidate
 	SyncStarted(totalTasks int)
 	SyncCompleted()
 	TaskStarted(taskId string, description string)
@@ -118,24 +136,52 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
-	resources, err := s.provider.LoadResourcesFromRemote(ctx)
+	remoteResources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
 	}
 
-	state, err := s.provider.MapRemoteToState(resources)
+	st, err := s.provider.MapRemoteToState(remoteResources)
 	if err != nil {
 		return []error{err}
 	}
-	source := StateToGraph(state)
+	source := StateToGraph(st)
 
-	p := planner.New(s.workspace.ID)
+	// Build planner options
+	var plannerOpts []planner.PlannerOption
+	if s.matchByName {
+		diffOpts, err := s.buildNameMatchingOptions(ctx)
+		if err != nil {
+			return []error{fmt.Errorf("building name matching options: %w", err)}
+		}
+		if diffOpts != nil {
+			plannerOpts = append(plannerOpts, planner.WithDiffOptions(*diffOpts))
+		}
+	}
+
+	p := planner.New(s.workspace.ID, plannerOpts...)
 	plan := p.Plan(source, target)
 
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
 		return nil
+	}
+
+	// Handle name-matched resources: get confirmation and convert to import operations
+	if len(plan.Diff.NameMatchedResources) > 0 {
+		confirmed := s.reporter.ConfirmNameMatches(plan.Diff.NameMatchedResources)
+		if len(confirmed) > 0 {
+			// Inject ImportMetadata into confirmed resources and re-plan
+			target = injectImportMetadata(target, confirmed, s.workspace.ID)
+
+			// Re-plan without name matching (confirmed matches now have ImportMetadata)
+			pFinal := planner.New(s.workspace.ID)
+			plan = pFinal.Plan(source, target)
+
+			// Re-report the updated plan so user sees import operations instead of creates
+			s.reporter.ReportPlan(plan)
+		}
 	}
 
 	if len(plan.Operations) == 0 {
@@ -154,18 +200,179 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		}
 	}
 
-	errors := s.executePlan(ctx, state, plan, target, continueOnFail)
+	errors := s.executePlan(ctx, st, plan, target, continueOnFail)
 	if len(errors) > 0 {
 		return errors
 	}
 
 	// Consolidate sync: providers can perform batch operations or multi-resource
 	// coordination after all individual resources have been processed
-	if err := s.provider.ConsolidateSync(ctx, target, state); err != nil {
+	if err := s.provider.ConsolidateSync(ctx, target, st); err != nil {
 		return []error{err}
 	}
 
 	return nil
+}
+
+// buildNameMatchingOptions loads unmanaged remote resources and builds a name index
+// for name-based matching during diff computation.
+func (s *ProjectSyncer) buildNameMatchingOptions(ctx context.Context) (*differ.DiffOptions, error) {
+	// Check if provider supports loading unmanaged resources
+	unmanagedLoader, ok := s.provider.(provider.UnmanagedRemoteResourceLoader)
+	if !ok {
+		// Provider doesn't support unmanaged resource loading, skip name matching
+		return nil, nil
+	}
+
+	// Load unmanaged resources (those without external_id)
+	// Pass nil for idNamer since we don't need to generate IDs for matching
+	unmanaged, err := unmanagedLoader.LoadImportable(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("loading unmanaged resources: %w", err)
+	}
+
+	if unmanaged == nil || unmanaged.Len() == 0 {
+		return nil, nil
+	}
+
+	// Build name index from unmanaged resources
+	unmanagedByName := buildNameIndex(unmanaged)
+	if len(unmanagedByName) == 0 {
+		return nil, nil
+	}
+
+	return &differ.DiffOptions{
+		MatchByName:     true,
+		UnmanagedByName: unmanagedByName,
+	}, nil
+}
+
+// buildNameIndex creates a lookup map of unmanaged resources by type and name.
+// Structure: map[resourceType]map[name]UnmanagedResource
+func buildNameIndex(unmanaged *resources.RemoteResources) map[string]map[string]differ.UnmanagedResource {
+	index := make(map[string]map[string]differ.UnmanagedResource)
+
+	// Iterate through all resource types dynamically
+	for _, resourceType := range unmanaged.Types() {
+		resourceMap := unmanaged.GetAll(resourceType)
+		if resourceMap == nil {
+			continue
+		}
+
+		// Sort resource IDs for deterministic iteration order
+		// This ensures consistent behavior when skipping duplicate names
+		ids := make([]string, 0, len(resourceMap))
+		for id := range resourceMap {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+
+		for _, id := range ids {
+			resource := resourceMap[id]
+			name := extractName(resource.Data)
+			if name == "" {
+				continue
+			}
+
+			if index[resourceType] == nil {
+				index[resourceType] = make(map[string]differ.UnmanagedResource)
+			}
+
+			// Skip if name already exists to avoid non-deterministic matching
+			// when multiple remote resources share the same name
+			if _, exists := index[resourceType][name]; exists {
+				continue
+			}
+
+			index[resourceType][name] = differ.UnmanagedResource{
+				RemoteID: resource.ID,
+				Name:     name,
+			}
+		}
+	}
+
+	return index
+}
+
+// extractName attempts to extract the "name" field from various resource data types.
+// Returns empty string if name cannot be extracted.
+func extractName(data interface{}) string {
+	if data == nil {
+		return ""
+	}
+
+	// Try common patterns for extracting name
+	switch v := data.(type) {
+	case map[string]interface{}:
+		if name, ok := v["name"].(string); ok {
+			return name
+		}
+	default:
+		// Use reflection for struct types with Name field
+		return extractNameByReflection(data)
+	}
+
+	return ""
+}
+
+// extractNameByReflection extracts the Name field from a struct using reflection.
+func extractNameByReflection(data interface{}) string {
+	if data == nil {
+		return ""
+	}
+
+	val := reflect.ValueOf(data)
+	// Handle pointer types
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return ""
+		}
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return ""
+	}
+
+	nameField := val.FieldByName("Name")
+	if !nameField.IsValid() || nameField.Kind() != reflect.String {
+		return ""
+	}
+
+	return nameField.String()
+}
+
+// injectImportMetadata creates a new graph with ImportMetadata injected into confirmed name-matched resources.
+// This converts the resources from "new" to "importable" in the next planning cycle.
+func injectImportMetadata(target *resources.Graph, confirmed []differ.NameMatchCandidate, workspaceID string) *resources.Graph {
+	// Build lookup map for confirmed matches
+	confirmedByURN := make(map[string]differ.NameMatchCandidate)
+	for _, match := range confirmed {
+		confirmedByURN[match.LocalURN] = match
+	}
+
+	// Create new graph with updated resources
+	newGraph := resources.NewGraph()
+	for urn, resource := range target.Resources() {
+		if match, ok := confirmedByURN[urn]; ok {
+			// Create new resource with ImportMetadata
+			newResource := resources.NewResource(
+				resource.ID(),
+				resource.Type(),
+				resource.Data(),
+				resource.Dependencies(),
+				resources.WithRawData(resource.RawData()),
+				resources.WithResourceImportMetadata(match.RemoteID, workspaceID),
+			)
+			newGraph.AddResource(newResource)
+		} else {
+			newGraph.AddResource(resource)
+		}
+		// Preserve dependencies
+		newGraph.AddDependencies(urn, target.GetDependencies(urn))
+	}
+
+	return newGraph
 }
 
 func StateToGraph(state *state.State) *resources.Graph {

@@ -81,6 +81,15 @@ func (rc *RemoteResources) GetURNByID(resourceType string, id string) (string, e
 	return URN(resource.ExternalID, resourceType), nil
 }
 
+// Types returns all resource types currently stored in the collection.
+func (rc *RemoteResources) Types() []string {
+	types := make([]string, 0, len(rc.resources))
+	for resourceType := range rc.resources {
+		types = append(types, resourceType)
+	}
+	return types
+}
+
 // Merge merges resources from another RemoteResources into a new collection
 // Returns a new RemoteResources or an error if there are any overlapping keys
 func (rc *RemoteResources) Merge(other *RemoteResources) (*RemoteResources, error) {

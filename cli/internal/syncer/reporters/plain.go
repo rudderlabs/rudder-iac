@@ -3,6 +3,7 @@ package reporters
 import (
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -14,6 +15,12 @@ type PlainSyncReporter struct {
 // This typically runs in CI/CD pipelines or when output is being redirected to a file,
 // which assumes non-interactive execution with --confirm=false for the apply command.
 func (r *PlainSyncReporter) AskConfirmation() (bool, error) { return false, nil }
+
+// ConfirmNameMatches in PlainSyncReporter auto-confirms all matches since in non-interactive
+// mode the user has explicitly enabled --match-by-name indicating intent to link resources.
+func (r *PlainSyncReporter) ConfirmNameMatches(matches []differ.NameMatchCandidate) []differ.NameMatchCandidate {
+	return matches
+}
 
 func (r *PlainSyncReporter) TaskCompleted(_ string, description string, err error) {
 	if err != nil {

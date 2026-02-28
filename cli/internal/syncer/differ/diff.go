@@ -18,6 +18,9 @@ type Diff struct {
 	NewResources []string
 	// ImportableResources contains URNs of resources that will be imported (exist in target but not in source, and have ImportMetadata)
 	ImportableResources []string
+	// NameMatchedResources contains candidates for name-based linking (exist in target, not in source,
+	// no ImportMetadata, but an unmanaged remote resource with the same name exists)
+	NameMatchedResources []NameMatchCandidate
 	// UpdatedResources contains URNs of resources that exist in both graphs but have different data
 	UpdatedResources map[string]ResourceDiff
 	// RemovedResources contains URNs of resources that exist in source but not in target
@@ -26,9 +29,23 @@ type Diff struct {
 	UnmodifiedResources []string
 }
 
+// NameMatchCandidate represents a potential link between a local resource and an unmanaged
+// remote resource that share the same name. Used when --match-by-name is enabled.
+type NameMatchCandidate struct {
+	// LocalURN is the URN of the local resource (e.g., "category:canvas")
+	LocalURN string
+	// RemoteID is the ID of the unmanaged remote resource
+	RemoteID string
+	// RemoteName is the display name of the remote resource
+	RemoteName string
+	// ResourceType is the type of resource (e.g., "category", "event")
+	ResourceType string
+}
+
 func (d *Diff) HasDiff() bool {
 	return len(d.NewResources) > 0 ||
 		len(d.ImportableResources) > 0 ||
+		len(d.NameMatchedResources) > 0 ||
 		len(d.UpdatedResources) > 0 ||
 		len(d.RemovedResources) > 0
 }
@@ -46,29 +63,53 @@ type PropertyDiff struct {
 
 type DiffOptions struct {
 	WorkspaceID string
+	// MatchByName enables name-based matching for resources without ImportMetadata.
+	// When true, resources that would normally be created are checked against
+	// UnmanagedByName to find potential matches.
+	MatchByName bool
+	// UnmanagedByName is an index of unmanaged remote resources by type and name.
+	// Structure: map[resourceType]map[name]UnmanagedResource
+	// Only used when MatchByName is true.
+	UnmanagedByName map[string]map[string]UnmanagedResource
+}
+
+// UnmanagedResource represents a remote resource without external_id that can be matched by name.
+type UnmanagedResource struct {
+	// RemoteID is the ID of the remote resource
+	RemoteID string
+	// Name is the display name of the remote resource
+	Name string
 }
 
 // ComputeDiff computes the diff between two graphs
-// It returns a Diff struct containing the new, importable, updated, removed and unmodified resources
+// It returns a Diff struct containing the new, importable, name-matched, updated, removed and unmodified resources
 // - New resources are resources that will be created (exist in target but not in source, without ImportMetadata)
 // - Importable resources are resources that will be imported (exist in target but not in source, with ImportMetadata)
+// - Name-matched resources are candidates for linking (exist in target, not in source, no ImportMetadata,
+//   but an unmanaged remote resource with the same name exists when MatchByName is enabled)
 // - Updated resources are resources that exist in both but their data differ
 // - Removed resources are resources that exist in the source but not in the target
 // - Unmodified resources are resources that exist in both with identical data
 func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffOptions) *Diff {
-	newResources := []string{}
-	importableResources := []string{}
-	removedResources := []string{}
-	updatedResources := map[string]ResourceDiff{}
-	unmodifiedResources := []string{}
+	var (
+		newResources         = []string{}
+		importableResources  = []string{}
+		nameMatchedResources = []NameMatchCandidate{}
+		removedResources     = []string{}
+		updatedResources     = map[string]ResourceDiff{}
+		unmodifiedResources  = []string{}
+	)
 
 	// Iterate over target resources to find new and updated resources
 	for urn, r := range target.Resources() {
 		if sourceResource, exists := source.GetResource(urn); !exists {
 			// Categorize based on ImportMetadata - mutually exclusive
 			if r.ImportMetadata() != nil && r.ImportMetadata().WorkspaceId == options.WorkspaceID {
-				// Resource will be imported (exists remotely)
+				// Resource will be imported (exists remotely with explicit mapping)
 				importableResources = append(importableResources, urn)
+			} else if match, found := findNameMatch(r, options); found {
+				// Resource matched by name to an unmanaged remote resource
+				nameMatchedResources = append(nameMatchedResources, match)
 			} else {
 				// Resource will be created (doesn't exist anywhere)
 				newResources = append(newResources, urn)
@@ -105,12 +146,45 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffO
 	}
 
 	return &Diff{
-		NewResources:        newResources,
-		ImportableResources: importableResources,
-		UpdatedResources:    updatedResources,
-		RemovedResources:    removedResources,
-		UnmodifiedResources: unmodifiedResources,
+		NewResources:         newResources,
+		ImportableResources:  importableResources,
+		NameMatchedResources: nameMatchedResources,
+		UpdatedResources:     updatedResources,
+		RemovedResources:     removedResources,
+		UnmodifiedResources:  unmodifiedResources,
 	}
+}
+
+// findNameMatch checks if an unmanaged remote resource exists with the same name as the local resource.
+// Returns the match candidate and true if found, otherwise returns empty struct and false.
+func findNameMatch(r *resources.Resource, options DiffOptions) (NameMatchCandidate, bool) {
+	if !options.MatchByName || options.UnmanagedByName == nil {
+		return NameMatchCandidate{}, false
+	}
+
+	resourceType := r.Type()
+	typeIndex, typeExists := options.UnmanagedByName[resourceType]
+	if !typeExists {
+		return NameMatchCandidate{}, false
+	}
+
+	// Extract name from resource data
+	name, ok := r.Data()["name"].(string)
+	if !ok || name == "" {
+		return NameMatchCandidate{}, false
+	}
+
+	unmanaged, nameExists := typeIndex[name]
+	if !nameExists {
+		return NameMatchCandidate{}, false
+	}
+
+	return NameMatchCandidate{
+		LocalURN:     r.URN(),
+		RemoteID:     unmanaged.RemoteID,
+		RemoteName:   unmanaged.Name,
+		ResourceType: resourceType,
+	}, true
 }
 
 // compareData compares the data of two resources and returns the differences

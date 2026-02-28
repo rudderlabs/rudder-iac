@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -29,6 +30,32 @@ func (r *ProgressSyncReporter) getErrWriter() io.Writer {
 
 func (r *ProgressSyncReporter) AskConfirmation() (bool, error) {
 	return ui.Confirm("Do you want to apply these changes?")
+}
+
+// ConfirmNameMatches prompts the user to confirm linking name-matched resources.
+// Returns the matches that the user confirmed for linking.
+func (r *ProgressSyncReporter) ConfirmNameMatches(matches []differ.NameMatchCandidate) []differ.NameMatchCandidate {
+	if len(matches) == 0 {
+		return nil
+	}
+
+	fmt.Fprintln(r.getWriter())
+	fmt.Fprintln(r.getWriter(), ui.Bold("The following local resources match existing remote resources by name:"))
+	for _, match := range matches {
+		fmt.Fprintf(r.getWriter(), "  - %s → %s (remote: %s)\n",
+			ui.Color(match.LocalURN, ui.ColorWhite),
+			ui.Color(match.RemoteName, ui.ColorGreen),
+			ui.Color(match.RemoteID, ui.ColorBlue),
+		)
+	}
+	fmt.Fprintln(r.getWriter())
+
+	confirmed, err := ui.Confirm("Link these resources? (This will import them instead of creating new ones)")
+	if err != nil || !confirmed {
+		return nil
+	}
+
+	return matches
 }
 
 func (r *ProgressSyncReporter) SyncStarted(totalTasks int) {
