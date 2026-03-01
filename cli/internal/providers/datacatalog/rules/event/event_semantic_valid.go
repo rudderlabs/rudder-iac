@@ -52,12 +52,14 @@ func validateEventNameUniqueness(spec localcatalog.EventSpec, graph *resources.G
 }
 
 func NewEventSemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"datacatalog/events/semantic-valid",
 		rules.Error,
 		"event references must resolve to existing resources",
 		rules.Examples{},
-		[]string{localcatalog.KindEvents},
-		validateEventSemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(localcatalog.KindEvents),
+			validateEventSemantic,
+		),
 	)
 }

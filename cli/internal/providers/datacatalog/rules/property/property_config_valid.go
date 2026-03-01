@@ -115,7 +115,9 @@ func NewPropertyConfigValidRule() rules.Rule {
 		rules.Error,
 		propConfigRuleDescription,
 		propConfigExamples,
-		[]string{"properties"},
-		validatePropertyConfig,
+		prules.NewVariant(
+			prules.LegacyVersionPatterns("properties"),
+			validatePropertyConfig,
+		),
 	)
 }
