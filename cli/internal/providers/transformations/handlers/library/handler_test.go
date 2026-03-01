@@ -798,6 +798,7 @@ func TestMapRemoteToState(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.False(t, state.Modified)
 	})
 }
 
@@ -827,6 +828,7 @@ func TestCreate(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -935,6 +937,7 @@ func TestUpdate(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -1157,6 +1160,7 @@ func TestImport(t *testing.T) {
 		require.NotNil(t, state)
 		assert.Equal(t, "lib-remote-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 		assert.Equal(t, "ext-new-123", capturedExternalID)
 		assert.True(t, mockStore.getLibraryCalled)
 		assert.True(t, mockStore.setLibraryExternalIDCalled)

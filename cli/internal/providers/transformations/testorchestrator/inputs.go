@@ -10,15 +10,19 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
-var JsonExt = ".json"
+var (
+	JsonExt        = ".json"
+	NoTestsDefined = "No test suites defined for transformation, using default events. Use `rudder-cli transformations test default-events--show` to view default events."
+)
 
 // ResolveTestDefinitions resolves test cases for a transformation.
 func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
-	// If no tests defined, use defaults with warning
 	if len(transformation.Tests) == 0 {
-		testLogger.Warn("No test suites defined for transformation, using default events", "transformationID", transformation.ID)
+		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
+		ui.Printf("\n%s: %s\n", transformation.ID, ui.GreyedOut(NoTestsDefined))
 		return defaultTestDefinitions()
 	}
 
@@ -32,9 +36,9 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 		allTestDefs = append(allTestDefs, testDefs...)
 	}
 
-	// If no test definitions found, use defaults with warning
 	if len(allTestDefs) == 0 {
-		testLogger.Warn("No test cases found, using default events", "transformationID", transformation.ID)
+		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
+		ui.Printf("\n%s: %s\n", transformation.ID, ui.GreyedOut(NoTestsDefined))
 		return defaultTestDefinitions()
 	}
 
@@ -79,9 +83,8 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest) ([]*transforma
 			}
 		}
 
-		testName := strings.TrimSuffix(filename, JsonExt)
 		testDef := &transformations.TestDefinition{
-			Name:           fmt.Sprintf("%s/%s", suite.Name, testName),
+			Name:           fmt.Sprintf("%s (%s/%s)", suite.Name, suite.Input, filename),
 			Input:          inputEvents,
 			ExpectedOutput: expectedOutput,
 		}

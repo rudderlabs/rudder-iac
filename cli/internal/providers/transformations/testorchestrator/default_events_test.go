@@ -106,3 +106,11 @@ func TestGetDefaultEvents(t *testing.T) {
 		assert.Contains(t, screenEvent, "properties")
 	})
 }
+
+func TestShowDefaultEvents(t *testing.T) {
+	t.Parallel()
+
+	// Test that ShowDefaultEvents runs without error
+	err := ShowDefaultEvents()
+	require.NoError(t, err)
+}
