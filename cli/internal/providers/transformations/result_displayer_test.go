@@ -246,15 +246,15 @@ func TestFormatJSON(t *testing.T) {
 			expected: "null",
 		},
 		{
-			name:     "simple object",
-			input:    map[string]any{"key": "value"},
+			name:  "simple object",
+			input: map[string]any{"key": "value"},
 			expected: `{
   "key": "value"
 }`,
 		},
 		{
-			name:     "array",
-			input:    []any{"item1", "item2"},
+			name:  "array",
+			input: []any{"item1", "item2"},
 			expected: `[
   "item1",
   "item2"
@@ -280,19 +280,49 @@ func TestFormatJSON(t *testing.T) {
 }
 
 func TestGenerateDiff(t *testing.T) {
-	expected := `{
-  "status": "success"
-}`
-	actual := `{
-  "status": "failed"
-}`
+	expected := `[
+  {
+    "anonymousId": "sample_anonymous_id",
+    "context": {
+      "app": {
+        "name": "RudderLabs JavaScript SDK",
+        "namespace": "com.rudderlabs.javascript",
+        "version": "3.7.6"
+      },
+    },
+    "event": "Product Click",
+    "integrations": {
+      "All": true
+    },
+    "messageId": "1",
+    "type": "track",
+  }
+]`
+	actual := `[
+  {
+    "anonymousId": "sample_anonymous_id",
+    "context": {
+      "app": {
+        "installType": "npm",
+        "name": "RudderLabs JavaScript SDK",
+        "namespace": "com.rudderlabs.javascript",
+        "version": "3.7.6"
+      },
+    },
+    "event": "Product Click",
+    "integrations": {
+      "All": true
+    },
+    "messageId": "1",
+    "type": "track",
+  }
+]`
 
 	diff := generateDiff(expected, actual)
 	assert.NotEmpty(t, diff)
 	assert.Contains(t, diff, "Expected")
 	assert.Contains(t, diff, "Actual")
-	assert.Contains(t, diff, "success")
-	assert.Contains(t, diff, "failed")
+	assert.Contains(t, diff, "installType")
 }
 
 func TestBuildExpectedOutputMap(t *testing.T) {

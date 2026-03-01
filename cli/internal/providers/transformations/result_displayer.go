@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	indentLevel1  = "  "
-	indentLevel2  = "    "
-	indentLevel3  = "      "
-	separatorLine = "------------------------------------------------------------"
+	indentLevel1   = "  "
+	indentLevel2   = "    "
+	indentLevel3   = "      "
+	separatorLine  = "------------------------------------------------------------"
 	detailBoxWidth = 60
 	headerBoxWidth = 78
-	lineWidth = 80
+	lineWidth      = 80
 
 	// Symbols
 	symbolPass     = "✓"
@@ -326,7 +326,7 @@ func (rd *ResultDisplayer) printFailureDetail(detail failureDetail) {
 
 func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 	var lines []string
-	for _, err := range detail.errors {
+	for i, err := range detail.errors {
 		messageLines := strings.SplitSeq(err.Message, "\n")
 		for line := range messageLines {
 			lines = append(lines, line)
@@ -340,6 +340,10 @@ func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 			for line := range eventLines {
 				lines = append(lines, line)
 			}
+		}
+
+		if i < len(detail.errors)-1 {
+			lines = append(lines, center(strings.Repeat("─", 10), detailBoxWidth))
 		}
 	}
 
@@ -381,6 +385,14 @@ func formatJSON(v any) string {
 func generateDiff(expected, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
+
+	// Add trailing newlines to each line for difflib
+	for i := range expectedLines {
+		expectedLines[i] += "\n"
+	}
+	for i := range actualLines {
+		actualLines[i] += "\n"
+	}
 
 	diff := difflib.UnifiedDiff{
 		A:        expectedLines,
