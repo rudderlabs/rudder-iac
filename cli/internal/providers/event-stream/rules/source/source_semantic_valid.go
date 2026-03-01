@@ -71,12 +71,14 @@ func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Gra
 }
 
 func NewSourceSemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"event-stream/source/semantic-valid",
 		rules.Error,
 		"event stream source references must resolve to existing resources",
 		rules.Examples{},
-		prules.LegacyVersionPatterns(esSource.ResourceKind),
-		validateSourceSemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(esSource.ResourceKind),
+			validateSourceSemantic,
+		),
 	)
 }

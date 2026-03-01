@@ -145,7 +145,9 @@ func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"tracking plan spec syntax must be valid",
 		examples,
-		prules.LegacyVersionPatterns("tp"),
-		validateTrackingPlanSpec,
+		prules.NewVariant(
+			prules.LegacyVersionPatterns("tp"),
+			validateTrackingPlanSpec,
+		),
 	)
 }

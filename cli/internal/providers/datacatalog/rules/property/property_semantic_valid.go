@@ -163,12 +163,14 @@ func normalizeItemTypes(config map[string]any, key string) string {
 }
 
 func NewPropertySemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"datacatalog/properties/semantic-valid",
 		rules.Error,
 		"property references must resolve to existing resources",
 		rules.Examples{},
-		prules.LegacyVersionPatterns(localcatalog.KindProperties),
-		validatePropertySemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(localcatalog.KindProperties),
+			validatePropertySemantic,
+		),
 	)
 }

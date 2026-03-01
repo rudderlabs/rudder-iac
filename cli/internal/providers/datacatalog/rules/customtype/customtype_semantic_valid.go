@@ -116,12 +116,14 @@ func validateConfigItemTypes(spec localcatalog.CustomTypeSpec, graph *resources.
 }
 
 func NewCustomTypeSemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"datacatalog/custom-types/semantic-valid",
 		rules.Error,
 		"custom type references must resolve to existing resources",
 		rules.Examples{},
-		prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
-		validateCustomTypeSemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
+			validateCustomTypeSemantic,
+		),
 	)
 }

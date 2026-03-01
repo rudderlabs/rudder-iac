@@ -39,12 +39,14 @@ func validateCategoryNameUniqueness(spec localcatalog.CategorySpec, graph *resou
 }
 
 func NewCategorySemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"datacatalog/categories/semantic-valid",
 		rules.Error,
 		"category names must be unique across the catalog",
 		rules.Examples{},
-		prules.LegacyVersionPatterns(localcatalog.KindCategories),
-		validateCategorySemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(localcatalog.KindCategories),
+			validateCategorySemantic,
+		),
 	)
 }

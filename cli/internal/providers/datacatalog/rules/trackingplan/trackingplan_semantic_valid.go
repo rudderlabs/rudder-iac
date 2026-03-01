@@ -169,12 +169,14 @@ func nestingAllowed(propertyType string, config map[string]any) bool {
 }
 
 func NewTrackingPlanSemanticValidRule() rules.Rule {
-	return prules.NewSemanticTypedRule(
+	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/semantic-valid",
 		rules.Error,
 		"tracking plan references must resolve to existing resources",
 		rules.Examples{},
-		prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
-		validateTrackingPlanSemantic,
+		prules.NewSemanticVariant(
+			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
+			validateTrackingPlanSemantic,
+		),
 	)
 }
