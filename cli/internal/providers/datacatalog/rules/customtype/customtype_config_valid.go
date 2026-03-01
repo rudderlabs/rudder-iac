@@ -63,6 +63,43 @@ var configExamples = rules.Examples{
 	},
 }
 
+// customTypeObjectConfig is a local validator for a custom type of type object
+// Config is allowed, but only 'additionalProperties' is a recognised field.
+type customTypeObjectConfig struct{}
+
+const additionalPropertiesKey = "additionalProperties"
+
+var allowedCustomTypeObjectKeys = map[string]bool{
+	additionalPropertiesKey: true,
+}
+
+func (c *customTypeObjectConfig) ConfigAllowed() bool { return true }
+
+func (c *customTypeObjectConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
+	if !allowedCustomTypeObjectKeys[fieldname] {
+		return nil, config.ErrFieldNotSupported
+	}
+	switch fieldname {
+	case additionalPropertiesKey:
+		if _, ok := fieldval.(bool); !ok {
+			return []rules.ValidationResult{{
+				Reference: fieldname,
+				Message:   "'additionalProperties' must be a boolean",
+			}}, nil
+		}
+	}
+	return nil, nil
+}
+
+func (c *customTypeObjectConfig) ValidateCrossFields(_ map[string]any) []rules.ValidationResult {
+	return nil
+}
+
+// customTypeValidatorOverrides injects context-specific validators for the custom-type context.
+var customTypeValidatorOverrides = map[string]config.TypeConfigValidator{
+	"object": &customTypeObjectConfig{},
+}
+
 // Main validation function for custom type config validation
 var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CustomTypeSpec) []rules.ValidationResult {
 	var results []rules.ValidationResult
@@ -80,6 +117,7 @@ var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[st
 			[]string{customType.Type},
 			customType.Config,
 			reference,
+			customTypeValidatorOverrides,
 		)
 
 		results = append(results, configResults...)

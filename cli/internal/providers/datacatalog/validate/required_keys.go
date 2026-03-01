@@ -271,14 +271,6 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 		// Check each property in properties has id field
 		if customType.Type == "object" {
-
-			if len(customType.Config) > 0 {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("config is not allowed on custom type of type object"),
-					Reference: reference,
-				})
-			}
-
 			for i, prop := range customType.Properties {
 				if prop.Property == "" {
 					errors = append(errors, ValidationError{
@@ -313,6 +305,8 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 				errors = append(errors, rk.validateNumberConfig(customType.Config, reference, customType.Type)...)
 			case "array":
 				errors = append(errors, rk.validateArrayConfig(customType.Config, reference)...)
+			case "object":
+				errors = append(errors, rk.validateObjectConfig(customType.Config, reference)...)
 			}
 		}
 
@@ -542,6 +536,32 @@ func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, refe
 		if _, ok := uniqueItems.(bool); !ok {
 			errors = append(errors, ValidationError{
 				error:     fmt.Errorf("uniqueItems must be a boolean"),
+				Reference: reference,
+			})
+		}
+	}
+
+	return errors
+}
+
+// validateObjectConfig validates config fields for object type.
+// Only additionalProperties (boolean) is supported.
+func (rk *RequiredKeysValidator) validateObjectConfig(config map[string]any, reference string) []ValidationError {
+	var errors []ValidationError
+
+	for key := range config {
+		if key != "additionalProperties" {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("config key %q is not allowed on custom type of type object", key),
+				Reference: reference,
+			})
+		}
+	}
+
+	if additionalProperties, ok := config["additionalProperties"]; ok {
+		if _, ok := additionalProperties.(bool); !ok {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("additionalProperties must be a boolean"),
 				Reference: reference,
 			})
 		}
