@@ -7,6 +7,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
@@ -134,8 +135,8 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 	return results
 }
 
-// validateImportIDs checks that every local_id in the metadata import block
-// exists as an external ID in the spec. This ensures that imported resources
+// validateImportIDs checks that every URN/local_id in the metadata import block
+// exists as a URN in the spec. This ensures that imported resources
 // are actually defined in the spec body.
 func (r *MetadataSyntaxValidRule) validateImportIDs(ctx *rules.ValidationContext, metadata *specs.Metadata) []rules.ValidationResult {
 	if metadata.Import == nil {
@@ -152,24 +153,31 @@ func (r *MetadataSyntaxValidRule) validateImportIDs(ctx *rules.ValidationContext
 		return nil
 	}
 
-	externalIDSet := make(map[string]struct{}, len(parsed.LocalIDs))
-	for _, localID := range parsed.LocalIDs {
-		externalIDSet[localID.ID] = struct{}{}
+	urnSet := make(map[string]struct{}, len(parsed.URNs))
+	for _, entry := range parsed.URNs {
+		urnSet[entry.URN] = struct{}{}
 	}
 
 	var results []rules.ValidationResult
 	for i, workspace := range metadata.Import.Workspaces {
 		for j, resource := range workspace.Resources {
-			_, exists := externalIDSet[resource.LocalID]
+			var urn string
+			if resource.URN != "" {
+				urn = resource.URN
+			} else if resource.LocalID != "" && parsed.LegacyResourceType != "" {
+				urn = resources.URN(resource.LocalID, parsed.LegacyResourceType)
+			}
 
-			if exists {
+			if urn == "" {
 				continue
 			}
 
-			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/metadata/import/workspaces/%d/resources/%d/local_id", i, j),
-				Message:   fmt.Sprintf("local_id '%s' from import metadata not found in spec", resource.LocalID),
-			})
+			if _, exists := urnSet[urn]; !exists {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/metadata/import/workspaces/%d/resources/%d", i, j),
+					Message:   fmt.Sprintf("import metadata URN '%s' not found in spec", urn),
+				})
+			}
 		}
 	}
 

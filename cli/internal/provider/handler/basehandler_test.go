@@ -27,7 +27,7 @@ metadata:
     workspaces:
       - workspace_id: ws-123
         resources:
-          - urn: "example_writer:tolkien"
+          - urn: "example-writer:tolkien"
             remote_id: "remote-writer-tolkien"
 spec:
   id: tolkien

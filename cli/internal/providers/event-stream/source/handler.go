@@ -64,7 +64,6 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 			JSONPointerPath: "/spec/id",
 		}},
 		LegacyResourceType: ResourceType,
-		LocalIDs:           []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
 	}, nil
 }
 

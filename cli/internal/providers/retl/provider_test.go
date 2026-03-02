@@ -615,7 +615,6 @@ func TestProviderParseSpec(t *testing.T) {
 		expectedURN := resources.URN("orders-model", sqlmodel.ResourceType)
 		assert.ElementsMatch(t, []specs.URNEntry{{URN: expectedURN, JSONPointerPath: "/spec/id"}}, parsed.URNs)
 		assert.Equal(t, sqlmodel.ResourceType, parsed.LegacyResourceType)
-		assert.ElementsMatch(t, []specs.LocalID{{ID: "orders-model", JSONPointerPath: "/spec/id"}}, parsed.LocalIDs)
 	})
 }
 

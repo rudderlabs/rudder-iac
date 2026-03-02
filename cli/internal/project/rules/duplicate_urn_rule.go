@@ -23,7 +23,7 @@ func (r *duplicateURNRule) Severity() rules.Severity { return rules.Error }
 func (r *duplicateURNRule) Description() string {
 	return "URNs must be unique across the project"
 }
-func (r *duplicateURNRule) AppliesTo() []string { return []string{"*"} }
+func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern { return []rules.MatchPattern{rules.MatchAll()} }
 func (r *duplicateURNRule) Examples() rules.Examples {
 	return rules.Examples{}
 }

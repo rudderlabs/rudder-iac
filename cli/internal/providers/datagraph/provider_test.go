@@ -498,16 +498,16 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
 
-	// Should return data graph ID plus all inline model IDs and relationship IDs
-	expectedLocalIDs := []specs.LocalID{
-		{ID: "my-data-graph", JSONPointerPath: "/spec/id"},
-		{ID: "user", JSONPointerPath: "/spec/models/0/id"},
-		{ID: "order", JSONPointerPath: "/spec/models/1/id"},
-		{ID: "purchase", JSONPointerPath: "/spec/models/2/id"},
-		{ID: "user-orders", JSONPointerPath: "/spec/models/0/relationships/0/id"},
-		{ID: "purchase-user", JSONPointerPath: "/spec/models/2/relationships/0/id"},
+	// Should return data graph ID plus all inline model IDs and relationship IDs as URNs
+	expectedURNs := []specs.URNEntry{
+		{URN: resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/id"},
+		{URN: resources.URN("user", modelHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/models/0/id"},
+		{URN: resources.URN("order", modelHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/models/1/id"},
+		{URN: resources.URN("purchase", modelHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/models/2/id"},
+		{URN: resources.URN("user-orders", relationshipHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/models/0/relationships/0/id"},
+		{URN: resources.URN("purchase-user", relationshipHandler.HandlerMetadata.ResourceType), JSONPointerPath: "/spec/models/2/relationships/0/id"},
 	}
-	assert.ElementsMatch(t, expectedLocalIDs, parsed.LocalIDs)
+	assert.ElementsMatch(t, expectedURNs, parsed.URNs)
 }
 
 func TestLoadSpec_RelationshipCardinalityConstraints(t *testing.T) {

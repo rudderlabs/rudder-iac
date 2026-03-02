@@ -73,26 +73,29 @@ func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedS
 		return nil, fmt.Errorf("decoding data graph spec: %w", err)
 	}
 
-	localIDs := []specs.LocalID{{ID: dgSpec.ID, JSONPointerPath: "/spec/id"}}
+	urnEntries := []specs.URNEntry{{
+		URN:             resources.URN(dgSpec.ID, datagraph.HandlerMetadata.ResourceType),
+		JSONPointerPath: "/spec/id",
+	}}
 
 	for i, modelSpec := range dgSpec.Models {
 		if modelSpec.ID != "" {
-			localIDs = append(localIDs, specs.LocalID{
-				ID:              modelSpec.ID,
+			urnEntries = append(urnEntries, specs.URNEntry{
+				URN:             resources.URN(modelSpec.ID, model.HandlerMetadata.ResourceType),
 				JSONPointerPath: fmt.Sprintf("/spec/models/%d/id", i),
 			})
 		}
 		for j, relSpec := range modelSpec.Relationships {
 			if relSpec.ID != "" {
-				localIDs = append(localIDs, specs.LocalID{
-					ID:              relSpec.ID,
+				urnEntries = append(urnEntries, specs.URNEntry{
+					URN:             resources.URN(relSpec.ID, relationship.HandlerMetadata.ResourceType),
 					JSONPointerPath: fmt.Sprintf("/spec/models/%d/relationships/%d/id", i, j),
 				})
 			}
 		}
 	}
 
-	return &specs.ParsedSpec{LocalIDs: localIDs}, nil
+	return &specs.ParsedSpec{URNs: urnEntries}, nil
 }
 
 func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {
