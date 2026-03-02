@@ -1,4 +1,4 @@
-version: rudder/v0.1
+version: rudder/v1
 kind: transformation
 metadata:
   name: test_transformations

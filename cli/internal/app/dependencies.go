@@ -98,14 +98,10 @@ func NewDeps() (Deps, error) {
 	cfg := config.GetConfig()
 
 	providerMap := map[string]provider.Provider{
-		"datacatalog": p.DataCatalog,
-		"retl":        p.RETL,
-		"eventstream": p.EventStream,
-	}
-
-	// Only attach transformations provider to composite provider when experimental flag is enabled
-	if cfg.ExperimentalFlags.Transformations {
-		providerMap["transformations"] = p.Transformations
+		"datacatalog":     p.DataCatalog,
+		"retl":            p.RETL,
+		"eventstream":     p.EventStream,
+		"transformations": p.Transformations,
 	}
 
 	if cfg.ExperimentalFlags.DataGraph {
