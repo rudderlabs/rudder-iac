@@ -8,27 +8,27 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// Variant encapsulates a typed validation handler for specific (Kind, Version)
-// match patterns. Each variant owns its own spec type through a closure created
-// by the generic constructors NewVariant or NewSemanticVariant.
-type Variant struct {
+// PatternValidator encapsulates a typed validation handler for specific (Kind, Version)
+// match patterns. Each validator owns its own spec type through a closure created
+// by the generic constructors NewPatternValidator or NewSemanticPatternValidator.
+type PatternValidator struct {
 	patterns []rules.MatchPattern
 	validate func(ctx *rules.ValidationContext) []rules.ValidationResult
 }
 
-// Patterns returns the match patterns this variant handles.
-func (v Variant) Patterns() []rules.MatchPattern {
+// Patterns returns the match patterns this validator handles.
+func (v PatternValidator) Patterns() []rules.MatchPattern {
 	return v.patterns
 }
 
-// NewVariant creates a syntactic validation variant (no graph access).
+// NewPatternValidator creates a syntactic validation handler (no graph access).
 // The generic type T determines the spec struct the raw map[string]any is
 // unmarshaled into before being passed to fn.
-func NewVariant[T any](
+func NewPatternValidator[T any](
 	patterns []rules.MatchPattern,
 	fn func(Kind string, Version string, Metadata map[string]any, Spec T) []rules.ValidationResult,
-) Variant {
-	return Variant{
+) PatternValidator {
+	return PatternValidator{
 		patterns: patterns,
 		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 			spec, err := unmarshalSpec[T](ctx.Spec)
@@ -43,14 +43,14 @@ func NewVariant[T any](
 	}
 }
 
-// NewSemanticVariant creates a semantic validation variant (with graph access).
+// NewSemanticPatternValidator creates a semantic validation handler (with graph access).
 // The generic type T determines the spec struct the raw map[string]any is
 // unmarshaled into before being passed to fn along with the resource graph.
-func NewSemanticVariant[T any](
+func NewSemanticPatternValidator[T any](
 	patterns []rules.MatchPattern,
 	fn func(Kind string, Version string, Metadata map[string]any, Spec T, Graph *resources.Graph) []rules.ValidationResult,
-) Variant {
-	return Variant{
+) PatternValidator {
+	return PatternValidator{
 		patterns: patterns,
 		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
 			spec, err := unmarshalSpec[T](ctx.Spec)

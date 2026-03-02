@@ -115,8 +115,8 @@ func NewPropertyConfigValidRule() rules.Rule {
 		rules.Error,
 		propConfigRuleDescription,
 		propConfigExamples,
-		prules.NewVariant(
-			prules.LegacyVersionPatterns("properties"),
+		prules.NewPatternValidator(
+			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertyConfig,
 		),
 	)

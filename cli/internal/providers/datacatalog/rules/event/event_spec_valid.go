@@ -86,8 +86,8 @@ func NewEventSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"event spec syntax must be valid",
 		examples,
-		prules.NewVariant(
-			prules.LegacyVersionPatterns("events"),
+		prules.NewPatternValidator(
+			prules.LegacyVersionPatterns(localcatalog.KindEvents),
 			validateEventSpec,
 		),
 	)

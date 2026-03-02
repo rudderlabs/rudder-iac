@@ -168,7 +168,7 @@ func NewPropertySemanticValidRule() rules.Rule {
 		rules.Error,
 		"property references must resolve to existing resources",
 		rules.Examples{},
-		prules.NewSemanticVariant(
+		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertySemantic,
 		),

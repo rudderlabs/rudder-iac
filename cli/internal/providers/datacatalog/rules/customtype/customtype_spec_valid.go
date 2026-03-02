@@ -90,8 +90,8 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"custom type spec syntax must be valid",
 		examples,
-		prules.NewVariant(
-			prules.LegacyVersionPatterns("custom-types"),
+		prules.NewPatternValidator(
+			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeSpec,
 		),
 	)

@@ -51,7 +51,7 @@ func TestTypedRule_Metadata(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		expectedExamples,
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKind("testKind")},
 			func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 				return nil
@@ -81,7 +81,7 @@ func TestTypedRule_Validate(t *testing.T) {
 			rules.Error,
 			"test rule description",
 			rules.Examples{},
-			NewVariant(
+			NewPatternValidator(
 				[]rules.MatchPattern{rules.MatchAll()},
 				func(kind string, version string, metadata map[string]any, spec testSpec) []rules.ValidationResult {
 					capturedKind = kind
@@ -146,7 +146,7 @@ func TestTypedRule_Validate_ReferencePrefixing(t *testing.T) {
 				rules.Error,
 				"Test rule",
 				rules.Examples{},
-				NewVariant(
+				NewPatternValidator(
 					[]rules.MatchPattern{rules.MatchAll()},
 					func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 						results := make([]rules.ValidationResult, len(tt.validateFuncRefs))
@@ -179,7 +179,7 @@ func TestTypedRule_Validate_MarshalError(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 				return nil
@@ -207,7 +207,7 @@ func TestTypedRule_Validate_UnmarshalError(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, _ strictTestSpec) []rules.ValidationResult {
 				return nil
@@ -240,7 +240,7 @@ func TestTypedRule_Validate_ParameterPassing(t *testing.T) {
 		rules.Error,
 		"test rule description",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(kind string, version string, metadata map[string]any, spec testSpec) []rules.ValidationResult {
 				receivedKind = kind
@@ -287,7 +287,7 @@ func TestSemanticVariant_PassesGraphToFunc(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewSemanticVariant(
+		NewSemanticPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, spec testSpec, g *resources.Graph) []rules.ValidationResult {
 				capturedSpec = spec
@@ -321,7 +321,7 @@ func TestSemanticVariant_ReferencePrefixing(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewSemanticVariant(
+		NewSemanticPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, _ testSpec, _ *resources.Graph) []rules.ValidationResult {
 				return []rules.ValidationResult{
@@ -355,7 +355,7 @@ func TestSemanticVariant_MarshalError(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewSemanticVariant(
+		NewSemanticPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, _ testSpec, _ *resources.Graph) []rules.ValidationResult {
 				return nil
@@ -386,13 +386,13 @@ func TestMultiVariant_DispatchesToMatchingVariant(t *testing.T) {
 		rules.Error,
 		"multi variant dispatch",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("props", "v1")},
 			func(_ string, _ string, _ map[string]any, spec testSpec) []rules.ValidationResult {
 				return []rules.ValidationResult{{Reference: "/field1", Message: "v1: " + spec.Field1}}
 			},
 		),
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("props", "v2")},
 			func(_ string, _ string, _ map[string]any, spec altSpec) []rules.ValidationResult {
 				return []rules.ValidationResult{{Reference: "/name", Message: "v2: " + spec.Name}}
@@ -452,13 +452,13 @@ func TestMultiVariant_AppliesToReturnsUnionOfPatterns(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("events", "v1")},
 			func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 				return nil
 			},
 		),
-		NewSemanticVariant(
+		NewSemanticPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("events", "v2")},
 			func(_ string, _ string, _ map[string]any, _ altSpec, _ *resources.Graph) []rules.ValidationResult {
 				return nil
@@ -481,13 +481,13 @@ func TestMultiVariant_FirstMatchWins(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKind("events")},
 			func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 				return []rules.ValidationResult{{Reference: "/first", Message: "first variant"}}
 			},
 		),
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchAll()},
 			func(_ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
 				return []rules.ValidationResult{{Reference: "/second", Message: "second variant"}}
@@ -519,13 +519,13 @@ func TestMultiVariant_MixedSyntacticAndSemantic(t *testing.T) {
 		rules.Error,
 		"test",
 		rules.Examples{},
-		NewVariant(
+		NewPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("props", "v1")},
 			func(_ string, _ string, _ map[string]any, spec testSpec) []rules.ValidationResult {
 				return []rules.ValidationResult{{Reference: "/field1", Message: "syntactic: " + spec.Field1}}
 			},
 		),
-		NewSemanticVariant(
+		NewSemanticPatternValidator(
 			[]rules.MatchPattern{rules.MatchKindVersion("props", "v2")},
 			func(_ string, _ string, _ map[string]any, spec altSpec, g *resources.Graph) []rules.ValidationResult {
 				if g == nil {
