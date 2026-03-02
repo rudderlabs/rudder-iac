@@ -370,7 +370,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 					WorkspaceID: source.WorkspaceID,
 					Resources: []specs.ImportIds{
 						{
-							LocalID:  args.LocalID,
+							URN:      resources.URN(args.LocalID, ResourceType),
 							RemoteID: args.RemoteID,
 						},
 					},

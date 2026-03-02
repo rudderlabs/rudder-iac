@@ -1425,7 +1425,7 @@ func TestSQLModelHandler(t *testing.T) {
 									"resources": []any{
 										map[string]any{
 											"remote_id": "remote-id",
-											"local_id":  "local-id",
+											"urn":       "retl-source-sql-model:local-id",
 										},
 									},
 								},
