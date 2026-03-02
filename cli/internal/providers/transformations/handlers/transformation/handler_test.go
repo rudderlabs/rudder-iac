@@ -255,6 +255,36 @@ func TestValidateSpec(t *testing.T) {
 			expectedError: true,
 			errorContains: "either code or file must be specified",
 		},
+		{
+			name: "valid spec with tests containing names",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: "Suite 2"},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple tests with one missing name",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: ""},
+					{Name: "Suite 3"},
+				},
+			},
+			expectedError: true,
+			errorContains: "name is required for each spec tests block",
+		},
 	}
 
 	for _, tc := range testCases {
