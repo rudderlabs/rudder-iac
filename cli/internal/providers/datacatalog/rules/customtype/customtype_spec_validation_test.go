@@ -3,6 +3,7 @@ package customtype
 import (
 	"testing"
 
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
@@ -36,7 +37,7 @@ func TestNewCustomTypeSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/custom-types/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "custom type spec syntax must be valid", rule.Description())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("custom-types")}, rule.AppliesTo())
+	assert.Equal(t, prules.LegacyVersionPatterns("custom-types"), rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
