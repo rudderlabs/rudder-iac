@@ -31,6 +31,20 @@ func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
 	return parseSpecWithIDs()(path, spec)
 }
 
+// parseSpecNewProvider returns a ParseSpecFunc for a new-style provider (no LegacyResourceType).
+func parseSpecNewProvider(ids ...string) ParseSpecFunc {
+	return func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
+		urnEntries := make([]specs.URNEntry, len(ids))
+		for i, id := range ids {
+			urnEntries[i] = specs.URNEntry{URN: "new-provider-type:" + id, JSONPointerPath: "/spec/id"}
+		}
+		return &specs.ParsedSpec{
+			URNs:               urnEntries,
+			LegacyResourceType: "",
+		}, nil
+	}
+}
+
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +240,31 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedErrors: 0,
 			expectedRefs:   []string{},
 			expectedMsgs:   []string{},
+		},
+		{
+			name:      "local_id on new provider (no LegacyResourceType) returns explicit diagnostic",
+			parseSpec: parseSpecNewProvider("some-id"),
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "some-id",
+										"remote_id": "remote-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
+			expectedMsgs:   []string{"'local_id' is not supported for this spec kind; use 'urn' instead"},
 		},
 	}
 

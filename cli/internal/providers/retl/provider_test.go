@@ -426,7 +426,7 @@ func TestProvider(t *testing.T) {
 									"workspace_id": "test-workspace-id",
 									"resources": []any{
 										map[string]any{
-											"local_id":  "local-id",
+											"urn":       "retl-source-sql-model:local-id",
 											"remote_id": "remote-id",
 										},
 									},

@@ -164,7 +164,14 @@ func (r *MetadataSyntaxValidRule) validateImportIDs(ctx *rules.ValidationContext
 			var urn string
 			if resource.URN != "" {
 				urn = resource.URN
-			} else if resource.LocalID != "" && parsed.LegacyResourceType != "" {
+			} else if resource.LocalID != "" {
+				if parsed.LegacyResourceType == "" {
+					results = append(results, rules.ValidationResult{
+						Reference: fmt.Sprintf("/metadata/import/workspaces/%d/resources/%d/local_id", i, j),
+						Message:   "'local_id' is not supported for this spec kind; use 'urn' instead",
+					})
+					continue
+				}
 				urn = resources.URN(resource.LocalID, parsed.LegacyResourceType)
 			}
 
