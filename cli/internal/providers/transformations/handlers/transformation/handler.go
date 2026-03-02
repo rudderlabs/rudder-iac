@@ -80,7 +80,6 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 	if spec.Language == "" {
 		return fmt.Errorf("language is required")
 	}
-
 	for _, test := range spec.Tests {
 		if test.Name == "" {
 			return fmt.Errorf("name is required for each spec tests block")
