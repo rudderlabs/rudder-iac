@@ -189,7 +189,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 func (h *BaseHandler[Spec, Res, State, Remote]) Validate(graph *resources.Graph) error {
 	for _, source := range h.resources {
 		if err := h.Impl.ValidateResource(source, graph); err != nil {
-			return fmt.Errorf("validating event stream source spec: %w", err)
+			return fmt.Errorf("validating %s resource: %w", h.metadata.ResourceType, err)
 		}
 	}
 	return nil
