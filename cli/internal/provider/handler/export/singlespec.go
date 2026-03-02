@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type SingleSpecExportHandler[Spec any, Remote handler.RemoteResource] interface {
@@ -28,16 +29,15 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 	workspaceID := ""
 	for localID, remote := range remotes {
 		remoteMetadata := (*remote).Metadata()
+		if workspaceID != "" && workspaceID != remoteMetadata.WorkspaceID {
+			return nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
+		}
 		if workspaceID == "" {
 			workspaceID = remoteMetadata.WorkspaceID
-		} else {
-			if workspaceID != remoteMetadata.WorkspaceID {
-				return nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
-			}
 		}
 
 		importResources = append(importResources, specs.ImportIds{
-			LocalID:  localID,
+			URN:      resources.URN(localID, s.Handler.Metadata().ResourceType),
 			RemoteID: remoteMetadata.ID,
 		})
 	}
