@@ -10,7 +10,6 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 var (
@@ -22,7 +21,6 @@ var (
 func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	if len(transformation.Tests) == 0 {
 		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
-		ui.Printf("\n%s: %s\n", transformation.ID, ui.GreyedOut(NoTestsDefined))
 		return defaultTestDefinitions()
 	}
 
@@ -38,7 +36,6 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 
 	if len(allTestDefs) == 0 {
 		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
-		ui.Printf("\n%s: %s\n", transformation.ID, ui.GreyedOut(NoTestsDefined))
 		return defaultTestDefinitions()
 	}
 

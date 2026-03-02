@@ -11,13 +11,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
-func wrapResults(result *transformations.TransformationTestResult, definitions []*transformations.TestDefinition) *model.TransformationTestWithDefinitions {
-	return &model.TransformationTestWithDefinitions{
-		Result:      result,
-		Definitions: definitions,
-	}
-}
-
 func TestIndent(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -38,12 +31,6 @@ func TestIndent(t *testing.T) {
 			expected: "    test",
 		},
 		{
-			name:     "level 3",
-			input:    "test",
-			level:    3,
-			expected: "      test",
-		},
-		{
 			name:     "level 0 or invalid",
 			input:    "test",
 			level:    0,
@@ -60,47 +47,6 @@ func TestIndent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indent(tt.input, tt.level)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestCenter(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		width    int
-		expected string
-	}{
-		{
-			name:     "center short string",
-			input:    "test",
-			width:    10,
-			expected: "   test   ",
-		},
-		{
-			name:     "center with odd padding",
-			input:    "abc",
-			width:    10,
-			expected: "   abc    ",
-		},
-		{
-			name:     "string equals width",
-			input:    "test",
-			width:    4,
-			expected: "test",
-		},
-		{
-			name:     "string longer than width",
-			input:    "testing",
-			width:    4,
-			expected: "testing",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := center(tt.input, tt.width)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -147,41 +93,25 @@ func TestPrintSection(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	printSection("TEST TITLE", 10)
+	printSection("TEST TITLE")
 
 	output := buf.String()
 	assert.Contains(t, output, "TEST TITLE")
-	assert.Contains(t, output, "──────────")
+	assert.Contains(t, output, "--------")
 }
 
-func TestPrintSectionSummary(t *testing.T) {
+func TestPrintSeparator(t *testing.T) {
 	tests := []struct {
-		name     string
-		total    int
-		metrics  []string
-		expected []string
+		name string
+		char string
 	}{
 		{
-			name:    "single metric",
-			total:   10,
-			metrics: []string{"Passed  5"},
-			expected: []string{
-				"Total  10",
-				"•",
-				"Passed  5",
-			},
+			name: "dash separator",
+			char: "-",
 		},
 		{
-			name:    "multiple metrics",
-			total:   20,
-			metrics: []string{"Passed  10", "Failed  5", "Skipped  5"},
-			expected: []string{
-				"Total  20",
-				"•",
-				"Passed  10",
-				"Failed  5",
-				"Skipped  5",
-			},
+			name: "equals separator",
+			char: "=",
 		},
 	}
 
@@ -191,30 +121,14 @@ func TestPrintSectionSummary(t *testing.T) {
 			ui.SetWriter(&buf)
 			defer ui.RestoreWriter()
 
-			printSectionSummary(tt.total, tt.metrics...)
+			printSeparator(tt.char)
 			output := buf.String()
 
-			for _, exp := range tt.expected {
-				assert.Contains(t, output, exp)
-			}
+			assert.Contains(t, output, tt.char)
+			// Should be lineWidth (80) characters
+			assert.Equal(t, 81, len(output)) // 80 chars + newline
 		})
 	}
-}
-
-func TestPrintBox(t *testing.T) {
-	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.RestoreWriter()
-
-	lines := []string{"line 1", "line 2", "line 3"}
-	printBox(lines, 30)
-
-	output := buf.String()
-	assert.Contains(t, output, "┌")
-	assert.Contains(t, output, "└")
-	assert.Contains(t, output, "│ line 1")
-	assert.Contains(t, output, "│ line 2")
-	assert.Contains(t, output, "│ line 3")
 }
 
 func TestSuiteCounterTotal(t *testing.T) {
@@ -280,49 +194,18 @@ func TestFormatJSON(t *testing.T) {
 }
 
 func TestGenerateDiff(t *testing.T) {
-	expected := `[
-  {
-    "anonymousId": "sample_anonymous_id",
-    "context": {
-      "app": {
-        "name": "RudderLabs JavaScript SDK",
-        "namespace": "com.rudderlabs.javascript",
-        "version": "3.7.6"
-      },
-    },
-    "event": "Product Click",
-    "integrations": {
-      "All": true
-    },
-    "messageId": "1",
-    "type": "track",
-  }
-]`
-	actual := `[
-  {
-    "anonymousId": "sample_anonymous_id",
-    "context": {
-      "app": {
-        "installType": "npm",
-        "name": "RudderLabs JavaScript SDK",
-        "namespace": "com.rudderlabs.javascript",
-        "version": "3.7.6"
-      },
-    },
-    "event": "Product Click",
-    "integrations": {
-      "All": true
-    },
-    "messageId": "1",
-    "type": "track",
-  }
-]`
+	expected := `{
+  "status": "success"
+}`
+	actual := `{
+  "status": "failed",
+  "error": "test"
+}`
 
-	diff := generateDiff(expected, actual)
+	diff := generateDiff(expected, actual, 0)
 	assert.NotEmpty(t, diff)
 	assert.Contains(t, diff, "Expected")
 	assert.Contains(t, diff, "Actual")
-	assert.Contains(t, diff, "installType")
 }
 
 func TestBuildExpectedOutputMap(t *testing.T) {
@@ -366,6 +249,8 @@ func TestNewResultDisplayer(t *testing.T) {
 			displayer := NewResultDisplayer(tt.verbose)
 			assert.NotNil(t, displayer)
 			assert.Equal(t, tt.verbose, displayer.verbose)
+			assert.Equal(t, 0, displayer.suiteCounter.total())
+			assert.Equal(t, 0, displayer.libraryCounter.total())
 		})
 	}
 }
@@ -375,128 +260,240 @@ func TestResultDisplayer_Display_AllPassed(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
 		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-123",
-				Name: "test-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusPass,
-					Results: []transformations.TestResult{
-						{Name: "test-case-1", Status: transformations.TestRunStatusPass},
-						{Name: "test-case-2", Status: transformations.TestRunStatusPass},
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "test-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{Name: "test-case-1", Status: transformations.TestRunStatusPass},
+							{Name: "test-case-2", Status: transformations.TestRunStatusPass},
+						},
 					},
 				},
-			}, nil),
+			},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "TRANSFORMATION TEST SUITE")
-	assert.Contains(t, output, "TEST SUITES")
+	assert.Contains(t, output, sectionTransformationTests)
 	assert.Contains(t, output, "test-transformation")
-	assert.Contains(t, output, "✓  test-case-1")
-	assert.Contains(t, output, "✓  test-case-2")
-	assert.Contains(t, output, "Total  2")
-	assert.Contains(t, output, "Passed  2")
-	assert.Contains(t, output, "Mismatch errors 0")
-	assert.Contains(t, output, "Execution errors  0")
-	assert.NotContains(t, output, "FAILURE DETAILS")
+	assert.Contains(t, output, symbolPass)
+	assert.Contains(t, output, "test-case-1")
+	assert.Contains(t, output, "test-case-2")
+	assert.Contains(t, output, testStatusPassed)
+	assert.Contains(t, output, sectionSummary)
+	assert.Contains(t, output, labelResultPassed)
 }
 
-func TestResultDisplayer_Display_WithFailures_NonVerbose(t *testing.T) {
+func TestResultDisplayer_Display_WithMismatchFailures(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	testDefinitions := []*transformations.TestDefinition{
 		{
-			Name:           "test-with-expected",
+			Name:           "test-mismatch",
 			ExpectedOutput: []any{map[string]any{"status": "success"}},
 		},
 	}
 
 	results := &model.TestResults{
 		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-456",
-				Name: "test-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusFail,
-					Results: []transformations.TestResult{
-						{Name: "test-case-1", Status: transformations.TestRunStatusPass},
-						{
-							Name:         "test-with-expected",
-							Status:       transformations.TestRunStatusFail,
-							ActualOutput: []any{map[string]any{"status": "failed"}},
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "test-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{Name: "test-pass", Status: transformations.TestRunStatusPass},
+							{
+								Name:         "test-mismatch",
+								Status:       transformations.TestRunStatusFail,
+								ActualOutput: []any{map[string]any{"status": "failed"}},
+							},
 						},
 					},
 				},
-			}, testDefinitions),
+				Definitions: testDefinitions,
+			},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "✓  test-case-1")
-	assert.Contains(t, output, "⊗  test-with-expected")
-	assert.Contains(t, output, "Total  2")
-	assert.Contains(t, output, "Passed  1")
-	assert.Contains(t, output, "Mismatch errors 1")
-	assert.Contains(t, output, "FAILURE DETAILS")
-	assert.Contains(t, output, "test-transformation  ›  test-with-expected")
-	assert.Contains(t, output, "Actual output mismatched from expected output")
-	assert.Contains(t, output, "Tip: run with --verbose to see full event diffs")
-	assert.NotContains(t, output, "success")
-	assert.NotContains(t, output, "failed")
+	assert.Contains(t, output, symbolMismatch)
+	assert.Contains(t, output, "test-mismatch")
+	assert.Contains(t, output, testStatusMismatch)
+	assert.Contains(t, output, sectionFailures)
+	assert.Contains(t, output, failureTypeOutputMismatch)
+	assert.Contains(t, output, labelResultFailed)
 }
 
-func TestResultDisplayer_Display_WithFailures_Verbose(t *testing.T) {
+func TestResultDisplayer_Display_WithExecutionErrors(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(true)
-	testDefinitions := []*transformations.TestDefinition{
-		{
-			Name:           "test-with-expected",
-			ExpectedOutput: []any{map[string]any{"status": "success"}},
-		},
-	}
-
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
 		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-verbose",
-				Name: "test-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusFail,
-					Results: []transformations.TestResult{
-						{
-							Name:         "test-with-expected",
-							Status:       transformations.TestRunStatusFail,
-							ActualOutput: []any{map[string]any{"status": "failed"}},
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "error-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{
+								Name:   "error-test",
+								Status: transformations.TestRunStatusError,
+								Errors: []transformations.TestError{
+									{
+										Message:    "Execution failed",
+										EventIndex: 0,
+									},
+								},
+							},
 						},
 					},
 				},
-			}, testDefinitions),
+			},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "FAILURE DETAILS")
-	assert.Contains(t, output, "test-transformation  ›  test-with-expected")
-	assert.Contains(t, output, "│")
-	assert.Contains(t, output, "success")
-	assert.Contains(t, output, "failed")
-	assert.NotContains(t, output, "Tip:")
+	assert.Contains(t, output, symbolError)
+	assert.Contains(t, output, "error-test")
+	assert.Contains(t, output, testStatusError)
+	assert.Contains(t, output, sectionFailures)
+	assert.Contains(t, output, failureTypeExecutionError)
+	assert.Contains(t, output, "Execution failed")
+}
+
+func TestResultDisplayer_Display_WithMultilineErrors(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(false)
+	results := &model.TestResults{
+		Transformations: []*model.TransformationTestWithDefinitions{
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "test-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{
+								Name:   "error-test",
+								Status: transformations.TestRunStatusError,
+								Errors: []transformations.TestError{
+									{
+										Message:    "Line 1 error\nLine 2 error\nLine 3 stack\nLine 4 stack",
+										EventIndex: 2,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.Contains(t, output, "Line 1 error")
+	assert.Contains(t, output, "Line 2 error")
+	// Stack trace should not be shown in non-verbose mode
+	assert.NotContains(t, output, "Line 3 stack")
+}
+
+func TestResultDisplayer_Display_WithMultilineErrors_Verbose(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(true)
+	results := &model.TestResults{
+		Transformations: []*model.TransformationTestWithDefinitions{
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "test-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{
+								Name:   "error-test",
+								Status: transformations.TestRunStatusError,
+								Errors: []transformations.TestError{
+									{
+										Message:    "Line 1 error\nLine 2 error\nLine 3 stack\nLine 4 stack",
+										EventIndex: 2,
+										Event:      map[string]any{"type": "track"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.Contains(t, output, "Line 1 error")
+	assert.Contains(t, output, "Line 2 error")
+	assert.Contains(t, output, labelFullStackTrace)
+	assert.Contains(t, output, "Line 3 stack")
+	assert.Contains(t, output, "Line 4 stack")
+	assert.Contains(t, output, "track")
+}
+
+func TestResultDisplayer_Display_WithGroupedErrors(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(false)
+	results := &model.TestResults{
+		Transformations: []*model.TransformationTestWithDefinitions{
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "test-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{
+								Name:   "error-test",
+								Status: transformations.TestRunStatusError,
+								Errors: []transformations.TestError{
+									{Message: "Same error", EventIndex: 0},
+									{Message: "Same error", EventIndex: 1},
+									{Message: "Different error", EventIndex: 2},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.Contains(t, output, "Same error")
+	assert.Contains(t, output, "Different error")
+	// Should show grouped error occurrences
+	assert.Contains(t, output, "2 times")
+	assert.Contains(t, output, "1 time")
 }
 
 func TestResultDisplayer_Display_WithImportedLibraries(t *testing.T) {
@@ -504,120 +501,59 @@ func TestResultDisplayer_Display_WithImportedLibraries(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
 		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:      "tr-789",
-				Name:    "transformation-with-libs",
-				Imports: []string{"myLib", "anotherLib"},
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusPass,
-					Results: []transformations.TestResult{
-						{Name: "test-case-1", Status: transformations.TestRunStatusPass},
+			{
+				Result: &transformations.TransformationTestResult{
+					Name:    "transformation-with-libs",
+					Imports: []string{"myLib", "anotherLib"},
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{Name: "test-1", Status: transformations.TestRunStatusPass},
+						},
 					},
 				},
-			}, nil),
+			},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
 	assert.Contains(t, output, "transformation-with-libs")
-	assert.Contains(t, output, "imported libraries")
 	assert.Contains(t, output, "myLib, anotherLib")
 }
 
-func TestResultDisplayer_Display_WithErrors(t *testing.T) {
+func TestResultDisplayer_DisplayLibraries_AllPassed(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-error",
-				Name: "error-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusError,
-					Results: []transformations.TestResult{
-						{
-							Name:   "error-test",
-							Status: transformations.TestRunStatusError,
-							Errors: []transformations.TestError{
-								{
-									Message:    "Transformation execution failed",
-									EventIndex: 0,
-								},
-							},
-						},
-					},
-				},
-			}, nil),
+		Libraries: []transformations.LibraryTestResult{
+			{HandleName: "lib-1", Pass: true},
+			{HandleName: "lib-2", Pass: true},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "✕  error-test")
-	assert.Contains(t, output, "Execution errors  1")
-	assert.Contains(t, output, "FAILURE DETAILS")
-	assert.Contains(t, output, "error-transformation  ›  error-test")
-	assert.Contains(t, output, "│")
-	assert.Contains(t, output, "Transformation execution failed")
-	assert.Contains(t, output, "errored input event can be found at index 0")
+	assert.Contains(t, output, sectionLibraryTests)
+	assert.Contains(t, output, "lib-1")
+	assert.Contains(t, output, "lib-2")
+	assert.Contains(t, output, syntaxStatusOK)
+	assert.Contains(t, output, symbolPass)
 }
 
-func TestResultDisplayer_Display_WithErrors_Verbose(t *testing.T) {
+func TestResultDisplayer_DisplayLibraries_WithFailures(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(true)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-error-verbose",
-				Name: "error-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusError,
-					Results: []transformations.TestResult{
-						{
-							Name:   "error-test",
-							Status: transformations.TestRunStatusError,
-							Errors: []transformations.TestError{
-								{
-									Message:    "Transformation execution failed",
-									EventIndex: 0,
-									Event:      map[string]any{"type": "track", "event": "Error Event"},
-								},
-							},
-						},
-					},
-				},
-			}, nil),
-		},
-	}
-
-	formatter.Display(results)
-
-	output := buf.String()
-	assert.Contains(t, output, "FAILURE DETAILS")
-	assert.Contains(t, output, "Transformation execution failed")
-	assert.Contains(t, output, "errored input event can be found at index 0")
-	assert.Contains(t, output, "track")
-	assert.Contains(t, output, "Error Event")
-}
-
-func TestResultDisplayer_Display_WithLibraries(t *testing.T) {
-	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.RestoreWriter()
-
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-pass", Pass: true},
@@ -625,18 +561,36 @@ func TestResultDisplayer_Display_WithLibraries(t *testing.T) {
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "LIBRARIES")
+	assert.Contains(t, output, sectionLibraryTests)
 	assert.Contains(t, output, "lib-pass")
-	assert.Contains(t, output, "syntax ok")
 	assert.Contains(t, output, "lib-fail")
-	assert.Contains(t, output, "syntax error")
+	assert.Contains(t, output, syntaxStatusError)
 	assert.Contains(t, output, "Syntax error on line 5")
-	assert.Contains(t, output, "Total  2")
-	assert.Contains(t, output, "Passed  1")
-	assert.Contains(t, output, "Errored  1")
+	assert.Contains(t, output, symbolError)
+}
+
+func TestResultDisplayer_DisplayLibraries_WithMultilineError_Verbose(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(true)
+	results := &model.TestResults{
+		Libraries: []transformations.LibraryTestResult{
+			{HandleName: "lib-fail", Pass: false, Message: "Error line 1\nStack line 2\nStack line 3"},
+		},
+	}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.Contains(t, output, "Error line 1")
+	assert.Contains(t, output, labelFullStackTrace)
+	assert.Contains(t, output, "Stack line 2")
+	assert.Contains(t, output, "Stack line 3")
 }
 
 func TestResultDisplayer_Display_EmptyResults(t *testing.T) {
@@ -644,16 +598,15 @@ func TestResultDisplayer_Display_EmptyResults(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "TRANSFORMATION TEST SUITE")
-	assert.Contains(t, output, "SUMMARY")
-	assert.NotContains(t, output, "LIBRARIES")
-	assert.NotContains(t, output, "TEST SUITES")
+	assert.Contains(t, output, sectionSummary)
+	assert.NotContains(t, output, sectionLibraryTests)
+	assert.NotContains(t, output, sectionTransformationTests)
 }
 
 func TestResultDisplayer_Display_MixedResults(t *testing.T) {
@@ -661,119 +614,76 @@ func TestResultDisplayer_Display_MixedResults(t *testing.T) {
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-1", Pass: true},
-			{HandleName: "lib-2", Pass: false, Message: "error"},
 		},
 		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-1",
-				Name: "transformation-1",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusPass,
-					Results: []transformations.TestResult{
-						{Name: "test-1", Status: transformations.TestRunStatusPass},
-					},
-				},
-			}, nil),
-		},
-	}
-
-	formatter.Display(results)
-
-	output := buf.String()
-	assert.Contains(t, output, "LIBRARIES")
-	assert.Contains(t, output, "TEST SUITES")
-	assert.Contains(t, output, "SUMMARY")
-	assert.Contains(t, output, "Libraries")
-	assert.Contains(t, output, "Suites")
-}
-
-func TestResultDisplayer_Display_MultilineErrorMessage(t *testing.T) {
-	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.RestoreWriter()
-
-	formatter := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-multiline",
-				Name: "test-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusError,
-					Results: []transformations.TestResult{
-						{
-							Name:   "error-test",
-							Status: transformations.TestRunStatusError,
-							Errors: []transformations.TestError{
-								{
-									Message:    "Line 1 error\nLine 2 error\nLine 3 error",
-									EventIndex: 2,
-								},
-							},
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "transformation-1",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{Name: "test-1", Status: transformations.TestRunStatusPass},
 						},
 					},
 				},
-			}, nil),
+			},
 		},
 	}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "Line 1 error")
-	assert.Contains(t, output, "Line 2 error")
-	assert.Contains(t, output, "Line 3 error")
-	assert.Contains(t, output, "errored input event can be found at index 2")
+	assert.Contains(t, output, sectionLibraryTests)
+	assert.Contains(t, output, sectionTransformationTests)
+	assert.Contains(t, output, sectionSummary)
 }
 
-func TestResultDisplayer_Display_NoExpectedOutputInVerboseMode(t *testing.T) {
+func TestResultDisplayer_VerboseTipShownWhenNonVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	ui.SetWriter(&buf)
 	defer ui.RestoreWriter()
 
-	formatter := NewResultDisplayer(true)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
-			wrapResults(&transformations.TransformationTestResult{
-				ID:   "tr-no-expected",
-				Name: "test-transformation",
-				TestSuiteResult: transformations.TestSuiteRunResult{
-					Status: transformations.TestRunStatusFail,
-					Results: []transformations.TestResult{
-						{
-							Name:         "test-no-expected",
-							Status:       transformations.TestRunStatusFail,
-							ActualOutput: []any{map[string]any{"status": "failed"}},
-						},
-					},
-				},
-			}, nil),
-		},
-	}
-
-	formatter.Display(results)
-
-	output := buf.String()
-	assert.Contains(t, output, "Actual output mismatched from expected output")
-	assert.NotContains(t, output, "failed")
-}
-
-func TestResultDisplayer_PrintSummary_NoResults(t *testing.T) {
-	var buf bytes.Buffer
-	ui.SetWriter(&buf)
-	defer ui.RestoreWriter()
-
-	formatter := NewResultDisplayer(false)
+	displayer := NewResultDisplayer(false)
 	results := &model.TestResults{}
 
-	formatter.Display(results)
+	displayer.Display(results)
 
 	output := buf.String()
-	assert.Contains(t, output, "SUMMARY")
-	assert.NotContains(t, output, "Libraries")
-	assert.NotContains(t, output, "Suites")
+	assert.Contains(t, output, labelVerboseTip)
+}
+
+func TestResultDisplayer_VerboseTipNotShownWhenVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(true)
+	results := &model.TestResults{}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.NotContains(t, output, labelVerboseTip)
+}
+
+func TestGroupErrorsByMessage(t *testing.T) {
+	errors := []transformations.TestError{
+		{Message: "Error A", EventIndex: 0, Event: "event0"},
+		{Message: "Error A", EventIndex: 1, Event: "event1"},
+		{Message: "Error B", EventIndex: 2, Event: "event2"},
+		{Message: "Error A", EventIndex: 3, Event: "event3"},
+	}
+
+	groups, order := groupErrorsByMessage(errors)
+
+	assert.Len(t, groups, 2)
+	assert.Len(t, order, 2)
+	assert.Equal(t, "Error A", order[0])
+	assert.Equal(t, "Error B", order[1])
+	assert.Equal(t, []int{0, 1, 3}, groups["Error A"].indices)
+	assert.Equal(t, []int{2}, groups["Error B"].indices)
+	assert.Equal(t, "event0", groups["Error A"].event)
 }

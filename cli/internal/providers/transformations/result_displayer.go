@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/samber/lo"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
@@ -13,21 +14,49 @@ import (
 )
 
 const (
-	indentLevel1   = "  "
-	indentLevel2   = "    "
-	indentLevel3   = "      "
-	separatorLine  = "------------------------------------------------------------"
-	detailBoxWidth = 60
-	headerBoxWidth = 78
-	lineWidth      = 80
+	// Display formatting
+	indentLevel1 = "  "
+	indentLevel2 = "    "
+	lineWidth    = 80
+	statusColumn = 70
+
+	// Section titles
+	sectionLibraryTests        = "LIBRARY TESTS"
+	sectionTransformationTests = "TRANSFORMATION TESTS"
+	sectionFailures            = "FAILURES"
+	sectionSummary             = "SUMMARY"
+
+	// Failure types
+	failureTypeExecutionError = "EXECUTION ERROR"
+	failureTypeOutputMismatch = "OUTPUT MISMATCH"
+
+	// Status labels
+	syntaxStatusOK     = "syntax ok"
+	syntaxStatusError  = "syntax error"
+	testStatusPassed   = "passed"
+	testStatusMismatch = "output mismatch"
+	testStatusError    = "execution error"
+
+	// Message labels
+	labelFullStackTrace  = "Full stack trace:"
+	labelImportedLibs    = "imported libraries: %s"
+	labelInputEvent      = "Input event at index %d:"
+	labelErrorOccurred1  = "This error occurred 1 time (input index: %d)"
+	labelErrorOccurredN  = "This error occurred %d times (input indices: %s)"
+	labelResultFailed    = "Result: FAILED (exit code 1)"
+	labelResultPassed    = "Result: PASSED"
+	labelLegend          = "Legend: %s passed  %s execution error  %s output mismatch"
+	labelVerboseTip      = "Tip: Run with --verbose for full diffs and input payloads"
+	labelSuiteField      = "Suite:       %s"
+	labelTestField       = "Test:        %s"
+	labelErrorField      = "Error: %s"
+	labelLibrarySummary  = "Libraries: %d passed, %d errored"
+	labelTestCaseSummary = "Test cases: %d passed, %d errored, %d mismatched"
 
 	// Symbols
 	symbolPass     = "✓"
 	symbolMismatch = "⊗"
 	symbolError    = "✕"
-	symbolSuite    = "♦"
-	symbolTreeNode = "└"
-	symbolBullet   = "•"
 )
 
 type (
@@ -42,8 +71,6 @@ func indent(s string, level int) string {
 		return indentLevel1 + s
 	case 2:
 		return indentLevel2 + s
-	case 3:
-		return indentLevel3 + s
 	default:
 		return s
 	}
@@ -59,39 +86,31 @@ func printIndentedLine(msg string, level int, newLine bool) {
 	ui.Printf("%s", formatted)
 }
 
-func center(s string, width int) string {
-	if len(s) >= width {
-		return s
+func printWithPadding(leftText, rightText string, rightTextStart int) {
+	padding := rightTextStart - len(leftText)
+	if padding < 1 {
+		padding = 1
 	}
-	padding := width - len(s)
-	leftPad := padding / 2
-	rightPad := padding - leftPad
-	return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
+	ui.Printf("%s%s%s\n", leftText, strings.Repeat(" ", padding), rightText)
 }
 
-func printSection(title string, underlineLen int) {
+func printSection(title string) {
 	ui.Println(ui.Bold(title))
-	ui.Println(strings.Repeat("─", underlineLen))
+	ui.Println(strings.Repeat("-", lineWidth))
 	ui.Println()
 }
 
-func printSectionSummary(total int, metrics ...string) {
-	parts := make([]string, 0, len(metrics)+1)
-	parts = append(parts, fmt.Sprintf("Total  %d", total))
-	parts = append(parts, metrics...)
-
-	ui.Println()
-	ui.Println(strings.Join(parts, "  "+symbolBullet+"  "))
-	ui.Println(separatorLine)
-	ui.Println()
+func printSeparator(char string) {
+	ui.Println(strings.Repeat(char, lineWidth))
 }
 
-func printBox(lines []string, width int) {
-	ui.Println("┌" + strings.Repeat("─", width))
+func printFullStackTrace(lines []string, indent int) {
+	ui.Println()
+	printIndentedLine(labelFullStackTrace, indent, true)
+
 	for _, line := range lines {
-		ui.Printf("│ %s\n", line)
+		printIndentedLine(line, indent, true)
 	}
-	ui.Println("└" + strings.Repeat("─", width))
 }
 
 type failureDetail struct {
@@ -137,19 +156,31 @@ func NewResultDisplayer(verbose bool) *ResultDisplayer {
 
 // Display formats and displays test results
 func (rd *ResultDisplayer) Display(results *TestResults) {
-	rd.printHeader()
+	rd.displayDefaultTestSuiteWarning(results)
 
+	rd.printHeader()
 	rd.displayLibraries(results.Libraries)
 	rd.displayTransformations(results.Transformations)
-
 	rd.printSummary()
+}
+
+func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *TestResults) {
+	names := results.DefaultSuiteTransformationNames()
+	if len(names) == 0 {
+		return
+	}
+
+	ui.Println()
+	ui.Println(ui.Color("WARNING: Default test suite used", ui.ColorYellow))
+	ui.Printf("No test suites defined for transformations: %s. Used default events to test.\n", strings.Join(names, ", "))
+	ui.Println(ui.GreyedOut("Use `rudder-cli transformations test default-events --show` to view default events."))
+	ui.Println()
 }
 
 func (rd *ResultDisplayer) printHeader() {
 	ui.Println()
-	ui.Println("┌" + strings.Repeat("─", headerBoxWidth) + "┐")
-	ui.Println("│" + ui.Bold(center("TRANSFORMATION TEST SUITE", headerBoxWidth)) + "│")
-	ui.Println("└" + strings.Repeat("─", headerBoxWidth) + "┘")
+	ui.Println(ui.Bold("Transformation Test Suite v1.0.0"))
+	printSeparator("=")
 	ui.Println()
 }
 
@@ -158,32 +189,51 @@ func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryT
 		return
 	}
 
-	printSection("LIBRARIES", 10)
+	uniqueLibs := lo.UniqBy(libraries, func(lib transformations.LibraryTestResult) string {
+		return lib.HandleName
+	})
 
-	for _, lib := range libraries {
-		if lib.Pass {
-			ui.Printf("%s  %s\n", ui.Color(symbolPass, ui.ColorGreen), lib.HandleName)
-			printIndentedLine(ui.Color(symbolPass, ui.ColorGreen)+" syntax ok", 1, true)
+	passed := lo.Filter(uniqueLibs, func(lib transformations.LibraryTestResult, _ int) bool {
+		return lib.Pass
+	})
+	failed := lo.Filter(uniqueLibs, func(lib transformations.LibraryTestResult, _ int) bool {
+		return !lib.Pass
+	})
 
-			rd.libraryCounter.passed++
-		} else {
-			ui.Printf("%s  %s\n", ui.Color(symbolError, ui.ColorRed), lib.HandleName)
-			printIndentedLine(ui.Color(symbolError, ui.ColorRed)+" syntax error", 1, true)
-			if lib.Message != "" {
-				printIndentedLine(lib.Message, 3, true)
-			}
+	printSection(sectionLibraryTests)
 
-			rd.libraryCounter.errored++
-		}
-		ui.Println()
+	for _, lib := range passed {
+		printWithPadding(
+			fmt.Sprintf("%s  %s", ui.Color(symbolPass, ui.ColorGreen), lib.HandleName),
+			syntaxStatusOK,
+			statusColumn,
+		)
+		rd.libraryCounter.passed++
 	}
 
-	total := rd.libraryCounter.total()
-	printSectionSummary(
-		total,
-		fmt.Sprintf("Passed  %d", rd.libraryCounter.passed),
-		fmt.Sprintf("Errored  %d", rd.libraryCounter.errored),
-	)
+	for _, lib := range failed {
+		printWithPadding(
+			fmt.Sprintf("%s  %s", ui.Color(symbolError, ui.ColorRed), lib.HandleName),
+			syntaxStatusError,
+			statusColumn,
+		)
+
+		// Print the first line of the error message
+		lines := strings.Split(lib.Message, "\n")
+		printIndentedLine(lines[0], 2, true)
+
+		if rd.verbose && len(lines) > 1 {
+			printFullStackTrace(lines[1:], 2)
+		}
+
+		ui.Println()
+		rd.libraryCounter.errored++
+	}
+
+	ui.Println()
+	ui.Printf(labelLibrarySummary+"\n", rd.libraryCounter.passed, rd.libraryCounter.errored)
+	printSeparator("-")
+	ui.Println()
 }
 
 func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions) {
@@ -191,63 +241,83 @@ func (rd *ResultDisplayer) displayTransformations(transformations []*Transformat
 		return
 	}
 
-	printSection("TEST SUITES", 13)
+	printSection(sectionTransformationTests)
 
 	for _, trWithDef := range transformations {
 		expectedOutputMap := buildExpectedOutputMap(trWithDef.Definitions)
 		rd.displayTransformation(trWithDef.Result, expectedOutputMap)
 	}
 
-	total := rd.suiteCounter.total()
-
-	printSectionSummary(
-		total,
-		fmt.Sprintf("Passed  %d", rd.suiteCounter.passed),
-		fmt.Sprintf("Mismatch errors %d", rd.suiteCounter.mismatched),
-		fmt.Sprintf("Execution errors  %d", rd.suiteCounter.errored),
+	ui.Printf(labelTestCaseSummary+"\n",
+		rd.suiteCounter.passed,
+		rd.suiteCounter.errored,
+		rd.suiteCounter.mismatched,
 	)
+	printSeparator("-")
+	ui.Println()
 
 	rd.printSuiteFailures()
 }
 
 func (rd *ResultDisplayer) printSummary() {
-	ui.Println(strings.Repeat("=", lineWidth))
-	ui.Println(ui.Bold("SUMMARY"))
-	ui.Println(strings.Repeat("=", lineWidth))
+	ui.Println(ui.Bold(sectionSummary))
+	printSeparator("=")
 
-	if rd.libraryCounter.passed > 0 || rd.libraryCounter.errored > 0 {
+	if rd.libraryCounter.total() > 0 {
 		ui.Printf("Libraries       %d passed       %d errored\n",
 			rd.libraryCounter.passed,
 			rd.libraryCounter.errored,
 		)
 	}
 
-	if rd.suiteCounter.passed > 0 || rd.suiteCounter.mismatched > 0 || rd.suiteCounter.errored > 0 {
-		ui.Printf("Suites          %d passed       %d errored       %d mismatched\n",
+	if rd.suiteCounter.total() > 0 {
+		ui.Printf("Test cases      %d passed       %d errored       %d mismatched\n",
 			rd.suiteCounter.passed,
 			rd.suiteCounter.errored,
 			rd.suiteCounter.mismatched,
 		)
 	}
 
-	ui.Println(strings.Repeat("─", lineWidth))
+	printSeparator("-")
+
+	hasFailures := rd.libraryCounter.errored > 0 || rd.suiteCounter.errored > 0 || rd.suiteCounter.mismatched > 0
+	if hasFailures {
+		ui.Println(ui.Color(labelResultFailed, ui.ColorRed))
+	} else {
+		ui.Println(ui.Color(labelResultPassed, ui.ColorGreen))
+	}
+
+	ui.Println()
+	ui.Printf(labelLegend+"\n",
+		ui.Color(symbolPass, ui.ColorGreen),
+		ui.Color(symbolError, ui.ColorRed),
+		ui.Color(symbolMismatch, ui.ColorYellow),
+	)
+
+	ui.Println()
+	if !rd.verbose {
+		ui.Println(labelVerboseTip)
+	}
+	printSeparator("=")
 }
 
 func (rd *ResultDisplayer) displayTransformation(
 	result *transformations.TransformationTestResult,
 	expectedOutputMap map[string][]any,
 ) {
-	ui.Printf("%s %s\n", symbolSuite, result.Name)
+	ui.Println(result.Name)
 
 	if len(result.Imports) > 0 {
 		importedLibs := strings.Join(result.Imports, ", ")
-		printIndentedLine(ui.GreyedOut(fmt.Sprintf("imported libraries: %s", importedLibs)), 1, true)
+		printIndentedLine(ui.GreyedOut(fmt.Sprintf(labelImportedLibs, importedLibs)), 1, true)
 	}
 
 	for _, testResult := range result.TestSuiteResult.Results {
 		expectedOutput := expectedOutputMap[testResult.Name]
 		rd.displayTestResult(result.Name, testResult, expectedOutput)
 	}
+
+	ui.Println()
 }
 
 func (rd *ResultDisplayer) displayTestResult(
@@ -257,11 +327,19 @@ func (rd *ResultDisplayer) displayTestResult(
 ) {
 	switch testResult.Status {
 	case transformations.TestRunStatusPass:
-		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolPass, ui.ColorGreen), testResult.Name)
+		printWithPadding(
+			fmt.Sprintf("  %s %s", ui.Color(symbolPass, ui.ColorGreen), testResult.Name),
+			testStatusPassed,
+			statusColumn,
+		)
 		rd.suiteCounter.passed++
 
 	case transformations.TestRunStatusFail:
-		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolMismatch, ui.ColorYellow), testResult.Name)
+		printWithPadding(
+			fmt.Sprintf("  %s %s", ui.Color(symbolMismatch, ui.ColorYellow), testResult.Name),
+			testStatusMismatch,
+			statusColumn,
+		)
 		rd.suiteCounter.mismatched++
 
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
@@ -274,7 +352,11 @@ func (rd *ResultDisplayer) displayTestResult(
 		})
 
 	case transformations.TestRunStatusError:
-		ui.Printf("  %s %s  %s\n", symbolTreeNode, ui.Color(symbolError, ui.ColorRed), testResult.Name)
+		printWithPadding(
+			fmt.Sprintf("  %s %s", ui.Color(symbolError, ui.ColorRed), testResult.Name),
+			testStatusError,
+			statusColumn,
+		)
 		rd.suiteCounter.errored++
 
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
@@ -291,29 +373,26 @@ func (rd *ResultDisplayer) printSuiteFailures() {
 		return
 	}
 
-	printSection("FAILURE DETAILS", 15)
+	printSection(sectionFailures)
 
-	for _, failure := range rd.suiteCounter.failures {
-		rd.printFailureDetail(failure)
+	for i, failure := range rd.suiteCounter.failures {
+		rd.printFailureDetail(failure, i+1)
 	}
-
-	if !rd.verbose {
-		ui.Printf("%s", ui.GreyedOut("\nTip: run with --verbose to see full event diffs\n"))
-	}
-	ui.Println()
 }
 
-func (rd *ResultDisplayer) printFailureDetail(detail failureDetail) {
-	symbol := symbolMismatch
+func (rd *ResultDisplayer) printFailureDetail(detail failureDetail, failureNum int) {
+	var failureType string
 	if detail.status == transformations.TestRunStatusError {
-		symbol = symbolError
+		failureType = failureTypeExecutionError
+	} else {
+		failureType = failureTypeOutputMismatch
 	}
 
-	ui.Printf("%s  %s  ›  %s\n",
-		ui.Color(symbol, ui.ColorRed),
-		detail.transformationName,
-		detail.testName,
-	)
+	ui.Printf("[%d/%d]  %s\n", failureNum, len(rd.suiteCounter.failures), failureType)
+	printSeparator("-")
+
+	ui.Printf(labelSuiteField+"\n", detail.transformationName)
+	ui.Printf(labelTestField+"\n", detail.testName)
 
 	if detail.status == transformations.TestRunStatusError {
 		rd.printErrorDetail(detail)
@@ -321,53 +400,94 @@ func (rd *ResultDisplayer) printFailureDetail(detail failureDetail) {
 		rd.printMismatchedOutput(detail)
 	}
 
-	ui.Println()
+	printSeparator("=")
+}
+
+type errorGroup struct {
+	message    string
+	indices    []int
+	event      any
+	eventIndex int
 }
 
 func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
-	var lines []string
-	for i, err := range detail.errors {
-		messageLines := strings.SplitSeq(err.Message, "\n")
-		for line := range messageLines {
-			lines = append(lines, line)
-		}
-		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("errored input event can be found at index %d in input file", err.EventIndex))
+	errorGroups, groupOrder := groupErrorsByMessage(detail.errors)
 
-		if rd.verbose && err.Event != nil {
-			eventJSON := formatJSON(err.Event)
-			eventLines := strings.SplitSeq(eventJSON, "\n")
-			for line := range eventLines {
-				lines = append(lines, line)
-			}
+	for groupIdx, msgKey := range groupOrder {
+		group := errorGroups[msgKey]
+		lines := strings.Split(group.message, "\n")
+
+		ui.Println()
+		ui.Printf(labelErrorField+"\n", lines[0])
+		if len(lines) > 1 {
+			ui.Println(lines[1])
 		}
 
-		if i < len(detail.errors)-1 {
-			lines = append(lines, center(strings.Repeat("─", 10), detailBoxWidth))
+		if rd.verbose && len(lines) > 2 {
+			printFullStackTrace(lines[2:], 0)
+		}
+
+		ui.Println()
+		if len(group.indices) == 1 {
+			ui.Printf(labelErrorOccurred1+"\n", group.indices[0])
+		} else {
+			indicesStr := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(group.indices)), ", "), "[]")
+			ui.Printf(labelErrorOccurredN+"\n", len(group.indices), indicesStr)
+		}
+
+		if rd.verbose && group.event != nil {
+			ui.Println()
+			ui.Printf(labelInputEvent+"\n", group.eventIndex)
+			ui.Println(formatJSON(group.event))
+		}
+
+		if groupIdx < len(groupOrder)-1 {
+			ui.Println()
+			printSeparator("=")
 		}
 	}
+}
 
-	printBox(lines, detailBoxWidth)
+func groupErrorsByMessage(errors []transformations.TestError) (map[string]*errorGroup, []string) {
+	errorGroups := make(map[string]*errorGroup)
+	var groupOrder []string
+
+	for _, err := range errors {
+		if _, exists := errorGroups[err.Message]; !exists {
+			errorGroups[err.Message] = &errorGroup{
+				message:    err.Message,
+				indices:    []int{},
+				event:      err.Event,
+				eventIndex: err.EventIndex,
+			}
+			groupOrder = append(groupOrder, err.Message)
+		}
+		errorGroups[err.Message].indices = append(errorGroups[err.Message].indices, err.EventIndex)
+	}
+
+	return errorGroups, groupOrder
 }
 
 func (rd *ResultDisplayer) printMismatchedOutput(detail failureDetail) {
-	var lines []string
-	if !rd.verbose || len(detail.expectedOutput) == 0 {
-		lines = append(lines, "Actual output mismatched from expected output")
-	} else {
-		diff := generateDiff(
-			formatJSON(detail.expectedOutput),
-			formatJSON(detail.actualOutput),
-		)
-		if diff != "" {
-			diffLines := strings.SplitSeq(diff, "\n")
-			for line := range diffLines {
-				lines = append(lines, line)
-			}
-		}
+	if len(detail.expectedOutput) == 0 {
+		ui.Println()
+		ui.Println("Actual output mismatched from expected output")
+		return
 	}
 
-	printBox(lines, detailBoxWidth)
+	contextLines := 0
+	if rd.verbose {
+		contextLines = 3
+	}
+
+	diff := generateDiff(
+		formatJSON(detail.expectedOutput),
+		formatJSON(detail.actualOutput),
+		contextLines,
+	)
+
+	ui.Println()
+	ui.Println(diff)
 }
 
 func formatJSON(v any) string {
@@ -382,7 +502,7 @@ func formatJSON(v any) string {
 	return string(jsonBytes)
 }
 
-func generateDiff(expected, actual string) string {
+func generateDiff(expected, actual string, contextLines int) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 
@@ -399,7 +519,7 @@ func generateDiff(expected, actual string) string {
 		B:        actualLines,
 		FromFile: "Expected",
 		ToFile:   "Actual",
-		Context:  3,
+		Context:  contextLines,
 	}
 
 	result, err := difflib.GetUnifiedDiffString(diff)
