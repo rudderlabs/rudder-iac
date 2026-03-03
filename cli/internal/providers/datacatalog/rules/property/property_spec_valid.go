@@ -2,13 +2,16 @@ package property
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
@@ -99,6 +102,80 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 	return results
 }
 
+var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{{
+			Reference: "/properties",
+			Message:   err.Error(),
+		}}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
+
+	for i, property := range spec.Properties {
+		if strings.TrimSpace(property.Name) != property.Name {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/name", i),
+				Message:   "'name' must not have leading or trailing whitespace",
+			})
+		}
+
+		if hasDuplicateValues(property.Types) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/types", i),
+				Message:   "'types' must not contain duplicate values",
+			})
+		}
+
+		if property.Type != "" && !isValidV1TypeOrCustomTypeRef(property.Type) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/type", i),
+				Message: fmt.Sprintf("'%s' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
+					property.Type,
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+
+		if property.ItemType != "" && !isValidV1TypeOrCustomTypeRef(property.ItemType) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/item_type", i),
+				Message: fmt.Sprintf("'%s' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
+					property.ItemType,
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+	}
+
+	return results
+}
+
+func hasDuplicateValues(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if _, found := seen[value]; found {
+			return true
+		}
+		seen[value] = struct{}{}
+	}
+	return false
+}
+
+func isValidV1TypeOrCustomTypeRef(typeValue string) bool {
+	if lo.Contains(drules.ValidPrimitiveTypes, typeValue) {
+		return true
+	}
+
+	resourceType, localID, err := funcs.ParseURNRef(typeValue)
+	if err != nil {
+		return false
+	}
+
+	return resourceType == types.CustomTypeResourceType && localID != ""
+}
+
 func NewPropertySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/properties/spec-syntax-valid",
@@ -108,6 +185,12 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertySpec,
+		),
+		prules.NewPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(localcatalog.KindProperties, specs.SpecVersionV1),
+			},
+			validatePropertySpecV1,
 		),
 	)
 }

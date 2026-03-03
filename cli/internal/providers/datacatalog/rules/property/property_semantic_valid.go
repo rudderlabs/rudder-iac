@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -24,6 +25,15 @@ var validatePropertySemantic = func(_ string, _ string, _ map[string]any, spec l
 
 	// (name, type, itemTypes) uniqueness across the entire resource graph
 	results = append(results, validatePropertyUniqueness(spec, graph)...)
+
+	return results
+}
+
+var validatePropertySemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpecV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	results = append(results, validateReferenceTypeV1(spec, graph)...)
+	results = append(results, validatePropertyUniquenessV1(spec, graph)...)
 
 	return results
 }
@@ -122,6 +132,100 @@ func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources
 	return results
 }
 
+func validateReferenceTypeV1(spec localcatalog.PropertySpecV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, property := range spec.Properties {
+		if hasCustomTypeRef(property.Type) {
+			results = append(results, checkRef(property.Type, fmt.Sprintf("/properties/%d/type", i), graph)...)
+		}
+
+		if hasCustomTypeRef(property.ItemType) {
+			results = append(results, checkRef(property.ItemType, fmt.Sprintf("/properties/%d/item_type", i), graph)...)
+		}
+	}
+
+	return results
+}
+
+func validatePropertyUniquenessV1(spec localcatalog.PropertySpecV1, graph *resources.Graph) []rules.ValidationResult {
+	countMap := make(map[string]int)
+	for _, resource := range graph.ResourcesByType(types.PropertyResourceType) {
+		data := resource.Data()
+		name, _ := data["name"].(string)
+		config, _ := data["config"].(map[string]any)
+		key := fmt.Sprintf(
+			"%s|%s|%s",
+			name,
+			normalizeType(data["type"]),
+			normalizeItemTypes(config, "item_types"),
+		)
+		countMap[key]++
+	}
+
+	var results []rules.ValidationResult
+	for i, property := range spec.Properties {
+		key := fmt.Sprintf(
+			"%s|%s|%s",
+			property.Name,
+			normalizePropertyTypeV1(property),
+			normalizePropertyItemTypesV1(property),
+		)
+
+		if countMap[key] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d", i),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'properties'", property.Name),
+			})
+		}
+	}
+
+	return results
+}
+
+func hasCustomTypeRef(typeValue string) bool {
+	if !strings.HasPrefix(typeValue, "#") {
+		return false
+	}
+
+	resourceType, localID, err := funcs.ParseURNRef(typeValue)
+	if err != nil {
+		return false
+	}
+
+	return resourceType == types.CustomTypeResourceType && localID != ""
+}
+
+func normalizePropertyTypeV1(property localcatalog.PropertyV1) string {
+	if property.Type != "" {
+		return normalizeType(property.Type)
+	}
+
+	if len(property.Types) == 0 {
+		return ""
+	}
+
+	typesCopy := append([]string(nil), property.Types...)
+	sort.Strings(typesCopy)
+
+	return strings.Join(typesCopy, ",")
+}
+
+func normalizePropertyItemTypesV1(property localcatalog.PropertyV1) string {
+	if property.ItemType != "" {
+		return normalizeType(property.ItemType)
+	}
+
+	if len(property.ItemTypes) == 0 {
+		return ""
+	}
+
+	itemTypesCopy := append([]string(nil), property.ItemTypes...)
+	sort.Strings(itemTypesCopy)
+
+	return strings.Join(itemTypesCopy, ",")
+}
+
 // normalizeType converts a type value (string or PropertyRef) to a
 // comparable string. Comma-separated primitives are sorted so order
 // doesn't matter (e.g., "string,number" == "number,string").
@@ -171,6 +275,12 @@ func NewPropertySemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertySemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(localcatalog.KindProperties, specs.SpecVersionV1),
+			},
+			validatePropertySemanticV1,
 		),
 	)
 }
