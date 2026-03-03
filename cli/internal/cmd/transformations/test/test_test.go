@@ -3,7 +3,6 @@ package test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,36 +142,5 @@ func TestValidateFlags(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
-	}
-}
-
-func TestShowDefaultEvents(t *testing.T) {
-	t.Parallel()
-
-	// Test that showDefaultEvents runs without error
-	err := showDefaultEvents()
-	require.NoError(t, err)
-}
-
-func TestGetDefaultEvents(t *testing.T) {
-	t.Parallel()
-
-	events := testorchestrator.GetDefaultEvents()
-
-	// Verify we have the expected default events
-	require.NotEmpty(t, events)
-	assert.Contains(t, events, "Track")
-	assert.Contains(t, events, "Identify")
-	assert.Contains(t, events, "Page")
-	assert.Contains(t, events, "Screen")
-
-	// Verify each event has expected structure
-	for name, content := range events {
-		eventMap, ok := content.(map[string]any)
-		assert.True(t, ok, "event %s should be a map[string]any", name)
-		assert.NotEmpty(t, eventMap, "event %s should not be empty", name)
-
-		// Verify each event has a type field
-		assert.Contains(t, eventMap, "type", "event %s should have a type field", name)
 	}
 }

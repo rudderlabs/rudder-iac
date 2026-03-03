@@ -59,7 +59,6 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
-	transformationsCmd *cobra.Command
 )
 
 func init() {
@@ -96,9 +95,7 @@ func init() {
 	rootCmd.AddCommand(experimentalCmd)
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
-
-	transformationsCmd = transformations.NewCmdTransformations()
-	rootCmd.AddCommand(transformationsCmd)
+	rootCmd.AddCommand(transformations.NewCmdTransformations())
 }
 
 func initConfig() {
@@ -113,10 +110,6 @@ func initConfig() {
 	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
 	if viper.GetBool("experimental") {
 		experimentalCmd.Hidden = false
-	}
-
-	if viper.GetBool("flags.transformations") {
-		transformationsCmd.Hidden = false
 	}
 }
 

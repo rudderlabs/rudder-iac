@@ -179,13 +179,12 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 		errorContains              string
 	}{
 		{
-			name:                       "rudder/v1 spec without v1 support - returns error",
+			name:                       "rudder/v1 spec without v1 support - calls LoadSpec",
 			specVersion:                "rudder/v1",
 			useV1SpecSupport:           false,
-			expectError:                true,
-			expectLoadSpecCalled:       false,
+			expectError:                false,
+			expectLoadSpecCalled:       true,
 			expectLoadLegacySpecCalled: false,
-			errorContains:              "unsupported spec version: rudder/v1",
 		},
 		{
 			name:                       "rudder/v1 spec with v1 support - calls LoadSpec",

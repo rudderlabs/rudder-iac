@@ -85,6 +85,7 @@ func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
 			return fmt.Errorf("name is required for each spec tests block")
 		}
 	}
+
 	return nil
 }
 
