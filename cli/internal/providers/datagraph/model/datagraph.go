@@ -45,8 +45,8 @@ type RelationshipSpec struct {
 
 // DataGraphResource represents the input data for a data graph
 type DataGraphResource struct {
-	ID        string
-	AccountID string
+	ID        string `mapstructure:"id"`
+	AccountID string `mapstructure:"account_id"`
 }
 
 // DataGraphState represents the output state of a data graph from the remote system
