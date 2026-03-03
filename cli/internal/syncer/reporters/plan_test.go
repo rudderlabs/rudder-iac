@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/stretchr/testify/assert"
@@ -58,4 +59,22 @@ Removed resources:
 `
 
 	assert.Equal(t, expectedOutput, buf.String())
+}
+
+func TestPrintablePropertyRef(t *testing.T) {
+	urn := "data-graph:my-graph"
+
+	t.Run("pointer PropertyRef renders URN", func(t *testing.T) {
+		ref := &resources.PropertyRef{URN: urn, Property: "id"}
+		result := printable(ref)
+		assert.Contains(t, result, urn)
+		assert.NotContains(t, result, "IsResolved")
+	})
+
+	t.Run("value PropertyRef renders URN", func(t *testing.T) {
+		ref := resources.PropertyRef{URN: urn, Property: "id"}
+		result := printable(ref)
+		assert.Contains(t, result, urn)
+		assert.NotContains(t, result, "IsResolved")
+	})
 }
