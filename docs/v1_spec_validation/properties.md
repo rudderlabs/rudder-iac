@@ -63,13 +63,17 @@ type PropertyV1 struct {
     LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
     Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
     Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
-    Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty"`
-    Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
-    ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
-    ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`
+    Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty" validate:"excluded_with=Types"`
+    Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty" validate:"excluded_with=Type,dive,oneof=string number integer boolean null array object"`
+    ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty" validate:"excluded_with=ItemTypes"`
+    ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty" validate:"excluded_with=ItemType,dive,oneof=string number integer boolean null array object"`
     Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
 }
 ```
+
+**Tag notes:**
+- `dive,oneof=...` on `Types` and `ItemTypes` validates each array element against the allowed primitive types. This means custom-type refs (e.g. `#custom-type:<id>`) are **not allowed** in `types` or `item_types` arrays — use the singular `type` or `item_type` field for custom-type references instead.
+- `excluded_with` on `Type`/`Types` and `ItemType`/`ItemTypes` enforces mutual exclusivity at the validator level, following the same pattern used in `retl/sqlmodel/model.go` (`SQL`/`File`) and `project/specs/metadata.go` (`LocalID`/`URN`).
 
 Also update `PropertySpecV1` to enable recursive validation via `dive`:
 
@@ -92,27 +96,26 @@ These rules must target `MatchKindVersion("properties", "rudder/v1")` and decode
 | 1 | `id` required | `validate:"required"` on `LocalID` | Property must have a non-empty `id` |
 | 2 | `name` required + length | `validate:"required,gte=1,lte=65"` on `Name` | Property must have a non-empty `name`, 1-65 chars |
 | 3 | `description` constraints | `validate:"omitempty,gte=3,lte=2000"` on `Description` | If present, 3-2000 chars |
+| 4 | `types` array values in ValidTypes | `validate:"dive,oneof=string number integer boolean null array object"` on `Types` | Each value in `types` must be a valid primitive type |
+| 5 | `item_types` array values in ValidTypes | `validate:"dive,oneof=string number integer boolean null array object"` on `ItemTypes` | Each value in `item_types` must be a valid primitive type |
+| 6 | `item_type` and `item_types` mutually exclusive | `validate:"excluded_with=ItemTypes"` on `ItemType` / `validate:"excluded_with=ItemType"` on `ItemTypes` | Only one of `item_type` or `item_types` can be specified |
+| 7 | `type` and `types` mutually exclusive | `validate:"excluded_with=Types"` on `Type` / `validate:"excluded_with=Type"` on `Types` | Only one of `type` (single) or `types` (array) can be specified |
 
 ### Custom Logic (manual rule code)
 
 | # | Validation | Description |
 |---|-----------|-------------|
-| 4 | `type` and `types` mutually exclusive | Only one of `type` (single) or `types` (array) can be specified |
-| 5 | `item_type` and `item_types` mutually exclusive | Only one of `item_type` (single) or `item_types` (array) can be specified |
-| 6 | No leading/trailing whitespace in `name` | Property name must not have leading or trailing whitespace |
-| 7 | `types` array values in ValidTypes | Each value in `types` must be one of: string, number, integer, boolean, null, array, object |
-| 8 | No duplicate values in `types` array | The `types` array must not contain duplicate type values |
-| 9 | Custom-type in `type` disallows `config` | When `type` references a custom type (`#custom-type:<id>`), `config` must be nil |
-| 10 | No comma-separated values in `type` | The `type` field must not contain comma-separated values; use `types` array instead |
-| 11 | `type` must be in ValidTypes or custom-type ref | Single `type` must be a valid primitive type or a custom-type reference (`#custom-type:<id>`) |
-| 12 | `item_type` must be in ValidTypes or custom-type ref | `item_type` must be a valid primitive type or custom-type reference |
-| 13 | `item_types` with custom-type must be single element | If `item_types` array contains a custom-type ref, it must be the only element |
+| 8 | No leading/trailing whitespace in `name` | Property name must not have leading or trailing whitespace |
+| 9 | No duplicate values in `types` array | The `types` array must not contain duplicate type values |
+| 10 | `type` must be in ValidTypes or custom-type ref | Single `type` must be a valid primitive type or a custom-type reference (`#custom-type:<id>`). This also catches comma-separated values (e.g. `"string,integer"`) since they won't match any valid type or ref pattern. |
+| 11 | `item_type` must be in ValidTypes or custom-type ref | `item_type` must be a valid primitive type or custom-type reference |
 
 ### Out of Scope (handled separately)
 
 | # | Validation | Description |
 |---|-----------|-------------|
 | - | Config validation per type | Validate `config` fields based on the property type (snake_case keys: `min_length`, `max_length`, `pattern`, `format` for string; `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum`, `multiple_of` for number/integer; `item_types`, `min_items`, `max_items`, `unique_items` for array; etc.). **Will be handled in a separate PR/task.** |
+| - | Custom-type in `type` disallows `config` | When `type` references a custom type (`#custom-type:<id>`), `config` must be nil. **Will be handled as part of config validation in a separate PR/task.** |
 
 ---
 
@@ -122,9 +125,9 @@ These rules must target `MatchKindVersion("properties", "rudder/v1")` and decode
 |---|-----------|-------------|
 | 1 | Custom-type refs in `type` resolve | If `type` is `#custom-type:<id>`, the referenced custom type must exist in the resource graph |
 | 2 | Custom-type refs in `item_type` resolve | If `item_type` is a custom-type ref, it must exist in the graph |
-| 3 | Custom-type refs in `item_types` resolve | Each custom-type ref in `item_types` must exist in the graph |
-| 4 | No custom-type refs in `types` array | The `types` array must not contain custom-type references (use single `type` field instead) |
-| 5 | `(name, type, itemTypes)` uniqueness | No two properties may share the same combination of (name, type, itemTypes) |
+| 3 | `(name, type, itemTypes)` uniqueness | No two properties may share the same combination of (name, type, itemTypes) |
+
+**Note:** Custom-type refs in `types` and `item_types` arrays are now prevented at the syntactic level by the `dive,oneof=...` validator tag — only primitive types are allowed. Semantic checks #3 and #4 from the previous revision are no longer needed.
 
 ### Out of Scope (handled separately)
 
@@ -138,10 +141,10 @@ Note: `id` uniqueness is handled by the project-level rule `project/duplicate-lo
 
 ## Acceptance Criteria
 
-- [ ] `validate:` tags added to `PropertyV1` and `PropertySpecV1` structs matching V0.1 style
-- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#3)
-- [ ] Custom logic implemented for validations #4-#13 (mutual exclusivity, type checks) -- config validation excluded, handled separately
-- [ ] All 5 semantic validations listed above are implemented as V1 rules (config `item_types` ref resolution excluded, handled separately)
+- [ ] `validate:` tags added to `PropertyV1` and `PropertySpecV1` structs matching V0.1 style (including `dive,oneof` on `Types`/`ItemTypes`, `excluded_with` on `Type`/`Types` and `ItemType`/`ItemTypes`)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#7)
+- [ ] Custom logic implemented for validations #8-#11 (whitespace, duplicates, type/item_type value checks) -- config validation and custom-type config constraint excluded, handled separately
+- [ ] All 3 semantic validations listed above are implemented as V1 rules (config `item_types` ref resolution excluded, handled separately)
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
 
