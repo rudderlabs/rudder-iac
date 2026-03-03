@@ -124,8 +124,9 @@ const (
 
 // TestError represents an error that occurred during test execution
 type TestError struct {
-	Message string `json:"message"`
-	Event   any    `json:"event,omitempty"`
+	Message    string `json:"message"`
+	Event      any    `json:"event,omitempty"`
+	EventIndex int    `json:"eventIndex,omitempty"`
 }
 
 // TestResult represents the result of a single test run
@@ -145,13 +146,13 @@ type TestSuiteRunResult struct {
 
 // TransformationTestResult represents result for a single transformation's test suite
 type TransformationTestResult struct {
-	ID         string             `json:"id"`
-	Name       string             `json:"name"`
-	VersionID  string             `json:"versionId"`
-	Imports    []string           `json:"imports,omitempty"`
-	Pass       bool               `json:"pass"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	VersionID       string             `json:"versionId"`
+	Imports         []string           `json:"imports,omitempty"`
+	Pass            bool               `json:"pass"`
 	TestSuiteResult TestSuiteRunResult `json:"testResult"`
-	Message    string             `json:"message,omitempty"`
+	Message         string             `json:"message,omitempty"`
 }
 
 // LibraryTestResult represents validation result for a library in batch test response

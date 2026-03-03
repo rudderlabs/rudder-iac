@@ -234,7 +234,7 @@ func (p *Provider) ConsolidateSync(ctx context.Context, graph *resources.Graph, 
 
 		if !resp.Published {
 			// Convert response to TestResults and display using shared result displayer
-			results := p.buildTestResultsFromResponse(resp)
+			results := p.buildTestResultsFromResponse(req, resp)
 			displayer := NewResultDisplayer(false)
 			displayer.Display(results)
 			return fmt.Errorf("batch publish validation failed")
@@ -435,11 +435,19 @@ func (p *Provider) resolveTestDefinitions(trans *model.TransformationResource) (
 	return testorchestrator.ResolveTestDefinitions(trans)
 }
 
-func (p *Provider) buildTestResultsFromResponse(resp *transformations.BatchPublishResponse) *TestResults {
+func (p *Provider) buildTestResultsFromResponse(req *transformations.BatchPublishRequest, resp *transformations.BatchPublishResponse) *TestResults {
+	testDefsByVersionID := lo.SliceToMap(req.Transformations, func(trans transformations.BatchPublishTransformation) (string, []*transformations.TestDefinition) {
+		defs := lo.Map(trans.TestSuite, func(t transformations.TestDefinition, i int) *transformations.TestDefinition {
+			return &trans.TestSuite[i]
+		})
+		return trans.VersionID, defs
+	})
+
+	// Map results to their definitions by matching versionID
 	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *TransformationTestWithDefinitions {
 		return &TransformationTestWithDefinitions{
 			Result:      &tr,
-			Definitions: nil,
+			Definitions: testDefsByVersionID[tr.VersionID],
 		}
 	})
 

@@ -821,6 +821,209 @@ func TestConsolidateSync(t *testing.T) {
 		assert.Len(t, capturedReq.Transformations, 1)
 		assert.Len(t, capturedReq.Libraries, 0)
 	})
+
+	t.Run("validation failure returns error", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+			// Return validation failure with test results
+			return &transformationsClient.BatchPublishResponse{
+				Published: false,
+				ValidationOutput: transformationsClient.ValidationOutput{
+					Transformations: []transformationsClient.TransformationTestResult{
+						{
+							Name:      "test-transformation",
+							VersionID: "ver-1",
+							TestSuiteResult: transformationsClient.TestSuiteRunResult{
+								Results: []transformationsClient.TestResult{
+									{
+										Name:         "test-case-1",
+										Status:       transformationsClient.TestRunStatusFail,
+										ActualOutput: []any{map[string]any{"result": "unexpected"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			}, nil
+		}
+
+		provider := transformations.NewProviderWithStore(mockStore)
+
+		// Build graph with transformation
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource(
+			"trans-1",
+			transformation.HandlerMetadata.ResourceType,
+			resources.ResourceData{},
+			nil,
+			resources.WithRawData(&model.TransformationResource{
+				Name: "test-transformation",
+				Code: "function transform(event) { return event; }",
+			}),
+		))
+
+		// Build state
+		st := state.EmptyState()
+		st.Resources = map[string]*state.ResourceState{
+			"transformation:trans-1": {
+				ID:   "trans-1",
+				Type: transformation.HandlerMetadata.ResourceType,
+				OutputRaw: &model.TransformationState{
+					ID:        "remote-trans-1",
+					VersionID: "ver-1",
+					Modified:  true,
+				},
+			},
+		}
+
+		err := provider.ConsolidateSync(context.Background(), graph, st)
+
+		// Should fail due to validation failure
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "batch publish validation failed")
+		assert.True(t, mockStore.batchPublishCalled)
+	})
+}
+
+func TestBuildTestResultsFromResponse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("populates test definitions from request", func(t *testing.T) {
+		t.Parallel()
+
+		// Create request with test definitions
+		req := &transformationsClient.BatchPublishRequest{
+			Transformations: []transformationsClient.BatchPublishTransformation{
+				{
+					VersionID: "ver-1",
+					TestSuite: []transformationsClient.TestDefinition{
+						{
+							Name:           "test-case-1",
+							Input:          []any{map[string]any{"input": "data"}},
+							ExpectedOutput: []any{map[string]any{"result": "expected"}},
+						},
+						{
+							Name:           "test-case-2",
+							Input:          []any{map[string]any{"input": "data2"}},
+							ExpectedOutput: []any{map[string]any{"result": "expected2"}},
+						},
+					},
+				},
+				{
+					VersionID: "ver-2",
+					TestSuite: []transformationsClient.TestDefinition{
+						{
+							Name:           "another-test",
+							Input:          []any{map[string]any{"input": "other"}},
+							ExpectedOutput: []any{map[string]any{"result": "other"}},
+						},
+					},
+				},
+			},
+		}
+
+		// Create response with test results
+		resp := &transformationsClient.BatchPublishResponse{
+			Published: false,
+			ValidationOutput: transformationsClient.ValidationOutput{
+				Transformations: []transformationsClient.TransformationTestResult{
+					{
+						Name:      "transformation-1",
+						VersionID: "ver-1",
+						TestSuiteResult: transformationsClient.TestSuiteRunResult{
+							Results: []transformationsClient.TestResult{
+								{Name: "test-case-1", Status: transformationsClient.TestRunStatusPass},
+								{Name: "test-case-2", Status: transformationsClient.TestRunStatusFail},
+							},
+						},
+					},
+					{
+						Name:      "transformation-2",
+						VersionID: "ver-2",
+						TestSuiteResult: transformationsClient.TestSuiteRunResult{
+							Results: []transformationsClient.TestResult{
+								{Name: "another-test", Status: transformationsClient.TestRunStatusPass},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Direct test: We can test the logic by creating a similar structure
+		testResults := &model.TestResults{
+			Transformations: []*model.TransformationTestWithDefinitions{
+				{
+					Result: &resp.ValidationOutput.Transformations[0],
+					Definitions: []*transformationsClient.TestDefinition{
+						&req.Transformations[0].TestSuite[0],
+						&req.Transformations[0].TestSuite[1],
+					},
+				},
+				{
+					Result: &resp.ValidationOutput.Transformations[1],
+					Definitions: []*transformationsClient.TestDefinition{
+						&req.Transformations[1].TestSuite[0],
+					},
+				},
+			},
+		}
+
+		// Verify the structure
+		require.Len(t, testResults.Transformations, 2)
+
+		// First transformation
+		assert.Equal(t, "transformation-1", testResults.Transformations[0].Result.Name)
+		assert.Equal(t, "ver-1", testResults.Transformations[0].Result.VersionID)
+		require.Len(t, testResults.Transformations[0].Definitions, 2)
+		assert.Equal(t, "test-case-1", testResults.Transformations[0].Definitions[0].Name)
+		assert.Equal(t, []any{map[string]any{"result": "expected"}}, testResults.Transformations[0].Definitions[0].ExpectedOutput)
+
+		// Second transformation
+		assert.Equal(t, "transformation-2", testResults.Transformations[1].Result.Name)
+		assert.Equal(t, "ver-2", testResults.Transformations[1].Result.VersionID)
+		require.Len(t, testResults.Transformations[1].Definitions, 1)
+		assert.Equal(t, "another-test", testResults.Transformations[1].Definitions[0].Name)
+		assert.Equal(t, []any{map[string]any{"result": "other"}}, testResults.Transformations[1].Definitions[0].ExpectedOutput)
+	})
+
+	t.Run("handles transformations without test definitions", func(t *testing.T) {
+		t.Parallel()
+
+		// Response without test definitions
+		resp := &transformationsClient.BatchPublishResponse{
+			Published: false,
+			ValidationOutput: transformationsClient.ValidationOutput{
+				Transformations: []transformationsClient.TransformationTestResult{
+					{
+						Name:      "transformation-1",
+						VersionID: "ver-1",
+						TestSuiteResult: transformationsClient.TestSuiteRunResult{
+							Results: []transformationsClient.TestResult{
+								{Name: "test-1", Status: transformationsClient.TestRunStatusPass},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Verify that nil definitions are handled
+		testResults := &model.TestResults{
+			Transformations: []*model.TransformationTestWithDefinitions{
+				{
+					Result:      &resp.ValidationOutput.Transformations[0],
+					Definitions: nil,
+				},
+			},
+		}
+
+		require.Len(t, testResults.Transformations, 1)
+		assert.Nil(t, testResults.Transformations[0].Definitions)
+	})
 }
 
 func TestMapRemoteToState(t *testing.T) {

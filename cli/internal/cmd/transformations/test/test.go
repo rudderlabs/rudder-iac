@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -105,7 +104,7 @@ func NewCmdTest() *cobra.Command {
 
 			// Handle show default events
 			if show {
-				return showDefaultEvents()
+				return testorchestrator.ShowDefaultEvents()
 			}
 
 			testLog.Debug("test", "location", location, "all", all, "modified", modified, "verbose", verbose)
@@ -205,28 +204,6 @@ func validateFlags(args []string, all, modified, show bool) error {
 	// Only one ID allowed
 	if len(args) > 1 {
 		return fmt.Errorf("only one transformation/library ID allowed, got %d arguments", len(args))
-	}
-
-	return nil
-}
-
-// showDefaultEvents displays the embedded default test events
-func showDefaultEvents() error {
-	events := testorchestrator.GetDefaultEvents()
-
-	ui.Println(ui.Bold("Default Test Events: \n"))
-
-	for eventName, eventData := range events {
-		ui.Printf("--- %s ---\n", ui.Color(eventName, ui.ColorYellow))
-
-		// Marshal event data to pretty JSON for display
-		jsonBytes, err := json.MarshalIndent(eventData, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshaling event %s to JSON: %w", eventName, err)
-		}
-
-		ui.Println(string(jsonBytes))
-		ui.Println()
 	}
 
 	return nil
