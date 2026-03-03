@@ -7,12 +7,24 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
 var (
 	log = logger.New("localcatalog")
+
+	// kindToResourceType maps spec kinds to their canonical resource type strings.
+	// Single source of truth used by ParseSpec, MigrateSpec, and addImportMetadata.
+	kindToResourceType = map[string]string{
+		KindProperties:      types.PropertyResourceType,
+		KindEvents:          types.EventResourceType,
+		KindCustomTypes:     types.CustomTypeResourceType,
+		KindCategories:      types.CategoryResourceType,
+		KindTrackingPlans:   types.TrackingPlanResourceType,
+		KindTrackingPlansV1: types.TrackingPlanResourceType,
+	}
 )
 
 const (
@@ -149,21 +161,12 @@ func convertPathToURN(pathRef string) (string, error) {
 
 	entityType := parts[0]
 	localId := parts[2]
-	URN := ""
-	switch entityType {
-	case KindProperties:
-		URN = resources.URN(localId, "property")
-	case KindEvents:
-		URN = resources.URN(localId, "event")
-	case KindCustomTypes:
-		URN = resources.URN(localId, "custom-type")
-	case KindCategories:
-		URN = resources.URN(localId, "category")
-	default:
+	resourceType, ok := kindToResourceType[entityType]
+	if !ok {
 		return "", fmt.Errorf("invalid entity type: %s", entityType)
 	}
 
-	return fmt.Sprintf("#%s", URN), nil
+	return fmt.Sprintf("#%s", resources.URN(localId, resourceType)), nil
 }
 
 // transformReferencesInSpec recursively walks the spec map and transforms
@@ -223,7 +226,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = properties
 		basePath = "/spec/properties"
-		resourceType = "property"
+		resourceType = types.PropertyResourceType
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -232,7 +235,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 		basePath = "/spec/events"
-		resourceType = "event"
+		resourceType = types.EventResourceType
 
 	case KindTrackingPlans, KindTrackingPlansV1:
 		tpID, ok := s.Spec["id"].(string)
@@ -240,10 +243,10 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
 		parsedSpec.URNs = append(parsedSpec.URNs, specs.URNEntry{
-			URN:             resources.URN(tpID, "tracking-plan"),
+			URN:             resources.URN(tpID, types.TrackingPlanResourceType),
 			JSONPointerPath: "/spec/id",
 		})
-		resourceType = "tracking-plan"
+		resourceType = types.TrackingPlanResourceType
 
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
@@ -252,7 +255,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = customTypes
 		basePath = "/spec/types"
-		resourceType = "custom-type"
+		resourceType = types.CustomTypeResourceType
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -261,7 +264,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = categories
 		basePath = "/spec/categories"
-		resourceType = "category"
+		resourceType = types.CategoryResourceType
 	}
 
 	// Array-based resources populate idArray and basePath for bulk processing.
@@ -316,20 +319,8 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
-	// Map spec kind to resource type for import metadata migration
-	var resourceType string
-	switch s.Kind {
-	case KindProperties:
-		resourceType = "property"
-	case KindEvents:
-		resourceType = "event"
-	case KindCustomTypes:
-		resourceType = "custom-type"
-	case KindCategories:
-		resourceType = "category"
-	case KindTrackingPlans, KindTrackingPlansV1:
-		resourceType = "tracking-plan"
-	default:
+	resourceType, ok := kindToResourceType[s.Kind]
+	if !ok {
 		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
 
@@ -400,20 +391,8 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
-		// Map spec kind to resource type
-		var resourceType string
-		switch s.Kind {
-		case KindProperties:
-			resourceType = "property"
-		case KindEvents:
-			resourceType = "event"
-		case KindCustomTypes:
-			resourceType = "custom-type"
-		case KindTrackingPlans, KindTrackingPlansV1:
-			resourceType = "tracking-plan"
-		case KindCategories:
-			resourceType = "category"
-		default:
+		resourceType, ok := kindToResourceType[s.Kind]
+		if !ok {
 			return fmt.Errorf("unknown kind: %s", s.Kind)
 		}
 

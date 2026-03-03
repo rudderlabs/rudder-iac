@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-viper/mapstructure/v2"
@@ -114,7 +115,7 @@ func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors, nil)
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(specs.Metadata{}))
 	// Before returning the results, simply prepend the metadata
 	// path to the reference to allow for unique identification.
 	results = lo.Map(results, func(result rules.ValidationResult, _ int) rules.ValidationResult {

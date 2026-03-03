@@ -31,19 +31,6 @@ func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
 	return parseSpecWithIDs()(path, spec)
 }
 
-// parseSpecNewProvider returns a ParseSpecFunc for a new-style provider (no LegacyResourceType).
-func parseSpecNewProvider(ids ...string) ParseSpecFunc {
-	return func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
-		urnEntries := make([]specs.URNEntry, len(ids))
-		for i, id := range ids {
-			urnEntries[i] = specs.URNEntry{URN: "new-provider-type:" + id, JSONPointerPath: "/spec/id"}
-		}
-		return &specs.ParsedSpec{
-			URNs:               urnEntries,
-			LegacyResourceType: "",
-		}, nil
-	}
-}
 
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
@@ -161,7 +148,33 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			},
 			expectedErrors: 2,
 			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id", "/metadata/import/workspaces/0/resources/0/urn"},
-			expectedMsgs:   []string{"'local_id' is required when 'URN' is not specified", "'urn' is required when 'LocalID' is not specified"},
+			expectedMsgs:   []string{"'local_id' is required when 'urn' is not specified", "'urn' is required when 'local_id' is not specified"},
+		},
+		{
+			name:      "import with both local_id and urn set is rejected",
+			parseSpec: parseSpecWithIDs("local-1"),
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "local-1",
+										"urn":       "test-resource:local-1",
+										"remote_id": "remote-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id", "/metadata/import/workspaces/0/resources/0/urn"},
+			expectedMsgs:   []string{"'local_id' and 'urn' cannot be specified together", "'urn' and 'local_id' cannot be specified together"},
 		},
 		{
 			name:      "import with missing remote_id in resource",
@@ -242,8 +255,13 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{},
 		},
 		{
-			name:      "local_id on new provider (no LegacyResourceType) returns explicit diagnostic",
-			parseSpec: parseSpecNewProvider("some-id"),
+			name: "local_id on new provider (no LegacyResourceType) returns explicit diagnostic",
+			parseSpec: func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
+				return &specs.ParsedSpec{
+					URNs:               []specs.URNEntry{{URN: "new-provider-type:some-id", JSONPointerPath: "/spec/id"}},
+					LegacyResourceType: "",
+				}, nil
+			},
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
