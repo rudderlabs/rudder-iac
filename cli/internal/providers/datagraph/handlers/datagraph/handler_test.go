@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
@@ -269,4 +270,22 @@ func TestDelete(t *testing.T) {
 
 	err := h.Delete(context.Background(), "test-dg", oldData, oldState)
 	require.NoError(t, err)
+}
+
+// TestDataGraphResourceMapstructureTags verifies that mapstructure.Decode produces
+// snake_case keys from DataGraphResource, matching what the diff engine expects.
+func TestDataGraphResourceMapstructureTags(t *testing.T) {
+	resource := &model.DataGraphResource{
+		ID:        "test-dg",
+		AccountID: "account-123",
+	}
+
+	var result map[string]interface{}
+	err := mapstructure.Decode(resource, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{
+		"id":         "test-dg",
+		"account_id": "account-123",
+	}, result)
 }
