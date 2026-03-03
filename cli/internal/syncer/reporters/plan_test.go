@@ -68,13 +68,13 @@ func TestPrintablePropertyRef(t *testing.T) {
 		ref := &resources.PropertyRef{URN: urn, Property: "id"}
 		result := printable(ref)
 		assert.Contains(t, result, urn)
-		assert.NotContains(t, result, "IsResolved")
+		assert.NotContains(t, result, "{")
 	})
 
 	t.Run("value PropertyRef renders URN", func(t *testing.T) {
 		ref := resources.PropertyRef{URN: urn, Property: "id"}
 		result := printable(ref)
 		assert.Contains(t, result, urn)
-		assert.NotContains(t, result, "IsResolved")
+		assert.NotContains(t, result, "{")
 	})
 }
