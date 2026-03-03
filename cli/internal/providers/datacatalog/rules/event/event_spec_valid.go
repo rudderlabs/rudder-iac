@@ -80,6 +80,46 @@ var validateEventSpec = func(Kind string, Version string, Metadata map[string]an
 	return results
 }
 
+// V1 validation function for event spec, targeting EventSpecV1 / EventV1 structs.
+var validateEventSpecV1 = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.EventSpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(Spec, "")
+	if err != nil {
+		return []rules.ValidationResult{
+			{
+				Reference: "/events",
+				Message:   err.Error(),
+			},
+		}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors, nil)
+
+	for i, event := range Spec.Events {
+		if !slices.Contains(drules.ValidEventTypes, event.Type) {
+			continue
+		}
+
+		if event.Type == "track" {
+			if len(event.Name) < 1 || len(event.Name) > 64 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/events/%d/name", i),
+					Message:   "name must be between 1 and 64 characters for track events",
+				})
+			}
+			continue
+		}
+
+		if event.Name != "" {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/events/%d/name", i),
+				Message:   "name should be empty for non-track events",
+			})
+		}
+	}
+
+	return results
+}
+
 func NewEventSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/events/spec-syntax-valid",
@@ -89,6 +129,10 @@ func NewEventSpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindEvents),
 			validateEventSpec,
+		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindEvents),
+			validateEventSpecV1,
 		),
 	)
 }

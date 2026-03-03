@@ -51,6 +51,38 @@ func validateEventNameUniqueness(spec localcatalog.EventSpec, graph *resources.G
 	return results
 }
 
+var validateEventSemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.EventSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	results := funcs.ValidateReferences(spec, graph)
+	results = append(results, validateEventNameUniquenessV1(spec, graph)...)
+	return results
+}
+
+func validateEventNameUniquenessV1(spec localcatalog.EventSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	countMap := make(map[string]int)
+	for _, resource := range graph.ResourcesByType(types.EventResourceType) {
+		data := resource.Data()
+		var (
+			name, _      = data["name"].(string)
+			eventType, _ = data["eventType"].(string)
+		)
+		key := name + "|" + eventType
+		countMap[key]++
+	}
+
+	var results []rules.ValidationResult
+	for i, event := range spec.Events {
+		key := event.Name + "|" + event.Type
+		if countMap[key] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/events/%d", i),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'events'", event.Name),
+			})
+		}
+	}
+
+	return results
+}
+
 func NewEventSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/events/semantic-valid",
@@ -60,6 +92,10 @@ func NewEventSemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindEvents),
 			validateEventSemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindEvents),
+			validateEventSemanticV1,
 		),
 	)
 }
