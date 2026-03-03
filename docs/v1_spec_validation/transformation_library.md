@@ -15,9 +15,9 @@ All existing validations live in the old handler-based framework:
 
 ## Structural Differences: V0.1 vs V1
 
-There is **no structural difference** between V0.1 and V1. The same `TransformationLibrarySpec` struct is used for both versions.
+There is **no structural difference** between V0.1 and V1. The same `TransformationLibrarySpec` struct is used for both versions. Since no V0.1 rules exist in the new validation engine for transformation libraries, adding `validate:` tags to the shared struct is safe.
 
-### Struct (`TransformationLibrarySpec` in `project/specs/transformation.go`)
+### Struct — Current (`TransformationLibrarySpec` in `project/specs/transformation.go`)
 
 ```go
 type TransformationLibrarySpec struct {
@@ -31,22 +31,42 @@ type TransformationLibrarySpec struct {
 }
 ```
 
+### Struct — Updated (tags to add)
+
+```go
+type TransformationLibrarySpec struct {
+    ID          string `json:"id" mapstructure:"id" validate:"required"`
+    Name        string `json:"name" mapstructure:"name" validate:"required"`
+    Description string `json:"description" mapstructure:"description"`
+    Language    string `json:"language" mapstructure:"language" validate:"required,oneof=javascript python"`
+    Code        string `json:"code,omitempty" mapstructure:"code"`
+    File        string `json:"file,omitempty" mapstructure:"file"`
+    ImportName  string `json:"import_name" mapstructure:"import_name" validate:"required"`
+}
+```
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("transformation-library", "rudder/v1")` and decode into `TransformationLibrarySpec`.
 
+### Tag-Based (handled by `rules.ValidateStruct()`)
+
+| # | Validation | Tag | Description |
+|---|-----------|-----|-------------|
+| 1 | `id` required | `validate:"required"` on `ID` | Library must have a non-empty `id` |
+| 2 | `name` required | `validate:"required"` on `Name` | Library must have a non-empty `name` |
+| 3 | `import_name` required | `validate:"required"` on `ImportName` | Library must have a non-empty `import_name` |
+| 4 | `language` required + oneof | `validate:"required,oneof=javascript python"` on `Language` | Language must be one of the allowed values |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `id` required | Library must have a non-empty `id` field |
-| 2 | `name` required | Library must have a non-empty `name` field |
-| 3 | `import_name` required | Library must have a non-empty `import_name` field |
-| 4 | `code` and `file` mutually exclusive, one required | Either `code` or `file` must be specified, but not both |
-| 5 | `language` required | Library must have a non-empty `language` field |
-| 6 | `language` in allowed values | Language must be one of: `javascript`, `python` |
-| 7 | `import_name` must equal camelCase of `name` | The `import_name` field must be the camelCase transformation of the `name` field |
-| 8 | Code syntax validation | When `code` is provided (or resolved from `file`), validate syntax using the appropriate parser (esbuild for JavaScript, Python parser for Python) |
+| 5 | `code` and `file` mutually exclusive, one required | Either `code` or `file` must be specified, but not both |
+| 6 | `import_name` must equal camelCase of `name` | The `import_name` field must be the camelCase transformation of the `name` field |
+| 7 | Code syntax validation | When `code` is provided (or resolved from `file`), validate syntax using the appropriate parser (esbuild for JavaScript, Python parser for Python) |
 
 ---
 
@@ -58,7 +78,9 @@ No semantic validations needed. Transformation libraries have no cross-resource 
 
 ## Acceptance Criteria
 
-- [ ] All 8 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("transformation-library", "rudder/v1")`
+- [ ] `validate:` tags added to `TransformationLibrarySpec` shared struct (safe since no V0.1 rules exist in new engine)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#4)
+- [ ] Custom logic implemented for code/file exclusivity (#5), import_name camelCase check (#6), and code syntax validation (#7)
 - [ ] `import_name` camelCase validation matches the existing handler logic
 - [ ] Code syntax validation integrates with the existing parser infrastructure (`parser.ValidateSyntax()`)
 - [ ] All validations are tested with unit tests
@@ -89,8 +111,8 @@ Add V1 spec validation rules for the `transformation-library` resource. These ru
 
 ## Changes
 
-* Add V1 syntactic rule for library spec validation (required fields, language, code/file exclusivity)
-* Add V1 syntactic rule for import_name camelCase validation and code syntax validation
+* Add `validate:` tags to `TransformationLibrarySpec` shared struct
+* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom logic for code/file exclusivity, import_name camelCase, and code syntax validation
 
 ---
 
