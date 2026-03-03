@@ -34,3 +34,15 @@ func (r *TestResults) HasFailures() bool {
 		})
 	})
 }
+
+// DefaultSuiteTransformationNames returns the names of transformations that used the default test suite
+func (r *TestResults) DefaultSuiteTransformationNames() []string {
+	const defaultTestSuiteName = "default-events"
+
+	return lo.FilterMap(r.Transformations, func(tr *TransformationTestWithDefinitions, _ int) (string, bool) {
+		if len(tr.Definitions) == 1 && tr.Definitions[0].Name == defaultTestSuiteName {
+			return tr.Result.Name, true
+		}
+		return "", false
+	})
+}
