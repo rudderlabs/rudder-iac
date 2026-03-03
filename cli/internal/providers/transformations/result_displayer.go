@@ -64,7 +64,6 @@ type (
 	TestResults                       = model.TestResults
 )
 
-// indent returns a string with the specified indentation level applied
 func indent(s string, level int) string {
 	switch level {
 	case 1:
@@ -76,36 +75,64 @@ func indent(s string, level int) string {
 	}
 }
 
+func newLine() {
+	ui.Println()
+}
+
+/*
+	printIndentedLine("error message", 1, true)
+	// Output:   error message
+	printIndentedLine("prefix: ", 0, false)
+	// Output: prefix: (no newline)
+*/
 func printIndentedLine(msg string, level int, newLine bool) {
-	formatted := indent(msg, level)
+	indented := indent(msg, level)
 	if newLine {
-		ui.Println(formatted)
+		ui.Println(indented)
 		return
 	}
 
-	ui.Printf("%s", formatted)
+	ui.Printf("%s", indented)
 }
 
+/*
+	printWithPadding("✓ test-case-1", "passed", 30)
+	// Output: ✓ test-case-1                 passed
+	printWithPadding("✓ test-case-1", "passed", 10)
+	// Output: ✓ test-case-1 passed
+*/
 func printWithPadding(leftText, rightText string, rightTextStart int) {
-	padding := rightTextStart - len(leftText)
-	if padding < 1 {
-		padding = 1
-	}
+	padding := max(rightTextStart - len(leftText), 1)
 	ui.Printf("%s%s%s\n", leftText, strings.Repeat(" ", padding), rightText)
 }
 
+/*
+printSection("TEST RESULTS")
+	// Output:
+	// TEST RESULTS (bold)
+	// --------------------------------------------------------------------------------
+	// (blank line)
+*/
 func printSection(title string) {
 	ui.Println(ui.Bold(title))
-	ui.Println(strings.Repeat("-", lineWidth))
-	ui.Println()
+	printSeparator("-")
+	newLine()
 }
 
 func printSeparator(char string) {
-	ui.Println(strings.Repeat(char, lineWidth))
+	ui.Printf("%s\n", strings.Repeat(char, lineWidth))
 }
 
+/*
+	printFullStackTrace([]string{"  at line 42", "  in function foo()"}, 2)
+	// Output:
+	// (blank line)
+	//     Full stack trace:
+	//       at line 42
+	//       in function foo()
+*/
 func printFullStackTrace(lines []string, indent int) {
-	ui.Println()
+	newLine()
 	printIndentedLine(labelFullStackTrace, indent, true)
 
 	for _, line := range lines {
@@ -174,14 +201,20 @@ func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *TestResults) 
 	ui.Println(ui.Color("WARNING: Default test suite used for test", ui.ColorYellow))
 	ui.Printf("No test suites defined for transformations:\n - %s\n", strings.Join(names, "\n - "))
 	ui.Println(ui.GreyedOut("Use `rudder-cli transformations test default-events --show` to view default events."))
-	ui.Println()
+	newLine()
 }
 
+/*
+(blank line)
+Transformation Test Suite v1.0.0 (bold)
+================================================================================
+(blank line)
+*/
 func (rd *ResultDisplayer) printHeader() {
-	ui.Println()
+	newLine()
 	ui.Println(ui.Bold("Transformation Test Suite v1.0.0"))
 	printSeparator("=")
-	ui.Println()
+	newLine()
 }
 
 func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryTestResult) {
@@ -226,14 +259,14 @@ func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryT
 			printFullStackTrace(lines[1:], 2)
 		}
 
-		ui.Println()
+		newLine()
 		rd.libraryCounter.errored++
 	}
 
-	ui.Println()
+	newLine()
 	ui.Printf(labelLibrarySummary+"\n", rd.libraryCounter.passed, rd.libraryCounter.errored)
 	printSeparator("-")
-	ui.Println()
+	newLine()
 }
 
 func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions) {
@@ -254,7 +287,7 @@ func (rd *ResultDisplayer) displayTransformations(transformations []*Transformat
 		rd.suiteCounter.mismatched,
 	)
 	printSeparator("-")
-	ui.Println()
+	newLine()
 
 	rd.printSuiteFailures()
 }
@@ -287,14 +320,14 @@ func (rd *ResultDisplayer) printSummary() {
 		ui.Println(ui.Color(labelResultPassed, ui.ColorGreen))
 	}
 
-	ui.Println()
+	newLine()
 	ui.Printf(labelLegend+"\n",
 		ui.Color(symbolPass, ui.ColorGreen),
 		ui.Color(symbolError, ui.ColorRed),
 		ui.Color(symbolMismatch, ui.ColorYellow),
 	)
 
-	ui.Println()
+	newLine()
 	if !rd.verbose {
 		ui.Println(labelVerboseTip)
 	}
@@ -317,7 +350,7 @@ func (rd *ResultDisplayer) displayTransformation(
 		rd.displayTestResult(result.Name, testResult, expectedOutput)
 	}
 
-	ui.Println()
+	newLine()
 }
 
 func (rd *ResultDisplayer) displayTestResult(
@@ -417,7 +450,7 @@ func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 		group := errorGroups[msgKey]
 		lines := strings.Split(group.message, "\n")
 
-		ui.Println()
+		newLine()
 		ui.Printf(labelErrorField+"\n", lines[0])
 		if len(lines) > 1 {
 			ui.Println(lines[1])
@@ -427,7 +460,7 @@ func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 			printFullStackTrace(lines[2:], 0)
 		}
 
-		ui.Println()
+		newLine()
 		if len(group.indices) == 1 {
 			ui.Printf(labelErrorOccurred1+"\n", group.indices[0])
 		} else {
@@ -436,13 +469,13 @@ func (rd *ResultDisplayer) printErrorDetail(detail failureDetail) {
 		}
 
 		if rd.verbose && group.event != nil {
-			ui.Println()
+			newLine()
 			ui.Printf(labelInputEvent+"\n", group.eventIndex)
 			ui.Println(formatJSON(group.event))
 		}
 
 		if groupIdx < len(groupOrder)-1 {
-			ui.Println()
+			newLine()
 			printSeparator("=")
 		}
 	}
@@ -470,7 +503,7 @@ func groupErrorsByMessage(errors []transformations.TestError) (map[string]*error
 
 func (rd *ResultDisplayer) printMismatchedOutput(detail failureDetail) {
 	if len(detail.expectedOutput) == 0 {
-		ui.Println()
+		newLine()
 		ui.Println("Actual output mismatched from expected output")
 		return
 	}
@@ -486,7 +519,7 @@ func (rd *ResultDisplayer) printMismatchedOutput(detail failureDetail) {
 		contextLines,
 	)
 
-	ui.Println()
+	newLine()
 	ui.Println(diff)
 }
 
@@ -502,6 +535,28 @@ func formatJSON(v any) string {
 	return string(jsonBytes)
 }
 
+/*
+generateDiff creates a unified diff between expected and actual strings.
+contextLines controls how many unchanged lines to show around changes (0 = none, 3 = typical).
+
+Example:
+
+	expected := `{
+	  "status": "success"
+	}`
+	actual := `{
+	  "status": "failed",
+	  "error": "timeout"
+	}`
+	diff := generateDiff(expected, actual, 0)
+	// Returns:
+	// --- Expected
+	// +++ Actual
+	// @@ -2 +2,2 @@
+	// -  "status": "success"
+	// +  "status": "failed",
+	// +  "error": "timeout"
+*/
 func generateDiff(expected, actual string, contextLines int) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
