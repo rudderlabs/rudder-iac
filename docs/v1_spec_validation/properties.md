@@ -26,8 +26,8 @@ These rules decode into V0 structs (`PropertySpec` / `Property`) and do **not** 
 | Config keys | camelCase (`itemTypes`, `minLength`, `maxLength`, `exclusiveMinimum`) | snake_case (`item_types`, `min_length`, `max_length`, `exclusive_minimum`) |
 | Multiple types | Comma-separated in `type` field (e.g. `"string,number"`) | Separate `types` array field (e.g. `["string", "number"]`) |
 | Item types | Inside config as `itemTypes` | Top-level `item_type` (single) and `item_types` (array) fields |
-| Validation tags on struct | Has `validate:"required"`, `validate:"gte=1,lte=65"` etc. | No validation tags on V1 struct |
-| Ref format for custom types | `#/custom-types/<group>/<id>` | `#custom-type:<id>` |
+| Validation tags on struct | Has `validate:"required"`, `validate:"gte=1,lte=65"` etc. | **Add matching tags** (see below) |
+| Ref format for custom types | `#/custom-types/<group>/<id>` | `#custom-type:<id>` (use `pattern=custom_type_ref`) |
 
 ### V0.1 Struct (`Property` in `localcatalog/model.go`)
 
@@ -41,7 +41,7 @@ type Property struct {
 }
 ```
 
-### V1 Struct (`PropertyV1` in `localcatalog/model_v1.go`)
+### V1 Struct — Current (`PropertyV1` in `localcatalog/model_v1.go`)
 
 ```go
 type PropertyV1 struct {
@@ -56,27 +56,63 @@ type PropertyV1 struct {
 }
 ```
 
+### V1 Struct — Updated (tags to add)
+
+```go
+type PropertyV1 struct {
+    LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
+    Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
+    Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
+    Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty"`
+    Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
+    ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
+    ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`
+    Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
+}
+```
+
+Also update `PropertySpecV1` to enable recursive validation via `dive`:
+
+```go
+type PropertySpecV1 struct {
+    Properties []PropertyV1 `mapstructure:"properties" json:"properties" validate:"dive"`
+}
+```
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("properties", "rudder/v1")` and decode into `PropertySpecV1` / `PropertyV1`.
 
+### Tag-Based (handled by `rules.ValidateStruct()`)
+
+| # | Validation | Tag | Description |
+|---|-----------|-----|-------------|
+| 1 | `id` required | `validate:"required"` on `LocalID` | Property must have a non-empty `id` |
+| 2 | `name` required + length | `validate:"required,gte=1,lte=65"` on `Name` | Property must have a non-empty `name`, 1-65 chars |
+| 3 | `description` constraints | `validate:"omitempty,gte=3,lte=2000"` on `Description` | If present, 3-2000 chars |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `id` required | Property must have a non-empty `id` field |
-| 2 | `name` required | Property must have a non-empty `name` field |
-| 3 | `type` and `types` mutually exclusive | Only one of `type` (single) or `types` (array) can be specified |
-| 4 | `item_type` and `item_types` mutually exclusive | Only one of `item_type` (single) or `item_types` (array) can be specified |
-| 5 | No leading/trailing whitespace in `name` | Property name must not have leading or trailing whitespace |
-| 6 | `types` array values in ValidTypes | Each value in `types` must be one of: string, number, integer, boolean, null, array, object |
-| 7 | No duplicate values in `types` array | The `types` array must not contain duplicate type values |
-| 8 | Custom-type in `type` disallows `config` | When `type` references a custom type (`#custom-type:<id>`), `config` must be nil |
-| 9 | No comma-separated values in `type` | The `type` field must not contain comma-separated values; use `types` array instead |
-| 10 | `type` must be in ValidTypes or custom-type ref | Single `type` must be a valid primitive type or a custom-type reference (`#custom-type:<id>`) |
-| 11 | `item_type` must be in ValidTypes or custom-type ref | `item_type` must be a valid primitive type or custom-type reference |
-| 12 | `item_types` with custom-type must be single element | If `item_types` array contains a custom-type ref, it must be the only element |
-| 13 | Config validation per type | Validate `config` fields based on the property type (snake_case keys: `min_length`, `max_length`, `pattern`, `format` for string; `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum`, `multiple_of` for number/integer; `item_types`, `min_items`, `max_items`, `unique_items` for array; etc.) |
+| 4 | `type` and `types` mutually exclusive | Only one of `type` (single) or `types` (array) can be specified |
+| 5 | `item_type` and `item_types` mutually exclusive | Only one of `item_type` (single) or `item_types` (array) can be specified |
+| 6 | No leading/trailing whitespace in `name` | Property name must not have leading or trailing whitespace |
+| 7 | `types` array values in ValidTypes | Each value in `types` must be one of: string, number, integer, boolean, null, array, object |
+| 8 | No duplicate values in `types` array | The `types` array must not contain duplicate type values |
+| 9 | Custom-type in `type` disallows `config` | When `type` references a custom type (`#custom-type:<id>`), `config` must be nil |
+| 10 | No comma-separated values in `type` | The `type` field must not contain comma-separated values; use `types` array instead |
+| 11 | `type` must be in ValidTypes or custom-type ref | Single `type` must be a valid primitive type or a custom-type reference (`#custom-type:<id>`) |
+| 12 | `item_type` must be in ValidTypes or custom-type ref | `item_type` must be a valid primitive type or custom-type reference |
+| 13 | `item_types` with custom-type must be single element | If `item_types` array contains a custom-type ref, it must be the only element |
+
+### Out of Scope (handled separately)
+
+| # | Validation | Description |
+|---|-----------|-------------|
+| - | Config validation per type | Validate `config` fields based on the property type (snake_case keys: `min_length`, `max_length`, `pattern`, `format` for string; `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum`, `multiple_of` for number/integer; `item_types`, `min_items`, `max_items`, `unique_items` for array; etc.). **Will be handled in a separate PR/task.** |
 
 ---
 
@@ -88,8 +124,13 @@ These rules must target `MatchKindVersion("properties", "rudder/v1")` and decode
 | 2 | Custom-type refs in `item_type` resolve | If `item_type` is a custom-type ref, it must exist in the graph |
 | 3 | Custom-type refs in `item_types` resolve | Each custom-type ref in `item_types` must exist in the graph |
 | 4 | No custom-type refs in `types` array | The `types` array must not contain custom-type references (use single `type` field instead) |
-| 5 | Config `item_types` custom-type refs resolve | Custom-type references within config `item_types` must resolve in the graph |
-| 6 | `(name, type, itemTypes)` uniqueness | No two properties may share the same combination of (name, type, itemTypes) |
+| 5 | `(name, type, itemTypes)` uniqueness | No two properties may share the same combination of (name, type, itemTypes) |
+
+### Out of Scope (handled separately)
+
+| # | Validation | Description |
+|---|-----------|-------------|
+| - | Config `item_types` custom-type refs resolve | Custom-type references within config `item_types` must resolve in the graph. **Will be handled in a separate PR/task alongside config validation.** |
 
 Note: `id` uniqueness is handled by the project-level rule `project/duplicate-local-id` which is version-agnostic.
 
@@ -97,9 +138,10 @@ Note: `id` uniqueness is handled by the project-level rule `project/duplicate-lo
 
 ## Acceptance Criteria
 
-- [ ] All 13 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("properties", "rudder/v1")` and decoding into `PropertySpecV1`
-- [ ] All 6 semantic validations listed above are implemented as V1 rules
-- [ ] Config validation handles snake_case keys (`min_length`, `max_length`, `item_types`, etc.) for V1 specs
+- [ ] `validate:` tags added to `PropertyV1` and `PropertySpecV1` structs matching V0.1 style
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#3)
+- [ ] Custom logic implemented for validations #4-#13 (mutual exclusivity, type checks) -- config validation excluded, handled separately
+- [ ] All 5 semantic validations listed above are implemented as V1 rules (config `item_types` ref resolution excluded, handled separately)
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
 
@@ -122,15 +164,16 @@ Note: `id` uniqueness is handled by the project-level rule `project/duplicate-lo
 
 ## Summary
 
-Add V1 spec validation rules for the `properties` resource in the datacatalog provider. These rules target `rudder/v1` specs and decode into `PropertySpecV1`/`PropertyV1` structs, implementing 13 syntactic and 6 semantic validations.
+Add V1 spec validation rules for the `properties` resource in the datacatalog provider. These rules target `rudder/v1` specs and decode into `PropertySpecV1`/`PropertyV1` structs, implementing syntactic and semantic validations. Config validation is excluded and will be handled separately.
 
 ---
 
 ## Changes
 
-* Add V1 syntactic rule for property spec validation (id, name, type/types exclusivity, config validation)
+* Add `validate:` tags to `PropertyV1` and `PropertySpecV1` structs
+* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom logic for type/types exclusivity
 * Add V1 semantic rule for property reference resolution and uniqueness
-* Add V1 config validation handling snake_case keys
+* **Note**: Config validation (per-type config fields, snake_case keys) is out of scope and will be handled separately
 
 ---
 

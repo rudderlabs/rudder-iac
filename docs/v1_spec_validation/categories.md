@@ -21,9 +21,9 @@ These rules decode into V0 structs (`CategorySpec` / `Category`) and do **not** 
 
 | Aspect | V0.1 (`Category`) | V1 (`CategoryV1`) |
 |--------|---------------------|--------------------|
-| Validation tags | Has `validate:"required"`, `validate:"pattern=display_name"` | No validation tags |
+| Validation tags | Has `validate:"required"`, `validate:"pattern=display_name"` | **Add matching tags** (see below) |
 
-The structures are nearly identical. The only difference is the presence of go-validator tags on V0.1 structs.
+The structures are nearly identical. V1 structs must be updated to include the same `validate:` tags as V0.1, so that `rules.ValidateStruct()` handles tag-expressible validations automatically.
 
 ### V0.1 Struct (`Category` in `localcatalog/model.go`)
 
@@ -34,7 +34,7 @@ type Category struct {
 }
 ```
 
-### V1 Struct (`CategoryV1` in `localcatalog/model.go`)
+### V1 Struct — Current (`CategoryV1` in `localcatalog/model.go`)
 
 ```go
 type CategoryV1 struct {
@@ -43,17 +43,44 @@ type CategoryV1 struct {
 }
 ```
 
+### V1 Struct — Updated (tags to add)
+
+```go
+type CategoryV1 struct {
+    LocalID string `mapstructure:"id" json:"id" validate:"required"`
+    Name    string `mapstructure:"name" json:"name" validate:"required,pattern=display_name"`
+}
+```
+
+Also update `CategorySpecV1` to enable recursive validation via `dive`:
+
+```go
+type CategorySpecV1 struct {
+    Categories []CategoryV1 `json:"categories" validate:"dive"`
+}
+```
+
+The `display_name` pattern (`^[A-Z_a-z][ \w,.-]{2,64}$`) is already registered in `cli/internal/providers/datacatalog/rules/constants.go`.
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("categories", "rudder/v1")` and decode into `CategorySpecV1` / `CategoryV1`.
 
+### Tag-Based (handled by `rules.ValidateStruct()`)
+
+| # | Validation | Tag | Description |
+|---|-----------|-----|-------------|
+| 1 | `id` required | `validate:"required"` on `LocalID` | Category must have non-empty `id` |
+| 2 | `name` required | `validate:"required"` on `Name` | Category must have non-empty `name` |
+| 3 | `name` matches pattern | `validate:"pattern=display_name"` on `Name` | Name must match `^[A-Z_a-z][\s\w,.-]{2,64}$` |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `id` and `name` required | Category must have non-empty `id` and `name` fields |
-| 2 | No leading/trailing whitespace in `name` | Category name must not have leading or trailing whitespace characters |
-| 3 | `name` matches pattern | Name must match `^[A-Z_a-z][\s\w,.-]{2,64}$` (starts with letter or underscore, 2-64 chars, allows spaces/word chars/commas/periods/hyphens) |
+| 4 | No leading/trailing whitespace in `name` | Category name must not have leading or trailing whitespace characters |
 
 ---
 
@@ -69,7 +96,9 @@ Note: `id` uniqueness is handled by the project-level rule `project/duplicate-lo
 
 ## Acceptance Criteria
 
-- [ ] All 3 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("categories", "rudder/v1")` and decoding into `CategorySpecV1`
+- [ ] `validate:` tags added to `CategoryV1` and `CategorySpecV1` structs matching V0.1 style
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#3)
+- [ ] Custom logic implemented for whitespace check (#4)
 - [ ] The 1 semantic validation listed above is implemented as a V1 rule
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
@@ -99,7 +128,8 @@ Add V1 spec validation rules for the `categories` resource in the datacatalog pr
 
 ## Changes
 
-* Add V1 syntactic rule for category spec validation (required fields, name whitespace, name pattern)
+* Add `validate:` tags to `CategoryV1` and `CategorySpecV1` structs
+* Add V1 syntactic rule for category spec validation using `rules.ValidateStruct()` for tag-based validations + custom whitespace check
 * Add V1 semantic rule for category name uniqueness
 
 ---
