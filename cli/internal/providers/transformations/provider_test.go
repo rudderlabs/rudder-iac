@@ -126,6 +126,32 @@ func TestProvider(t *testing.T) {
 		assert.Contains(t, types, "transformation-library")
 		assert.Contains(t, types, "transformation")
 	})
+
+	t.Run("LoadLegacySpec requires V1 version", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		provider := transformations.NewProviderWithStore(mockStore)
+
+		t.Run("rejects legacy version via LoadLegacySpec", func(t *testing.T) {
+			spec := &specs.Spec{
+				Version: specs.SpecVersionV0_1,
+				Kind:    "transformation",
+				Metadata: map[string]any{
+					"name": "test-transformation",
+				},
+				Spec: map[string]any{
+					"language": "javascript",
+					"code":     "export function transformEvent(event, metadata) { return event; }",
+				},
+			}
+
+			err := provider.LoadLegacySpec("test.yaml", spec)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "transformation specs require version 'rudder/v1'")
+			assert.Contains(t, err.Error(), "Legacy versions are not supported")
+		})
+	})
 }
 
 func TestResourceGraph(t *testing.T) {
@@ -152,6 +178,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load a library spec
 		err := provider.LoadSpec("lib.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
@@ -185,6 +212,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load a transformation spec without imports
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
@@ -217,6 +245,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load a library spec
 		err := provider.LoadSpec("lib.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
@@ -230,6 +259,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load a transformation spec that imports the library
 		err = provider.LoadSpec("trans.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
@@ -263,6 +293,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load first library
 		err := provider.LoadSpec("lib1.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
@@ -276,6 +307,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load second library
 		err = provider.LoadSpec("lib2.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-2",
@@ -289,6 +321,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load transformation that imports both libraries
 		err = provider.LoadSpec("trans.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
@@ -324,6 +357,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load transformation that imports a non-existent library
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
@@ -350,6 +384,7 @@ func TestResourceGraph(t *testing.T) {
 
 		// Load a Python transformation (parser returns empty imports)
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
+			Version: specs.SpecVersionV1,
 			Kind: "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",

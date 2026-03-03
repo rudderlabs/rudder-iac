@@ -115,7 +115,7 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	switch {
 	case spec.IsLegacyVersion():
 		return p.provider.LoadLegacySpec(path, spec)
-	case spec.Version == specs.SpecVersionV1 && p.loadV1Specs:
+	case spec.Version == specs.SpecVersionV1:
 		return p.provider.LoadSpec(path, spec)
 	default:
 		return fmt.Errorf("unsupported spec version: %s", spec.Version)

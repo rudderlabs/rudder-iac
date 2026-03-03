@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
@@ -59,6 +60,10 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 		BaseProvider: provider.NewBaseProvider(handlers),
 		store:        store,
 	}
+}
+
+func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
+	return fmt.Errorf("transformation specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
 }
 
 // MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations
