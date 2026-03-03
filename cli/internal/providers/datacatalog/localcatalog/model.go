@@ -98,8 +98,8 @@ func ExtractEvents(s *specs.Spec) ([]EventV1, error) {
 
 // CategoryV1 represents a user-defined category
 type CategoryV1 struct {
-	LocalID string `mapstructure:"id" json:"id"`
-	Name    string `mapstructure:"name" json:"name"`
+	LocalID string `mapstructure:"id" json:"id" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=display_name"`
 }
 
 // Category represents a user-defined category (V0 spec)
@@ -114,7 +114,7 @@ type CategorySpec struct {
 
 // CategorySpecV1 represents the spec section of a categories resource
 type CategorySpecV1 struct {
-	Categories []CategoryV1 `json:"categories"`
+	Categories []CategoryV1 `json:"categories" validate:"dive"`
 }
 
 // ExtractCategories parses a resource definition and extracts categories
