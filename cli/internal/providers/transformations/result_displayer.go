@@ -156,11 +156,12 @@ func NewResultDisplayer(verbose bool) *ResultDisplayer {
 
 // Display formats and displays test results
 func (rd *ResultDisplayer) Display(results *TestResults) {
+	rd.printHeader()
 	rd.displayDefaultTestSuiteWarning(results)
 
-	rd.printHeader()
 	rd.displayLibraries(results.Libraries)
 	rd.displayTransformations(results.Transformations)
+
 	rd.printSummary()
 }
 
@@ -170,9 +171,8 @@ func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *TestResults) 
 		return
 	}
 
-	ui.Println()
-	ui.Println(ui.Color("WARNING: Default test suite used", ui.ColorYellow))
-	ui.Printf("No test suites defined for transformations: %s. Used default events to test.\n", strings.Join(names, ", "))
+	ui.Println(ui.Color("WARNING: Default test suite used for test", ui.ColorYellow))
+	ui.Printf("No test suites defined for transformations:\n - %s\n", strings.Join(names, "\n - "))
 	ui.Println(ui.GreyedOut("Use `rudder-cli transformations test default-events --show` to view default events."))
 	ui.Println()
 }
