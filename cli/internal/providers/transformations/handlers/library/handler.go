@@ -179,6 +179,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteLibrary, urnResolver 
 	state := &model.LibraryState{
 		ID:        remote.ID,
 		VersionID: remote.VersionID,
+		Modified:  false,
 	}
 
 	return resource, state, nil
@@ -202,6 +203,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.LibraryResource) (
 	return &model.LibraryState{
 		ID:        created.ID,
 		VersionID: created.VersionID,
+		Modified:  true,
 	}, nil
 }
 
@@ -222,6 +224,7 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.LibraryResource
 	return &model.LibraryState{
 		ID:        updated.ID,
 		VersionID: updated.VersionID,
+		Modified:  true,
 	}, nil
 }
 
@@ -252,6 +255,7 @@ func (h *HandlerImpl) Import(ctx context.Context, data *model.LibraryResource, r
 	return &model.LibraryState{
 		ID:        updated.ID,
 		VersionID: updated.VersionID,
+		Modified:  true,
 	}, nil
 }
 
@@ -298,8 +302,8 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path: transformations/<language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(handlers.TransformationsDir, langFolder, externalID+ext)
+		// For the actual file entity, we need just <language-folder>/<external-id>.<ext>
+		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
 		// Build import metadata
 		workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -348,7 +352,7 @@ func (h *HandlerImpl) FormatForExport(
 		// Add code file entity
 		formattables = append(formattables, writer.FormattableEntity{
 			Content:      remote.Code,
-			RelativePath: codeFilePath,
+			RelativePath: filepath.Join(handlers.TransformationsDir, codeFilePath),
 		})
 	}
 

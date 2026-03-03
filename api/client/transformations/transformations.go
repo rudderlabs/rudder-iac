@@ -33,8 +33,8 @@ type TransformationStore interface {
 	SetLibraryExternalID(ctx context.Context, id string, externalID string) error
 
 	// Batch operations
-	BatchPublish(ctx context.Context, req *BatchPublishRequest) error
-	BatchTest(ctx context.Context, req *BatchTestRequest) ([]*TransformationTestResult, error)
+	BatchPublish(ctx context.Context, req *BatchPublishRequest) (*BatchPublishResponse, error)
+	BatchTest(ctx context.Context, req *BatchTestRequest) (*BatchTestResponse, error)
 }
 
 type rudderTransformationStore struct {
@@ -267,23 +267,28 @@ func (r *rudderTransformationStore) SetLibraryExternalID(ctx context.Context, id
 // Batch operations
 
 // BatchPublish publishes multiple transformations and libraries in a single batch operation
-func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *BatchPublishRequest) error {
+func (r *rudderTransformationStore) BatchPublish(ctx context.Context, req *BatchPublishRequest) (*BatchPublishResponse, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("marshalling batch publish request: %w", err)
+		return nil, fmt.Errorf("marshalling batch publish request: %w", err)
 	}
 
-	path := "/transformations/libraries/publish"
-	_, err = r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	path := "/transformations/publish"
+	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("batch publishing: %w", err)
+		return nil, fmt.Errorf("batch publishing: %w", err)
 	}
 
-	return nil
+	var batchResp BatchPublishResponse
+	if err := json.Unmarshal(resp, &batchResp); err != nil {
+		return nil, fmt.Errorf("unmarshalling batch publish response: %w", err)
+	}
+
+	return &batchResp, nil
 }
 
 // BatchTest runs tests for multiple transformations
-func (r *rudderTransformationStore) BatchTest(ctx context.Context, req *BatchTestRequest) ([]*TransformationTestResult, error) {
+func (r *rudderTransformationStore) BatchTest(ctx context.Context, req *BatchTestRequest) (*BatchTestResponse, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling batch test request: %w", err)
@@ -295,10 +300,10 @@ func (r *rudderTransformationStore) BatchTest(ctx context.Context, req *BatchTes
 		return nil, fmt.Errorf("running batch tests: %w", err)
 	}
 
-	var results []*TransformationTestResult
-	if err := json.Unmarshal(resp, &results); err != nil {
+	var batchResp BatchTestResponse
+	if err := json.Unmarshal(resp, &batchResp); err != nil {
 		return nil, fmt.Errorf("unmarshalling batch test response: %w", err)
 	}
 
-	return results, nil
+	return &batchResp, nil
 }

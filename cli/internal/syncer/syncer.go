@@ -161,7 +161,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	// Consolidate sync: providers can perform batch operations or multi-resource
 	// coordination after all individual resources have been processed
-	if err := s.provider.ConsolidateSync(ctx, state); err != nil {
+	if err := s.provider.ConsolidateSync(ctx, target, state); err != nil {
 		return []error{err}
 	}
 

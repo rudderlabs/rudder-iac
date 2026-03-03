@@ -12,9 +12,9 @@ import (
 
 func NewCmdTransformations() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "transformations <command>",
-		Short: "Manage transformations",
-		Long:  "Manage the lifecycle of transformations and libraries",
+		Use:    "transformations <command>",
+		Short:  "Manage transformations",
+		Long:   "Manage the lifecycle of transformations and libraries",
 		Hidden: true,
 		Example: heredoc.Doc(`
 			$ rudder-cli transformations test my-transformation-id

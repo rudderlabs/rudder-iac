@@ -56,7 +56,7 @@ func (p *EmptyProvider) MigrateSpec(_ *specs.Spec) (*specs.Spec, error) {
 }
 
 // ConsolidateSync default implementation
-func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *state.State) error {
+func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *resources.Graph, _ *state.State) error {
 	// Default: no consolidation needed
 	return nil
 }

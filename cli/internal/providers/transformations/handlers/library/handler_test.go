@@ -130,11 +130,11 @@ func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Contex
 	return fmt.Errorf("not implemented")
 }
 
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) error {
-	return fmt.Errorf("not implemented")
+func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) ([]*transformations.TransformationTestResult, error) {
+func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -798,6 +798,7 @@ func TestMapRemoteToState(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.False(t, state.Modified)
 	})
 }
 
@@ -827,6 +828,7 @@ func TestCreate(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-456", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -935,6 +937,7 @@ func TestUpdate(t *testing.T) {
 
 		assert.Equal(t, "lib-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 	})
 
 	t.Run("API error", func(t *testing.T) {
@@ -1157,6 +1160,7 @@ func TestImport(t *testing.T) {
 		require.NotNil(t, state)
 		assert.Equal(t, "lib-remote-123", state.ID)
 		assert.Equal(t, "ver-updated", state.VersionID)
+		assert.True(t, state.Modified)
 		assert.Equal(t, "ext-new-123", capturedExternalID)
 		assert.True(t, mockStore.getLibraryCalled)
 		assert.True(t, mockStore.setLibraryExternalIDCalled)
@@ -1288,7 +1292,7 @@ func TestFormatForExport(t *testing.T) {
 		assert.Equal(t, "Test library", spec.Spec["description"])
 		assert.Equal(t, "javascript", spec.Spec["language"])
 		assert.Equal(t, "myLibrary", spec.Spec["import_name"])
-		assert.Equal(t, "transformations/javascript/my-library.js", spec.Spec["file"])
+		assert.Equal(t, "javascript/my-library.js", spec.Spec["file"])
 
 		// Check code file
 		assert.Equal(t, "transformations/javascript/my-library.js", result[1].RelativePath)
@@ -1329,7 +1333,7 @@ func TestFormatForExport(t *testing.T) {
 		// Check YAML spec has .py extension
 		spec := result[0].Content.(*specs.Spec)
 		assert.Equal(t, "python", spec.Spec["language"])
-		assert.Equal(t, "transformations/python/my-py-lib.py", spec.Spec["file"])
+		assert.Equal(t, "python/my-py-lib.py", spec.Spec["file"])
 
 		// Check code file path
 		assert.Equal(t, "transformations/python/my-py-lib.py", result[1].RelativePath)

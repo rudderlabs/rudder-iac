@@ -13,8 +13,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/samber/lo"
 )
 
 var log = logger.New("transformationsprovider")
@@ -212,18 +214,27 @@ func (p *Provider) DeleteRaw(_ context.Context, _ string, resourceType string, _
 
 // ConsolidateSync implements batch publishing of all transformations and libraries
 // This is called after all Create/Update operations to publish changes in a single batch
-func (p *Provider) ConsolidateSync(ctx context.Context, st *state.State) error {
-	// Phase 1: Batch publish all draft versions
-	req, err := p.buildBatchPublishRequest(st)
+func (p *Provider) ConsolidateSync(ctx context.Context, graph *resources.Graph, st *state.State) error {
+	req, err := p.buildBatchPublishRequest(graph, st)
 	if err != nil {
 		return fmt.Errorf("building batch publish request: %w", err)
 	}
 
 	if len(req.Transformations) > 0 || len(req.Libraries) > 0 {
-		if err := p.store.BatchPublish(ctx, req); err != nil {
+		resp, err := p.store.BatchPublish(ctx, req)
+		if err != nil {
 			return fmt.Errorf("batch publishing %d transformations and %d libraries: %w",
 				len(req.Transformations), len(req.Libraries), err)
 		}
+
+		if !resp.Published {
+			// Convert response to TestResults and display using shared result displayer
+			results := p.buildTestResultsFromResponse(resp)
+			displayer := NewResultDisplayer(false)
+			displayer.Display(results)
+			return fmt.Errorf("batch publish validation failed")
+		}
+
 		log.Info("Successfully published transformations and libraries",
 			"transformations", len(req.Transformations), "libraries", len(req.Libraries))
 	}
@@ -259,42 +270,176 @@ func (p *Provider) executePendingDeletes(ctx context.Context) error {
 	return nil
 }
 
-// buildBatchPublishRequest builds the batch publish request by extracting version IDs from state
-func (p *Provider) buildBatchPublishRequest(st *state.State) (*transformations.BatchPublishRequest, error) {
+// buildBatchPublishRequest builds the batch publish request by extracting version IDs from state.
+// Only publishes modified resources and their dependencies/dependents.
+// Includes test suites for transformations when available.
+func (p *Provider) buildBatchPublishRequest(graph *resources.Graph, st *state.State) (*transformations.BatchPublishRequest, error) {
+	transformationURNs, libraryURNs := p.collectModifiedResources(st)
+
+	var (
+		transformationsToPublish = make(map[string]struct{})
+		librariesToPublish       = make(map[string]struct{})
+	)
+
+	for _, urn := range transformationURNs {
+		transformationsToPublish[urn] = struct{}{}
+
+		for _, libDep := range graph.GetDependencies(urn) {
+			librariesToPublish[libDep] = struct{}{}
+		}
+	}
+
+	for _, urn := range libraryURNs {
+		librariesToPublish[urn] = struct{}{}
+
+		for _, tranURN := range graph.GetDependents(urn) {
+			// This transformation needs to be published because its library changed
+			transformationsToPublish[tranURN] = struct{}{}
+
+			for _, libURN := range graph.GetDependencies(tranURN) {
+				librariesToPublish[libURN] = struct{}{}
+			}
+		}
+	}
+
+	return p.buildRequestFromURNs(graph, st, transformationsToPublish, librariesToPublish)
+}
+
+func (p *Provider) collectModifiedResources(st *state.State) (transformationURNs []string, libraryURNs []string) {
+	for _, resource := range st.Resources {
+
+		switch resource.Type {
+		case library.HandlerMetadata.ResourceType:
+			if libState, ok := resource.OutputRaw.(*model.LibraryState); ok {
+				if libState.Modified {
+					urn := resources.URN(resource.ID, resource.Type)
+					libraryURNs = append(libraryURNs, urn)
+				}
+			}
+
+		case transformation.HandlerMetadata.ResourceType:
+			if transState, ok := resource.OutputRaw.(*model.TransformationState); ok {
+				if transState.Modified {
+					urn := resources.URN(resource.ID, resource.Type)
+					transformationURNs = append(transformationURNs, urn)
+				}
+			}
+		}
+	}
+
+	return transformationURNs, libraryURNs
+}
+
+func (p *Provider) buildRequestFromURNs(
+	graph *resources.Graph,
+	st *state.State,
+	transformationURNs map[string]struct{},
+	libraryURNs map[string]struct{},
+) (*transformations.BatchPublishRequest, error) {
 	req := &transformations.BatchPublishRequest{
 		Transformations: []transformations.BatchPublishTransformation{},
 		Libraries:       []transformations.BatchPublishLibrary{},
 	}
 
-	for urn, resource := range st.Resources {
-		switch resource.Type {
-		case library.HandlerMetadata.ResourceType:
-			libState, ok := resource.OutputRaw.(*model.LibraryState)
-			if !ok {
-				return nil, fmt.Errorf("resource %s has invalid OutputRaw type for library", urn)
-			}
-			if libState.VersionID == "" {
-				return nil, fmt.Errorf("resource %s has empty version ID", urn)
-			}
+	for libURN := range libraryURNs {
+		lib, err := p.buildLibraryPublishItem(st, libURN)
+		if err != nil {
+			return nil, err
+		}
+		if lib != nil {
+			req.Libraries = append(req.Libraries, *lib)
+		}
+	}
 
-			req.Libraries = append(req.Libraries, transformations.BatchPublishLibrary{
-				VersionID: libState.VersionID,
-			})
-
-		case transformation.HandlerMetadata.ResourceType:
-			transState, ok := resource.OutputRaw.(*model.TransformationState)
-			if !ok {
-				return nil, fmt.Errorf("resource %s has invalid OutputRaw type for transformation", urn)
-			}
-			if transState.VersionID == "" {
-				return nil, fmt.Errorf("resource %s has empty version ID", urn)
-			}
-
-			req.Transformations = append(req.Transformations, transformations.BatchPublishTransformation{
-				VersionID: transState.VersionID,
-			})
+	for transURN := range transformationURNs {
+		trans, err := p.buildTransformationPublishItem(graph, st, transURN)
+		if err != nil {
+			return nil, err
+		}
+		if trans != nil {
+			req.Transformations = append(req.Transformations, *trans)
 		}
 	}
 
 	return req, nil
+}
+
+func (p *Provider) buildLibraryPublishItem(st *state.State, libURN string) (*transformations.BatchPublishLibrary, error) {
+	stateResource := st.GetResource(libURN)
+
+	libState, ok := stateResource.OutputRaw.(*model.LibraryState)
+	if !ok {
+		return nil, fmt.Errorf("resource %s has invalid OutputRaw type for library", libURN)
+	}
+	if libState.VersionID == "" {
+		return nil, fmt.Errorf("resource %s has empty version ID", libURN)
+	}
+
+	return &transformations.BatchPublishLibrary{
+		VersionID: libState.VersionID,
+	}, nil
+}
+
+func (p *Provider) buildTransformationPublishItem(graph *resources.Graph, st *state.State, transURN string) (*transformations.BatchPublishTransformation, error) {
+	stateResource := st.GetResource(transURN)
+
+	transState, ok := stateResource.OutputRaw.(*model.TransformationState)
+	if !ok {
+		return nil, fmt.Errorf("resource %s has invalid OutputRaw type for transformation", transURN)
+	}
+	if transState.VersionID == "" {
+		return nil, fmt.Errorf("resource %s has empty version ID", transURN)
+	}
+
+	testSuite, err := p.resolveTestSuite(graph, transURN)
+	if err != nil {
+		return nil, fmt.Errorf("resolving test suite for %s: %w", transURN, err)
+	}
+
+	return &transformations.BatchPublishTransformation{
+		VersionID: transState.VersionID,
+		TestSuite: testSuite,
+	}, nil
+}
+
+func (p *Provider) resolveTestSuite(graph *resources.Graph, transURN string) ([]transformations.TestDefinition, error) {
+	graphResource, exists := graph.GetResource(transURN)
+	if !exists {
+		return nil, fmt.Errorf("resource %s not found in graph", transURN)
+	}
+
+	transResource, ok := graphResource.RawData().(*model.TransformationResource)
+	if !ok {
+		return nil, fmt.Errorf("resource %s has invalid RawData type for transformation", transURN)
+	}
+
+	testDefs, err := p.resolveTestDefinitions(transResource)
+	if err != nil {
+		return nil, fmt.Errorf("resolving test definitions: %w", err)
+	}
+
+	testSuite := make([]transformations.TestDefinition, 0, len(testDefs))
+	for _, td := range testDefs {
+		testSuite = append(testSuite, *td)
+	}
+
+	return testSuite, nil
+}
+
+func (p *Provider) resolveTestDefinitions(trans *model.TransformationResource) ([]*transformations.TestDefinition, error) {
+	return testorchestrator.ResolveTestDefinitions(trans)
+}
+
+func (p *Provider) buildTestResultsFromResponse(resp *transformations.BatchPublishResponse) *TestResults {
+	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *TransformationTestWithDefinitions {
+		return &TransformationTestWithDefinitions{
+			Result:      &tr,
+			Definitions: nil,
+		}
+	})
+
+	return &TestResults{
+		Libraries:       resp.ValidationOutput.Libraries,
+		Transformations: trResults,
+	}
 }

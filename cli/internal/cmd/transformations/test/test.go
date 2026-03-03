@@ -1,7 +1,9 @@
 package test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -11,14 +13,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
+var ErrTestsFailed = errors.New("one or more tests failed")
+
 var (
-	testLog = logger.New("root", logger.Attr{
+	testLog = logger.New("transformations", logger.Attr{
 		Key:   "cmd",
-		Value: "transformations-test",
+		Value: "test",
 	})
 )
 
@@ -105,30 +110,53 @@ func NewCmdTest() *cobra.Command {
 
 			testLog.Debug("test", "location", location, "all", all, "modified", modified, "verbose", verbose)
 
+			ctx := context.Background()
+			// Get workspace information
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(ctx)
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
 			// Get resource graph
-			_, err := p.ResourceGraph()
+			graph, err := p.ResourceGraph()
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
-			// Determine mode and target ID
-			_ = args // Will be used in Phase 3
+			// Create transformations provider
+			trProvider := deps.Providers().Transformations
 
-			// TODO: Create test runner and execute tests
-			// runner := testorchestrator.NewRunner(deps, provider, graph)
-			// results, err := runner.Run(ctx, mode, targetID)
-			// if err != nil {
-			//     return fmt.Errorf("running tests: %w", err)
-			// }
+			// Determine test mode and target
+			var mode testorchestrator.Mode
+			var targetID string
 
-			// TODO: Format and display results
-			// formatter := testorchestrator.NewFormatter(verbose)
-			// formatter.Display(results)
+			if all {
+				mode = testorchestrator.ModeAll
+			} else if modified {
+				mode = testorchestrator.ModeModified
+			} else {
+				mode = testorchestrator.ModeSingle
+				targetID = args[0]
+			}
 
-			// TODO: Exit with error if any tests failed
+			spinner := ui.NewSpinner("Running tests...")
+			spinner.Start()
 
-			testLog.Info("Test command not yet fully implemented")
-			ui.Println(ui.Color("Test orchestrator implementation pending (Phase 3)", ui.ColorYellow))
+			runner := testorchestrator.NewRunner(deps.Client(), trProvider, graph, workspace.ID)
+			results, err := runner.Run(ctx, mode, targetID)
+
+			spinner.Stop()
+
+			if err != nil {
+				return fmt.Errorf("running tests: %w", err)
+			}
+
+			displayer := transformations.NewResultDisplayer(verbose)
+			displayer.Display(results)
+
+			if results.HasFailures() {
+				return ErrTestsFailed
+			}
 
 			return nil
 		},

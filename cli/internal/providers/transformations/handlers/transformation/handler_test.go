@@ -128,11 +128,11 @@ func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id s
 	return fmt.Errorf("not implemented")
 }
 
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) error {
-	return fmt.Errorf("not implemented")
+func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) ([]*transformations.TransformationTestResult, error) {
+func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -254,6 +254,36 @@ func TestValidateSpec(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "either code or file must be specified",
+		},
+		{
+			name: "valid spec with tests containing names",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: "Suite 2"},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple tests with one missing name",
+			spec: &model.TransformationSpec{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: ""},
+					{Name: "Suite 3"},
+				},
+			},
+			expectedError: true,
+			errorContains: "name is required for each spec tests block",
 		},
 	}
 
@@ -509,6 +539,64 @@ func TestValidateResource(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "language must be javascript or python",
+		},
+		{
+			name: "valid test names with allowed characters",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite 1"},
+					{Name: "Suite-1"},
+					{Name: "Suite_1"},
+					{Name: "Suite/1"},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "empty test name",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: ""},
+				},
+			},
+			expectedError: true,
+			errorContains: "test name is required",
+		},
+		{
+			name: "whitespace-only test name",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "    "},
+				},
+			},
+			expectedError: true,
+			errorContains: "test name is required",
+		},
+		{
+			name: "invalid test name character",
+			resource: &model.TransformationResource{
+				ID:       "test-trans",
+				Name:     "Test Transformation",
+				Language: "javascript",
+				Code:     "export function transformEvent(event, metadata) { return event; }",
+				Tests: []specs.TransformationTest{
+					{Name: "Suite@1"},
+				},
+			},
+			expectedError: true,
+			errorContains: "invalid test name",
 		},
 	}
 

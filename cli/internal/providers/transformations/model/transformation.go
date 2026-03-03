@@ -22,8 +22,9 @@ type TransformationResource struct {
 // TransformationState represents the output state from the remote system
 // Contains computed fields (remote ID, version ID)
 type TransformationState struct {
-	ID        string `json:"id"`        // Remote ID
-	VersionID string `json:"versionId"` // Remote version ID
+	ID        string `json:"id"`                 // Remote ID
+	VersionID string `json:"versionId"`          // Remote version ID
+	Modified  bool   `json:"-" mapstructure:"-"` // Used to determine if it is modified during plan operations
 }
 
 // RemoteTransformation wraps transformations.Transformation to implement RemoteResource interface

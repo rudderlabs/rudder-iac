@@ -310,35 +310,34 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 
 func (p *project) registry() (rules.Registry, error) {
 	baseRegistry := rules.NewRegistry()
+	validVersions := []string{
+		specs.SpecVersionV0_1,
+		specs.SpecVersionV0_1Variant,
+	}
+	if p.loadV1Specs {
+		validVersions = append(validVersions, specs.SpecVersionV1)
+	}
 
 	// Add project-level syntactic rules along with aggregated
 	// syntactic rules from each provider.
 	syntactic := []rules.Rule{
-		prules.NewSpecSyntaxValidRule(),
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec),
-		prules.NewSpecSemanticValidRule(
+		prules.NewSpecSyntaxValidRule(
 			p.provider.SupportedKinds(),
-			[]string{
-				specs.SpecVersionV0_1,
-				specs.SpecVersionV0_1Variant,
-			},
+			validVersions,
 		),
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
 		prules.NewDuplicateLocalIDRule(p.provider.ParseSpec),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
-		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
-			return nil, fmt.Errorf("registering syntactic rule %s: %w", rule.ID(), err)
-		}
+		baseRegistry.RegisterSyntactic(rule)
 	}
 
 	semantic := p.provider.SemanticRules()
 
 	for _, rule := range semantic {
-		if err := baseRegistry.RegisterSemantic(rule); err != nil {
-			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
-		}
+		baseRegistry.RegisterSemantic(rule)
 	}
 
 	return baseRegistry, nil
