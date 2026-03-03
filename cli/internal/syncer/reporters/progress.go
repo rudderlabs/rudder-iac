@@ -42,6 +42,9 @@ func (r *ProgressSyncReporter) SyncStarted(totalTasks int) {
 }
 
 func (r *ProgressSyncReporter) SyncCompleted() {
+	if r.reporter == nil {
+		return
+	}
 	r.reporter.Done()
 }
 
