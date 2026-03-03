@@ -31,7 +31,7 @@ These rules decode into V0 structs (`TrackingPlan` / `TPRule`) and match `kind: 
 | Unplanned handling | `AllowUnplanned` on `TPRuleEvent` | `AdditionalProperties` on `TPRuleV1` and `TPRulePropertyV1` |
 | Variant property refs | `PropertyReference` with `$ref` | `PropertyReferenceV1` with `property` |
 | Include ref format | `#/tp/<group>/event_rule/<id>` | Same format |
-| Validation tags | Has `validate:"required"`, `validate:"pattern=display_name"` etc. | No validation tags |
+| Validation tags | Has `validate:"required"`, `validate:"pattern=display_name"` etc. | **Add matching tags** (see below) |
 
 ### V0.1 Structs (`TrackingPlan`, `TPRule`, `TPRuleProperty` in `localcatalog/tracking_plan.go`)
 
@@ -66,7 +66,7 @@ type TPRuleProperty struct {
 }
 ```
 
-### V1 Structs (`TrackingPlanV1`, `TPRuleV1`, `TPRulePropertyV1` in `localcatalog/tracking_plan.go`)
+### V1 Structs — Current (`TrackingPlanV1`, `TPRuleV1`, `TPRulePropertyV1` in `localcatalog/tracking_plan.go`)
 
 ```go
 type TrackingPlanV1 struct {
@@ -95,22 +95,68 @@ type TPRulePropertyV1 struct {
 }
 ```
 
+### V1 Structs — Updated (tags to add)
+
+```go
+type TrackingPlanV1 struct {
+    Name        string      `json:"display_name" validate:"required,pattern=display_name"`
+    LocalID     string      `json:"id" validate:"required"`
+    Description string      `json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+    Rules       []*TPRuleV1 `json:"rules,omitempty" validate:"omitempty,dive"`
+}
+
+type TPRuleV1 struct {
+    Type                 string              `json:"type"`
+    LocalID              string              `json:"id" validate:"required"`
+    Event                string              `json:"event"`
+    IdentitySection      string              `json:"identity_section,omitempty"`
+    AdditionalProperties bool                `json:"additionalProperties,omitempty"`
+    Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
+    Includes             *TPRuleIncludes     `json:"includes,omitempty"`
+    Variants             VariantsV1          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
+}
+
+type TPRulePropertyV1 struct {
+    Property             string              `json:"property" validate:"required,pattern=property_ref"`
+    Required             bool                `json:"required"`
+    AdditionalProperties *bool               `json:"additionalProperties,omitempty"`
+    Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
+}
+```
+
+The `VariantV1`, `VariantCaseV1`, and `PropertyReferenceV1` structs should also have tags added (see `custom_types.md` for the full variant tag definitions, which are shared across both custom types and tracking plans).
+
+The `display_name`, `letter_start`, and `property_ref` patterns are already registered.
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("tracking-plan", "rudder/v1")` and decode into `TrackingPlanV1` / `TPRuleV1`.
 
+### Tag-Based (handled by `rules.ValidateStruct()`)
+
+| # | Validation | Tag | Description |
+|---|-----------|-----|-------------|
+| 1 | `display_name` required + pattern | `validate:"required,pattern=display_name"` on `Name` | Tracking plan must have a valid display name |
+| 2 | `id` required on TP | `validate:"required"` on `TrackingPlanV1.LocalID` | Tracking plan must have non-empty `id` |
+| 3 | `description` constraints | `validate:"omitempty,gte=3,lte=2000,pattern=letter_start"` on `Description` | If present, 3-2000 chars starting with a letter |
+| 4 | Rules dive | `validate:"omitempty,dive"` on `Rules` | Recursively validates each `TPRuleV1` |
+| 5 | Rule `id` required | `validate:"required"` on `TPRuleV1.LocalID` | Each rule must have a non-empty `id` |
+| 6 | Rule properties dive | `validate:"omitempty,dive"` on `TPRuleV1.Properties` | Recursively validates each `TPRulePropertyV1` |
+| 7 | Rule variants | `validate:"omitempty,max=1,dive"` on `TPRuleV1.Variants` | Max 1 variant, dives into `VariantV1` tags |
+| 8 | Property `property` required + format | `validate:"required,pattern=property_ref"` on `TPRulePropertyV1.Property` | Must match `#properties:<id>` |
+| 9 | Nested properties dive | `validate:"omitempty,dive"` on `TPRulePropertyV1.Properties` | Recursively validates nested properties |
+| 10 | Variant structure | Tags on `VariantV1`, `VariantCaseV1`, `PropertyReferenceV1` | See custom_types.md for full variant tag definitions |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `display_name` required | Tracking plan must have a non-empty `display_name` field |
-| 2 | Rule `id` required | Each rule must have a non-empty `id` field |
-| 3 | Rule must have `event` or `includes` (not both, not neither) | Each rule must specify either an `event` string ref or an `includes` block, but not both |
-| 4 | Properties without events not allowed | Rules with `properties` must also have `event` (not just `includes`) |
-| 5 | Variant structure validation | Max 1 variant per rule; variant `type` must be `"discriminator"`; `discriminator` required; `cases` min 1 element; each case needs `display_name`, `match` (min 1, values string/bool/integer), `properties` (min 1, each with `property` field); default properties must have `property` field |
-| 6 | Nesting depth <= 3 levels | Nested properties within rules must not exceed 3 levels of nesting depth |
-| 7 | `additionalProperties` only for nested properties | The `additionalProperties` field on `TPRulePropertyV1` is only valid for properties that have nested sub-properties |
-| 8 | Nested property `property` field required, format valid | Each nested property must have a non-empty `property` field in the V1 ref format (`#property:<id>`) |
+| 11 | Rule must have `event` or `includes` (not both, not neither) | Each rule must specify either an `event` string ref or an `includes` block, but not both |
+| 12 | Properties without events not allowed | Rules with `properties` must also have `event` (not just `includes`) |
+| 13 | Nesting depth <= 3 levels | Nested properties within rules must not exceed 3 levels of nesting depth |
+| 14 | `additionalProperties` only for nested properties | The `additionalProperties` field on `TPRulePropertyV1` is only valid for properties that have nested sub-properties |
 
 ---
 
@@ -131,10 +177,12 @@ Note: Rule `id` uniqueness within a TP and `id` uniqueness across TPs are handle
 
 ## Acceptance Criteria
 
-- [ ] All 8 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("tracking-plan", "rudder/v1")` and decoding into `TrackingPlanV1`
+- [ ] `validate:` tags added to `TrackingPlanV1`, `TPRuleV1`, `TPRulePropertyV1` structs matching V0.1 style (with V1 ref patterns)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#10)
+- [ ] Custom logic implemented for event/includes exclusivity (#11), properties-require-events (#12), nesting depth (#13), and additionalProperties constraint (#14)
 - [ ] All 6 semantic validations listed above are implemented as V1 rules
 - [ ] Event refs use V1 format (string `#event:<id>` instead of object with `$ref`)
-- [ ] Property refs use V1 format (`property` field with `#property:<id>` instead of `$ref`)
+- [ ] Property refs use V1 format (`property` field with `#properties:<id>` instead of `$ref`)
 - [ ] `additionalProperties` is validated instead of `allow_unplanned`
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
@@ -164,7 +212,8 @@ Add V1 spec validation rules for the `tracking-plan` resource in the datacatalog
 
 ## Changes
 
-* Add V1 syntactic rule for tracking plan spec validation (required fields, event/includes exclusivity, variant structure, nesting depth, additionalProperties)
+* Add `validate:` tags to `TrackingPlanV1`, `TPRuleV1`, `TPRulePropertyV1` structs (using V1 ref patterns)
+* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom logic for event/includes exclusivity, nesting depth, additionalProperties constraint
 * Add V1 semantic rule for event/property/include reference resolution, variant discriminator validation, and display_name uniqueness
 
 ---
