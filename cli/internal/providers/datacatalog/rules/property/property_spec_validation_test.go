@@ -3,6 +3,7 @@ package property
 import (
 	"testing"
 
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -36,7 +37,7 @@ func TestNewPropertySpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datacatalog/properties/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "property spec syntax must be valid", rule.Description())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchKind("properties")}, rule.AppliesTo())
+	assert.Equal(t, prules.LegacyVersionPatterns("properties"), rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
