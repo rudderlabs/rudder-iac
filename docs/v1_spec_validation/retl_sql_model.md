@@ -22,14 +22,15 @@ No semantic rules exist for RETL in either framework. This rule does **not** mat
 
 ## Structural Differences: V0.1 vs V1
 
-The RETL SQL model spec structure is **identical** between V0.1 and V1. The same `SQLModelSpec` struct is used for both versions.
+The RETL SQL model spec structure is **identical** between V0.1 and V1. The same `SQLModelSpec` struct is used for both versions. The struct **already has `validate:` tags** covering most validations.
 
 | Aspect | V0.1 | V1 |
 |--------|------|----|
 | Struct | `SQLModelSpec` | `SQLModelSpec` (same) |
 | Fields | Identical | Identical |
+| Validation tags | **Already present** | **Already present** (shared struct) |
 
-### Struct (`SQLModelSpec` in `sqlmodel/model.go`)
+### Struct (`SQLModelSpec` in `sqlmodel/model.go`) — Already Has Tags
 
 ```go
 type SQLModelSpec struct {
@@ -45,20 +46,29 @@ type SQLModelSpec struct {
 }
 ```
 
+**No struct tag changes needed.** The existing tags already cover validations #1-#6. The V1 rule should use `rules.ValidateStruct()` to leverage these existing tags.
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("retl-source-sql-model", "rudder/v1")` and decode into `SQLModelSpec`.
 
+### Tag-Based (handled by `rules.ValidateStruct()` via existing tags)
+
+| # | Validation | Existing Tag | Description |
+|---|-----------|--------------|-------------|
+| 1 | `id` required | `validate:"required"` on `ID` | SQL model must have a non-empty `id` |
+| 2 | `display_name` required | `validate:"required"` on `DisplayName` | SQL model must have a non-empty `display_name` |
+| 3 | `account_id` required | `validate:"required"` on `AccountID` | SQL model must have a non-empty `account_id` |
+| 4 | `primary_key` required | `validate:"required"` on `PrimaryKey` | SQL model must have a non-empty `primary_key` |
+| 5 | `source_definition` required + oneof | `validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino"` on `SourceDefinition` | Must be one of the allowed values |
+| 6 | `sql`/`file` mutual exclusivity | `validate:"required_without=File,excluded_with=File"` on `SQL` | Either `sql` or `file` must be specified, but not both |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `id` required | SQL model must have a non-empty `id` field |
-| 2 | `display_name` required | SQL model must have a non-empty `display_name` field |
-| 3 | `account_id` required | SQL model must have a non-empty `account_id` field |
-| 4 | `primary_key` required | SQL model must have a non-empty `primary_key` field |
-| 5 | `source_definition` required and in allowed set | Must be one of: postgres, redshift, snowflake, bigquery, mysql, databricks, trino |
-| 6 | `sql` and `file` mutually exclusive, one required | Either `sql` or `file` must be specified, but not both |
 | 7 | `sql` non-empty after file resolution | After resolving `file` to `sql` content, the resulting SQL must not be empty |
 
 ---
@@ -71,7 +81,9 @@ No semantic validations needed. RETL SQL models have no cross-resource reference
 
 ## Acceptance Criteria
 
-- [ ] All 7 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("retl-source-sql-model", "rudder/v1")`
+- [ ] No struct tag changes needed (existing tags on `SQLModelSpec` already cover #1-#6)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` to leverage existing tags for validations #1-#6
+- [ ] Custom logic implemented for sql-non-empty-after-file-resolution (#7)
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
 
@@ -100,7 +112,7 @@ Add V1 spec validation rules for the `retl-source-sql-model` resource. These rul
 
 ## Changes
 
-* Add V1 syntactic rule for SQL model spec validation (required fields, source_definition in allowed set, sql/file exclusivity, sql non-empty)
+* Add V1 syntactic rule using `rules.ValidateStruct()` to leverage existing struct tags for validations #1-#6 + custom logic for sql non-empty after file resolution
 
 ---
 
