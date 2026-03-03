@@ -102,25 +102,37 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 	return collection, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) {
+func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 	workspaces := m.Workspaces
 	for _, workspaceMetadata := range workspaces {
 		workspaceId := workspaceMetadata.WorkspaceID
 		resources := workspaceMetadata.Resources
 		for _, resourceMetadata := range resources {
-			h.importMetadata[resourceMetadata.LocalID] = &importResourceInfo{
+			if err := resourceMetadata.Validate(); err != nil {
+				return fmt.Errorf("invalid import metadata for workspace '%s': %w", workspaceId, err)
+			}
+			if resourceMetadata.URN == "" {
+				return fmt.Errorf("urn field is required for import metadata in workspace '%s' (local_id is not supported)", workspaceId)
+			}
+			h.importMetadata[resourceMetadata.URN] = &importResourceInfo{
 				WorkspaceId: workspaceId,
 				RemoteId:    resourceMetadata.RemoteID,
 			}
 		}
 	}
+	return nil
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
+	resourceType := h.metadata.ResourceType
+
 	// First, try to extract a single "id" field
 	if id, ok := s.Spec["id"].(string); ok {
 		return &specs.ParsedSpec{
-			LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
+			URNs: []specs.URNEntry{{
+				URN:             resources.URN(id, resourceType),
+				JSONPointerPath: "/spec/id",
+			}},
 		}, nil
 	}
 
@@ -128,12 +140,12 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 	if len(s.Spec) == 1 {
 		for specKey, value := range s.Spec {
 			if arr, ok := value.([]any); ok {
-				localIDs := make([]specs.LocalID, 0, len(arr))
+				urnEntries := make([]specs.URNEntry, 0, len(arr))
 				for i, item := range arr {
 					if itemMap, ok := item.(map[string]any); ok {
 						if id, ok := itemMap["id"].(string); ok {
-							localIDs = append(localIDs, specs.LocalID{
-								ID:              id,
+							urnEntries = append(urnEntries, specs.URNEntry{
+								URN:             resources.URN(id, resourceType),
 								JSONPointerPath: fmt.Sprintf("/spec/%s/%d/id", specKey, i),
 							})
 						} else {
@@ -143,7 +155,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 						return nil, fmt.Errorf("array item at index %d is not a map", i)
 					}
 				}
-				return &specs.ParsedSpec{LocalIDs: localIDs}, nil
+				return &specs.ParsedSpec{URNs: urnEntries}, nil
 			}
 		}
 	}
@@ -180,7 +192,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 	}
 
 	if commonMetadata.Import != nil {
-		h.loadImportMetadata(commonMetadata.Import)
+		if err := h.loadImportMetadata(commonMetadata.Import); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
 	}
 
 	return nil
@@ -201,7 +215,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resour
 		opts := []resources.ResourceOpts{
 			resources.WithRawData(s),
 		}
-		if importMetadata, ok := h.importMetadata[resourceId]; ok {
+		// Construct URN to look up import metadata (keyed by URN, not resourceId)
+		urn := resources.URN(resourceId, h.metadata.ResourceType)
+		if importMetadata, ok := h.importMetadata[urn]; ok {
 			opts = append(opts, resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId))
 		}
 		r := resources.NewResource(

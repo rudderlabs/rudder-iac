@@ -8,22 +8,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// parseSpecWithLocalIDs returns a ParseSpecFunc that always returns the given IDs as LocalIDs.
-func parseSpecWithLocalIDs(ids ...string) ParseSpecFunc {
+const testResourceType = "test-resource"
+
+// parseSpecWithIDs returns a ParseSpecFunc that returns URNEntry items for the given IDs.
+// LegacyResourceType is set so that local_id-based import metadata can be resolved.
+func parseSpecWithIDs(ids ...string) ParseSpecFunc {
 	return func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
-		localIDs := make([]specs.LocalID, len(ids))
+		urnEntries := make([]specs.URNEntry, len(ids))
 		for i, id := range ids {
-			localIDs[i] = specs.LocalID{ID: id, JSONPointerPath: "/spec/id"}
+			urnEntries[i] = specs.URNEntry{URN: testResourceType + ":" + id, JSONPointerPath: "/spec/id"}
 		}
-		return &specs.ParsedSpec{LocalIDs: localIDs}, nil
+		return &specs.ParsedSpec{
+			URNs:               urnEntries,
+			LegacyResourceType: testResourceType,
+		}, nil
 	}
 }
 
 // noopParseSpec returns an empty ParsedSpec — used when import ID validation
 // is not the focus of a test case.
 func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
-	return parseSpecWithLocalIDs()(path, spec)
+	return parseSpecWithIDs()(path, spec)
 }
+
 
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
@@ -73,7 +80,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 		},
 		{
 			name:      "valid metadata with complete import structure",
-			parseSpec: parseSpecWithLocalIDs("local-1"),
+			parseSpec: parseSpecWithIDs("local-1"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -116,7 +123,11 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedMsgs:   []string{"'workspace_id' is required"},
 		},
 		{
-			name:      "import with missing local_id in resource",
+			// Note: The case of missing both local_id and urn is validated by Metadata.Validate()
+			// at the spec validation layer, not by struct validation tags. This test verifies
+			// that struct validation passes when only remote_id is provided (the conditional
+			// requirement of either local_id or urn is checked elsewhere).
+			name:      "import with only remote_id (no local_id or urn) - passes struct validation",
 			parseSpec: noopParseSpec,
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
@@ -135,9 +146,35 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
-			expectedMsgs:   []string{"'local_id' is required"},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id", "/metadata/import/workspaces/0/resources/0/urn"},
+			expectedMsgs:   []string{"'local_id' is required when 'urn' is not specified", "'urn' is required when 'local_id' is not specified"},
+		},
+		{
+			name:      "import with both local_id and urn set is rejected",
+			parseSpec: parseSpecWithIDs("local-1"),
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "local-1",
+										"urn":       "test-resource:local-1",
+										"remote_id": "remote-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id", "/metadata/import/workspaces/0/resources/0/urn"},
+			expectedMsgs:   []string{"'local_id' and 'urn' cannot be specified together", "'urn' and 'local_id' cannot be specified together"},
 		},
 		{
 			name:      "import with missing remote_id in resource",
@@ -165,7 +202,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 		},
 		{
 			name:      "import local_id missing from spec external IDs",
-			parseSpec: parseSpecWithLocalIDs("other-id"),
+			parseSpec: parseSpecWithIDs("other-id"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -185,12 +222,12 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
-			expectedMsgs:   []string{"local_id 'missing-id' from import metadata not found in spec"},
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0"},
+			expectedMsgs:   []string{"import metadata URN 'test-resource:missing-id' not found in spec"},
 		},
 		{
 			name:      "all import local_ids present in spec",
-			parseSpec: parseSpecWithLocalIDs("id1", "id2", "id3"),
+			parseSpec: parseSpecWithIDs("id1", "id2", "id3"),
 			ctx: &rules.ValidationContext{
 				Metadata: map[string]any{
 					"name": "test-project",
@@ -216,6 +253,36 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 			expectedErrors: 0,
 			expectedRefs:   []string{},
 			expectedMsgs:   []string{},
+		},
+		{
+			name: "local_id on new provider (no LegacyResourceType) returns explicit diagnostic",
+			parseSpec: func(_ string, _ *specs.Spec) (*specs.ParsedSpec, error) {
+				return &specs.ParsedSpec{
+					URNs:               []specs.URNEntry{{URN: "new-provider-type:some-id", JSONPointerPath: "/spec/id"}},
+					LegacyResourceType: "",
+				}, nil
+			},
+			ctx: &rules.ValidationContext{
+				Metadata: map[string]any{
+					"name": "test-project",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-123",
+								"resources": []any{
+									map[string]any{
+										"local_id":  "some-id",
+										"remote_id": "remote-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/metadata/import/workspaces/0/resources/0/local_id"},
+			expectedMsgs:   []string{"'local_id' is not supported for this spec kind; use 'urn' instead"},
 		},
 	}
 

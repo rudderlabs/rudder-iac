@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type MutliSpecExportHandler[Spec any, Remote handler.RemoteResource] interface {
@@ -35,7 +36,7 @@ func (s *MultiSpecExportStrategy[Spec, Remote]) FormatForExport(
 						WorkspaceID: remoteMetadata.WorkspaceID,
 						Resources: []specs.ImportIds{
 							{
-								LocalID:  localID,
+								URN:      resources.URN(localID, s.Handler.Metadata().ResourceType),
 								RemoteID: remoteMetadata.ID,
 							},
 						},

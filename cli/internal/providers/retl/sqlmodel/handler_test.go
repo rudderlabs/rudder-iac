@@ -212,11 +212,11 @@ func TestSQLModelHandler(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name             string
-			spec             *specs.Spec
-			expectedLocalIDs []specs.LocalID
-			expectedError    bool
-			errorContains    string
+			name          string
+			spec          *specs.Spec
+			expectedIDs   []string
+			expectedError bool
+			errorContains string
 		}{
 			{
 				name: "success - parse spec with id",
@@ -228,7 +228,7 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedLocalIDs: []specs.LocalID{{ID: "test-model", JSONPointerPath: "/spec/id"}},
+				expectedIDs: []string{"test-model"},
 				expectedError:    false,
 			},
 			{
@@ -240,7 +240,7 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedLocalIDs: nil,
+
 				expectedError:    true,
 				errorContains:    "id not found in sql model spec",
 			},
@@ -254,7 +254,7 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedLocalIDs: nil,
+
 				expectedError:    true,
 				errorContains:    "id not found in sql model spec",
 			},
@@ -264,7 +264,7 @@ func TestSQLModelHandler(t *testing.T) {
 					Kind: "retl-source-sql-model",
 					Spec: map[string]any{},
 				},
-				expectedLocalIDs: nil,
+
 				expectedError:    true,
 				errorContains:    "id not found in sql model spec",
 			},
@@ -287,7 +287,16 @@ func TestSQLModelHandler(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.NotNil(t, parsedSpec)
-					assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
+					// Convert expected IDs to URNEntries for comparison
+					expectedURNs := make([]specs.URNEntry, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = specs.URNEntry{
+							URN:             resources.URN(id, sqlmodel.ResourceType),
+							JSONPointerPath: "/spec/id",
+						}
+					}
+					assert.Equal(t, expectedURNs, parsedSpec.URNs)
+					assert.Equal(t, sqlmodel.ResourceType, parsedSpec.LegacyResourceType)
 				}
 			})
 		}
@@ -1416,7 +1425,7 @@ func TestSQLModelHandler(t *testing.T) {
 									"resources": []any{
 										map[string]any{
 											"remote_id": "remote-id",
-											"local_id":  "local-id",
+											"urn":       "retl-source-sql-model:local-id",
 										},
 									},
 								},

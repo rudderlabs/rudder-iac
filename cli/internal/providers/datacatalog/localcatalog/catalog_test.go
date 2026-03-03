@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:         []EventV1{},
@@ -860,11 +861,11 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name             string
-		spec             *specs.Spec
-		expectedLocalIDs []specs.LocalID
-		expectedError    bool
-		errorContains    string
+		name         string
+		spec         *specs.Spec
+		expectedIDs  []string
+		expectedError bool
+		errorContains string
 	}{
 		{
 			name: "success - parse properties spec with multiple IDs",
@@ -878,11 +879,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "prop1", JSONPointerPath: "/spec/properties/0/id"},
-				{ID: "prop2", JSONPointerPath: "/spec/properties/1/id"},
-				{ID: "prop3", JSONPointerPath: "/spec/properties/2/id"},
-			},
+			expectedIDs: []string{"prop1", "prop2", "prop3"},
 		},
 		{
 			name: "success - parse events spec with multiple IDs",
@@ -895,10 +892,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "event1", JSONPointerPath: "/spec/events/0/id"},
-				{ID: "event2", JSONPointerPath: "/spec/events/1/id"},
-			},
+			expectedIDs: []string{"event1", "event2"},
 		},
 		{
 			name: "success - parse tracking plan spec",
@@ -909,9 +903,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					"display_name": "My Tracking Plan",
 				},
 			},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "my_tracking_plan", JSONPointerPath: "/spec/id"},
-			},
+			expectedIDs: []string{"my_tracking_plan"},
 		},
 		{
 			name: "success - parse custom types spec with multiple IDs",
@@ -924,10 +916,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "type1", JSONPointerPath: "/spec/types/0/id"},
-				{ID: "type2", JSONPointerPath: "/spec/types/1/id"},
-			},
+			expectedIDs: []string{"type1", "type2"},
 		},
 		{
 			name: "success - parse categories spec with multiple IDs",
@@ -941,11 +930,7 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 					},
 				},
 			},
-			expectedLocalIDs: []specs.LocalID{
-				{ID: "cat1", JSONPointerPath: "/spec/categories/0/id"},
-				{ID: "cat2", JSONPointerPath: "/spec/categories/1/id"},
-				{ID: "cat3", JSONPointerPath: "/spec/categories/2/id"},
-			},
+			expectedIDs: []string{"cat1", "cat2", "cat3"},
 		},
 		{
 			name: "error - properties not found in spec",
@@ -1153,8 +1138,105 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, parsedSpec)
-				assert.Equal(t, tc.expectedLocalIDs, parsedSpec.LocalIDs)
+				// Convert expected IDs to URNEntries for comparison based on spec kind
+				resourceType := kindToResourceType[tc.spec.Kind]
+				var expectedURNs []specs.URNEntry
+				if tc.expectedIDs != nil {
+					expectedURNs = make([]specs.URNEntry, len(tc.expectedIDs))
+					for i, id := range tc.expectedIDs {
+						expectedURNs[i] = specs.URNEntry{
+							URN: resources.URN(id, resourceType),
+							// We're not testing JSONPointerPath in this test
+							JSONPointerPath: parsedSpec.URNs[i].JSONPointerPath,
+						}
+					}
+				}
+				assert.Equal(t, expectedURNs, parsedSpec.URNs)
 			}
+		})
+	}
+}
+
+func TestDataCatalog_ParseSpec_LegacyResourceType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                     string
+		spec                     *specs.Spec
+		expectedResourceType     string
+	}{
+		{
+			name: "tracking plan sets LegacyResourceType to tracking-plan",
+			spec: &specs.Spec{
+				Kind: KindTrackingPlans,
+				Spec: map[string]any{
+					"id":           "my_tp",
+					"display_name": "My TP",
+				},
+			},
+			expectedResourceType: "tracking-plan",
+		},
+		{
+			name: "properties sets LegacyResourceType to property",
+			spec: &specs.Spec{
+				Kind: KindProperties,
+				Spec: map[string]any{
+					"properties": []any{
+						map[string]any{"id": "prop1"},
+					},
+				},
+			},
+			expectedResourceType: "property",
+		},
+		{
+			name: "events sets LegacyResourceType to event",
+			spec: &specs.Spec{
+				Kind: KindEvents,
+				Spec: map[string]any{
+					"events": []any{
+						map[string]any{"id": "event1"},
+					},
+				},
+			},
+			expectedResourceType: "event",
+		},
+		{
+			name: "custom types sets LegacyResourceType to custom-type",
+			spec: &specs.Spec{
+				Kind: KindCustomTypes,
+				Spec: map[string]any{
+					"types": []any{
+						map[string]any{"id": "type1"},
+					},
+				},
+			},
+			expectedResourceType: "custom-type",
+		},
+		{
+			name: "categories sets LegacyResourceType to category",
+			spec: &specs.Spec{
+				Kind: KindCategories,
+				Spec: map[string]any{
+					"categories": []any{
+						map[string]any{"id": "cat1"},
+					},
+				},
+			},
+			expectedResourceType: "category",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dc := New()
+			parsedSpec, err := dc.ParseSpec("test/path.yaml", tc.spec)
+
+			require.NoError(t, err)
+			require.NotNil(t, parsedSpec)
+			assert.Equal(t, tc.expectedResourceType, parsedSpec.LegacyResourceType)
 		})
 	}
 }
@@ -1392,6 +1474,354 @@ func TestDataCatalog_MigrateSpec(t *testing.T) {
 		// Compare entire migrated spec
 		assert.Equal(t, expected, migratedSpec)
 	})
+
+	t.Run("Migrates import metadata from LocalID to URN format for properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "test_props",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-123",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"local_id":  "prop1",
+									"remote_id": "remote-prop-1",
+								},
+								map[string]interface{}{
+									"local_id":  "prop2",
+									"remote_id": "remote-prop-2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":   "prop1",
+						"name": "Property 1",
+						"type": "string",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 2)
+
+		// Verify URN field is set and LocalID is cleared
+		assert.Equal(t, "property:prop1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-prop-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+
+		assert.Equal(t, "property:prop2", metadata.Import.Workspaces[0].Resources[1].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[1].LocalID)
+		assert.Equal(t, "remote-prop-2", metadata.Import.Workspaces[0].Resources[1].RemoteID)
+	})
+
+	t.Run("Migrates import metadata from LocalID to URN format for events", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "events",
+			Metadata: map[string]interface{}{
+				"name": "test_events",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-456",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"local_id":  "event1",
+									"remote_id": "remote-event-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"events": []interface{}{
+					map[string]interface{}{
+						"id":         "event1",
+						"name":       "Event 1",
+						"event_type": "track",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+
+		assert.Equal(t, "event:event1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-event-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Migrates import metadata from LocalID to URN format for custom-types", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "custom-types",
+			Metadata: map[string]interface{}{
+				"name": "test_types",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-789",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"local_id":  "CustomType1",
+									"remote_id": "remote-type-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"types": []interface{}{
+					map[string]interface{}{
+						"id":   "CustomType1",
+						"name": "Custom Type 1",
+						"type": "string",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+
+		assert.Equal(t, "custom-type:CustomType1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-type-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Migrates import metadata from LocalID to URN format for categories", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "categories",
+			Metadata: map[string]interface{}{
+				"name": "test_categories",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-999",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"local_id":  "cat1",
+									"remote_id": "remote-cat-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"categories": []interface{}{
+					map[string]interface{}{
+						"id":   "cat1",
+						"name": "Category 1",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+
+		assert.Equal(t, "category:cat1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-cat-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Migrates import metadata from LocalID to URN format for tracking plans", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "tracking-plan",
+			Metadata: map[string]interface{}{
+				"name": "test_tp",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-111",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"local_id":  "tp1",
+									"remote_id": "remote-tp-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"id":           "tp1",
+				"display_name": "Tracking Plan 1",
+				"rules":        []interface{}{},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+
+		assert.Equal(t, "tracking-plan:tp1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-tp-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Skips migration when URN is already set", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "test_props",
+				"import": map[string]interface{}{
+					"workspaces": []interface{}{
+						map[string]interface{}{
+							"workspace_id": "ws-123",
+							"resources": []interface{}{
+								map[string]interface{}{
+									"urn":       "property:prop1",
+									"remote_id": "remote-prop-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":   "prop1",
+						"name": "Property 1",
+						"type": "string",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		require.NotNil(t, metadata.Import)
+		require.Len(t, metadata.Import.Workspaces, 1)
+		require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+
+		// URN should remain unchanged, LocalID should remain empty
+		assert.Equal(t, "property:prop1", metadata.Import.Workspaces[0].Resources[0].URN)
+		assert.Equal(t, "", metadata.Import.Workspaces[0].Resources[0].LocalID)
+		assert.Equal(t, "remote-prop-1", metadata.Import.Workspaces[0].Resources[0].RemoteID)
+	})
+
+	t.Run("Handles spec with no import metadata", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    "properties",
+			Metadata: map[string]interface{}{
+				"name": "test_props",
+			},
+			Spec: map[string]interface{}{
+				"properties": []interface{}{
+					map[string]interface{}{
+						"id":   "prop1",
+						"name": "Property 1",
+						"type": "string",
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+		require.NotNil(t, migratedSpec)
+
+		metadata, err := migratedSpec.CommonMetadata()
+		require.NoError(t, err)
+		assert.Nil(t, metadata.Import)
+	})
+
+	t.Run("Returns error for unknown kind", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: "rudder/v0.1",
+			Kind:    "unknown-kind",
+			Metadata: map[string]interface{}{
+				"name": "test",
+			},
+			Spec: map[string]interface{}{},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown kind")
+		assert.Nil(t, migratedSpec)
+	})
 }
 
 func TestDataCatalog_LoadSpec(t *testing.T) {
@@ -1528,48 +1958,6 @@ func TestDataCatalog_LoadSpec(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "extracting data catalog entity")
 		assert.Contains(t, err.Error(), "test.yaml")
-	})
-
-	t.Run("stores import metadata for tracking plans under tracking-plan kind(instead of tp) for provider lookup", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &specs.Spec{
-			Version: "rudder/v1",
-			Kind:    KindTrackingPlansV1,
-			Metadata: map[string]any{
-				"name": "my-tracking-plan",
-				"import": map[string]any{
-					"workspaces": []any{
-						map[string]any{
-							"workspace_id": "ws-123",
-							"resources": []any{
-								map[string]any{
-									"local_id":  "tp-imported",
-									"remote_id": "remote-tp-id",
-								},
-							},
-						},
-					},
-				},
-			},
-			Spec: map[string]any{
-				"id":           "tp-imported",
-				"display_name": "Imported Plan",
-				"rules":        []any{},
-			},
-		}
-
-		dc := New()
-		err := dc.LoadSpec("tracking-plan.yaml", spec)
-
-		require.NoError(t, err)
-		require.Len(t, dc.TrackingPlans, 1)
-		// Provider looks up with KindTrackingPlans ("tp"), not KindTrackingPlansV1 ("tracking-plan")
-		urn := resources.URN(KindTrackingPlansV1, "tp-imported")
-		meta, ok := dc.ImportMetadata[urn]
-		require.True(t, ok, "ImportMetadata should be stored under tracking-plan:localId for provider lookup")
-		assert.Equal(t, "ws-123", meta.WorkspaceID)
-		assert.Equal(t, "remote-tp-id", meta.RemoteID)
 	})
 }
 

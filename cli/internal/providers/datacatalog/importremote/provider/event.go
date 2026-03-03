@@ -143,8 +143,9 @@ func (p *EventImportProvider) FormatForExport(
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the events
+		urn := resources.URN(event.ExternalID, types.EventResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
-			LocalID:  event.ExternalID,
+			URN:      urn,
 			RemoteID: event.ID,
 		})
 

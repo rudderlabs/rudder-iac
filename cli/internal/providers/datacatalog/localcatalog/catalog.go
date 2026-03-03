@@ -7,12 +7,24 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
 
 var (
 	log = logger.New("localcatalog")
+
+	// kindToResourceType maps spec kinds to their canonical resource type strings.
+	// Single source of truth used by ParseSpec, MigrateSpec, and addImportMetadata.
+	kindToResourceType = map[string]string{
+		KindProperties:      types.PropertyResourceType,
+		KindEvents:          types.EventResourceType,
+		KindCustomTypes:     types.CustomTypeResourceType,
+		KindCategories:      types.CategoryResourceType,
+		KindTrackingPlans:   types.TrackingPlanResourceType,
+		KindTrackingPlansV1: types.TrackingPlanResourceType,
+	}
 )
 
 const (
@@ -149,21 +161,12 @@ func convertPathToURN(pathRef string) (string, error) {
 
 	entityType := parts[0]
 	localId := parts[2]
-	URN := ""
-	switch entityType {
-	case KindProperties:
-		URN = resources.URN(localId, "property")
-	case KindEvents:
-		URN = resources.URN(localId, "event")
-	case KindCustomTypes:
-		URN = resources.URN(localId, "custom-type")
-	case KindCategories:
-		URN = resources.URN(localId, "category")
-	default:
+	resourceType, ok := kindToResourceType[entityType]
+	if !ok {
 		return "", fmt.Errorf("invalid entity type: %s", entityType)
 	}
 
-	return fmt.Sprintf("#%s", URN), nil
+	return fmt.Sprintf("#%s", resources.URN(localId, resourceType)), nil
 }
 
 // transformReferencesInSpec recursively walks the spec map and transforms
@@ -208,11 +211,11 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 }
 
 func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	var parsedSpec specs.ParsedSpec
-
 	var (
-		idArray  []any
-		basePath string
+		parsedSpec   specs.ParsedSpec
+		idArray      []any
+		basePath     string
+		resourceType string
 	)
 
 	switch s.Kind {
@@ -223,6 +226,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = properties
 		basePath = "/spec/properties"
+		resourceType = types.PropertyResourceType
 
 	case KindEvents:
 		events, ok := s.Spec["events"].([]any)
@@ -231,17 +235,18 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = events
 		basePath = "/spec/events"
+		resourceType = types.EventResourceType
 
 	case KindTrackingPlans, KindTrackingPlansV1:
 		tpID, ok := s.Spec["id"].(string)
 		if !ok {
 			return nil, fmt.Errorf("kind: %s, id not found in tracking plan spec", s.Kind)
 		}
-		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:              tpID,
+		parsedSpec.URNs = append(parsedSpec.URNs, specs.URNEntry{
+			URN:             resources.URN(tpID, types.TrackingPlanResourceType),
 			JSONPointerPath: "/spec/id",
 		})
-		return &parsedSpec, nil
+		resourceType = types.TrackingPlanResourceType
 
 	case KindCustomTypes:
 		customTypes, ok := s.Spec["types"].([]any)
@@ -250,6 +255,7 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = customTypes
 		basePath = "/spec/types"
+		resourceType = types.CustomTypeResourceType
 
 	case KindCategories:
 		categories, ok := s.Spec["categories"].([]any)
@@ -258,8 +264,11 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		}
 		idArray = categories
 		basePath = "/spec/categories"
+		resourceType = types.CategoryResourceType
 	}
 
+	// Array-based resources populate idArray and basePath for bulk processing.
+	// Single-resource types (tracking plans) set URNs directly and skip this loop.
 	for i, item := range idArray {
 		idMap, ok := item.(map[string]any)
 		if !ok {
@@ -269,12 +278,13 @@ func (dc *DataCatalog) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec,
 		if !ok {
 			return nil, fmt.Errorf("id not found in entity: %s", s.Kind)
 		}
-		parsedSpec.LocalIDs = append(parsedSpec.LocalIDs, specs.LocalID{
-			ID:              id,
+		parsedSpec.URNs = append(parsedSpec.URNs, specs.URNEntry{
+			URN:             resources.URN(id, resourceType),
 			JSONPointerPath: fmt.Sprintf("%s/%d/id", basePath, i),
 		})
 	}
 
+	parsedSpec.LegacyResourceType = resourceType
 	return &parsedSpec, nil
 }
 
@@ -309,6 +319,17 @@ func (dc *DataCatalog) LoadSpec(path string, s *specs.Spec) error {
 }
 
 func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
+	resourceType, ok := kindToResourceType[s.Kind]
+	if !ok {
+		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
+	}
+
+	// Migrate import metadata to URN format before other transformations
+	if err := specs.MigrateImportMetadataToURN(s, resourceType); err != nil {
+		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
+	}
+
+	// Perform provider-specific spec transformations
 	var resourceSpec any
 	switch s.Kind {
 	case KindProperties:
@@ -343,7 +364,7 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = CategorySpecV1{
 			Categories: categories,
 		}
-	case KindTrackingPlans:
+	case KindTrackingPlans, KindTrackingPlansV1:
 		trackingPlan, err := ExtractTrackingPlan(s)
 		if err != nil {
 			return nil, fmt.Errorf("extracting tracking plans: %w", err)
@@ -351,8 +372,6 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		resourceSpec = trackingPlan
 		// change kind for tracking plans from "tp" to "tracking-plan"
 		s.Kind = KindTrackingPlansV1
-	default:
-		return nil, fmt.Errorf("unknown kind: %s", s.Kind)
 	}
 
 	jsonByt, err := json.Marshal(resourceSpec)
@@ -372,16 +391,23 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	if metadata.Import != nil {
-		// use KindTrackingPlansV1 to store import metadata for tracking plans
-		kind := s.Kind
-		if kind == KindTrackingPlans {
-			kind = KindTrackingPlansV1
+		resourceType, ok := kindToResourceType[s.Kind]
+		if !ok {
+			return fmt.Errorf("unknown kind: %s", s.Kind)
 		}
+
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				dc.ImportMetadata[resources.URN(kind, resource.LocalID)] = &WorkspaceRemoteIDMapping{
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resource.URN != "" {
+					urn = resource.URN
+				} else {
+					urn = resources.URN(resource.LocalID, resourceType)
+				}
+				dc.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceID: workspace.WorkspaceID,
 					RemoteID:    resource.RemoteID,
 				}

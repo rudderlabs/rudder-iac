@@ -198,7 +198,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 							"workspace_id": "ws1",
 							"resources": []any{
 								map[string]any{
-									"local_id":  "e-commerce-tracking",
+									"urn":       "tracking-plan:e-commerce-tracking",
 									"remote_id": "tp1",
 								},
 							},
@@ -474,7 +474,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 							"workspace_id": "ws1",
 							"resources": []any{
 								map[string]any{
-									"local_id":  "e-commerce-tracking",
+									"urn":       "tracking-plan:e-commerce-tracking",
 									"remote_id": "tp1",
 								},
 							},
@@ -516,7 +516,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 							"workspace_id": "ws2",
 							"resources": []any{
 								map[string]any{
-									"local_id":  "user-analytics",
+									"urn":       "tracking-plan:user-analytics",
 									"remote_id": "tp2",
 								},
 							},

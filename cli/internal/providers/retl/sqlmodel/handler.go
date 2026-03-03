@@ -54,7 +54,11 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 		return nil, fmt.Errorf("id not found in sql model spec")
 	}
 	return &specs.ParsedSpec{
-		LocalIDs: []specs.LocalID{{ID: id, JSONPointerPath: "/spec/id"}},
+		URNs: []specs.URNEntry{{
+			URN:             resources.URN(id, ResourceType),
+			JSONPointerPath: "/spec/id",
+		}},
+		LegacyResourceType: ResourceType,
 	}, nil
 }
 
@@ -136,9 +140,15 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 		workspaces := metadata.Import.Workspaces
 		for _, workspaceMetadata := range workspaces {
 			workspaceId := workspaceMetadata.WorkspaceID
-			resources := workspaceMetadata.Resources
-			for _, resourceMetadata := range resources {
-				importMetadata[resourceMetadata.LocalID] = &ImportResourceInfo{
+			for _, resourceMetadata := range workspaceMetadata.Resources {
+				// Support both URN field (new) and LocalID field (legacy)
+				var urn string
+				if resourceMetadata.URN != "" {
+					urn = resourceMetadata.URN
+				} else {
+					urn = resources.URN(resourceMetadata.LocalID, ResourceType)
+				}
+				importMetadata[urn] = &ImportResourceInfo{
 					WorkspaceId: workspaceId,
 					RemoteId:    resourceMetadata.RemoteID,
 				}
@@ -177,9 +187,10 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		}
 
 		var opts []resources.ResourceOpts
-		if importMetadata, ok := importMetadata[spec.ID]; ok {
+		urn := resources.URN(spec.ID, ResourceType)
+		if importMeta, ok := importMetadata[urn]; ok {
 			opts = []resources.ResourceOpts{
-				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+				resources.WithResourceImportMetadata(importMeta.RemoteId, importMeta.WorkspaceId),
 			}
 		}
 		resource := resources.NewResource(
@@ -359,7 +370,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 					WorkspaceID: source.WorkspaceID,
 					Resources: []specs.ImportIds{
 						{
-							LocalID:  args.LocalID,
+							URN:      resources.URN(args.LocalID, ResourceType),
 							RemoteID: args.RemoteID,
 						},
 					},
@@ -483,9 +494,10 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			return nil, fmt.Errorf("unable to cast resource to retl source")
 		}
 		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
+		urn := resources.URN(source.ExternalID, ResourceType)
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
-				LocalID:  source.ExternalID,
+				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}
