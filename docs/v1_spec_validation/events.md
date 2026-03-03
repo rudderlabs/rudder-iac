@@ -21,11 +21,11 @@ These rules decode into V0 structs (`EventSpec` / `Event`) and do **not** match 
 
 | Aspect | V0.1 (`Event`) | V1 (`EventV1`) |
 |--------|-----------------|-----------------|
-| Validation tags | Has `validate:"required"`, `validate:"oneof=track screen identify group page"` etc. | No validation tags |
-| Category ref format | `#/categories/<group>/<id>` (validated by `pattern=legacy_category_ref`) | `#category:<id>` |
-| Description validation | `validate:"omitempty,gte=3,lte=2000,pattern=letter_start"` | No tags |
+| Validation tags | Has `validate:"required"`, `validate:"oneof=track screen identify group page"` etc. | **Add matching tags** (see below) |
+| Category ref format | `#/categories/<group>/<id>` (validated by `pattern=legacy_category_ref`) | `#category:<id>` (use `pattern=category_ref`) |
+| Description validation | `validate:"omitempty,gte=3,lte=2000,pattern=letter_start"` | **Add matching tag** |
 
-The structural shape is very similar between V0.1 and V1 -- the main difference is the reference format for categories and the absence of validation tags on V1 structs.
+The structural shape is very similar between V0.1 and V1. V1 structs must be updated to include `validate:` tags so that `rules.ValidateStruct()` handles tag-expressible validations automatically. The main difference is the V1 reference format for categories (`category_ref` instead of `legacy_category_ref`).
 
 ### V0.1 Struct (`Event` in `localcatalog/model.go`)
 
@@ -39,7 +39,7 @@ type Event struct {
 }
 ```
 
-### V1 Struct (`EventV1` in `localcatalog/model.go`)
+### V1 Struct — Current (`EventV1` in `localcatalog/model.go`)
 
 ```go
 type EventV1 struct {
@@ -51,18 +51,49 @@ type EventV1 struct {
 }
 ```
 
+### V1 Struct — Updated (tags to add)
+
+```go
+type EventV1 struct {
+    LocalID     string  `json:"id" mapstructure:"id" validate:"required"`
+    Name        string  `json:"name,omitempty" mapstructure:"name,omitempty"`
+    Type        string  `json:"event_type" mapstructure:"event_type" validate:"required,oneof=track screen identify group page"`
+    Description string  `json:"description,omitempty" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+    CategoryRef *string `json:"category,omitempty" mapstructure:"category,omitempty" validate:"omitempty,pattern=category_ref"`
+}
+```
+
+Also update `EventSpecV1` to enable recursive validation via `dive`:
+
+```go
+type EventSpecV1 struct {
+    Events []EventV1 `json:"events" validate:"dive"`
+}
+```
+
+The `category_ref` pattern (`#categories:<id>`) and `letter_start` pattern are already registered in `cli/internal/providers/datacatalog/rules/constants.go` and `cli/internal/provider/rules/funcs/init.go` respectively.
+
 ---
 
 ## Syntactic Validations to Add for V1
 
 These rules must target `MatchKindVersion("events", "rudder/v1")` and decode into `EventSpecV1` / `EventV1`.
 
+### Tag-Based (handled by `rules.ValidateStruct()`)
+
+| # | Validation | Tag | Description |
+|---|-----------|-----|-------------|
+| 1 | `id` required | `validate:"required"` on `LocalID` | Event must have a non-empty `id` |
+| 2 | `event_type` required + oneof | `validate:"required,oneof=track screen identify group page"` on `Type` | Event type must be one of the allowed values |
+| 3 | `description` constraints | `validate:"omitempty,gte=3,lte=2000,pattern=letter_start"` on `Description` | If present, 3-2000 chars starting with a letter |
+| 4 | `category` ref format | `validate:"omitempty,pattern=category_ref"` on `CategoryRef` | If present, must match `#categories:<id>` |
+
+### Custom Logic (manual rule code)
+
 | # | Validation | Description |
 |---|-----------|-------------|
-| 1 | `id` required | Event must have a non-empty `id` field |
-| 2 | `event_type` required | Event must have a non-empty `event_type` field, value in `track`, `screen`, `identify`, `group`, `page` |
-| 3 | Track events: `name` required, 1-64 chars | When `event_type` is `track`, `name` is required and must be between 1 and 64 characters |
-| 4 | Non-track events: `name` must be empty | When `event_type` is not `track`, `name` must be empty |
+| 5 | Track events: `name` required, 1-64 chars | When `event_type` is `track`, `name` is required and must be between 1 and 64 characters |
+| 6 | Non-track events: `name` must be empty | When `event_type` is not `track`, `name` must be empty |
 
 ---
 
@@ -79,9 +110,11 @@ Note: `id` uniqueness is handled by the project-level rule `project/duplicate-lo
 
 ## Acceptance Criteria
 
-- [ ] All 4 syntactic validations listed above are implemented as V1 rules targeting `MatchKindVersion("events", "rudder/v1")` and decoding into `EventSpecV1`
+- [ ] `validate:` tags added to `EventV1` and `EventSpecV1` structs matching V0.1 style (with V1 ref patterns)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#4)
+- [ ] Custom logic implemented for conditional name validations (#5-#6)
 - [ ] All 2 semantic validations listed above are implemented as V1 rules
-- [ ] Category ref validation uses V1 ref format (`#category:<id>`)
+- [ ] Category ref validation uses V1 ref pattern (`category_ref` = `#categories:<id>`)
 - [ ] All validations are tested with unit tests
 - [ ] Test coverage for changed files exceeds 85%
 
@@ -110,7 +143,8 @@ Add V1 spec validation rules for the `events` resource in the datacatalog provid
 
 ## Changes
 
-* Add V1 syntactic rule for event spec validation (id, event_type, name constraints per event type)
+* Add `validate:` tags to `EventV1` and `EventSpecV1` structs (using V1 ref patterns)
+* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom name-per-event-type logic
 * Add V1 semantic rule for category reference resolution and (name, eventType) uniqueness
 
 ---
