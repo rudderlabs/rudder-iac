@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.1](https://github.com/rudderlabs/rudder-iac/compare/v0.13.0...v0.13.1) (2026-03-04)
+
+
+### Miscellaneous
+
+* add mapstructure to transformations resources ([#437](https://github.com/rudderlabs/rudder-iac/issues/437)) ([ae51f65](https://github.com/rudderlabs/rudder-iac/commit/ae51f65357b9cb530452ea3249b5b555af1f4f18))
+* command to show default events ([#435](https://github.com/rudderlabs/rudder-iac/issues/435)) ([b95fd61](https://github.com/rudderlabs/rudder-iac/commit/b95fd61e7c4ed91c5884e5a3edc568f3ed69ef45))
+
 ## [0.13.0](https://github.com/rudderlabs/rudder-iac/compare/v0.12.1...v0.13.0) (2026-03-03)
 
 
