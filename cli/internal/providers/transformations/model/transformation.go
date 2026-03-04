@@ -11,12 +11,12 @@ type TransformationSpec = specs.TransformationSpec
 
 // TransformationResource represents the input data for a transformation
 type TransformationResource struct {
-	ID          string                     `json:"id"`
-	Name        string                     `json:"name"`
-	Description string                     `json:"description"`
-	Language    string                     `json:"language"`
-	Code        string                     `json:"code"`               // Resolved from inline or file
-	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"` // Excluded from state comparison (local test-only field)
+	ID          string                     `json:"id" mapstructure:"id"`
+	Name        string                     `json:"name" mapstructure:"name"`
+	Description string                     `json:"description" mapstructure:"description"`
+	Language    string                     `json:"language" mapstructure:"language"`
+	Code        string                     `json:"code" mapstructure:"code"`               // Resolved from inline or file
+	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"`                     // Excluded from state comparison (local test-only field)
 }
 
 // TransformationState represents the output state from the remote system
