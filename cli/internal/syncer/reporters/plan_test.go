@@ -16,6 +16,11 @@ func TestPlanReporter(t *testing.T) {
 	r := &planReporter{}
 	r.SetWriter(&buf)
 
+	var (
+		oldRefURN = "data-graph:old-graph"
+		newRefURN = "data-graph:new-graph"
+	)
+
 	diff := &differ.Diff{
 		ImportableResources: []string{"importable.resource1", "importable.resource2"},
 		NewResources:        []string{"new.resource1"},
@@ -27,6 +32,26 @@ func TestPlanReporter(t *testing.T) {
 						Property:    "name",
 						SourceValue: "old-name",
 						TargetValue: "new-name",
+					},
+					"ref_ptr_changed": {
+						Property:    "ref_ptr_changed",
+						SourceValue: &resources.PropertyRef{URN: oldRefURN},
+						TargetValue: &resources.PropertyRef{URN: newRefURN},
+					},
+					"ref_ptr_nil_source": {
+						Property:    "ref_ptr_nil_source",
+						SourceValue: (*resources.PropertyRef)(nil),
+						TargetValue: &resources.PropertyRef{URN: newRefURN},
+					},
+					"ref_ptr_nil_target": {
+						Property:    "ref_ptr_nil_target",
+						SourceValue: &resources.PropertyRef{URN: oldRefURN},
+						TargetValue: (*resources.PropertyRef)(nil),
+					},
+					"ref_val_changed": {
+						Property:    "ref_val_changed",
+						SourceValue: resources.PropertyRef{URN: oldRefURN},
+						TargetValue: resources.PropertyRef{URN: newRefURN},
 					},
 					"size": {
 						Property:    "size",
@@ -41,22 +66,25 @@ func TestPlanReporter(t *testing.T) {
 
 	r.ReportPlan(&planner.Plan{Diff: diff})
 
-	expectedOutput := `Importable resources:
-  - importable.resource1
-  - importable.resource2
-
-New resources:
-  - new.resource1
-
-Updated resources:
-  - updated.resource1
-    - name: old-name => new-name
-    - size: 10 => 20
-
-Removed resources:
-  - removed.resource1
-
-`
+	expectedOutput := "Importable resources:\n" +
+		"  - importable.resource1\n" +
+		"  - importable.resource2\n" +
+		"\n" +
+		"New resources:\n" +
+		"  - new.resource1\n" +
+		"\n" +
+		"Updated resources:\n" +
+		"  - updated.resource1\n" +
+		"    - name: old-name => new-name\n" +
+		"    - ref_ptr_changed: " + oldRefURN + " => " + newRefURN + "\n" +
+		"    - ref_ptr_nil_source: <nil> => " + newRefURN + "\n" +
+		"    - ref_ptr_nil_target: " + oldRefURN + " => <nil>\n" +
+		"    - ref_val_changed: " + oldRefURN + " => " + newRefURN + "\n" +
+		"    - size: 10 => 20\n" +
+		"\n" +
+		"Removed resources:\n" +
+		"  - removed.resource1\n" +
+		"\n"
 
 	assert.Equal(t, expectedOutput, buf.String())
 }
@@ -77,4 +105,5 @@ func TestPrintablePropertyRef(t *testing.T) {
 		assert.Contains(t, result, urn)
 		assert.NotContains(t, result, "{")
 	})
+
 }

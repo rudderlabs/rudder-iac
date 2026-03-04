@@ -90,6 +90,9 @@ func listResources(b *strings.Builder, label string, resources []string, detailF
 }
 
 func renderPropertyRef(ref *resources.PropertyRef) string {
+	if ref == nil {
+		return ui.Color("<nil>", ui.ColorBlue)
+	}
 	return ui.Color(ref.URN, ui.ColorGreen)
 }
 
