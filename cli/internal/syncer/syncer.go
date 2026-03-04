@@ -212,6 +212,7 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 	var errors []error
 
 	s.reporter.SyncStarted(len(plan.Operations))
+	defer s.reporter.SyncCompleted()
 
 	for _, o := range plan.Operations {
 		operationString := o.String()
@@ -227,8 +228,6 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 		}
 	}
 
-	s.reporter.SyncCompleted()
-
 	return errors
 }
 
@@ -241,6 +240,7 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 	}
 
 	s.reporter.SyncStarted(len(tasks))
+	defer s.reporter.SyncCompleted()
 
 	taskErrors := tasker.RunTasks(ctx, tasks, s.concurrency, continueOnFail, func(task tasker.Task) error {
 		opTask, ok := task.(*operationTask)
@@ -258,8 +258,6 @@ func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *stat
 
 		return nil
 	})
-
-	s.reporter.SyncCompleted()
 
 	return taskErrors
 }
