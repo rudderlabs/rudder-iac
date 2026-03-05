@@ -338,7 +338,18 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 				"type":         "entity",
 				"primary_id":   "id",
 			},
-			errorMsg: "table is required",
+			errorMsg: "3-part reference",
+		},
+		{
+			name: "invalid 1-part table ref",
+			modelSpec: map[string]interface{}{
+				"id":           "user",
+				"display_name": "User",
+				"type":         "entity",
+				"table":        "users",
+				"primary_id":   "id",
+			},
+			errorMsg: "3-part reference",
 		},
 		{
 			name: "entity model missing primary_id",

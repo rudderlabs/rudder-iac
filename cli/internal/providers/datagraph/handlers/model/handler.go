@@ -15,7 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-var tableRefPattern = regexp.MustCompile(`^[^.]+\.[^.]+\.[^.]+$`)
+var TableRefPattern = regexp.MustCompile(`^[^.]+\.[^.]+\.[^.]+$`)
 
 type ModelHandler = handler.BaseHandler[struct{}, dgModel.ModelResource, dgModel.ModelState, dgModel.RemoteModel]
 
@@ -71,7 +71,7 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.ModelResource, graph *r
 	if resource.Type != "entity" && resource.Type != "event" {
 		return fmt.Errorf("type must be 'entity' or 'event'")
 	}
-	if !tableRefPattern.MatchString(resource.Table) {
+	if !TableRefPattern.MatchString(resource.Table) {
 		return fmt.Errorf("table must be a 3-part reference in the format catalog.schema.table")
 	}
 	if resource.DataGraphRef == nil {
