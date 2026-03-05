@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
@@ -40,6 +41,13 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 	ctx.TrackingPlanID = plan.Metadata.TrackingPlanID
 	ctx.TrackingPlanVersion = plan.Metadata.TrackingPlanVersion
 	ctx.TrackingPlanURL = plan.Metadata.URL
+
+	for _, fqn := range kotlinOptions.ParsedAnnotations() {
+		shortName := fqn[strings.LastIndex(fqn, ".")+1:]
+		ctx.Annotations = append(ctx.Annotations, shortName)
+		ctx.AnnotationImports = append(ctx.AnnotationImports, fqn)
+	}
+
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)

@@ -1,9 +1,13 @@
 {{- define "dataclasswithindent" -}}
 {{- $indentLevel := (index . 0) -}}
 {{- $dataClass := (index . 1) -}}
+{{- $annotations := (index . 2) -}}
 {{- with $dataClass -}}
 {{- if .Comment }}
 /** {{ escapeComment .Comment }} */
+{{- end }}
+{{- range $annotations }}
+@{{ . }}
 {{- end }}
 data class {{ .Name }}(
 {{- range $index, $prop := .Properties }}{{- if $index }},
@@ -16,7 +20,7 @@ data class {{ .Name }}(
 ){{- if gt (len .NestedClasses) 0 }} {
 {{- range $nested :=.NestedClasses }}
 {{- $nestedIndentLevel := (add $indentLevel 1) }}
-{{- $ctx := mkSlice $nestedIndentLevel $nested }}
+{{- $ctx := mkSlice $nestedIndentLevel $nested $annotations }}
 {{- include "dataclasswithindent" $ctx | indent $nestedIndentLevel }}
 {{- end }}
 }
