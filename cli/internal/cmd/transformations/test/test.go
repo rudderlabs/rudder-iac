@@ -35,7 +35,6 @@ func NewCmdTest() *cobra.Command {
 		all      bool
 		modified bool
 		verbose  bool
-		show     bool
 	)
 
 	cmd := &cobra.Command{
@@ -60,19 +59,11 @@ func NewCmdTest() *cobra.Command {
 
 			# Test with verbose output (shows diffs)
 			$ rudder-cli transformations test --all --verbose
-
-			# Show default test events
-			$ rudder-cli transformations test default-events --show
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flags first
-			if err := validateFlags(args, all, modified, show); err != nil {
+			if err := validateFlags(args, all, modified); err != nil {
 				return err
-			}
-
-			// If showing default events, skip project initialization
-			if show {
-				return nil
 			}
 
 			// Initialize dependencies
@@ -98,14 +89,8 @@ func NewCmdTest() *cobra.Command {
 					{K: "all", V: all},
 					{K: "modified", V: modified},
 					{K: "verbose", V: verbose},
-					{K: "show", V: show},
 				}...)
 			}()
-
-			// Handle show default events
-			if show {
-				return testorchestrator.ShowDefaultEvents()
-			}
 
 			testLog.Debug("test", "location", location, "all", all, "modified", modified, "verbose", verbose)
 
@@ -165,21 +150,12 @@ func NewCmdTest() *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")
-	cmd.Flags().BoolVar(&show, "show", false, "Show default test events (use with 'default-events' argument)")
 
 	return cmd
 }
 
 // validateFlags validates the command flags and arguments
-func validateFlags(args []string, all, modified, show bool) error {
-	// Special case: show flag requires "default-events" argument
-	if show {
-		if len(args) == 0 || args[0] != "default-events" {
-			return fmt.Errorf("--show flag requires 'default-events' argument")
-		}
-		return nil
-	}
-
+func validateFlags(args []string, all, modified bool) error {
 	// Count active modes
 	modes := 0
 	hasID := len(args) > 0

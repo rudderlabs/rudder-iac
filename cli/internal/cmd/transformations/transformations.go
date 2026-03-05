@@ -4,6 +4,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
+	showDefaultEventsCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations/showdefaultevents"
 	testCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations/test"
 )
 
@@ -20,6 +21,7 @@ func NewCmdTransformations() *cobra.Command {
 	}
 
 	cmd.AddCommand(testCmd.NewCmdTest())
+	cmd.AddCommand(showDefaultEventsCmd.NewCmdShowDefaultEvents())
 
 	return cmd
 }
