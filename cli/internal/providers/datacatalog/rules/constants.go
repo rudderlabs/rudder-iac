@@ -38,9 +38,9 @@ const (
 
 	// display_name is a shared pattern for human-readable names across resource types
 	// (e.g., category name, tracking plan display_name)
-	displayNameRegexPattern = `^[A-Z_a-z][ \w,.-]{2,64}$`
+	displayNameRegexPattern = `^[A-Z_a-z][ \w,.-]{1,63}[\w,.-]$`
 	displayNameRegexTag     = "display_name"
-	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"
+	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"
 )
 
 var (
