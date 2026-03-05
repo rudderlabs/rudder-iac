@@ -65,3 +65,32 @@ func TestGenerateWithInvalidPackageName(t *testing.T) {
 
 	assert.Error(t, err, "should fail with invalid package name")
 }
+
+func TestGenerateWithCustomOutputFileName(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		OutputFileName: "Events.kt",
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
+	assert.NotNil(t, files[0])
+	assert.Equal(t, "Events.kt", files[0].Path)
+}
+
+func TestGenerateWithInvalidOutputFileName(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	_, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		OutputFileName: "Events.java", // Invalid: not a .kt file
+	})
+
+	assert.ErrorContains(t, err, ".kt extension")
+}
