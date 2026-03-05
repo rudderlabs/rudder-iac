@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/rudderlabs/rudder-iac/compare/v0.13.1...v0.14.0) (2026-03-05)
+
+
+### Features
+
+* **datacatalog:** add V1 spec validation rules for categories ([#432](https://github.com/rudderlabs/rudder-iac/issues/432)) ([91833ce](https://github.com/rudderlabs/rudder-iac/commit/91833ce817a1edfdde8741fbc9066973a25b8c41))
+* **datacatalog:** add V1 spec validation rules for events ([#433](https://github.com/rudderlabs/rudder-iac/issues/433)) ([e677879](https://github.com/rudderlabs/rudder-iac/commit/e6778794640effe6e5f434687ac7ff227f403540))
+* **datacatalog:** support additionalProperties in object custom type config ([#410](https://github.com/rudderlabs/rudder-iac/issues/410)) ([c44e494](https://github.com/rudderlabs/rudder-iac/commit/c44e49412deda7d4d997ab28fa3a56c7d5a8ec44))
+
+
+### Bug Fixes
+
+* render PropertyRef as URN in property diffs ([#430](https://github.com/rudderlabs/rudder-iac/issues/430)) ([115a994](https://github.com/rudderlabs/rudder-iac/commit/115a994b6ffa2d5c4f16c010903fd6f44674ccf3))
+
 ## [0.13.1](https://github.com/rudderlabs/rudder-iac/compare/v0.13.0...v0.13.1) (2026-03-04)
 
 
