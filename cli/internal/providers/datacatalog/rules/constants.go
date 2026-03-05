@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 	categoryLegacyReferenceTag     = "legacy_category_ref"
 	categoryReferenceTag           = "category_ref"
 	categoryLegacyReferenceMessage = "must be of pattern #/categories/<group>/<id>"
-	categoryReferenceMessage       = "must be of pattern #categories:<id>"
+	categoryReferenceMessage       = "must be of pattern #category:<id>"
 
 	trackingPlanLegacyReferenceTag     = "legacy_tracking_plan_ref"
 	trackingPlanReferenceTag           = "tracking_plan_ref"
@@ -81,7 +82,7 @@ var (
 
 	CategoryReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindCategories,
+		types.CategoryResourceType,
 	)
 
 	TrackingPlanLegacyReferenceRegex = fmt.Sprintf(
@@ -161,7 +162,7 @@ func init() {
 		categoryLegacyReferenceMessage,
 	)
 
-	// #categories:<id>
+	// #category:<id>
 	funcs.NewPattern(
 		categoryReferenceTag,
 		CategoryReferenceRegex,
