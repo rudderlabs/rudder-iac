@@ -3,8 +3,8 @@ package rules
 import (
 	"fmt"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -75,7 +75,10 @@ func NewCategorySemanticValidRule() rules.Rule {
 			validateCategorySemantic,
 		),
 		prules.NewSemanticPatternValidator(
-			[]rules.MatchPattern{rules.MatchKindVersion(localcatalog.KindCategories, specs.SpecVersionV1)},
+			[]rules.MatchPattern{rules.MatchKindVersion(
+				localcatalog.KindCategories,
+				specs.SpecVersionV1,
+			)},
 			validateCategorySemanticV1,
 		),
 	)

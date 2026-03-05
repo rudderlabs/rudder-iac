@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +21,25 @@ func categoryResource(id, name string) *resources.Resource {
 		"name": name,
 	}
 	return resources.NewResource(id, "category", data, nil)
+}
+
+func TestNewCategorySemanticValidRule_Metadata(t *testing.T) {
+	t.Parallel()
+
+	rule := NewCategorySemanticValidRule()
+
+	assert.Equal(t, "datacatalog/categories/semantic-valid", rule.ID())
+	assert.Equal(t, vrules.Error, rule.Severity())
+	assert.Equal(t, "category names must be unique across the catalog", rule.Description())
+
+	expectedPatterns := append(
+		prules.LegacyVersionPatterns(localcatalog.KindCategories),
+		vrules.MatchKindVersion(localcatalog.KindCategories, specs.SpecVersionV1),
+	)
+	assert.Equal(t, expectedPatterns, rule.AppliesTo())
+
+	examples := rule.Examples()
+	assert.NotNil(t, examples, "Rule should expose examples")
 }
 
 func TestCategorySemanticValid_Uniqueness(t *testing.T) {

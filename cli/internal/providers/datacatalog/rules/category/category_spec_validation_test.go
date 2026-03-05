@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -42,8 +42,11 @@ func TestNewCategorySpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "category spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
-		prules.LegacyVersionPatterns("categories"),
-		rules.MatchKindVersion("categories", specs.SpecVersionV1),
+		prules.LegacyVersionPatterns(localcatalog.KindCategories),
+		rules.MatchKindVersion(
+			localcatalog.KindCategories,
+			specs.SpecVersionV1,
+		),
 	)
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 
@@ -192,7 +195,7 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name too long (66 chars)",
@@ -203,7 +206,7 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name starting with digit",
@@ -214,7 +217,7 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name starting with special char",
@@ -225,7 +228,7 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name with disallowed chars",
@@ -236,7 +239,7 @@ func TestCategorySpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "category missing both id and name",
@@ -457,7 +460,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name too long (66 chars)",
@@ -468,7 +471,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name starting with digit",
@@ -479,7 +482,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name starting with special char",
@@ -490,7 +493,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name with disallowed chars",
@@ -501,7 +504,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "category missing both id and name",
@@ -534,12 +537,9 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 					{LocalID: "cat1", Name: " User Actions"},
 				},
 			},
-			expectedErrors: 2,
-			expectedRefs:   []string{"/categories/0/name", "/categories/0/name"},
-			expectedMsgs: []string{
-				"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters",
-				"'name' must not have leading or trailing whitespace",
-			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name with trailing whitespace",
@@ -550,7 +550,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/0/name"},
-			expectedMsgs:   []string{"'name' must not have leading or trailing whitespace"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name with both leading and trailing whitespace",
@@ -559,12 +559,9 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 					{LocalID: "cat1", Name: " User Actions "},
 				},
 			},
-			expectedErrors: 2,
-			expectedRefs:   []string{"/categories/0/name", "/categories/0/name"},
-			expectedMsgs: []string{
-				"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters",
-				"'name' must not have leading or trailing whitespace",
-			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/categories/0/name"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "whitespace errors across multiple categories",
@@ -577,7 +574,7 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/categories/1/name"},
-			expectedMsgs:   []string{"'name' must not have leading or trailing whitespace"},
+			expectedMsgs:   []string{"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "mixed tag and whitespace errors",
@@ -587,12 +584,11 @@ func TestCategorySpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 					{LocalID: "cat2", Name: " Leading Space"},
 				},
 			},
-			expectedErrors: 3,
-			expectedRefs:   []string{"/categories/0/id", "/categories/1/name", "/categories/1/name"},
+			expectedErrors: 2,
+			expectedRefs:   []string{"/categories/0/id", "/categories/1/name"},
 			expectedMsgs: []string{
 				"'id' is required",
-				"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters",
-				"'name' must not have leading or trailing whitespace",
+				"'name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space",
 			},
 		},
 	}
