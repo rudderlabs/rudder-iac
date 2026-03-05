@@ -26,7 +26,7 @@ var validateEventSemantic = func(_ string, _ string, _ map[string]any, spec loca
 // identify) the name is empty (enforced by syntactic validation) so only
 // one of each non-track type can exist.
 func validateEventNameUniqueness(spec localcatalog.EventSpec, graph *resources.Graph) []rules.ValidationResult {
-	countMap := buildEventNameCountMap(graph)
+	countMap := buildEventNameAndTypeCountMap(graph)
 
 	var results []rules.ValidationResult
 	for i, event := range spec.Events {
@@ -50,7 +50,7 @@ var validateEventSemanticV1 = func(_ string, _ string, _ map[string]any, spec lo
 	return results
 }
 
-func buildEventNameCountMap(graph *resources.Graph) map[string]int {
+func buildEventNameAndTypeCountMap(graph *resources.Graph) map[string]int {
 	countMap := make(map[string]int)
 	for _, resource := range graph.ResourcesByType(types.EventResourceType) {
 		data := resource.Data()
@@ -70,7 +70,7 @@ func buildEventNameCountMap(graph *resources.Graph) map[string]int {
 // identify) the name is empty (enforced by syntactic validation) so only
 // one of each non-track type can exist.
 func validateEventNameUniquenessV1(spec localcatalog.EventSpecV1, graph *resources.Graph) []rules.ValidationResult {
-	countMap := buildEventNameCountMap(graph)
+	countMap := buildEventNameAndTypeCountMap(graph)
 
 	var results []rules.ValidationResult
 	for i, event := range spec.Events {
