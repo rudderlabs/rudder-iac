@@ -543,7 +543,7 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 				Name:    "Ab",
 			},
 			expectedRefs: []string{"/display_name"},
-			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name too long (66 chars)",
@@ -552,7 +552,7 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 				Name:    "A" + strings.Repeat("b", 65),
 			},
 			expectedRefs: []string{"/display_name"},
-			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name starting with digit",
@@ -561,7 +561,7 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 				Name:    "1Invalid Plan",
 			},
 			expectedRefs: []string{"/display_name"},
-			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "name with disallowed chars",
@@ -570,7 +570,16 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 				Name:    "Plan@Name",
 			},
 			expectedRefs: []string{"/display_name"},
-			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"},
+			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
+		},
+		{
+			name: "name with trailing whitespace",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "tp1",
+				Name:    "Test Plan ",
+			},
+			expectedRefs: []string{"/display_name"},
+			expectedMsgs: []string{"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"},
 		},
 		{
 			name: "description too short (2 chars)",
@@ -611,7 +620,7 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidNameAndDescription(t *testing.T)
 			},
 			expectedRefs: []string{"/display_name", "/description"},
 			expectedMsgs: []string{
-				"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters",
+				"'display_name' is not valid: must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space",
 				"'description' length must be greater than or equal to 3",
 			},
 		},

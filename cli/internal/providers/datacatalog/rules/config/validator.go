@@ -30,9 +30,11 @@ var (
 	ErrFieldNotSupported = errors.New("field not supported for this type")
 )
 
-// ValidateConfig validates config map for given type(s)
-// Implements union semantics for field validation and strict semantics for cross-field
-func ValidateConfig(types []string, config map[string]any, reference string) []rules.ValidationResult {
+// ValidateConfig validates config map for given type(s).
+// Implements union semantics for field validation and strict semantics for cross-field validation.
+// validatorOverrides allows callers to inject context-specific validators for specific types;
+// pass nil to use the default validators for all types.
+func ValidateConfig(types []string, config map[string]any, reference string, validatorOverrides map[string]TypeConfigValidator) []rules.ValidationResult {
 
 	if len(config) == 0 {
 		return nil
@@ -40,7 +42,10 @@ func ValidateConfig(types []string, config map[string]any, reference string) []r
 
 	var validators []TypeConfigValidator
 	for _, typeName := range types {
-		validator := getValidatorForType(typeName)
+		validator := getDefaultValidatorForType(typeName)
+		if v, ok := validatorOverrides[typeName]; ok {
+			validator = v
+		}
 
 		if validator == nil {
 			// If we have a type for which a validator
@@ -176,8 +181,8 @@ func dedup(results []rules.ValidationResult) []rules.ValidationResult {
 	return deduplicated
 }
 
-// getValidatorForType returns validator for given type name
-func getValidatorForType(typeName string) TypeConfigValidator {
+// getDefaultValidatorForType returns validator for given type name
+func getDefaultValidatorForType(typeName string) TypeConfigValidator {
 	switch typeName {
 	case "string":
 		return &StringTypeConfig{}
