@@ -393,7 +393,7 @@ func TestEventSpecV1SyntaxValidRule_ValidSpecs(t *testing.T) {
 						LocalID:     "page_viewed",
 						Name:        "Page Viewed",
 						Type:        "track",
-						CategoryRef: stringPtr("#categories:navigation"),
+						CategoryRef: stringPtr("#category:navigation"),
 					},
 				},
 			},
@@ -670,9 +670,9 @@ func TestEventSpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/events/0/category"},
-			expectedMsgs:   []string{"'category' is not valid: must be of pattern #categories:<id>"},
-		},
-		{
+expectedMsgs:   []string{"'category' is not valid: must be of pattern #category:<id>"},
+			},
+			{
 			name: "legacy category ref format rejected in V1",
 			spec: localcatalog.EventSpecV1{
 				Events: []localcatalog.EventV1{
@@ -686,7 +686,7 @@ func TestEventSpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/events/0/category"},
-			expectedMsgs:   []string{"'category' is not valid: must be of pattern #categories:<id>"},
+			expectedMsgs:   []string{"'category' is not valid: must be of pattern #category:<id>"},
 		},
 		{
 			name: "multiple events with errors at different indices",

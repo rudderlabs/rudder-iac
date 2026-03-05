@@ -260,8 +260,8 @@ func TestEventSemanticV1Valid_CategoryRef(t *testing.T) {
 	t.Run("V1 category ref found", func(t *testing.T) {
 		t.Parallel()
 
-		graph := funcs.GraphWith("page_events", "categories")
-		catRef := "#categories:page_events"
+		graph := funcs.GraphWith("page_events", "category")
+		catRef := "#category:page_events"
 
 		spec := localcatalog.EventSpecV1{
 			Events: []localcatalog.EventV1{
@@ -282,7 +282,7 @@ func TestEventSemanticV1Valid_CategoryRef(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
-		catRef := "#categories:nonexistent"
+		catRef := "#category:nonexistent"
 
 		spec := localcatalog.EventSpecV1{
 			Events: []localcatalog.EventV1{
@@ -299,7 +299,7 @@ func TestEventSemanticV1Valid_CategoryRef(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/events/0/category", results[0].Reference)
-		assert.Contains(t, results[0].Message, "referenced categories 'nonexistent' not found")
+		assert.Contains(t, results[0].Message, "referenced category 'nonexistent' not found")
 	})
 
 	t.Run("nil category ref skipped", func(t *testing.T) {
@@ -324,11 +324,11 @@ func TestEventSemanticV1Valid_CategoryRef(t *testing.T) {
 	t.Run("multiple events mixed category refs", func(t *testing.T) {
 		t.Parallel()
 
-		graph := funcs.GraphWith("page_events", "categories")
+		graph := funcs.GraphWith("page_events", "category")
 
 		var (
-			validRef   = "#categories:page_events"
-			invalidRef = "#categories:missing_cat"
+			validRef   = "#category:page_events"
+			invalidRef = "#category:missing_cat"
 		)
 
 		spec := localcatalog.EventSpecV1{
@@ -356,7 +356,7 @@ func TestEventSemanticV1Valid_CategoryRef(t *testing.T) {
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/events/1/category", results[0].Reference)
-		assert.Contains(t, results[0].Message, "referenced categories 'missing_cat' not found")
+		assert.Contains(t, results[0].Message, "referenced category 'missing_cat' not found")
 	})
 }
 
