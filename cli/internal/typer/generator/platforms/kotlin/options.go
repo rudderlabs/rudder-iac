@@ -7,13 +7,15 @@ import (
 
 // KotlinOptions contains Kotlin-specific generation options
 type KotlinOptions struct {
-	PackageName string `mapstructure:"packageName" description:"Package name for generated Kotlin code (e.g., com.example.analytics)"`
+	PackageName    string `mapstructure:"packageName" description:"Package name for generated Kotlin code (e.g., com.example.analytics)"`
+	OutputFileName string `mapstructure:"outputFileName" description:"Name of the generated Kotlin file (e.g., MyEvents.kt). Defaults to Main.kt"`
 }
 
 // GetAvailableOptions returns metadata about all supported Kotlin options
 func (k *Generator) DefaultOptions() any {
 	return KotlinOptions{
-		PackageName: "com.rudderstack.ruddertyper",
+		PackageName:    "com.rudderstack.ruddertyper",
+		OutputFileName: "Main.kt",
 	}
 }
 
