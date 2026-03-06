@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -70,6 +71,64 @@ func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Gra
 	return nil
 }
 
+var validateSourceSemanticV1 = func(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec SourceSpecV1,
+	graph *resources.Graph,
+) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	results = append(results, validateTrackingPlanExistsV1(spec, graph)...)
+	results = append(results, validateSourceNameUniquenessV1(spec, graph)...)
+
+	return results
+}
+
+// validateTrackingPlanExistsV1 checks that the referenced tracking plan exists in the graph.
+// Ref format is already validated by syntactic rules, so we only verify existence.
+func validateTrackingPlanExistsV1(spec SourceSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
+		return nil
+	}
+
+	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(spec.Governance.TrackingPlan.Ref)
+	if len(matches) != 2 {
+		return nil
+	}
+
+	trackingPlanID := matches[1]
+	urn := resources.URN(trackingPlanID, types.TrackingPlanResourceType)
+
+	if _, ok := graph.GetResource(urn); !ok {
+		return []rules.ValidationResult{{
+			Reference: "/governance/validations/tracking_plan",
+			Message:   fmt.Sprintf("tracking plan '%s' not found in the project", trackingPlanID),
+		}}
+	}
+
+	return nil
+}
+
+func validateSourceNameUniquenessV1(spec SourceSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	countMap := make(map[string]int)
+	for _, resource := range graph.ResourcesByType(esSource.ResourceType) {
+		data := resource.Data()
+		name, _ := data["name"].(string)
+		countMap[name]++
+	}
+
+	if countMap[spec.Name] > 1 {
+		return []rules.ValidationResult{{
+			Reference: "/name",
+			Message:   fmt.Sprintf("duplicate name '%s' within kind 'event-stream-source'", spec.Name),
+		}}
+	}
+
+	return nil
+}
+
 func NewSourceSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/source/semantic-valid",
@@ -79,6 +138,12 @@ func NewSourceSemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(esSource.ResourceKind),
 			validateSourceSemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(esSource.ResourceKind, specs.SpecVersionV1),
+			},
+			validateSourceSemanticV1,
 		),
 	)
 }

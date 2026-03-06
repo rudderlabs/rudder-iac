@@ -3,6 +3,7 @@ package source
 import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -23,6 +24,22 @@ var validateSourceSpec = func(
 	return funcs.ParseValidationErrors(validationErrors, nil)
 }
 
+var validateSourceSpecV1 = func(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec SourceSpecV1,
+) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{{
+			Message: err.Error(),
+		}}
+	}
+
+	return funcs.ParseValidationErrors(validationErrors, nil)
+}
+
 func NewSourceSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/source/spec-syntax-valid",
@@ -32,6 +49,12 @@ func NewSourceSpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(esSource.ResourceKind),
 			validateSourceSpec,
+		),
+		prules.NewPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(esSource.ResourceKind, specs.SpecVersionV1),
+			},
+			validateSourceSpecV1,
 		),
 	)
 }

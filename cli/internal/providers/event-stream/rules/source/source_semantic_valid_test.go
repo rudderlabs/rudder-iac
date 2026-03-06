@@ -5,6 +5,7 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -15,10 +16,15 @@ import (
 func TestSourceSemanticValidRule_Metadata(t *testing.T) {
 	rule := NewSourceSemanticValidRule()
 
+	expectedPatterns := append(
+		prules.LegacyVersionPatterns("event-stream-source"),
+		rules.MatchKindVersion(esSource.ResourceKind, specs.SpecVersionV1),
+	)
+
 	assert.Equal(t, "event-stream/source/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "event stream source references must resolve to existing resources", rule.Description())
-	assert.Equal(t, prules.LegacyVersionPatterns("event-stream-source"), rule.AppliesTo())
+	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 }
 
 func TestSourceSemanticValid(t *testing.T) {
@@ -152,6 +158,139 @@ func TestSourceSemanticValid_NameUniqueness(t *testing.T) {
 		}
 
 		results := validateSourceSemantic("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+}
+
+// V1 Semantic Validation Tests
+
+func TestSourceSemanticValidV1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no governance is valid", func(t *testing.T) {
+		t.Parallel()
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "My Source",
+			SourceDefinition: "javascript",
+		}
+
+		graph := resources.NewGraph()
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+
+	t.Run("V1 tracking plan ref found in graph", func(t *testing.T) {
+		t.Parallel()
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "My Source",
+			SourceDefinition: "javascript",
+			Governance: &SourceGovernanceSpecV1{
+				TrackingPlan: &TrackingPlanSpecV1{
+					Ref:    "#tracking-plan:tp-1",
+					Config: &esSource.TrackingPlanConfigSpec{},
+				},
+			},
+		}
+
+		graph := funcs.GraphWith("tp-1", "tracking-plan")
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+
+	t.Run("V1 tracking plan ref not found in graph", func(t *testing.T) {
+		t.Parallel()
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "My Source",
+			SourceDefinition: "javascript",
+			Governance: &SourceGovernanceSpecV1{
+				TrackingPlan: &TrackingPlanSpecV1{
+					Ref:    "#tracking-plan:tp-missing",
+					Config: &esSource.TrackingPlanConfigSpec{},
+				},
+			},
+		}
+
+		graph := resources.NewGraph()
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		assert.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "not found in the project")
+		assert.Equal(t, "/governance/validations/tracking_plan", results[0].Reference)
+	})
+
+	t.Run("nil validations inside governance is valid", func(t *testing.T) {
+		t.Parallel()
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "My Source",
+			SourceDefinition: "javascript",
+			Governance:       &SourceGovernanceSpecV1{},
+		}
+
+		graph := resources.NewGraph()
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+}
+
+func TestSourceSemanticValidV1_NameUniqueness(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unique source names", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Source Alpha"))
+		graph.AddResource(sourceResource("src-2", "Source Beta"))
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "Source Alpha",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate source name detected", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Same Name"))
+		graph.AddResource(sourceResource("src-2", "Same Name"))
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "Same Name",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		require.Len(t, results, 1)
+		assert.Equal(t, "/name", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate name 'Same Name' within kind 'event-stream-source'")
+	})
+
+	t.Run("single source in graph — no false positive", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "Only Source"))
+
+		spec := SourceSpecV1{
+			LocalID:          "src-1",
+			Name:             "Only Source",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemanticV1("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 }
