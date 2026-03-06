@@ -5,7 +5,6 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -37,7 +36,7 @@ func NewSQLModelSpecSyntaxValidRule() rules.Rule {
 			validateSQLModelSpec,
 		),
 		prules.NewPatternValidator(
-			[]rules.MatchPattern{rules.MatchKindVersion(sqlmodel.ResourceKind, specs.SpecVersionV1)},
+			prules.V1VersionPatterns(sqlmodel.ResourceKind),
 			validateSQLModelSpec,
 		),
 	)
