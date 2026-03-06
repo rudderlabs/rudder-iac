@@ -19,22 +19,46 @@ var validateSourceSemantic = func(
 	spec esSource.SourceSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
-	var results []rules.ValidationResult
+	var trackingPlanRef string
+	if spec.Governance != nil && spec.Governance.TrackingPlan != nil {
+		trackingPlanRef = spec.Governance.TrackingPlan.Ref
+	}
 
-	results = append(results, validateTrackingPlanExists(spec, graph)...)
-	results = append(results, validateSourceNameUniqueness(spec, graph)...)
+	var results []rules.ValidationResult
+	results = append(results, validateTrackingPlanExists(trackingPlanRef, graph)...)
+	results = append(results, validateSourceNameUniqueness(spec.Name, graph)...)
+
+	return results
+}
+
+var validateSourceSemanticV1 = func(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec esSource.SourceSpecV1,
+	graph *resources.Graph,
+) []rules.ValidationResult {
+	var trackingPlanRef string
+	if spec.Governance != nil && spec.Governance.TrackingPlan != nil {
+		trackingPlanRef = spec.Governance.TrackingPlan.Ref
+	}
+
+	var results []rules.ValidationResult
+	results = append(results, validateTrackingPlanExists(trackingPlanRef, graph)...)
+	results = append(results, validateSourceNameUniqueness(spec.Name, graph)...)
 
 	return results
 }
 
 // validateTrackingPlanExists checks that the referenced tracking plan exists in the graph.
 // Ref format is already validated by syntactic rules, so we only need to verify existence.
-func validateTrackingPlanExists(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
-	if spec.Governance == nil || spec.Governance.TrackingPlan == nil {
+// Supports both V0.1 (#/tp/<group>/<id>) and V1 (#tracking-plan:<id>) formats.
+func validateTrackingPlanExists(trackingPlanRef string, graph *resources.Graph) []rules.ValidationResult {
+	if trackingPlanRef == "" {
 		return nil
 	}
 
-	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(spec.Governance.TrackingPlan.Ref)
+	matches := localcatalog.TrackingPlanRegex.FindStringSubmatch(trackingPlanRef)
 	if len(matches) != 2 {
 		return nil
 	}
@@ -52,7 +76,7 @@ func validateTrackingPlanExists(spec esSource.SourceSpec, graph *resources.Graph
 	return nil
 }
 
-func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
+func validateSourceNameUniqueness(sourceName string, graph *resources.Graph) []rules.ValidationResult {
 	countMap := make(map[string]int)
 	for _, resource := range graph.ResourcesByType(esSource.ResourceType) {
 		data := resource.Data()
@@ -60,10 +84,10 @@ func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Gra
 		countMap[name]++
 	}
 
-	if countMap[spec.Name] > 1 {
+	if countMap[sourceName] > 1 {
 		return []rules.ValidationResult{{
 			Reference: "/name",
-			Message:   fmt.Sprintf("duplicate name '%s' within kind 'event-stream-source'", spec.Name),
+			Message:   fmt.Sprintf("duplicate name '%s' within kind 'event-stream-source'", sourceName),
 		}}
 	}
 
@@ -79,6 +103,10 @@ func NewSourceSemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(esSource.ResourceKind),
 			validateSourceSemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			prules.V1VersionPatterns(esSource.ResourceKind),
+			validateSourceSemanticV1,
 		),
 	)
 }
