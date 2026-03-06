@@ -88,27 +88,6 @@ func unmarshalSpec[T any](raw map[string]any) (T, []rules.ValidationResult) {
 	return spec, nil
 }
 
-// NewPatternValidatorWithPath creates a syntactic validation handler with access to the spec file path.
-// Use this when validation logic needs to resolve relative file paths (e.g., for SQL file resolution).
-func NewPatternValidatorWithPath[T any](
-	patterns []rules.MatchPattern,
-	fn func(FilePath string, Kind string, Version string, Metadata map[string]any, Spec T) []rules.ValidationResult,
-) PatternValidator {
-	return PatternValidator{
-		patterns: patterns,
-		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
-			spec, err := unmarshalSpec[T](ctx.Spec)
-			if err != nil {
-				return err
-			}
-
-			results := fn(ctx.FilePath, ctx.Kind, ctx.Version, ctx.Metadata, spec)
-			prefixReferences(results)
-			return results
-		},
-	}
-}
-
 // prefixReferences prepends "/spec" to every result's Reference field
 // so that JSON pointers are rooted at the spec level in the YAML document.
 func prefixReferences(results []rules.ValidationResult) {
