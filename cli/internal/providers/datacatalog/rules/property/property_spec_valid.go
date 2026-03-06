@@ -11,12 +11,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	drules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
 
-var customTypeLegacyRefRegex = regexp.MustCompile(drules.CustomTypeLegacyReferenceRegex)
+var (
+	customTypeLegacyRefRegex = regexp.MustCompile(drules.CustomTypeLegacyReferenceRegex)
+	customTypeRefRegex       = regexp.MustCompile(drules.CustomTypeReferenceRegex)
+)
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -147,6 +149,13 @@ var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec loc
 				),
 			})
 		}
+
+		if hasDuplicateValues(property.ItemTypes) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/item_types", i),
+				Message:   "'item_types' must not contain duplicate values",
+			})
+		}
 	}
 
 	return results
@@ -168,12 +177,7 @@ func isValidV1TypeOrCustomTypeRef(typeValue string) bool {
 		return true
 	}
 
-	resourceType, localID, err := funcs.ParseURNRef(typeValue)
-	if err != nil {
-		return false
-	}
-
-	return resourceType == types.CustomTypeResourceType && localID != ""
+	return customTypeRefRegex.MatchString(typeValue)
 }
 
 func NewPropertySpecSyntaxValidRule() rules.Rule {

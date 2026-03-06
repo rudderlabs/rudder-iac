@@ -2,17 +2,20 @@ package property
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
+
+var customTypeRegex = regexp.MustCompile(catalogRules.CustomTypeReferenceRegex)
 
 var validatePropertySemantic = func(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpec, graph *resources.Graph) []rules.ValidationResult {
 	// Generic ref validation for pattern=legacy_* tagged fields
@@ -45,7 +48,7 @@ func validateReferenceType(spec localcatalog.PropertySpec, graph *resources.Grap
 	var results []rules.ValidationResult
 
 	for i, prop := range spec.Properties {
-		// Check the Type field for a custom type reference
+		// check the Type field for a custom type reference
 		if strings.HasPrefix(prop.Type, "#") {
 			results = append(results, checkRef(prop.Type, fmt.Sprintf("/properties/%d/type", i), graph)...)
 		}
@@ -66,7 +69,11 @@ func validateReferenceType(spec localcatalog.PropertySpec, graph *resources.Grap
 			if !ok || !strings.HasPrefix(ref, "#") {
 				continue
 			}
-			results = append(results, checkRef(ref, fmt.Sprintf("/properties/%d/propConfig/itemTypes/%d", i, j), graph)...)
+			results = append(results, checkRef(
+				ref,
+				fmt.Sprintf("/properties/%d/propConfig/itemTypes/%d", i, j),
+				graph,
+			)...)
 		}
 	}
 
@@ -74,30 +81,31 @@ func validateReferenceType(spec localcatalog.PropertySpec, graph *resources.Grap
 }
 
 // checkRef parses a URN reference and verifies it exists in the graph.
+// The regex has two capturing groups: (resource-type) and (id); the custom type id is in matches[2].
 func checkRef(ref, jsonPointer string, graph *resources.Graph) []rules.ValidationResult {
-	resourceType, localID, err := funcs.ParseURNRef(ref)
-	if err != nil {
+	matches := customTypeRegex.FindStringSubmatch(ref)
+	if len(matches) != 3 {
 		return []rules.ValidationResult{{
 			Reference: jsonPointer,
-			Message:   fmt.Sprintf("failed to parse reference '%s': %v", ref, err),
+			Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #custom-type:<id>", ref),
 		}}
 	}
 
-	urn := resources.URN(localID, resourceType)
+	customTypeID := matches[2]
+	urn := resources.URN(customTypeID, types.CustomTypeResourceType)
 	if _, exists := graph.GetResource(urn); !exists {
 		return []rules.ValidationResult{{
 			Reference: jsonPointer,
-			Message:   fmt.Sprintf("referenced %s '%s' not found in resource graph", resourceType, localID),
+			Message:   fmt.Sprintf("referenced %s '%s' not found in resource graph", types.CustomTypeResourceType, customTypeID),
 		}}
 	}
 
 	return nil
 }
 
-// validatePropertyUniqueness checks that each property's (name, type, itemTypes)
-// combination is unique across the entire resource graph. If another property
-// with the same combination exists, both spec files will independently report an error.
-func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources.Graph) []rules.ValidationResult {
+// buildPropertyUniquenessCountMap builds a map of property uniqueness counts
+// by combining the name, type, and itemTypes of each property.
+func buildPropertyUniquenessCountMap(graph *resources.Graph) map[string]int {
 	countMap := make(map[string]int)
 	for _, resource := range graph.ResourcesByType(types.PropertyResourceType) {
 		data := resource.Data()
@@ -111,6 +119,15 @@ func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources
 		)
 		countMap[key]++
 	}
+
+	return countMap
+}
+
+// validatePropertyUniqueness checks that each property's (name, type, itemTypes)
+// combination is unique across the entire resource graph. If another property
+// with the same combination exists, both spec files will independently report an error.
+func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources.Graph) []rules.ValidationResult {
+	countMap := buildPropertyUniquenessCountMap(graph)
 
 	var results []rules.ValidationResult
 	for i, prop := range spec.Properties {
@@ -124,7 +141,7 @@ func validatePropertyUniqueness(spec localcatalog.PropertySpec, graph *resources
 		if countMap[key] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d", i),
-				Message:   fmt.Sprintf("duplicate name '%s' within kind 'properties'", prop.Name),
+				Message:   fmt.Sprintf("duplicate name, type and itemTypes: '%s' within kind 'properties'", prop.Name),
 			})
 		}
 	}
@@ -136,12 +153,18 @@ func validateReferenceTypeV1(spec localcatalog.PropertySpecV1, graph *resources.
 	var results []rules.ValidationResult
 
 	for i, property := range spec.Properties {
-		if hasCustomTypeRef(property.Type) {
-			results = append(results, checkRef(property.Type, fmt.Sprintf("/properties/%d/type", i), graph)...)
+		if strings.HasPrefix(property.Type, "#") {
+			results = append(
+				results,
+				checkRef(property.Type, fmt.Sprintf("/properties/%d/type", i), graph)...,
+			)
 		}
 
-		if hasCustomTypeRef(property.ItemType) {
-			results = append(results, checkRef(property.ItemType, fmt.Sprintf("/properties/%d/item_type", i), graph)...)
+		if strings.HasPrefix(property.ItemType, "#") {
+			results = append(
+				results,
+				checkRef(property.ItemType, fmt.Sprintf("/properties/%d/item_type", i), graph)...,
+			)
 		}
 	}
 
@@ -149,19 +172,7 @@ func validateReferenceTypeV1(spec localcatalog.PropertySpecV1, graph *resources.
 }
 
 func validatePropertyUniquenessV1(spec localcatalog.PropertySpecV1, graph *resources.Graph) []rules.ValidationResult {
-	countMap := make(map[string]int)
-	for _, resource := range graph.ResourcesByType(types.PropertyResourceType) {
-		data := resource.Data()
-		name, _ := data["name"].(string)
-		config, _ := data["config"].(map[string]any)
-		key := fmt.Sprintf(
-			"%s|%s|%s",
-			name,
-			normalizeType(data["type"]),
-			normalizeItemTypes(config, "item_types"),
-		)
-		countMap[key]++
-	}
+	countMap := buildPropertyUniquenessCountMap(graph)
 
 	var results []rules.ValidationResult
 	for i, property := range spec.Properties {
@@ -175,25 +186,12 @@ func validatePropertyUniquenessV1(spec localcatalog.PropertySpecV1, graph *resou
 		if countMap[key] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d", i),
-				Message:   fmt.Sprintf("duplicate name '%s' within kind 'properties'", property.Name),
+				Message:   fmt.Sprintf("duplicate name, type and itemTypes: '%s' within kind 'properties'", property.Name),
 			})
 		}
 	}
 
 	return results
-}
-
-func hasCustomTypeRef(typeValue string) bool {
-	if !strings.HasPrefix(typeValue, "#") {
-		return false
-	}
-
-	resourceType, localID, err := funcs.ParseURNRef(typeValue)
-	if err != nil {
-		return false
-	}
-
-	return resourceType == types.CustomTypeResourceType && localID != ""
 }
 
 func normalizePropertyTypeV1(property localcatalog.PropertyV1) string {
@@ -205,10 +203,7 @@ func normalizePropertyTypeV1(property localcatalog.PropertyV1) string {
 		return ""
 	}
 
-	typesCopy := append([]string(nil), property.Types...)
-	sort.Strings(typesCopy)
-
-	return strings.Join(typesCopy, ",")
+	return normalizeType(strings.Join(property.Types, ","))
 }
 
 func normalizePropertyItemTypesV1(property localcatalog.PropertyV1) string {
@@ -220,10 +215,14 @@ func normalizePropertyItemTypesV1(property localcatalog.PropertyV1) string {
 		return ""
 	}
 
-	itemTypesCopy := append([]string(nil), property.ItemTypes...)
-	sort.Strings(itemTypesCopy)
-
-	return strings.Join(itemTypesCopy, ",")
+	// normalize each item type to make sure we are
+	// backward compatibe with v0 spec way of normalizing item types
+	normalized := make([]string, 0, len(property.ItemTypes))
+	for _, item := range property.ItemTypes {
+		normalized = append(normalized, normalizeType(item))
+	}
+	sort.Strings(normalized)
+	return strings.Join(normalized, ",")
 }
 
 // normalizeType converts a type value (string or PropertyRef) to a
@@ -277,9 +276,7 @@ func NewPropertySemanticValidRule() rules.Rule {
 			validatePropertySemantic,
 		),
 		prules.NewSemanticPatternValidator(
-			[]rules.MatchPattern{
-				rules.MatchKindVersion(localcatalog.KindProperties, specs.SpecVersionV1),
-			},
+			prules.V1VersionPatterns(localcatalog.KindProperties),
 			validatePropertySemanticV1,
 		),
 	)

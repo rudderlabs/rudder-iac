@@ -204,6 +204,25 @@ func TestPropertySpecSyntaxValidRuleV1_CustomValidations(t *testing.T) {
 		assertHasValidationError(t, results, "/properties/0/types", "must not contain duplicate values")
 	})
 
+	t.Run("item_types cannot contain duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.PropertySpecV1{
+			Properties: []localcatalog.PropertyV1{
+				{
+					LocalID:   "tags",
+					Name:     "Tags",
+					Type:     "array",
+					ItemTypes: []string{"string", "number", "string"},
+				},
+			},
+		}
+
+		results := validatePropertySpecV1(localcatalog.KindProperties, specs.SpecVersionV1, nil, spec)
+		require.Len(t, results, 1)
+		assertHasValidationError(t, results, "/properties/0/item_types", "must not contain duplicate values")
+	})
+
 	t.Run("invalid single type values are rejected", func(t *testing.T) {
 		t.Parallel()
 
