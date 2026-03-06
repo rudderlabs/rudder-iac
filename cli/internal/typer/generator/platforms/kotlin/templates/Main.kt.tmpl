@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+{{- range .AnnotationImports }}
+import {{ . }}
+{{- end }}
 
 private fun Unit.rudderSerialize(): JsonObject = buildJsonObject {}
 private fun String.rudderSerialize(): JsonPrimitive = JsonPrimitive(this)
@@ -69,7 +72,7 @@ private fun List<List<JsonNull>>.rudderSerialize(): JsonArray = JsonArray(this.m
 {{ template "sealedclass.tmpl" . }}
 {{- end }}
 {{- range .DataClasses }}
-{{- $ctx := mkSlice 0 . }}
+{{- $ctx := mkSlice 0 . $.Annotations }}
 {{ template "dataclasswithindent" $ctx }}
 {{- end }}
 

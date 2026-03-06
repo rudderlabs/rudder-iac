@@ -65,3 +65,51 @@ func TestGenerateWithInvalidPackageName(t *testing.T) {
 
 	assert.Error(t, err, "should fail with invalid package name")
 }
+
+func TestGenerateWithAnnotations(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		Annotations: "androidx.compose.runtime.Stable",
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
+	assert.NotNil(t, files[0])
+	assert.Contains(t, files[0].Content, "import androidx.compose.runtime.Stable")
+	assert.Contains(t, files[0].Content, "@Stable\ndata class")
+}
+
+func TestGenerateWithMultipleAnnotations(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		Annotations: "androidx.compose.runtime.Stable,androidx.compose.runtime.Immutable",
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
+	assert.NotNil(t, files[0])
+	assert.Contains(t, files[0].Content, "import androidx.compose.runtime.Stable")
+	assert.Contains(t, files[0].Content, "import androidx.compose.runtime.Immutable")
+	assert.Contains(t, files[0].Content, "@Stable\n@Immutable\ndata class")
+}
+
+func TestGenerateWithInvalidAnnotation(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	_, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		Annotations: "Stable", // Invalid: not fully qualified
+	})
+
+	assert.ErrorContains(t, err, "fully qualified class name")
+}
