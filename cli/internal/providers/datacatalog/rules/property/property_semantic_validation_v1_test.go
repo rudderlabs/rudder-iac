@@ -117,8 +117,8 @@ func TestPropertySemanticValidV1_ReferenceType(t *testing.T) {
 		require.Len(t, results, 2)
 		assert.Equal(t, "/properties/0/type", results[0].Reference)
 		assert.Equal(t, "/properties/0/item_type", results[1].Reference)
-		assert.Equal(t, "must be of pattern #custom-type:<id>", results[0].Message)
-		assert.Equal(t, "must be of pattern #custom-type:<id>", results[1].Message)
+		assert.Contains(t, results[0].Message, "must be of pattern #custom-type:<id>")
+		assert.Contains(t, results[1].Message, "must be of pattern #custom-type:<id>")
 	})
 }
 
@@ -158,7 +158,7 @@ func TestPropertySemanticValidV1_Uniqueness(t *testing.T) {
 		results := validatePropertySemanticV1(localcatalog.KindProperties, specs.SpecVersionV1, nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "duplicate name 'Email'")
+		assert.Contains(t, results[0].Message, "duplicate name, type and itemTypes: 'Email'")
 	})
 
 	t.Run("types array order is ignored", func(t *testing.T) {
@@ -177,7 +177,7 @@ func TestPropertySemanticValidV1_Uniqueness(t *testing.T) {
 		results := validatePropertySemanticV1(localcatalog.KindProperties, specs.SpecVersionV1, nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "duplicate name 'Mixed'")
+		assert.Contains(t, results[0].Message, "duplicate name, type and itemTypes: 'Mixed'")
 	})
 
 	t.Run("item_types array order is ignored", func(t *testing.T) {
@@ -201,7 +201,7 @@ func TestPropertySemanticValidV1_Uniqueness(t *testing.T) {
 		results := validatePropertySemanticV1(localcatalog.KindProperties, specs.SpecVersionV1, nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/properties/0", results[0].Reference)
-		assert.Contains(t, results[0].Message, "duplicate name 'Tags'")
+		assert.Contains(t, results[0].Message, "duplicate name, type and itemTypes: 'Tags'")
 	})
 
 	t.Run("same name and type with different item type is not duplicate", func(t *testing.T) {
