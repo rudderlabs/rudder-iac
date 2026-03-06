@@ -1,8 +1,6 @@
 package sqlmodel
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -294,7 +292,7 @@ func TestSQLModelV1SpecValidation_ValidSpecs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			results := validateSQLModelV1Spec("", "", "", nil, tt.spec)
+			results := validateSQLModelSpec("", "", nil, tt.spec)
 			assert.Empty(t, results, "expected no validation errors")
 		})
 	}
@@ -318,7 +316,7 @@ func TestSQLModelV1SpecValidation_AllSourceDefinitions(t *testing.T) {
 				SourceDefinition: sd,
 				SQL:              ptr("SELECT 1"),
 			}
-			results := validateSQLModelV1Spec("", "", "", nil, spec)
+			results := validateSQLModelSpec("", "", nil, spec)
 			assert.Empty(t, results, "source definition %q should be valid", sd)
 		})
 	}
@@ -442,7 +440,7 @@ func TestSQLModelV1SpecValidation_InvalidSpecs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			results := validateSQLModelV1Spec("", "", "", nil, tt.spec)
+			results := validateSQLModelSpec("", "", nil, tt.spec)
 			require.Len(t, results, len(tt.wantMessages))
 
 			var gotMessages []string
@@ -452,203 +450,4 @@ func TestSQLModelV1SpecValidation_InvalidSpecs(t *testing.T) {
 			assert.ElementsMatch(t, tt.wantMessages, gotMessages)
 		})
 	}
-}
-
-func TestSQLModelV1SpecValidation_FileResolution(t *testing.T) {
-	t.Parallel()
-
-	t.Run("valid file with SQL content", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		sqlFile := filepath.Join(tmpDir, "query.sql")
-		err := os.WriteFile(sqlFile, []byte("SELECT * FROM users"), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("query.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		assert.Empty(t, results, "expected no validation errors for valid SQL file")
-	})
-
-	t.Run("file with empty content", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		sqlFile := filepath.Join(tmpDir, "empty.sql")
-		err := os.WriteFile(sqlFile, []byte(""), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("empty.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		require.Len(t, results, 1)
-		assert.Equal(t, "/file", results[0].Reference)
-		assert.Equal(t, "'sql' content is empty after resolving 'file'", results[0].Message)
-	})
-
-	t.Run("file with only whitespace", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		sqlFile := filepath.Join(tmpDir, "whitespace.sql")
-		err := os.WriteFile(sqlFile, []byte("   \n\t  \n  "), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("whitespace.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		require.Len(t, results, 1)
-		assert.Equal(t, "/file", results[0].Reference)
-		assert.Equal(t, "'sql' content is empty after resolving 'file'", results[0].Message)
-	})
-
-	t.Run("file does not exist", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("nonexistent.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		require.Len(t, results, 1)
-		assert.Equal(t, "/file", results[0].Reference)
-		assert.Contains(t, results[0].Message, "failed to read sql file")
-	})
-
-	t.Run("relative file path resolution", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-
-		subDir := filepath.Join(tmpDir, "queries")
-		err := os.MkdirAll(subDir, 0755)
-		require.NoError(t, err)
-
-		sqlFile := filepath.Join(subDir, "query.sql")
-		err = os.WriteFile(sqlFile, []byte("SELECT 1"), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("queries/query.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		assert.Empty(t, results, "expected no validation errors for relative file path")
-	})
-
-	t.Run("parent directory relative path", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-
-		sqlDir := filepath.Join(tmpDir, "sql")
-		specDir := filepath.Join(tmpDir, "specs")
-		err := os.MkdirAll(sqlDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(specDir, 0755)
-		require.NoError(t, err)
-
-		sqlFile := filepath.Join(sqlDir, "query.sql")
-		err = os.WriteFile(sqlFile, []byte("SELECT * FROM orders"), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(specDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr("../sql/query.sql"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		assert.Empty(t, results, "expected no validation errors for parent directory path")
-	})
-
-	t.Run("absolute file path", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		sqlFile := filepath.Join(tmpDir, "absolute.sql")
-		err := os.WriteFile(sqlFile, []byte("SELECT COUNT(*) FROM events"), 0644)
-		require.NoError(t, err)
-
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			File:             ptr(sqlFile),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		assert.Empty(t, results, "expected no validation errors for absolute file path")
-	})
-
-	t.Run("sql specified takes precedence - no file check", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		specFilePath := filepath.Join(tmpDir, "spec.yaml")
-
-		spec := sqlmodel.SQLModelSpec{
-			ID:               "model-1",
-			DisplayName:      "My Model",
-			AccountID:        "acc-1",
-			PrimaryKey:       "id",
-			SourceDefinition: "postgres",
-			SQL:              ptr("SELECT 1"),
-		}
-
-		results := validateSQLModelV1Spec(specFilePath, "", "", nil, spec)
-		assert.Empty(t, results, "expected no validation errors when sql is specified")
-	})
 }
