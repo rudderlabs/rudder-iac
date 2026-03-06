@@ -12,18 +12,18 @@ import (
 )
 
 type PropertyV1 struct {
-	LocalID     string                 `mapstructure:"id" json:"id"`
-	Name        string                 `mapstructure:"name" json:"name"`
-	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty"`
-	Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty"`
-	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
-	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
-	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`
+	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
+	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty" validate:"excluded_with=Types"`
+	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty" validate:"excluded_with=Type,dive,oneof=string number integer boolean null array object"`
+	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty" validate:"excluded_with=ItemTypes"`
+	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty" validate:"excluded_with=ItemType,dive,oneof=string number integer boolean null array object"`
 	Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
 }
 
 type PropertySpecV1 struct {
-	Properties []PropertyV1 `mapstructure:"properties" json:"properties"`
+	Properties []PropertyV1 `mapstructure:"properties" json:"properties" validate:"dive"`
 }
 
 func (p *PropertyV1) FromV0(v0 Property) error {
