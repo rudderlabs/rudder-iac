@@ -31,7 +31,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"id":           "user",
 					"display_name": "User",
 					"type":         "entity",
-					"table":        "users",
+					"table":        "db.schema.users",
 					"description":  "User entity model",
 					"primary_id":   "user_id",
 					"root":         true,
@@ -50,7 +50,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"id":           "account",
 					"display_name": "Account",
 					"type":         "entity",
-					"table":        "accounts",
+					"table":        "db.schema.accounts",
 					"description":  "Account entity model",
 					"primary_id":   "account_id",
 					"root":         false,
@@ -59,7 +59,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"id":           "page_view",
 					"display_name": "Page View",
 					"type":         "event",
-					"table":        "page_views",
+					"table":        "db.schema.page_views",
 					"description":  "Page view event",
 					"timestamp":    "viewed_at",
 					"relationships": []map[string]interface{}{
@@ -77,7 +77,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 					"id":           "purchase",
 					"display_name": "Purchase",
 					"type":         "event",
-					"table":        "purchases",
+					"table":        "db.schema.purchases",
 					"timestamp":    "purchased_at",
 				},
 			},
@@ -112,7 +112,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	assert.Equal(t, "user", userData.ID)
 	assert.Equal(t, "User", userData.DisplayName)
 	assert.Equal(t, "entity", userData.Type)
-	assert.Equal(t, "users", userData.Table)
+	assert.Equal(t, "db.schema.users", userData.Table)
 	assert.Equal(t, "User entity model", userData.Description)
 	assert.Equal(t, "user_id", userData.PrimaryID)
 	assert.True(t, userData.Root)
@@ -126,7 +126,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	assert.Equal(t, "account", accountData.ID)
 	assert.Equal(t, "Account", accountData.DisplayName)
 	assert.Equal(t, "entity", accountData.Type)
-	assert.Equal(t, "accounts", accountData.Table)
+	assert.Equal(t, "db.schema.accounts", accountData.Table)
 	assert.Equal(t, "Account entity model", accountData.Description)
 	assert.Equal(t, "account_id", accountData.PrimaryID)
 	assert.False(t, accountData.Root)
@@ -139,7 +139,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	assert.Equal(t, "page_view", pageViewData.ID)
 	assert.Equal(t, "Page View", pageViewData.DisplayName)
 	assert.Equal(t, "event", pageViewData.Type)
-	assert.Equal(t, "page_views", pageViewData.Table)
+	assert.Equal(t, "db.schema.page_views", pageViewData.Table)
 	assert.Equal(t, "Page view event", pageViewData.Description)
 	assert.Equal(t, "viewed_at", pageViewData.Timestamp)
 
@@ -150,7 +150,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	assert.Equal(t, "purchase", purchaseData.ID)
 	assert.Equal(t, "Purchase", purchaseData.DisplayName)
 	assert.Equal(t, "event", purchaseData.Type)
-	assert.Equal(t, "purchases", purchaseData.Table)
+	assert.Equal(t, "db.schema.purchases", purchaseData.Table)
 	assert.Empty(t, purchaseData.Description) // No description provided
 	assert.Equal(t, "purchased_at", purchaseData.Timestamp)
 
@@ -295,7 +295,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 			modelSpec: map[string]interface{}{
 				"display_name": "User",
 				"type":         "entity",
-				"table":        "users",
+				"table":        "db.schema.users",
 				"primary_id":   "id",
 			},
 			errorMsg: "id is required",
@@ -304,7 +304,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 			name: "missing display_name",
 			modelSpec: map[string]interface{}{
 				"id":         "user",
-				"table":      "users",
+				"table":      "db.schema.users",
 				"primary_id": "id",
 			},
 			errorMsg: "display_name is required",
@@ -314,7 +314,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 			modelSpec: map[string]interface{}{
 				"id":           "user",
 				"display_name": "User",
-				"table":        "users",
+				"table":        "db.schema.users",
 				"primary_id":   "id",
 			},
 			errorMsg: "type must be 'entity' or 'event'",
@@ -325,7 +325,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 				"id":           "user",
 				"display_name": "User",
 				"type":         "invalid",
-				"table":        "users",
+				"table":        "db.schema.users",
 				"primary_id":   "id",
 			},
 			errorMsg: "type must be 'entity' or 'event'",
@@ -338,7 +338,18 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 				"type":         "entity",
 				"primary_id":   "id",
 			},
-			errorMsg: "table is required",
+			errorMsg: "3-part reference",
+		},
+		{
+			name: "invalid 1-part table ref",
+			modelSpec: map[string]interface{}{
+				"id":           "user",
+				"display_name": "User",
+				"type":         "entity",
+				"table":        "users",
+				"primary_id":   "id",
+			},
+			errorMsg: "3-part reference",
 		},
 		{
 			name: "entity model missing primary_id",
@@ -346,7 +357,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 				"id":           "user",
 				"display_name": "User",
 				"type":         "entity",
-				"table":        "users",
+				"table":        "db.schema.users",
 			},
 			errorMsg: "primary_id is required for entity models",
 		},
@@ -356,7 +367,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 				"id":           "purchase",
 				"display_name": "Purchase",
 				"type":         "event",
-				"table":        "purchases",
+				"table":        "db.schema.purchases",
 			},
 			errorMsg: "timestamp is required for event models",
 		},
@@ -401,14 +412,14 @@ func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 					"id":           "user",
 					"display_name": "User",
 					"type":         "entity",
-					"table":        "users",
+					"table":        "db.schema.users",
 					"primary_id":   "id",
 				},
 				{
 					"id":           "user", // Duplicate ID
 					"display_name": "User Duplicate",
 					"type":         "entity",
-					"table":        "users2",
+					"table":        "db.schema.users2",
 					"primary_id":   "id",
 				},
 			},
@@ -455,7 +466,7 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 					"id":           "user",
 					"display_name": "User",
 					"type":         "entity",
-					"table":        "users",
+					"table":        "db.schema.users",
 					"primary_id":   "user_id",
 					"relationships": []map[string]interface{}{
 						{
@@ -471,14 +482,14 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 				{
 					"id":           "order",
 					"display_name": "Order",
-					"table":        "orders",
+					"table":        "db.schema.orders",
 					"primary_id":   "order_id",
 				},
 				{
 					"id":           "purchase",
 					"display_name": "Purchase",
 					"type":         "event",
-					"table":        "purchases",
+					"table":        "db.schema.purchases",
 					"timestamp":    "purchased_at",
 					"relationships": []map[string]interface{}{
 						{
@@ -636,7 +647,7 @@ func buildRelationshipTestSpec(sourceType, targetType, cardinality string) *spec
 		"id":           "source-model",
 		"display_name": "Source Model",
 		"type":         sourceType,
-		"table":        "source_table",
+		"table":        "db.schema.source_table",
 		"relationships": []map[string]interface{}{
 			{
 				"id":              "test-rel",
@@ -662,7 +673,7 @@ func buildRelationshipTestSpec(sourceType, targetType, cardinality string) *spec
 		"id":           "target-model",
 		"display_name": "Target Model",
 		"type":         targetType,
-		"table":        "target_table",
+		"table":        "db.schema.target_table",
 	}
 
 	// Add type-specific fields for target model
