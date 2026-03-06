@@ -3,8 +3,8 @@ package source
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -114,11 +114,13 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 
 	tests := []struct {
 		name         string
+		version      string
 		spec         esSource.SourceSpec
 		wantMessages []string
 	}{
 		{
-			name: "missing id",
+			name:    "missing id",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				Name:             "My Source",
 				SourceDefinition: "javascript",
@@ -126,7 +128,8 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'id' is required"},
 		},
 		{
-			name: "missing name",
+			name:    "missing name",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				SourceDefinition: "javascript",
@@ -134,7 +137,8 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'name' is required"},
 		},
 		{
-			name: "missing type",
+			name:    "missing type",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID: "src-1",
 				Name:    "My Source",
@@ -142,7 +146,8 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'type' is required"},
 		},
 		{
-			name: "invalid type enum",
+			name:    "invalid type enum",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
@@ -153,7 +158,8 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid tracking plan ref format",
+			name:    "V0: invalid tracking plan ref",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
@@ -166,11 +172,12 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				},
 			},
 			wantMessages: []string{
-				"'tracking_plan' is not valid: must be of pattern #/tp/<group>/<id>",
+				"'tracking_plan' is invalid: must be of pattern #/tp/<group>/<id>",
 			},
 		},
 		{
-			name: "new format tracking plan ref rejected",
+			name:    "V0: modern ref format rejected",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
@@ -183,11 +190,12 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				},
 			},
 			wantMessages: []string{
-				"'tracking_plan' is not valid: must be of pattern #/tp/<group>/<id>",
+				"'tracking_plan' is invalid: must be of pattern #/tp/<group>/<id>",
 			},
 		},
 		{
-			name: "missing config when validations present",
+			name:    "missing config when validations present",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
@@ -201,7 +209,8 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'config' is required"},
 		},
 		{
-			name: "missing tracking_plan when validations present",
+			name:    "missing tracking_plan when validations present",
+			version: specs.SpecVersionV0_1,
 			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
@@ -215,20 +224,17 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'tracking_plan' is required"},
 		},
 		{
-			name: "all required fields missing",
-			spec: esSource.SourceSpec{},
-			wantMessages: []string{
-				"'id' is required",
-				"'name' is required",
-				"'type' is required",
-			},
+			name:         "all required fields missing",
+			version:      specs.SpecVersionV0_1,
+			spec:         esSource.SourceSpec{},
+			wantMessages: []string{"'id' is required", "'name' is required", "'type' is required"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			results := validateSourceSpec("", "", nil, tt.spec)
+			results := validateSourceSpec("", tt.version, nil, tt.spec)
 			require.Len(t, results, len(tt.wantMessages))
 
 			var gotMessages []string
@@ -247,11 +253,11 @@ func TestSourceSpecSyntaxValidV1Rule_ValidSpecs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		spec SourceSpecV1
+		spec esSource.SourceSpec
 	}{
 		{
 			name: "minimal source",
-			spec: SourceSpecV1{
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "javascript",
@@ -259,12 +265,12 @@ func TestSourceSpecSyntaxValidV1Rule_ValidSpecs(t *testing.T) {
 		},
 		{
 			name: "source with V1 tracking plan ref",
-			spec: SourceSpecV1{
+			spec: esSource.SourceSpec{
 				LocalID:          "src-2",
 				Name:             "My Source",
 				SourceDefinition: "node",
-				Governance: &SourceGovernanceSpecV1{
-					TrackingPlan: &TrackingPlanSpecV1{
+				Governance: &esSource.SourceGovernanceSpec{
+					TrackingPlan: &esSource.TrackingPlanSpec{
 						Ref:    "#tracking-plan:tp-1",
 						Config: &esSource.TrackingPlanConfigSpec{},
 					},
@@ -273,7 +279,7 @@ func TestSourceSpecSyntaxValidV1Rule_ValidSpecs(t *testing.T) {
 		},
 		{
 			name: "nil governance",
-			spec: SourceSpecV1{
+			spec: esSource.SourceSpec{
 				LocalID:          "src-3",
 				Name:             "My Source",
 				SourceDefinition: "python",
@@ -282,11 +288,11 @@ func TestSourceSpecSyntaxValidV1Rule_ValidSpecs(t *testing.T) {
 		},
 		{
 			name: "empty governance with nil validations",
-			spec: SourceSpecV1{
+			spec: esSource.SourceSpec{
 				LocalID:          "src-4",
 				Name:             "My Source",
 				SourceDefinition: "go",
-				Governance:       &SourceGovernanceSpecV1{},
+				Governance:       &esSource.SourceGovernanceSpec{},
 			},
 		},
 	}
@@ -294,7 +300,7 @@ func TestSourceSpecSyntaxValidV1Rule_ValidSpecs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			results := validateSourceSpecV1("", "", nil, tt.spec)
+			results := validateSourceSpec("", specs.SpecVersionV1, nil, tt.spec)
 			assert.Empty(t, results, "expected no validation errors")
 		})
 	}
@@ -312,12 +318,12 @@ func TestSourceSpecSyntaxValidV1Rule_AllSourceTypes(t *testing.T) {
 	for _, st := range sourceTypes {
 		t.Run(st, func(t *testing.T) {
 			t.Parallel()
-			spec := SourceSpecV1{
+			spec := esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: st,
 			}
-			results := validateSourceSpecV1("", "", nil, spec)
+			results := validateSourceSpec("", specs.SpecVersionV1, nil, spec)
 			assert.Empty(t, results, "source type %q should be valid", st)
 		})
 	}
@@ -328,36 +334,41 @@ func TestSourceSpecSyntaxValidV1Rule_InvalidSpecs(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		spec         SourceSpecV1
+		version      string
+		spec         esSource.SourceSpec
 		wantMessages []string
 	}{
 		{
-			name: "missing id",
-			spec: SourceSpecV1{
+			name:    "missing id",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				Name:             "My Source",
 				SourceDefinition: "javascript",
 			},
 			wantMessages: []string{"'id' is required"},
 		},
 		{
-			name: "missing name",
-			spec: SourceSpecV1{
+			name:    "missing name",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				SourceDefinition: "javascript",
 			},
 			wantMessages: []string{"'name' is required"},
 		},
 		{
-			name: "missing type",
-			spec: SourceSpecV1{
+			name:    "missing type",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID: "src-1",
 				Name:    "My Source",
 			},
 			wantMessages: []string{"'type' is required"},
 		},
 		{
-			name: "invalid type enum",
-			spec: SourceSpecV1{
+			name:    "invalid type enum",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "invalid_type",
@@ -367,47 +378,50 @@ func TestSourceSpecSyntaxValidV1Rule_InvalidSpecs(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid V1 tracking plan ref format",
-			spec: SourceSpecV1{
+			name:    "V1: invalid tracking plan ref format",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "javascript",
-				Governance: &SourceGovernanceSpecV1{
-					TrackingPlan: &TrackingPlanSpecV1{
+				Governance: &esSource.SourceGovernanceSpec{
+					TrackingPlan: &esSource.TrackingPlanSpec{
 						Ref:    "not-a-valid-ref",
 						Config: &esSource.TrackingPlanConfigSpec{},
 					},
 				},
 			},
 			wantMessages: []string{
-				"'tracking_plan' is not valid: must be of pattern #tracking-plan:<id>",
+				"'tracking_plan' is invalid: must be of pattern #tracking-plan:<id>",
 			},
 		},
 		{
-			name: "legacy format tracking plan ref rejected in V1",
-			spec: SourceSpecV1{
+			name:    "V1: legacy tracking plan ref rejected",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "javascript",
-				Governance: &SourceGovernanceSpecV1{
-					TrackingPlan: &TrackingPlanSpecV1{
+				Governance: &esSource.SourceGovernanceSpec{
+					TrackingPlan: &esSource.TrackingPlanSpec{
 						Ref:    "#/tp/my-group/tp-1",
 						Config: &esSource.TrackingPlanConfigSpec{},
 					},
 				},
 			},
 			wantMessages: []string{
-				"'tracking_plan' is not valid: must be of pattern #tracking-plan:<id>",
+				"'tracking_plan' is invalid: must be of pattern #tracking-plan:<id>",
 			},
 		},
 		{
-			name: "missing config when validations present",
-			spec: SourceSpecV1{
+			name:    "missing config when validations present",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "javascript",
-				Governance: &SourceGovernanceSpecV1{
-					TrackingPlan: &TrackingPlanSpecV1{
+				Governance: &esSource.SourceGovernanceSpec{
+					TrackingPlan: &esSource.TrackingPlanSpec{
 						Ref: "#tracking-plan:tp-1",
 					},
 				},
@@ -415,13 +429,14 @@ func TestSourceSpecSyntaxValidV1Rule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'config' is required"},
 		},
 		{
-			name: "missing tracking_plan when validations present",
-			spec: SourceSpecV1{
+			name:    "missing tracking_plan when validations present",
+			version: specs.SpecVersionV1,
+			spec: esSource.SourceSpec{
 				LocalID:          "src-1",
 				Name:             "My Source",
 				SourceDefinition: "javascript",
-				Governance: &SourceGovernanceSpecV1{
-					TrackingPlan: &TrackingPlanSpecV1{
+				Governance: &esSource.SourceGovernanceSpec{
+					TrackingPlan: &esSource.TrackingPlanSpec{
 						Config: &esSource.TrackingPlanConfigSpec{},
 					},
 				},
@@ -429,20 +444,17 @@ func TestSourceSpecSyntaxValidV1Rule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'tracking_plan' is required"},
 		},
 		{
-			name: "all required fields missing",
-			spec: SourceSpecV1{},
-			wantMessages: []string{
-				"'id' is required",
-				"'name' is required",
-				"'type' is required",
-			},
+			name:         "all required fields missing",
+			version:      specs.SpecVersionV1,
+			spec:         esSource.SourceSpec{},
+			wantMessages: []string{"'id' is required", "'name' is required", "'type' is required"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			results := validateSourceSpecV1("", "", nil, tt.spec)
+			results := validateSourceSpec("", tt.version, nil, tt.spec)
 			require.Len(t, results, len(tt.wantMessages))
 
 			var gotMessages []string

@@ -170,26 +170,26 @@ func TestSourceSemanticValidV1(t *testing.T) {
 	t.Run("no governance is valid", func(t *testing.T) {
 		t.Parallel()
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "My Source",
 			SourceDefinition: "javascript",
 		}
 
 		graph := resources.NewGraph()
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 
 	t.Run("V1 tracking plan ref found in graph", func(t *testing.T) {
 		t.Parallel()
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "My Source",
 			SourceDefinition: "javascript",
-			Governance: &SourceGovernanceSpecV1{
-				TrackingPlan: &TrackingPlanSpecV1{
+			Governance: &esSource.SourceGovernanceSpec{
+				TrackingPlan: &esSource.TrackingPlanSpec{
 					Ref:    "#tracking-plan:tp-1",
 					Config: &esSource.TrackingPlanConfigSpec{},
 				},
@@ -197,19 +197,19 @@ func TestSourceSemanticValidV1(t *testing.T) {
 		}
 
 		graph := funcs.GraphWith("tp-1", "tracking-plan")
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 
 	t.Run("V1 tracking plan ref not found in graph", func(t *testing.T) {
 		t.Parallel()
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "My Source",
 			SourceDefinition: "javascript",
-			Governance: &SourceGovernanceSpecV1{
-				TrackingPlan: &TrackingPlanSpecV1{
+			Governance: &esSource.SourceGovernanceSpec{
+				TrackingPlan: &esSource.TrackingPlanSpec{
 					Ref:    "#tracking-plan:tp-missing",
 					Config: &esSource.TrackingPlanConfigSpec{},
 				},
@@ -217,7 +217,7 @@ func TestSourceSemanticValidV1(t *testing.T) {
 		}
 
 		graph := resources.NewGraph()
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "not found in the project")
 		assert.Equal(t, "/governance/validations/tracking_plan", results[0].Reference)
@@ -226,15 +226,15 @@ func TestSourceSemanticValidV1(t *testing.T) {
 	t.Run("nil validations inside governance is valid", func(t *testing.T) {
 		t.Parallel()
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "My Source",
 			SourceDefinition: "javascript",
-			Governance:       &SourceGovernanceSpecV1{},
+			Governance:       &esSource.SourceGovernanceSpec{},
 		}
 
 		graph := resources.NewGraph()
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 }
@@ -249,13 +249,13 @@ func TestSourceSemanticValidV1_NameUniqueness(t *testing.T) {
 		graph.AddResource(sourceResource("src-1", "Source Alpha"))
 		graph.AddResource(sourceResource("src-2", "Source Beta"))
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "Source Alpha",
 			SourceDefinition: "javascript",
 		}
 
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 
@@ -266,13 +266,13 @@ func TestSourceSemanticValidV1_NameUniqueness(t *testing.T) {
 		graph.AddResource(sourceResource("src-1", "Same Name"))
 		graph.AddResource(sourceResource("src-2", "Same Name"))
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "Same Name",
 			SourceDefinition: "javascript",
 		}
 
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/name", results[0].Reference)
 		assert.Contains(t, results[0].Message, "duplicate name 'Same Name' within kind 'event-stream-source'")
@@ -284,13 +284,13 @@ func TestSourceSemanticValidV1_NameUniqueness(t *testing.T) {
 		graph := resources.NewGraph()
 		graph.AddResource(sourceResource("src-1", "Only Source"))
 
-		spec := SourceSpecV1{
+		spec := esSource.SourceSpec{
 			LocalID:          "src-1",
 			Name:             "Only Source",
 			SourceDefinition: "javascript",
 		}
 
-		results := validateSourceSemanticV1("", "", nil, spec, graph)
+		results := validateSourceSemantic("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 }
