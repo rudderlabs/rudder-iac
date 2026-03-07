@@ -15,17 +15,17 @@ const (
 	customTypeLegacyReferenceTag     = "legacy_custom_type_ref"
 	customTypeReferenceTag           = "custom_type_ref"
 	customTypeLegacyReferenceMessage = "must be of pattern #/custom-types/<group>/<id>"
-	customTypeReferenceMessage       = "must be of pattern #custom-types:<id>"
+	customTypeReferenceMessage       = "must be of pattern #custom-type:<id>"
 
 	propertyLegacyReferenceTag     = "legacy_property_ref"
 	propertyReferenceTag           = "property_ref"
 	propertyLegacyReferenceMessage = "must be of pattern #/properties/<group>/<id>"
-	propertyReferenceMessage       = "must be of pattern #properties:<id>"
+	propertyReferenceMessage       = "must be of pattern #property:<id>"
 
 	eventLegacyReferenceTag     = "legacy_event_ref"
 	eventReferenceTag           = "event_ref"
 	eventLegacyReferenceMessage = "must be of pattern #/events/<group>/<id>"
-	eventReferenceMessage       = "must be of pattern #events:<id>"
+	eventReferenceMessage       = "must be of pattern #event:<id>"
 
 	categoryLegacyReferenceTag     = "legacy_category_ref"
 	categoryReferenceTag           = "category_ref"
@@ -52,7 +52,7 @@ var (
 
 	CustomTypeReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindCustomTypes,
+		types.CustomTypeResourceType,
 	)
 
 	PropertyLegacyReferenceRegex = fmt.Sprintf(
@@ -62,7 +62,7 @@ var (
 
 	PropertyReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindProperties,
+		types.PropertyResourceType,
 	)
 
 	EventLegacyReferenceRegex = fmt.Sprintf(
@@ -72,7 +72,7 @@ var (
 
 	EventReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindEvents,
+		types.EventResourceType,
 	)
 
 	CategoryLegacyReferenceRegex = fmt.Sprintf(
