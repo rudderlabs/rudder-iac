@@ -3,10 +3,9 @@ package customtype
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	validationRules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,9 +15,13 @@ func TestCustomTypeConfigValidRule_Metadata(t *testing.T) {
 	rule := NewCustomTypeConfigValidRule()
 
 	assert.Equal(t, "datacatalog/custom-types/config-valid", rule.ID())
-	assert.Equal(t, rules.Error, rule.Severity())
+	assert.Equal(t, validationRules.Error, rule.Severity())
 	assert.Equal(t, "custom type config must be valid for the given type", rule.Description())
-	assert.Equal(t, prules.LegacyVersionPatterns("custom-types"), rule.AppliesTo())
+	assert.Equal(t, []validationRules.MatchPattern{
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1),
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1Variant),
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
+	}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
