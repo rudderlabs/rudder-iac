@@ -22,25 +22,25 @@ func TestCustomTypeSpecSyntaxValidRule_V1ValidSpecs(t *testing.T) {
 				Description: "Contact details for a profile",
 				Type:        "object",
 				Properties: []localcatalog.CustomTypePropertyV1{
-					{Property: "#properties:email", Required: true},
-					{Property: "#properties:signup_method", Required: true},
+					{Property: "#property:email", Required: true},
+					{Property: "#property:signup_method", Required: true},
 				},
 				Variants: localcatalog.VariantsV1{
 					{
 						Type:          "discriminator",
-						Discriminator: "#properties:signup_method",
+						Discriminator: "#property:signup_method",
 						Cases: []localcatalog.VariantCaseV1{
 							{
 								DisplayName: "Email signup",
 								Match:       []any{"email"},
 								Properties: []localcatalog.PropertyReferenceV1{
-									{Property: "#properties:email", Required: true},
+									{Property: "#property:email", Required: true},
 								},
 							},
 						},
 						Default: localcatalog.DefaultPropertiesV1{
 							Properties: []localcatalog.PropertyReferenceV1{
-								{Property: "#properties:email"},
+								{Property: "#property:email"},
 							},
 						},
 					},
@@ -112,11 +112,11 @@ func TestCustomTypeSpecSyntaxValidRule_V1InvalidSpecs(t *testing.T) {
 				"/types/0/variants/0/default/properties/0/property",
 			},
 			expectedMsgs: []string{
-				"'property' is not valid: must be of pattern #properties:<id>",
+				"'property' is not valid: must be of pattern #property:<id>",
 				"'type' must equal 'discriminator'",
-				"'discriminator' is not valid: must be of pattern #properties:<id>",
-				"'property' is not valid: must be of pattern #properties:<id>",
-				"'property' is not valid: must be of pattern #properties:<id>",
+				"'discriminator' is not valid: must be of pattern #property:<id>",
+				"'property' is not valid: must be of pattern #property:<id>",
+				"'property' is not valid: must be of pattern #property:<id>",
 			},
 		},
 		{
@@ -130,13 +130,13 @@ func TestCustomTypeSpecSyntaxValidRule_V1InvalidSpecs(t *testing.T) {
 						Variants: localcatalog.VariantsV1{
 							{
 								Type:          "discriminator",
-								Discriminator: "#properties:status_type",
+								Discriminator: "#property:status_type",
 								Cases: []localcatalog.VariantCaseV1{
 									{
 										DisplayName: "Case1",
 										Match:       []any{"email"},
 										Properties: []localcatalog.PropertyReferenceV1{
-											{Property: "#properties:status_value"},
+											{Property: "#property:status_value"},
 										},
 									},
 								},
@@ -177,25 +177,25 @@ func TestCustomTypeSemanticValid_V1(t *testing.T) {
 					Name:    "ContactInfo",
 					Type:    "object",
 					Properties: []localcatalog.CustomTypePropertyV1{
-						{Property: "#properties:email"},
-						{Property: "#properties:signup_method"},
+						{Property: "#property:email"},
+						{Property: "#property:signup_method"},
 					},
 					Variants: localcatalog.VariantsV1{
 						{
 							Type:          "discriminator",
-							Discriminator: "#properties:signup_method",
+							Discriminator: "#property:signup_method",
 							Cases: []localcatalog.VariantCaseV1{
 								{
 									DisplayName: "Email",
 									Match:       []any{"email"},
 									Properties: []localcatalog.PropertyReferenceV1{
-										{Property: "#properties:email"},
+										{Property: "#property:email"},
 									},
 								},
 							},
 							Default: localcatalog.DefaultPropertiesV1{
 								Properties: []localcatalog.PropertyReferenceV1{
-									{Property: "#properties:email"},
+									{Property: "#property:email"},
 								},
 							},
 						},
@@ -224,24 +224,24 @@ func TestCustomTypeSemanticValid_V1(t *testing.T) {
 					Name:    "ContactInfo",
 					Type:    "object",
 					Properties: []localcatalog.CustomTypePropertyV1{
-						{Property: "#properties:email"},
+						{Property: "#property:email"},
 					},
 					Variants: localcatalog.VariantsV1{
 						{
 							Type:          "discriminator",
-							Discriminator: "#properties:address",
+							Discriminator: "#property:address",
 							Cases: []localcatalog.VariantCaseV1{
 								{
 									DisplayName: "Home",
 									Match:       []any{"home"},
 									Properties: []localcatalog.PropertyReferenceV1{
-										{Property: "#properties:missing_case_property"},
+										{Property: "#property:missing_case_property"},
 									},
 								},
 							},
 							Default: localcatalog.DefaultPropertiesV1{
 								Properties: []localcatalog.PropertyReferenceV1{
-									{Property: "#properties:missing_default_property"},
+									{Property: "#property:missing_default_property"},
 								},
 							},
 						},
