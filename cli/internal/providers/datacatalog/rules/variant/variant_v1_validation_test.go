@@ -21,18 +21,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:signup_method",
+				Discriminator: "#property:signup_method",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Email",
 						Match:       []any{"email"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:signup_method"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:signup_method"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:signup_method"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:signup_method"}, "/types/0", graph)
 		assert.Empty(t, results, "string type should be valid for discriminator")
 	})
 
@@ -45,18 +45,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:level",
+				Discriminator: "#property:level",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Basic",
 						Match:       []any{1},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:level"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:level"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:level"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:level"}, "/types/0", graph)
 		assert.Empty(t, results, "integer type should be valid for discriminator")
 	})
 
@@ -69,18 +69,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:is_active",
+				Discriminator: "#property:is_active",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Active",
 						Match:       []any{true},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:is_active"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:is_active"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:is_active"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:is_active"}, "/types/0", graph)
 		assert.Empty(t, results, "boolean type should be valid for discriminator")
 	})
 
@@ -93,18 +93,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:address",
+				Discriminator: "#property:address",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Home",
 						Match:       []any{"home"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:address"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:address"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:address"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:address"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -120,18 +120,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:tags",
+				Discriminator: "#property:tags",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Tagged",
 						Match:       []any{"tag"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:tags"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:tags"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:tags"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:tags"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "discriminator property type 'array' must contain one of: string, integer, boolean")
@@ -150,18 +150,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:payment_method",
+				Discriminator: "#property:payment_method",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Credit",
 						Match:       []any{"credit"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:payment_method"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:payment_method"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:payment_method"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:payment_method"}, "/types/0", graph)
 		assert.Empty(t, results, "custom type ref with valid underlying type should be allowed")
 	})
 
@@ -178,18 +178,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:address_field",
+				Discriminator: "#property:address_field",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Home",
 						Match:       []any{"home"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:address_field"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:address_field"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:address_field"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:address_field"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -206,18 +206,18 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:missing_prop",
+				Discriminator: "#property:missing_prop",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Case",
 						Match:       []any{"x"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:missing_prop"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:missing_prop"}},
 					},
 				},
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#properties:missing_prop"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:missing_prop"}, "/types/0", graph)
 		assert.Empty(t, results, "missing ref should be skipped for type check — reported by ValidateReferences")
 	})
 }
@@ -234,18 +234,18 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:signup_method",
+				Discriminator: "#property:signup_method",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Email",
 						Match:       []any{"email"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:signup_method"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:signup_method"}},
 					},
 				},
 			},
 		}
 
-		ownRefs := []string{"#properties:email", "#properties:signup_method"}
+		ownRefs := []string{"#property:email", "#property:signup_method"}
 		results := ValidateVariantDiscriminatorsV1(variants, ownRefs, "/types/0", graph)
 		assert.Empty(t, results, "discriminator found in own properties — no error")
 	})
@@ -259,18 +259,18 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:signup_method",
+				Discriminator: "#property:signup_method",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Email",
 						Match:       []any{"email"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:signup_method"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:signup_method"}},
 					},
 				},
 			},
 		}
 
-		ownRefs := []string{"#properties:email", "#properties:phone"}
+		ownRefs := []string{"#property:email", "#property:phone"}
 		results := ValidateVariantDiscriminatorsV1(variants, ownRefs, "/types/0", graph)
 
 		require.Len(t, results, 1)
@@ -287,12 +287,12 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 		variants := localcatalog.VariantsV1{
 			{
 				Type:          "discriminator",
-				Discriminator: "#properties:signup_method",
+				Discriminator: "#property:signup_method",
 				Cases: []localcatalog.VariantCaseV1{
 					{
 						DisplayName: "Email",
 						Match:       []any{"email"},
-						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#properties:signup_method"}},
+						Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:signup_method"}},
 					},
 				},
 			},

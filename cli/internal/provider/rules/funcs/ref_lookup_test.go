@@ -287,13 +287,9 @@ func TestParseURNRef(t *testing.T) {
 		wantErr      bool
 	}{
 		{"property ref", "#property:user_id", "property", "user_id", false},
-		{"properties ref", "#properties:user_id", "property", "user_id", false},
 		{"event ref", "#event:signup", "event", "signup", false},
-		{"events ref", "#events:signup", "event", "signup", false},
 		{"category ref", "#category:page_events", "category", "page_events", false},
-		{"categories ref", "#categories:page_events", "category", "page_events", false},
 		{"custom type ref", "#custom-type:Address", "custom-type", "Address", false},
-		{"custom types ref", "#custom-types:Address", "custom-type", "Address", false},
 		{"tracking plan ref", "#tracking-plan:my_tp", "tracking-plan", "my_tp", false},
 		{"missing colon", "#property", "", "", true},
 		{"empty kind", "#:user_id", "", "", true},

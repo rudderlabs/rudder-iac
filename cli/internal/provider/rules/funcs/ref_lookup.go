@@ -170,14 +170,6 @@ func hasReferencePattern(validateTag string) bool {
 	return false
 }
 
-var normalizedResourceTypes = map[string]string{
-	"properties":    "property",
-	"events":        "event",
-	"categories":    "category",
-	"custom-types":  "custom-type",
-	"tracking-plan": "tracking-plan",
-}
-
 // ParseURNRef extracts the normalized resource type and local ID from a URN-format reference.
 // Input:  "#properties:user_id"
 // Output: "property", "user_id", nil
@@ -186,10 +178,6 @@ func ParseURNRef(ref string) (string, string, error) {
 	resourceType, localID, ok := strings.Cut(trimmed, ":")
 	if !ok || resourceType == "" || localID == "" {
 		return "", "", fmt.Errorf("expected URN format '#<kind>:<id>', got '%s'", ref)
-	}
-
-	if normalizedResourceType, exists := normalizedResourceTypes[resourceType]; exists {
-		resourceType = normalizedResourceType
 	}
 
 	return resourceType, localID, nil
