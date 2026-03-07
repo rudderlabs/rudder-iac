@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -118,9 +117,7 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 			validateCustomTypeSpec,
 		),
 		prules.NewPatternValidator(
-			[]rules.MatchPattern{
-				rules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
-			},
+			prules.V1VersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeSpecV1,
 		),
 	)

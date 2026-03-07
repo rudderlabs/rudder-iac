@@ -20,7 +20,6 @@ func TestCustomTypeConfigValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, []validationRules.MatchPattern{
 		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1),
 		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1Variant),
-		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
 	}, rule.AppliesTo())
 
 	examples := rule.Examples()

@@ -1,4 +1,4 @@
-package funcs
+package variant
 
 import (
 	"testing"
@@ -46,7 +46,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:signup_method"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:signup_method"}, "/types/0", graph)
 		assert.Empty(t, results, "string type should be valid for discriminator")
 	})
 
@@ -66,7 +66,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:level"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:level"}, "/types/0", graph)
 		assert.Empty(t, results, "integer type should be valid for discriminator")
 	})
 
@@ -86,7 +86,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:is_active"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:is_active"}, "/types/0", graph)
 		assert.Empty(t, results, "boolean type should be valid for discriminator")
 	})
 
@@ -106,7 +106,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:address"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:address"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -129,7 +129,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:tags"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:tags"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "discriminator property type 'array' must contain one of: string, integer, boolean")
@@ -155,7 +155,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:payment_method"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:payment_method"}, "/types/0", graph)
 		assert.Empty(t, results, "custom type ref with valid underlying type should be allowed")
 	})
 
@@ -179,7 +179,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:address_field"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:address_field"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -208,7 +208,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, []string{"#property:payment_method"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:payment_method"}, "/types/0", graph)
 		assert.Empty(t, results, "custom type not in graph should be skipped gracefully")
 	})
 
@@ -228,7 +228,7 @@ func TestValidateVariantDiscriminators_TypeCheck(t *testing.T) {
 		}
 
 		// Ownership error expected, but no type check error (ref resolution handled by ValidateReferences)
-		results := ValidateVariantDiscriminators(variants, []string{"#property:missing_prop"}, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, []string{"#property:missing_prop"}, "/types/0", graph)
 		assert.Empty(t, results, "missing ref should be skipped for type check — reported by ValidateReferences")
 	})
 }
@@ -253,7 +253,7 @@ func TestValidateVariantDiscriminators_Ownership(t *testing.T) {
 		}
 
 		ownRefs := []string{"#property:email", "#property:signup_method"}
-		results := ValidateVariantDiscriminators(variants, ownRefs, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, ownRefs, "/types/0", graph)
 		assert.Empty(t, results, "discriminator found in own properties — no error")
 	})
 
@@ -275,7 +275,7 @@ func TestValidateVariantDiscriminators_Ownership(t *testing.T) {
 
 		// ownRefs does NOT contain signup_method
 		ownRefs := []string{"#property:email", "#property:phone"}
-		results := ValidateVariantDiscriminators(variants, ownRefs, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, ownRefs, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -298,7 +298,7 @@ func TestValidateVariantDiscriminators_Ownership(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminators(variants, nil, "/types/0", graph)
+		results := ValidateVariantDiscriminatorsV0(variants, nil, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "must reference a property defined in the parent's own properties")

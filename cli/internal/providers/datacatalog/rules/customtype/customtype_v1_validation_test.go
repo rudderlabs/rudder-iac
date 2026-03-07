@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
@@ -268,47 +269,131 @@ func TestCustomTypeSemanticValid_V1(t *testing.T) {
 	})
 }
 
-func TestCustomTypeConfigValidRule_V1(t *testing.T) {
+func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("object config is rejected", func(t *testing.T) {
+	t.Run("custom type ref found in item_types", func(t *testing.T) {
 		t.Parallel()
+
+		graph := funcs.GraphWith("Address", "custom-type")
 
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "contact_info",
-					Name:    "ContactInfo",
-					Type:    "object",
-					Config:  map[string]any{"anything": "value"},
+					LocalID: "address_list",
+					Name:    "AddressList",
+					Type:    "array",
+					Config:  map[string]any{"item_types": []any{"#custom-type:Address"}},
 				},
 			},
 		}
 
-		results := validateCustomTypeConfigV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
-		require.Len(t, results, 1)
-		assert.Equal(t, "/types/0/config", results[0].Reference)
-		assert.Equal(t, "config is not allowed for the specified type(s)", results[0].Message)
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "custom type ref exists in graph - no error")
 	})
 
-	t.Run("snake case config stays out of scope", func(t *testing.T) {
+	t.Run("custom type ref not found", func(t *testing.T) {
 		t.Parallel()
+
+		graph := resources.NewGraph()
 
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "status",
-					Name:    "Status",
-					Type:    "string",
-					Config: map[string]any{
-						"min_length": 1,
-						"max_length": 32,
-					},
+					LocalID: "address_list",
+					Name:    "AddressList",
+					Type:    "array",
+					Config:  map[string]any{"item_types": []any{"#custom-type:Missing"}},
 				},
 			},
 		}
 
-		results := validateCustomTypeConfigV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
-		assert.Empty(t, results)
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/config/item_types/0", results[0].Reference)
+		assert.Contains(t, results[0].Message, "referenced custom-type 'Missing' not found")
+	})
+
+	t.Run("primitive types skipped", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "string_list",
+					Name:    "StringList",
+					Type:    "array",
+					Config:  map[string]any{"item_types": []any{"string"}},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "primitive types should not trigger ref lookup")
+	})
+
+	t.Run("mixed primitives and custom type refs", func(t *testing.T) {
+		t.Parallel()
+
+		graph := funcs.GraphWith("Address", "custom-type")
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "mixed_list",
+					Name:    "MixedList",
+					Type:    "array",
+					Config:  map[string]any{"item_types": []any{"string", "#custom-type:Address", "#custom-type:Missing"}},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/config/item_types/2", results[0].Reference)
+		assert.Contains(t, results[0].Message, "referenced custom-type 'Missing' not found")
+	})
+
+	t.Run("no item_types in config", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "simple_type",
+					Name:    "SimpleType",
+					Type:    "string",
+					Config:  map[string]any{"min_length": 1},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "config without item_types should not trigger ref check")
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "simple_type",
+					Name:    "SimpleType",
+					Type:    "string",
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "nil config should not trigger ref check")
 	})
 }
