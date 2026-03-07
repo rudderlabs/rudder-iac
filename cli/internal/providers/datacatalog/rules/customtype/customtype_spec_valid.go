@@ -1,11 +1,15 @@
 package customtype
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -13,10 +17,12 @@ const (
 	customTypeNameRegexPattern = "^[A-Z][A-Za-z0-9_-]*$"
 	customTypeNameRegexTag     = "custom_type_name"
 	customTypeNameErrorMessage = "must start with uppercase and contain only alphanumeric, underscores, or hyphens"
-
-	customTypeTypeRegexPattern = "^(string|number|integer|boolean|array|object|null)$"
 	customTypeTypeRegexTag     = "primitive_type"
-	customTypeTypeErrorMessage = "must be one of the following: string, number, integer, boolean, array, object, null"
+)
+
+var (
+	customTypeTypeRegexPattern = fmt.Sprintf("^(%s)$", strings.Join(catalogRules.ValidPrimitiveTypes, "|"))
+	customTypeTypeErrorMessage = fmt.Sprintf("must be one of the following: %s", strings.Join(catalogRules.ValidPrimitiveTypes, ", "))
 )
 
 func init() {
@@ -84,6 +90,23 @@ var validateCustomTypeSpec = func(Kind string, Version string, Metadata map[stri
 	)
 }
 
+var validateCustomTypeSpecV1 = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CustomTypeSpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(Spec, "")
+	if err != nil {
+		return []rules.ValidationResult{
+			{
+				Reference: "/types",
+				Message:   err.Error(),
+			},
+		}
+	}
+
+	return funcs.ParseValidationErrors(
+		validationErrors,
+		reflect.TypeOf(Spec),
+	)
+}
+
 func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/custom-types/spec-syntax-valid",
@@ -93,6 +116,12 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeSpec,
+		),
+		prules.NewPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
+			},
+			validateCustomTypeSpecV1,
 		),
 	)
 }

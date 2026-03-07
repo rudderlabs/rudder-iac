@@ -3,6 +3,7 @@ package customtype
 import (
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/config"
@@ -126,6 +127,21 @@ var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[st
 	return results
 }
 
+var validateCustomTypeConfigV1 = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CustomTypeSpecV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, customType := range Spec.Types {
+		if len(customType.Config) == 0 || customType.Type != "object" {
+			continue
+		}
+
+		reference := fmt.Sprintf("/types/%d/config", i)
+		results = append(results, config.ValidateConfig([]string{customType.Type}, customType.Config, reference)...)
+	}
+
+	return results
+}
+
 // NewCustomTypeConfigValidRule creates a new custom type config validation rule using TypedRule pattern
 func NewCustomTypeConfigValidRule() rules.Rule {
 	return prules.NewTypedRule(
@@ -136,6 +152,12 @@ func NewCustomTypeConfigValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeConfig,
+		),
+		prules.NewPatternValidator(
+			[]rules.MatchPattern{
+				rules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
+			},
+			validateCustomTypeConfigV1,
 		),
 	)
 }
