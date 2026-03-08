@@ -23,6 +23,14 @@ var validateTrackingPlanSemantic = func(_ string, _ string, _ map[string]any, sp
 	return results
 }
 
+var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
+	results := funcs.ValidateReferences(spec, graph)
+	results = append(results, validatePropertyNestingV1(spec, graph)...)
+	results = append(results, validateTrackingPlanNameUniquenessV1(spec, graph)...)
+
+	return results
+}
+
 func validateTrackingPlanVariants(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
 	var results []rules.ValidationResult
 	for i, rule := range spec.Rules {
@@ -42,13 +50,7 @@ func validateTrackingPlanVariants(spec localcatalog.TrackingPlan, graph *resourc
 }
 
 func validateTrackingPlanNameUniqueness(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
-	countMap := make(map[string]int)
-	for _, resource := range graph.ResourcesByType(types.TrackingPlanResourceType) {
-		data := resource.Data()
-		name, _ := data["name"].(string)
-		countMap[name]++
-	}
-
+	countMap := trackingPlanDisplayNameCountMap(graph)
 	if countMap[spec.Name] > 1 {
 		return []rules.ValidationResult{{
 			Reference: "/display_name",
@@ -57,6 +59,29 @@ func validateTrackingPlanNameUniqueness(spec localcatalog.TrackingPlan, graph *r
 	}
 
 	return nil
+}
+
+func validateTrackingPlanNameUniquenessV1(spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
+	countMap := trackingPlanDisplayNameCountMap(graph)
+	if countMap[spec.Name] > 1 {
+		return []rules.ValidationResult{{
+			Reference: "/display_name",
+			Message:   fmt.Sprintf("duplicate display_name '%s' within kind 'tracking-plan'", spec.Name),
+		}}
+	}
+
+	return nil
+}
+
+func trackingPlanDisplayNameCountMap(graph *resources.Graph) map[string]int {
+	countMap := make(map[string]int)
+	for _, resource := range graph.ResourcesByType(types.TrackingPlanResourceType) {
+		data := resource.Data()
+		name, _ := data["name"].(string)
+		countMap[name]++
+	}
+
+	return countMap
 }
 
 // validatePropertyNesting checks that each rule property's referenced type supports
@@ -74,16 +99,42 @@ func validatePropertyNesting(spec localcatalog.TrackingPlan, graph *resources.Gr
 	return results
 }
 
-func validatePropertyNestingAllowed(prop *localcatalog.TPRuleProperty, ref string, graph *resources.Graph) []rules.ValidationResult {
-	hasNested := len(prop.Properties) > 0
-	hasAdditionalProps := prop.AdditionalProperties != nil
+func validatePropertyNestingV1(spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
 
+	for i, rule := range spec.Rules {
+		for j, prop := range rule.Properties {
+			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
+			results = append(results, validatePropertyNestingAllowedV1(prop, ref, graph)...)
+		}
+	}
+
+	return results
+}
+
+func validatePropertyNestingAllowed(prop *localcatalog.TPRuleProperty, ref string, graph *resources.Graph) []rules.ValidationResult {
+	return validatePropertyNestingRef(prop.Ref, prop.Properties, prop.AdditionalProperties != nil, ref, graph, validatePropertyNestingAllowed)
+}
+
+func validatePropertyNestingAllowedV1(prop *localcatalog.TPRulePropertyV1, ref string, graph *resources.Graph) []rules.ValidationResult {
+	return validatePropertyNestingRef(prop.Property, prop.Properties, prop.AdditionalProperties != nil, ref, graph, validatePropertyNestingAllowedV1)
+}
+
+func validatePropertyNestingRef[T any](
+	propertyRef string,
+	nestedProperties []*T,
+	hasAdditionalProps bool,
+	ref string,
+	graph *resources.Graph,
+	recurse func(*T, string, *resources.Graph) []rules.ValidationResult,
+) []rules.ValidationResult {
+	hasNested := len(nestedProperties) > 0
 	if !hasNested && !hasAdditionalProps {
 		return nil
 	}
 
 	// Resolve the property ref to get its type from the graph
-	resourceType, localID, err := funcs.ParseURNRef(prop.Ref)
+	resourceType, localID, err := funcs.ParseURNRef(propertyRef)
 	if err != nil {
 		// Ref parsing errors are already reported by ValidateReferences
 		return nil
@@ -104,9 +155,9 @@ func validatePropertyNestingAllowed(prop *localcatalog.TPRuleProperty, ref strin
 	if nestingAllowed(propertyType, config) {
 		// Type supports nesting — recurse into nested properties
 		var results []rules.ValidationResult
-		for k, nested := range prop.Properties {
+		for k, nested := range nestedProperties {
 			nestedRef := fmt.Sprintf("%s/properties/%d", ref, k)
-			results = append(results, validatePropertyNestingAllowed(nested, nestedRef, graph)...)
+			results = append(results, recurse(nested, nestedRef, graph)...)
 		}
 		return results
 	}
@@ -177,6 +228,10 @@ func NewTrackingPlanSemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
 			validateTrackingPlanSemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1),
+			validateTrackingPlanSemanticV1,
 		),
 	)
 }
