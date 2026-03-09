@@ -19,7 +19,7 @@ The shared config validator in `cli/internal/providers/datacatalog/rules/config/
 V1 config validation must support the following changes without duplicating the entire validator stack:
 
 1. V1 config keys use snake_case instead of camelCase
-2. V1 array custom type references should recognize the current custom type reference format: `#custom-types:<id>`
+2. V1 array custom type references should recognize the current custom type reference format: `#custom-type:<id>`
 3. V1 key handling should be driven by caller-supplied aliasing rather than a dedicated version-specific validator fork
 
 This spec defines a focused change in the shared `rules/config` package only. Wiring V1 property and custom type rules to consume the new behavior is intentionally deferred to follow-up PRs.
@@ -109,15 +109,17 @@ Examples:
 - `minLength` is not handled specially by the shared package
 - if `minLength` is not aliased, it should fall through to the existing unknown-key / not-applicable behavior
 
-### D-4: V1 Custom Type Refs Use `#custom-types:<id>`
+### D-4: V1 Custom Type Refs Use `#custom-type:<id>`
 
 For this change, the current reference format is:
 
 ```text
-#custom-types:<id>
+#custom-type:<id>
 ```
 
-This matches the existing `CustomTypeReferenceRegex` in `constants.go`, which uses `KindCustomTypes` (`"custom-types"`) with the pattern `^#(%s):([a-zA-Z0-9_-]+)$`.
+This matches the existing `CustomTypeReferenceRegex` in `constants.go`, which uses `types.CustomTypeResourceType` (`"custom-type"`, singular) with the pattern `^#(%s):([a-zA-Z0-9_-]+)$`.
+
+**Note**: The legacy format uses `localcatalog.KindCustomTypes` (`"custom-types"`, plural) for `#/custom-types/<group>/<id>`. The V1 format uses `types.CustomTypeResourceType` (`"custom-type"`, singular) for `#custom-type:<id>`. These are different constants — do not confuse them.
 
 Legacy refs such as `#/custom-types/<group>/<id>` do not need a special V1 error. If they appear inside V1 config, it is acceptable for them to fail through the existing invalid-type path.
 
@@ -670,7 +672,7 @@ The implementation must add table-driven tests covering at least:
 4. V1 unchanged-key acceptance for `enum`, `minimum`, `maximum`, `pattern`, `format`
 5. Unaliased camelCase keys fall through the existing unknown-key / not-applicable behavior
 6. V1 array `item_types` accepts primitive types
-7. V1 array `item_types` accepts `#custom-types:<id>`
+7. V1 array `item_types` accepts `#custom-type:<id>`
 8. V1 array `item_types` rejects invalid references through the normal invalid-type path
 9. V1 custom type object config accepts `additional_properties`
 10. V1 custom type object config with unaliased `additionalProperties` falls through the existing unknown-key / not-applicable behavior
@@ -681,7 +683,7 @@ The implementation must add table-driven tests covering at least:
     - `exclusive_minimum >= exclusive_maximum`
 13. Validator override behavior still works with the options-aware entrypoint
 14. V1 top-level custom type type detection works in the shared package:
-    - `ValidateConfigWithOptions([]string{"#custom-types:Address"}, ...)` rejects config as not allowed
+    - `ValidateConfigWithOptions([]string{"#custom-type:Address"}, ...)` rejects config as not allowed
 15. `enum` mixed element types remain valid where they are valid today
 16. `pattern` invalid regex syntax is not rejected solely for being an invalid regex pattern
 17. Unknown type names still cause the shared config validator to defer rather than producing a new type-level error
@@ -732,7 +734,7 @@ go test ./cli/internal/providers/datacatalog/rules/config/... -cover
 - [ ] V0 camelCase config keys are resolved through explicit aliases rather than implicit fallback
 - [ ] V1 accepts snake_case config keys and normalizes them to shared validator keywords
 - [ ] V1 does not introduce a dedicated wrong-spelling error path in the shared package
-- [ ] V1 array custom type references are recognized only in `#custom-types:<id>` format
+- [ ] V1 array custom type references are recognized only in `#custom-type:<id>` format
 - [ ] Legacy custom type refs inside V1 `item_types` are allowed to fail through the normal invalid-type path
 - [ ] V1 custom type object config accepts only `additional_properties`
 - [ ] V1 `additionalProperties` is not aliased and therefore falls through the existing unknown-key / not-applicable behavior
