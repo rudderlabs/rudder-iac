@@ -25,26 +25,31 @@ const (
 	KeywordMaxItems             ConfigKeyword = "max_items"
 	KeywordUniqueItems          ConfigKeyword = "unique_items"
 	KeywordAdditionalProperties ConfigKeyword = "additional_properties"
+
+	// KeywordUnknownField is a sentinel assigned to config keys that have no alias mapping.
+	// Validators receiving this keyword must return ErrFieldNotSupported — they cannot
+	// meaningfully validate a field they don't recognise. It is never added to crossFieldMap.
+	KeywordUnknownField ConfigKeyword = "__unknown__"
 )
 
 // V0FieldAliases maps V0 camelCase raw keys to canonical ConfigKeyword values.
 // Exposed so callers can compose or inspect the V0 preset.
 var V0FieldAliases = map[string]ConfigKeyword{
-	"enum":                  KeywordEnum,
-	"minimum":               KeywordMinimum,
-	"maximum":               KeywordMaximum,
-	"pattern":               KeywordPattern,
-	"format":                KeywordFormat,
-	"minLength":             KeywordMinLength,
-	"maxLength":             KeywordMaxLength,
-	"exclusiveMinimum":      KeywordExclusiveMinimum,
-	"exclusiveMaximum":      KeywordExclusiveMaximum,
-	"multipleOf":            KeywordMultipleOf,
-	"itemTypes":             KeywordItemTypes,
-	"minItems":              KeywordMinItems,
-	"maxItems":              KeywordMaxItems,
-	"uniqueItems":           KeywordUniqueItems,
-	"additionalProperties":  KeywordAdditionalProperties,
+	"enum":                 KeywordEnum,
+	"minimum":              KeywordMinimum,
+	"maximum":              KeywordMaximum,
+	"pattern":              KeywordPattern,
+	"format":               KeywordFormat,
+	"minLength":            KeywordMinLength,
+	"maxLength":            KeywordMaxLength,
+	"exclusiveMinimum":     KeywordExclusiveMinimum,
+	"exclusiveMaximum":     KeywordExclusiveMaximum,
+	"multipleOf":           KeywordMultipleOf,
+	"itemTypes":            KeywordItemTypes,
+	"minItems":             KeywordMinItems,
+	"maxItems":             KeywordMaxItems,
+	"uniqueItems":          KeywordUniqueItems,
+	"additionalProperties": KeywordAdditionalProperties,
 }
 
 // V1FieldAliases maps V1 snake_case raw keys to canonical ConfigKeyword values.
@@ -72,6 +77,14 @@ type validateConfigOptions struct {
 	fieldAliases         map[string]ConfigKeyword
 	customTypeRefMatcher func(string) bool
 	validatorOverrides   map[string]TypeConfigValidator
+}
+
+func newValidateConfigOptions() *validateConfigOptions {
+	return &validateConfigOptions{
+		fieldAliases:         map[string]ConfigKeyword{},
+		customTypeRefMatcher: nil,
+		validatorOverrides:   map[string]TypeConfigValidator{},
+	}
 }
 
 // ValidateConfigOption is a functional option for ValidateConfigWithOptions.
@@ -102,8 +115,8 @@ func WithValidatorOverrides(overrides map[string]TypeConfigValidator) ValidateCo
 }
 
 var (
-	customTypeLegacyRefRegex    = regexp.MustCompile(catalogRules.CustomTypeLegacyReferenceRegex)
-	customTypeCurrentRefRegex   = regexp.MustCompile(catalogRules.CustomTypeReferenceRegex)
+	customTypeLegacyRefRegex  = regexp.MustCompile(catalogRules.CustomTypeLegacyReferenceRegex)
+	customTypeCurrentRefRegex = regexp.MustCompile(catalogRules.CustomTypeReferenceRegex)
 )
 
 // legacyCustomTypeRefMatcher matches the V0 legacy custom type reference format:

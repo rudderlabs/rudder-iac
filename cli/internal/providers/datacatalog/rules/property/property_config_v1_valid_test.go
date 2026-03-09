@@ -3,43 +3,24 @@ package property
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPropertyConfigValidRule_Metadata(t *testing.T) {
-	t.Parallel()
-
-	rule := NewPropertyConfigValidRule()
-
-	assert.Equal(t, "datacatalog/properties/config-valid", rule.ID())
-	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "property config must be valid for the given type", rule.Description())
-	assert.ElementsMatch(t, append(prules.LegacyVersionPatterns("properties"), prules.V1VersionPatterns("properties")...), rule.AppliesTo())
-
-	examples := rule.Examples()
-	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
-	assert.NotEmpty(t, examples.Invalid, "Rule should have invalid examples")
-}
-
-func TestPropertyConfigValidRule_ObjectType(t *testing.T) {
+func TestPropertyConfigV1ValidRule_ObjectType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
 			name: "object type with no config is valid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "address",
 						Name:    "Address",
@@ -51,8 +32,8 @@ func TestPropertyConfigValidRule_ObjectType(t *testing.T) {
 		},
 		{
 			name: "object type with config is invalid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "address",
 						Name:    "Address",
@@ -71,9 +52,9 @@ func TestPropertyConfigValidRule_ObjectType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -90,30 +71,30 @@ func TestPropertyConfigValidRule_ObjectType(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_StringType(t *testing.T) {
+func TestPropertyConfigV1ValidRule_StringType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
 			name: "valid string config with all fields",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "email",
 						Name:    "Email",
 						Type:    "string",
 						Config: map[string]any{
-							"enum":      []any{"active@example.com", "inactive@example.com"},
-							"minLength": 5,
-							"maxLength": 100,
-							"pattern":   "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-							"format":    "email",
+							"enum":       []any{"active@example.com", "inactive@example.com"},
+							"min_length": 5,
+							"max_length": 100,
+							"pattern":    "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+							"format":     "email",
 						},
 					},
 				},
@@ -122,8 +103,8 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 		},
 		{
 			name: "enum not array",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "status",
 						Name:    "Status",
@@ -139,45 +120,45 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 			expectedMsgs:   []string{"'enum' must be an array"},
 		},
 		{
-			name: "minLength not integer",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "min_length not integer",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "username",
 						Name:    "Username",
 						Type:    "string",
 						Config: map[string]any{
-							"minLength": "five",
+							"min_length": "five",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/minLength"},
-			expectedMsgs:   []string{"'minLength' must be an integer"},
+			expectedRefs:   []string{"/properties/0/propConfig/min_length"},
+			expectedMsgs:   []string{"'min_length' must be an integer"},
 		},
 		{
-			name: "maxLength not integer",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "max_length not integer",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "description",
 						Name:    "Description",
 						Type:    "string",
 						Config: map[string]any{
-							"maxLength": "hundred",
+							"max_length": "hundred",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/maxLength"},
-			expectedMsgs:   []string{"'maxLength' must be an integer"},
+			expectedRefs:   []string{"/properties/0/propConfig/max_length"},
+			expectedMsgs:   []string{"'max_length' must be an integer"},
 		},
 		{
 			name: "pattern not string",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "code",
 						Name:    "Code",
@@ -194,8 +175,8 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 		},
 		{
 			name: "format not string",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "email_field",
 						Name:    "EmailField",
@@ -212,8 +193,8 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 		},
 		{
 			name: "format with invalid value",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "email_field",
 						Name:    "EmailField",
@@ -229,8 +210,8 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 		},
 		{
 			name: "enum with duplicate values",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "status",
 						Name:    "Status",
@@ -247,8 +228,8 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 		},
 		{
 			name: "unknown config key",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "status",
 						Name:    "Status",
@@ -266,9 +247,9 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -287,29 +268,29 @@ func TestPropertyConfigValidRule_StringType(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
+func TestPropertyConfigV1ValidRule_IntegerType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
 			name: "valid integer config",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "age",
 						Name:    "Age",
 						Type:    "integer",
 						Config: map[string]any{
-							"enum":       []any{18, 21, 30, 40},
-							"minimum":    0,
-							"maximum":    120,
-							"multipleOf": 1,
+							"enum":        []any{18, 21, 30, 40},
+							"minimum":     0,
+							"maximum":     120,
+							"multiple_of": 1,
 						},
 					},
 				},
@@ -318,8 +299,8 @@ func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
 		},
 		{
 			name: "valid integer config with float64 that are integers",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "age",
 						Name:    "Age",
@@ -336,8 +317,8 @@ func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
 		},
 		{
 			name: "minimum not integer",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "age",
 						Name:    "Age",
@@ -354,8 +335,8 @@ func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
 		},
 		{
 			name: "enum with duplicate values",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "count",
 						Name:    "Count",
@@ -374,9 +355,9 @@ func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -395,29 +376,29 @@ func TestPropertyConfigValidRule_IntegerType(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_ArrayType(t *testing.T) {
+func TestPropertyConfigV1ValidRule_ArrayType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
 			name: "valid array config with primitives",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "tags",
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"itemTypes":   []any{"string"},
-							"minItems":    1,
-							"maxItems":    10,
-							"uniqueItems": true,
+							"item_types":   []any{"string"},
+							"min_items":    1,
+							"max_items":    10,
+							"unique_items": true,
 						},
 					},
 				},
@@ -425,84 +406,84 @@ func TestPropertyConfigValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "itemTypes not array",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "item_types not array",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "tags",
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"itemTypes": "string",
+							"item_types": "string",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/itemTypes"},
-			expectedMsgs:   []string{"'itemTypes' must be an array"},
+			expectedRefs:   []string{"/properties/0/propConfig/item_types"},
+			expectedMsgs:   []string{"'item_types' must be an array"},
 		},
 		{
-			name: "itemTypes element not string",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "item_types element not string",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "tags",
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"itemTypes": []any{123},
+							"item_types": []any{123},
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/itemTypes/0"},
+			expectedRefs:   []string{"/properties/0/propConfig/item_types/0"},
 			expectedMsgs:   []string{"'123' must be a string value"},
 		},
 		{
-			name: "minItems not integer",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "min_items not integer",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "tags",
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"minItems": "one",
+							"min_items": "one",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/minItems"},
-			expectedMsgs:   []string{"'minItems' must be an integer"},
+			expectedRefs:   []string{"/properties/0/propConfig/min_items"},
+			expectedMsgs:   []string{"'min_items' must be an integer"},
 		},
 		{
-			name: "uniqueItems not boolean",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			name: "unique_items not boolean",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "tags",
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"uniqueItems": "yes",
+							"unique_items": "yes",
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/uniqueItems"},
-			expectedMsgs:   []string{"'uniqueItems' must be a boolean"},
+			expectedRefs:   []string{"/properties/0/propConfig/unique_items"},
+			expectedMsgs:   []string{"'unique_items' must be a boolean"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -521,20 +502,20 @@ func TestPropertyConfigValidRule_ArrayType(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_NullType(t *testing.T) {
+func TestPropertyConfigV1ValidRule_NullType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 		expectedMsgs   []string
 	}{
 		{
 			name: "null type with no config is valid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "empty",
 						Name:    "Empty",
@@ -546,8 +527,8 @@ func TestPropertyConfigValidRule_NullType(t *testing.T) {
 		},
 		{
 			name: "null type with config is invalid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "empty",
 						Name:    "Empty",
@@ -566,9 +547,9 @@ func TestPropertyConfigValidRule_NullType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -585,19 +566,19 @@ func TestPropertyConfigValidRule_NullType(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_MultipleProperties(t *testing.T) {
+func TestPropertyConfigV1ValidRule_MultipleProperties(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 		expectedRefs   []string
 	}{
 		{
 			name: "mix of valid and invalid configs",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "email",
 						Name:    "Email",
@@ -631,9 +612,9 @@ func TestPropertyConfigValidRule_MultipleProperties(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
@@ -648,18 +629,18 @@ func TestPropertyConfigValidRule_MultipleProperties(t *testing.T) {
 	}
 }
 
-func TestPropertyConfigValidRule_EdgeCases(t *testing.T) {
+func TestPropertyConfigV1ValidRule_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
-		spec           localcatalog.PropertySpec
+		spec           localcatalog.PropertySpecV1
 		expectedErrors int
 	}{
 		{
 			name: "no config is valid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "username",
 						Name:    "Username",
@@ -671,8 +652,8 @@ func TestPropertyConfigValidRule_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "empty config map is valid",
-			spec: localcatalog.PropertySpec{
-				Properties: []localcatalog.Property{
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
 					{
 						LocalID: "username",
 						Name:    "Username",
@@ -683,41 +664,34 @@ func TestPropertyConfigValidRule_EdgeCases(t *testing.T) {
 			},
 			expectedErrors: 0,
 		},
+		{
+			name: "empty type defaults to all primitive types",
+			spec: localcatalog.PropertySpecV1{
+				Properties: []localcatalog.PropertyV1{
+					{
+						LocalID: "flexible",
+						Name:    "Flexible",
+						Type:    "",
+						Config: map[string]any{
+							"enum": []any{"a", "b"},
+						},
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := validatePropertyConfig(
+			results := validatePropertyConfigV1(
 				localcatalog.KindProperties,
-				specs.SpecVersionV0_1,
+				"",
 				map[string]any{},
 				tt.spec,
 			)
 
 			assert.Len(t, results, tt.expectedErrors)
-		})
-	}
-}
-
-func TestParsePropertyType(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name     string
-		typeStr  string
-		expected []string
-	}{
-		{"single type", "string", []string{"string"}},
-		{"multi-type", "string,null", []string{"string", "null"}},
-		{"empty string", "", catalogRules.ValidPrimitiveTypes},
-		{"custom type", "Address", []string{"Address"}},
-		{"multi with spaces", "string, null, integer", []string{"string", "null", "integer"}},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := parsePropertyType(tc.typeStr)
-			assert.Equal(t, tc.expected, result)
 		})
 	}
 }

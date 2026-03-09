@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -33,31 +32,40 @@ var (
 )
 
 // resolvedField holds a single config entry after alias resolution.
+// Fields with no alias mapping are assigned KeywordUnknownField as a sentinel.
 type resolvedField struct {
 	RawKey  string
 	Keyword ConfigKeyword
 	Value   any
 }
 
-// resolveAliases splits raw config keys into resolved fields (keyword known) and
-// unresolved fields (keyword not in alias map).
+// resolveAliases maps every raw config key to a resolvedField.
+// Keys with no alias entry are assigned KeywordUnknownField; they are excluded from
+// crossFieldMap so cross-field validators never see them.
 func resolveAliases(
 	config map[string]any,
 	aliases map[string]ConfigKeyword,
-) (resolved []resolvedField, crossFieldMap map[ConfigKeyword]any, unresolved map[string]any) {
+) (fields []resolvedField, crossFieldMap map[ConfigKeyword]any) {
 	crossFieldMap = make(map[ConfigKeyword]any, len(config))
-	unresolved = make(map[string]any)
 
 	for rawKey, val := range config {
-		if kw, ok := aliases[rawKey]; ok {
-			resolved = append(resolved, resolvedField{RawKey: rawKey, Keyword: kw, Value: val})
+		kw, ok := aliases[rawKey]
+		if !ok {
+			kw = KeywordUnknownField
+		}
+
+		fields = append(fields, resolvedField{
+			RawKey:  rawKey,
+			Keyword: kw,
+			Value:   val,
+		})
+
+		if kw != KeywordUnknownField {
 			crossFieldMap[kw] = val
-		} else {
-			unresolved[rawKey] = val
 		}
 	}
 
-	return resolved, crossFieldMap, unresolved
+	return fields, crossFieldMap
 }
 
 // ValidateConfig validates config map for given type(s) using V0 camelCase field names.
@@ -84,24 +92,17 @@ func ValidateConfigWithOptions(types []string, config map[string]any, reference 
 		return nil
 	}
 
-	o := &validateConfigOptions{}
+	o := newValidateConfigOptions()
 	for _, opt := range opts {
 		if opt != nil {
 			opt(o)
 		}
 	}
 
-	// Ensure alias map is never nil so lookups are safe.
-	if o.fieldAliases == nil {
-		o.fieldAliases = map[string]ConfigKeyword{}
-	}
-	if o.validatorOverrides == nil {
-		o.validatorOverrides = map[string]TypeConfigValidator{}
-	}
-
 	var validators []TypeConfigValidator
 	for _, typeName := range types {
 		validator := getDefaultValidatorForType(typeName, *o)
+
 		if v, ok := o.validatorOverrides[typeName]; ok {
 			validator = v
 		}
@@ -133,20 +134,18 @@ func ValidateConfigWithOptions(types []string, config map[string]any, reference 
 		}}
 	}
 
-	resolved, crossFieldMap, unresolved := resolveAliases(config, o.fieldAliases)
+	fields, crossFieldMap := resolveAliases(config, o.fieldAliases)
 
 	var results []rules.ValidationResult
 
-	// Validate each resolved field using its keyword for matching and rawKey for messages.
-	for _, rf := range resolved {
-		fieldResults := validateFieldUnion(validators, rf.RawKey, rf.Keyword, rf.Value, reference)
-		results = append(results, fieldResults...)
-	}
-
-	// Unresolved fields have no matching keyword — all validators will return ErrFieldNotSupported,
-	// producing the existing "not applicable for type(s)" message.
-	for rawKey, val := range unresolved {
-		fieldResults := validateFieldUnion(validators, rawKey, ConfigKeyword(""), val, reference)
+	for _, rf := range fields {
+		fieldResults := validateFieldUnion(
+			validators,
+			rf.RawKey,
+			rf.Keyword,
+			rf.Value,
+			reference,
+		)
 		results = append(results, fieldResults...)
 	}
 
@@ -183,9 +182,7 @@ func validateFieldUnion(
 		allNotSupported = false
 
 		for i := range results {
-			if !strings.HasPrefix(results[i].Reference, baseRef) {
-				results[i].Reference = joinReference(baseRef, results[i].Reference)
-			}
+			results[i].Reference = joinReference(baseRef, results[i].Reference)
 		}
 
 		collectedResults = append(collectedResults, results...)
@@ -193,7 +190,7 @@ func validateFieldUnion(
 
 	if allNotSupported {
 		return []rules.ValidationResult{{
-			Reference: fmt.Sprintf("%s/%s", baseRef, rawKey),
+			Reference: joinReference(baseRef, rawKey),
 			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", rawKey),
 		}}
 	}
@@ -202,16 +199,22 @@ func validateFieldUnion(
 }
 
 // validateCrossFieldsWithDedup implements strict cross-field semantics with deduplication.
-func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[ConfigKeyword]any, baseRef string) []rules.ValidationResult {
+func validateCrossFieldsWithDedup(
+	validators []TypeConfigValidator,
+	config map[ConfigKeyword]any,
+	baseRef string,
+) []rules.ValidationResult {
 	var collectedResults []rules.ValidationResult
 
 	for _, validator := range validators {
 		crossResults := validator.ValidateCrossFields(config)
 
 		for i := range crossResults {
-			crossResults[i].Reference = joinReference(baseRef, crossResults[i].Reference)
+			crossResults[i].Reference = joinReference(
+				baseRef,
+				crossResults[i].Reference,
+			)
 		}
-
 		collectedResults = append(collectedResults, crossResults...)
 	}
 
