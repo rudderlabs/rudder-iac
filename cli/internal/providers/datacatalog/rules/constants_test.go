@@ -240,12 +240,12 @@ func TestCategoryReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#categories:profile-updates", wantMatch: true},
-			{name: "with underscores", reference: "#categories:user_profile", wantMatch: true},
+			{name: "basic reference", reference: "#category:profile-updates", wantMatch: true},
+			{name: "with underscores", reference: "#category:user_profile", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#categories:", wantMatch: false},
-			{name: "wrong format", reference: "#category:id", wantMatch: false},
+			{name: "missing id", reference: "#category:", wantMatch: false},
+			{name: "wrong format", reference: "#categories:id", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -355,7 +355,7 @@ func TestConstantValues(t *testing.T) {
 			{"eventLegacyReferenceMessage", eventLegacyReferenceMessage, "must be of pattern #/events/<group>/<id>"},
 			{"eventReferenceMessage", eventReferenceMessage, "must be of pattern #events:<id>"},
 			{"categoryLegacyReferenceMessage", categoryLegacyReferenceMessage, "must be of pattern #/categories/<group>/<id>"},
-			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #categories:<id>"},
+			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #category:<id>"},
 			{"trackingPlanLegacyReferenceMessage", trackingPlanLegacyReferenceMessage, "must be of pattern #/tp/<group>/<id>"},
 			{"trackingPlanReferenceMessage", trackingPlanReferenceMessage, "must be of pattern #tracking-plan:<id>"},
 		}

@@ -34,12 +34,8 @@ var examples = rules.Examples{
 
 // Main validation function for event spec
 // which delegates the validation to the go-validator through struct tags.
-var validateEventSpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.EventSpec) []rules.ValidationResult {
-	validationErrors, err := rules.ValidateStruct(
-		Spec,
-		"",
-		getValidateFuncs(Version)..., // attach custom validate funcs specially for event specs
-	)
+var validateEventSpec = func(_ string, _ string, _ map[string]any, spec localcatalog.EventSpec) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
 
 	if err != nil {
 		return []rules.ValidationResult{
@@ -54,7 +50,47 @@ var validateEventSpec = func(Kind string, Version string, Metadata map[string]an
 
 	// Cross-field: name validation depends on event_type.
 	// Only run when event_type is valid to avoid confusing errors on top of the oneof failure.
-	for i, event := range Spec.Events {
+	for i, event := range spec.Events {
+		if !slices.Contains(drules.ValidEventTypes, event.Type) {
+			continue
+		}
+
+		if event.Type == "track" {
+			if len(event.Name) < 1 || len(event.Name) > 64 {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/events/%d/name", i),
+					Message:   "name must be between 1 and 64 characters for track events",
+				})
+			}
+			continue
+		}
+
+		if event.Name != "" {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/events/%d/name", i),
+				Message:   "name should be empty for non-track events",
+			})
+		}
+	}
+
+	return results
+}
+
+// V1 validation function for event spec, targeting EventSpecV1 / EventV1 structs.
+var validateEventSpecV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.EventSpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{
+			{
+				Reference: "/events",
+				Message:   err.Error(),
+			},
+		}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors, nil)
+
+	for i, event := range spec.Events {
 		if !slices.Contains(drules.ValidEventTypes, event.Type) {
 			continue
 		}
@@ -90,11 +126,9 @@ func NewEventSpecSyntaxValidRule() rules.Rule {
 			prules.LegacyVersionPatterns(localcatalog.KindEvents),
 			validateEventSpec,
 		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindEvents),
+			validateEventSpecV1,
+		),
 	)
-}
-
-// getValidateFuncs returns custom validate functions which the event spec employs
-// by adding requisite tags to fields in the spec struct
-func getValidateFuncs(_ string) []rules.CustomValidateFunc {
-	return nil
 }
