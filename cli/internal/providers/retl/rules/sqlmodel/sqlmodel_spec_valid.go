@@ -35,5 +35,9 @@ func NewSQLModelSpecSyntaxValidRule() rules.Rule {
 			prules.LegacyVersionPatterns(sqlmodel.ResourceKind),
 			validateSQLModelSpec,
 		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(sqlmodel.ResourceKind),
+			validateSQLModelSpec,
+		),
 	)
 }
