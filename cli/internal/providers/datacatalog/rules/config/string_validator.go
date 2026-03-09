@@ -7,70 +7,66 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// StringTypeConfig validates config for string type
+// StringTypeConfig validates config for string type.
 type StringTypeConfig struct{}
 
-var allowedStringKeys = map[string]bool{
-	"enum":      true,
-	"minLength": true,
-	"maxLength": true,
-	"pattern":   true,
-	"format":    true,
+var allowedStringKeys = map[ConfigKeyword]bool{
+	KeywordEnum:      true,
+	KeywordMinLength: true,
+	KeywordMaxLength: true,
+	KeywordPattern:   true,
+	KeywordFormat:    true,
 }
 
-// ConfigAllowed returns true for string type
+// ConfigAllowed returns true for string type.
 func (s *StringTypeConfig) ConfigAllowed() bool {
 	return true
 }
 
-// ValidateField validates a single field for string type
-func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	// Check if field is allowed
-	if !allowedStringKeys[fieldname] {
+// ValidateField validates a single field for string type.
+func (s *StringTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
+	if !allowedStringKeys[keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	// Validate field value based on field name
-	switch fieldname {
-	case "enum":
-		return validateEnum(fieldname, fieldval)
+	switch keyword {
+	case KeywordEnum:
+		return validateEnum(rawKey, fieldval)
 
-	case "minLength", "maxLength":
+	case KeywordMinLength, KeywordMaxLength:
 		if !isInteger(fieldval) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be an integer", fieldname),
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", rawKey),
 			}}, nil
 		}
-		// Check if value is non-negative
 		val, _ := toInteger(fieldval)
 		if val < 0 {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be >= 0", fieldname),
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be >= 0", rawKey),
 			}}, nil
 		}
 
-	case "pattern":
-		_, ok := fieldval.(string)
-		if !ok {
+	case KeywordPattern:
+		if _, ok := fieldval.(string); !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'pattern' must be a string",
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be a string", rawKey),
 			}}, nil
 		}
 
-	case "format":
+	case KeywordFormat:
 		formatStr, ok := fieldval.(string)
 		if !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'format' must be a string",
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be a string", rawKey),
 			}}, nil
 		}
 		if !isValidFormat(formatStr) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
+				Reference: rawKey,
 				Message:   fmt.Sprintf("'format' must be one of: %v", catalogRules.ValidFormatValues),
 			}}, nil
 		}
@@ -79,23 +75,21 @@ func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 	return nil, nil
 }
 
-// ValidateCrossFields validates relationships between string config fields
-func (s *StringTypeConfig) ValidateCrossFields(config map[string]any) []rules.ValidationResult {
+// ValidateCrossFields validates relationships between string config fields.
+func (s *StringTypeConfig) ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Check minLength <= maxLength
-	minLength, hasMin := config["minLength"]
-	maxLength, hasMax := config["maxLength"]
+	minLength, hasMin := config[KeywordMinLength]
+	maxLength, hasMax := config[KeywordMaxLength]
 
 	if hasMin && hasMax {
-		// Both must be valid integers for cross-field check
 		minVal, minOk := toInteger(minLength)
 		maxVal, maxOk := toInteger(maxLength)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "minLength cannot be greater than maxLength",
+				Message:   fmt.Sprintf("%s cannot be greater than %s", KeywordMinLength, KeywordMaxLength),
 			})
 		}
 	}

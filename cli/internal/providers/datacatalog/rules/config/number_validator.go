@@ -6,46 +6,46 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// NumberTypeConfig validates config for number type
+// NumberTypeConfig validates config for number type.
 type NumberTypeConfig struct{}
 
-var allowedNumberKeys = map[string]bool{
-	"enum":             true,
-	"minimum":          true,
-	"maximum":          true,
-	"exclusiveMinimum": true,
-	"exclusiveMaximum": true,
-	"multipleOf":       true,
+var allowedNumberKeys = map[ConfigKeyword]bool{
+	KeywordEnum:             true,
+	KeywordMinimum:          true,
+	KeywordMaximum:          true,
+	KeywordExclusiveMinimum: true,
+	KeywordExclusiveMaximum: true,
+	KeywordMultipleOf:       true,
 }
 
-// ConfigAllowed returns true for number type
+// ConfigAllowed returns true for number type.
 func (n *NumberTypeConfig) ConfigAllowed() bool {
 	return true
 }
 
-// ValidateField validates a single field for number type
-func (n *NumberTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedNumberKeys[fieldname] {
+// ValidateField validates a single field for number type.
+func (n *NumberTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
+	if !allowedNumberKeys[keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	switch fieldname {
-	case "enum":
-		return validateEnum(fieldname, fieldval)
+	switch keyword {
+	case KeywordEnum:
+		return validateEnum(rawKey, fieldval)
 
-	case "multipleOf":
+	case KeywordMultipleOf:
 		if !isNumber(fieldval) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be a number", fieldname),
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be a number", rawKey),
 			}}, nil
 		}
 
 		val, _ := toNumber(fieldval)
 		if val <= 0 {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'multipleOf' must be > 0",
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be > 0", rawKey),
 			}}, nil
 		}
 
@@ -54,8 +54,8 @@ func (n *NumberTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 	default:
 		if !isNumber(fieldval) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be a number", fieldname),
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be a number", rawKey),
 			}}, nil
 		}
 
@@ -63,13 +63,12 @@ func (n *NumberTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 	}
 }
 
-// ValidateCrossFields validates relationships between number config fields
-func (n *NumberTypeConfig) ValidateCrossFields(config map[string]any) []rules.ValidationResult {
+// ValidateCrossFields validates relationships between number config fields.
+func (n *NumberTypeConfig) ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Check minimum <= maximum
-	minimum, hasMin := config["minimum"]
-	maximum, hasMax := config["maximum"]
+	minimum, hasMin := config[KeywordMinimum]
+	maximum, hasMax := config[KeywordMaximum]
 
 	if hasMin && hasMax {
 		minVal, minOk := toNumber(minimum)
@@ -78,14 +77,13 @@ func (n *NumberTypeConfig) ValidateCrossFields(config map[string]any) []rules.Va
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "minimum cannot be greater than maximum",
+				Message:   fmt.Sprintf("%s cannot be greater than %s", KeywordMinimum, KeywordMaximum),
 			})
 		}
 	}
 
-	// Check exclusiveMinimum < exclusiveMaximum
-	exMinimum, hasExMin := config["exclusiveMinimum"]
-	exMaximum, hasExMax := config["exclusiveMaximum"]
+	exMinimum, hasExMin := config[KeywordExclusiveMinimum]
+	exMaximum, hasExMax := config[KeywordExclusiveMaximum]
 
 	if hasExMin && hasExMax {
 		exMinVal, exMinOk := toNumber(exMinimum)
@@ -94,7 +92,7 @@ func (n *NumberTypeConfig) ValidateCrossFields(config map[string]any) []rules.Va
 		if exMinOk && exMaxOk && exMinVal >= exMaxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "exclusiveMinimum must be less than exclusiveMaximum",
+				Message:   fmt.Sprintf("%s must be less than %s", KeywordExclusiveMinimum, KeywordExclusiveMaximum),
 			})
 		}
 	}
