@@ -7,7 +7,9 @@ import (
 )
 
 // ArrayTypeConfig validates config for array type
-type ArrayTypeConfig struct{}
+type ArrayTypeConfig struct {
+	isCustomTypeRef func(string) bool
+}
 
 var allowedArrayKeys = map[string]bool{
 	"itemTypes":   true,
@@ -25,6 +27,11 @@ func (a *ArrayTypeConfig) ConfigAllowed() bool {
 func (a *ArrayTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
 	if !allowedArrayKeys[fieldname] {
 		return nil, ErrFieldNotSupported
+	}
+
+	isCustomTypeRef := a.isCustomTypeRef
+	if isCustomTypeRef == nil {
+		isCustomTypeRef = LegacyCustomTypeRefMatcher
 	}
 
 	switch fieldname {
@@ -76,8 +83,7 @@ func (a *ArrayTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules
 				}}, nil
 			}
 
-			// Check if it's a custom type reference (legacy format)
-			if customTypeLegacyReferenceRegex.MatchString(typeStr) {
+			if isCustomTypeRef(typeStr) {
 				// Custom type reference cannot be paired with other types
 				if len(itemTypesArray) > 1 {
 					return []rules.ValidationResult{{

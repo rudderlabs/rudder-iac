@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -35,15 +34,41 @@ var (
 // validatorOverrides allows callers to inject context-specific validators for specific types;
 // pass nil to use the default validators for all types.
 func ValidateConfig(types []string, config map[string]any, reference string, validatorOverrides map[string]TypeConfigValidator) []rules.ValidationResult {
+	return ValidateConfigWithOptions(
+		types,
+		config,
+		reference,
+		WithFieldAliases(V0FieldAliases()),
+		WithValidatorOverrides(validatorOverrides),
+		WithCustomTypeRefMatcher(LegacyCustomTypeRefMatcher),
+	)
+}
+
+type normalizedField struct {
+	Raw      string
+	Keyword  ConfigKeyword
+	Value    any
+	Resolved bool
+}
+
+// ValidateConfigWithOptions validates config using explicit field aliasing and custom type matching rules.
+func ValidateConfigWithOptions(
+	types []string,
+	config map[string]any,
+	reference string,
+	opts ...ValidateConfigOption,
+) []rules.ValidationResult {
 
 	if len(config) == 0 {
 		return nil
 	}
 
+	options := newValidateConfigOptions(opts...)
+
 	var validators []TypeConfigValidator
 	for _, typeName := range types {
-		validator := getDefaultValidatorForType(typeName)
-		if v, ok := validatorOverrides[typeName]; ok {
+		validator := getDefaultValidatorForType(typeName, options)
+		if v, ok := options.validatorOverrides[typeName]; ok {
 			validator = v
 		}
 
@@ -81,28 +106,62 @@ func ValidateConfig(types []string, config map[string]any, reference string, val
 
 	var results []rules.ValidationResult
 
-	for fieldName, fieldVal := range config {
+	fields, normalizedConfig, normalizedFieldNames := normalizeConfig(config, options)
+
+	for _, field := range fields {
 		fieldResults := validateFieldUnion(
 			validators,
-			fieldName,
-			fieldVal,
+			field,
 			reference,
 		)
 		results = append(results, fieldResults...)
 	}
 
-	crossResults := validateCrossFieldsWithDedup(validators, config, reference)
+	crossResults := validateCrossFieldsWithDedup(
+		validators,
+		normalizedConfig,
+		normalizedFieldNames,
+		reference,
+	)
 	results = append(results, crossResults...)
 
 	return results
+}
+
+func normalizeConfig(
+	config map[string]any,
+	options validateConfigOptions,
+) ([]normalizedField, map[string]any, map[ConfigKeyword]string) {
+	fields := make([]normalizedField, 0, len(config))
+	normalized := make(map[string]any, len(config))
+	fieldNames := make(map[ConfigKeyword]string, len(config))
+
+	for rawField, value := range config {
+		keyword, ok := options.fieldAliases[rawField]
+		field := normalizedField{
+			Raw:      rawField,
+			Keyword:  keyword,
+			Value:    value,
+			Resolved: ok,
+		}
+		fields = append(fields, field)
+
+		if !ok {
+			continue
+		}
+
+		normalized[validatorFieldName(keyword)] = value
+		fieldNames[keyword] = rawField
+	}
+
+	return fields, normalized, fieldNames
 }
 
 // validateFieldUnion implements union semantics for field validation
 // where in field is valid if ANY validator accepts it
 func validateFieldUnion(
 	validators []TypeConfigValidator,
-	fieldName string,
-	fieldVal any,
+	field normalizedField,
 	baseRef string,
 ) []rules.ValidationResult {
 	var (
@@ -110,8 +169,17 @@ func validateFieldUnion(
 		collectedResults []rules.ValidationResult
 	)
 
+	if !field.Resolved {
+		return []rules.ValidationResult{{
+			Reference: fmt.Sprintf("%s/%s", baseRef, field.Raw),
+			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", field.Raw),
+		}}
+	}
+
+	canonicalField := validatorFieldName(field.Keyword)
+
 	for _, validator := range validators {
-		results, err := validator.ValidateField(fieldName, fieldVal)
+		results, err := validator.ValidateField(canonicalField, field.Value)
 
 		if err == nil && len(results) == 0 {
 			return nil
@@ -123,31 +191,36 @@ func validateFieldUnion(
 
 		allNotSupported = false
 
-		for i := range results {
-			if !strings.HasPrefix(results[i].Reference, baseRef) {
-				results[i].Reference = joinReference(baseRef, results[i].Reference)
-			}
-		}
-
+		results = rewriteResultsToRawKey(results, canonicalField, field.Raw)
 		collectedResults = append(collectedResults, results...)
 	}
 
 	if allNotSupported {
 		return []rules.ValidationResult{{
-			Reference: fmt.Sprintf("%s/%s", baseRef, fieldName),
-			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", fieldName),
+			Reference: fmt.Sprintf("%s/%s", baseRef, field.Raw),
+			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", field.Raw),
 		}}
+	}
+
+	for i := range collectedResults {
+		collectedResults[i].Reference = joinReference(baseRef, collectedResults[i].Reference)
 	}
 
 	return dedup(collectedResults)
 }
 
 // validateCrossFieldsWithDedup implements strict semantics with deduplication
-func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[string]any, baseRef string) []rules.ValidationResult {
+func validateCrossFieldsWithDedup(
+	validators []TypeConfigValidator,
+	config map[string]any,
+	fieldNames map[ConfigKeyword]string,
+	baseRef string,
+) []rules.ValidationResult {
 	var collectedResults []rules.ValidationResult
 
 	for _, validator := range validators {
 		crossResults := validator.ValidateCrossFields(config)
+		crossResults = rewriteCrossFieldResults(crossResults, fieldNames)
 
 		for i := range crossResults {
 			crossResults[i].Reference = joinReference(baseRef, crossResults[i].Reference)
@@ -182,7 +255,7 @@ func dedup(results []rules.ValidationResult) []rules.ValidationResult {
 }
 
 // getDefaultValidatorForType returns validator for given type name
-func getDefaultValidatorForType(typeName string) TypeConfigValidator {
+func getDefaultValidatorForType(typeName string, options validateConfigOptions) TypeConfigValidator {
 	switch typeName {
 	case "string":
 		return &StringTypeConfig{}
@@ -191,7 +264,7 @@ func getDefaultValidatorForType(typeName string) TypeConfigValidator {
 	case "number":
 		return &NumberTypeConfig{}
 	case "array":
-		return &ArrayTypeConfig{}
+		return &ArrayTypeConfig{isCustomTypeRef: options.customTypeRefMatcher}
 	case "object":
 		return &ObjectTypeConfig{}
 	case "boolean":
@@ -200,7 +273,7 @@ func getDefaultValidatorForType(typeName string) TypeConfigValidator {
 		return &NullTypeConfig{}
 	default:
 		// It could also be a custom type reference
-		if customTypeLegacyReferenceRegex.MatchString(typeName) {
+		if options.customTypeRefMatcher != nil && options.customTypeRefMatcher(typeName) {
 			return &CustomTypeConfig{}
 		}
 		return nil

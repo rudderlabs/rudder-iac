@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -673,4 +674,258 @@ func TestValidateConfig(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "config is not allowed")
 	})
+}
+
+func TestValidateConfigWithOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without aliases there is no implicit fallback", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"string"},
+			map[string]any{"minLength": 5},
+			"/test",
+			WithCustomTypeRefMatcher(LegacyCustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/minLength", results[0].Reference)
+		assert.Equal(t, "'minLength' is not applicable for type(s)", results[0].Message)
+	})
+
+	t.Run("v1 accepts snake_case string keys", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"string"},
+			map[string]any{
+				"min_length": 1,
+				"max_length": 5,
+				"pattern":    "[",
+				"format":     "email",
+			},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 preserves raw key in field errors", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"string"},
+			map[string]any{"min_length": "bad"},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/min_length", results[0].Reference)
+		assert.Equal(t, "'min_length' must be an integer", results[0].Message)
+	})
+
+	t.Run("v1 cross-field errors use normalized raw names", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"array"},
+			map[string]any{
+				"min_items": 10,
+				"max_items": 1,
+			},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test", results[0].Reference)
+		assert.Equal(t, "min_items cannot be greater than max_items", results[0].Message)
+	})
+
+	t.Run("v1 unchanged keys still validate", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"number"},
+			map[string]any{
+				"enum":    []any{1, "x", true},
+				"minimum": 1,
+				"maximum": 2,
+			},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 unaliased camelCase falls through as not applicable", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"string"},
+			map[string]any{"minLength": 5},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/minLength", results[0].Reference)
+		assert.Equal(t, "'minLength' is not applicable for type(s)", results[0].Message)
+	})
+
+	t.Run("v1 mixed snake_case and camelCase validates only aliased key", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"string"},
+			map[string]any{
+				"min_length": 1,
+				"minLength":  5,
+			},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/minLength", results[0].Reference)
+		assert.Equal(t, "'minLength' is not applicable for type(s)", results[0].Message)
+	})
+
+	t.Run("v1 item_types accepts primitive types", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"array"},
+			map[string]any{"item_types": []any{"string", "number"}},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 item_types accepts current custom type ref", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"array"},
+			map[string]any{"item_types": []any{"#custom-type:Address"}},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 item_types rejects legacy custom type ref through normal invalid type path", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"array"},
+			map[string]any{"item_types": []any{"#/custom-types/foo/bar"}},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/item_types/0", results[0].Reference)
+		assert.Equal(t, "invalid type '#/custom-types/foo/bar' in item_types, must be a primitive type or custom type reference", results[0].Message)
+	})
+
+	t.Run("v1 top-level custom type uses configured matcher for config allowance", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"#custom-type:Address"},
+			map[string]any{"enum": []any{"a"}},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test", results[0].Reference)
+		assert.Equal(t, "config is not allowed for the specified type(s)", results[0].Message)
+	})
+
+	t.Run("unknown types still defer", func(t *testing.T) {
+		results := ValidateConfigWithOptions(
+			[]string{"totally-unknown"},
+			map[string]any{"enum": []any{"a"}},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("validator overrides still work with options aware path", func(t *testing.T) {
+		overrides := map[string]TypeConfigValidator{
+			"object": &StringTypeConfig{},
+		}
+
+		results := ValidateConfigWithOptions(
+			[]string{"object"},
+			map[string]any{"format": "date"},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithValidatorOverrides(overrides),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 object override accepts additional_properties only", func(t *testing.T) {
+		overrides := map[string]TypeConfigValidator{
+			"object": additionalPropertiesOnlyValidator{},
+		}
+
+		results := ValidateConfigWithOptions(
+			[]string{"object"},
+			map[string]any{"additional_properties": true},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithValidatorOverrides(overrides),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("v1 object override rejects unaliased additionalProperties", func(t *testing.T) {
+		overrides := map[string]TypeConfigValidator{
+			"object": additionalPropertiesOnlyValidator{},
+		}
+
+		results := ValidateConfigWithOptions(
+			[]string{"object"},
+			map[string]any{"additionalProperties": true},
+			"/test",
+			WithFieldAliases(V1FieldAliases()),
+			WithValidatorOverrides(overrides),
+			WithCustomTypeRefMatcher(V1CustomTypeRefMatcher),
+		)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/test/additionalProperties", results[0].Reference)
+		assert.Equal(t, "'additionalProperties' is not applicable for type(s)", results[0].Message)
+	})
+}
+
+type additionalPropertiesOnlyValidator struct{}
+
+func (additionalPropertiesOnlyValidator) ConfigAllowed() bool {
+	return true
+}
+
+func (additionalPropertiesOnlyValidator) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
+	if fieldname != "additionalProperties" {
+		return nil, ErrFieldNotSupported
+	}
+
+	if _, ok := fieldval.(bool); ok {
+		return nil, nil
+	}
+
+	return []rules.ValidationResult{{
+		Reference: fieldname,
+		Message:   "'additionalProperties' must be a boolean",
+	}}, nil
+}
+
+func (additionalPropertiesOnlyValidator) ValidateCrossFields(map[string]any) []rules.ValidationResult {
+	return nil
 }

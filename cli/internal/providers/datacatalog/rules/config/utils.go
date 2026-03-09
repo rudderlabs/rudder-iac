@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strings"
 
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -14,7 +15,18 @@ var (
 	// Legacy custom type reference pattern
 	customTypeLegacyReferenceRegex = regexp.MustCompile(
 		catalogRules.CustomTypeLegacyReferenceRegex)
+	customTypeReferenceRegex = regexp.MustCompile(`^#custom-type:[a-zA-Z0-9_-]+$`)
 )
+
+// LegacyCustomTypeRefMatcher keeps the V0 behavior explicit for existing callers.
+func LegacyCustomTypeRefMatcher(value string) bool {
+	return customTypeLegacyReferenceRegex.MatchString(value)
+}
+
+// V1CustomTypeRefMatcher validates current custom type references.
+func V1CustomTypeRefMatcher(value string) bool {
+	return customTypeReferenceRegex.MatchString(value)
+}
 
 // isNumber checks if value is any numeric type
 func isNumber(val any) bool {
@@ -127,6 +139,62 @@ func joinReference(base, suffix string) string {
 		return base
 	}
 	return fmt.Sprintf("%s/%s", base, suffix)
+}
+
+func rewriteReferenceToRawKey(reference, canonicalField, rawField string) string {
+	if rawField == "" || canonicalField == "" || rawField == canonicalField {
+		return reference
+	}
+
+	switch {
+	case reference == canonicalField:
+		return rawField
+	case strings.HasPrefix(reference, canonicalField+"/"):
+		return rawField + strings.TrimPrefix(reference, canonicalField)
+	default:
+		return reference
+	}
+}
+
+func rewriteMessageFieldName(message, canonicalField, rawField string) string {
+	if rawField == "" || canonicalField == "" || rawField == canonicalField {
+		return message
+	}
+
+	message = strings.ReplaceAll(message, fmt.Sprintf("'%s'", canonicalField), fmt.Sprintf("'%s'", rawField))
+	return strings.ReplaceAll(message, canonicalField, rawField)
+}
+
+func rewriteResultsToRawKey(results []rules.ValidationResult, canonicalField, rawField string) []rules.ValidationResult {
+	if rawField == "" || canonicalField == "" || rawField == canonicalField {
+		return results
+	}
+
+	rewritten := make([]rules.ValidationResult, 0, len(results))
+	for _, result := range results {
+		result.Reference = rewriteReferenceToRawKey(result.Reference, canonicalField, rawField)
+		result.Message = rewriteMessageFieldName(result.Message, canonicalField, rawField)
+		rewritten = append(rewritten, result)
+	}
+	return rewritten
+}
+
+func rewriteCrossFieldResults(
+	results []rules.ValidationResult,
+	fieldNames map[ConfigKeyword]string,
+) []rules.ValidationResult {
+	if len(results) == 0 || len(fieldNames) == 0 {
+		return results
+	}
+
+	rewritten := make([]rules.ValidationResult, 0, len(results))
+	for _, result := range results {
+		for keyword, rawField := range fieldNames {
+			result.Message = rewriteMessageFieldName(result.Message, validatorFieldName(keyword), rawField)
+		}
+		rewritten = append(rewritten, result)
+	}
+	return rewritten
 }
 
 // validateEnum validates an enum field value: must be an array with no duplicates
