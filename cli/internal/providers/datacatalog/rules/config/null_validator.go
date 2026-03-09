@@ -13,11 +13,11 @@ func (n *NullTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for null type.
-func (n *NullTypeConfig) ValidateField(_ string, _ ConfigKeyword, _ any) ([]rules.ValidationResult, error) {
+func (n *NullTypeConfig) ValidateField(_ ResolvedField) ([]rules.ValidationResult, error) {
 	return nil, ErrFieldNotSupported
 }
 
 // ValidateCrossFields validates relationships between null config fields.
-func (n *NullTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]any) []rules.ValidationResult {
+func (n *NullTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	return nil
 }

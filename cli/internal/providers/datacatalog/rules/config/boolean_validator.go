@@ -17,19 +17,19 @@ func (b *BooleanTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for boolean type.
-func (b *BooleanTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedBooleanKeys[keyword] {
+func (b *BooleanTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedBooleanKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	if keyword == KeywordEnum {
-		return validateEnum(rawKey, fieldval)
+	if field.Keyword == KeywordEnum {
+		return validateEnum(field.RawKey, field.Value)
 	}
 
 	return nil, ErrFieldNotSupported
 }
 
 // ValidateCrossFields validates relationships between boolean config fields.
-func (b *BooleanTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]any) []rules.ValidationResult {
+func (b *BooleanTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	return nil
 }

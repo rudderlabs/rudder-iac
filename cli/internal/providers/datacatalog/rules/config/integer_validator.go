@@ -24,38 +24,38 @@ func (i *IntegerTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for integer type.
-func (i *IntegerTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedIntegerKeys[keyword] {
+func (i *IntegerTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedIntegerKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	switch keyword {
+	switch field.Keyword {
 	case KeywordEnum:
-		return validateEnum(rawKey, fieldval)
+		return validateEnum(field.RawKey, field.Value)
 
 	case KeywordMultipleOf:
-		if !isInteger(fieldval) {
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be an integer", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
 
-		val, _ := toInteger(fieldval)
+		val, _ := toInteger(field.Value)
 		if val <= 0 {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be > 0", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be > 0", field.RawKey),
 			}}, nil
 		}
 
 		return nil, nil
 
 	default:
-		if !isInteger(fieldval) {
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be an integer", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
 
@@ -64,35 +64,35 @@ func (i *IntegerTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, 
 }
 
 // ValidateCrossFields validates relationships between integer config fields.
-func (i *IntegerTypeConfig) ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult {
+func (i *IntegerTypeConfig) ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	minimum, hasMin := config[KeywordMinimum]
-	maximum, hasMax := config[KeywordMaximum]
+	minField, hasMin := config[KeywordMinimum]
+	maxField, hasMax := config[KeywordMaximum]
 
 	if hasMin && hasMax {
-		minVal, minOk := toInteger(minimum)
-		maxVal, maxOk := toInteger(maximum)
+		minVal, minOk := toInteger(minField.Value)
+		maxVal, maxOk := toInteger(maxField.Value)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   fmt.Sprintf("%s cannot be greater than %s", KeywordMinimum, KeywordMaximum),
+				Message:   fmt.Sprintf("%s cannot be greater than %s", minField.RawKey, maxField.RawKey),
 			})
 		}
 	}
 
-	exMinimum, hasExMin := config[KeywordExclusiveMinimum]
-	exMaximum, hasExMax := config[KeywordExclusiveMaximum]
+	exMinField, hasExMin := config[KeywordExclusiveMinimum]
+	exMaxField, hasExMax := config[KeywordExclusiveMaximum]
 
 	if hasExMin && hasExMax {
-		exMinVal, exMinOk := toInteger(exMinimum)
-		exMaxVal, exMaxOk := toInteger(exMaximum)
+		exMinVal, exMinOk := toInteger(exMinField.Value)
+		exMaxVal, exMaxOk := toInteger(exMaxField.Value)
 
 		if exMinOk && exMaxOk && exMinVal >= exMaxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   fmt.Sprintf("%s must be less than %s", KeywordExclusiveMinimum, KeywordExclusiveMaximum),
+				Message:   fmt.Sprintf("%s must be less than %s", exMinField.RawKey, exMaxField.RawKey),
 			})
 		}
 	}

@@ -7,23 +7,36 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// ResolvedField holds a single config entry after alias resolution.
+// RawKey is the original user-supplied key (e.g. "minLength" for V0, "min_length" for V1),
+// Keyword is the canonical ConfigKeyword used for dispatch, and Value is the field's value.
+// Both ValidateField and ValidateCrossFields receive ResolvedField so that implementations
+// always have access to the original key for use in Reference/Message output, preserving
+// backward compatibility across schema versions.
+type ResolvedField struct {
+	RawKey  string
+	Keyword ConfigKeyword
+	Value   any
+}
+
 // TypeConfigValidator validates config keywords for a specific data type.
 type TypeConfigValidator interface {
 	// ConfigAllowed returns whether config is allowed for this type.
 	ConfigAllowed() bool
 
 	// ValidateField validates a single config field.
-	// rawKey is the original user-supplied key; keyword is the resolved ConfigKeyword.
-	// Use keyword for matching logic and rawKey for Reference/Message output.
+	// Use field.Keyword for dispatch/matching logic and field.RawKey for Reference/Message output.
 	// Returns:
 	//   - (nil, nil) if field is valid
 	//   - (nil, ErrFieldNotSupported) if field is not applicable to this type
 	//   - ([]ValidationResult, nil) if field is applicable but has validation errors
-	ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error)
+	ValidateField(field ResolvedField) ([]rules.ValidationResult, error)
 
 	// ValidateCrossFields validates relationships between config fields.
-	// config contains only the resolved (keyword -> value) pairs.
-	ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult
+	// config maps each resolved keyword to its ResolvedField (rawKey + keyword + value).
+	// Implementations must use field.RawKey in error messages so that the original
+	// user-supplied key (e.g. "minLength" for V0, "min_length" for V1) is preserved.
+	ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult
 }
 
 // Sentinel errors for field validation.
@@ -31,22 +44,14 @@ var (
 	ErrFieldNotSupported = errors.New("field not supported for this type")
 )
 
-// resolvedField holds a single config entry after alias resolution.
-// Fields with no alias mapping are assigned KeywordUnknownField as a sentinel.
-type resolvedField struct {
-	RawKey  string
-	Keyword ConfigKeyword
-	Value   any
-}
-
-// resolveAliases maps every raw config key to a resolvedField.
+// resolveAliases maps every raw config key to a ResolvedField.
 // Keys with no alias entry are assigned KeywordUnknownField; they are excluded from
 // crossFieldMap so cross-field validators never see them.
 func resolveAliases(
 	config map[string]any,
 	aliases map[string]ConfigKeyword,
-) (fields []resolvedField, crossFieldMap map[ConfigKeyword]any) {
-	crossFieldMap = make(map[ConfigKeyword]any, len(config))
+) (fields []ResolvedField, crossFieldMap map[ConfigKeyword]ResolvedField) {
+	crossFieldMap = make(map[ConfigKeyword]ResolvedField, len(config))
 
 	for rawKey, val := range config {
 		kw, ok := aliases[rawKey]
@@ -54,14 +59,11 @@ func resolveAliases(
 			kw = KeywordUnknownField
 		}
 
-		fields = append(fields, resolvedField{
-			RawKey:  rawKey,
-			Keyword: kw,
-			Value:   val,
-		})
+		rf := ResolvedField{RawKey: rawKey, Keyword: kw, Value: val}
+		fields = append(fields, rf)
 
 		if kw != KeywordUnknownField {
-			crossFieldMap[kw] = val
+			crossFieldMap[kw] = rf
 		}
 	}
 
@@ -139,13 +141,7 @@ func ValidateConfigWithOptions(types []string, config map[string]any, reference 
 	var results []rules.ValidationResult
 
 	for _, rf := range fields {
-		fieldResults := validateFieldUnion(
-			validators,
-			rf.RawKey,
-			rf.Keyword,
-			rf.Value,
-			reference,
-		)
+		fieldResults := validateFieldUnion(validators, rf, reference)
 		results = append(results, fieldResults...)
 	}
 
@@ -158,9 +154,7 @@ func ValidateConfigWithOptions(types []string, config map[string]any, reference 
 // validateFieldUnion implements union semantics: a field is valid if ANY validator accepts it.
 func validateFieldUnion(
 	validators []TypeConfigValidator,
-	rawKey string,
-	keyword ConfigKeyword,
-	fieldVal any,
+	field ResolvedField,
 	baseRef string,
 ) []rules.ValidationResult {
 	var (
@@ -169,7 +163,7 @@ func validateFieldUnion(
 	)
 
 	for _, validator := range validators {
-		results, err := validator.ValidateField(rawKey, keyword, fieldVal)
+		results, err := validator.ValidateField(field)
 
 		if err == nil && len(results) == 0 {
 			return nil
@@ -190,8 +184,8 @@ func validateFieldUnion(
 
 	if allNotSupported {
 		return []rules.ValidationResult{{
-			Reference: joinReference(baseRef, rawKey),
-			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", rawKey),
+			Reference: joinReference(baseRef, field.RawKey),
+			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", field.RawKey),
 		}}
 	}
 
@@ -201,7 +195,7 @@ func validateFieldUnion(
 // validateCrossFieldsWithDedup implements strict cross-field semantics with deduplication.
 func validateCrossFieldsWithDedup(
 	validators []TypeConfigValidator,
-	config map[ConfigKeyword]any,
+	config map[ConfigKeyword]ResolvedField,
 	baseRef string,
 ) []rules.ValidationResult {
 	var collectedResults []rules.ValidationResult

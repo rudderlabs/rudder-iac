@@ -26,37 +26,37 @@ func (a *ArrayTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for array type.
-func (a *ArrayTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedArrayKeys[keyword] {
+func (a *ArrayTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedArrayKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	switch keyword {
+	switch field.Keyword {
 	case KeywordMinItems, KeywordMaxItems:
-		if !isInteger(fieldval) {
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be an integer", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
-		val, _ := toInteger(fieldval)
+		val, _ := toInteger(field.Value)
 		if val < 0 {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be >= 0", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be >= 0", field.RawKey),
 			}}, nil
 		}
 
 	case KeywordUniqueItems:
-		if _, ok := fieldval.(bool); !ok {
+		if _, ok := field.Value.(bool); !ok {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be a boolean", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be a boolean", field.RawKey),
 			}}, nil
 		}
 
 	case KeywordItemTypes:
-		return a.validateItemTypes(rawKey, fieldval)
+		return a.validateItemTypes(field.RawKey, field.Value)
 	}
 
 	return nil, nil
@@ -110,20 +110,20 @@ func (a *ArrayTypeConfig) validateItemTypes(rawKey string, fieldval any) ([]rule
 }
 
 // ValidateCrossFields validates relationships between array config fields.
-func (a *ArrayTypeConfig) ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult {
+func (a *ArrayTypeConfig) ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	minItems, hasMin := config[KeywordMinItems]
-	maxItems, hasMax := config[KeywordMaxItems]
+	minField, hasMin := config[KeywordMinItems]
+	maxField, hasMax := config[KeywordMaxItems]
 
 	if hasMin && hasMax {
-		minVal, minOk := toInteger(minItems)
-		maxVal, maxOk := toInteger(maxItems)
+		minVal, minOk := toInteger(minField.Value)
+		maxVal, maxOk := toInteger(maxField.Value)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   fmt.Sprintf("%s cannot be greater than %s", KeywordMinItems, KeywordMaxItems),
+				Message:   fmt.Sprintf("%s cannot be greater than %s", minField.RawKey, maxField.RawKey),
 			})
 		}
 	}

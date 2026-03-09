@@ -71,22 +71,22 @@ type customTypeObjectConfig struct{}
 
 func (c *customTypeObjectConfig) ConfigAllowed() bool { return true }
 
-func (c *customTypeObjectConfig) ValidateField(rawKey string, keyword config.ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
-	if keyword != config.KeywordAdditionalProperties {
+func (c *customTypeObjectConfig) ValidateField(field config.ResolvedField) ([]rules.ValidationResult, error) {
+	if field.Keyword != config.KeywordAdditionalProperties {
 		return nil, config.ErrFieldNotSupported
 	}
 
-	if _, ok := fieldval.(bool); !ok {
+	if _, ok := field.Value.(bool); !ok {
 		return []rules.ValidationResult{{
-			Reference: rawKey,
-			Message:   fmt.Sprintf("'%s' must be a boolean", rawKey),
+			Reference: field.RawKey,
+			Message:   fmt.Sprintf("'%s' must be a boolean", field.RawKey),
 		}}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *customTypeObjectConfig) ValidateCrossFields(_ map[config.ConfigKeyword]any) []rules.ValidationResult {
+func (c *customTypeObjectConfig) ValidateCrossFields(_ map[config.ConfigKeyword]config.ResolvedField) []rules.ValidationResult {
 	return nil
 }
 

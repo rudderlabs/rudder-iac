@@ -14,11 +14,11 @@ func (c *CustomTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for custom type.
-func (c *CustomTypeConfig) ValidateField(_ string, _ ConfigKeyword, _ any) ([]rules.ValidationResult, error) {
+func (c *CustomTypeConfig) ValidateField(_ ResolvedField) ([]rules.ValidationResult, error) {
 	return nil, ErrFieldNotSupported
 }
 
 // ValidateCrossFields validates relationships between custom type config fields.
-func (c *CustomTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]any) []rules.ValidationResult {
+func (c *CustomTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	return nil
 }

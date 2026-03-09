@@ -40,7 +40,7 @@ func TestStringValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				assert.Empty(t, results)
 			})
@@ -48,7 +48,7 @@ func TestStringValidator(t *testing.T) {
 	})
 
 	t.Run("unsupported keyword returns ErrFieldNotSupported", func(t *testing.T) {
-		results, err := validator.ValidateField("minimum", KeywordMinimum, 10)
+		results, err := validator.ValidateField(ResolvedField{RawKey: "minimum", Keyword: KeywordMinimum, Value: 10})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
@@ -73,7 +73,7 @@ func TestStringValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				require.Len(t, results, 1)
 				assert.Contains(t, results[0].Message, tc.expectedMessage)
@@ -82,7 +82,7 @@ func TestStringValidator(t *testing.T) {
 	})
 
 	t.Run("enum with duplicates", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", KeywordEnum, []any{"active", "inactive", "active"})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{"active", "inactive", "active"}})
 		assert.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Equal(t, "enum/2", results[0].Reference)
@@ -90,7 +90,7 @@ func TestStringValidator(t *testing.T) {
 	})
 
 	t.Run("enum with multiple duplicates", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", KeywordEnum, []any{"a", "b", "a", "c", "b"})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{"a", "b", "a", "c", "b"}})
 		assert.NoError(t, err)
 		require.Len(t, results, 2)
 		assert.Contains(t, results[0].Message, "is a duplicate value")
@@ -99,20 +99,39 @@ func TestStringValidator(t *testing.T) {
 
 	t.Run("cross-field validation", func(t *testing.T) {
 		t.Run("valid: min_length < max_length", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinLength: 5, KeywordMaxLength: 10}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinLength: {RawKey: "min_length", Keyword: KeywordMinLength, Value: 5},
+				KeywordMaxLength: {RawKey: "max_length", Keyword: KeywordMaxLength, Value: 10},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
-		t.Run("invalid: min_length > max_length", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinLength: 10, KeywordMaxLength: 5}
+		t.Run("invalid: minLength > maxLength", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinLength: {RawKey: "minLength", Keyword: KeywordMinLength, Value: 10},
+				KeywordMaxLength: {RawKey: "maxLength", Keyword: KeywordMaxLength, Value: 5},
+			}
+			results := validator.ValidateCrossFields(cfg)
+			require.Len(t, results, 1)
+			assert.Equal(t, "minLength cannot be greater than maxLength", results[0].Message)
+		})
+
+		t.Run("invalid V1: min_length > max_length preserves snake_case in message", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinLength: {RawKey: "min_length", Keyword: KeywordMinLength, Value: 10},
+				KeywordMaxLength: {RawKey: "max_length", Keyword: KeywordMaxLength, Value: 5},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
 			assert.Equal(t, "min_length cannot be greater than max_length", results[0].Message)
 		})
 
 		t.Run("skips if values are invalid", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinLength: "invalid", KeywordMaxLength: 5}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinLength: {RawKey: "minLength", Keyword: KeywordMinLength, Value: "invalid"},
+				KeywordMaxLength: {RawKey: "maxLength", Keyword: KeywordMaxLength, Value: 5},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
@@ -146,7 +165,7 @@ func TestIntegerValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				assert.Empty(t, results)
 			})
@@ -168,7 +187,7 @@ func TestIntegerValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				require.Len(t, results, 1)
 				assert.Contains(t, results[0].Message, tc.expectedMessage)
@@ -178,29 +197,41 @@ func TestIntegerValidator(t *testing.T) {
 
 	t.Run("cross-field validation", func(t *testing.T) {
 		t.Run("valid: minimum <= maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 0, KeywordMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 0},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("invalid: minimum > maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 100, KeywordMaximum: 0}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 100},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 0},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
 			assert.Equal(t, "minimum cannot be greater than maximum", results[0].Message)
 		})
 
 		t.Run("valid: exclusive_minimum < exclusive_maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 0, KeywordExclusiveMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 0},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
-		t.Run("invalid: exclusive_minimum >= exclusive_maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 100, KeywordExclusiveMaximum: 100}
+		t.Run("invalid V0: exclusiveMinimum >= exclusiveMaximum preserves camelCase in message", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 100},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
-			assert.Equal(t, "exclusive_minimum must be less than exclusive_maximum", results[0].Message)
+			assert.Equal(t, "exclusiveMinimum must be less than exclusiveMaximum", results[0].Message)
 		})
 	})
 }
@@ -238,7 +269,7 @@ func TestNumberValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				assert.Empty(t, results)
 			})
@@ -246,7 +277,7 @@ func TestNumberValidator(t *testing.T) {
 	})
 
 	t.Run("unsupported keyword returns ErrFieldNotSupported", func(t *testing.T) {
-		results, err := validator.ValidateField("minLength", KeywordMinLength, 10)
+		results, err := validator.ValidateField(ResolvedField{RawKey: "minLength", Keyword: KeywordMinLength, Value: 10})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
@@ -272,7 +303,7 @@ func TestNumberValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				require.Len(t, results, 1)
 				assert.Contains(t, results[0].Message, tc.expectedMessage)
@@ -282,7 +313,7 @@ func TestNumberValidator(t *testing.T) {
 
 	t.Run("enum with duplicates", func(t *testing.T) {
 		t.Run("single duplicate", func(t *testing.T) {
-			results, err := validator.ValidateField("enum", KeywordEnum, []any{1.5, 2.5, 1.5})
+			results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{1.5, 2.5, 1.5}})
 			assert.NoError(t, err)
 			require.Len(t, results, 1)
 			assert.Equal(t, "enum/2", results[0].Reference)
@@ -290,7 +321,7 @@ func TestNumberValidator(t *testing.T) {
 		})
 
 		t.Run("multiple duplicates", func(t *testing.T) {
-			results, err := validator.ValidateField("enum", KeywordEnum, []any{1, 2, 1, 3, 2})
+			results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{1, 2, 1, 3, 2}})
 			assert.NoError(t, err)
 			require.Len(t, results, 2)
 			assert.Contains(t, results[0].Message, "is a duplicate value")
@@ -300,77 +331,112 @@ func TestNumberValidator(t *testing.T) {
 
 	t.Run("cross-field validation", func(t *testing.T) {
 		t.Run("valid: minimum <= maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 0, KeywordMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 0},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("valid: minimum == maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 50, KeywordMaximum: 50}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 50},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 50},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("valid: minimum <= maximum with decimals", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 0.5, KeywordMaximum: 99.9}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 0.5},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 99.9},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("invalid: minimum > maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 100, KeywordMaximum: 0}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 100},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 0},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
 			assert.Equal(t, "minimum cannot be greater than maximum", results[0].Message)
 		})
 
 		t.Run("invalid: minimum > maximum with decimals", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 99.9, KeywordMaximum: 0.5}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 99.9},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 0.5},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
 			assert.Equal(t, "minimum cannot be greater than maximum", results[0].Message)
 		})
 
 		t.Run("valid: exclusive_minimum < exclusive_maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 0, KeywordExclusiveMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 0},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("valid: exclusive_minimum < exclusive_maximum with decimals", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 0.5, KeywordExclusiveMaximum: 99.9}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 0.5},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 99.9},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
-		t.Run("invalid: exclusive_minimum == exclusive_maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 50, KeywordExclusiveMaximum: 50}
+		t.Run("invalid V0: exclusiveMinimum == exclusiveMaximum preserves camelCase in message", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 50},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 50},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
-			assert.Equal(t, "exclusive_minimum must be less than exclusive_maximum", results[0].Message)
+			assert.Equal(t, "exclusiveMinimum must be less than exclusiveMaximum", results[0].Message)
 		})
 
-		t.Run("invalid: exclusive_minimum > exclusive_maximum", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: 100, KeywordExclusiveMaximum: 0}
+		t.Run("invalid V0: exclusiveMinimum > exclusiveMaximum preserves camelCase in message", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: 100},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 0},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
-			assert.Equal(t, "exclusive_minimum must be less than exclusive_maximum", results[0].Message)
+			assert.Equal(t, "exclusiveMinimum must be less than exclusiveMaximum", results[0].Message)
 		})
 
 		t.Run("skips validation if values are invalid", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: "invalid", KeywordMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: "invalid"},
+				KeywordMaximum: {RawKey: "maximum", Keyword: KeywordMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("skips validation if exclusive values are invalid", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordExclusiveMinimum: "invalid", KeywordExclusiveMaximum: 100}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordExclusiveMinimum: {RawKey: "exclusiveMinimum", Keyword: KeywordExclusiveMinimum, Value: "invalid"},
+				KeywordExclusiveMaximum: {RawKey: "exclusiveMaximum", Keyword: KeywordExclusiveMaximum, Value: 100},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
 		t.Run("validates only fields present", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinimum: 50}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinimum: {RawKey: "minimum", Keyword: KeywordMinimum, Value: 50},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
@@ -406,7 +472,7 @@ func TestArrayValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				assert.Empty(t, results)
 			})
@@ -427,7 +493,7 @@ func TestArrayValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				assert.Empty(t, results)
 			})
@@ -455,7 +521,7 @@ func TestArrayValidator(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				results, err := validator.ValidateField(tc.rawKey, tc.keyword, tc.val)
+				results, err := validator.ValidateField(ResolvedField{RawKey: tc.rawKey, Keyword: tc.keyword, Value: tc.val})
 				assert.NoError(t, err)
 				require.Len(t, results, 1)
 				assert.Contains(t, results[0].Message, tc.expectedMessage)
@@ -463,9 +529,9 @@ func TestArrayValidator(t *testing.T) {
 		}
 	})
 
-	t.Run("V1 item_types with current custom type ref paired with others is rejected", func(t *testing.T) {
+	t.Run("invalid: item_types with current custom type ref paired with others is rejected", func(t *testing.T) {
 		validator := &ArrayTypeConfig{isCustomTypeRef: currentMatcher}
-		results, err := validator.ValidateField("item_types", KeywordItemTypes, []any{"#custom-type:Address", "string"})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "item_types", Keyword: KeywordItemTypes, Value: []any{"#custom-type:Address", "string"}})
 		assert.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "custom type reference cannot be paired with other types")
@@ -475,16 +541,22 @@ func TestArrayValidator(t *testing.T) {
 		validator := &ArrayTypeConfig{}
 
 		t.Run("valid: min_items <= max_items", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinItems: 1, KeywordMaxItems: 10}
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinItems: {RawKey: "minItems", Keyword: KeywordMinItems, Value: 1},
+				KeywordMaxItems: {RawKey: "maxItems", Keyword: KeywordMaxItems, Value: 10},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			assert.Empty(t, results)
 		})
 
-		t.Run("invalid: min_items > max_items", func(t *testing.T) {
-			cfg := map[ConfigKeyword]any{KeywordMinItems: 10, KeywordMaxItems: 1}
+		t.Run("invalid: minItems > maxItems preserves raw keys in message", func(t *testing.T) {
+			cfg := map[ConfigKeyword]ResolvedField{
+				KeywordMinItems: {RawKey: "minItems", Keyword: KeywordMinItems, Value: 10},
+				KeywordMaxItems: {RawKey: "maxItems", Keyword: KeywordMaxItems, Value: 1},
+			}
 			results := validator.ValidateCrossFields(cfg)
 			require.Len(t, results, 1)
-			assert.Equal(t, "min_items cannot be greater than max_items", results[0].Message)
+			assert.Equal(t, "minItems cannot be greater than maxItems", results[0].Message)
 		})
 	})
 }
@@ -500,26 +572,26 @@ func TestBooleanValidator(t *testing.T) {
 	})
 
 	t.Run("valid enum", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", KeywordEnum, []any{true, false})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{true, false}})
 		assert.NoError(t, err)
 		assert.Empty(t, results)
 	})
 
 	t.Run("enum with duplicates", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", KeywordEnum, []any{true, false, true})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{true, false, true}})
 		assert.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "true")
 	})
 
 	t.Run("non-enum keyword not supported", func(t *testing.T) {
-		results, err := validator.ValidateField("minLength", KeywordMinLength, 5)
+		results, err := validator.ValidateField(ResolvedField{RawKey: "minLength", Keyword: KeywordMinLength, Value: 5})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
 
 	t.Run("no cross-field validation", func(t *testing.T) {
-		results := validator.ValidateCrossFields(map[ConfigKeyword]any{})
+		results := validator.ValidateCrossFields(map[ConfigKeyword]ResolvedField{})
 		assert.Empty(t, results)
 	})
 }
@@ -535,13 +607,13 @@ func TestObjectValidator(t *testing.T) {
 	})
 
 	t.Run("all fields not supported", func(t *testing.T) {
-		results, err := validator.ValidateField("additionalProperties", KeywordAdditionalProperties, true)
+		results, err := validator.ValidateField(ResolvedField{RawKey: "additionalProperties", Keyword: KeywordAdditionalProperties, Value: true})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
 
 	t.Run("no cross-field validation", func(t *testing.T) {
-		results := validator.ValidateCrossFields(map[ConfigKeyword]any{})
+		results := validator.ValidateCrossFields(map[ConfigKeyword]ResolvedField{})
 		assert.Empty(t, results)
 	})
 }
@@ -557,13 +629,13 @@ func TestNullValidator(t *testing.T) {
 	})
 
 	t.Run("all fields not supported", func(t *testing.T) {
-		results, err := validator.ValidateField("enum", KeywordEnum, []any{})
+		results, err := validator.ValidateField(ResolvedField{RawKey: "enum", Keyword: KeywordEnum, Value: []any{}})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
 
 	t.Run("no cross-field validation", func(t *testing.T) {
-		results := validator.ValidateCrossFields(map[ConfigKeyword]any{})
+		results := validator.ValidateCrossFields(map[ConfigKeyword]ResolvedField{})
 		assert.Empty(t, results)
 	})
 }
@@ -579,13 +651,13 @@ func TestCustomTypeValidator(t *testing.T) {
 	})
 
 	t.Run("all fields not supported", func(t *testing.T) {
-		results, err := validator.ValidateField("$ref", ConfigKeyword(""), "#/custom-types/foo")
+		results, err := validator.ValidateField(ResolvedField{RawKey: "$ref", Keyword: ConfigKeyword(""), Value: "#/custom-types/foo"})
 		assert.ErrorIs(t, err, ErrFieldNotSupported)
 		assert.Nil(t, results)
 	})
 
 	t.Run("no cross-field validation", func(t *testing.T) {
-		results := validator.ValidateCrossFields(map[ConfigKeyword]any{})
+		results := validator.ValidateCrossFields(map[ConfigKeyword]ResolvedField{})
 		assert.Empty(t, results)
 	})
 }
@@ -682,8 +754,8 @@ func TestValidateConfig(t *testing.T) {
 		results := ValidateConfig([]string{"string"}, cfg, "/test", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/test", results[0].Reference)
-		// V0 cross-field messages use keyword string values (acceptable cosmetic change per spec)
-		assert.Contains(t, results[0].Message, "min_length cannot be greater than max_length")
+		// V0 cross-field messages use the original camelCase raw keys for backward compatibility.
+		assert.Contains(t, results[0].Message, "minLength cannot be greater than maxLength")
 	})
 
 	t.Run("validator override replaces default for specified type", func(t *testing.T) {
@@ -1068,7 +1140,7 @@ func TestValidateConfigWithOptions(t *testing.T) {
 		assert.Contains(t, results[0].Message, "'min_length' must be an integer")
 	})
 
-	t.Run("cross-field with V1 input uses keyword string values in message", func(t *testing.T) {
+	t.Run("cross-field with V1 input uses raw snake_case keys in message", func(t *testing.T) {
 		cfg := map[string]any{"min_length": 10, "max_length": 5}
 		results := ValidateConfigWithOptions(
 			[]string{"string"}, cfg, "/test",
@@ -1089,21 +1161,21 @@ var allowedCustomTypeObjectKeysForTest = map[ConfigKeyword]bool{
 
 func (c *customTypeObjectConfigForTest) ConfigAllowed() bool { return true }
 
-func (c *customTypeObjectConfigForTest) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedCustomTypeObjectKeysForTest[keyword] {
+func (c *customTypeObjectConfigForTest) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedCustomTypeObjectKeysForTest[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
-	if keyword == KeywordAdditionalProperties {
-		if _, ok := fieldval.(bool); !ok {
+	if field.Keyword == KeywordAdditionalProperties {
+		if _, ok := field.Value.(bool); !ok {
 			return []rules.ValidationResult{{
-				Reference: rawKey,
-				Message:   fmt.Sprintf("'%s' must be a boolean", rawKey),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be a boolean", field.RawKey),
 			}}, nil
 		}
 	}
 	return nil, nil
 }
 
-func (c *customTypeObjectConfigForTest) ValidateCrossFields(_ map[ConfigKeyword]any) []rules.ValidationResult {
+func (c *customTypeObjectConfigForTest) ValidateCrossFields(_ map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	return nil
 }

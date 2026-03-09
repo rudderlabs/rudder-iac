@@ -13,11 +13,11 @@ func (o *ObjectTypeConfig) ConfigAllowed() bool {
 }
 
 // ValidateField validates a single field for object type.
-func (o *ObjectTypeConfig) ValidateField(_ string, _ ConfigKeyword, _ any) ([]rules.ValidationResult, error) {
+func (o *ObjectTypeConfig) ValidateField(_ ResolvedField) ([]rules.ValidationResult, error) {
 	return nil, ErrFieldNotSupported
 }
 
 // ValidateCrossFields validates relationships between object config fields.
-func (o *ObjectTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]any) []rules.ValidationResult {
+func (o *ObjectTypeConfig) ValidateCrossFields(_ map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	return nil
 }
