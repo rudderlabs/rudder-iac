@@ -19,7 +19,7 @@ The shared config validator in `cli/internal/providers/datacatalog/rules/config/
 V1 config validation must support the following changes without duplicating the entire validator stack:
 
 1. V1 config keys use snake_case instead of camelCase
-2. V1 array custom type references should recognize the current custom type reference format: `#custom-type:<id>`
+2. V1 array custom type references should recognize the current custom type reference format: `#custom-types:<id>`
 3. V1 key handling should be driven by caller-supplied aliasing rather than a dedicated version-specific validator fork
 
 This spec defines a focused change in the shared `rules/config` package only. Wiring V1 property and custom type rules to consume the new behavior is intentionally deferred to follow-up PRs.
@@ -109,13 +109,15 @@ Examples:
 - `minLength` is not handled specially by the shared package
 - if `minLength` is not aliased, it should fall through to the existing unknown-key / not-applicable behavior
 
-### D-4: V1 Custom Type Refs Use `#custom-type:<id>`
+### D-4: V1 Custom Type Refs Use `#custom-types:<id>`
 
 For this change, the current reference format is:
 
 ```text
-#custom-type:<id>
+#custom-types:<id>
 ```
+
+This matches the existing `CustomTypeReferenceRegex` in `constants.go`, which uses `KindCustomTypes` (`"custom-types"`) with the pattern `^#(%s):([a-zA-Z0-9_-]+)$`.
 
 Legacy refs such as `#/custom-types/<group>/<id>` do not need a special V1 error. If they appear inside V1 config, it is acceptable for them to fail through the existing invalid-type path.
 
@@ -161,6 +163,28 @@ The following existing shared-validator semantics must remain unchanged:
    - if no validator can be constructed for a type, the shared config validator should continue to defer rather than inventing a new type-level error
 
 This is important because the current tests explicitly permit mixed-type enum arrays, and no current validator compiles regex patterns.
+
+### D-8: Validators Accept Both Raw Key and Keyword
+
+The `TypeConfigValidator` interface should change to accept both the user's raw input key and the resolved `ConfigKeyword`:
+
+```go
+ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error)
+ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult
+```
+
+Validators use `keyword` for switch-case matching and allowed-key lookup, and `rawKey` for constructing `Reference` and `Message` fields in `ValidationResult`.
+
+This ensures:
+
+1. Error messages say `"'min_length' must be an integer"` (raw) not `"'minLength' must be an integer"` (canonical V0) when called from V1
+2. Error references point to `"min_length"` (raw) not `"min_length"` (keyword string value)
+3. No post-processing denormalization step is needed — correctness is guaranteed at the source
+4. The blast radius is contained to the `config` package (~10 validator implementations) plus one external override (`customTypeObjectConfig` in `customtype_config_valid.go`)
+
+The `TypeConfigValidator` interface is package-internal; the public API (`ValidateConfig` / `ValidateConfigWithOptions`) does not change. External callers are unaffected.
+
+For cross-field validation, the method receives a `map[ConfigKeyword]any` built from resolved fields only. Since `ConfigKeyword` is `type ConfigKeyword string`, cross-field error messages naturally use keyword string values (e.g., `"min_length cannot be greater than max_length"`). This is a minor cosmetic change for V0 cross-field messages (previously `"minLength cannot be greater than maxLength"`) which is acceptable because cross-field errors reference the config root, not individual fields.
 
 ---
 
@@ -280,45 +304,125 @@ var v1FieldAliases = map[string]ConfigKeyword{
 
 The shared package may expose these as reusable presets, or callers may compose them locally. The important part is that V0 compatibility remains explicit and testable.
 
-### 4.3 Canonicalization Flow
+### 4.3 Normalization and Validation Flow
 
-Before invoking the existing validators:
+The normalization layer resolves alias mappings and distributes fields into the correct validation paths. There is no post-processing denormalization step — raw key preservation is handled at the source by passing `rawKey` into validators.
+
+**Step 1: Resolve aliases**
 
 1. Iterate over raw config keys
-2. Resolve the raw key through the effective alias map supplied in options
-3. If the raw key is not present in the effective alias map, leave it unresolved
-4. Build a normalized config map keyed by `ConfigKeyword`
-5. Run field-level validation using `ConfigKeyword`, but preserve raw references in error output
-6. Run cross-field validation against the normalized config map
+2. Look up each raw key in the effective alias map supplied in options
+3. For resolved keys: record `(rawKey, keyword, value)` for field-level validation, and add `keyword -> value` to the cross-field map
+4. For unresolved keys: record `(rawKey, value)` for the unresolved field path
 
 Suggested shape:
 
 ```go
-type normalizedField struct {
-	Raw       string
-	Keyword   ConfigKeyword
-	Value     any
-	Resolved  bool
+type resolvedField struct {
+	RawKey  string
+	Keyword ConfigKeyword
+	Value   any
 }
 
-func normalizeConfig(
+func resolveAliases(
 	config map[string]any,
-	opts validateConfigOptions,
-) (fields []normalizedField, normalized map[ConfigKeyword]any)
+	aliases map[string]ConfigKeyword,
+) (resolved []resolvedField, crossFieldMap map[ConfigKeyword]any, unresolved map[string]any)
 ```
+
+**Step 2: Field-level validation**
+
+5. For each resolved field: call `validateFieldUnion(validators, rawKey, keyword, value, reference)` — validators use `keyword` for matching and `rawKey` in error output
+6. For each unresolved field: call `validateFieldUnion(validators, rawKey, ConfigKeyword(""), value, reference)` — no validator's allowed-key map will match an empty keyword, so all validators return `ErrFieldNotSupported`, producing the existing "not applicable for type(s)" message
+
+**Step 3: Cross-field validation**
+
+7. Run cross-field validation against the `map[ConfigKeyword]any` containing only resolved fields
+8. Cross-field validators look up keywords directly (e.g., `config[KeywordMinLength]`)
 
 Important:
 
-- references in validation errors should continue to point to the user-provided raw key
-- cross-field errors may continue to point at the config object root, as they do today
-- keys not present in the effective alias map should continue through the existing unknown-key / not-applicable flow
-- unresolved keys should not be inserted into the normalized cross-field map
+- error `Reference` and `Message` fields use `rawKey` at the source — no post-processing rewrite is needed
+- cross-field errors continue to point at the config object root, as they do today
+- cross-field error messages use keyword string values (e.g., `"min_length cannot be greater than max_length"`) which is a minor cosmetic change from the current V0 camelCase messages
+- unresolved keys are not inserted into the cross-field map
 
-### 4.4 Validator Construction Must Become Options-Aware
+### 4.4 Validator Interface Change and Options-Aware Construction
 
-The main validators should become keyword-oriented, and type resolution must stop depending on the legacy regex directly.
+#### Interface Change
 
-Recommended direction:
+The `TypeConfigValidator` interface must be updated to accept both the raw key and keyword (see D-8):
+
+```go
+type TypeConfigValidator interface {
+	ConfigAllowed() bool
+	ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error)
+	ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult
+}
+```
+
+Each type validator must update:
+
+- **Allowed-key maps**: change from `map[string]bool` to `map[ConfigKeyword]bool`
+- **`ValidateField` switch cases**: match on `keyword` (e.g., `case KeywordMinLength, KeywordMaxLength:`) instead of raw strings
+- **`ValidateField` error output**: use `rawKey` in `Reference` and `Message` fields
+- **`ValidateCrossFields` key lookups**: use keyword constants (e.g., `config[KeywordMinLength]`) instead of camelCase strings (e.g., `config["minLength"]`)
+
+Example — `StringTypeConfig` after the change:
+
+```go
+var allowedStringKeys = map[ConfigKeyword]bool{
+	KeywordEnum:      true,
+	KeywordMinLength: true,
+	KeywordMaxLength: true,
+	KeywordPattern:   true,
+	KeywordFormat:    true,
+}
+
+func (s *StringTypeConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
+	if !allowedStringKeys[keyword] {
+		return nil, ErrFieldNotSupported
+	}
+
+	switch keyword {
+	case KeywordEnum:
+		return validateEnum(rawKey, fieldval)
+	case KeywordMinLength, KeywordMaxLength:
+		if !isInteger(fieldval) {
+			return []rules.ValidationResult{{
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", rawKey),
+			}}, nil
+		}
+		// ...
+	}
+	return nil, nil
+}
+
+func (s *StringTypeConfig) ValidateCrossFields(config map[ConfigKeyword]any) []rules.ValidationResult {
+	minLength, hasMin := config[KeywordMinLength]
+	maxLength, hasMax := config[KeywordMaxLength]
+	// ...
+}
+```
+
+#### Validators That Must Update
+
+| Validator | Field-level change | Cross-field change |
+|-----------|-------------------|-------------------|
+| `StringTypeConfig` | allowed keys + switch + messages | `KeywordMinLength` / `KeywordMaxLength` lookup |
+| `IntegerTypeConfig` | allowed keys + switch + messages | `KeywordMinimum` / `KeywordMaximum` + `KeywordExclusiveMinimum` / `KeywordExclusiveMaximum` lookup |
+| `NumberTypeConfig` | allowed keys + switch + messages | Same as integer |
+| `ArrayTypeConfig` | allowed keys + switch + messages | `KeywordMinItems` / `KeywordMaxItems` lookup |
+| `BooleanTypeConfig` | allowed keys + switch + messages | None (no cross-field) |
+| `ObjectTypeConfig` | Trivial (returns `ErrFieldNotSupported`) | None |
+| `NullTypeConfig` | Trivial (returns `ErrFieldNotSupported`) | None |
+| `CustomTypeConfig` | Trivial (returns `ErrFieldNotSupported`) | None |
+| `customTypeObjectConfig` (external) | allowed keys + switch + messages | None |
+
+#### Options-Aware Type Resolution
+
+Type resolution must stop depending on the legacy regex directly:
 
 ```go
 func getDefaultValidatorForType(typeName string, opts validateConfigOptions) TypeConfigValidator {
@@ -346,21 +450,13 @@ func getDefaultValidatorForType(typeName string, opts validateConfigOptions) Typ
 }
 ```
 
-The array validator should also use the configured matcher for `itemTypes` custom type reference checks.
+The array validator must also use the configured matcher for `itemTypes` custom type reference checks:
 
 ```go
 type ArrayTypeConfig struct {
 	isCustomTypeRef func(string) bool
 }
 ```
-
-Recommended follow-through:
-
-- `ValidateField(field ConfigKeyword, value any)`
-- allowed-key sets keyed by `ConfigKeyword`
-- cross-field validation maps keyed by `ConfigKeyword`
-
-The other type validators may remain stateless aside from consuming `ConfigKeyword`.
 
 ---
 
@@ -448,7 +544,41 @@ Desired behavior:
 
 This is achieved by mapping accepted V1 `additional_properties` to the shared validator keyword for additional properties.
 
-The override implementation itself does not need a separate V1 version if canonicalization is done correctly.
+### Override Contract with Normalization
+
+Validator overrides receive `rawKey` and `keyword` through the same interface as default validators, since normalization resolves the keyword before any validator is invoked.
+
+The `customTypeObjectConfig` override must update to match on `KeywordAdditionalProperties` instead of the raw string `"additionalProperties"`:
+
+```go
+var allowedCustomTypeObjectKeys = map[ConfigKeyword]bool{
+	KeywordAdditionalProperties: true,
+}
+
+func (c *customTypeObjectConfig) ValidateField(rawKey string, keyword ConfigKeyword, fieldval any) ([]rules.ValidationResult, error) {
+	if !allowedCustomTypeObjectKeys[keyword] {
+		return nil, config.ErrFieldNotSupported
+	}
+	switch keyword {
+	case KeywordAdditionalProperties:
+		if _, ok := fieldval.(bool); !ok {
+			return []rules.ValidationResult{{
+				Reference: rawKey,
+				Message:   fmt.Sprintf("'%s' must be a boolean", rawKey),
+			}}, nil
+		}
+	}
+	return nil, nil
+}
+```
+
+Resolution flow for the override:
+
+- V0: raw `"additionalProperties"` -> alias -> `KeywordAdditionalProperties` -> override matches, uses `"additionalProperties"` in messages
+- V1: raw `"additional_properties"` -> alias -> `KeywordAdditionalProperties` -> override matches, uses `"additional_properties"` in messages
+- V1 wrong-casing: raw `"additionalProperties"` -> not in V1 alias map -> unresolved, empty keyword -> override's allowed-key map rejects -> `ErrFieldNotSupported` -> "not applicable for type(s)"
+
+**Note on `additionalProperties` in the V0 preset**: The V0 alias preset maps `"additionalProperties" -> KeywordAdditionalProperties`. No default type validator in the `config` package recognizes this keyword — it is consumed only via the `customTypeObjectConfig` override. For non-custom-type callers, `additionalProperties` will correctly fall through to "not applicable for type(s)" via union semantics.
 
 ---
 
@@ -460,12 +590,21 @@ Likely changes for this work:
 
 ```text
 cli/internal/providers/datacatalog/rules/config/
-├── validator.go                  # new options-aware entrypoint, normalization flow
+├── validator.go                  # new options-aware entrypoint, normalization flow, updated validateFieldUnion
 ├── utils.go                      # remove direct legacy-only matcher dependency
-├── array_validator.go            # options-aware custom type ref checks
-├── customtype_validator.go       # no logic change, but type resolution path changes
+├── string_validator.go           # keyword-aware allowed keys, rawKey in messages, keyword cross-field lookups
+├── integer_validator.go          # keyword-aware allowed keys, rawKey in messages, keyword cross-field lookups
+├── number_validator.go           # keyword-aware allowed keys, rawKey in messages, keyword cross-field lookups
+├── array_validator.go            # keyword-aware + options-aware custom type ref checks, keyword cross-field lookups
+├── boolean_validator.go          # keyword-aware allowed keys, rawKey in messages
+├── object_validator.go           # trivial interface update (returns ErrFieldNotSupported)
+├── null_validator.go             # trivial interface update (returns ErrFieldNotSupported)
+├── customtype_validator.go       # trivial interface update, type resolution path changes
 ├── options.go                    # new functional options plus explicit V0/V1 alias presets
 └── validator_test.go             # new V1 and backward-compat coverage
+
+cli/internal/providers/datacatalog/rules/customtype/
+└── customtype_config_valid.go    # customTypeObjectConfig override: keyword-aware interface update
 ```
 
 ### Recommended Non-Changes
@@ -475,8 +614,7 @@ The following should not be expanded in this PR:
 1. property V1 rule wiring
 2. custom type V1 rule wiring
 3. semantic validation
-4. refactoring each validator into a different interface
-5. top-level property `item_type` / `item_types` validation
+4. top-level property `item_type` / `item_types` validation
 
 ### Future Usage Example
 
@@ -512,6 +650,11 @@ The implementation must preserve the following behavior:
 12. `enum` remains array-and-duplicate validated only; enum element types are not newly type-checked in this work
 13. `pattern` remains string-validated only; regex compilation is not introduced in this work
 14. If no validator can be constructed for a type, shared config validation still defers to the surrounding spec/type syntax validators
+15. If `WithFieldAliases` receives an empty map, all config keys are treated as unresolved and produce the existing "not applicable for type(s)" behavior
+16. If `ValidateConfigWithOptions` is called with zero options (no aliases, no matcher, no overrides), it must not panic; behavior should be equivalent to passing empty aliases
+17. A V1 config containing both `"min_length": 5` (resolved) and `"minLength": 10` (unresolved) validates `min_length` normally and produces "not applicable for type(s)" for `minLength`
+18. A misconfigured custom type ref matcher that returns `true` for a primitive type name (e.g., `"string"`) must not override the built-in type validator, because `getDefaultValidatorForType` checks built-in types before the custom type ref matcher
+19. V0 cross-field error messages may change from camelCase (e.g., `"minLength cannot be greater than maxLength"`) to keyword form (e.g., `"min_length cannot be greater than max_length"`); this is an acceptable cosmetic change
 
 ---
 
@@ -527,7 +670,7 @@ The implementation must add table-driven tests covering at least:
 4. V1 unchanged-key acceptance for `enum`, `minimum`, `maximum`, `pattern`, `format`
 5. Unaliased camelCase keys fall through the existing unknown-key / not-applicable behavior
 6. V1 array `item_types` accepts primitive types
-7. V1 array `item_types` accepts `#custom-type:<id>`
+7. V1 array `item_types` accepts `#custom-types:<id>`
 8. V1 array `item_types` rejects invalid references through the normal invalid-type path
 9. V1 custom type object config accepts `additional_properties`
 10. V1 custom type object config with unaliased `additionalProperties` falls through the existing unknown-key / not-applicable behavior
@@ -538,10 +681,17 @@ The implementation must add table-driven tests covering at least:
     - `exclusive_minimum >= exclusive_maximum`
 13. Validator override behavior still works with the options-aware entrypoint
 14. V1 top-level custom type type detection works in the shared package:
-    - `ValidateConfigWithOptions([]string{"#custom-type:Address"}, ...)` rejects config as not allowed
+    - `ValidateConfigWithOptions([]string{"#custom-types:Address"}, ...)` rejects config as not allowed
 15. `enum` mixed element types remain valid where they are valid today
 16. `pattern` invalid regex syntax is not rejected solely for being an invalid regex pattern
 17. Unknown type names still cause the shared config validator to defer rather than producing a new type-level error
+18. Empty alias map: all fields produce "not applicable for type(s)"
+19. Zero options: `ValidateConfigWithOptions` called with no options does not panic
+20. Dual-cased keys in V1: `{"min_length": 5, "minLength": 10}` — first validates, second produces "not applicable"
+21. Custom type ref matcher returning `true` for `"string"` — built-in string validator takes precedence
+22. Error `Reference` uses raw key: V1 `"min_length"` field errors reference `"min_length"` not `"minLength"` in results
+23. Error `Message` uses raw key: V1 error says `"'min_length' must be an integer"` not `"'minLength' must be an integer"`
+24. Cross-field with V1 input: `{"min_length": 10, "max_length": 5}` produces min > max error using keyword string values
 
 ### Suggested Coverage Focus
 
@@ -582,15 +732,22 @@ go test ./cli/internal/providers/datacatalog/rules/config/... -cover
 - [ ] V0 camelCase config keys are resolved through explicit aliases rather than implicit fallback
 - [ ] V1 accepts snake_case config keys and normalizes them to shared validator keywords
 - [ ] V1 does not introduce a dedicated wrong-spelling error path in the shared package
-- [ ] V1 array custom type references are recognized only in `#custom-type:<id>` format
+- [ ] V1 array custom type references are recognized only in `#custom-types:<id>` format
 - [ ] Legacy custom type refs inside V1 `item_types` are allowed to fail through the normal invalid-type path
 - [ ] V1 custom type object config accepts only `additional_properties`
 - [ ] V1 `additionalProperties` is not aliased and therefore falls through the existing unknown-key / not-applicable behavior
 - [ ] Raw field references in validation results use the original input key provided by the user
+- [ ] Error messages in validation results use the original input key provided by the user
+- [ ] `TypeConfigValidator.ValidateField` accepts both `rawKey string` and `keyword ConfigKeyword`
+- [ ] `TypeConfigValidator.ValidateCrossFields` accepts `map[ConfigKeyword]any`
+- [ ] All type validators in the `config` package are updated to the new interface
+- [ ] The `customTypeObjectConfig` override in `customtype_config_valid.go` is updated to the new interface
 - [ ] Existing union semantics, cross-field semantics, and deduplication behavior remain unchanged
 - [ ] Existing shallow `enum` behavior remains unchanged
 - [ ] Existing shallow `pattern` behavior remains unchanged
 - [ ] Existing deferral behavior for unknown/invalid types remains unchanged
+- [ ] `ValidateConfigWithOptions` with zero options does not panic
+- [ ] `ValidateConfigWithOptions` with empty alias map treats all fields as unresolved
 
 ### Scope
 
@@ -617,6 +774,8 @@ go test ./cli/internal/providers/datacatalog/rules/config/... -cover
 2. If custom type reference matching remains hard-coded to the legacy regex anywhere in the shared path, V1 arrays will silently miss valid custom type refs
 3. If the current `ValidateConfig` signature is replaced instead of wrapped, later rule-wiring deferral will cause unnecessary churn in existing V0 callers
 4. If V0 compatibility depends on implicit fallback rather than an explicit alias preset, the `ConfigKeyword` abstraction is likely to be misread and regress later
+5. The `TypeConfigValidator` interface changes (`ValidateField` gains `rawKey` + `keyword`, `ValidateCrossFields` gains `map[ConfigKeyword]any`). While the blast radius is contained to the `config` package and one external override (`customTypeObjectConfig`), all ~10 implementations must be updated mechanically. Any out-of-tree override will break at compile time.
+6. V0 cross-field error messages will change from camelCase (e.g., `"minLength cannot be greater than maxLength"`) to keyword string values (e.g., `"min_length cannot be greater than max_length"`). This is a cosmetic change that may affect snapshot-based test assertions in V0 callers.
 
 ### Follow-Ups
 
