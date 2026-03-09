@@ -299,22 +299,22 @@ func TestPropertySpecSyntaxValidRule_InvalidTypeField(t *testing.T) {
 		{
 			name:        "invalid primitive",
 			typeVal:     "invalidtype",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be valid primitive one of",
 		},
 		{
 			name:        "mixed valid and invalid primitives",
 			typeVal:     "string, xyz",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be valid primitive one of",
 		},
 		{
 			name:        "duplicate primitives",
 			typeVal:     "string, string",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be unique one of",
 		},
 		{
 			name:        "duplicate among multiple",
 			typeVal:     "string, number, string",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be unique one of",
 		},
 		{
 			name:        "invalid custom type ref format",

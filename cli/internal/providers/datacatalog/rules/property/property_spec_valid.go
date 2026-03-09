@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -75,7 +74,7 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 			if !customTypeLegacyRefRegex.MatchString(prop.Type) {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/properties/%d/type", i),
-					Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #/custom-types/<group>/<id>", prop.Type),
+					Message:   "'type' is invalid: must be of pattern #/custom-types/<group>/<id>",
 				})
 			}
 			continue
@@ -88,7 +87,9 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 		if !lo.Every(drules.ValidPrimitiveTypes, typs) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/type", i),
-				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+				Message: fmt.Sprintf("'type' is invalid: must be valid primitive one of [%s]",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
 			})
 			continue
 		}
@@ -96,7 +97,9 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 		if len(lo.Uniq(typs)) != len(typs) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/type", i),
-				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+				Message: fmt.Sprintf("'type' is invalid: must be unique one of [%s]",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
 			})
 		}
 	}
@@ -126,15 +129,16 @@ var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec loc
 		if hasDuplicateValues(property.Types) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/types", i),
-				Message:   "'types' must not contain duplicate values",
+				Message: fmt.Sprintf("'types' is invalid: must be unique one of [%s]",
+					strings.Join(property.Types, ", "),
+				),
 			})
 		}
 
 		if property.Type != "" && !isValidV1TypeOrCustomTypeRef(property.Type) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/type", i),
-				Message: fmt.Sprintf("'%s' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
-					property.Type,
+				Message: fmt.Sprintf("'type' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
 					strings.Join(drules.ValidPrimitiveTypes, ", "),
 				),
 			})
@@ -143,8 +147,7 @@ var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec loc
 		if property.ItemType != "" && !isValidV1TypeOrCustomTypeRef(property.ItemType) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/item_type", i),
-				Message: fmt.Sprintf("'%s' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
-					property.ItemType,
+				Message: fmt.Sprintf("'item_type' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
 					strings.Join(drules.ValidPrimitiveTypes, ", "),
 				),
 			})
@@ -153,7 +156,9 @@ var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec loc
 		if hasDuplicateValues(property.ItemTypes) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/item_types", i),
-				Message:   "'item_types' must not contain duplicate values",
+				Message: fmt.Sprintf("'item_types' is invalid: must be unique one of [%s]",
+					strings.Join(property.ItemTypes, ", "),
+				),
 			})
 		}
 	}
@@ -191,9 +196,7 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 			validatePropertySpec,
 		),
 		prules.NewPatternValidator(
-			[]rules.MatchPattern{
-				rules.MatchKindVersion(localcatalog.KindProperties, specs.SpecVersionV1),
-			},
+			prules.V1VersionPatterns(localcatalog.KindProperties),
 			validatePropertySpecV1,
 		),
 	)

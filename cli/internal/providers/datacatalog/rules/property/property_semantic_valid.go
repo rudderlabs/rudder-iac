@@ -2,20 +2,16 @@ package property
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
-
-var customTypeRegex = regexp.MustCompile(catalogRules.CustomTypeReferenceRegex)
 
 var validatePropertySemantic = func(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpec, graph *resources.Graph) []rules.ValidationResult {
 	// Generic ref validation for pattern=legacy_* tagged fields
@@ -83,7 +79,7 @@ func validateReferenceType(spec localcatalog.PropertySpec, graph *resources.Grap
 // checkRef parses a URN reference and verifies it exists in the graph.
 // The regex has two capturing groups: (resource-type) and (id); the custom type id is in matches[2].
 func checkRef(ref, jsonPointer string, graph *resources.Graph) []rules.ValidationResult {
-	matches := customTypeRegex.FindStringSubmatch(ref)
+	matches := customTypeRefRegex.FindStringSubmatch(ref)
 	if len(matches) != 3 {
 		return []rules.ValidationResult{{
 			Reference: jsonPointer,
