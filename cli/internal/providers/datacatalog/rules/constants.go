@@ -15,7 +15,7 @@ const (
 	customTypeLegacyReferenceTag     = "legacy_custom_type_ref"
 	customTypeReferenceTag           = "custom_type_ref"
 	customTypeLegacyReferenceMessage = "must be of pattern #/custom-types/<group>/<id>"
-	customTypeReferenceMessage       = "must be of pattern #custom-types:<id>"
+	customTypeReferenceMessage       = "must be of pattern #custom-type:<id>"
 
 	propertyLegacyReferenceTag     = "legacy_property_ref"
 	propertyReferenceTag           = "property_ref"
@@ -52,7 +52,7 @@ var (
 
 	CustomTypeReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindCustomTypes,
+		types.CustomTypeResourceType,
 	)
 
 	PropertyLegacyReferenceRegex = fmt.Sprintf(
@@ -120,7 +120,7 @@ func init() {
 		customTypeLegacyReferenceMessage,
 	)
 
-	// #custom-types:<id>
+	// #custom-type:<id> (TypeCustomType, same as category uses TypeCategory)
 	funcs.NewPattern(
 		customTypeReferenceTag,
 		CustomTypeReferenceRegex,
