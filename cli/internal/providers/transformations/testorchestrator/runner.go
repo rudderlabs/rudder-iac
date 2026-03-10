@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -22,8 +23,8 @@ import (
 
 // Type aliases for backwards compatibility
 type (
-	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
-	TestResults                       = model.TestResults
+	TransformationTestWithDefinitions = results.TransformationTestWithDefinitions
+	TestResults                       = results.TestResults
 )
 
 var testLogger = logger.New("testorchestrator")

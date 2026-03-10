@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
@@ -179,7 +180,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load a library spec
 		err := provider.LoadSpec("lib.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation-library",
+			Kind:    "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
 				"name":        "Math Library",
@@ -213,7 +214,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load a transformation spec without imports
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation",
+			Kind:    "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
 				"name":     "Simple Transformation",
@@ -246,7 +247,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load a library spec
 		err := provider.LoadSpec("lib.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation-library",
+			Kind:    "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
 				"name":        "Math Library",
@@ -260,7 +261,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load a transformation spec that imports the library
 		err = provider.LoadSpec("trans.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation",
+			Kind:    "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
 				"name":     "Math Transformation",
@@ -294,7 +295,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load first library
 		err := provider.LoadSpec("lib1.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation-library",
+			Kind:    "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-1",
 				"name":        "Math Library",
@@ -308,7 +309,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load second library
 		err = provider.LoadSpec("lib2.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation-library",
+			Kind:    "transformation-library",
 			Spec: map[string]interface{}{
 				"id":          "lib-2",
 				"name":        "String Library",
@@ -322,7 +323,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load transformation that imports both libraries
 		err = provider.LoadSpec("trans.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation",
+			Kind:    "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
 				"name":     "Complex Transformation",
@@ -358,7 +359,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load transformation that imports a non-existent library
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation",
+			Kind:    "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
 				"name":     "Broken Transformation",
@@ -385,7 +386,7 @@ func TestResourceGraph(t *testing.T) {
 		// Load a Python transformation (parser returns empty imports)
 		err := provider.LoadSpec("trans.yaml", &specs.Spec{
 			Version: specs.SpecVersionV1,
-			Kind: "transformation",
+			Kind:    "transformation",
 			Spec: map[string]interface{}{
 				"id":       "trans-1",
 				"name":     "Python Transformation",
@@ -954,8 +955,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Direct test: We can test the logic by creating a similar structure
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &results.TestResults{
+			Transformations: []*results.TransformationTestWithDefinitions{
 				{
 					Result: &resp.ValidationOutput.Transformations[0],
 					Definitions: []*transformationsClient.TestDefinition{
@@ -1012,8 +1013,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Verify that nil definitions are handled
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &results.TestResults{
+			Transformations: []*results.TransformationTestWithDefinitions{
 				{
 					Result:      &resp.ValidationOutput.Transformations[0],
 					Definitions: nil,

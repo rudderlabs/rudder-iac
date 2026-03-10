@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -261,8 +261,8 @@ func TestResultDisplayer_Display_AllPassed(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "test-transformation",
@@ -303,8 +303,8 @@ func TestResultDisplayer_Display_WithMismatchFailures(t *testing.T) {
 		},
 	}
 
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "test-transformation",
@@ -341,8 +341,8 @@ func TestResultDisplayer_Display_WithExecutionErrors(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "error-transformation",
@@ -382,8 +382,8 @@ func TestResultDisplayer_Display_WithMultilineErrors(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "test-transformation",
@@ -421,8 +421,8 @@ func TestResultDisplayer_Display_WithMultilineErrors_Verbose(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(true)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "test-transformation",
@@ -463,8 +463,8 @@ func TestResultDisplayer_Display_WithGroupedErrors(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "test-transformation",
@@ -502,8 +502,8 @@ func TestResultDisplayer_Display_WithImportedLibraries(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
-		Transformations: []*model.TransformationTestWithDefinitions{
+	results := &results.TestResults{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name:    "transformation-with-libs",
@@ -531,7 +531,7 @@ func TestResultDisplayer_DisplayLibraries_AllPassed(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
+	results := &results.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-1", Pass: true},
 			{HandleName: "lib-2", Pass: true},
@@ -554,7 +554,7 @@ func TestResultDisplayer_DisplayLibraries_WithFailures(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
+	results := &results.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-pass", Pass: true},
 			{HandleName: "lib-fail", Pass: false, Message: "Syntax error on line 5"},
@@ -578,7 +578,7 @@ func TestResultDisplayer_DisplayLibraries_WithMultilineError_Verbose(t *testing.
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(true)
-	results := &model.TestResults{
+	results := &results.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-fail", Pass: false, Message: "Error line 1\nStack line 2\nStack line 3"},
 		},
@@ -599,7 +599,7 @@ func TestResultDisplayer_Display_EmptyResults(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{}
+	results := &results.TestResults{}
 
 	displayer.Display(results)
 
@@ -615,11 +615,11 @@ func TestResultDisplayer_Display_MixedResults(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{
+	results := &results.TestResults{
 		Libraries: []transformations.LibraryTestResult{
 			{HandleName: "lib-1", Pass: true},
 		},
-		Transformations: []*model.TransformationTestWithDefinitions{
+		Transformations: []*results.TransformationTestWithDefinitions{
 			{
 				Result: &transformations.TransformationTestResult{
 					Name: "transformation-1",
@@ -647,7 +647,7 @@ func TestResultDisplayer_VerboseTipShownWhenNonVerbose(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(false)
-	results := &model.TestResults{}
+	results := &results.TestResults{}
 
 	displayer.Display(results)
 
@@ -661,7 +661,7 @@ func TestResultDisplayer_VerboseTipNotShownWhenVerbose(t *testing.T) {
 	defer ui.RestoreWriter()
 
 	displayer := NewResultDisplayer(true)
-	results := &model.TestResults{}
+	results := &results.TestResults{}
 
 	displayer.Display(results)
 

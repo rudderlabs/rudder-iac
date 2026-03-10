@@ -135,6 +135,11 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
+			if results.IsEmpty() {
+				ui.Println("No resources to test")
+				return nil
+			}
+
 			displayer := transformations.NewResultDisplayer(verbose)
 			displayer.Display(results)
 

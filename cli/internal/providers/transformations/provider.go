@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -435,7 +436,10 @@ func (p *Provider) resolveTestDefinitions(trans *model.TransformationResource) (
 	return testorchestrator.ResolveTestDefinitions(trans)
 }
 
-func (p *Provider) buildTestResultsFromResponse(req *transformations.BatchPublishRequest, resp *transformations.BatchPublishResponse) *TestResults {
+func (p *Provider) buildTestResultsFromResponse(
+	req *transformations.BatchPublishRequest,
+	resp *transformations.BatchPublishResponse,
+) *results.TestResults {
 	testDefsByVersionID := lo.SliceToMap(req.Transformations, func(trans transformations.BatchPublishTransformation) (string, []*transformations.TestDefinition) {
 		defs := lo.Map(trans.TestSuite, func(t transformations.TestDefinition, i int) *transformations.TestDefinition {
 			return &trans.TestSuite[i]
@@ -444,14 +448,14 @@ func (p *Provider) buildTestResultsFromResponse(req *transformations.BatchPublis
 	})
 
 	// Map results to their definitions by matching versionID
-	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *TransformationTestWithDefinitions {
-		return &TransformationTestWithDefinitions{
+	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *results.TransformationTestWithDefinitions {
+		return &results.TransformationTestWithDefinitions{
 			Result:      &tr,
 			Definitions: testDefsByVersionID[tr.VersionID],
 		}
 	})
 
-	return &TestResults{
+	return &results.TestResults{
 		Libraries:       resp.ValidationOutput.Libraries,
 		Transformations: trResults,
 	}

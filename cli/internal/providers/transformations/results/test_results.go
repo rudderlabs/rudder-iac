@@ -1,4 +1,4 @@
-package model
+package results
 
 import (
 	"github.com/samber/lo"
@@ -33,6 +33,11 @@ func (r *TestResults) HasFailures() bool {
 			return res.Status == transformations.TestRunStatusFail || res.Status == transformations.TestRunStatusError
 		})
 	})
+}
+
+// IsEmpty returns true if there are no test results (no libraries or transformations)
+func (r *TestResults) IsEmpty() bool {
+	return len(r.Libraries) == 0 && len(r.Transformations) == 0
 }
 
 // DefaultSuiteTransformationNames returns the names of transformations that used the default test suite
