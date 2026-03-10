@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
+	testresults "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -135,7 +136,7 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
-			if results.IsEmpty() {
+			if results.Status == testresults.RunStatusNoResources {
 				ui.Println("No resources to test")
 				return nil
 			}

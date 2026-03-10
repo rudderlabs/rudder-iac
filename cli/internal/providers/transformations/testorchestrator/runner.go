@@ -78,7 +78,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 && len(testPlan.StandaloneLibraries) == 0 {
 		testLogger.Info("No resources to test")
-		return &TestResults{Pass: true}, nil
+		return &TestResults{Status: results.RunStatusNoResources}, nil
 	}
 
 	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
@@ -146,6 +146,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	}
 
 	results := &TestResults{
+		Status:          results.RunStatusExecuted,
 		Libraries:       allLibs,
 		Transformations: allResults,
 	}
