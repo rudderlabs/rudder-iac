@@ -134,7 +134,7 @@ func init() {
 		propertyLegacyReferenceMessage,
 	)
 
-	// #properties:<id>
+	// #property:<id>
 	funcs.NewPattern(
 		propertyReferenceTag,
 		PropertyReferenceRegex,
@@ -148,7 +148,7 @@ func init() {
 		eventLegacyReferenceMessage,
 	)
 
-	// #events:<id>
+	// #event:<id>
 	funcs.NewPattern(
 		eventReferenceTag,
 		EventReferenceRegex,

@@ -926,16 +926,16 @@ func TestTrackingPlanSpecSyntaxValidRule_V1ValidSpec(t *testing.T) {
 			{
 				Type:            "event_rule",
 				LocalID:         "signup_rule",
-				Event:           "#events:signup",
+				Event:           "#event:signup",
 				IdentitySection: "properties",
 				Properties: []*localcatalog.TPRulePropertyV1{
 					{
-						Property: "#properties:address",
+						Property: "#property:address",
 						Properties: []*localcatalog.TPRulePropertyV1{
 							{
-								Property: "#properties:city",
+								Property: "#property:city",
 								Properties: []*localcatalog.TPRulePropertyV1{
-									{Property: "#properties:zip"},
+									{Property: "#property:zip"},
 								},
 							},
 						},
@@ -971,7 +971,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 				Rules: []*localcatalog.TPRuleV1{
 					{
 						LocalID: "rule1",
-						Event:   "#events:signup",
+						Event:   "#event:signup",
 					},
 				},
 			},
@@ -987,7 +987,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 					{
 						Type:    "wrong_type",
 						LocalID: "rule1",
-						Event:   "#events:signup",
+						Event:   "#event:signup",
 					},
 				},
 			},
@@ -1023,7 +1023,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 				},
 			},
 			expectedRefs: []string{"/rules/0/event"},
-			expectedMsgs: []string{"'event' is not valid: must be of pattern #events:<id>"},
+			expectedMsgs: []string{"'event' is not valid: must be of pattern #event:<id>"},
 		},
 		{
 			name: "invalid identity section",
@@ -1034,7 +1034,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 					{
 						Type:            "event_rule",
 						LocalID:         "rule1",
-						Event:           "#events:signup",
+						Event:           "#event:signup",
 						IdentitySection: "bad_section",
 					},
 				},
@@ -1051,7 +1051,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 					{
 						Type:    "event_rule",
 						LocalID: "rule1",
-						Event:   "#events:signup",
+						Event:   "#event:signup",
 						Properties: []*localcatalog.TPRulePropertyV1{
 							{},
 						},
@@ -1070,7 +1070,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 					{
 						Type:    "event_rule",
 						LocalID: "rule1",
-						Event:   "#events:signup",
+						Event:   "#event:signup",
 						Properties: []*localcatalog.TPRulePropertyV1{
 							{Property: "#/properties/group/email"},
 						},
@@ -1078,7 +1078,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 				},
 			},
 			expectedRefs: []string{"/rules/0/properties/0/property"},
-			expectedMsgs: []string{"'property' is not valid: must be of pattern #properties:<id>"},
+			expectedMsgs: []string{"'property' is not valid: must be of pattern #property:<id>"},
 		},
 	}
 
@@ -1106,10 +1106,10 @@ func TestTrackingPlanSpecSyntaxValidRule_V1AdditionalProperties(t *testing.T) {
 				{
 					Type:    "event_rule",
 					LocalID: "rule1",
-					Event:   "#events:signup",
+					Event:   "#event:signup",
 					Properties: []*localcatalog.TPRulePropertyV1{
 						{
-							Property:             "#properties:address",
+							Property:             "#property:address",
 							AdditionalProperties: &boolTrue,
 						},
 					},
@@ -1131,13 +1131,13 @@ func TestTrackingPlanSpecSyntaxValidRule_V1AdditionalProperties(t *testing.T) {
 				{
 					Type:    "event_rule",
 					LocalID: "rule1",
-					Event:   "#events:signup",
+					Event:   "#event:signup",
 					Properties: []*localcatalog.TPRulePropertyV1{
 						{
-							Property:             "#properties:address",
+							Property:             "#property:address",
 							AdditionalProperties: &boolTrue,
 							Properties: []*localcatalog.TPRulePropertyV1{
-								{Property: "#properties:city"},
+								{Property: "#property:city"},
 							},
 						},
 					},
@@ -1161,18 +1161,18 @@ func TestTrackingPlanSpecSyntaxValidRule_V1NestingDepth(t *testing.T) {
 				{
 					Type:    "event_rule",
 					LocalID: "rule1",
-					Event:   "#events:signup",
+					Event:   "#event:signup",
 					Properties: []*localcatalog.TPRulePropertyV1{
 						{
-							Property: "#properties:address",
+							Property: "#property:address",
 							Properties: []*localcatalog.TPRulePropertyV1{
 								{
-									Property: "#properties:city",
+									Property: "#property:city",
 									Properties: []*localcatalog.TPRulePropertyV1{
 										{
-											Property: "#properties:district",
+											Property: "#property:district",
 											Properties: []*localcatalog.TPRulePropertyV1{
-												{Property: "#properties:zone"},
+												{Property: "#property:zone"},
 											},
 										},
 									},
@@ -1196,21 +1196,21 @@ func TestTrackingPlanSpecSyntaxValidRule_V1NestingDepth(t *testing.T) {
 				{
 					Type:    "event_rule",
 					LocalID: "rule1",
-					Event:   "#events:signup",
+					Event:   "#event:signup",
 					Properties: []*localcatalog.TPRulePropertyV1{
 						{
-							Property: "#properties:address",
+							Property: "#property:address",
 							Properties: []*localcatalog.TPRulePropertyV1{
 								{
-									Property: "#properties:city",
+									Property: "#property:city",
 									Properties: []*localcatalog.TPRulePropertyV1{
 										{
-											Property: "#properties:district",
+											Property: "#property:district",
 											Properties: []*localcatalog.TPRulePropertyV1{
 												{
-													Property: "#properties:zone",
+													Property: "#property:zone",
 													Properties: []*localcatalog.TPRulePropertyV1{
-														{Property: "#properties:block"},
+														{Property: "#property:block"},
 													},
 												},
 											},
