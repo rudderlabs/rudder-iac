@@ -39,8 +39,8 @@ type TransformationLibrarySpec struct {
     Name        string `json:"name" mapstructure:"name" validate:"required"`
     Description string `json:"description" mapstructure:"description"`
     Language    string `json:"language" mapstructure:"language" validate:"required,oneof=javascript python"`
-    Code        string `json:"code,omitempty" mapstructure:"code"`
-    File        string `json:"file,omitempty" mapstructure:"file"`
+    Code        string `json:"code,omitempty" mapstructure:"code" validate:"required_without=File,excluded_with=File"`
+    File        string `json:"file,omitempty" mapstructure:"file" validate:"required_without=Code,excluded_with=Code"`
     ImportName  string `json:"import_name" mapstructure:"import_name" validate:"required"`
 }
 ```
@@ -59,12 +59,12 @@ These rules must target `MatchKindVersion("transformation-library", "rudder/v1")
 | 2 | `name` required | `validate:"required"` on `Name` | Library must have a non-empty `name` |
 | 3 | `import_name` required | `validate:"required"` on `ImportName` | Library must have a non-empty `import_name` |
 | 4 | `language` required + oneof | `validate:"required,oneof=javascript python"` on `Language` | Language must be one of the allowed values |
+| 5 | `code`/`file` mutual exclusivity | `validate:"required_without=File,excluded_with=File"` on `Code`; `validate:"required_without=Code,excluded_with=Code"` on `File` | Exactly one of `code` or `file` must be specified — both missing and both present are invalid. Pattern mirrors `cli/internal/project/specs/metadata.go` (`LocalID`/`URN`) and `cli/internal/providers/retl/sqlmodel/model.go` (`SQL`/`File`) |
 
 ### Custom Logic (manual rule code)
 
 | # | Validation | Description |
 |---|-----------|-------------|
-| 5 | `code` and `file` mutually exclusive, one required | Either `code` or `file` must be specified, but not both |
 | 6 | `import_name` must equal camelCase of `name` | The `import_name` field must be the camelCase transformation of the `name` field |
 | 7 | Code syntax validation | When `code` is provided (or resolved from `file`), validate syntax using the appropriate parser (esbuild for JavaScript, Python parser for Python) |
 
@@ -79,8 +79,9 @@ No semantic validations needed. Transformation libraries have no cross-resource 
 ## Acceptance Criteria
 
 - [ ] `validate:` tags added to `TransformationLibrarySpec` shared struct (safe since no V0.1 rules exist in new engine)
-- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#4)
-- [ ] Custom logic implemented for code/file exclusivity (#5), import_name camelCase check (#6), and code syntax validation (#7)
+- [ ] `code`/`file` mutual exclusivity expressed via `required_without`/`excluded_with` tags on both `Code` and `File` fields (no custom logic needed)
+- [ ] V1 syntactic rule uses `rules.ValidateStruct()` for tag-based validations (#1-#5)
+- [ ] Custom logic implemented for import_name camelCase check (#6) and code syntax validation (#7)
 - [ ] `import_name` camelCase validation matches the existing handler logic
 - [ ] Code syntax validation integrates with the existing parser infrastructure (`parser.ValidateSyntax()`)
 - [ ] All validations are tested with unit tests
@@ -105,14 +106,14 @@ No semantic validations needed. Transformation libraries have no cross-resource 
 
 ## Summary
 
-Add V1 spec validation rules for the `transformation-library` resource. These rules target `rudder/v1` specs, implementing 8 syntactic validations including required fields, language constraints, code/file exclusivity, import_name camelCase validation, and code syntax validation.
+Add V1 spec validation rules for the `transformation-library` resource. These rules target `rudder/v1` specs, implementing 7 syntactic validations including required fields, language constraints, code/file exclusivity via go validator tags, import_name camelCase validation, and code syntax validation.
 
 ---
 
 ## Changes
 
-* Add `validate:` tags to `TransformationLibrarySpec` shared struct
-* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom logic for code/file exclusivity, import_name camelCase, and code syntax validation
+* Add `validate:` tags to `TransformationLibrarySpec` shared struct, including `required_without`/`excluded_with` tags for `code`/`file` mutual exclusivity
+* Add V1 syntactic rule using `rules.ValidateStruct()` for tag-based validations + custom logic for import_name camelCase and code syntax validation
 
 ---
 
@@ -120,6 +121,7 @@ Add V1 spec validation rules for the `transformation-library` resource. These ru
 
 * Unit tests for all syntactic validations
 * Table-driven tests covering valid and invalid V1 library specs
+* Tests for code/file mutual exclusivity via tag validation
 * Tests for import_name camelCase validation
 * Tests for code syntax validation (valid/invalid JavaScript and Python)
 
