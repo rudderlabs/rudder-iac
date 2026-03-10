@@ -88,7 +88,7 @@ from real_lib2 import func
 			expected: []string{},
 		},
 		{
-			name: "Stdlib modules pass through (filtering is provider responsibility)",
+			name: "Stdlib modules are filtered out",
 			code: `
 import json
 import hashlib
@@ -97,7 +97,7 @@ import mylib
 from base64 import b64encode
 import another_lib
 `,
-			expected: []string{"another_lib", "base64", "datetime", "hashlib", "json", "mylib"},
+			expected: []string{"another_lib", "mylib"},
 		},
 		{
 			name: "Deduplicate imports",
@@ -127,7 +127,7 @@ def transform_event(event):
     response = requests.get("https://api.example.com")
     return data.to_dict()
 `,
-			expected: []string{"datetime", "json", "numpy", "pandas", "requests"},
+			expected: []string{"numpy", "pandas"},
 		},
 		{
 			name: "Import with as alias",
@@ -172,7 +172,7 @@ another_var = {"key": "value"}
 def transform(event):
     return mylib.process(event)
 `,
-			expected: []string{"json", "mylib"},
+			expected: []string{"mylib"},
 		},
 		{
 			name: "Function and class names not included in imports",
@@ -247,7 +247,7 @@ template = 'from fake import something'
 		{
 			name:     "Semicolon-separated imports",
 			code:     `import json; import mylib`,
-			expected: []string{"json", "mylib"},
+			expected: []string{"mylib"},
 		},
 		{
 			name:     "Semicolon inside string should not split",
