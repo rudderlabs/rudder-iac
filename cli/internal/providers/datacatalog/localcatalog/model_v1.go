@@ -12,18 +12,18 @@ import (
 )
 
 type PropertyV1 struct {
-	LocalID     string                 `mapstructure:"id" json:"id"`
-	Name        string                 `mapstructure:"name" json:"name"`
-	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty"`
-	Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty"`
-	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty"`
-	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty"`
-	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty"`
+	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=1,lte=65"`
+	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000"`
+	Type        string                 `mapstructure:"type,omitempty" json:"type,omitempty" validate:"excluded_with=Types"`
+	Types       []string               `mapstructure:"types,omitempty" json:"types,omitempty" validate:"excluded_with=Type,dive,oneof=string number integer boolean null array object"`
+	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty" validate:"excluded_with=ItemTypes"`
+	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty" validate:"excluded_with=ItemType,dive,oneof=string number integer boolean null array object"`
 	Config      map[string]interface{} `mapstructure:"config,omitempty" json:"config,omitempty"`
 }
 
 type PropertySpecV1 struct {
-	Properties []PropertyV1 `mapstructure:"properties" json:"properties"`
+	Properties []PropertyV1 `mapstructure:"properties" json:"properties" validate:"dive"`
 }
 
 func (p *PropertyV1) FromV0(v0 Property) error {
@@ -145,23 +145,23 @@ func extractSpec(spec map[string]any, result any) error {
 
 // CustomTypeSpecV1 represents the spec section of a custom-types resource (V1 spec)
 type CustomTypeSpecV1 struct {
-	Types []CustomTypeV1 `json:"types"`
+	Types []CustomTypeV1 `json:"types" validate:"required,dive"`
 }
 
 // CustomTypeV1 represents a user-defined custom type (V1 spec)
 type CustomTypeV1 struct {
-	LocalID     string                 `mapstructure:"id" json:"id"`
-	Name        string                 `mapstructure:"name" json:"name"`
-	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty"`
-	Type        string                 `mapstructure:"type" json:"type"`
+	LocalID     string                 `mapstructure:"id" json:"id" validate:"required"`
+	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern=custom_type_name"`
+	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	Type        string                 `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
 	Config      map[string]any         `mapstructure:"config,omitempty" json:"config,omitempty"`
-	Properties  []CustomTypePropertyV1 `mapstructure:"properties,omitempty" json:"properties,omitempty"`
-	Variants    VariantsV1             `mapstructure:"variants,omitempty" json:"variants,omitempty"`
+	Properties  []CustomTypePropertyV1 `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
+	Variants    VariantsV1             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"excluded_unless=Type object,omitempty,max=1,dive"`
 }
 
 // CustomTypePropertyV1 represents a property reference within a custom type (V1 spec)
 type CustomTypePropertyV1 struct {
-	Property string `mapstructure:"property" json:"property"`
+	Property string `mapstructure:"property" json:"property" validate:"required,pattern=property_ref"`
 	Required bool   `mapstructure:"required" json:"required"`
 }
 

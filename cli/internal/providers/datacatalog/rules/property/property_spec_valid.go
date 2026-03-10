@@ -2,6 +2,7 @@ package property
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -13,7 +14,10 @@ import (
 	"github.com/samber/lo"
 )
 
-var customTypeLegacyRefRegex = regexp.MustCompile(drules.CustomTypeLegacyReferenceRegex)
+var (
+	customTypeLegacyRefRegex = regexp.MustCompile(drules.CustomTypeLegacyReferenceRegex)
+	customTypeRefRegex       = regexp.MustCompile(drules.CustomTypeReferenceRegex)
+)
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -70,7 +74,7 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 			if !customTypeLegacyRefRegex.MatchString(prop.Type) {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/properties/%d/type", i),
-					Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #/custom-types/<group>/<id>", prop.Type),
+					Message:   "'type' is invalid: must be of pattern #/custom-types/<group>/<id>",
 				})
 			}
 			continue
@@ -83,7 +87,9 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 		if !lo.Every(drules.ValidPrimitiveTypes, typs) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/type", i),
-				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+				Message: fmt.Sprintf("'type' is invalid: must be valid primitive one of [%s]",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
 			})
 			continue
 		}
@@ -91,12 +97,92 @@ var validatePropertySpec = func(_ string, _ string, _ map[string]any, Spec local
 		if len(lo.Uniq(typs)) != len(typs) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/properties/%d/type", i),
-				Message:   fmt.Sprintf("'%s' is not a valid primitive type: must be unique one of [%s]", prop.Type, strings.Join(drules.ValidPrimitiveTypes, ", ")),
+				Message: fmt.Sprintf("'type' is invalid: must be unique one of [%s]",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
 			})
 		}
 	}
 
 	return results
+}
+
+var validatePropertySpecV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{{
+			Reference: "/properties",
+			Message:   err.Error(),
+		}}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
+
+	for i, property := range spec.Properties {
+		if strings.TrimSpace(property.Name) != property.Name {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/name", i),
+				Message:   "'name' must not have leading or trailing whitespace",
+			})
+		}
+
+		if hasDuplicateValues(property.Types) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/types", i),
+				Message: fmt.Sprintf("'types' is invalid: must be unique one of [%s]",
+					strings.Join(property.Types, ", "),
+				),
+			})
+		}
+
+		if property.Type != "" && !isValidV1TypeOrCustomTypeRef(property.Type) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/type", i),
+				Message: fmt.Sprintf("'type' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+
+		if property.ItemType != "" && !isValidV1TypeOrCustomTypeRef(property.ItemType) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/item_type", i),
+				Message: fmt.Sprintf("'item_type' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
+					strings.Join(drules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+
+		if hasDuplicateValues(property.ItemTypes) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/properties/%d/item_types", i),
+				Message: fmt.Sprintf("'item_types' is invalid: must be unique one of [%s]",
+					strings.Join(property.ItemTypes, ", "),
+				),
+			})
+		}
+	}
+
+	return results
+}
+
+func hasDuplicateValues(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if _, found := seen[value]; found {
+			return true
+		}
+		seen[value] = struct{}{}
+	}
+	return false
+}
+
+func isValidV1TypeOrCustomTypeRef(typeValue string) bool {
+	if lo.Contains(drules.ValidPrimitiveTypes, typeValue) {
+		return true
+	}
+
+	return customTypeRefRegex.MatchString(typeValue)
 }
 
 func NewPropertySpecSyntaxValidRule() rules.Rule {
@@ -108,6 +194,10 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertySpec,
+		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindProperties),
+			validatePropertySpecV1,
 		),
 	)
 }
