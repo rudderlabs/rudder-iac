@@ -125,6 +125,17 @@ actualKind := fieldVal.Kind()
   - "Create validation engine" (obvious from `NewValidationEngine()`)
   - "Loop through specs" (obvious from `for path, spec := range p.specs`)
 
+## Pull Request Descriptions
+
+Always use the template in `.github/pull_request_template.md` when creating PR descriptions. Fill in every section:
+
+- **Ticket**: link to the Linear issue (e.g. `[PRO-1234](url)`)
+- **Summary**: one-paragraph description of what and why
+- **Changes**: bullet list of key changes
+- **Testing**: how it was tested (unit/integration/manual)
+- **Risk / Impact**: Low / Medium / High with brief notes
+- **Checklist**: tick completed items
+
 ## Standard Workflows
 
 ### 1. New CLI Command + Provider Enhancement
