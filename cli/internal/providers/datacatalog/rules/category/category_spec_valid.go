@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -26,9 +27,9 @@ var examples = rules.Examples{
 
 // Main validation function for category spec
 // which delegates the validation to the go-validator through struct tags.
-var validateCategorySpec = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CategorySpec) []rules.ValidationResult {
+var validateCategorySpec = func(_ string, _ string, _ map[string]any, spec localcatalog.CategorySpec) []rules.ValidationResult {
 	validationErrors, err := rules.ValidateStruct(
-		Spec,
+		spec,
 		"",
 	)
 
@@ -44,6 +45,18 @@ var validateCategorySpec = func(Kind string, Version string, Metadata map[string
 	return funcs.ParseValidationErrors(validationErrors, nil)
 }
 
+var validateCategorySpecV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.CategorySpecV1) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{{
+			Reference: "/categories",
+			Message:   err.Error(),
+		}}
+	}
+
+	return funcs.ParseValidationErrors(validationErrors, nil)
+}
+
 func NewCategorySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/categories/spec-syntax-valid",
@@ -53,6 +66,13 @@ func NewCategorySpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCategories),
 			validateCategorySpec,
+		),
+		prules.NewPatternValidator(
+			[]rules.MatchPattern{rules.MatchKindVersion(
+				localcatalog.KindCategories,
+				specs.SpecVersionV1,
+			)},
+			validateCategorySpecV1,
 		),
 	)
 }

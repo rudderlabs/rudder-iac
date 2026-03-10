@@ -3,8 +3,8 @@ package property
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -34,10 +34,15 @@ func TestNewPropertySpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	rule := NewPropertySpecSyntaxValidRule()
 
+	expectedPatterns := append(
+		prules.LegacyVersionPatterns("properties"),
+		rules.MatchKindVersion("properties", specs.SpecVersionV1),
+	)
+
 	assert.Equal(t, "datacatalog/properties/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "property spec syntax must be valid", rule.Description())
-	assert.Equal(t, prules.LegacyVersionPatterns("properties"), rule.AppliesTo())
+	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
@@ -294,22 +299,22 @@ func TestPropertySpecSyntaxValidRule_InvalidTypeField(t *testing.T) {
 		{
 			name:        "invalid primitive",
 			typeVal:     "invalidtype",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be valid primitive one of",
 		},
 		{
 			name:        "mixed valid and invalid primitives",
 			typeVal:     "string, xyz",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be valid primitive one of",
 		},
 		{
 			name:        "duplicate primitives",
 			typeVal:     "string, string",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be unique one of",
 		},
 		{
 			name:        "duplicate among multiple",
 			typeVal:     "string, number, string",
-			expectedMsg: "is not a valid primitive type",
+			expectedMsg: "must be unique one of",
 		},
 		{
 			name:        "invalid custom type ref format",

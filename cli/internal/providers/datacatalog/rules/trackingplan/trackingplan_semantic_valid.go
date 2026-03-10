@@ -7,6 +7,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/variant"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -33,7 +34,7 @@ func validateTrackingPlanVariants(spec localcatalog.TrackingPlan, graph *resourc
 		for _, prop := range rule.Properties {
 			ownRefs = append(ownRefs, prop.Ref)
 		}
-		results = append(results, funcs.ValidateVariantDiscriminators(
+		results = append(results, variant.ValidateVariantDiscriminatorsV0(
 			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
 		)...)
 	}
