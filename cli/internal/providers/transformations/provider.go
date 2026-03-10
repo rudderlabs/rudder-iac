@@ -14,9 +14,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
 
@@ -64,6 +66,18 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("transformation specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
+}
+
+func (p *Provider) SyntacticRules() []vrules.Rule {
+	return []vrules.Rule{
+		trules.NewTransformationSpecSyntaxValidRule(),
+	}
+}
+
+func (p *Provider) SemanticRules() []vrules.Rule {
+	return []vrules.Rule{
+		trules.NewTransformationImportsSemanticValidRule(),
+	}
 }
 
 // MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations
@@ -173,11 +187,10 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 		for _, handleName := range handleNames {
 			libraryURN, exists := handleNameToURN[handleName]
 			if !exists {
-				return nil, fmt.Errorf(
-					"transformation %s importing library with import_name '%s' not found",
-					r.ID(),
-					handleName,
-				)
+				log.Warn("transformation import could not be resolved during graph construction",
+					"transformation", r.ID(),
+					"import_name", handleName)
+				continue
 			}
 
 			graph.AddDependency(r.URN(), libraryURN)
