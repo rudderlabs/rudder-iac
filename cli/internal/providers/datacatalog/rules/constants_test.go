@@ -138,13 +138,13 @@ func TestPropertyReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#properties:email-address", wantMatch: true},
-			{name: "with underscores", reference: "#properties:user_id", wantMatch: true},
+			{name: "basic reference", reference: "#property:email-address", wantMatch: true},
+			{name: "with underscores", reference: "#property:user_id", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#properties:", wantMatch: false},
-			{name: "space in id", reference: "#properties:id with space", wantMatch: false},
-			{name: "invalid char", reference: "#properties:id@123", wantMatch: false},
+			{name: "missing id", reference: "#property:", wantMatch: false},
+			{name: "space in id", reference: "#property:id with space", wantMatch: false},
+			{name: "invalid char", reference: "#property:id@123", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -198,12 +198,12 @@ func TestEventReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#events:user-login", wantMatch: true},
-			{name: "with underscores and numbers", reference: "#events:PAGE_VIEW_123", wantMatch: true},
+			{name: "basic reference", reference: "#event:user-login", wantMatch: true},
+			{name: "with underscores and numbers", reference: "#event:PAGE_VIEW_123", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#events:", wantMatch: false},
-			{name: "space in id", reference: "#events:user login", wantMatch: false},
+			{name: "missing id", reference: "#event:", wantMatch: false},
+			{name: "space in id", reference: "#event:user login", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -368,9 +368,9 @@ func TestConstantValues(t *testing.T) {
 			{"customTypeLegacyReferenceMessage", customTypeLegacyReferenceMessage, "must be of pattern #/custom-types/<group>/<id>"},
 			{"customTypeReferenceMessage", customTypeReferenceMessage, "must be of pattern #custom-type:<id>"},
 			{"propertyLegacyReferenceMessage", propertyLegacyReferenceMessage, "must be of pattern #/properties/<group>/<id>"},
-			{"propertyReferenceMessage", propertyReferenceMessage, "must be of pattern #properties:<id>"},
+			{"propertyReferenceMessage", propertyReferenceMessage, "must be of pattern #property:<id>"},
 			{"eventLegacyReferenceMessage", eventLegacyReferenceMessage, "must be of pattern #/events/<group>/<id>"},
-			{"eventReferenceMessage", eventReferenceMessage, "must be of pattern #events:<id>"},
+			{"eventReferenceMessage", eventReferenceMessage, "must be of pattern #event:<id>"},
 			{"categoryLegacyReferenceMessage", categoryLegacyReferenceMessage, "must be of pattern #/categories/<group>/<id>"},
 			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #category:<id>"},
 			{"trackingPlanLegacyReferenceMessage", trackingPlanLegacyReferenceMessage, "must be of pattern #/tp/<group>/<id>"},

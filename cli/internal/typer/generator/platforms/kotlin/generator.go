@@ -34,6 +34,11 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 		ctx.PackageName = defaults.PackageName
 	}
 
+	outputFileName := kotlinOptions.OutputFileName
+	if outputFileName == "" {
+		outputFileName = defaults.OutputFileName
+	}
+
 	ctx.RudderCLIVersion = options.RudderCLIVersion
 	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	ctx.TrackingPlanName = plan.Name
@@ -52,7 +57,7 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 		return nil, err
 	}
 
-	mainFile, err := GenerateFile("Main.kt", ctx)
+	mainFile, err := GenerateFile(outputFileName, ctx)
 	if err != nil {
 		return nil, err
 	}

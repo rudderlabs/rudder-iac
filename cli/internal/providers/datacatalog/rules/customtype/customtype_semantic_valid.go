@@ -7,6 +7,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/variant"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -16,8 +17,8 @@ var validateCustomTypeSemantic = func(_ string, _ string, _ map[string]any, spec
 	// Generic ref validation for pattern=legacy_* tagged fields
 	results := funcs.ValidateReferences(spec, graph)
 
-	// Config itemTypes custom type ref resolution
-	results = append(results, validateConfigItemTypes(spec, graph)...)
+	// Legacy config itemTypes reference validation remains in-place.
+	results = append(results, validateConfigItemTypesV0(spec, graph)...)
 
 	// Variant discriminator type + ownership checks (shared module)
 	results = append(results, validateCustomTypeVariants(spec, graph)...)
@@ -25,6 +26,14 @@ var validateCustomTypeSemantic = func(_ string, _ string, _ map[string]any, spec
 	// Name uniqueness across the entire resource graph
 	results = append(results, validateCustomTypeNameUniqueness(spec, graph)...)
 
+	return results
+}
+
+var validateCustomTypeSemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	results := funcs.ValidateReferences(spec, graph)
+	results = append(results, validateConfigItemTypesV1(spec, graph)...)
+	results = append(results, validateCustomTypeVariantsV1(spec, graph)...)
+	results = append(results, validateCustomTypeNameUniquenessV1(spec, graph)...)
 	return results
 }
 
@@ -37,23 +46,50 @@ func validateCustomTypeVariants(spec localcatalog.CustomTypeSpec, graph *resourc
 		for j, prop := range ct.Properties {
 			ownRefs[j] = prop.Ref
 		}
-		results = append(results, funcs.ValidateVariantDiscriminators(
+		results = append(results, variant.ValidateVariantDiscriminatorsV0(
 			ct.Variants, ownRefs, fmt.Sprintf("/types/%d", i), graph,
 		)...)
-	}	
+	}
 
 	return results
 }
 
-// validateCustomTypeNameUniqueness checks that each custom type's name is unique
-// across the entire resource graph.
-func validateCustomTypeNameUniqueness(spec localcatalog.CustomTypeSpec, graph *resources.Graph) []rules.ValidationResult {
+func validateCustomTypeVariantsV1(spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, ct := range spec.Types {
+		ownRefs := make([]string, len(ct.Properties))
+		for j, prop := range ct.Properties {
+			ownRefs[j] = prop.Property
+		}
+
+		results = append(results, variant.ValidateVariantDiscriminatorsV1(
+			ct.Variants,
+			ownRefs,
+			fmt.Sprintf("/types/%d", i),
+			graph,
+		)...)
+	}
+
+	return results
+}
+
+// buildCustomTypeNameCountMap builds a map of custom type
+// names to their count in the resource graph.
+func buildCustomTypeNameCountMap(graph *resources.Graph) map[string]int {
 	countMap := make(map[string]int)
 	for _, resource := range graph.ResourcesByType(types.CustomTypeResourceType) {
 		data := resource.Data()
 		name, _ := data["name"].(string)
 		countMap[name]++
 	}
+	return countMap
+}
+
+// validateCustomTypeNameUniqueness checks that each custom type's name is unique
+// across the entire resource graph.
+func validateCustomTypeNameUniqueness(spec localcatalog.CustomTypeSpec, graph *resources.Graph) []rules.ValidationResult {
+	countMap := buildCustomTypeNameCountMap(graph)
 
 	var results []rules.ValidationResult
 	for i, ct := range spec.Types {
@@ -68,47 +104,86 @@ func validateCustomTypeNameUniqueness(spec localcatalog.CustomTypeSpec, graph *r
 	return results
 }
 
-// validateConfigItemTypes checks custom type references in Config["itemTypes"].
-// These may contain URN-format refs (e.g., "#custom-type:Address") that must
-// exist in the resource graph.
-func validateConfigItemTypes(spec localcatalog.CustomTypeSpec, graph *resources.Graph) []rules.ValidationResult {
+func validateCustomTypeNameUniquenessV1(spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	countMap := buildCustomTypeNameCountMap(graph)
+
+	var results []rules.ValidationResult
+	for i, ct := range spec.Types {
+		if countMap[ct.Name] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/types/%d/name", i),
+				Message:   fmt.Sprintf("duplicate name '%s' within kind 'custom-types'", ct.Name),
+			})
+		}
+	}
+
+	return results
+}
+
+// validateConfigItemTypesV0 checks custom type references in Config["itemTypes"].
+func validateConfigItemTypesV0(spec localcatalog.CustomTypeSpec, graph *resources.Graph) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	for i, ct := range spec.Types {
-		if ct.Config == nil {
+		results = append(
+			results,
+			validateConfigItemTypes(ct.Config, "itemTypes", fmt.Sprintf("/types/%d/config/itemTypes", i), graph)...,
+		)
+	}
+
+	return results
+}
+
+// validateConfigItemTypesV1 checks custom type references in Config["item_types"].
+func validateConfigItemTypesV1(spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, ct := range spec.Types {
+		results = append(
+			results,
+			validateConfigItemTypes(ct.Config, "item_types", fmt.Sprintf("/types/%d/config/item_types", i), graph)...,
+		)
+	}
+
+	return results
+}
+
+// validateConfigItemTypes checks custom type references in the provided config key.
+// These may contain URN-format refs (e.g., "#custom-type:Address") that must
+// exist in the resource graph.
+func validateConfigItemTypes(config map[string]any, configKey, refBase string, graph *resources.Graph) []rules.ValidationResult {
+	if config == nil {
+		return nil
+	}
+
+	itemTypes, ok := config[configKey]
+	if !ok {
+		return nil
+	}
+
+	items, ok := itemTypes.([]any)
+	if !ok {
+		return nil
+	}
+
+	var results []rules.ValidationResult
+	for i, item := range items {
+		ref, ok := item.(string)
+		if !ok || !strings.HasPrefix(ref, "#") {
 			continue
 		}
 
-		itemTypes, ok := ct.Config["itemTypes"]
-		if !ok {
+		resourceType, localID, err := funcs.ParseURNRef(ref)
+		if err != nil {
 			continue
 		}
 
-		items, ok := itemTypes.([]any)
-		if !ok {
-			continue
-		}
-
-		for j, item := range items {
-			ref, ok := item.(string)
-			if !ok || !strings.HasPrefix(ref, "#") {
-				continue
-			}
-
-			resourceType, localID, err := funcs.ParseURNRef(ref)
-			if err != nil {
-				// if the value is not a valid URN ref, it should
-				// be reported in the syntactic validation rule.
-				continue
-			}
-
-			urn := resources.URN(localID, resourceType)
-			if _, exists := graph.GetResource(urn); !exists {
-				results = append(results, rules.ValidationResult{
-					Reference: fmt.Sprintf("/types/%d/config/itemTypes/%d", i, j),
-					Message:   fmt.Sprintf("referenced %s '%s' not found in resource graph", resourceType, localID),
-				})
-			}
+		urn := resources.URN(localID, resourceType)
+		if _, exists := graph.GetResource(urn); !exists {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d", refBase, i),
+				Message:   fmt.Sprintf("referenced %s '%s' not found in resource graph", resourceType, localID),
+			})
 		}
 	}
 
@@ -124,6 +199,10 @@ func NewCustomTypeSemanticValidRule() rules.Rule {
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeSemantic,
+		),
+		prules.NewSemanticPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindCustomTypes),
+			validateCustomTypeSemanticV1,
 		),
 	)
 }
