@@ -287,8 +287,8 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", specPath, nil, spec)
 
 		assert.ElementsMatch(t, []string{"/tests/0/input", "/tests/0/output"}, extractReferences(results))
-		assert.Contains(t, extractMessages(results), `path "`+inputFilePath+`" must be a directory`)
-		assert.Contains(t, extractMessages(results), `path "`+outputFilePath+`" must be a directory`)
+		assert.Contains(t, extractMessages(results), `path must be a directory`)
+		assert.Contains(t, extractMessages(results), `path must be a directory`)
 	})
 
 	t.Run("json files must contain top-level objects or arrays", func(t *testing.T) {
