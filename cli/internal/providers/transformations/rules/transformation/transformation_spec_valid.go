@@ -47,6 +47,24 @@ func validateTransformationSpec(
 		} else {
 			results = append(results, validateSpecFile(resolvedPath)...)
 		}
+
+		// Validate file extension matches language
+		ext := filepath.Ext(spec.File)
+		var expectedExt string
+
+		switch spec.Language {
+		case "javascript":
+			expectedExt = ".js"
+		case "python":
+			expectedExt = ".py"
+		}
+
+		if ext != expectedExt {
+			results = append(results, rules.ValidationResult{
+				Reference: "/file",
+				Message:   fmt.Sprintf("file extension must be '%s' for language '%s', got '%s'", expectedExt, spec.Language, ext),
+			})
+		}
 	}
 
 	for idx, test := range spec.Tests {
