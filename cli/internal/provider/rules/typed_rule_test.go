@@ -378,6 +378,79 @@ func TestSemanticVariant_MarshalError(t *testing.T) {
 	assert.Contains(t, results[0].Message, "failed to marshal spec")
 }
 
+func TestPathAwareVariant_PassesFilePathToFunc(t *testing.T) {
+	t.Parallel()
+
+	var (
+		receivedFilePath string
+		receivedSpec     testSpec
+	)
+
+	rule := NewTypedRule(
+		"path-aware-rule",
+		rules.Error,
+		"test",
+		rules.Examples{},
+		NewPathAwarePatternValidator(
+			[]rules.MatchPattern{rules.MatchAll()},
+			func(_ string, _ string, filePath string, _ map[string]any, spec testSpec) []rules.ValidationResult {
+				receivedFilePath = filePath
+				receivedSpec = spec
+				return nil
+			},
+		),
+	)
+
+	ctx := &rules.ValidationContext{
+		FilePath: "/tmp/specs/test.yaml",
+		Spec:     map[string]any{"field1": "hello", "field2": 42},
+		Kind:     "test",
+		Version:  "v1",
+		Metadata: map[string]any{},
+	}
+
+	results := rule.Validate(ctx)
+
+	assert.Empty(t, results)
+	assert.Equal(t, "/tmp/specs/test.yaml", receivedFilePath)
+	assert.Equal(t, "hello", receivedSpec.Field1)
+	assert.Equal(t, 42, receivedSpec.Field2)
+}
+
+func TestPathAwareVariant_ReferencePrefixing(t *testing.T) {
+	t.Parallel()
+
+	rule := NewTypedRule(
+		"path-aware-rule",
+		rules.Error,
+		"test",
+		rules.Examples{},
+		NewPathAwarePatternValidator(
+			[]rules.MatchPattern{rules.MatchAll()},
+			func(_ string, _ string, _ string, _ map[string]any, _ testSpec) []rules.ValidationResult {
+				return []rules.ValidationResult{
+					{Reference: "/field1", Message: "error1"},
+					{Reference: "/nested/field", Message: "error2"},
+				}
+			},
+		),
+	)
+
+	ctx := &rules.ValidationContext{
+		FilePath: "/tmp/specs/test.yaml",
+		Spec:     map[string]any{"field1": "hello", "field2": 42},
+		Kind:     "test",
+		Version:  "v1",
+		Metadata: map[string]any{},
+	}
+
+	results := rule.Validate(ctx)
+
+	assert.Len(t, results, 2)
+	assert.Equal(t, "/spec/field1", results[0].Reference)
+	assert.Equal(t, "/spec/nested/field", results[1].Reference)
+}
+
 func TestMultiVariant_DispatchesToMatchingVariant(t *testing.T) {
 	t.Parallel()
 
