@@ -149,14 +149,14 @@ func validateTestDirectory(testIdx int, fieldName, resolvedPath string) []rules.
 	if err != nil {
 		return []rules.ValidationResult{{
 			Reference: fmt.Sprintf("/tests/%d/%s", testIdx, fieldName),
-			Message:   fmt.Sprintf("path %q does not exist or is not accessible", resolvedPath),
+			Message:   "path does not exist or is not accessible",
 		}}
 	}
 
 	if !info.IsDir() {
 		return []rules.ValidationResult{{
 			Reference: fmt.Sprintf("/tests/%d/%s", testIdx, fieldName),
-			Message:   fmt.Sprintf("path %q must be a directory", resolvedPath),
+			Message:   "path must be a directory",
 		}}
 	}
 

@@ -180,7 +180,9 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 
 		handleNames, err := codeParser.ExtractImports(tf.Code)
 		if err != nil {
-			return nil, fmt.Errorf("parsing imports for %s: %w", r.URN(), err)
+			log.Warn("failed to parse imports for transformation",
+				"transformation", r.URN(),
+				"error", err)
 		}
 
 		// Resolve handleNames to library URNs and add dependencies
