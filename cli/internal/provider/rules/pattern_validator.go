@@ -43,6 +43,27 @@ func NewPatternValidator[T any](
 	}
 }
 
+// NewPathAwarePatternValidator creates a syntactic validation handler that also
+// receives the absolute spec file path from ValidationContext.
+func NewPathAwarePatternValidator[T any](
+	patterns []rules.MatchPattern,
+	fn func(Kind string, Version string, FilePath string, Metadata map[string]any, Spec T) []rules.ValidationResult,
+) PatternValidator {
+	return PatternValidator{
+		patterns: patterns,
+		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
+			spec, err := unmarshalSpec[T](ctx.Spec)
+			if err != nil {
+				return err
+			}
+
+			results := fn(ctx.Kind, ctx.Version, ctx.FilePath, ctx.Metadata, spec)
+			prefixReferences(results)
+			return results
+		},
+	}
+}
+
 // NewSemanticPatternValidator creates a semantic validation handler (with graph access).
 // The generic type T determines the spec struct the raw map[string]any is
 // unmarshaled into before being passed to fn along with the resource graph.
