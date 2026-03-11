@@ -258,7 +258,7 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 
 		assert.ElementsMatch(t, []string{"/file", "/file"}, extractReferences(results))
 		assert.Contains(t, extractMessages(results), "path must be a file")
-		assert.Contains(t, extractMessages(results), "file extension must be '.js' for language 'javascript', got ''")
+		assert.Contains(t, extractMessages(results), "file extension must be '.js'")
 	})
 
 	t.Run("input and output must be directories", func(t *testing.T) {
@@ -353,28 +353,28 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 				language:          "javascript",
 				fileName:          "transform.py",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.js' for language 'javascript', got '.py'",
+				expectedMessage:   "file extension must be '.js'",
 			},
 			{
 				name:              "python with javascript extension",
 				language:          "python",
 				fileName:          "transform.js",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.py' for language 'python', got '.js'",
+				expectedMessage:   "file extension must be '.py'",
 			},
 			{
 				name:              "javascript with wrong extension",
 				language:          "javascript",
 				fileName:          "transform.txt",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.js' for language 'javascript', got '.txt'",
+				expectedMessage:   "file extension must be '.js'",
 			},
 			{
 				name:              "python with no extension",
 				language:          "python",
 				fileName:          "transform",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.py' for language 'python', got ''",
+				expectedMessage:   "file extension must be '.py'",
 			},
 		}
 

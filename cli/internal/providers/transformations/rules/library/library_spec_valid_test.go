@@ -232,14 +232,14 @@ func TestValidateLibrarySpec_InvalidSpecs(t *testing.T) {
 				libraryName:       "My Library",
 				importName:        "MyLibrary",
 				expectedReference: "/import_name",
-				expectedMessage:   "'import_name' must be camelCase of 'name': expected 'myLibrary', got 'MyLibrary'",
+				expectedMessage:   "'import_name' must be camelCase of 'name'",
 			},
 			{
 				name:              "completely different",
 				libraryName:       "Math Utils",
 				importName:        "helper",
 				expectedReference: "/import_name",
-				expectedMessage:   "'import_name' must be camelCase of 'name': expected 'mathUtils', got 'helper'",
+				expectedMessage:   "'import_name' must be camelCase of 'name'",
 			},
 		}
 
@@ -355,7 +355,7 @@ func TestValidateLibrarySpec_InvalidSpecs(t *testing.T) {
 
 			assert.ElementsMatch(t, []string{"/file", "/file"}, extractReferences(results))
 			assert.Contains(t, extractMessages(results), "path must be a file")
-			assert.Contains(t, extractMessages(results), "file extension must be '.js' for language 'javascript', got ''")
+			assert.Contains(t, extractMessages(results), "file extension must be '.js'")
 		})
 	})
 
@@ -374,28 +374,28 @@ func TestValidateLibrarySpec_InvalidSpecs(t *testing.T) {
 				language:          "javascript",
 				fileName:          "lib.py",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.js' for language 'javascript', got '.py'",
+				expectedMessage:   "file extension must be '.js'",
 			},
 			{
 				name:              "python with javascript extension",
 				language:          "python",
 				fileName:          "lib.js",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.py' for language 'python', got '.js'",
+				expectedMessage:   "file extension must be '.py'",
 			},
 			{
 				name:              "javascript with wrong extension",
 				language:          "javascript",
 				fileName:          "lib.txt",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.js' for language 'javascript', got '.txt'",
+				expectedMessage:   "file extension must be '.js'",
 			},
 			{
 				name:              "python with no extension",
 				language:          "python",
 				fileName:          "lib",
 				expectedReference: "/file",
-				expectedMessage:   "file extension must be '.py' for language 'python', got ''",
+				expectedMessage:   "file extension must be '.py'",
 			},
 		}
 

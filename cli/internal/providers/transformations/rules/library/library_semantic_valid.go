@@ -39,7 +39,7 @@ func validateLibrarySemanticValid(
 
 	importNameCounts := make(map[string]int)
 	for _, lib := range graph.ResourcesByType(libraryhandler.HandlerMetadata.ResourceType) {
-		libData, _ := lib.RawData().(*model.LibraryResource)
+		libData := lib.RawData().(*model.LibraryResource)
 		importNameCounts[libData.ImportName]++
 	}
 

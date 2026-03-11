@@ -2,18 +2,17 @@ package transformation
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	transformationhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
+	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -38,31 +37,24 @@ func validateTransformationSpec(
 	)
 
 	if spec.File != "" {
-		resolvedPath, err := resolveSpecRelativePath(filePath, spec.File)
+		resolvedPath, err := trules.ResolveSpecRelativePath(filePath, spec.File)
 		if err != nil {
 			results = append(results, rules.ValidationResult{
 				Reference: "/file",
 				Message:   err.Error(),
 			})
 		} else {
-			results = append(results, validateSpecFile(resolvedPath)...)
+			results = append(results, trules.ValidateSpecFile(resolvedPath)...)
 		}
 
 		// Validate file extension matches language
 		ext := filepath.Ext(spec.File)
-		var expectedExt string
-
-		switch spec.Language {
-		case "javascript":
-			expectedExt = ".js"
-		case "python":
-			expectedExt = ".py"
-		}
+		expectedExt := trules.GetExpectedExtension(spec.Language)
 
 		if ext != expectedExt {
 			results = append(results, rules.ValidationResult{
 				Reference: "/file",
-				Message:   fmt.Sprintf("file extension must be '%s' for language '%s', got '%s'", expectedExt, spec.Language, ext),
+				Message:   fmt.Sprintf("file extension must be '%s'", expectedExt),
 			})
 		}
 	}
@@ -94,7 +86,7 @@ func validateTransformationSpec(
 				continue
 			}
 
-			resolvedPath, err := resolveSpecRelativePath(filePath, field.path)
+			resolvedPath, err := trules.ResolveSpecRelativePath(filePath, field.path)
 			if err != nil {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/tests/%d/%s", idx, field.name),
@@ -124,44 +116,6 @@ func validateTransformationSpec(
 	return results
 }
 
-func resolveSpecRelativePath(specFilePath, targetPath string) (string, error) {
-	if filepath.IsAbs(targetPath) {
-		return "", errors.New("path must be relative to the spec file directory")
-	}
-
-	if slices.Contains(splitPathSegments(targetPath), "..") {
-		return "", errors.New("path must not contain '..' segments")
-	}
-
-	return filepath.Join(filepath.Dir(specFilePath), targetPath), nil
-}
-
-func splitPathSegments(path string) []string {
-	return strings.FieldsFunc(path, func(r rune) bool {
-		return r == '/' || r == '\\'
-	})
-}
-
-func validateSpecFile(resolvedPath string) []rules.ValidationResult {
-	info, err := os.Stat(resolvedPath)
-	if err != nil {
-		return []rules.ValidationResult{{
-			Reference: "/file",
-			Message:   "path does not exist or is not accessible",
-		}}
-	}
-
-	if info.IsDir() {
-		return []rules.ValidationResult{{
-			Reference: "/file",
-			Message:   "path must be a file",
-		}}
-	}
-
-	return nil
-}
-
-// validateTestDirectory verifies the resolved path is a directory
 func validateTestDirectory(testIdx int, fieldName, resolvedPath string) []rules.ValidationResult {
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
