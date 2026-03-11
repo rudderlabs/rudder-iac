@@ -748,17 +748,12 @@ func TestTrackingPlanSemanticValid_V1ReferenceResolution(t *testing.T) {
 							},
 						},
 					},
-					Variants: localcatalog.VariantsV1{
-						{
-							Type: "wrong_type",
-						},
-					},
 				},
 			},
 		}
 
 		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
-		assert.Empty(t, results, "V1 semantic validation should ignore variants and pass when refs resolve")
+		assert.Empty(t, results, "all refs resolve — no errors expected")
 	})
 
 	t.Run("missing refs are reported from tagged fields", func(t *testing.T) {
@@ -911,4 +906,210 @@ func TestTrackingPlanSemanticValid_V1Uniqueness(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, "/display_name", results[0].Reference)
 	assert.Contains(t, results[0].Message, "duplicate display_name 'Onboarding Plan' within kind 'tracking-plan'")
+}
+
+func TestTrackingPlanSemanticValid_V1VariantDiscriminator(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid discriminator type — string", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("signup_method", "Signup Method", "string"))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "rule1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:signup_method"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:signup_method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Email",
+									Match:       []any{"email"},
+									Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:email"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "string discriminator in own properties — no errors")
+	})
+
+	t.Run("invalid discriminator type — object", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("address", "Address", "object"))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "rule1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:address"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:address",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Home",
+									Match:       []any{"home"},
+									Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:email"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/discriminator", results[0].Reference)
+		assert.Contains(t, results[0].Message, "discriminator property type 'object' must contain one of: string, integer, boolean")
+	})
+
+	t.Run("discriminator not in rule's own properties — error", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("external_prop", "External Prop", "string"))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "rule1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:external_prop",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case1",
+									Match:       []any{"x"},
+									Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:email"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/discriminator", results[0].Reference)
+		assert.Contains(t, results[0].Message, "must reference a property defined in the parent's own properties")
+	})
+
+	t.Run("rule without variants — no variant errors", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "rule1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "no variants means no variant errors")
+	})
+
+	t.Run("custom type ref discriminator — allowed when underlying type is valid", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(resources.NewResource("payment_method", "property", resources.ResourceData{
+			"name": "Payment Method",
+			"type": resources.PropertyRef{URN: "custom-type:PaymentType", Property: "name"},
+		}, nil))
+		graph.AddResource(resources.NewResource("PaymentType", "custom-type", resources.ResourceData{
+			"name": "PaymentType",
+			"type": "string",
+		}, nil))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "rule1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:payment_method"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:payment_method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Credit",
+									Match:       []any{"credit"},
+									Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:email"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "custom type ref with valid underlying string type — no errors")
+	})
 }

@@ -5,15 +5,34 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/variant"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
 	results := funcs.ValidateReferences(spec, graph)
+	results = append(results, validateTrackingPlanVariantsV1(spec, graph)...)
 	results = append(results, validatePropertyNestingV1(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV1(spec, graph)...)
 
+	return results
+}
+
+func validateTrackingPlanVariantsV1(spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+	for i, rule := range spec.Rules {
+		if len(rule.Variants) == 0 {
+			continue
+		}
+		ownRefs := make([]string, 0, len(rule.Properties))
+		for _, prop := range rule.Properties {
+			ownRefs = append(ownRefs, prop.Property)
+		}
+		results = append(results, variant.ValidateVariantDiscriminatorsV1(
+			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
+		)...)
+	}
 	return results
 }
 

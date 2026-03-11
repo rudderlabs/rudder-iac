@@ -943,7 +943,17 @@ func TestTrackingPlanSpecSyntaxValidRule_V1ValidSpec(t *testing.T) {
 				},
 				Variants: localcatalog.VariantsV1{
 					{
-						Type: "wrong_type",
+						Type:          "discriminator",
+						Discriminator: "#property:signup_method",
+						Cases: []localcatalog.VariantCaseV1{
+							{
+								DisplayName: "Email",
+								Match:       []any{"email"},
+								Properties: []localcatalog.PropertyReferenceV1{
+									{Property: "#property:email"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -951,7 +961,139 @@ func TestTrackingPlanSpecSyntaxValidRule_V1ValidSpec(t *testing.T) {
 	}
 
 	results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
-	assert.Empty(t, results, "V1 syntax validation should ignore variant validation")
+	assert.Empty(t, results, "valid V1 spec with valid variant should produce no errors")
+}
+
+func TestTrackingPlanSpecSyntaxValidRule_V1Variants(t *testing.T) {
+	t.Parallel()
+
+	validVariant := func() localcatalog.VariantV1 {
+		return localcatalog.VariantV1{
+			Type:          "discriminator",
+			Discriminator: "#property:signup_method",
+			Cases: []localcatalog.VariantCaseV1{
+				{
+					DisplayName: "Email",
+					Match:       []any{"email"},
+					Properties: []localcatalog.PropertyReferenceV1{
+						{Property: "#property:email"},
+					},
+				},
+			},
+		}
+	}
+
+	baseRule := func(variants localcatalog.VariantsV1) *localcatalog.TPRuleV1 {
+		return &localcatalog.TPRuleV1{
+			Type:    "event_rule",
+			LocalID: "rule1",
+			Event:   "#event:signup",
+			Properties: []*localcatalog.TPRulePropertyV1{
+				{Property: "#property:signup_method"},
+			},
+			Variants: variants,
+		}
+	}
+
+	t.Run("valid variant — no errors", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{validVariant()})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("type not discriminator — error", func(t *testing.T) {
+		t.Parallel()
+
+		v := validVariant()
+		v.Type = "wrong_type"
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{v})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/type", extractRefs(results)[0])
+		assert.Contains(t, extractMsgs(results)[0], "'type' must equal 'discriminator'")
+	})
+
+	t.Run("empty discriminator — error", func(t *testing.T) {
+		t.Parallel()
+
+		v := validVariant()
+		v.Discriminator = ""
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{v})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/discriminator", extractRefs(results)[0])
+		assert.Contains(t, extractMsgs(results)[0], "'discriminator' is required")
+	})
+
+	t.Run("empty cases — error", func(t *testing.T) {
+		t.Parallel()
+
+		v := validVariant()
+		v.Cases = []localcatalog.VariantCaseV1{}
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{v})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/cases", extractRefs(results)[0])
+		assert.Contains(t, extractMsgs(results)[0], "'cases' length must be greater than or equal to 1")
+	})
+
+	t.Run("invalid match item type (float) — error", func(t *testing.T) {
+		t.Parallel()
+
+		v := validVariant()
+		v.Cases[0].Match = []any{3.14}
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{v})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants/0/cases/0/match", extractRefs(results)[0])
+		assert.Contains(t, extractMsgs(results)[0], "'match' values must be one of [string bool integer]")
+	})
+
+	t.Run("more than one variant (max=1) — error", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test TP V1",
+			Rules:   []*localcatalog.TPRuleV1{baseRule(localcatalog.VariantsV1{validVariant(), validVariant()})},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec)
+		assert.Len(t, results, 1)
+		assert.Equal(t, "/rules/0/variants", extractRefs(results)[0])
+		assert.Contains(t, extractMsgs(results)[0], "'variants' length must be less than or equal to 1")
+	})
 }
 
 func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {

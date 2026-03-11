@@ -337,7 +337,7 @@ type TPRuleV1 struct {
 	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
 	Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
-	Variants             VariantsV1          `json:"variants,omitempty"`
+	Variants             VariantsV1          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
 // TPRulePropertyV1 represents the V1 spec format for tracking plan rule properties
