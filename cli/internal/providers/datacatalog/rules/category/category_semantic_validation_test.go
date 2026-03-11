@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +21,25 @@ func categoryResource(id, name string) *resources.Resource {
 		"name": name,
 	}
 	return resources.NewResource(id, "category", data, nil)
+}
+
+func TestNewCategorySemanticValidRule_Metadata(t *testing.T) {
+	t.Parallel()
+
+	rule := NewCategorySemanticValidRule()
+
+	assert.Equal(t, "datacatalog/categories/semantic-valid", rule.ID())
+	assert.Equal(t, vrules.Error, rule.Severity())
+	assert.Equal(t, "category names must be unique across the catalog", rule.Description())
+
+	expectedPatterns := append(
+		prules.LegacyVersionPatterns(localcatalog.KindCategories),
+		vrules.MatchKindVersion(localcatalog.KindCategories, specs.SpecVersionV1),
+	)
+	assert.Equal(t, expectedPatterns, rule.AppliesTo())
+
+	examples := rule.Examples()
+	assert.NotNil(t, examples, "Rule should expose examples")
 }
 
 func TestCategorySemanticValid_Uniqueness(t *testing.T) {
@@ -118,6 +139,110 @@ func TestCategorySemanticValid_Uniqueness(t *testing.T) {
 		}
 
 		results := validateCategorySemantic(localcatalog.KindCategories, specs.SpecVersionV0_1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/categories/0/name", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate name")
+	})
+}
+
+func TestCategorySemanticV1Valid_Uniqueness(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no duplicate — unique V1 categories", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(categoryResource("user_actions", "User Actions"))
+		graph.AddResource(categoryResource("system_events", "System Events"))
+
+		spec := localcatalog.CategorySpecV1{
+			Categories: []localcatalog.CategoryV1{
+				{LocalID: "user_actions", Name: "User Actions"},
+			},
+		}
+
+		results := validateCategorySemanticV1(localcatalog.KindCategories, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "unique category names should not trigger errors")
+	})
+
+	t.Run("duplicate V1 category detected", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(categoryResource("user_actions_v1", "User Actions"))
+		graph.AddResource(categoryResource("user_actions_v2", "User Actions"))
+
+		spec := localcatalog.CategorySpecV1{
+			Categories: []localcatalog.CategoryV1{
+				{LocalID: "user_actions_v1", Name: "User Actions"},
+			},
+		}
+
+		results := validateCategorySemanticV1(localcatalog.KindCategories, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/categories/0/name", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate name")
+	})
+
+	t.Run("single V1 category in graph — no false positive", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(categoryResource("user_actions", "User Actions"))
+
+		spec := localcatalog.CategorySpecV1{
+			Categories: []localcatalog.CategoryV1{
+				{LocalID: "user_actions", Name: "User Actions"},
+			},
+		}
+
+		results := validateCategorySemanticV1(localcatalog.KindCategories, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "single category should not be flagged")
+	})
+
+	t.Run("multiple V1 duplicates reported independently", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(categoryResource("ua_v1", "User Actions"))
+		graph.AddResource(categoryResource("ua_v2", "User Actions"))
+		graph.AddResource(categoryResource("se_v1", "System Events"))
+		graph.AddResource(categoryResource("se_v2", "System Events"))
+
+		spec := localcatalog.CategorySpecV1{
+			Categories: []localcatalog.CategoryV1{
+				{LocalID: "ua_v1", Name: "User Actions"},
+				{LocalID: "se_v1", Name: "System Events"},
+			},
+		}
+
+		results := validateCategorySemanticV1(localcatalog.KindCategories, specs.SpecVersionV1, nil, spec, graph)
+
+		require.Len(t, results, 2)
+		assert.Equal(t, "/categories/0/name", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate name")
+		assert.Equal(t, "/categories/1/name", results[1].Reference)
+		assert.Contains(t, results[1].Message, "duplicate name")
+	})
+
+	t.Run("mixed unique and duplicate V1 — only duplicate flagged", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(categoryResource("ua_v1", "User Actions"))
+		graph.AddResource(categoryResource("ua_v2", "User Actions"))
+		graph.AddResource(categoryResource("analytics", "Analytics"))
+
+		spec := localcatalog.CategorySpecV1{
+			Categories: []localcatalog.CategoryV1{
+				{LocalID: "ua_v1", Name: "User Actions"},
+				{LocalID: "analytics", Name: "Analytics"},
+			},
+		}
+
+		results := validateCategorySemanticV1(localcatalog.KindCategories, specs.SpecVersionV1, nil, spec, graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/categories/0/name", results[0].Reference)

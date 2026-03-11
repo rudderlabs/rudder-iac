@@ -11,6 +11,31 @@ import (
 // by a participle grammar parser (phase 2) that produces typed ImportStatement AST nodes.
 type PythonParser struct{}
 
+// pythonBuiltinModules contains Python stdlib and builtin modules that should be filtered
+// from import extraction since they are available in the RudderStack transformation runtime.
+var pythonBuiltinModules = map[string]struct{}{
+	"ast":         {},
+	"base64":      {},
+	"collections": {},
+	"datetime":    {},
+	"dateutil":    {},
+	"hashlib":     {},
+	"hmac":        {},
+	"json":        {},
+	"math":        {},
+	"random":      {},
+	"re":          {},
+	"requests":    {},
+	"string":      {},
+	"time":        {},
+	"uuid":        {},
+	"urllib":      {},
+	"utils":       {},
+	"copy":        {},
+	"_strptime":   {},
+	"typing":      {},
+}
+
 // ValidateSyntax is a no-op in this phase; full Python syntax validation
 // requires embedding a Python interpreter or an equivalent AST library.
 func (p *PythonParser) ValidateSyntax(code string) error {
@@ -18,10 +43,10 @@ func (p *PythonParser) ValidateSyntax(code string) error {
 }
 
 // ExtractImports parses Python source and returns the deduplicated, sorted list of
-// top-level module names referenced by import statements.
+// top-level module names referenced by import statements, excluding Python builtin modules.
 //
 // Relative imports are rejected with an error because transformations must use
-// absolute imports. Builtin/stdlib filtering is delegated to the provider layer.
+// absolute imports. Builtin/stdlib modules are filtered automatically.
 func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 	candidates := scanImportCandidates(code)
 
@@ -40,7 +65,10 @@ func (p *PythonParser) ExtractImports(code string) ([]string, error) {
 			return nil, err
 		}
 		for _, m := range modules {
-			moduleSet[m] = struct{}{}
+			// Filter out builtin modules
+			if _, isBuiltin := pythonBuiltinModules[m]; !isBuiltin {
+				moduleSet[m] = struct{}{}
+			}
 		}
 	}
 

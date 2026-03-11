@@ -79,7 +79,7 @@ type SourceGovernanceSpec struct {
 }
 
 type TrackingPlanSpec struct {
-	Ref    string                  `json:"tracking_plan" mapstructure:"tracking_plan" validate:"required,pattern=legacy_tracking_plan_ref"`
+	Ref    string                  `json:"tracking_plan" mapstructure:"tracking_plan" validate:"required"`
 	Config *TrackingPlanConfigSpec `json:"config"        mapstructure:"config"        validate:"required"`
 }
 

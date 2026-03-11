@@ -68,15 +68,15 @@ func ExtractProperties(s *specs.Spec) ([]PropertyV1, error) {
 }
 
 type EventV1 struct {
-	LocalID     string  `json:"id" mapstructure:"id"`
+	LocalID     string  `json:"id" mapstructure:"id" validate:"required"`
 	Name        string  `json:"name,omitempty" mapstructure:"name,omitempty"`
-	Type        string  `json:"event_type" mapstructure:"event_type"`
-	Description string  `json:"description,omitempty" mapstructure:"description,omitempty"`
-	CategoryRef *string `json:"category,omitempty" mapstructure:"category,omitempty"`
+	Type        string  `json:"event_type" mapstructure:"event_type" validate:"required,oneof=track screen identify group page"`
+	Description string  `json:"description,omitempty" mapstructure:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	CategoryRef *string `json:"category,omitempty" mapstructure:"category,omitempty" validate:"omitempty,pattern=category_ref"`
 }
 
 type EventSpecV1 struct {
-	Events []EventV1 `json:"events"`
+	Events []EventV1 `json:"events" validate:"dive"`
 }
 
 // ExtractEvents simply parses the whole file defined as resource definition
@@ -98,8 +98,8 @@ func ExtractEvents(s *specs.Spec) ([]EventV1, error) {
 
 // CategoryV1 represents a user-defined category
 type CategoryV1 struct {
-	LocalID string `mapstructure:"id" json:"id"`
-	Name    string `mapstructure:"name" json:"name"`
+	LocalID string `mapstructure:"id" json:"id" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required,pattern=display_name"`
 }
 
 // Category represents a user-defined category (V0 spec)
@@ -114,7 +114,7 @@ type CategorySpec struct {
 
 // CategorySpecV1 represents the spec section of a categories resource
 type CategorySpecV1 struct {
-	Categories []CategoryV1 `json:"categories"`
+	Categories []CategoryV1 `json:"categories" validate:"dive"`
 }
 
 // ExtractCategories parses a resource definition and extracts categories

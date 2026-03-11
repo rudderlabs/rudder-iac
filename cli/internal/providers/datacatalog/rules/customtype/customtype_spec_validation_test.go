@@ -3,16 +3,15 @@ package customtype
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	validationRules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
 
 // extractRefs extracts Reference fields from ValidationResults
-func extractRefs(results []rules.ValidationResult) []string {
+func extractRefs(results []validationRules.ValidationResult) []string {
 	refs := make([]string, len(results))
 	for i, result := range results {
 		refs[i] = result.Reference
@@ -21,7 +20,7 @@ func extractRefs(results []rules.ValidationResult) []string {
 }
 
 // extractMsgs extracts Message fields from ValidationResults
-func extractMsgs(results []rules.ValidationResult) []string {
+func extractMsgs(results []validationRules.ValidationResult) []string {
 	msgs := make([]string, len(results))
 	for i, result := range results {
 		msgs[i] = result.Message
@@ -35,9 +34,13 @@ func TestNewCustomTypeSpecSyntaxValidRule_Metadata(t *testing.T) {
 	rule := NewCustomTypeSpecSyntaxValidRule()
 
 	assert.Equal(t, "datacatalog/custom-types/spec-syntax-valid", rule.ID())
-	assert.Equal(t, rules.Error, rule.Severity())
+	assert.Equal(t, validationRules.Error, rule.Severity())
 	assert.Equal(t, "custom type spec syntax must be valid", rule.Description())
-	assert.Equal(t, prules.LegacyVersionPatterns("custom-types"), rule.AppliesTo())
+	assert.Equal(t, []validationRules.MatchPattern{
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1),
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1Variant),
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV1),
+	}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
@@ -202,7 +205,7 @@ func TestCustomTypeSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/type"},
-			expectedMsgs:   []string{"'type' is not valid: must be one of the following: string, number, integer, boolean, array, object, null"},
+			expectedMsgs:   []string{"'type' is not valid: must be one of the following: string, number, integer, boolean, null, array, object"},
 		},
 		{
 			name: "custom type with property missing $ref",

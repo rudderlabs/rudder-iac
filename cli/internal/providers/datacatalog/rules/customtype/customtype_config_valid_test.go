@@ -3,10 +3,9 @@ package customtype
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	validationRules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,9 +15,12 @@ func TestCustomTypeConfigValidRule_Metadata(t *testing.T) {
 	rule := NewCustomTypeConfigValidRule()
 
 	assert.Equal(t, "datacatalog/custom-types/config-valid", rule.ID())
-	assert.Equal(t, rules.Error, rule.Severity())
+	assert.Equal(t, validationRules.Error, rule.Severity())
 	assert.Equal(t, "custom type config must be valid for the given type", rule.Description())
-	assert.Equal(t, prules.LegacyVersionPatterns("custom-types"), rule.AppliesTo())
+	assert.Equal(t, []validationRules.MatchPattern{
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1),
+		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1Variant),
+	}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid, "Rule should have valid examples")
@@ -49,7 +51,41 @@ func TestCustomTypeConfigValidRule_ObjectType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "object type with config is invalid",
+			name: "object type with additionalProperties in config is valid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "address",
+						Name:    "Address",
+						Type:    "object",
+						Config: map[string]any{
+							"additionalProperties": true,
+						},
+					},
+				},
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "object type with additionalProperties non-boolean is invalid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "address",
+						Name:    "Address",
+						Type:    "object",
+						Config: map[string]any{
+							"additionalProperties": "true",
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/additionalProperties"},
+			expectedMsgs:   []string{"'additionalProperties' must be a boolean"},
+		},
+		{
+			name: "object type with unsupported field in config is invalid",
 			spec: localcatalog.CustomTypeSpec{
 				Types: []localcatalog.CustomType{
 					{
@@ -63,8 +99,27 @@ func TestCustomTypeConfigValidRule_ObjectType(t *testing.T) {
 				},
 			},
 			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config"},
-			expectedMsgs:   []string{"config is not allowed for the specified type(s)"},
+			expectedRefs:   []string{"/types/0/config/properties"},
+			expectedMsgs:   []string{"'properties' is not applicable for type(s)"},
+		},
+		{
+			name: "object type with additionalProperties and unsupported field in config is invalid",
+			spec: localcatalog.CustomTypeSpec{
+				Types: []localcatalog.CustomType{
+					{
+						LocalID: "address",
+						Name:    "Address",
+						Type:    "object",
+						Config: map[string]any{
+							"additionalProperties": false,
+							"minLength":            5,
+						},
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/types/0/config/minLength"},
+			expectedMsgs:   []string{"'minLength' is not applicable for type(s)"},
 		},
 	}
 
@@ -1012,6 +1067,7 @@ func TestCustomTypeConfigValidRule_MultipleTypes(t *testing.T) {
 						Name:    "Address",
 						Type:    "object",
 						Config: map[string]any{
+							// 'invalid' is not in allowedCustomTypeObjectKeys — field-level error
 							"invalid": "config",
 						},
 					},
@@ -1026,7 +1082,7 @@ func TestCustomTypeConfigValidRule_MultipleTypes(t *testing.T) {
 				},
 			},
 			expectedErrors: 2,
-			expectedRefs:   []string{"/types/1/config", "/types/2/config/minimum"},
+			expectedRefs:   []string{"/types/1/config/invalid", "/types/2/config/minimum"},
 		},
 	}
 

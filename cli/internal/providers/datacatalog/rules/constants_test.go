@@ -54,18 +54,19 @@ func TestCustomTypeReferences(t *testing.T) {
 			reference string
 			wantMatch bool
 		}{
-			// Valid cases
-			{name: "basic reference", reference: "#custom-types:user-id", wantMatch: true},
-			{name: "with underscores", reference: "#custom-types:MY_ID_123", wantMatch: true},
-			{name: "single char", reference: "#custom-types:a", wantMatch: true},
+			// Valid cases (#custom-type:<id> — TypeCustomType, not Kind)
+			{name: "basic reference", reference: "#custom-type:user-id", wantMatch: true},
+			{name: "with underscores", reference: "#custom-type:MY_ID_123", wantMatch: true},
+			{name: "single char", reference: "#custom-type:a", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#custom-types:", wantMatch: false},
-			{name: "space in id", reference: "#custom-types:id with space", wantMatch: false},
-			{name: "wrong prefix with slash", reference: "#/custom-types:id", wantMatch: false},
-			{name: "missing hash", reference: "custom-types:id", wantMatch: false},
-			{name: "invalid char", reference: "#custom-types:id@123", wantMatch: false},
+			{name: "missing id", reference: "#custom-type:", wantMatch: false},
+			{name: "space in id", reference: "#custom-type:id with space", wantMatch: false},
+			{name: "wrong prefix with slash", reference: "#/custom-type:id", wantMatch: false},
+			{name: "missing hash", reference: "custom-type:id", wantMatch: false},
+			{name: "invalid char", reference: "#custom-type:id@123", wantMatch: false},
 			{name: "empty", reference: "", wantMatch: false},
+			{name: "wrong kind plural", reference: "#custom-types:id", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -74,6 +75,22 @@ func TestCustomTypeReferences(t *testing.T) {
 				assert.Equal(t, tt.wantMatch, got, "reference: %s", tt.reference)
 			})
 		}
+	})
+
+	// Submatch contract: referenceRegexPattern has two capturing groups (resource-type, id).
+	// FindStringSubmatch returns [full, group1, group2]; checkRef in property_semantic_valid.go
+	// expects len(matches)==3 and uses matches[2] as the custom type id for URN lookup.
+	t.Run("new format submatch count and id in matches[2]", func(t *testing.T) {
+		t.Parallel()
+
+		regex := regexp.MustCompile(CustomTypeReferenceRegex)
+		ref := "#custom-type:Address"
+		matches := regex.FindStringSubmatch(ref)
+
+		assert.Len(t, matches, 3, "regex has 2 capturing groups so expect full match + 2 groups = 3; property_semantic_valid.checkRef relies on this")
+		assert.Equal(t, "#custom-type:Address", matches[0])
+		assert.Equal(t, "custom-type", matches[1], "first group is resource type")
+		assert.Equal(t, "Address", matches[2], "second group is the custom type id used for URN lookup")
 	})
 }
 
@@ -121,13 +138,13 @@ func TestPropertyReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#properties:email-address", wantMatch: true},
-			{name: "with underscores", reference: "#properties:user_id", wantMatch: true},
+			{name: "basic reference", reference: "#property:email-address", wantMatch: true},
+			{name: "with underscores", reference: "#property:user_id", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#properties:", wantMatch: false},
-			{name: "space in id", reference: "#properties:id with space", wantMatch: false},
-			{name: "invalid char", reference: "#properties:id@123", wantMatch: false},
+			{name: "missing id", reference: "#property:", wantMatch: false},
+			{name: "space in id", reference: "#property:id with space", wantMatch: false},
+			{name: "invalid char", reference: "#property:id@123", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -181,12 +198,12 @@ func TestEventReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#events:user-login", wantMatch: true},
-			{name: "with underscores and numbers", reference: "#events:PAGE_VIEW_123", wantMatch: true},
+			{name: "basic reference", reference: "#event:user-login", wantMatch: true},
+			{name: "with underscores and numbers", reference: "#event:PAGE_VIEW_123", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#events:", wantMatch: false},
-			{name: "space in id", reference: "#events:user login", wantMatch: false},
+			{name: "missing id", reference: "#event:", wantMatch: false},
+			{name: "space in id", reference: "#event:user login", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -240,12 +257,12 @@ func TestCategoryReferences(t *testing.T) {
 			wantMatch bool
 		}{
 			// Valid cases
-			{name: "basic reference", reference: "#categories:profile-updates", wantMatch: true},
-			{name: "with underscores", reference: "#categories:user_profile", wantMatch: true},
+			{name: "basic reference", reference: "#category:profile-updates", wantMatch: true},
+			{name: "with underscores", reference: "#category:user_profile", wantMatch: true},
 
 			// Invalid cases
-			{name: "missing id", reference: "#categories:", wantMatch: false},
-			{name: "wrong format", reference: "#category:id", wantMatch: false},
+			{name: "missing id", reference: "#category:", wantMatch: false},
+			{name: "wrong format", reference: "#categories:id", wantMatch: false},
 		}
 
 		for _, tt := range tests {
@@ -349,13 +366,13 @@ func TestConstantValues(t *testing.T) {
 			expected string
 		}{
 			{"customTypeLegacyReferenceMessage", customTypeLegacyReferenceMessage, "must be of pattern #/custom-types/<group>/<id>"},
-			{"customTypeReferenceMessage", customTypeReferenceMessage, "must be of pattern #custom-types:<id>"},
+			{"customTypeReferenceMessage", customTypeReferenceMessage, "must be of pattern #custom-type:<id>"},
 			{"propertyLegacyReferenceMessage", propertyLegacyReferenceMessage, "must be of pattern #/properties/<group>/<id>"},
-			{"propertyReferenceMessage", propertyReferenceMessage, "must be of pattern #properties:<id>"},
+			{"propertyReferenceMessage", propertyReferenceMessage, "must be of pattern #property:<id>"},
 			{"eventLegacyReferenceMessage", eventLegacyReferenceMessage, "must be of pattern #/events/<group>/<id>"},
-			{"eventReferenceMessage", eventReferenceMessage, "must be of pattern #events:<id>"},
+			{"eventReferenceMessage", eventReferenceMessage, "must be of pattern #event:<id>"},
 			{"categoryLegacyReferenceMessage", categoryLegacyReferenceMessage, "must be of pattern #/categories/<group>/<id>"},
-			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #categories:<id>"},
+			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #category:<id>"},
 			{"trackingPlanLegacyReferenceMessage", trackingPlanLegacyReferenceMessage, "must be of pattern #/tp/<group>/<id>"},
 			{"trackingPlanReferenceMessage", trackingPlanReferenceMessage, "must be of pattern #tracking-plan:<id>"},
 		}
