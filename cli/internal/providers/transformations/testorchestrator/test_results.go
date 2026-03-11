@@ -1,4 +1,4 @@
-package results
+package testorchestrator
 
 import (
 	"github.com/samber/lo"

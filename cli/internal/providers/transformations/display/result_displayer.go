@@ -1,4 +1,4 @@
-package transformations
+package display
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/samber/lo"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -178,7 +178,7 @@ func NewResultDisplayer(verbose bool) *ResultDisplayer {
 }
 
 // Display formats and displays test results
-func (rd *ResultDisplayer) Display(results *results.TestResults) {
+func (rd *ResultDisplayer) Display(results *testorchestrator.TestResults) {
 	rd.printHeader()
 	rd.displayDefaultTestSuiteWarning(results)
 
@@ -188,7 +188,7 @@ func (rd *ResultDisplayer) Display(results *results.TestResults) {
 	rd.printSummary()
 }
 
-func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *results.TestResults) {
+func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *testorchestrator.TestResults) {
 	names := results.DefaultSuiteTransformationNames()
 	if len(names) == 0 {
 		return
@@ -265,7 +265,7 @@ func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryT
 	newLine()
 }
 
-func (rd *ResultDisplayer) displayTransformations(transformations []*results.TransformationTestWithDefinitions) {
+func (rd *ResultDisplayer) displayTransformations(transformations []*testorchestrator.TransformationTestWithDefinitions) {
 	if len(transformations) == 0 {
 		return
 	}

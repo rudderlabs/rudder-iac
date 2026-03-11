@@ -14,17 +14,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
-)
-
-// Type aliases for backwards compatibility
-type (
-	TransformationTestWithDefinitions = results.TransformationTestWithDefinitions
-	TestResults                       = results.TestResults
 )
 
 var testLogger = logger.New("testorchestrator")
@@ -78,7 +71,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 && len(testPlan.StandaloneLibraries) == 0 {
 		testLogger.Info("No resources to test")
-		return &TestResults{Status: results.RunStatusNoResources}, nil
+		return &TestResults{Status: RunStatusNoResources}, nil
 	}
 
 	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
@@ -145,13 +138,13 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		allResults = append(allResults, trResults...)
 	}
 
-	results := &TestResults{
-		Status:          results.RunStatusExecuted,
+	testResults := &TestResults{
+		Status:          RunStatusExecuted,
 		Libraries:       allLibs,
 		Transformations: allResults,
 	}
 
-	return results, nil
+	return testResults, nil
 }
 
 // buildRemoteIDByURN builds a map of remote IDs indexed by URN.

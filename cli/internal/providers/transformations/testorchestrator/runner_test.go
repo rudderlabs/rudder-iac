@@ -10,7 +10,6 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -150,7 +149,7 @@ func TestRunnerRun(t *testing.T) {
 		testResults, err := runner.Run(ctx, ModeAll, "")
 
 		require.NoError(t, err)
-		assert.Equal(t, results.RunStatusNoResources, testResults.Status)
+		assert.Equal(t, RunStatusNoResources, testResults.Status)
 		assert.Empty(t, testResults.Transformations)
 		assert.Empty(t, testResults.Libraries)
 	})
@@ -298,7 +297,7 @@ func TestRunnerRun(t *testing.T) {
 		testResults, err := runner.Run(ctx, ModeAll, "")
 
 		require.NoError(t, err)
-		assert.Equal(t, results.RunStatusExecuted, testResults.Status)
+		assert.Equal(t, RunStatusExecuted, testResults.Status)
 		assert.Len(t, testResults.Transformations, 1)
 		assert.Empty(t, testResults.Libraries)
 		assert.Equal(t, "trans-ver-1", testResults.Transformations[0].Result.VersionID)

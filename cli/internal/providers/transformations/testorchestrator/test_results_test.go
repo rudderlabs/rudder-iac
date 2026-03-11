@@ -1,4 +1,4 @@
-package results
+package testorchestrator
 
 import (
 	"testing"
@@ -164,19 +164,19 @@ func TestHasFailures(t *testing.T) {
 	}
 }
 
-func TestDefaultSuiteTransformationNames(t *testing.T) {
+func TestTestResults_DefaultSuiteTransformationNames(t *testing.T) {
 	tests := []struct {
 		name     string
 		results  *TestResults
 		expected []string
 	}{
 		{
-			name:     "no transformations returns empty slice",
+			name:     "returns empty when no transformations exist in test results",
 			results:  &TestResults{},
 			expected: []string{},
 		},
 		{
-			name: "transformation with single non-default definition is excluded",
+			name: "excludes transformation with custom test suite",
 			results: &TestResults{
 				Transformations: []*TransformationTestWithDefinitions{
 					{
@@ -190,7 +190,7 @@ func TestDefaultSuiteTransformationNames(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name: "transformation with multiple definitions is excluded even if one is default-events",
+			name: "excludes transformation with multiple test suites even when one is default-events",
 			results: &TestResults{
 				Transformations: []*TransformationTestWithDefinitions{
 					{
@@ -205,7 +205,7 @@ func TestDefaultSuiteTransformationNames(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name: "transformation with no definitions is excluded",
+			name: "excludes transformation with empty test definitions",
 			results: &TestResults{
 				Transformations: []*TransformationTestWithDefinitions{
 					{
@@ -217,7 +217,7 @@ func TestDefaultSuiteTransformationNames(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name: "only default-events transformations are returned from mixed set",
+			name: "returns only transformations with single default-events suite",
 			results: &TestResults{
 				Transformations: []*TransformationTestWithDefinitions{
 					{

@@ -10,11 +10,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/display"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/results"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -236,7 +236,7 @@ func (p *Provider) ConsolidateSync(ctx context.Context, graph *resources.Graph, 
 		if !resp.Published {
 			// Convert response to TestResults and display using shared result displayer
 			results := p.buildTestResultsFromResponse(req, resp)
-			displayer := NewResultDisplayer(false)
+			displayer := display.NewResultDisplayer(false)
 			displayer.Display(results)
 			return fmt.Errorf("batch publish validation failed")
 		}
@@ -439,7 +439,7 @@ func (p *Provider) resolveTestDefinitions(trans *model.TransformationResource) (
 func (p *Provider) buildTestResultsFromResponse(
 	req *transformations.BatchPublishRequest,
 	resp *transformations.BatchPublishResponse,
-) *results.TestResults {
+) *testorchestrator.TestResults {
 	testDefsByVersionID := lo.SliceToMap(req.Transformations, func(trans transformations.BatchPublishTransformation) (string, []*transformations.TestDefinition) {
 		defs := lo.Map(trans.TestSuite, func(t transformations.TestDefinition, i int) *transformations.TestDefinition {
 			return &trans.TestSuite[i]
@@ -448,14 +448,14 @@ func (p *Provider) buildTestResultsFromResponse(
 	})
 
 	// Map results to their definitions by matching versionID
-	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *results.TransformationTestWithDefinitions {
-		return &results.TransformationTestWithDefinitions{
+	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *testorchestrator.TransformationTestWithDefinitions {
+		return &testorchestrator.TransformationTestWithDefinitions{
 			Result:      &tr,
 			Definitions: testDefsByVersionID[tr.VersionID],
 		}
 	})
 
-	return &results.TestResults{
+	return &testorchestrator.TestResults{
 		Libraries:       resp.ValidationOutput.Libraries,
 		Transformations: trResults,
 	}
