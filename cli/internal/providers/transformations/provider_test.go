@@ -165,7 +165,7 @@ func TestProvider(t *testing.T) {
 
 		semanticRules := provider.SemanticRules()
 		require.Len(t, semanticRules, 1)
-		assert.Equal(t, "transformations/transformation/imports-semantic-valid", semanticRules[0].ID())
+		assert.Equal(t, "transformations/transformation/semantic-valid", semanticRules[0].ID())
 	})
 }
 

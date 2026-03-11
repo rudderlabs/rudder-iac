@@ -46,14 +46,16 @@ func TestValidateTransformationSpec_ValidSpecs(t *testing.T) {
 	t.Run("relative file and explicit test directories", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		specPath := filepath.Join(tmpDir, "transformations", "spec.yaml")
-		specDir := filepath.Dir(specPath)
-		require.NoError(t, os.MkdirAll(specDir, 0o755))
+		var (
+			tmpDir    = t.TempDir()
+			specPath  = filepath.Join(tmpDir, "transformations", "spec.yaml")
+			specDir   = filepath.Dir(specPath)
+			codeDir   = filepath.Join(specDir, "scripts")
+			inputDir  = filepath.Join(specDir, "fixtures", "input")
+			outputDir = filepath.Join(specDir, "fixtures", "output")
+		)
 
-		codeDir := filepath.Join(specDir, "scripts")
-		inputDir := filepath.Join(specDir, "fixtures", "input")
-		outputDir := filepath.Join(specDir, "fixtures", "output")
+		require.NoError(t, os.MkdirAll(specDir, 0o755))
 		require.NoError(t, os.MkdirAll(codeDir, 0o755))
 		require.NoError(t, os.MkdirAll(inputDir, 0o755))
 		require.NoError(t, os.MkdirAll(outputDir, 0o755))
@@ -83,6 +85,70 @@ func TestValidateTransformationSpec_ValidSpecs(t *testing.T) {
 
 func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 	t.Parallel()
+
+	t.Run("missing required top-level fields and invalid language are rejected", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name              string
+			spec              specs.TransformationSpec
+			expectedReference string
+			expectedMessage   string
+		}{
+			{
+				name: "missing id",
+				spec: specs.TransformationSpec{
+					Name:     "Transformation",
+					Language: "javascript",
+					Code:     "export function transformEvent(event, metadata) { return event; }",
+				},
+				expectedReference: "/id",
+				expectedMessage:   "'id' is required",
+			},
+			{
+				name: "missing name",
+				spec: specs.TransformationSpec{
+					ID:       "trans-1",
+					Language: "javascript",
+					Code:     "export function transformEvent(event, metadata) { return event; }",
+				},
+				expectedReference: "/name",
+				expectedMessage:   "'name' is required",
+			},
+			{
+				name: "missing language",
+				spec: specs.TransformationSpec{
+					ID:   "trans-1",
+					Name: "Transformation",
+					Code: "export function transformEvent(event, metadata) { return event; }",
+				},
+				expectedReference: "/language",
+				expectedMessage:   "'language' is required",
+			},
+			{
+				name: "invalid language",
+				spec: specs.TransformationSpec{
+					ID:       "trans-1",
+					Name:     "Transformation",
+					Language: "ruby",
+					Code:     "export function transformEvent(event, metadata) { return event; }",
+				},
+				expectedReference: "/language",
+				expectedMessage:   "'language' must be one of [javascript python]",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				results := validateTransformationSpec("", "", "/tmp/spec.yaml", nil, tt.spec)
+
+				assert.Equal(t, []string{tt.expectedReference}, extractReferences(results))
+				assert.Equal(t, []string{tt.expectedMessage}, extractMessages(results))
+			})
+		}
+	})
 
 	t.Run("missing code and file produces cross-field errors", func(t *testing.T) {
 		t.Parallel()
@@ -115,9 +181,17 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 
 		results := validateTransformationSpec("", "", "/tmp/spec.yaml", nil, spec)
 
-		assert.ElementsMatch(t, []string{"/code", "/file", "/file"}, extractReferences(results))
-		assert.Contains(t, extractMessages(results), "'code' and 'file' cannot be specified together")
-		assert.Contains(t, extractMessages(results), "'file' and 'code' cannot be specified together")
+		assert.ElementsMatch(t, []string{
+			"/code",
+			"/file",
+			"/file",
+		}, extractReferences(results))
+
+		assert.ElementsMatch(t, []string{
+			"'code' and 'file' cannot be specified together",
+			"'file' and 'code' cannot be specified together",
+			"path does not exist or is not accessible",
+		}, extractMessages(results))
 	})
 
 	t.Run("whitespace-only and invalid test names are rejected", func(t *testing.T) {
@@ -137,8 +211,8 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", "/tmp/spec.yaml", nil, spec)
 
 		assert.ElementsMatch(t, []string{"/tests/0/name", "/tests/1/name"}, extractReferences(results))
-		assert.Contains(t, extractMessages(results), "test name must not be blank or whitespace-only")
-		assert.Contains(t, extractMessages(results), `test name must match ^[A-Za-z0-9 _/\-]+$`)
+		assert.Contains(t, extractMessages(results), "'name' must not be blank or whitespace-only")
+		assert.Contains(t, extractMessages(results), `'name' must match '^[A-Za-z0-9 _/\-]+$'`)
 	})
 
 	t.Run("absolute and parent traversal test paths are rejected", func(t *testing.T) {
@@ -161,8 +235,8 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", "/tmp/spec.yaml", nil, spec)
 
 		assert.ElementsMatch(t, []string{"/tests/0/input", "/tests/0/output"}, extractReferences(results))
-		assert.Contains(t, extractMessages(results), `path must be relative to the spec file directory: "/tmp/fixtures/input"`)
-		assert.Contains(t, extractMessages(results), `path must not contain '..' segments: "../fixtures/output"`)
+		assert.Contains(t, extractMessages(results), "path must be relative to the spec file directory")
+		assert.Contains(t, extractMessages(results), "path must not contain '..' segments")
 	})
 
 	t.Run("file path must exist and be a regular file", func(t *testing.T) {
@@ -183,7 +257,7 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", specPath, nil, spec)
 
 		assert.Equal(t, []string{"/file"}, extractReferences(results))
-		assert.Equal(t, []string{`path "` + dirPath + `" must be a file`}, extractMessages(results))
+		assert.Equal(t, []string{"path must be a file"}, extractMessages(results))
 	})
 
 	t.Run("input and output must be directories", func(t *testing.T) {
@@ -217,16 +291,20 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		assert.Contains(t, extractMessages(results), `path "`+outputFilePath+`" must be a directory`)
 	})
 
-	t.Run("invalid json files are reported while scalar json remains valid", func(t *testing.T) {
+	t.Run("json files must contain top-level objects or arrays", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
 		specPath := filepath.Join(tmpDir, "spec.yaml")
 		inputDir := filepath.Join(tmpDir, "input")
 		require.NoError(t, os.MkdirAll(inputDir, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "valid-scalar.json"), []byte(`123`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "null.json"), []byte(`null`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "string.json"), []byte(`"hello"`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "number.json"), []byte(`123`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "boolean.json"), []byte(`true`), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "invalid.json"), []byte(`{"missing":`), 0o644))
-		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "empty.json"), []byte(""), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "object.json"), []byte(`{"ok":true}`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(inputDir, "array.json"), []byte(`[{"ok":true}]`), 0o644))
 
 		spec := specs.TransformationSpec{
 			ID:       "trans-1",
@@ -244,14 +322,45 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", specPath, nil, spec)
 
 		assert.ElementsMatch(t, []string{
-			"/tests/0/input/empty.json",
-			"/tests/0/input/invalid.json",
+			"/tests/0/input",
+			"/tests/0/input",
+			"/tests/0/input",
+			"/tests/0/input",
+			"/tests/0/input",
 		}, extractReferences(results))
-		assert.Equal(t, []string{
-			"file must contain valid JSON",
-			"file must contain valid JSON",
+		assert.ElementsMatch(t, []string{
+			"file: null.json must contain valid object or array",
+			"file: string.json must contain valid object or array",
+			"file: number.json must contain valid object or array",
+			"file: boolean.json must contain valid object or array",
+			"file: invalid.json must contain valid object or array",
 		}, extractMessages(results))
 	})
+}
+
+func TestJSONValidObjectOrArray(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{name: "object", input: `{"ok":true}`, expected: true},
+		{name: "array", input: `[{"ok":true}]`, expected: true},
+		{name: "null", input: `null`, expected: false},
+		{name: "string", input: `"hello"`, expected: false},
+		{name: "number", input: `123`, expected: false},
+		{name: "boolean", input: `true`, expected: false},
+		{name: "invalid json", input: `{"missing":`, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, jsonValidObjectOrArray([]byte(tt.input)))
+		})
+	}
 }
 
 func extractReferences(results []vrules.ValidationResult) []string {

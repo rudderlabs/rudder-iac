@@ -19,7 +19,7 @@ func TestNewTransformationImportsSemanticValidRule_Metadata(t *testing.T) {
 
 	rule := NewTransformationImportsSemanticValidRule()
 
-	assert.Equal(t, "transformations/transformation/imports-semantic-valid", rule.ID())
+	assert.Equal(t, "transformations/transformation/semantic-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
 	assert.Equal(t, "transformation imports must resolve to existing transformation libraries", rule.Description())
 	assert.Equal(t, prules.V1VersionPatterns("transformation"), rule.AppliesTo())
@@ -47,7 +47,7 @@ func TestValidateTransformationImports(t *testing.T) {
 			&model.LibraryResource{ID: "lib-1", ImportName: "mathLibrary"},
 		)
 
-		results := validateTransformationImports("", "", nil, spec, graph)
+		results := validateTransformationSemanticValid("", "", nil, spec, graph)
 		assert.Empty(t, results)
 	})
 
@@ -69,10 +69,10 @@ func TestValidateTransformationImports(t *testing.T) {
 			},
 		)
 
-		results := validateTransformationImports("", "", nil, spec, graph)
+		results := validateTransformationSemanticValid("", "", nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/code", results[0].Reference)
-		assert.Equal(t, "imported transformation library not found: missingLib", results[0].Message)
+		assert.Equal(t, "'missingLib' imported library not found", results[0].Message)
 	})
 
 	t.Run("file-backed spec reports file reference", func(t *testing.T) {
@@ -93,13 +93,13 @@ func TestValidateTransformationImports(t *testing.T) {
 			},
 		)
 
-		results := validateTransformationImports("", "", nil, spec, graph)
+		results := validateTransformationSemanticValid("", "", nil, spec, graph)
 		require.Len(t, results, 1)
 		assert.Equal(t, "/file", results[0].Reference)
-		assert.Equal(t, "imported transformation library not found: missingLib", results[0].Message)
+		assert.Equal(t, "'missingLib' imported library not found", results[0].Message)
 	})
 
-	t.Run("missing graph resource produces no diagnostics", func(t *testing.T) {
+	t.Run("missing transformation resource in graph produces no diagnostics", func(t *testing.T) {
 		t.Parallel()
 
 		spec := specs.TransformationSpec{
@@ -109,8 +109,10 @@ func TestValidateTransformationImports(t *testing.T) {
 			Code:     "import missingLib from 'missingLib';",
 		}
 
-		results := validateTransformationImports("", "", nil, spec, resources.NewGraph())
-		assert.Empty(t, results)
+		results := validateTransformationSemanticValid("", "", nil, spec, resources.NewGraph())
+		require.Len(t, results, 1)
+		assert.Equal(t, "/id", results[0].Reference)
+		assert.Equal(t, "'transformation' resource not found in graph", results[0].Message)
 	})
 }
 

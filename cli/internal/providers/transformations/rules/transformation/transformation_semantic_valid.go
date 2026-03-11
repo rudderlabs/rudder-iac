@@ -1,6 +1,8 @@
 package transformation
 
 import (
+	"fmt"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	libraryhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
@@ -11,35 +13,45 @@ import (
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-func validateTransformationImports(
+// validateTransformationSemanticValid primary responsibility is to validate
+// that the imports in the transformation code resolve to libraries in the graph
+func validateTransformationSemanticValid(
 	_ string,
 	_ string,
 	_ map[string]any,
 	spec specs.TransformationSpec,
 	graph *resources.Graph,
 ) []vrules.ValidationResult {
-	if graph == nil || spec.ID == "" {
-		return nil
-	}
-
 	resource, exists := graph.GetResource(resources.URN(spec.ID, transformationhandler.HandlerMetadata.ResourceType))
 	if !exists {
-		return nil
+		return []vrules.ValidationResult{{
+			Reference: "/id",
+			Message:   "'transformation' resource not found in graph",
+		}}
 	}
 
 	transformationResource, ok := resource.RawData().(*model.TransformationResource)
 	if !ok {
-		return nil
+		return []vrules.ValidationResult{{
+			Reference: "/id",
+			Message:   "'transformation' resource must be valid in the graph",
+		}}
 	}
 
 	codeParser, err := parser.NewParser(transformationResource.Language)
 	if err != nil {
-		return nil
+		return []vrules.ValidationResult{{
+			Reference: sourceReference(spec),
+			Message:   fmt.Sprintf("failed to create parser for language %s: %s", transformationResource.Language, err.Error()),
+		}}
 	}
 
 	imports, err := codeParser.ExtractImports(transformationResource.Code)
 	if err != nil {
-		return nil
+		return []vrules.ValidationResult{{
+			Reference: sourceReference(spec),
+			Message:   fmt.Sprintf("failed to extract imports from transformation code: %s", err.Error()),
+		}}
 	}
 
 	availableHandles := make(map[string]struct{})
@@ -68,7 +80,7 @@ func validateTransformationImports(
 
 		results = append(results, vrules.ValidationResult{
 			Reference: reference,
-			Message:   "imported transformation library not found: " + handleName,
+			Message:   fmt.Sprintf("'%s' imported library not found", handleName),
 		})
 	}
 
@@ -85,13 +97,13 @@ func sourceReference(spec specs.TransformationSpec) string {
 
 func NewTransformationImportsSemanticValidRule() vrules.Rule {
 	return rules.NewTypedRule(
-		"transformations/transformation/imports-semantic-valid",
+		"transformations/transformation/semantic-valid",
 		vrules.Error,
 		"transformation imports must resolve to existing transformation libraries",
 		vrules.Examples{},
 		rules.NewSemanticPatternValidator(
 			rules.V1VersionPatterns(transformationhandler.HandlerMetadata.SpecKind),
-			validateTransformationImports,
+			validateTransformationSemanticValid,
 		),
 	)
 }

@@ -2,10 +2,12 @@ package transformation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -30,7 +32,10 @@ func validateTransformationSpec(
 		}}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
+	results := funcs.ParseValidationErrors(
+		validationErrors,
+		reflect.TypeOf(spec),
+	)
 
 	if spec.File != "" {
 		resolvedPath, err := resolveSpecRelativePath(filePath, spec.File)
@@ -48,7 +53,7 @@ func validateTransformationSpec(
 		if test.Name != "" && strings.TrimSpace(test.Name) == "" {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/tests/%d/name", idx),
-				Message:   "test name must not be blank or whitespace-only",
+				Message:   "'name' must not be blank or whitespace-only",
 			})
 			continue
 		}
@@ -56,7 +61,7 @@ func validateTransformationSpec(
 		if test.Name != "" && !transformationhandler.TestNameRegex.MatchString(test.Name) {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/tests/%d/name", idx),
-				Message:   `test name must match ^[A-Za-z0-9 _/\-]+$`,
+				Message:   `'name' must match '^[A-Za-z0-9 _/\-]+$'`,
 			})
 		}
 
@@ -80,13 +85,21 @@ func validateTransformationSpec(
 				continue
 			}
 
-			dirResults := validateTestDirectory(idx, field.name, resolvedPath)
+			dirResults := validateTestDirectory(
+				idx,
+				field.name,
+				resolvedPath,
+			)
 			results = append(results, dirResults...)
 			if len(dirResults) > 0 {
 				continue
 			}
 
-			results = append(results, validateTestJSONFiles(idx, field.name, resolvedPath)...)
+			// only if the directory is valid, validate the JSON files
+			results = append(
+				results,
+				validateTestJSONFiles(idx, field.name, resolvedPath)...,
+			)
 		}
 	}
 
@@ -95,13 +108,11 @@ func validateTransformationSpec(
 
 func resolveSpecRelativePath(specFilePath, targetPath string) (string, error) {
 	if filepath.IsAbs(targetPath) {
-		return "", fmt.Errorf("path must be relative to the spec file directory: %q", targetPath)
+		return "", errors.New("path must be relative to the spec file directory")
 	}
 
-	for _, segment := range splitPathSegments(targetPath) {
-		if segment == ".." {
-			return "", fmt.Errorf("path must not contain '..' segments: %q", targetPath)
-		}
+	if slices.Contains(splitPathSegments(targetPath), "..") {
+		return "", errors.New("path must not contain '..' segments")
 	}
 
 	return filepath.Join(filepath.Dir(specFilePath), targetPath), nil
@@ -118,20 +129,21 @@ func validateSpecFile(resolvedPath string) []rules.ValidationResult {
 	if err != nil {
 		return []rules.ValidationResult{{
 			Reference: "/file",
-			Message:   fmt.Sprintf("path %q does not exist or is not accessible", resolvedPath),
+			Message:   "path does not exist or is not accessible",
 		}}
 	}
 
 	if info.IsDir() {
 		return []rules.ValidationResult{{
 			Reference: "/file",
-			Message:   fmt.Sprintf("path %q must be a file", resolvedPath),
+			Message:   "path must be a file",
 		}}
 	}
 
 	return nil
 }
 
+// validateTestDirectory verifies the resolved path is a directory
 func validateTestDirectory(testIdx int, fieldName, resolvedPath string) []rules.ValidationResult {
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
@@ -151,6 +163,8 @@ func validateTestDirectory(testIdx int, fieldName, resolvedPath string) []rules.
 	return nil
 }
 
+// validateTestJSONFiles validates JSON fixtures and only accepts
+// top-level JSON objects or arrays.
 func validateTestJSONFiles(testIdx int, fieldName, dir string) []rules.ValidationResult {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -170,21 +184,37 @@ func validateTestJSONFiles(testIdx int, fieldName, dir string) []rules.Validatio
 		contents, err := os.ReadFile(filePath)
 		if err != nil {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/tests/%d/%s/%s", testIdx, fieldName, entry.Name()),
-				Message:   fmt.Sprintf("reading file %q: %v", filePath, err),
+				Reference: fmt.Sprintf("/tests/%d/%s", testIdx, fieldName),
+				Message:   fmt.Sprintf("file: %s unable to be read", entry.Name()),
 			})
 			continue
 		}
 
-		if !json.Valid(contents) {
+		if !jsonValidObjectOrArray(contents) {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/tests/%d/%s/%s", testIdx, fieldName, entry.Name()),
-				Message:   "file must contain valid JSON",
+				Reference: fmt.Sprintf("/tests/%d/%s", testIdx, fieldName),
+				Message:   fmt.Sprintf("file: %s must contain valid object or array", entry.Name()),
 			})
 		}
 	}
 
 	return results
+}
+
+// jsonValidObjectOrArray returns true only for top-level JSON objects or arrays.
+func jsonValidObjectOrArray(contents []byte) bool {
+	var value any
+
+	if err := json.Unmarshal(contents, &value); err != nil {
+		return false
+	}
+
+	switch value.(type) {
+	case map[string]any, []any:
+		return true
+	default:
+		return false
+	}
 }
 
 func NewTransformationSpecSyntaxValidRule() rules.Rule {
