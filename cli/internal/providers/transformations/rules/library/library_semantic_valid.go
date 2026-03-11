@@ -2,7 +2,6 @@ package library
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -38,29 +37,17 @@ func validateLibrarySemanticValid(
 
 	var results []vrules.ValidationResult
 
-	var allLibs []*model.LibraryResource
+	importNameCounts := make(map[string]int)
 	for _, lib := range graph.ResourcesByType(libraryhandler.HandlerMetadata.ResourceType) {
 		libData, _ := lib.RawData().(*model.LibraryResource)
-		allLibs = append(allLibs, libData)
+		importNameCounts[libData.ImportName]++
 	}
 
-	sort.Slice(allLibs, func(i, j int) bool {
-		return allLibs[i].ID < allLibs[j].ID
-	})
-
-	seenImportNames := make(map[string]string)
-	for _, libData := range allLibs {
-		if existingID, exists := seenImportNames[libData.ImportName]; exists {
-			// Only report the error for the current library being validated
-			if libData.ID == spec.ID {
-				results = append(results, vrules.ValidationResult{
-					Reference: "/import_name",
-					Message:   fmt.Sprintf("'import_name' '%s' is already used by library '%s'", libData.ImportName, existingID),
-				})
-			}
-		} else {
-			seenImportNames[libData.ImportName] = libData.ID
-		}
+	if importNameCounts[spec.ImportName] > 1 {
+		results = append(results, vrules.ValidationResult{
+			Reference: "/import_name",
+			Message:   fmt.Sprintf("import_name '%s' is duplicate", spec.ImportName),
+		})
 	}
 
 	return results

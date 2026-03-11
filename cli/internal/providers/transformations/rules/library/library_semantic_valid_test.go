@@ -136,41 +136,7 @@ func TestValidateLibrarySemanticValid_InvalidLibraries(t *testing.T) {
 		assert.Equal(t, []string{"'transformation-library' resource not found in graph"}, extractMessages(results))
 	})
 
-	t.Run("duplicate import_name across libraries", func(t *testing.T) {
-		t.Parallel()
-
-		spec := specs.TransformationLibrarySpec{
-			ID:         "lib-2",
-			Name:       "Second Library",
-			ImportName: "myLibrary",
-			Language:   "javascript",
-			Code:       "export function other() {}",
-		}
-
-		graph := createGraphWithLibraries([]*model.LibraryResource{
-			{
-				ID:         "lib-1",
-				Name:       "First Library",
-				ImportName: "myLibrary",
-				Language:   "javascript",
-				Code:       "export function helper() {}",
-			},
-			{
-				ID:         "lib-2",
-				Name:       "Second Library",
-				ImportName: "myLibrary",
-				Language:   "javascript",
-				Code:       "export function other() {}",
-			},
-		})
-
-		results := validateLibrarySemanticValid("", "", nil, spec, graph)
-
-		assert.Equal(t, []string{"/import_name"}, extractReferences(results))
-		assert.Equal(t, []string{"'import_name' 'myLibrary' is already used by library 'lib-1'"}, extractMessages(results))
-	})
-
-	t.Run("error reported only for current library when duplicates exist", func(t *testing.T) {
+	t.Run("duplicate import_name reported for all affected libraries", func(t *testing.T) {
 		t.Parallel()
 
 		graph := createGraphWithLibraries([]*model.LibraryResource{
@@ -190,7 +156,7 @@ func TestValidateLibrarySemanticValid_InvalidLibraries(t *testing.T) {
 			},
 		})
 
-		// Validate lib-1 - should not report error since it's the first one
+		// Validate lib-1 - should report error since myLibrary is duplicated
 		spec1 := specs.TransformationLibrarySpec{
 			ID:         "lib-1",
 			Name:       "First Library",
@@ -200,9 +166,10 @@ func TestValidateLibrarySemanticValid_InvalidLibraries(t *testing.T) {
 		}
 
 		results1 := validateLibrarySemanticValid("", "", nil, spec1, graph)
-		assert.Empty(t, results1, "lib-1 should not report duplicate error since it's first")
+		assert.Equal(t, []string{"/import_name"}, extractReferences(results1))
+		assert.Equal(t, []string{"import_name 'myLibrary' is duplicate"}, extractMessages(results1))
 
-		// Validate lib-2 - should report error since lib-1 already has this import_name
+		// Validate lib-2 - should also report error since myLibrary is duplicated
 		spec2 := specs.TransformationLibrarySpec{
 			ID:         "lib-2",
 			Name:       "Second Library",
@@ -213,48 +180,7 @@ func TestValidateLibrarySemanticValid_InvalidLibraries(t *testing.T) {
 
 		results2 := validateLibrarySemanticValid("", "", nil, spec2, graph)
 		assert.Equal(t, []string{"/import_name"}, extractReferences(results2))
-		assert.Contains(t, extractMessages(results2)[0], "'import_name' 'myLibrary' is already used by library 'lib-1'")
-	})
-
-	t.Run("multiple libraries with same import_name", func(t *testing.T) {
-		t.Parallel()
-
-		spec := specs.TransformationLibrarySpec{
-			ID:         "lib-3",
-			Name:       "Third Library",
-			ImportName: "sharedName",
-			Language:   "python",
-			Code:       "def third(): pass",
-		}
-
-		graph := createGraphWithLibraries([]*model.LibraryResource{
-			{
-				ID:         "lib-1",
-				Name:       "First Library",
-				ImportName: "sharedName",
-				Language:   "javascript",
-				Code:       "export function first() {}",
-			},
-			{
-				ID:         "lib-2",
-				Name:       "Second Library",
-				ImportName: "uniqueName",
-				Language:   "javascript",
-				Code:       "export function second() {}",
-			},
-			{
-				ID:         "lib-3",
-				Name:       "Third Library",
-				ImportName: "sharedName",
-				Language:   "python",
-				Code:       "def third(): pass",
-			},
-		})
-
-		results := validateLibrarySemanticValid("", "", nil, spec, graph)
-
-		assert.Equal(t, []string{"/import_name"}, extractReferences(results))
-		assert.Equal(t, []string{"'import_name' 'sharedName' is already used by library 'lib-1'"}, extractMessages(results))
+		assert.Equal(t, []string{"import_name 'myLibrary' is duplicate"}, extractMessages(results2))
 	})
 }
 
