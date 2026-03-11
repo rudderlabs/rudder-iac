@@ -95,7 +95,7 @@ func sourceReference(spec specs.TransformationSpec) string {
 	return "/code"
 }
 
-func NewTransformationImportsSemanticValidRule() vrules.Rule {
+func NewTransformationSemanticValidRule() vrules.Rule {
 	return rules.NewTypedRule(
 		"transformations/transformation/semantic-valid",
 		vrules.Error,

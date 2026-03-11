@@ -17,7 +17,7 @@ import (
 func TestNewTransformationImportsSemanticValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewTransformationImportsSemanticValidRule()
+	rule := NewTransformationSemanticValidRule()
 
 	assert.Equal(t, "transformations/transformation/semantic-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())

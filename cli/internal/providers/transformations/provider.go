@@ -76,7 +76,7 @@ func (p *Provider) SyntacticRules() []vrules.Rule {
 
 func (p *Provider) SemanticRules() []vrules.Rule {
 	return []vrules.Rule{
-		trules.NewTransformationImportsSemanticValidRule(),
+		trules.NewTransformationSemanticValidRule(),
 	}
 }
 
