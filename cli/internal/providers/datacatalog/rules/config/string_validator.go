@@ -2,76 +2,76 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// StringTypeConfig validates config for string type
+// StringTypeConfig validates config for string type.
 type StringTypeConfig struct{}
 
-var allowedStringKeys = map[string]bool{
-	"enum":      true,
-	"minLength": true,
-	"maxLength": true,
-	"pattern":   true,
-	"format":    true,
+var allowedStringKeys = map[ConfigKeyword]bool{
+	KeywordEnum:      true,
+	KeywordMinLength: true,
+	KeywordMaxLength: true,
+	KeywordPattern:   true,
+	KeywordFormat:    true,
 }
 
-// ConfigAllowed returns true for string type
+// ConfigAllowed returns true for string type.
 func (s *StringTypeConfig) ConfigAllowed() bool {
 	return true
 }
 
-// ValidateField validates a single field for string type
-func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	// Check if field is allowed
-	if !allowedStringKeys[fieldname] {
+// ValidateField validates a single field for string type.
+func (s *StringTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedStringKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	// Validate field value based on field name
-	switch fieldname {
-	case "enum":
-		return validateEnum(fieldname, fieldval)
+	switch field.Keyword {
+	case KeywordEnum:
+		return validateEnum(field.RawKey, field.Value)
 
-	case "minLength", "maxLength":
-		if !isInteger(fieldval) {
+	case KeywordMinLength, KeywordMaxLength:
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be an integer", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
-		// Check if value is non-negative
-		val, _ := toInteger(fieldval)
+		val, _ := toInteger(field.Value)
 		if val < 0 {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be >= 0", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be >= 0", field.RawKey),
 			}}, nil
 		}
 
-	case "pattern":
-		_, ok := fieldval.(string)
-		if !ok {
+	case KeywordPattern:
+		if _, ok := field.Value.(string); !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'pattern' must be a string",
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be a string", field.RawKey),
 			}}, nil
 		}
 
-	case "format":
-		formatStr, ok := fieldval.(string)
+	case KeywordFormat:
+		formatStr, ok := field.Value.(string)
 		if !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'format' must be a string",
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be a string", field.RawKey),
 			}}, nil
 		}
 		if !isValidFormat(formatStr) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'format' must be one of: %v", catalogRules.ValidFormatValues),
+				Reference: field.RawKey,
+				Message: fmt.Sprintf("'%s' must be one of: [%s]",
+					field.RawKey,
+					strings.Join(catalogRules.ValidFormatValues, ", "),
+				),
 			}}, nil
 		}
 	}
@@ -79,23 +79,21 @@ func (s *StringTypeConfig) ValidateField(fieldname string, fieldval any) ([]rule
 	return nil, nil
 }
 
-// ValidateCrossFields validates relationships between string config fields
-func (s *StringTypeConfig) ValidateCrossFields(config map[string]any) []rules.ValidationResult {
+// ValidateCrossFields validates relationships between string config fields.
+func (s *StringTypeConfig) ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Check minLength <= maxLength
-	minLength, hasMin := config["minLength"]
-	maxLength, hasMax := config["maxLength"]
+	minField, hasMin := config[KeywordMinLength]
+	maxField, hasMax := config[KeywordMaxLength]
 
 	if hasMin && hasMax {
-		// Both must be valid integers for cross-field check
-		minVal, minOk := toInteger(minLength)
-		maxVal, maxOk := toInteger(maxLength)
+		minVal, minOk := toInteger(minField.Value)
+		maxVal, maxOk := toInteger(maxField.Value)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "minLength cannot be greater than maxLength",
+				Message:   fmt.Sprintf("%s cannot be greater than %s", minField.RawKey, maxField.RawKey),
 			})
 		}
 	}
