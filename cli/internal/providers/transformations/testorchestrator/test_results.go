@@ -1,9 +1,16 @@
-package model
+package testorchestrator
 
 import (
 	"github.com/samber/lo"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+)
+
+type RunStatus int
+
+const (
+	RunStatusExecuted RunStatus = iota
+	RunStatusNoResources
 )
 
 // TransformationTestWithDefinitions combines test results with their original definitions
@@ -14,8 +21,7 @@ type TransformationTestWithDefinitions struct {
 
 // TestResults contains the results of all test executions with their definitions
 type TestResults struct {
-	Pass            bool
-	Message         string
+	Status          RunStatus
 	Libraries       []transformations.LibraryTestResult
 	Transformations []*TransformationTestWithDefinitions
 }

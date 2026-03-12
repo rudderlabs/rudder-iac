@@ -20,12 +20,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-// Type aliases for backwards compatibility
-type (
-	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
-	TestResults                       = model.TestResults
-)
-
 var testLogger = logger.New("testorchestrator")
 
 // remoteStateLoader abstracts provider methods needed by the runner
@@ -77,7 +71,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 
 	if len(testPlan.TestUnits) == 0 && len(testPlan.StandaloneLibraries) == 0 {
 		testLogger.Info("No resources to test")
-		return &TestResults{Pass: true}, nil
+		return &TestResults{Status: RunStatusNoResources}, nil
 	}
 
 	testLogger.Info("Test plan created", "testUnits", len(testPlan.TestUnits), "standaloneLibraries", len(testPlan.StandaloneLibraries))
@@ -144,12 +138,13 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 		allResults = append(allResults, trResults...)
 	}
 
-	results := &TestResults{
+	testResults := &TestResults{
+		Status:          RunStatusExecuted,
 		Libraries:       allLibs,
 		Transformations: allResults,
 	}
 
-	return results, nil
+	return testResults, nil
 }
 
 // buildRemoteIDByURN builds a map of remote IDs indexed by URN.
