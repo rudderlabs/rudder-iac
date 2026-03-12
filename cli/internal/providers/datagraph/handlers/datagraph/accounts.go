@@ -45,7 +45,7 @@ func (r *accountNameResolver) GetAccountName(ctx context.Context, accountID stri
 		return account.Definition.Type, nil
 	}
 
-	return "", fmt.Errorf("account %s has no name or definition type", accountID)
+	return "", nil
 }
 
 // cachedAccountNameResolver wraps an AccountNameResolver with an in-memory cache

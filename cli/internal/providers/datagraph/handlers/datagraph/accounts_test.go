@@ -50,14 +50,14 @@ func TestAccountNameResolver_GetAccountName(t *testing.T) {
 		assert.Equal(t, "SNOWFLAKE", name)
 	})
 
-	t.Run("returns error when both name and definition type are empty", func(t *testing.T) {
+	t.Run("returns empty string when both name and definition type are empty", func(t *testing.T) {
 		resolver := NewAccountNameResolver(&mockAccountGetter{
 			account: &client.Account{},
 		})
 
-		_, err := resolver.GetAccountName(context.Background(), "account-1")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has no name or definition type")
+		name, err := resolver.GetAccountName(context.Background(), "account-1")
+		require.NoError(t, err)
+		assert.Empty(t, name)
 	})
 
 	t.Run("returns error when API call fails", func(t *testing.T) {

@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
-	dgHandlerPkg "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
@@ -158,8 +157,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	// Initialize data graph provider if experimental flag is enabled
 	if cfg.ExperimentalFlags.DataGraph {
 		dgStore := dgClient.NewRudderDataGraphClient(c)
-		accountResolver := dgHandlerPkg.NewAccountNameResolver(c.Accounts)
-		providers.DataGraph = dgProvider.NewProvider(dgStore, accountResolver)
+		providers.DataGraph = dgProvider.NewProvider(dgStore, c.Accounts)
 	}
 
 	return providers, nil

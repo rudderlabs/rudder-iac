@@ -30,8 +30,13 @@ type Provider struct {
 	relationshipHandler *relationship.RelationshipHandler
 }
 
-// NewProvider creates a new data graph provider instance
-func NewProvider(client dgClient.DataGraphClient, accountResolver datagraph.AccountNameResolver) *Provider {
+// NewProvider creates a new data graph provider instance.
+// The accountGetter is used internally to build the account name resolver.
+func NewProvider(client dgClient.DataGraphClient, accountGetter datagraph.AccountGetter) *Provider {
+	var accountResolver datagraph.AccountNameResolver
+	if accountGetter != nil {
+		accountResolver = datagraph.NewAccountNameResolver(accountGetter)
+	}
 	dgHandler := datagraph.NewHandler(client, accountResolver)
 	modelHandler := model.NewHandler(client)
 	relationshipHandler := relationship.NewHandler(client)
@@ -316,6 +321,18 @@ func (p *Provider) extractRelationshipResource(dataGraphID, sourceModelID string
 	}, nil
 }
 
+// exportLookups holds pre-computed indexes used when formatting data graph specs for export
+type exportLookups struct {
+	modelsByDG       map[string][]*resources.RemoteResource
+	relsByKey        map[relKey][]*resources.RemoteResource
+	modelExternalIDs map[string]string
+}
+
+type relKey struct {
+	dataGraphID   string
+	sourceModelID string
+}
+
 // FormatForExport overrides BaseProvider.FormatForExport to produce composite specs.
 // Data graphs are composite resources: a single YAML spec contains a data graph with
 // inline models and inline relationships, so export logic lives at the provider level.
@@ -329,46 +346,7 @@ func (p *Provider) FormatForExport(
 		return nil, nil
 	}
 
-	importableModels := collection.GetAll(model.HandlerMetadata.ResourceType)
-	importableRelationships := collection.GetAll(relationship.HandlerMetadata.ResourceType)
-
-	// Build set of importable data graph remote IDs for filtering children
-	importableDGIDs := make(map[string]bool, len(importableDataGraphs))
-	for _, dg := range importableDataGraphs {
-		importableDGIDs[dg.ID] = true
-	}
-
-	// Build lookup: models grouped by DataGraphID, only including models whose
-	// parent data graph is also importable. Models under managed (non-importable)
-	// data graphs are excluded — an alternative would be creating a spec with the
-	// managed DG's external ID that only imports new children.
-	modelsByDG := make(map[string][]*resources.RemoteResource)
-	for _, m := range importableModels {
-		remote := m.Data.(*dgModel.RemoteModel)
-		if !importableDGIDs[remote.DataGraphID] {
-			continue
-		}
-		modelsByDG[remote.DataGraphID] = append(modelsByDG[remote.DataGraphID], m)
-	}
-
-	// Build lookup: relationships grouped by DataGraphID and SourceModelID
-	type relKey struct {
-		dataGraphID   string
-		sourceModelID string
-	}
-	relsByKey := make(map[relKey][]*resources.RemoteResource)
-	for _, r := range importableRelationships {
-		remote := r.Data.(*dgModel.RemoteRelationship)
-		key := relKey{dataGraphID: remote.DataGraphID, sourceModelID: remote.SourceModelID}
-		relsByKey[key] = append(relsByKey[key], r)
-	}
-
-	// Build model ID -> externalID lookup for resolving relationship target references
-	modelExternalIDs := make(map[string]string)
-	for _, m := range importableModels {
-		remote := m.Data.(*dgModel.RemoteModel)
-		modelExternalIDs[remote.ID] = m.ExternalID
-	}
+	lookups := p.groupResourcesByDataGraph(collection, importableDataGraphs)
 
 	// Sort data graphs by external ID for deterministic output
 	sortedDGs := make([]*resources.RemoteResource, 0, len(importableDataGraphs))
@@ -380,122 +358,188 @@ func (p *Provider) FormatForExport(
 	})
 
 	var result []writer.FormattableEntity
-
 	for _, dgResource := range sortedDGs {
-		remoteDG := dgResource.Data.(*dgModel.RemoteDataGraph)
-
-		// Collect import metadata URNs for all resources in this spec
-		importResources := []specs.ImportIds{
-			{
-				URN:      resources.URN(dgResource.ExternalID, datagraph.HandlerMetadata.ResourceType),
-				RemoteID: remoteDG.ID,
-			},
-		}
-
-		// Sort models for this DG by external ID
-		dgModels := modelsByDG[remoteDG.ID]
-		slices.SortFunc(dgModels, func(a, b *resources.RemoteResource) int {
-			return cmp.Compare(a.ExternalID, b.ExternalID)
-		})
-
-		// Build inline model specs
-		var modelSpecs []dgModel.ModelSpec
-		for _, modelResource := range dgModels {
-			remoteModel := modelResource.Data.(*dgModel.RemoteModel)
-
-			importResources = append(importResources, specs.ImportIds{
-				URN:      resources.URN(modelResource.ExternalID, model.HandlerMetadata.ResourceType),
-				RemoteID: remoteModel.ID,
-			})
-
-			// Sort relationships for this model by external ID
-			key := relKey{dataGraphID: remoteDG.ID, sourceModelID: remoteModel.ID}
-			modelRels := relsByKey[key]
-			slices.SortFunc(modelRels, func(a, b *resources.RemoteResource) int {
-				return cmp.Compare(a.ExternalID, b.ExternalID)
-			})
-
-			// Build inline relationship specs for this model
-			var relSpecs []dgModel.RelationshipSpec
-			for _, relResource := range modelRels {
-				remoteRel := relResource.Data.(*dgModel.RemoteRelationship)
-
-				// Skip relationships whose target model is not in the importable collection
-				targetExternalID := modelExternalIDs[remoteRel.TargetModelID]
-				if targetExternalID == "" {
-					continue
-				}
-
-				importResources = append(importResources, specs.ImportIds{
-					URN:      resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
-					RemoteID: remoteRel.ID,
-				})
-
-				targetRef := fmt.Sprintf("#data-graph-model:%s", targetExternalID)
-
-				relSpecs = append(relSpecs, dgModel.RelationshipSpec{
-					ID:            relResource.ExternalID,
-					DisplayName:   remoteRel.Name,
-					Cardinality:   remoteRel.Cardinality,
-					Target:        targetRef,
-					SourceJoinKey: remoteRel.SourceJoinKey,
-					TargetJoinKey: remoteRel.TargetJoinKey,
-				})
-			}
-
-			ms := dgModel.ModelSpec{
-				ID:            modelResource.ExternalID,
-				DisplayName:   remoteModel.Name,
-				Type:          remoteModel.Type,
-				Table:         remoteModel.TableRef,
-				Description:   remoteModel.Description,
-				Relationships: relSpecs,
-				PrimaryID:     remoteModel.PrimaryID,
-				Root:          remoteModel.Root,
-				Timestamp:     remoteModel.Timestamp,
-			}
-			modelSpecs = append(modelSpecs, ms)
-		}
-
-		metadata := specs.Metadata{
-			Name: datagraph.HandlerMetadata.SpecMetadataName,
-			Import: &specs.WorkspacesImportMetadata{
-				Workspaces: []specs.WorkspaceImportMetadata{
-					{
-						WorkspaceID: remoteDG.WorkspaceID,
-						Resources:   importResources,
-					},
-				},
-			},
-		}
-
-		metadataMap, err := metadata.ToMap()
+		entity, err := p.formatDataGraphSpec(dgResource, lookups)
 		if err != nil {
-			return nil, fmt.Errorf("converting metadata to map: %w", err)
+			return nil, err
 		}
-
-		specBody := map[string]any{
-			"id":         dgResource.ExternalID,
-			"account_id": remoteDG.AccountID,
-		}
-		if len(modelSpecs) > 0 {
-			specBody["models"] = modelSpecs
-		}
-
-		spec := &specs.Spec{
-			Version:  specs.SpecVersionV1,
-			Kind:     datagraph.HandlerMetadata.SpecKind,
-			Metadata: metadataMap,
-			Spec:     specBody,
-		}
-
-		result = append(result, writer.FormattableEntity{
-			Content:      spec,
-			RelativePath: filepath.Join("data-graphs", fmt.Sprintf("%s.yaml", dgResource.ExternalID)),
-		})
+		result = append(result, entity)
 	}
 
 	return result, nil
+}
+
+// groupResourcesByDataGraph builds lookup indexes from the importable collection,
+// filtering children to only those whose parent data graph is also importable.
+func (p *Provider) groupResourcesByDataGraph(
+	collection *resources.RemoteResources,
+	importableDataGraphs map[string]*resources.RemoteResource,
+) *exportLookups {
+	importableModels := collection.GetAll(model.HandlerMetadata.ResourceType)
+	importableRelationships := collection.GetAll(relationship.HandlerMetadata.ResourceType)
+
+	importableDGIDs := make(map[string]bool, len(importableDataGraphs))
+	for _, dg := range importableDataGraphs {
+		importableDGIDs[dg.ID] = true
+	}
+
+	// Models grouped by DataGraphID, excluding models under managed (non-importable) data graphs
+	modelsByDG := make(map[string][]*resources.RemoteResource)
+	for _, m := range importableModels {
+		remote := m.Data.(*dgModel.RemoteModel)
+		if !importableDGIDs[remote.DataGraphID] {
+			continue
+		}
+		modelsByDG[remote.DataGraphID] = append(modelsByDG[remote.DataGraphID], m)
+	}
+
+	// Relationships grouped by DataGraphID and SourceModelID
+	relsByKey := make(map[relKey][]*resources.RemoteResource)
+	for _, r := range importableRelationships {
+		remote := r.Data.(*dgModel.RemoteRelationship)
+		key := relKey{dataGraphID: remote.DataGraphID, sourceModelID: remote.SourceModelID}
+		relsByKey[key] = append(relsByKey[key], r)
+	}
+
+	// Model remote ID -> externalID for resolving relationship target references
+	modelExternalIDs := make(map[string]string)
+	for _, m := range importableModels {
+		remote := m.Data.(*dgModel.RemoteModel)
+		modelExternalIDs[remote.ID] = m.ExternalID
+	}
+
+	return &exportLookups{
+		modelsByDG:       modelsByDG,
+		relsByKey:        relsByKey,
+		modelExternalIDs: modelExternalIDs,
+	}
+}
+
+// formatDataGraphSpec produces a single FormattableEntity for one data graph and its children
+func (p *Provider) formatDataGraphSpec(
+	dgResource *resources.RemoteResource,
+	lookups *exportLookups,
+) (writer.FormattableEntity, error) {
+	remoteDG := dgResource.Data.(*dgModel.RemoteDataGraph)
+
+	importResources := []specs.ImportIds{
+		{
+			URN:      resources.URN(dgResource.ExternalID, datagraph.HandlerMetadata.ResourceType),
+			RemoteID: remoteDG.ID,
+		},
+	}
+
+	modelSpecs, modelImports := p.buildInlineModelSpecs(remoteDG.ID, lookups)
+	importResources = append(importResources, modelImports...)
+
+	metadata := specs.Metadata{
+		Name: datagraph.HandlerMetadata.SpecMetadataName,
+		Import: &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{
+				{
+					WorkspaceID: remoteDG.WorkspaceID,
+					Resources:   importResources,
+				},
+			},
+		},
+	}
+
+	metadataMap, err := metadata.ToMap()
+	if err != nil {
+		return writer.FormattableEntity{}, fmt.Errorf("converting metadata to map: %w", err)
+	}
+
+	specBody := map[string]any{
+		"id":         dgResource.ExternalID,
+		"account_id": remoteDG.AccountID,
+	}
+	if len(modelSpecs) > 0 {
+		specBody["models"] = modelSpecs
+	}
+
+	spec := &specs.Spec{
+		Version:  specs.SpecVersionV1,
+		Kind:     datagraph.HandlerMetadata.SpecKind,
+		Metadata: metadataMap,
+		Spec:     specBody,
+	}
+
+	return writer.FormattableEntity{
+		Content:      spec,
+		RelativePath: filepath.Join("data-graphs", fmt.Sprintf("%s.yaml", dgResource.ExternalID)),
+	}, nil
+}
+
+// buildInlineModelSpecs builds model specs with inline relationships for a single data graph,
+// returning both the specs and the import metadata entries for all included resources
+func (p *Provider) buildInlineModelSpecs(
+	dataGraphID string,
+	lookups *exportLookups,
+) ([]dgModel.ModelSpec, []specs.ImportIds) {
+	dgModels := lookups.modelsByDG[dataGraphID]
+	slices.SortFunc(dgModels, func(a, b *resources.RemoteResource) int {
+		return cmp.Compare(a.ExternalID, b.ExternalID)
+	})
+
+	var (
+		modelSpecs      []dgModel.ModelSpec
+		importResources []specs.ImportIds
+	)
+
+	for _, modelResource := range dgModels {
+		remoteModel := modelResource.Data.(*dgModel.RemoteModel)
+
+		importResources = append(importResources, specs.ImportIds{
+			URN:      resources.URN(modelResource.ExternalID, model.HandlerMetadata.ResourceType),
+			RemoteID: remoteModel.ID,
+		})
+
+		// Sort relationships for this model by external ID
+		key := relKey{dataGraphID: dataGraphID, sourceModelID: remoteModel.ID}
+		modelRels := lookups.relsByKey[key]
+		slices.SortFunc(modelRels, func(a, b *resources.RemoteResource) int {
+			return cmp.Compare(a.ExternalID, b.ExternalID)
+		})
+
+		var relSpecs []dgModel.RelationshipSpec
+		for _, relResource := range modelRels {
+			remoteRel := relResource.Data.(*dgModel.RemoteRelationship)
+
+			// Skip relationships whose target model is not in the importable collection
+			targetExternalID := lookups.modelExternalIDs[remoteRel.TargetModelID]
+			if targetExternalID == "" {
+				continue
+			}
+
+			importResources = append(importResources, specs.ImportIds{
+				URN:      resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
+				RemoteID: remoteRel.ID,
+			})
+
+			relSpecs = append(relSpecs, dgModel.RelationshipSpec{
+				ID:            relResource.ExternalID,
+				DisplayName:   remoteRel.Name,
+				Cardinality:   remoteRel.Cardinality,
+				Target:        fmt.Sprintf("#data-graph-model:%s", targetExternalID),
+				SourceJoinKey: remoteRel.SourceJoinKey,
+				TargetJoinKey: remoteRel.TargetJoinKey,
+			})
+		}
+
+		modelSpecs = append(modelSpecs, dgModel.ModelSpec{
+			ID:            modelResource.ExternalID,
+			DisplayName:   remoteModel.Name,
+			Type:          remoteModel.Type,
+			Table:         remoteModel.TableRef,
+			Description:   remoteModel.Description,
+			Relationships: relSpecs,
+			PrimaryID:     remoteModel.PrimaryID,
+			Root:          remoteModel.Root,
+			Timestamp:     remoteModel.Timestamp,
+		})
+	}
+
+	return modelSpecs, importResources
 }
 
 // parseModelReference parses a model reference like '#data-graph-model:user' and returns the URN
