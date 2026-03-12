@@ -1240,7 +1240,7 @@ func TestTrackingPlanSpecSyntaxValidRule_V1AdditionalProperties(t *testing.T) {
 
 	boolTrue := true
 
-	t.Run("additionalProperties requires nested properties", func(t *testing.T) {
+	t.Run("additional_properties requires nested properties", func(t *testing.T) {
 		spec := localcatalog.TrackingPlanV1{
 			LocalID: "tp_v1",
 			Name:    "Test Plan",
@@ -1261,11 +1261,11 @@ func TestTrackingPlanSpecSyntaxValidRule_V1AdditionalProperties(t *testing.T) {
 
 		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
 		assert.Len(t, results, 1)
-		assert.Equal(t, "/rules/0/properties/0/additionalProperties", extractRefs(results)[0])
-		assert.Equal(t, "additionalProperties is only allowed on properties with nested properties", extractMsgs(results)[0])
+		assert.Equal(t, "/rules/0/properties/0/additional_properties", extractRefs(results)[0])
+		assert.Equal(t, "additional_properties is only allowed on properties with nested properties", extractMsgs(results)[0])
 	})
 
-	t.Run("additionalProperties allowed when nested properties exist", func(t *testing.T) {
+	t.Run("additional_properties allowed when nested properties exist", func(t *testing.T) {
 		spec := localcatalog.TrackingPlanV1{
 			LocalID: "tp_v1",
 			Name:    "Test Plan",
