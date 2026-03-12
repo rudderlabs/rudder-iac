@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
@@ -977,8 +978,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Direct test: We can test the logic by creating a similar structure
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &testorchestrator.TestResults{
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 				{
 					Result: &resp.ValidationOutput.Transformations[0],
 					Definitions: []*transformationsClient.TestDefinition{
@@ -1035,8 +1036,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Verify that nil definitions are handled
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &testorchestrator.TestResults{
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 				{
 					Result:      &resp.ValidationOutput.Transformations[0],
 					Definitions: nil,
