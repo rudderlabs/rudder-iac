@@ -153,6 +153,23 @@ func TestProvider(t *testing.T) {
 			assert.Contains(t, err.Error(), "Legacy versions are not supported")
 		})
 	})
+
+	t.Run("validation rules", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		provider := transformations.NewProviderWithStore(mockStore)
+
+		syntacticRules := provider.SyntacticRules()
+		require.Len(t, syntacticRules, 2)
+		assert.Equal(t, "transformations/transformation/spec-syntax-valid", syntacticRules[0].ID())
+		assert.Equal(t, "transformations/transformation-library/spec-syntax-valid", syntacticRules[1].ID())
+
+		semanticRules := provider.SemanticRules()
+		require.Len(t, semanticRules, 2)
+		assert.Equal(t, "transformations/transformation/semantic-valid", semanticRules[0].ID())
+		assert.Equal(t, "transformations/transformation-library/semantic-valid", semanticRules[1].ID())
+	})
 }
 
 func TestResourceGraph(t *testing.T) {
@@ -371,9 +388,15 @@ func TestResourceGraph(t *testing.T) {
 
 		graph, err := provider.ResourceGraph()
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "transformation trans-1 importing library with import_name 'missingLib' not found")
-		assert.Nil(t, graph)
+		require.NoError(t, err)
+		require.NotNil(t, graph)
+		assert.Len(t, graph.Resources(), 1)
+
+		transURN := "transformation:trans-1"
+		trans, exists := graph.GetResource(transURN)
+		require.True(t, exists)
+		assert.Equal(t, "trans-1", trans.ID())
+		assert.Empty(t, graph.GetDependencies(transURN))
 	})
 
 	// TODO: Implement this test once we have a python parser

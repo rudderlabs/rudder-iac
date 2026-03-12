@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -102,6 +103,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 	for path, rawSpec := range rawSpecs {
 		contexts[path] = &rules.ValidationContext{
 			FilePath: path,
+			FileName: filepath.Base(path),
 			Spec:     rawSpec.Parsed().Spec,
 			Kind:     rawSpec.Parsed().Kind,
 			Version:  rawSpec.Parsed().Version,
@@ -189,6 +191,8 @@ func (e *validationEngine) runValidationRules(
 	diagnostics := make([]Diagnostic, 0)
 	for _, rule := range toValidateAgainst {
 		results := rule.Validate(&rules.ValidationContext{
+			FilePath: path,
+			FileName: filepath.Base(path),
 			Spec:     rawSpec.Parsed().Spec,
 			Kind:     rawSpec.Parsed().Kind,
 			Version:  rawSpec.Parsed().Version,

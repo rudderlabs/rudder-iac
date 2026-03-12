@@ -136,6 +136,43 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			assert.Empty(t, diagnostics)
 		})
 
+		t.Run("per-spec rules receive file path metadata", func(t *testing.T) {
+			t.Parallel()
+
+			rawSpecs := map[string]*specs.RawSpec{
+				"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
+			}
+
+			var (
+				receivedFilePath string
+				receivedFileName string
+			)
+
+			rule := &mockRule{
+				id:        "file-path-rule",
+				severity:  rules.Error,
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
+				validateFn: func(ctx *rules.ValidationContext) []rules.ValidationResult {
+					receivedFilePath = ctx.FilePath
+					receivedFileName = ctx.FileName
+					return nil
+				},
+			}
+
+			registry := rules.NewRegistry()
+			registry.RegisterSyntactic(rule)
+
+			engine, err := NewValidationEngine(registry, nil)
+			require.NoError(t, err)
+
+			diagnostics, err := engine.ValidateSyntax(context.Background(), rawSpecs)
+			require.NoError(t, err)
+
+			assert.Empty(t, diagnostics)
+			assert.Equal(t, "/path/to/test.yaml", receivedFilePath)
+			assert.Equal(t, "test.yaml", receivedFileName)
+		})
+
 		t.Run("multiple specs with multiple errors each", func(t *testing.T) {
 			t.Parallel()
 

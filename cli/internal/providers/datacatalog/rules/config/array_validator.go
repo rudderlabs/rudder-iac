@@ -6,118 +6,124 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// ArrayTypeConfig validates config for array type
-type ArrayTypeConfig struct{}
-
-var allowedArrayKeys = map[string]bool{
-	"itemTypes":   true,
-	"minItems":    true,
-	"maxItems":    true,
-	"uniqueItems": true,
+// ArrayTypeConfig validates config for array type.
+type ArrayTypeConfig struct {
+	// isCustomTypeRef is the caller-supplied matcher for custom type references.
+	// Used for both top-level type resolution and itemTypes entry validation.
+	isCustomTypeRef func(string) bool
 }
 
-// ConfigAllowed returns true for array type
+var allowedArrayKeys = map[ConfigKeyword]bool{
+	KeywordItemTypes:   true,
+	KeywordMinItems:    true,
+	KeywordMaxItems:    true,
+	KeywordUniqueItems: true,
+}
+
+// ConfigAllowed returns true for array type.
 func (a *ArrayTypeConfig) ConfigAllowed() bool {
 	return true
 }
 
-// ValidateField validates a single field for array type
-func (a *ArrayTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedArrayKeys[fieldname] {
+// ValidateField validates a single field for array type.
+func (a *ArrayTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedArrayKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	switch fieldname {
-	case "minItems", "maxItems":
-		if !isInteger(fieldval) {
+	switch field.Keyword {
+	case KeywordMinItems, KeywordMaxItems:
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be an integer", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
-		val, _ := toInteger(fieldval)
+		val, _ := toInteger(field.Value)
 		if val < 0 {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be >= 0", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be >= 0", field.RawKey),
 			}}, nil
 		}
 
-	case "uniqueItems":
-		if _, ok := fieldval.(bool); !ok {
+	case KeywordUniqueItems:
+		if _, ok := field.Value.(bool); !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'uniqueItems' must be a boolean",
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be a boolean", field.RawKey),
 			}}, nil
 		}
 
-	case "itemTypes":
-		itemTypesArray, ok := fieldval.([]any)
+	case KeywordItemTypes:
+		return a.validateItemTypes(field.RawKey, field.Value)
+	}
+
+	return nil, nil
+}
+
+func (a *ArrayTypeConfig) validateItemTypes(rawKey string, fieldval any) ([]rules.ValidationResult, error) {
+	itemTypesArray, ok := fieldval.([]any)
+	if !ok {
+		return []rules.ValidationResult{{
+			Reference: rawKey,
+			Message:   fmt.Sprintf("'%s' must be an array", rawKey),
+		}}, nil
+	}
+
+	if len(itemTypesArray) == 0 {
+		return []rules.ValidationResult{{
+			Reference: rawKey,
+			Message:   fmt.Sprintf("'%s' must contain at least one type", rawKey),
+		}}, nil
+	}
+
+	for idx, itemType := range itemTypesArray {
+		typeStr, ok := itemType.(string)
 		if !ok {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'itemTypes' must be an array",
+				Reference: fmt.Sprintf("%s/%d", rawKey, idx),
+				Message:   fmt.Sprintf("'%v' must be a string value", itemType),
 			}}, nil
 		}
 
-		if len(itemTypesArray) == 0 {
+		if a.isCustomTypeRef != nil && a.isCustomTypeRef(typeStr) {
+			// Custom type reference cannot be paired with other types.
+			if len(itemTypesArray) > 1 {
+				return []rules.ValidationResult{{
+					Reference: fmt.Sprintf("%s/%d", rawKey, idx),
+					Message:   fmt.Sprintf("'%v' custom type reference cannot be paired with other types", itemType),
+				}}, nil
+			}
+			continue
+		}
+
+		if !isValidPrimitiveType(typeStr) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'itemTypes' must contain at least one type",
+				Reference: fmt.Sprintf("%s/%d", rawKey, idx),
+				Message:   fmt.Sprintf("invalid type '%s' in %s, must be a primitive type or custom type reference", typeStr, rawKey),
 			}}, nil
-		}
-
-		for idx, itemType := range itemTypesArray {
-			typeStr, ok := itemType.(string)
-			if !ok {
-				return []rules.ValidationResult{{
-					Reference: fmt.Sprintf("%s/%d", fieldname, idx),
-					Message:   fmt.Sprintf("'%v' must be a string value", itemType),
-				}}, nil
-			}
-
-			// Check if it's a custom type reference (legacy format)
-			if customTypeLegacyReferenceRegex.MatchString(typeStr) {
-				// Custom type reference cannot be paired with other types
-				if len(itemTypesArray) > 1 {
-					return []rules.ValidationResult{{
-						Reference: fmt.Sprintf("%s/%d", fieldname, idx),
-						Message:   fmt.Sprintf("'%v' custom type reference cannot be paired with other types", itemType),
-					}}, nil
-				}
-				// Valid custom type reference - skip primitive type check
-				continue
-			}
-
-			// Must be a valid primitive type
-			if !isValidPrimitiveType(typeStr) {
-				return []rules.ValidationResult{{
-					Reference: fmt.Sprintf("%s/%d", fieldname, idx),
-					Message:   fmt.Sprintf("invalid type '%s' in itemTypes, must be a primitive type or custom type reference", typeStr),
-				}}, nil
-			}
 		}
 	}
 
 	return nil, nil
 }
 
-// ValidateCrossFields validates relationships between array config fields
-func (a *ArrayTypeConfig) ValidateCrossFields(config map[string]any) []rules.ValidationResult {
+// ValidateCrossFields validates relationships between array config fields.
+func (a *ArrayTypeConfig) ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Check minItems <= maxItems
-	minItems, hasMin := config["minItems"]
-	maxItems, hasMax := config["maxItems"]
+	minField, hasMin := config[KeywordMinItems]
+	maxField, hasMax := config[KeywordMaxItems]
 
 	if hasMin && hasMax {
-		minVal, minOk := toInteger(minItems)
-		maxVal, maxOk := toInteger(maxItems)
+		minVal, minOk := toInteger(minField.Value)
+		maxVal, maxOk := toInteger(maxField.Value)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "minItems cannot be greater than maxItems",
+				Message:   fmt.Sprintf("%s cannot be greater than %s", minField.RawKey, maxField.RawKey),
 			})
 		}
 	}

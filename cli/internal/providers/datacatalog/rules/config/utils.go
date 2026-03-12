@@ -3,17 +3,10 @@ package config
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"slices"
 
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
-)
-
-var (
-	// Legacy custom type reference pattern
-	customTypeLegacyReferenceRegex = regexp.MustCompile(
-		catalogRules.CustomTypeLegacyReferenceRegex)
 )
 
 // isNumber checks if value is any numeric type
