@@ -256,8 +256,9 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 
 		results := validateTransformationSpec("", "", specPath, nil, spec)
 
-		assert.Equal(t, []string{"/file"}, extractReferences(results))
-		assert.Equal(t, []string{"path must be a file"}, extractMessages(results))
+		assert.ElementsMatch(t, []string{"/file", "/file"}, extractReferences(results))
+		assert.Contains(t, extractMessages(results), "path must be a file")
+		assert.Contains(t, extractMessages(results), "file extension must be '.js'")
 	})
 
 	t.Run("input and output must be directories", func(t *testing.T) {
@@ -335,6 +336,69 @@ func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {
 			"file: boolean.json must contain valid object or array",
 			"file: invalid.json must contain valid object or array",
 		}, extractMessages(results))
+	})
+
+	t.Run("file extension must match language", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name              string
+			language          string
+			fileName          string
+			expectedReference string
+			expectedMessage   string
+		}{
+			{
+				name:              "javascript with python extension",
+				language:          "javascript",
+				fileName:          "transform.py",
+				expectedReference: "/file",
+				expectedMessage:   "file extension must be '.js'",
+			},
+			{
+				name:              "python with javascript extension",
+				language:          "python",
+				fileName:          "transform.js",
+				expectedReference: "/file",
+				expectedMessage:   "file extension must be '.py'",
+			},
+			{
+				name:              "javascript with wrong extension",
+				language:          "javascript",
+				fileName:          "transform.txt",
+				expectedReference: "/file",
+				expectedMessage:   "file extension must be '.js'",
+			},
+			{
+				name:              "python with no extension",
+				language:          "python",
+				fileName:          "transform",
+				expectedReference: "/file",
+				expectedMessage:   "file extension must be '.py'",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				tmpDir := t.TempDir()
+				specPath := filepath.Join(tmpDir, "spec.yaml")
+				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, tt.fileName), []byte("code"), 0o644))
+
+				spec := specs.TransformationSpec{
+					ID:       "trans-1",
+					Name:     "Transformation",
+					Language: tt.language,
+					File:     tt.fileName,
+				}
+
+				results := validateTransformationSpec("", "", specPath, nil, spec)
+
+				assert.Contains(t, extractReferences(results), tt.expectedReference)
+				assert.Contains(t, extractMessages(results), tt.expectedMessage)
+			})
+		}
 	})
 }
 

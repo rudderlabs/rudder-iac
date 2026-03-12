@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	lrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/library"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -71,12 +72,14 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 func (p *Provider) SyntacticRules() []vrules.Rule {
 	return []vrules.Rule{
 		trules.NewTransformationSpecSyntaxValidRule(),
+		lrules.NewLibrarySpecSyntaxValidRule(),
 	}
 }
 
 func (p *Provider) SemanticRules() []vrules.Rule {
 	return []vrules.Rule{
 		trules.NewTransformationSemanticValidRule(),
+		lrules.NewLibrarySemanticValidRule(),
 	}
 }
 
