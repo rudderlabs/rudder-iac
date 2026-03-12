@@ -171,6 +171,18 @@ func (m *MockDataGraphClient) SetRelationshipExternalID(ctx context.Context, req
 	return nil, nil
 }
 
+// MockAccountNameResolver implements datagraph.AccountNameResolver for testing
+type MockAccountNameResolver struct {
+	GetAccountNameFunc func(ctx context.Context, accountID string) (string, error)
+}
+
+func (m *MockAccountNameResolver) GetAccountName(ctx context.Context, accountID string) (string, error) {
+	if m.GetAccountNameFunc != nil {
+		return m.GetAccountNameFunc(ctx, accountID)
+	}
+	return "", fmt.Errorf("account not found: %s", accountID)
+}
+
 // MockURNResolver implements handler.URNResolver for testing
 type MockURNResolver struct {
 	urnByID map[string]map[string]string // map[resourceType]map[remoteID]urn

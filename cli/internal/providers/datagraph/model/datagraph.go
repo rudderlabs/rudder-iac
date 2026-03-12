@@ -58,6 +58,7 @@ type DataGraphState struct {
 // RemoteDataGraph wraps datagraph.DataGraph to implement RemoteResource interface
 type RemoteDataGraph struct {
 	*datagraph.DataGraph
+	AccountName string // Resolved account name for human-readable naming
 }
 
 // Metadata implements the RemoteResource interface
@@ -66,5 +67,6 @@ func (r RemoteDataGraph) Metadata() handler.RemoteResourceMetadata {
 		ID:          r.ID,
 		ExternalID:  r.ExternalID,
 		WorkspaceID: r.WorkspaceID,
+		Name:        r.AccountName,
 	}
 }

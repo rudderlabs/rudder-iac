@@ -24,12 +24,13 @@ var HandlerMetadata = handler.HandlerMetadata{
 // HandlerImpl implements the HandlerImpl interface for data graph resources
 // Note: The provider handles all spec parsing and resource extraction for data-graph specs
 type HandlerImpl struct {
-	client dgClient.DataGraphStore
+	client          dgClient.DataGraphStore
+	accountResolver AccountNameResolver
 }
 
 // NewHandler creates a new BaseHandler for data graph resources
-func NewHandler(client dgClient.DataGraphStore) *DataGraphHandler {
-	h := &HandlerImpl{client: client}
+func NewHandler(client dgClient.DataGraphStore, accountResolver AccountNameResolver) *DataGraphHandler {
+	h := &HandlerImpl{client: client, accountResolver: accountResolver}
 	return handler.NewHandler(h)
 }
 
@@ -94,9 +95,24 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteD
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
-	// Fetch all data graphs without external IDs using API filtering
 	hasExternalID := false
-	return h.listAllDataGraphs(ctx, &hasExternalID)
+	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve account names for human-readable naming during import
+	for _, dg := range dataGraphs {
+		if h.accountResolver != nil && dg.AccountID != "" {
+			name, err := h.accountResolver.GetAccountName(ctx, dg.AccountID)
+			if err != nil {
+				return nil, fmt.Errorf("resolving account name for data graph %s: %w", dg.ID, err)
+			}
+			dg.AccountName = name
+		}
+	}
+
+	return dataGraphs, nil
 }
 
 func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteDataGraph, urnResolver handler.URNResolver) (*model.DataGraphResource, *model.DataGraphState, error) {
