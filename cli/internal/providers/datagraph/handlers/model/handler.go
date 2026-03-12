@@ -206,8 +206,8 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.RemoteModel, error) {
 	hasExternalID := false
 
-	// First, get all data graphs
-	dataGraphs, err := h.listAllDataGraphs(ctx, nil)
+	// Only fetch unmanaged data graphs — models under managed DGs are not importable
+	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,14 +404,12 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *dgModel.Mo
 	return nil
 }
 
-// FormatForExport formats resources for export
-// Models are exported inline in data-graph specs, so this is not supported
+// FormatForExport is a no-op — export is handled at the provider level for composite specs
 func (h *HandlerImpl) FormatForExport(
 	collection map[string]*dgModel.RemoteModel,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
-	// Models don't have standalone specs - they're exported inline in data-graph specs
 	return nil, nil
 }
 

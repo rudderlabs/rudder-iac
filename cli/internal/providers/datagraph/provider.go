@@ -1,8 +1,10 @@
 package datagraph
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -368,9 +370,18 @@ func (p *Provider) FormatForExport(
 		modelExternalIDs[remote.ID] = m.ExternalID
 	}
 
+	// Sort data graphs by external ID for deterministic output
+	sortedDGs := make([]*resources.RemoteResource, 0, len(importableDataGraphs))
+	for _, dg := range importableDataGraphs {
+		sortedDGs = append(sortedDGs, dg)
+	}
+	slices.SortFunc(sortedDGs, func(a, b *resources.RemoteResource) int {
+		return cmp.Compare(a.ExternalID, b.ExternalID)
+	})
+
 	var result []writer.FormattableEntity
 
-	for _, dgResource := range importableDataGraphs {
+	for _, dgResource := range sortedDGs {
 		remoteDG := dgResource.Data.(*dgModel.RemoteDataGraph)
 
 		// Collect import metadata URNs for all resources in this spec
@@ -381,9 +392,15 @@ func (p *Provider) FormatForExport(
 			},
 		}
 
+		// Sort models for this DG by external ID
+		dgModels := modelsByDG[remoteDG.ID]
+		slices.SortFunc(dgModels, func(a, b *resources.RemoteResource) int {
+			return cmp.Compare(a.ExternalID, b.ExternalID)
+		})
+
 		// Build inline model specs
 		var modelSpecs []dgModel.ModelSpec
-		for _, modelResource := range modelsByDG[remoteDG.ID] {
+		for _, modelResource := range dgModels {
 			remoteModel := modelResource.Data.(*dgModel.RemoteModel)
 
 			importResources = append(importResources, specs.ImportIds{
@@ -391,19 +408,29 @@ func (p *Provider) FormatForExport(
 				RemoteID: remoteModel.ID,
 			})
 
+			// Sort relationships for this model by external ID
+			key := relKey{dataGraphID: remoteDG.ID, sourceModelID: remoteModel.ID}
+			modelRels := relsByKey[key]
+			slices.SortFunc(modelRels, func(a, b *resources.RemoteResource) int {
+				return cmp.Compare(a.ExternalID, b.ExternalID)
+			})
+
 			// Build inline relationship specs for this model
 			var relSpecs []dgModel.RelationshipSpec
-			key := relKey{dataGraphID: remoteDG.ID, sourceModelID: remoteModel.ID}
-			for _, relResource := range relsByKey[key] {
+			for _, relResource := range modelRels {
 				remoteRel := relResource.Data.(*dgModel.RemoteRelationship)
+
+				// Skip relationships whose target model is not in the importable collection
+				targetExternalID := modelExternalIDs[remoteRel.TargetModelID]
+				if targetExternalID == "" {
+					continue
+				}
 
 				importResources = append(importResources, specs.ImportIds{
 					URN:      resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
 					RemoteID: remoteRel.ID,
 				})
 
-				// Resolve target model reference using the importable collection's external IDs
-				targetExternalID := modelExternalIDs[remoteRel.TargetModelID]
 				targetRef := fmt.Sprintf("#data-graph-model:%s", targetExternalID)
 
 				relSpecs = append(relSpecs, dgModel.RelationshipSpec{

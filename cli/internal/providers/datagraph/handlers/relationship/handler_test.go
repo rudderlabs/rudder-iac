@@ -1081,6 +1081,10 @@ func TestLoadRemoteResources(t *testing.T) {
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
 		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+			// Verify only unmanaged data graphs are fetched
+			require.NotNil(t, hasExternalID)
+			assert.False(t, *hasExternalID)
+
 			if page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{

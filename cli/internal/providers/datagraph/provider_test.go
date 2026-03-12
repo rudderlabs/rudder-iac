@@ -786,6 +786,24 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 					},
 				},
 			},
+			// Relationship whose target model is NOT in the importable collection —
+			// should be silently skipped.
+			"rel-remote-2": {
+				ID:         "rel-remote-2",
+				ExternalID: "user-order",
+				Data: &dgModel.RemoteRelationship{
+					Relationship: &dgClient.Relationship{
+						ID:            "rel-remote-2",
+						Name:          "User Order",
+						Cardinality:   "one-to-many",
+						SourceModelID: "model-remote-1",
+						TargetModelID: "model-remote-99", // Not in importable collection
+						DataGraphID:   "dg-remote-1",
+						SourceJoinKey: "user_id",
+						TargetJoinKey: "user_id",
+					},
+				},
+			},
 		},
 	)
 
@@ -819,7 +837,8 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 	ws := metadata.Import.Workspaces[0]
 	assert.Equal(t, "ws-123", ws.WorkspaceID)
 
-	// Should have 4 resources: 1 data graph + 2 models + 1 relationship
+	// Should have 4 resources: 1 DG + 2 models + 1 valid relationship
+	// (the unresolvable-target relationship is excluded)
 	require.Len(t, ws.Resources, 4)
 
 	// Collect URNs for verification
@@ -832,16 +851,24 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 	assert.Equal(t, "model-remote-2", urns[resources.URN("purchase", modelHandler.HandlerMetadata.ResourceType)])
 	assert.Equal(t, "rel-remote-1", urns[resources.URN("purchase-user", relationshipHandler.HandlerMetadata.ResourceType)])
 
+	// Unresolvable-target relationship should NOT appear
+	assert.Empty(t, urns[resources.URN("user-order", relationshipHandler.HandlerMetadata.ResourceType)])
+
 	// Verify relationship target reference is resolved correctly
-	var purchaseModel dgModel.ModelSpec
+	var purchaseModel, userModel dgModel.ModelSpec
 	for _, m := range models {
-		if m.ID == "purchase" {
+		switch m.ID {
+		case "purchase":
 			purchaseModel = m
-			break
+		case "user":
+			userModel = m
 		}
 	}
 	require.Len(t, purchaseModel.Relationships, 1)
 	assert.Equal(t, "#data-graph-model:user", purchaseModel.Relationships[0].Target)
+
+	// User model's unresolvable relationship should have been skipped
+	assert.Empty(t, userModel.Relationships)
 }
 
 func TestFormatForExport_DataGraphWithoutModels(t *testing.T) {
@@ -916,16 +943,15 @@ func TestFormatForExport_MultipleDataGraphs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 
-	// Verify each data graph produces a separate spec file
-	paths := make(map[string]bool)
+	// Verify deterministic ordering — sorted by external ID
+	assert.Equal(t, "data-graphs/dg-one.yaml", result[0].RelativePath)
+	assert.Equal(t, "data-graphs/dg-two.yaml", result[1].RelativePath)
+
 	for _, entity := range result {
-		paths[entity.RelativePath] = true
 		spec := entity.Content.(*specs.Spec)
 		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "data-graph", spec.Kind)
 	}
-	assert.True(t, paths["data-graphs/dg-one.yaml"])
-	assert.True(t, paths["data-graphs/dg-two.yaml"])
 }
 
 func TestFormatForExport_EmptyCollection(t *testing.T) {
