@@ -124,8 +124,7 @@ func TestLoadImportableResources(t *testing.T) {
 }
 
 func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
-	t.Run("resolves and caches account name lookups", func(t *testing.T) {
-		resolverCallCount := 0
+	t.Run("resolves account name", func(t *testing.T) {
 		mockClient := &testutils.MockDataGraphClient{
 			ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
 				if page == 1 {
@@ -133,7 +132,6 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 						Data: []dgClient.DataGraph{
 							{ID: "remote-1", AccountID: "account-1"},
 							{ID: "remote-2", AccountID: "account-2"},
-							{ID: "remote-3", AccountID: "account-1"}, // Shares account with remote-1
 						},
 						Paging: client.Paging{Next: ""},
 					}, nil
@@ -144,7 +142,6 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 
 		mockResolver := &testutils.MockAccountNameResolver{
 			GetAccountNameFunc: func(ctx context.Context, accountID string) (string, error) {
-				resolverCallCount++
 				names := map[string]string{
 					"account-1": "My Warehouse",
 					"account-2": "Production DB",
@@ -159,17 +156,13 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
 		remotes, err := h.LoadImportableResources(context.Background())
 		require.NoError(t, err)
-		require.Len(t, remotes, 3)
+		require.Len(t, remotes, 2)
 		assert.Equal(t, "My Warehouse", remotes[0].AccountName)
 		assert.Equal(t, "Production DB", remotes[1].AccountName)
-		assert.Equal(t, "My Warehouse", remotes[2].AccountName)
 
 		// Verify Metadata() returns account name as Name
 		assert.Equal(t, "My Warehouse", remotes[0].Metadata().Name)
 		assert.Equal(t, "Production DB", remotes[1].Metadata().Name)
-
-		// Resolver should only be called twice — account-1 is cached on second use
-		assert.Equal(t, 2, resolverCallCount, "resolver should be called once per unique account ID")
 	})
 
 	t.Run("returns error when account resolution fails", func(t *testing.T) {

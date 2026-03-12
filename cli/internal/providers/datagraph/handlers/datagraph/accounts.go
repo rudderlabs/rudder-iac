@@ -22,9 +22,14 @@ type accountNameResolver struct {
 	accounts AccountGetter
 }
 
-// NewAccountNameResolver creates a new AccountNameResolver from an AccountGetter
+// NewAccountNameResolver creates a new AccountNameResolver from an AccountGetter.
+// Results are cached for the lifetime of the resolver to avoid duplicate API calls
+// when multiple data graphs share the same account.
 func NewAccountNameResolver(accounts AccountGetter) AccountNameResolver {
-	return &accountNameResolver{accounts: accounts}
+	return &cachedAccountNameResolver{
+		inner: &accountNameResolver{accounts: accounts},
+		cache: make(map[string]string),
+	}
 }
 
 func (r *accountNameResolver) GetAccountName(ctx context.Context, accountID string) (string, error) {
@@ -41,4 +46,22 @@ func (r *accountNameResolver) GetAccountName(ctx context.Context, accountID stri
 	}
 
 	return "", fmt.Errorf("account %s has no name or definition type", accountID)
+}
+
+// cachedAccountNameResolver wraps an AccountNameResolver with an in-memory cache
+type cachedAccountNameResolver struct {
+	inner AccountNameResolver
+	cache map[string]string
+}
+
+func (r *cachedAccountNameResolver) GetAccountName(ctx context.Context, accountID string) (string, error) {
+	if name, ok := r.cache[accountID]; ok {
+		return name, nil
+	}
+	name, err := r.inner.GetAccountName(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+	r.cache[accountID] = name
+	return name, nil
 }

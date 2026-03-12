@@ -101,20 +101,13 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.Rem
 		return nil, err
 	}
 
-	// Resolve account names for human-readable naming during import.
-	// Cache results to avoid duplicate API calls when multiple DGs share an account.
-	accountNames := make(map[string]string)
+	// Resolve account names for human-readable naming during import
 	for _, dg := range dataGraphs {
 		if h.accountResolver != nil && dg.AccountID != "" {
-			if name, cached := accountNames[dg.AccountID]; cached {
-				dg.AccountName = name
-				continue
-			}
 			name, err := h.accountResolver.GetAccountName(ctx, dg.AccountID)
 			if err != nil {
 				return nil, fmt.Errorf("resolving account name for data graph %s: %w", dg.ID, err)
 			}
-			accountNames[dg.AccountID] = name
 			dg.AccountName = name
 		}
 	}

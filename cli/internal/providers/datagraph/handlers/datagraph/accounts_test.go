@@ -69,4 +69,38 @@ func TestAccountNameResolver_GetAccountName(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "fetching account")
 	})
+
+	t.Run("caches results across calls", func(t *testing.T) {
+		callCount := 0
+		getter := &countingAccountGetter{
+			account:   &client.Account{Name: "Cached Warehouse"},
+			callCount: &callCount,
+		}
+		resolver := NewAccountNameResolver(getter)
+
+		name1, err := resolver.GetAccountName(context.Background(), "account-1")
+		require.NoError(t, err)
+		assert.Equal(t, "Cached Warehouse", name1)
+
+		name2, err := resolver.GetAccountName(context.Background(), "account-1")
+		require.NoError(t, err)
+		assert.Equal(t, "Cached Warehouse", name2)
+
+		// Different account ID should trigger a new call
+		name3, err := resolver.GetAccountName(context.Background(), "account-2")
+		require.NoError(t, err)
+		assert.Equal(t, "Cached Warehouse", name3)
+
+		assert.Equal(t, 2, callCount, "API should be called once per unique account ID")
+	})
+}
+
+type countingAccountGetter struct {
+	account   *client.Account
+	callCount *int
+}
+
+func (m *countingAccountGetter) Get(_ context.Context, _ string) (*client.Account, error) {
+	*m.callCount++
+	return m.account, nil
 }
