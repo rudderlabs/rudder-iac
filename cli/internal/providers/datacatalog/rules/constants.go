@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
 const (
@@ -14,22 +15,22 @@ const (
 	customTypeLegacyReferenceTag     = "legacy_custom_type_ref"
 	customTypeReferenceTag           = "custom_type_ref"
 	customTypeLegacyReferenceMessage = "must be of pattern #/custom-types/<group>/<id>"
-	customTypeReferenceMessage       = "must be of pattern #custom-types:<id>"
+	customTypeReferenceMessage       = "must be of pattern #custom-type:<id>"
 
 	propertyLegacyReferenceTag     = "legacy_property_ref"
 	propertyReferenceTag           = "property_ref"
 	propertyLegacyReferenceMessage = "must be of pattern #/properties/<group>/<id>"
-	propertyReferenceMessage       = "must be of pattern #properties:<id>"
+	propertyReferenceMessage       = "must be of pattern #property:<id>"
 
 	eventLegacyReferenceTag     = "legacy_event_ref"
 	eventReferenceTag           = "event_ref"
 	eventLegacyReferenceMessage = "must be of pattern #/events/<group>/<id>"
-	eventReferenceMessage       = "must be of pattern #events:<id>"
+	eventReferenceMessage       = "must be of pattern #event:<id>"
 
 	categoryLegacyReferenceTag     = "legacy_category_ref"
 	categoryReferenceTag           = "category_ref"
 	categoryLegacyReferenceMessage = "must be of pattern #/categories/<group>/<id>"
-	categoryReferenceMessage       = "must be of pattern #categories:<id>"
+	categoryReferenceMessage       = "must be of pattern #category:<id>"
 
 	trackingPlanLegacyReferenceTag     = "legacy_tracking_plan_ref"
 	trackingPlanReferenceTag           = "tracking_plan_ref"
@@ -38,9 +39,9 @@ const (
 
 	// display_name is a shared pattern for human-readable names across resource types
 	// (e.g., category name, tracking plan display_name)
-	displayNameRegexPattern = `^[A-Z_a-z][ \w,.-]{2,64}$`
+	displayNameRegexPattern = `^[A-Z_a-z][ \w,.-]{1,63}[\w,.-]$`
 	displayNameRegexTag     = "display_name"
-	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters"
+	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"
 )
 
 var (
@@ -51,7 +52,7 @@ var (
 
 	CustomTypeReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindCustomTypes,
+		types.CustomTypeResourceType,
 	)
 
 	PropertyLegacyReferenceRegex = fmt.Sprintf(
@@ -61,7 +62,7 @@ var (
 
 	PropertyReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindProperties,
+		types.PropertyResourceType,
 	)
 
 	EventLegacyReferenceRegex = fmt.Sprintf(
@@ -71,7 +72,7 @@ var (
 
 	EventReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindEvents,
+		types.EventResourceType,
 	)
 
 	CategoryLegacyReferenceRegex = fmt.Sprintf(
@@ -81,7 +82,7 @@ var (
 
 	CategoryReferenceRegex = fmt.Sprintf(
 		referenceRegexPattern,
-		localcatalog.KindCategories,
+		types.CategoryResourceType,
 	)
 
 	TrackingPlanLegacyReferenceRegex = fmt.Sprintf(
@@ -119,7 +120,7 @@ func init() {
 		customTypeLegacyReferenceMessage,
 	)
 
-	// #custom-types:<id>
+	// #custom-type:<id> (TypeCustomType, same as category uses TypeCategory)
 	funcs.NewPattern(
 		customTypeReferenceTag,
 		CustomTypeReferenceRegex,
@@ -133,7 +134,7 @@ func init() {
 		propertyLegacyReferenceMessage,
 	)
 
-	// #properties:<id>
+	// #property:<id>
 	funcs.NewPattern(
 		propertyReferenceTag,
 		PropertyReferenceRegex,
@@ -147,7 +148,7 @@ func init() {
 		eventLegacyReferenceMessage,
 	)
 
-	// #events:<id>
+	// #event:<id>
 	funcs.NewPattern(
 		eventReferenceTag,
 		EventReferenceRegex,
@@ -161,7 +162,7 @@ func init() {
 		categoryLegacyReferenceMessage,
 	)
 
-	// #categories:<id>
+	// #category:<id>
 	funcs.NewPattern(
 		categoryReferenceTag,
 		CategoryReferenceRegex,

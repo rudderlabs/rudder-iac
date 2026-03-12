@@ -30,25 +30,25 @@ type PropertyReference struct {
 type VariantsV1 []VariantV1
 
 type VariantV1 struct {
-	Type          string              `json:"type"`
-	Discriminator string              `json:"discriminator"`
-	Cases         []VariantCaseV1     `json:"cases"`
+	Type          string              `json:"type" validate:"required,eq=discriminator"`
+	Discriminator string              `json:"discriminator" validate:"required,pattern=property_ref"`
+	Cases         []VariantCaseV1     `json:"cases" validate:"required,min=1,dive"`
 	Default       DefaultPropertiesV1 `json:"default"`
 }
 
 type DefaultPropertiesV1 struct {
-	Properties []PropertyReferenceV1 `json:"properties"`
+	Properties []PropertyReferenceV1 `json:"properties" validate:"omitempty,dive"`
 }
 
 type VariantCaseV1 struct {
-	DisplayName string                `json:"display_name"`
-	Match       []any                 `json:"match"`
+	DisplayName string                `json:"display_name" validate:"required"`
+	Match       []any                 `json:"match" validate:"required,min=1,array_item_types=string bool integer"`
 	Description string                `json:"description"`
-	Properties  []PropertyReferenceV1 `json:"properties"`
+	Properties  []PropertyReferenceV1 `json:"properties" validate:"required,min=1,dive"`
 }
 
 type PropertyReferenceV1 struct {
-	Property string `json:"property"`
+	Property string `json:"property" validate:"required,pattern=property_ref"`
 	Required bool   `json:"required"`
 }
 

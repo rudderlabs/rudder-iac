@@ -1,10 +1,11 @@
-package funcs
+package variant
 
 import (
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -18,7 +19,7 @@ var validDiscriminatorTypes = []string{"string", "integer", "boolean"}
 //  1. Type validity — discriminator property must be string, integer, or boolean.
 //     For custom type refs, the referenced custom type's own type is validated.
 //  2. Ownership — discriminator must reference a property in the parent's own properties.
-func ValidateVariantDiscriminators(
+func ValidateVariantDiscriminatorsV0(
 	variants localcatalog.Variants,
 	ownPropertyRefs []string,
 	basePath string,
@@ -52,7 +53,7 @@ func ValidateVariantDiscriminators(
 // validateDiscriminatorType looks up the discriminator property in the graph
 // and checks that its type is string, integer, or boolean.
 func validateDiscriminatorType(discriminator, jsonPointer string, graph *resources.Graph) []rules.ValidationResult {
-	resourceType, localID, err := ParseURNRef(discriminator)
+	resourceType, localID, err := funcs.ParseURNRef(discriminator)
 	if err != nil {
 		// Parse errors are already reported by ValidateReferences
 		return nil
@@ -97,17 +98,8 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 		}
 
 		ctType, ok := ctResource.Data()["type"].(string)
-		if !ok {
+		if !ok || isAllowedDiscriminatorType(ctType) {
 			return nil
-		}
-		ctTypes := lo.Map(strings.Split(ctType, ","), func(item string, _ int) string {
-			return strings.TrimSpace(item)
-		})
-
-		for _, vt := range validDiscriminatorTypes {
-			if lo.Contains(ctTypes, vt) {
-				return nil
-			}
 		}
 
 		return []rules.ValidationResult{{
@@ -117,4 +109,16 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 	default:
 		return nil
 	}
+}
+
+func isAllowedDiscriminatorType(input string) bool {
+	rawTypes := lo.Map(strings.Split(input, ","), func(item string, _ int) string {
+		return strings.TrimSpace(item)
+	})
+	for _, allowedType := range validDiscriminatorTypes {
+		if lo.Contains(rawTypes, allowedType) {
+			return true
+		}
+	}
+	return false
 }

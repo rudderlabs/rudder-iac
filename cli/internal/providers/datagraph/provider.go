@@ -169,8 +169,8 @@ func (p *Provider) validateModelSpec(spec *dgModel.ModelSpec) error {
 	if spec.Type != "entity" && spec.Type != "event" {
 		return fmt.Errorf("type must be 'entity' or 'event'")
 	}
-	if spec.Table == "" {
-		return fmt.Errorf("table is required")
+	if !model.TableRefPattern.MatchString(spec.Table) {
+		return fmt.Errorf("table must be a 3-part reference in the format catalog.schema.table")
 	}
 
 	// Type-specific validation

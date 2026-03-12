@@ -128,7 +128,7 @@ func newTestState() *state.State {
 // --- Runner.Run ---
 
 func TestRunnerRun(t *testing.T) {
-	t.Run("returns empty results when no resources to test", func(t *testing.T) {
+	t.Run("returns RunStatusNoResources when no resources to test", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{
 			loadResourcesFromRemoteFunc: func(ctx context.Context) (*resources.RemoteResources, error) {
@@ -146,12 +146,12 @@ func TestRunnerRun(t *testing.T) {
 			workspaceID: "ws-123",
 		}
 
-		results, err := runner.Run(ctx, ModeAll, "")
+		testResults, err := runner.Run(ctx, ModeAll, "")
 
 		require.NoError(t, err)
-		assert.True(t, results.Pass)
-		assert.Empty(t, results.Transformations)
-		assert.Empty(t, results.Libraries)
+		assert.Equal(t, RunStatusNoResources, testResults.Status)
+		assert.Empty(t, testResults.Transformations)
+		assert.Empty(t, testResults.Libraries)
 	})
 
 	t.Run("returns error when loading remote resources fails", func(t *testing.T) {
@@ -294,12 +294,13 @@ func TestRunnerRun(t *testing.T) {
 			}, nil
 		}
 
-		results, err := runner.Run(ctx, ModeAll, "")
+		testResults, err := runner.Run(ctx, ModeAll, "")
 
 		require.NoError(t, err)
-		assert.Len(t, results.Transformations, 1)
-		assert.Empty(t, results.Libraries)
-		assert.Equal(t, "trans-ver-1", results.Transformations[0].Result.VersionID)
+		assert.Equal(t, RunStatusExecuted, testResults.Status)
+		assert.Len(t, testResults.Transformations, 1)
+		assert.Empty(t, testResults.Libraries)
+		assert.Equal(t, "trans-ver-1", testResults.Transformations[0].Result.VersionID)
 	})
 
 	t.Run("successfully runs tests for standalone libraries", func(t *testing.T) {

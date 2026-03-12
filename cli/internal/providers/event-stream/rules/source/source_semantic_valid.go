@@ -80,5 +80,9 @@ func NewSourceSemanticValidRule() rules.Rule {
 			prules.LegacyVersionPatterns(esSource.ResourceKind),
 			validateSourceSemantic,
 		),
+		prules.NewSemanticPatternValidator(
+			prules.V1VersionPatterns(esSource.ResourceKind),
+			validateSourceSemantic,
+		),
 	)
 }

@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -13,6 +14,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
+
+var TableRefPattern = regexp.MustCompile(`^[^.]+\.[^.]+\.[^.]+$`)
 
 type ModelHandler = handler.BaseHandler[struct{}, dgModel.ModelResource, dgModel.ModelState, dgModel.RemoteModel]
 
@@ -68,8 +71,8 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.ModelResource, graph *r
 	if resource.Type != "entity" && resource.Type != "event" {
 		return fmt.Errorf("type must be 'entity' or 'event'")
 	}
-	if resource.Table == "" {
-		return fmt.Errorf("table is required")
+	if !TableRefPattern.MatchString(resource.Table) {
+		return fmt.Errorf("table must be a 3-part reference in the format catalog.schema.table")
 	}
 	if resource.DataGraphRef == nil {
 		return fmt.Errorf("data_graph reference is required")

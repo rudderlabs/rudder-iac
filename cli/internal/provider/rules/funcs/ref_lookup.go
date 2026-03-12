@@ -170,7 +170,7 @@ func hasReferencePattern(validateTag string) bool {
 	return false
 }
 
-// ParseURNRef extracts the resource type and local ID from a URN-format reference.
+// ParseURNRef extracts the normalized resource type and local ID from a URN-format reference.
 // Input:  "#property:user_id"
 // Output: "property", "user_id", nil
 func ParseURNRef(ref string) (string, string, error) {
@@ -179,6 +179,7 @@ func ParseURNRef(ref string) (string, string, error) {
 	if !ok || resourceType == "" || localID == "" {
 		return "", "", fmt.Errorf("expected URN format '#<kind>:<id>', got '%s'", ref)
 	}
+
 	return resourceType, localID, nil
 }
 

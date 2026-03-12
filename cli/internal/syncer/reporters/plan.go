@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -88,14 +89,25 @@ func listResources(b *strings.Builder, label string, resources []string, detailF
 	fmt.Fprintln(b)
 }
 
+func renderPropertyRef(ref *resources.PropertyRef) string {
+	if ref == nil {
+		return ui.Color("<nil>", ui.ColorBlue)
+	}
+	return ui.Color(ref.URN, ui.ColorGreen)
+}
+
 func printable(val any) string {
 	if val == nil {
 		return ui.Color("<nil>", ui.ColorBlue)
 	}
-
+	if ref, ok := val.(*resources.PropertyRef); ok {
+		return renderPropertyRef(ref)
+	}
+	if ref, ok := val.(resources.PropertyRef); ok {
+		return renderPropertyRef(&ref)
+	}
 	if reflect.ValueOf(val).Kind() == reflect.Pointer {
 		return fmt.Sprintf("%v", reflect.ValueOf(val).Elem())
 	}
-
 	return fmt.Sprintf("%v", val)
 }

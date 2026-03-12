@@ -6,56 +6,56 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// IntegerTypeConfig validates config for integer type
+// IntegerTypeConfig validates config for integer type.
 type IntegerTypeConfig struct{}
 
-var allowedIntegerKeys = map[string]bool{
-	"enum":             true,
-	"minimum":          true,
-	"maximum":          true,
-	"exclusiveMinimum": true,
-	"exclusiveMaximum": true,
-	"multipleOf":       true,
+var allowedIntegerKeys = map[ConfigKeyword]bool{
+	KeywordEnum:             true,
+	KeywordMinimum:          true,
+	KeywordMaximum:          true,
+	KeywordExclusiveMinimum: true,
+	KeywordExclusiveMaximum: true,
+	KeywordMultipleOf:       true,
 }
 
-// ConfigAllowed returns true for integer type
+// ConfigAllowed returns true for integer type.
 func (i *IntegerTypeConfig) ConfigAllowed() bool {
 	return true
 }
 
-// ValidateField validates a single field for integer type
-func (i *IntegerTypeConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedIntegerKeys[fieldname] {
+// ValidateField validates a single field for integer type.
+func (i *IntegerTypeConfig) ValidateField(field ResolvedField) ([]rules.ValidationResult, error) {
+	if !allowedIntegerKeys[field.Keyword] {
 		return nil, ErrFieldNotSupported
 	}
 
-	switch fieldname {
-	case "enum":
-		return validateEnum(fieldname, fieldval)
+	switch field.Keyword {
+	case KeywordEnum:
+		return validateEnum(field.RawKey, field.Value)
 
-	case "multipleOf":
-		if !isInteger(fieldval) {
+	case KeywordMultipleOf:
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be an integer", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
 
-		val, _ := toInteger(fieldval)
+		val, _ := toInteger(field.Value)
 		if val <= 0 {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'multipleOf' must be > 0",
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be > 0", field.RawKey),
 			}}, nil
 		}
 
 		return nil, nil
 
 	default:
-		if !isInteger(fieldval) {
+		if !isInteger(field.Value) {
 			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   fmt.Sprintf("'%s' must be an integer", fieldname),
+				Reference: field.RawKey,
+				Message:   fmt.Sprintf("'%s' must be an integer", field.RawKey),
 			}}, nil
 		}
 
@@ -63,38 +63,36 @@ func (i *IntegerTypeConfig) ValidateField(fieldname string, fieldval any) ([]rul
 	}
 }
 
-// ValidateCrossFields validates relationships between integer config fields
-func (i *IntegerTypeConfig) ValidateCrossFields(config map[string]any) []rules.ValidationResult {
+// ValidateCrossFields validates relationships between integer config fields.
+func (i *IntegerTypeConfig) ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Check minimum <= maximum
-	minimum, hasMin := config["minimum"]
-	maximum, hasMax := config["maximum"]
+	minField, hasMin := config[KeywordMinimum]
+	maxField, hasMax := config[KeywordMaximum]
 
 	if hasMin && hasMax {
-		minVal, minOk := toInteger(minimum)
-		maxVal, maxOk := toInteger(maximum)
+		minVal, minOk := toInteger(minField.Value)
+		maxVal, maxOk := toInteger(maxField.Value)
 
 		if minOk && maxOk && minVal > maxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "minimum cannot be greater than maximum",
+				Message:   fmt.Sprintf("%s cannot be greater than %s", minField.RawKey, maxField.RawKey),
 			})
 		}
 	}
 
-	// Check exclusiveMinimum < exclusiveMaximum
-	exMinimum, hasExMin := config["exclusiveMinimum"]
-	exMaximum, hasExMax := config["exclusiveMaximum"]
+	exMinField, hasExMin := config[KeywordExclusiveMinimum]
+	exMaxField, hasExMax := config[KeywordExclusiveMaximum]
 
 	if hasExMin && hasExMax {
-		exMinVal, exMinOk := toInteger(exMinimum)
-		exMaxVal, exMaxOk := toInteger(exMaximum)
+		exMinVal, exMinOk := toInteger(exMinField.Value)
+		exMaxVal, exMaxOk := toInteger(exMaxField.Value)
 
 		if exMinOk && exMaxOk && exMinVal >= exMaxVal {
 			results = append(results, rules.ValidationResult{
 				Reference: "",
-				Message:   "exclusiveMinimum must be less than exclusiveMaximum",
+				Message:   fmt.Sprintf("%s must be less than %s", exMinField.RawKey, exMaxField.RawKey),
 			})
 		}
 	}

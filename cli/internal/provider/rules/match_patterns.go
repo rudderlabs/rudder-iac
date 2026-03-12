@@ -13,3 +13,10 @@ func LegacyVersionPatterns(kind string) []rules.MatchPattern {
 		rules.MatchKindVersion(kind, specs.SpecVersionV0_1Variant),
 	}
 }
+
+// V1VersionPatterns returns MatchPatterns for a kind matching the V1 spec version (rudder/v1).
+func V1VersionPatterns(kind string) []rules.MatchPattern {
+	return []rules.MatchPattern{
+		rules.MatchKindVersion(kind, specs.SpecVersionV1),
+	}
+}
