@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
@@ -160,12 +161,14 @@ func TestProvider(t *testing.T) {
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		syntacticRules := provider.SyntacticRules()
-		require.Len(t, syntacticRules, 1)
+		require.Len(t, syntacticRules, 2)
 		assert.Equal(t, "transformations/transformation/spec-syntax-valid", syntacticRules[0].ID())
+		assert.Equal(t, "transformations/transformation-library/spec-syntax-valid", syntacticRules[1].ID())
 
 		semanticRules := provider.SemanticRules()
-		require.Len(t, semanticRules, 1)
+		require.Len(t, semanticRules, 2)
 		assert.Equal(t, "transformations/transformation/semantic-valid", semanticRules[0].ID())
+		assert.Equal(t, "transformations/transformation-library/semantic-valid", semanticRules[1].ID())
 	})
 }
 
@@ -975,8 +978,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Direct test: We can test the logic by creating a similar structure
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &testorchestrator.TestResults{
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 				{
 					Result: &resp.ValidationOutput.Transformations[0],
 					Definitions: []*transformationsClient.TestDefinition{
@@ -1033,8 +1036,8 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Verify that nil definitions are handled
-		testResults := &model.TestResults{
-			Transformations: []*model.TransformationTestWithDefinitions{
+		testResults := &testorchestrator.TestResults{
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 				{
 					Result:      &resp.ValidationOutput.Transformations[0],
 					Definitions: nil,

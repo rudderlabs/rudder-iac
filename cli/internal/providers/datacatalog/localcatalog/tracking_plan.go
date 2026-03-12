@@ -73,7 +73,7 @@ type TPEventProperty struct {
 }
 
 type TPRule struct {
-	Type       string            `json:"type"`
+	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
 	Event      *TPRuleEvent      `json:"event" validate:"required"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
@@ -321,31 +321,31 @@ func ExtractTrackingPlan(s *specs.Spec) (TrackingPlanV1, error) {
 
 // TrackingPlanV1 represents the V1 spec format for tracking plans
 type TrackingPlanV1 struct {
-	Name        string      `json:"display_name"`
-	LocalID     string      `json:"id"`
-	Description string      `json:"description,omitempty"`
-	Rules       []*TPRuleV1 `json:"rules,omitempty"`
+	Name        string      `json:"display_name" validate:"required,pattern=display_name"`
+	LocalID     string      `json:"id" validate:"required"`
+	Description string      `json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
+	Rules       []*TPRuleV1 `json:"rules,omitempty" validate:"omitempty,dive"`
 	EventProps  []*TPEvent  `json:"event_props,omitempty"`
 }
 
 // TPRuleV1 represents the V1 spec format for tracking plan rules
 type TPRuleV1 struct {
-	Type                 string              `json:"type"`
-	LocalID              string              `json:"id"`
-	Event                string              `json:"event"` // Direct reference instead of object
-	IdentitySection      string              `json:"identity_section,omitempty"`
+	Type                 string              `json:"type" validate:"required,eq=event_rule"`
+	LocalID              string              `json:"id" validate:"required"`
+	Event                string              `json:"event" validate:"required,pattern=event_ref"` // Direct reference instead of object
+	IdentitySection      string              `json:"identity_section,omitempty" validate:"omitempty,oneof=properties traits context.traits"`
 	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
-	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
+	Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
-	Variants             VariantsV1          `json:"variants,omitempty"`
+	Variants             VariantsV1          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
 // TPRulePropertyV1 represents the V1 spec format for tracking plan rule properties
 type TPRulePropertyV1 struct {
-	Property             string              `json:"property"`
+	Property             string              `json:"property" validate:"required,pattern=property_ref"`
 	Required             bool                `json:"required"`
 	AdditionalProperties *bool               `json:"additionalProperties,omitempty"`
-	Properties           []*TPRulePropertyV1 `json:"properties,omitempty"`
+	Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
 }
 
 // FromV0 converts a V0 TPRuleProperty to V1 format
