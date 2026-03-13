@@ -334,7 +334,7 @@ type TPRuleV1 struct {
 	LocalID              string              `json:"id" validate:"required"`
 	Event                string              `json:"event" validate:"required,pattern=event_ref"` // Direct reference instead of object
 	IdentitySection      string              `json:"identity_section,omitempty" validate:"omitempty,oneof=properties traits context.traits"`
-	AdditionalProperties bool                `json:"additionalProperties,omitempty"`
+	AdditionalProperties bool                `json:"additional_properties,omitempty"`
 	Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes             *TPRuleIncludes     `json:"includes,omitempty"`
 	Variants             VariantsV1          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
@@ -344,7 +344,7 @@ type TPRuleV1 struct {
 type TPRulePropertyV1 struct {
 	Property             string              `json:"property" validate:"required,pattern=property_ref"`
 	Required             bool                `json:"required"`
-	AdditionalProperties *bool               `json:"additionalProperties,omitempty"`
+	AdditionalProperties *bool               `json:"additional_properties,omitempty"`
 	Properties           []*TPRulePropertyV1 `json:"properties,omitempty" validate:"omitempty,dive"`
 }
 

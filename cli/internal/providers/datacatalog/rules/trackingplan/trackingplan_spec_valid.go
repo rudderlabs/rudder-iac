@@ -204,8 +204,8 @@ func validateAdditionalPropertiesV1(prop *localcatalog.TPRulePropertyV1, ref str
 
 	if prop.AdditionalProperties != nil && len(prop.Properties) == 0 {
 		results = append(results, rules.ValidationResult{
-			Reference: ref + "/additionalProperties",
-			Message:   "additionalProperties is only allowed on properties with nested properties",
+			Reference: ref + "/additional_properties",
+			Message:   "additional_properties is only allowed on properties with nested properties",
 		})
 	}
 
