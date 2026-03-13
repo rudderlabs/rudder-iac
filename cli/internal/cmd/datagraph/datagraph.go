@@ -9,13 +9,13 @@ import (
 
 func NewCmdDataGraph() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "data-graph <command>",
+		Use:   "data-graphs <command>",
 		Short: "Manage data graphs",
 		Long:  "Manage the lifecycle of data graph resources (models and relationships)",
 		Example: heredoc.Doc(`
-			$ rudder-cli data-graph validate --all
-			$ rudder-cli data-graph validate --modified
-			$ rudder-cli data-graph validate model my-model-id
+			$ rudder-cli data-graphs validate --all
+			$ rudder-cli data-graphs validate --modified
+			$ rudder-cli data-graphs validate model my-model-id
 		`),
 	}
 

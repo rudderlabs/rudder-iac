@@ -47,24 +47,24 @@ func NewCmdValidate() *cobra.Command {
 		`),
 		Example: heredoc.Doc(`
 			# Validate all resources
-			$ rudder-cli data-graph validate --all
+			$ rudder-cli data-graphs validate --all
 
 			# Validate only modified resources
-			$ rudder-cli data-graph validate --modified
+			$ rudder-cli data-graphs validate --modified
 
 			# Validate a specific model
-			$ rudder-cli data-graph validate model my-model-id
+			$ rudder-cli data-graphs validate model my-model-id
 
 			# Validate a specific relationship
-			$ rudder-cli data-graph validate relationship my-relationship-id
+			$ rudder-cli data-graphs validate relationship my-relationship-id
 
 			# Output as JSON
-			$ rudder-cli data-graph validate --all --json
+			$ rudder-cli data-graphs validate --all --json
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.GetConfig()
 			if !cfg.ExperimentalFlags.DataGraph {
-				return fmt.Errorf("data-graph commands require the experimental flag 'data_graph' to be enabled in your configuration")
+				return fmt.Errorf("data-graphs commands require the experimental flag 'data_graph' to be enabled in your configuration")
 			}
 
 			if err := validateFlags(args, all, modified); err != nil {
@@ -86,7 +86,7 @@ func NewCmdValidate() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer func() {
-				telemetry.TrackCommand("data-graph validate", err, []telemetry.KV{
+				telemetry.TrackCommand("data-graphs validate", err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "all", V: all},
 					{K: "modified", V: modified},
