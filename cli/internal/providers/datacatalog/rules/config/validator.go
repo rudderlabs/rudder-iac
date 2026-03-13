@@ -3,54 +3,114 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// TypeConfigValidator validates config keywords for a specific data type
+// ResolvedField holds a single config entry after alias resolution.
+// RawKey is the original user-supplied key (e.g. "minLength" for V0, "min_length" for V1),
+// Keyword is the canonical ConfigKeyword used for dispatch, and Value is the field's value.
+// Both ValidateField and ValidateCrossFields receive ResolvedField so that implementations
+// always have access to the original key for use in Reference/Message output, preserving
+// backward compatibility across schema versions.
+type ResolvedField struct {
+	RawKey  string
+	Keyword ConfigKeyword
+	Value   any
+}
+
+// TypeConfigValidator validates config keywords for a specific data type.
 type TypeConfigValidator interface {
-	// ConfigAllowed returns whether config is allowed for this type
+	// ConfigAllowed returns whether config is allowed for this type.
 	ConfigAllowed() bool
 
-	// ValidateField validates a single config field
+	// ValidateField validates a single config field.
+	// Use field.Keyword for dispatch/matching logic and field.RawKey for Reference/Message output.
 	// Returns:
 	//   - (nil, nil) if field is valid
 	//   - (nil, ErrFieldNotSupported) if field is not applicable to this type
 	//   - ([]ValidationResult, nil) if field is applicable but has validation errors
-	ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error)
+	ValidateField(field ResolvedField) ([]rules.ValidationResult, error)
 
-	// ValidateCrossFields validates relationships between config fields
-	// Only runs if both field values are valid for this type
-	ValidateCrossFields(config map[string]any) []rules.ValidationResult
+	// ValidateCrossFields validates relationships between config fields.
+	// config maps each resolved keyword to its ResolvedField (rawKey + keyword + value).
+	// Implementations must use field.RawKey in error messages so that the original
+	// user-supplied key (e.g. "minLength" for V0, "min_length" for V1) is preserved.
+	ValidateCrossFields(config map[ConfigKeyword]ResolvedField) []rules.ValidationResult
 }
 
-// Sentinel errors for field validation
+// Sentinel errors for field validation.
 var (
 	ErrFieldNotSupported = errors.New("field not supported for this type")
 )
 
-// ValidateConfig validates config map for given type(s).
-// Implements union semantics for field validation and strict semantics for cross-field validation.
+// resolveAliases maps every raw config key to a ResolvedField.
+// Keys with no alias entry are assigned KeywordUnknownField; they are excluded from
+// crossFieldMap so cross-field validators never see them.
+func resolveAliases(
+	config map[string]any,
+	aliases map[string]ConfigKeyword,
+) (fields []ResolvedField, crossFieldMap map[ConfigKeyword]ResolvedField) {
+	crossFieldMap = make(map[ConfigKeyword]ResolvedField, len(config))
+
+	for rawKey, val := range config {
+		kw, ok := aliases[rawKey]
+		if !ok {
+			kw = KeywordUnknownField
+		}
+
+		rf := ResolvedField{RawKey: rawKey, Keyword: kw, Value: val}
+		fields = append(fields, rf)
+
+		if kw != KeywordUnknownField {
+			crossFieldMap[kw] = rf
+		}
+	}
+
+	return fields, crossFieldMap
+}
+
+// ValidateConfig validates config map for given type(s) using V0 camelCase field names.
+// This is the legacy entrypoint; it delegates to ValidateConfigWithOptions with an
+// explicit V0 alias preset so backward compatibility is part of the API contract.
 // validatorOverrides allows callers to inject context-specific validators for specific types;
 // pass nil to use the default validators for all types.
 func ValidateConfig(types []string, config map[string]any, reference string, validatorOverrides map[string]TypeConfigValidator) []rules.ValidationResult {
+	return ValidateConfigWithOptions(
+		types,
+		config,
+		reference,
+		WithFieldAliases(V0FieldAliases),
+		WithCustomTypeRefMatcher(legacyCustomTypeRefMatcher),
+		WithValidatorOverrides(validatorOverrides),
+	)
+}
 
+// ValidateConfigWithOptions validates config map for given type(s) using caller-supplied options.
+// Use WithFieldAliases to supply a V0 or V1 alias preset, WithCustomTypeRefMatcher to configure
+// custom type reference recognition, and WithValidatorOverrides for context-specific overrides.
+func ValidateConfigWithOptions(types []string, config map[string]any, reference string, opts ...ValidateConfigOption) []rules.ValidationResult {
 	if len(config) == 0 {
 		return nil
 	}
 
+	o := newValidateConfigOptions()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(o)
+		}
+	}
+
 	var validators []TypeConfigValidator
 	for _, typeName := range types {
-		validator := getDefaultValidatorForType(typeName)
-		if v, ok := validatorOverrides[typeName]; ok {
+		validator := getDefaultValidatorForType(typeName, *o)
+
+		if v, ok := o.validatorOverrides[typeName]; ok {
 			validator = v
 		}
 
 		if validator == nil {
-			// If we have a type for which a validator
-			// is not found, we skip it as the other syntax validations
-			// from where the type is being used will raise an error
+			// If no validator is found for a type, defer to surrounding syntax validators.
 			continue
 		}
 		validators = append(validators, validator)
@@ -60,11 +120,8 @@ func ValidateConfig(types []string, config map[string]any, reference string, val
 		return nil
 	}
 
-	// Initial check simply verifies that the
-	// config object is allowed based on the type
-	// or not
+	// Verify that config is allowed for at least one of the resolved types.
 	allDisallow := true
-
 	for _, validator := range validators {
 		if validator.ConfigAllowed() {
 			allDisallow = false
@@ -79,30 +136,25 @@ func ValidateConfig(types []string, config map[string]any, reference string, val
 		}}
 	}
 
+	fields, crossFieldMap := resolveAliases(config, o.fieldAliases)
+
 	var results []rules.ValidationResult
 
-	for fieldName, fieldVal := range config {
-		fieldResults := validateFieldUnion(
-			validators,
-			fieldName,
-			fieldVal,
-			reference,
-		)
+	for _, rf := range fields {
+		fieldResults := validateFieldUnion(validators, rf, reference)
 		results = append(results, fieldResults...)
 	}
 
-	crossResults := validateCrossFieldsWithDedup(validators, config, reference)
+	crossResults := validateCrossFieldsWithDedup(validators, crossFieldMap, reference)
 	results = append(results, crossResults...)
 
 	return results
 }
 
-// validateFieldUnion implements union semantics for field validation
-// where in field is valid if ANY validator accepts it
+// validateFieldUnion implements union semantics: a field is valid if ANY validator accepts it.
 func validateFieldUnion(
 	validators []TypeConfigValidator,
-	fieldName string,
-	fieldVal any,
+	field ResolvedField,
 	baseRef string,
 ) []rules.ValidationResult {
 	var (
@@ -111,7 +163,7 @@ func validateFieldUnion(
 	)
 
 	for _, validator := range validators {
-		results, err := validator.ValidateField(fieldName, fieldVal)
+		results, err := validator.ValidateField(field)
 
 		if err == nil && len(results) == 0 {
 			return nil
@@ -124,9 +176,7 @@ func validateFieldUnion(
 		allNotSupported = false
 
 		for i := range results {
-			if !strings.HasPrefix(results[i].Reference, baseRef) {
-				results[i].Reference = joinReference(baseRef, results[i].Reference)
-			}
+			results[i].Reference = joinReference(baseRef, results[i].Reference)
 		}
 
 		collectedResults = append(collectedResults, results...)
@@ -134,32 +184,38 @@ func validateFieldUnion(
 
 	if allNotSupported {
 		return []rules.ValidationResult{{
-			Reference: fmt.Sprintf("%s/%s", baseRef, fieldName),
-			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", fieldName),
+			Reference: joinReference(baseRef, field.RawKey),
+			Message:   fmt.Sprintf("'%s' is not applicable for type(s)", field.RawKey),
 		}}
 	}
 
 	return dedup(collectedResults)
 }
 
-// validateCrossFieldsWithDedup implements strict semantics with deduplication
-func validateCrossFieldsWithDedup(validators []TypeConfigValidator, config map[string]any, baseRef string) []rules.ValidationResult {
+// validateCrossFieldsWithDedup implements strict cross-field semantics with deduplication.
+func validateCrossFieldsWithDedup(
+	validators []TypeConfigValidator,
+	config map[ConfigKeyword]ResolvedField,
+	baseRef string,
+) []rules.ValidationResult {
 	var collectedResults []rules.ValidationResult
 
 	for _, validator := range validators {
 		crossResults := validator.ValidateCrossFields(config)
 
 		for i := range crossResults {
-			crossResults[i].Reference = joinReference(baseRef, crossResults[i].Reference)
+			crossResults[i].Reference = joinReference(
+				baseRef,
+				crossResults[i].Reference,
+			)
 		}
-
 		collectedResults = append(collectedResults, crossResults...)
 	}
 
 	return dedup(collectedResults)
 }
 
-// dedup removes duplicate validation results based on reference and message
+// dedup removes duplicate validation results based on reference and message.
 func dedup(results []rules.ValidationResult) []rules.ValidationResult {
 	type errorKey struct {
 		Reference string
@@ -181,8 +237,9 @@ func dedup(results []rules.ValidationResult) []rules.ValidationResult {
 	return deduplicated
 }
 
-// getDefaultValidatorForType returns validator for given type name
-func getDefaultValidatorForType(typeName string) TypeConfigValidator {
+// getDefaultValidatorForType returns the default validator for a given type name.
+// Built-in types are checked first; the custom type ref matcher is only consulted for unknowns.
+func getDefaultValidatorForType(typeName string, opts validateConfigOptions) TypeConfigValidator {
 	switch typeName {
 	case "string":
 		return &StringTypeConfig{}
@@ -191,7 +248,7 @@ func getDefaultValidatorForType(typeName string) TypeConfigValidator {
 	case "number":
 		return &NumberTypeConfig{}
 	case "array":
-		return &ArrayTypeConfig{}
+		return &ArrayTypeConfig{isCustomTypeRef: opts.customTypeRefMatcher}
 	case "object":
 		return &ObjectTypeConfig{}
 	case "boolean":
@@ -199,8 +256,7 @@ func getDefaultValidatorForType(typeName string) TypeConfigValidator {
 	case "null":
 		return &NullTypeConfig{}
 	default:
-		// It could also be a custom type reference
-		if customTypeLegacyReferenceRegex.MatchString(typeName) {
+		if opts.customTypeRefMatcher != nil && opts.customTypeRefMatcher(typeName) {
 			return &CustomTypeConfig{}
 		}
 		return nil

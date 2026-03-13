@@ -69,11 +69,11 @@ var propConfigExamples = rules.Examples{
 }
 
 // Main validation function for property config validation
-var validatePropertyConfig = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.PropertySpec) []rules.ValidationResult {
+var validatePropertyConfig = func(_ string, version string, _ map[string]any, spec localcatalog.PropertySpec) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	// Validate each property's config
-	for i, property := range Spec.Properties {
+	for i, property := range spec.Properties {
 		if len(property.Config) == 0 {
 			continue
 		}
@@ -89,6 +89,35 @@ var validatePropertyConfig = func(Kind string, Version string, Metadata map[stri
 			property.Config,
 			reference,
 			nil,
+		)
+
+		results = append(results, configResults...)
+	}
+
+	return results
+}
+
+func validatePropertyConfigV1(_ string, _ string, _ map[string]any, spec localcatalog.PropertySpecV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	// Validate each property's config
+	for i, property := range spec.Properties {
+		if len(property.Config) == 0 {
+			continue
+		}
+
+		reference := fmt.Sprintf("/properties/%d/propConfig", i)
+
+		// Parse the type string to get individual types
+		types := parsePropertyType(property.Type)
+
+		// Use the shared config validation abstraction
+		configResults := config.ValidateConfigWithOptions(
+			types,
+			property.Config,
+			reference,
+			config.WithFieldAliases(config.V1FieldAliases),
+			config.WithCustomTypeRefMatcher(config.CurrentCustomTypeRefMatcher),
 		)
 
 		results = append(results, configResults...)
@@ -119,6 +148,10 @@ func NewPropertyConfigValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),
 			validatePropertyConfig,
+		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindProperties),
+			validatePropertyConfigV1,
 		),
 	)
 }

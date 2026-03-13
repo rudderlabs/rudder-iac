@@ -63,35 +63,30 @@ var configExamples = rules.Examples{
 	},
 }
 
-// customTypeObjectConfig is a local validator for a custom type of type object
-// Config is allowed, but only 'additionalProperties' is a recognised field.
+// customTypeObjectConfig is a local validator for a custom type of type object.
+// Config is allowed, but only 'additionalProperties' (boolean) is a recognised field.
+// The keyword is matched via ConfigKeyword so both V0 ("additionalProperties") and
+// V1 ("additional_properties") raw keys resolve correctly through the alias layer.
 type customTypeObjectConfig struct{}
-
-const additionalPropertiesKey = "additionalProperties"
-
-var allowedCustomTypeObjectKeys = map[string]bool{
-	additionalPropertiesKey: true,
-}
 
 func (c *customTypeObjectConfig) ConfigAllowed() bool { return true }
 
-func (c *customTypeObjectConfig) ValidateField(fieldname string, fieldval any) ([]rules.ValidationResult, error) {
-	if !allowedCustomTypeObjectKeys[fieldname] {
+func (c *customTypeObjectConfig) ValidateField(field config.ResolvedField) ([]rules.ValidationResult, error) {
+	if field.Keyword != config.KeywordAdditionalProperties {
 		return nil, config.ErrFieldNotSupported
 	}
-	switch fieldname {
-	case additionalPropertiesKey:
-		if _, ok := fieldval.(bool); !ok {
-			return []rules.ValidationResult{{
-				Reference: fieldname,
-				Message:   "'additionalProperties' must be a boolean",
-			}}, nil
-		}
+
+	if _, ok := field.Value.(bool); !ok {
+		return []rules.ValidationResult{{
+			Reference: field.RawKey,
+			Message:   fmt.Sprintf("'%s' must be a boolean", field.RawKey),
+		}}, nil
 	}
+
 	return nil, nil
 }
 
-func (c *customTypeObjectConfig) ValidateCrossFields(_ map[string]any) []rules.ValidationResult {
+func (c *customTypeObjectConfig) ValidateCrossFields(_ map[config.ConfigKeyword]config.ResolvedField) []rules.ValidationResult {
 	return nil
 }
 
@@ -100,19 +95,18 @@ var customTypeValidatorOverrides = map[string]config.TypeConfigValidator{
 	"object": &customTypeObjectConfig{},
 }
 
-// Main validation function for custom type config validation
-var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[string]any, Spec localcatalog.CustomTypeSpec) []rules.ValidationResult {
+// validateCustomTypeConfig is the main validation function for custom type config
+// using V0 field aliases and legacy custom type reference matcher.
+var validateCustomTypeConfig = func(_ string, version string, _ map[string]any, spec localcatalog.CustomTypeSpec) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	// Validate each custom type's config
-	for i, customType := range Spec.Types {
+	for i, customType := range spec.Types {
 		if len(customType.Config) == 0 {
 			continue
 		}
 
 		reference := fmt.Sprintf("/types/%d/config", i)
 
-		// Use the shared config validation abstraction
 		configResults := config.ValidateConfig(
 			[]string{customType.Type},
 			customType.Config,
@@ -126,7 +120,35 @@ var validateCustomTypeConfig = func(Kind string, Version string, Metadata map[st
 	return results
 }
 
-// NewCustomTypeConfigValidRule creates a new custom type config validation rule using TypedRule pattern
+// validateCustomTypeConfigV1 is the main validation function for custom type config
+// using V1 field aliases and current custom type reference matcher.
+func validateCustomTypeConfigV1(_ string, _ string, _ map[string]any, spec localcatalog.CustomTypeSpecV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	// Validate each custom type's config
+	for i, customType := range spec.Types {
+		if len(customType.Config) == 0 {
+			continue
+		}
+
+		reference := fmt.Sprintf("/types/%d/config", i)
+
+		configResults := config.ValidateConfigWithOptions(
+			[]string{customType.Type},
+			customType.Config,
+			reference,
+			config.WithFieldAliases(config.V1FieldAliases),
+			config.WithCustomTypeRefMatcher(config.CurrentCustomTypeRefMatcher),
+			config.WithValidatorOverrides(customTypeValidatorOverrides),
+		)
+
+		results = append(results, configResults...)
+	}
+
+	return results
+}
+
+// NewCustomTypeConfigValidRule creates a new custom type config validation rule using TypedRule pattern.
 func NewCustomTypeConfigValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		ruleID,
@@ -136,6 +158,10 @@ func NewCustomTypeConfigValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),
 			validateCustomTypeConfig,
+		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindCustomTypes),
+			validateCustomTypeConfigV1,
 		),
 	)
 }

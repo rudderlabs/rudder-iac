@@ -12,30 +12,30 @@ package specs
 // handle names from import statements.
 type TransformationSpec struct {
 	// ID is the unique identifier for this transformation within the project
-	ID string `json:"id" mapstructure:"id"`
+	ID string `json:"id" mapstructure:"id" validate:"required"`
 
 	// Name is the human-readable display name for the transformation
-	Name string `json:"name" mapstructure:"name"`
+	Name string `json:"name" mapstructure:"name" validate:"required"`
 
 	// Description provides additional context about what this transformation does
 	Description string `json:"description" mapstructure:"description"`
 
 	// Language specifies the programming language of the transformation code.
 	// Valid values: "javascript", "python"
-	Language string `json:"language" mapstructure:"language"`
+	Language string `json:"language" mapstructure:"language" validate:"required,oneof=javascript python"`
 
 	// Code contains the inline transformation code.
-	// Mutually exclusive with File. Validation is performed in the handler.
-	Code string `json:"code,omitempty" mapstructure:"code"`
+	// Exactly one of Code or File must be specified.
+	Code string `json:"code,omitempty" mapstructure:"code" validate:"required_without=File,excluded_with=File"`
 
 	// File specifies the path to an external file containing the transformation code.
 	// Relative paths are resolved relative to the spec file's parent directory.
-	// Mutually exclusive with Code. Validation is performed in the handler.
-	File string `json:"file,omitempty" mapstructure:"file"`
+	// Exactly one of File or Code must be specified.
+	File string `json:"file,omitempty" mapstructure:"file" validate:"required_without=Code,excluded_with=Code"`
 
 	// Tests defines the test suites for this transformation.
 	// Tests are local-only and never synced to the RudderStack workspace.
-	Tests []TransformationTest `json:"tests,omitempty" mapstructure:"tests"`
+	Tests []TransformationTest `json:"tests,omitempty" mapstructure:"tests" validate:"omitempty,dive"`
 }
 
 // TransformationTest represents a test suite configuration for a transformation.
@@ -45,7 +45,7 @@ type TransformationSpec struct {
 // Tests are local-only development tools and are never uploaded to RudderStack.
 type TransformationTest struct {
 	// Name is a human-readable identifier for this test suite
-	Name string `json:"name" mapstructure:"name"`
+	Name string `json:"name" mapstructure:"name" validate:"required"`
 
 	// Input is the path to a directory containing JSON files with test event payloads.
 	// Each JSON file will be passed to the transformEvent function.
@@ -73,29 +73,29 @@ type TransformationTest struct {
 // Each library has a unique ImportName (handle name) used in transformation imports.
 type TransformationLibrarySpec struct {
 	// ID is the unique identifier for this library within the project
-	ID string `json:"id" mapstructure:"id"`
+	ID string `json:"id" mapstructure:"id" validate:"required"`
 
 	// Name is the human-readable display name for the library
-	Name string `json:"name" mapstructure:"name"`
+	Name string `json:"name" mapstructure:"name" validate:"required"`
 
 	// Description provides additional context about what this library provides
 	Description string `json:"description" mapstructure:"description"`
 
 	// Language specifies the programming language of the library code.
 	// Valid values: "javascript", "python"
-	Language string `json:"language" mapstructure:"language"`
+	Language string `json:"language" mapstructure:"language" validate:"required,oneof=javascript python"`
 
 	// Code contains the inline library code.
-	// Mutually exclusive with File. Validation is performed in the handler.
-	Code string `json:"code,omitempty" mapstructure:"code"`
+	// Exactly one of Code or File must be specified.
+	Code string `json:"code,omitempty" mapstructure:"code" validate:"required_without=File,excluded_with=File"`
 
 	// File specifies the path to an external file containing the library code.
 	// Relative paths are resolved relative to the spec file's parent directory.
-	// Mutually exclusive with Code. Validation is performed in the handler.
-	File string `json:"file,omitempty" mapstructure:"file"`
+	// Exactly one of File or Code must be specified.
+	File string `json:"file,omitempty" mapstructure:"file" validate:"required_without=Code,excluded_with=Code"`
 
 	// ImportName is the handle name used when importing this library in transformations.
 	// This is typically a camelCase identifier (e.g., "myMathLibrary").
 	// Must be unique within the workspace.
-	ImportName string `json:"import_name" mapstructure:"import_name"`
+	ImportName string `json:"import_name" mapstructure:"import_name" validate:"required"`
 }

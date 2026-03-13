@@ -61,8 +61,8 @@ rules:
 	},
 }
 
-// validateTrackingPlanSpec validates the trackingplan spec including variants
-// using struct tags and go-playground/validator
+// validateTrackingPlanSpec validates the V0 tracking plan spec using struct tags
+// and V0-specific follow-up checks.
 var validateTrackingPlanSpec = func(
 	Kind string,
 	Version string,
@@ -91,6 +91,28 @@ var validateTrackingPlanSpec = func(
 	return results
 }
 
+var validateTrackingPlanSpecV1 = func(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec localcatalog.TrackingPlanV1,
+) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{
+			{
+				Reference: "/rules",
+				Message:   err.Error(),
+			},
+		}
+	}
+
+	results := funcs.ParseValidationErrors(validationErrors, nil)
+	results = append(results, validateRulesV1(spec.Rules)...)
+
+	return results
+}
+
 func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
@@ -106,6 +128,25 @@ func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 				results,
 				validateNestingDepth(prop.Properties, 1, ref)...,
 			)
+		}
+	}
+
+	return results
+}
+
+func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, rule := range tpRules {
+		for j, prop := range rule.Properties {
+			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
+			if len(prop.Properties) > 0 {
+				results = append(
+					results,
+					validateNestingDepthV1(prop.Properties, 1, ref)...,
+				)
+			}
+			results = append(results, validateAdditionalPropertiesV1(prop, ref)...)
 		}
 	}
 
@@ -135,10 +176,49 @@ func validateNestingDepth(properties []*localcatalog.TPRuleProperty, currentDept
 	return results
 }
 
+func validateNestingDepthV1(properties []*localcatalog.TPRulePropertyV1, currentDepth int, rootRef string) []rules.ValidationResult {
+	if currentDepth > maxNestingDepth {
+		return []rules.ValidationResult{{
+			Reference: rootRef,
+			Message:   fmt.Sprintf("maximum property nesting depth of %d levels exceeded", maxNestingDepth),
+		}}
+	}
+
+	var results []rules.ValidationResult
+	for _, prop := range properties {
+		if len(prop.Properties) == 0 {
+			continue
+		}
+
+		results = append(
+			results,
+			validateNestingDepthV1(prop.Properties, currentDepth+1, rootRef)...,
+		)
+	}
+
+	return results
+}
+
+func validateAdditionalPropertiesV1(prop *localcatalog.TPRulePropertyV1, ref string) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	if prop.AdditionalProperties != nil && len(prop.Properties) == 0 {
+		results = append(results, rules.ValidationResult{
+			Reference: ref + "/additional_properties",
+			Message:   "additional_properties is only allowed on properties with nested properties",
+		})
+	}
+
+	for i, nested := range prop.Properties {
+		nestedRef := fmt.Sprintf("%s/properties/%d", ref, i)
+		results = append(results, validateAdditionalPropertiesV1(nested, nestedRef)...)
+	}
+
+	return results
+}
+
 // NewTrackingPlanSpecSyntaxValidRule creates a spec syntax validation rule
-// for trackingplan. This rule validates the syntactic correctness of the trackingplan spec,
-// including variants in trackingplan rules (required fields, types, format) while catalog
-// validators handle semantic checks (reference existence, discriminator in properties).
+// for tracking plans across supported spec versions.
 func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/spec-syntax-valid",
@@ -148,6 +228,10 @@ func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
 			validateTrackingPlanSpec,
+		),
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1),
+			validateTrackingPlanSpecV1,
 		),
 	)
 }

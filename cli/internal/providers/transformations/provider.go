@@ -10,13 +10,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/display"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	lrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/library"
+	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
 
@@ -64,6 +68,20 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("transformation specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
+}
+
+func (p *Provider) SyntacticRules() []vrules.Rule {
+	return []vrules.Rule{
+		trules.NewTransformationSpecSyntaxValidRule(),
+		lrules.NewLibrarySpecSyntaxValidRule(),
+	}
+}
+
+func (p *Provider) SemanticRules() []vrules.Rule {
+	return []vrules.Rule{
+		trules.NewTransformationSemanticValidRule(),
+		lrules.NewLibrarySemanticValidRule(),
+	}
 }
 
 // MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations
@@ -166,18 +184,19 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 
 		handleNames, err := codeParser.ExtractImports(tf.Code)
 		if err != nil {
-			return nil, fmt.Errorf("parsing imports for %s: %w", r.URN(), err)
+			log.Warn("failed to parse imports for transformation",
+				"transformation", r.URN(),
+				"error", err)
 		}
 
 		// Resolve handleNames to library URNs and add dependencies
 		for _, handleName := range handleNames {
 			libraryURN, exists := handleNameToURN[handleName]
 			if !exists {
-				return nil, fmt.Errorf(
-					"transformation %s importing library with import_name '%s' not found",
-					r.ID(),
-					handleName,
-				)
+				log.Warn("transformation import could not be resolved during graph construction",
+					"transformation", r.ID(),
+					"import_name", handleName)
+				continue
 			}
 
 			graph.AddDependency(r.URN(), libraryURN)
@@ -235,7 +254,7 @@ func (p *Provider) ConsolidateSync(ctx context.Context, graph *resources.Graph, 
 		if !resp.Published {
 			// Convert response to TestResults and display using shared result displayer
 			results := p.buildTestResultsFromResponse(req, resp)
-			displayer := NewResultDisplayer(false)
+			displayer := display.NewResultDisplayer(false)
 			displayer.Display(results)
 			return fmt.Errorf("batch publish validation failed")
 		}
@@ -435,7 +454,10 @@ func (p *Provider) resolveTestDefinitions(trans *model.TransformationResource) (
 	return testorchestrator.ResolveTestDefinitions(trans)
 }
 
-func (p *Provider) buildTestResultsFromResponse(req *transformations.BatchPublishRequest, resp *transformations.BatchPublishResponse) *TestResults {
+func (p *Provider) buildTestResultsFromResponse(
+	req *transformations.BatchPublishRequest,
+	resp *transformations.BatchPublishResponse,
+) *testorchestrator.TestResults {
 	testDefsByVersionID := lo.SliceToMap(req.Transformations, func(trans transformations.BatchPublishTransformation) (string, []*transformations.TestDefinition) {
 		defs := lo.Map(trans.TestSuite, func(t transformations.TestDefinition, i int) *transformations.TestDefinition {
 			return &trans.TestSuite[i]
@@ -444,14 +466,14 @@ func (p *Provider) buildTestResultsFromResponse(req *transformations.BatchPublis
 	})
 
 	// Map results to their definitions by matching versionID
-	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *TransformationTestWithDefinitions {
-		return &TransformationTestWithDefinitions{
+	trResults := lo.Map(resp.ValidationOutput.Transformations, func(tr transformations.TransformationTestResult, _ int) *testorchestrator.TransformationTestWithDefinitions {
+		return &testorchestrator.TransformationTestWithDefinitions{
 			Result:      &tr,
 			Definitions: testDefsByVersionID[tr.VersionID],
 		}
 	})
 
-	return &TestResults{
+	return &testorchestrator.TestResults{
 		Libraries:       resp.ValidationOutput.Libraries,
 		Transformations: trResults,
 	}
