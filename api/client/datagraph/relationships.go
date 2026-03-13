@@ -28,6 +28,9 @@ type RelationshipStore interface {
 
 	// SetRelationshipExternalID sets the external ID for a relationship and returns the updated relationship
 	SetRelationshipExternalID(ctx context.Context, req *SetRelationshipExternalIDRequest) (*Relationship, error)
+
+	// ValidateRelationship validates a relationship against the warehouse and returns a validation report
+	ValidateRelationship(ctx context.Context, req *ValidateRelationshipRequest) (*ValidationReport, error)
 }
 
 // ListRelationships lists relationships in a data graph
@@ -190,6 +193,31 @@ func (s *rudderDataGraphClient) SetRelationshipExternalID(ctx context.Context, r
 	}
 
 	var result Relationship
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// ValidateRelationship validates a relationship against the warehouse
+func (s *rudderDataGraphClient) ValidateRelationship(ctx context.Context, req *ValidateRelationshipRequest) (*ValidationReport, error) {
+	if req.DataGraphID == "" {
+		return nil, fmt.Errorf("data graph ID cannot be empty")
+	}
+
+	path := fmt.Sprintf("%s/%s/relationships/validate", dataGraphsBasePath, req.DataGraphID)
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling request: %w", err)
+	}
+
+	resp, err := s.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("validating relationship: %w", err)
+	}
+
+	var result ValidationReport
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}

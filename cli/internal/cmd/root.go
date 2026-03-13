@@ -19,6 +19,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
+	datagraphCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
@@ -96,6 +97,7 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(datagraphCmd.NewCmdDataGraph())
 }
 
 func initConfig() {
