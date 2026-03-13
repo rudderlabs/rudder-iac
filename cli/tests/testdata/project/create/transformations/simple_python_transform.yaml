@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: simple_python_transform
+  name: Simple Python Transform
+  description: Adds timestamp and formats user data
+  language: python
+  file: python/simple_python_transform.py

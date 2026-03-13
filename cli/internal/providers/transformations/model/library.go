@@ -15,7 +15,7 @@ type LibraryResource struct {
 	Name        string `json:"name" mapstructure:"name"`
 	Description string `json:"description" mapstructure:"description"`
 	Language    string `json:"language" mapstructure:"language"`
-	Code        string `json:"code" mapstructure:"code"`               // Resolved from inline or file
+	Code        string `json:"code" mapstructure:"code"` // Resolved from inline or file
 	ImportName  string `json:"import_name" mapstructure:"import_name"`
 }
 

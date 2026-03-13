@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
@@ -876,4 +877,39 @@ func TestLoadImportableResources(t *testing.T) {
 	assert.Equal(t, "", remotes[1].ExternalID)
 	assert.Equal(t, "event", remotes[1].Type)
 	assert.Equal(t, "dg-1", remotes[1].DataGraphID)
+}
+
+// TestModelResourceMapstructureTags verifies that mapstructure.Decode produces
+// snake_case keys from ModelResource, matching what the diff engine expects.
+func TestModelResourceMapstructureTags(t *testing.T) {
+	dataGraphURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
+	dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
+
+	resource := &model.ModelResource{
+		ID:           "user",
+		DisplayName:  "User",
+		Type:         "entity",
+		Table:        "users",
+		Description:  "User entity",
+		DataGraphRef: dataGraphRef,
+		PrimaryID:    "id",
+		Root:         true,
+		Timestamp:    "",
+	}
+
+	var result map[string]interface{}
+	err := mapstructure.Decode(resource, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{
+		"id":           "user",
+		"display_name": "User",
+		"type":         "entity",
+		"table":        "users",
+		"description":  "User entity",
+		"data_graph":   dataGraphRef,
+		"primary_id":   "id",
+		"root":         true,
+		"timestamp":    "",
+	}, result)
 }

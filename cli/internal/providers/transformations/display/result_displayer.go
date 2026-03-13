@@ -1,4 +1,4 @@
-package transformations
+package display
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/samber/lo"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
@@ -59,11 +59,6 @@ const (
 	symbolError    = "✕"
 )
 
-type (
-	TransformationTestWithDefinitions = model.TransformationTestWithDefinitions
-	TestResults                       = model.TestResults
-)
-
 func indent(s string, level int) string {
 	switch level {
 	case 1:
@@ -80,10 +75,10 @@ func newLine() {
 }
 
 /*
-	printIndentedLine("error message", 1, true)
-	// Output:   error message
-	printIndentedLine("prefix: ", 0, false)
-	// Output: prefix: (no newline)
+printIndentedLine("error message", 1, true)
+// Output:   error message
+printIndentedLine("prefix: ", 0, false)
+// Output: prefix: (no newline)
 */
 func printIndentedLine(msg string, level int, newLine bool) {
 	indented := indent(msg, level)
@@ -96,18 +91,19 @@ func printIndentedLine(msg string, level int, newLine bool) {
 }
 
 /*
-	printWithPadding("✓ test-case-1", "passed", 30)
-	// Output: ✓ test-case-1                 passed
-	printWithPadding("✓ test-case-1", "passed", 10)
-	// Output: ✓ test-case-1 passed
+printWithPadding("✓ test-case-1", "passed", 30)
+// Output: ✓ test-case-1                 passed
+printWithPadding("✓ test-case-1", "passed", 10)
+// Output: ✓ test-case-1 passed
 */
 func printWithPadding(leftText, rightText string, rightTextStart int) {
-	padding := max(rightTextStart - len(leftText), 1)
+	padding := max(rightTextStart-len(leftText), 1)
 	ui.Printf("%s%s%s\n", leftText, strings.Repeat(" ", padding), rightText)
 }
 
 /*
 printSection("TEST RESULTS")
+
 	// Output:
 	// TEST RESULTS (bold)
 	// --------------------------------------------------------------------------------
@@ -124,12 +120,12 @@ func printSeparator(char string) {
 }
 
 /*
-	printFullStackTrace([]string{"  at line 42", "  in function foo()"}, 2)
-	// Output:
-	// (blank line)
-	//     Full stack trace:
-	//       at line 42
-	//       in function foo()
+printFullStackTrace([]string{"  at line 42", "  in function foo()"}, 2)
+// Output:
+// (blank line)
+//     Full stack trace:
+//       at line 42
+//       in function foo()
 */
 func printFullStackTrace(lines []string, indent int) {
 	newLine()
@@ -182,7 +178,7 @@ func NewResultDisplayer(verbose bool) *ResultDisplayer {
 }
 
 // Display formats and displays test results
-func (rd *ResultDisplayer) Display(results *TestResults) {
+func (rd *ResultDisplayer) Display(results *testorchestrator.TestResults) {
 	rd.printHeader()
 	rd.displayDefaultTestSuiteWarning(results)
 
@@ -192,7 +188,7 @@ func (rd *ResultDisplayer) Display(results *TestResults) {
 	rd.printSummary()
 }
 
-func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *TestResults) {
+func (rd *ResultDisplayer) displayDefaultTestSuiteWarning(results *testorchestrator.TestResults) {
 	names := results.DefaultSuiteTransformationNames()
 	if len(names) == 0 {
 		return
@@ -269,7 +265,7 @@ func (rd *ResultDisplayer) displayLibraries(libraries []transformations.LibraryT
 	newLine()
 }
 
-func (rd *ResultDisplayer) displayTransformations(transformations []*TransformationTestWithDefinitions) {
+func (rd *ResultDisplayer) displayTransformations(transformations []*testorchestrator.TransformationTestWithDefinitions) {
 	if len(transformations) == 0 {
 		return
 	}
