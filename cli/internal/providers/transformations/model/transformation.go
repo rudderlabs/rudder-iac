@@ -15,8 +15,8 @@ type TransformationResource struct {
 	Name        string                     `json:"name" mapstructure:"name"`
 	Description string                     `json:"description" mapstructure:"description"`
 	Language    string                     `json:"language" mapstructure:"language"`
-	Code        string                     `json:"code" mapstructure:"code"`               // Resolved from inline or file
-	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"`                     // Excluded from state comparison (local test-only field)
+	Code        string                     `json:"code" mapstructure:"code"` // Resolved from inline or file
+	Tests       []specs.TransformationTest `json:"-" mapstructure:"-"`       // Excluded from state comparison (local test-only field)
 }
 
 // TransformationState represents the output state from the remote system
