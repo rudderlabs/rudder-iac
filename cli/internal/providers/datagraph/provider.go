@@ -139,6 +139,24 @@ func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {
 		}
 	}
 
+	// Load import metadata into all handlers so the apply cycle
+	// recognizes these resources as imports (not creates)
+	commonMetadata, err := s.CommonMetadata()
+	if err != nil {
+		return fmt.Errorf("getting common metadata: %w", err)
+	}
+	if commonMetadata.Import != nil {
+		if err := p.dataGraphHandler.LoadImportMetadata(commonMetadata.Import); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
+		if err := p.modelHandler.LoadImportMetadata(commonMetadata.Import); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
+		if err := p.relationshipHandler.LoadImportMetadata(commonMetadata.Import); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
+	}
+
 	return nil
 }
 
