@@ -62,6 +62,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
+
+		// Reserve space for help footer and margins
+		helpHeight := 1
+		tableHeight := max(msg.Height-helpHeight-1, 3)
+		m.table.SetHeight(tableHeight)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
@@ -88,9 +93,11 @@ func (m model) View() string {
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
-	// Main Layout
+	// Main Layout — constrain details pane to match table height
+	tableHeight := m.table.Height() + 1 // +1 for header border
 	detailsStyle := lipgloss.NewStyle().
-		Padding(0, 2)
+		Padding(0, 2).
+		Height(tableHeight)
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -146,7 +153,7 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(len(rows)+1), // +1 for the header
+		table.WithHeight(20),
 	)
 
 	s := table.DefaultStyles()
