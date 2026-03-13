@@ -94,14 +94,15 @@ func (m model) View() string {
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
 	// Main Layout — constrain details pane to match table height
-	tableHeight := m.table.Height() + 1 // +1 for header border
+	tableView := m.table.View()
+	tableHeight := lipgloss.Height(tableView)
 	detailsStyle := lipgloss.NewStyle().
 		Padding(0, 2).
 		Height(tableHeight)
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		m.table.View(),
+		tableView,
 		detailsStyle.Render(fullDetailsView),
 	)
 
