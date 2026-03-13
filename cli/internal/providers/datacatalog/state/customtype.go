@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -147,25 +148,29 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomTypeV
 	}
 	args.Variants = variants
 
-	// BUGGY CODE TO BE FIXED IN A BETTER
-	itemTypes, ok := args.Config["item_types"]
-	if ok {
-
-		for idx, item := range itemTypes.([]any) {
-
-			if !localcatalog.CustomTypeRegex.Match([]byte(item.(string))) {
-				continue
+	// Handle item_type and item_types fields — independent of type above
+	switch {
+	case from.ItemType != "":
+		args.Config["item_types"] = []any{from.ItemType}
+		// override item_types with a PropertyRef if the item_type is a custom type reference
+		if strings.HasPrefix(from.ItemType, "#custom-type:") {
+			customTypeURN := urnFromRef(from.ItemType)
+			if customTypeURN == "" {
+				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", from.ItemType)
 			}
-
-			typesWithPropRef := make([]any, len(itemTypes.([]any)))
-			typesWithPropRef[idx] = resources.PropertyRef{
-				URN:      urnFromRef(item.(string)),
-				Property: "name",
+			args.Config["item_types"] = []any{
+				resources.PropertyRef{
+					URN:      customTypeURN,
+					Property: "name",
+				},
 			}
-
-			args.Config["item_types"] = typesWithPropRef
 		}
-
+	case len(from.ItemTypes) > 0:
+		itemTypes := make([]any, len(from.ItemTypes))
+		for i, itemType := range from.ItemTypes {
+			itemTypes[i] = itemType
+		}
+		args.Config["item_types"] = itemTypes
 	}
 
 	args.Properties = properties

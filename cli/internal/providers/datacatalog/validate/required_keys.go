@@ -297,6 +297,40 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 			})
 		}
 
+		// Validate mutual exclusivity of item_type and item_types fields
+		hasItemType := customType.ItemType != ""
+		hasItemTypes := len(customType.ItemTypes) > 0
+		if hasItemType && hasItemTypes {
+			errors = append(errors, ValidationError{
+				error:     fmt.Errorf("'item_type' and 'item_types' fields are mutually exclusive, only one can be specified"),
+				Reference: reference,
+			})
+		}
+
+		// Validate item_type field (single value, can be a primitive or custom-type ref)
+		if customType.ItemType != "" {
+			if !catalog.CustomTypeRegex.Match([]byte(customType.ItemType)) {
+				if !slices.Contains(ValidTypes, customType.ItemType) {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("item_type '%s' is invalid, valid type values are: %s", customType.ItemType, strings.Join(ValidTypes, ", ")),
+						Reference: reference,
+					})
+				}
+			}
+		}
+
+		// Validate item_types field (multiple item types)
+		if len(customType.ItemTypes) > 0 {
+			for idx, itemType := range customType.ItemTypes {
+				if !slices.Contains(ValidTypes, itemType) {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("item_types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
+						Reference: reference,
+					})
+				}
+			}
+		}
+
 		if customType.Config != nil {
 			switch customType.Type {
 			case "string":
@@ -475,48 +509,6 @@ func (rk *RequiredKeysValidator) validateNumberConfig(config map[string]any, ref
 // validateArrayConfig validates config fields for array type
 func (rk *RequiredKeysValidator) validateArrayConfig(config map[string]any, reference string) []ValidationError {
 	var errors []ValidationError
-
-	// Check item_types is an array with a single item
-	if itemTypes, ok := config["item_types"]; ok {
-		itemTypesArray, ok := itemTypes.([]any)
-		if !ok {
-			errors = append(errors, ValidationError{
-				error:     fmt.Errorf("item_types must be an array"),
-				Reference: reference,
-			})
-		}
-
-		for idx, itemType := range itemTypesArray {
-			val, ok := itemType.(string)
-			if !ok {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("item_types at idx: %d must be string value", idx),
-					Reference: reference,
-				})
-
-				continue
-			}
-
-			if catalog.CustomTypeRegex.Match([]byte(val)) {
-				if len(itemTypesArray) != 1 {
-					errors = append(errors, ValidationError{
-						error:     fmt.Errorf("item_types containing custom type at idx: %d cannot be paired with other types", idx),
-						Reference: reference,
-					})
-				}
-
-				continue
-			}
-
-			if !slices.Contains(ValidTypes, val) {
-				errors = append(errors, ValidationError{
-					error:     fmt.Errorf("item_types at idx: %d is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ",")),
-					Reference: reference,
-				})
-			}
-
-		}
-	}
 
 	// Check numeric fields are numbers
 	numericFields := []string{"minItems", "maxItems"}

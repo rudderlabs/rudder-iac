@@ -127,22 +127,6 @@ func TestCustomTypeValidation(t *testing.T) {
 				errorContains: []string{"minimum must be a number"},
 			},
 			{
-				name: "array type with invalid config",
-				customTypes: []catalog.CustomTypeV1{
-					{
-						LocalID:     "TestType1",
-						Name:        "TestType",
-						Description: "Test custom type",
-						Type:        "array",
-						Config: map[string]any{
-							"item_types": "not-an-array", // Should be an array
-						},
-					},
-				},
-				expectedErrs:  1,
-				errorContains: []string{"item_types must be an array"},
-			},
-			{
 				name: "object type with additionalProperties false is valid",
 				customTypes: []catalog.CustomTypeV1{
 					{
