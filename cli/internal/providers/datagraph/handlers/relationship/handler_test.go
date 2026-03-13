@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
@@ -1399,4 +1400,38 @@ func TestNewHandler(t *testing.T) {
 	handler := NewHandler(mockClient)
 
 	assert.NotNil(t, handler)
+}
+
+// TestRelationshipResourceMapstructureTags verifies that mapstructure.Decode produces
+// snake_case keys from RelationshipResource, matching what the diff engine expects.
+func TestRelationshipResourceMapstructureTags(t *testing.T) {
+	dataGraphRef := createResolvedDataGraphRef("my-dg", "dg-remote-1")
+	sourceRef := createResolvedModelRef("user", "em-1")
+	targetRef := createResolvedModelRef("order", "em-2")
+
+	resource := &dgModel.RelationshipResource{
+		ID:             "user-order",
+		DisplayName:    "User Orders",
+		DataGraphRef:   dataGraphRef,
+		SourceModelRef: sourceRef,
+		TargetModelRef: targetRef,
+		SourceJoinKey:  "id",
+		TargetJoinKey:  "user_id",
+		Cardinality:    "one-to-many",
+	}
+
+	var result map[string]interface{}
+	err := mapstructure.Decode(resource, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{
+		"id":              "user-order",
+		"display_name":    "User Orders",
+		"data_graph":      dataGraphRef,
+		"source":          sourceRef,
+		"target":          targetRef,
+		"source_join_key": "id",
+		"target_join_key": "user_id",
+		"cardinality":     "one-to-many",
+	}, result)
 }

@@ -87,6 +87,36 @@ For each resource type:
 
    **Rule**: Every field in a `Spec` struct needs both tags with matching field names. The `mapstructure` tag should match the YAML field name exactly (including snake_case).
 
+   **CRITICAL: Mapstructure Tags Required for Resource Structs**
+
+   All `Res` (Resource) structs **must** also include `mapstructure` tags using the **same field names as the corresponding `Spec` struct**. This is required for two reasons that work together:
+
+   - `Spec` tags ensure YAML fields decode correctly into Go structs
+   - `Res` tags ensure diff output shows the same field names users see in their YAML specs
+
+   The diff engine (`cli/internal/syncer/differ/diff.go`) calls `mapstructure.Decode(resource.RawData(), &map)` to build comparison maps. Without tags, Go field names (PascalCase) become the map keys — so users see `DisplayName` in a diff instead of the `display_name` they wrote in their spec.
+
+   ```go
+   // ✅ CORRECT — Spec and Resource use matching field names; diffs show what users wrote
+   type RelationshipSpec struct {
+       DisplayName string `json:"display_name" mapstructure:"display_name"`
+       Target      string `json:"target"       mapstructure:"target"`
+   }
+
+   type RelationshipResource struct {
+       DisplayName    string                 `mapstructure:"display_name"`
+       TargetModelRef *resources.PropertyRef `mapstructure:"target"` // matches spec's "target" field
+   }
+
+   // ❌ WRONG — Resource missing tags; diff shows PascalCase names users don't recognize
+   type ModelResource struct {
+       DisplayName  string
+       DataGraphRef *resources.PropertyRef
+   }
+   ```
+
+   **Rule**: Every field in a `Res` struct needs a `mapstructure` tag that matches the corresponding `Spec` field name exactly.
+
 2. **Implement Handler** in `handlers/<resource>/handler.go`:
    - Create `HandlerImpl` struct with API client
    - Implement all `HandlerImpl[Spec, Res, State, Remote]` methods
@@ -436,6 +466,7 @@ Two-phase validation:
 
 - [ ] Data types defined (Spec, Res, State, Remote)
 - [ ] Spec structs include both `json` and `mapstructure` tags for all fields
+- [ ] Resource (Res) structs include `mapstructure` tags matching the Spec field names (required for correct diff display)
 - [ ] Remote implements `RemoteResource` with value receiver
 - [ ] HandlerMetadata configured (ResourceType, SpecKind, SpecMetadataName)
 - [ ] All HandlerImpl methods implemented:
