@@ -17,7 +17,7 @@ import (
 func TestValidateModel_Success(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
 		ValidateModelFunc: func(ctx context.Context, req *dgClient.ValidateModelRequest) (*dgClient.ValidationReport, error) {
-			assert.Equal(t, "dg-remote-123", req.DataGraphID)
+			assert.Equal(t, "acc-123", req.AccountID)
 			assert.Equal(t, "entity", req.Type)
 			assert.Equal(t, "cat.sch.users", req.TableRef)
 			return &dgClient.ValidationReport{
@@ -31,7 +31,7 @@ func TestValidateModel_Success(t *testing.T) {
 	unit := &ValidationUnit{
 		ResourceType: "model",
 		ID:           "user",
-		DataGraphID:  "dg-remote-123",
+		AccountID:  "acc-123",
 		Resource: &dgModel.ModelResource{
 			ID:          "user",
 			DisplayName: "User",
@@ -61,7 +61,7 @@ func TestValidateModel_APIError(t *testing.T) {
 	unit := &ValidationUnit{
 		ResourceType: "model",
 		ID:           "user",
-		DataGraphID:  "dg-remote-123",
+		AccountID:  "acc-123",
 		Resource: &dgModel.ModelResource{
 			ID:          "user",
 			DisplayName: "User",
@@ -89,7 +89,7 @@ func TestValidateRelationship_Success(t *testing.T) {
 
 	mockClient := &testutils.MockDataGraphClient{
 		ValidateRelationshipFunc: func(ctx context.Context, req *dgClient.ValidateRelationshipRequest) (*dgClient.ValidationReport, error) {
-			assert.Equal(t, "dg-remote-123", req.DataGraphID)
+			assert.Equal(t, "acc-123", req.AccountID)
 			assert.Equal(t, "one-to-many", req.Cardinality)
 			assert.Equal(t, "cat.sch.users", req.SourceModel.TableRef)
 			assert.Equal(t, "id", req.SourceModel.JoinKey)
@@ -105,7 +105,7 @@ func TestValidateRelationship_Success(t *testing.T) {
 	unit := &ValidationUnit{
 		ResourceType: "relationship",
 		ID:           "user-orders",
-		DataGraphID:  "dg-remote-123",
+		AccountID:  "acc-123",
 		Resource: &dgModel.RelationshipResource{
 			ID:             "user-orders",
 			DisplayName:    "User Orders",
@@ -133,7 +133,7 @@ func TestValidateRelationship_ModelNotInGraph(t *testing.T) {
 	unit := &ValidationUnit{
 		ResourceType: "relationship",
 		ID:           "user-orders",
-		DataGraphID:  "dg-remote-123",
+		AccountID:  "acc-123",
 		Resource: &dgModel.RelationshipResource{
 			ID:             "user-orders",
 			DisplayName:    "User Orders",
@@ -161,13 +161,13 @@ func TestRunValidationTasks_Concurrent(t *testing.T) {
 		{
 			ResourceType: "model",
 			ID:           "model-1",
-			DataGraphID:  "dg-123",
+			AccountID:  "acc-123",
 			Resource:     &dgModel.ModelResource{ID: "model-1", DisplayName: "M1", Type: "entity", Table: "cat.sch.t1", PrimaryID: "id"},
 		},
 		{
 			ResourceType: "model",
 			ID:           "model-2",
-			DataGraphID:  "dg-123",
+			AccountID:  "acc-123",
 			Resource:     &dgModel.ModelResource{ID: "model-2", DisplayName: "M2", Type: "event", Table: "cat.sch.t2", Timestamp: "ts"},
 		},
 	}

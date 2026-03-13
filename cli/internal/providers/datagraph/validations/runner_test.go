@@ -6,22 +6,19 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveDataGraphIDs(t *testing.T) {
-	runner := &Runner{graph: resources.NewGraph()}
+func TestResolveAccountIDs(t *testing.T) {
+	graph := resources.NewGraph()
 
 	dgURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
+	dgRes := &dgModel.DataGraphResource{ID: "my-dg", AccountID: "acc-456"}
+	graph.AddResource(resources.NewResource("my-dg", datagraph.HandlerMetadata.ResourceType,
+		resources.ResourceData{"AccountID": "acc-456"}, nil, resources.WithRawData(dgRes)))
 
-	remoteState := state.EmptyState()
-	remoteState.AddResource(&state.ResourceState{
-		ID:        "my-dg",
-		Type:      datagraph.HandlerMetadata.ResourceType,
-		OutputRaw: &dgModel.DataGraphState{ID: "dg-remote-456"},
-	})
+	runner := &Runner{graph: graph}
 
 	plan := &ValidationPlan{
 		Units: []*ValidationUnit{
@@ -36,16 +33,16 @@ func TestResolveDataGraphIDs(t *testing.T) {
 		},
 	}
 
-	err := runner.resolveDataGraphIDs(plan, remoteState)
+	err := runner.resolveAccountIDs(plan)
 	require.NoError(t, err)
-	assert.Equal(t, "dg-remote-456", plan.Units[0].DataGraphID)
+	assert.Equal(t, "acc-456", plan.Units[0].AccountID)
 }
 
-func TestResolveDataGraphIDs_NotSynced(t *testing.T) {
-	runner := &Runner{graph: resources.NewGraph()}
+func TestResolveAccountIDs_NotInGraph(t *testing.T) {
+	graph := resources.NewGraph()
+	runner := &Runner{graph: graph}
 
 	dgURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
-	remoteState := state.EmptyState()
 
 	plan := &ValidationPlan{
 		Units: []*ValidationUnit{
@@ -60,9 +57,9 @@ func TestResolveDataGraphIDs_NotSynced(t *testing.T) {
 		},
 	}
 
-	err := runner.resolveDataGraphIDs(plan, remoteState)
+	err := runner.resolveAccountIDs(plan)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "has not been synced yet")
+	assert.Contains(t, err.Error(), "not found in local graph")
 }
 
 func TestFindDataGraphURN_Model(t *testing.T) {

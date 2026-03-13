@@ -7,10 +7,8 @@ import (
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
@@ -43,18 +41,21 @@ func NewRunner(client dgClient.DataGraphClient, loader remoteStateLoader, graph 
 func (r *Runner) Run(ctx context.Context, mode Mode, resourceType, targetID, workspaceID string) (*ValidationResults, error) {
 	validationLog.Info("Starting validation run", "mode", mode, "resourceType", resourceType, "targetID", targetID)
 
-	// Load remote state for --modified mode and for data graph ID resolution
-	remoteResources, err := r.loader.LoadResourcesFromRemote(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("loading remote resources: %w", err)
-	}
+	// Only load remote state for --modified mode (needed for diff computation)
+	var remoteGraph *resources.Graph
+	if mode == ModeModified {
+		remoteResources, err := r.loader.LoadResourcesFromRemote(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading remote resources: %w", err)
+		}
 
-	remoteState, err := r.loader.MapRemoteToState(remoteResources)
-	if err != nil {
-		return nil, fmt.Errorf("building remote state: %w", err)
-	}
+		remoteState, err := r.loader.MapRemoteToState(remoteResources)
+		if err != nil {
+			return nil, fmt.Errorf("building remote state: %w", err)
+		}
 
-	remoteGraph := syncer.StateToGraph(remoteState)
+		remoteGraph = syncer.StateToGraph(remoteState)
+	}
 
 	// Build plan
 	planner := NewPlanner(r.graph)
@@ -69,8 +70,8 @@ func (r *Runner) Run(ctx context.Context, mode Mode, resourceType, targetID, wor
 
 	validationLog.Info("Validation plan created", "units", len(plan.Units))
 
-	// Resolve data graph remote IDs for each unit
-	if err := r.resolveDataGraphIDs(plan, remoteState); err != nil {
+	// Resolve account IDs from the local graph
+	if err := r.resolveAccountIDs(plan); err != nil {
 		return nil, err
 	}
 
@@ -83,19 +84,10 @@ func (r *Runner) Run(ctx context.Context, mode Mode, resourceType, targetID, wor
 	}, nil
 }
 
-// resolveDataGraphIDs resolves the remote data graph ID for each validation unit.
-// The validate endpoints need the data graph's remote ID in the URL path.
-func (r *Runner) resolveDataGraphIDs(plan *ValidationPlan, remoteState *state.State) error {
-	// Build a cache of data graph URN -> remote ID from state
-	dgRemoteIDs := make(map[string]string)
-	for urn, rs := range remoteState.Resources {
-		if rs.Type == datagraph.HandlerMetadata.ResourceType {
-			dgState, ok := rs.OutputRaw.(*dgModel.DataGraphState)
-			if ok {
-				dgRemoteIDs[urn] = dgState.ID
-			}
-		}
-	}
+// resolveAccountIDs resolves the account ID for each validation unit by looking up
+// the parent data graph resource in the local graph.
+func (r *Runner) resolveAccountIDs(plan *ValidationPlan) error {
+	cache := make(map[string]string)
 
 	for _, unit := range plan.Units {
 		dgURN := r.findDataGraphURN(unit)
@@ -103,12 +95,23 @@ func (r *Runner) resolveDataGraphIDs(plan *ValidationPlan, remoteState *state.St
 			return fmt.Errorf("could not determine data graph for resource %s/%s", unit.ResourceType, unit.ID)
 		}
 
-		remoteID, ok := dgRemoteIDs[dgURN]
+		accountID, ok := cache[dgURN]
 		if !ok {
-			return fmt.Errorf("data graph %s has not been synced yet — run 'apply' first to create it remotely", dgURN)
+			res, exists := r.graph.GetResource(dgURN)
+			if !exists {
+				return fmt.Errorf("data graph %s not found in local graph", dgURN)
+			}
+
+			dgRes, ok := res.RawData().(*dgModel.DataGraphResource)
+			if !ok {
+				return fmt.Errorf("resource %s is not a data graph", dgURN)
+			}
+
+			accountID = dgRes.AccountID
+			cache[dgURN] = accountID
 		}
 
-		unit.DataGraphID = remoteID
+		unit.AccountID = accountID
 	}
 
 	return nil

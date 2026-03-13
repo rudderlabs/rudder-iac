@@ -735,8 +735,8 @@ func TestSetModelExternalID_Event(t *testing.T) {
 func TestValidateModel_Entity(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"type":"entity","tableRef":"catalog.schema.users","primaryId":"id","root":true}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/validate", expected)
+			expected := `{"accountId":"acc-123","type":"entity","tableRef":"catalog.schema.users","primaryId":"id","root":true}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/models/validate", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -750,11 +750,11 @@ func TestValidateModel_Entity(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	result, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
-		DataGraphID: "dg-123",
-		Type:        "entity",
-		TableRef:    "catalog.schema.users",
-		PrimaryID:   "id",
-		Root:        true,
+		AccountID: "acc-123",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
+		Root:      true,
 	})
 	require.NoError(t, err)
 
@@ -771,8 +771,8 @@ func TestValidateModel_Entity(t *testing.T) {
 func TestValidateModel_Event(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"type":"event","tableRef":"catalog.schema.purchases","timestamp":"event_time"}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/validate", expected)
+			expected := `{"accountId":"acc-123","type":"event","tableRef":"catalog.schema.purchases","timestamp":"event_time"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/models/validate", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody:   `{"issues": []}`,
@@ -781,10 +781,10 @@ func TestValidateModel_Event(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	result, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
-		DataGraphID: "dg-123",
-		Type:        "event",
-		TableRef:    "catalog.schema.purchases",
-		Timestamp:   "event_time",
+		AccountID: "acc-123",
+		Type:      "event",
+		TableRef:  "catalog.schema.purchases",
+		Timestamp: "event_time",
 	})
 	require.NoError(t, err)
 
@@ -795,24 +795,24 @@ func TestValidateModel_Event(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestValidateModel_EmptyDataGraphID(t *testing.T) {
+func TestValidateModel_EmptyAccountID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t)
 	store := newTestStore(t, httpClient)
 
 	_, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
-		DataGraphID: "",
-		Type:        "entity",
-		TableRef:    "catalog.schema.users",
-		PrimaryID:   "id",
+		AccountID: "",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "data graph ID cannot be empty")
+	assert.Contains(t, err.Error(), "account ID cannot be empty")
 }
 
 func TestValidateModel_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/dg-123/models/validate"
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/models/validate"
 		},
 		ResponseStatus: 400,
 		ResponseBody:   `{"error":"Bad Request"}`,
@@ -821,10 +821,10 @@ func TestValidateModel_APIError(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
-		DataGraphID: "dg-123",
-		Type:        "entity",
-		TableRef:    "catalog.schema.users",
-		PrimaryID:   "id",
+		AccountID: "acc-123",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validating model")

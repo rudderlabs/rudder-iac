@@ -202,11 +202,11 @@ func (s *rudderDataGraphClient) SetRelationshipExternalID(ctx context.Context, r
 
 // ValidateRelationship validates a relationship against the warehouse
 func (s *rudderDataGraphClient) ValidateRelationship(ctx context.Context, req *ValidateRelationshipRequest) (*ValidationReport, error) {
-	if req.DataGraphID == "" {
-		return nil, fmt.Errorf("data graph ID cannot be empty")
+	if req.AccountID == "" {
+		return nil, fmt.Errorf("account ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/relationships/validate", dataGraphsBasePath, req.DataGraphID)
+	path := fmt.Sprintf("%s/relationships/validate", dataGraphsBasePath)
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)

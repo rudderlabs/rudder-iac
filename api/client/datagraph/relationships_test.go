@@ -421,8 +421,8 @@ func TestSetRelationshipExternalID(t *testing.T) {
 func TestValidateRelationship(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			expected := `{"cardinality":"one-to-many","sourceModel":{"tableRef":"catalog.schema.users","joinKey":"id"},"targetModel":{"tableRef":"catalog.schema.orders","joinKey":"user_id"}}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/dg-123/relationships/validate", expected)
+			expected := `{"accountId":"acc-123","cardinality":"one-to-many","sourceModel":{"tableRef":"catalog.schema.users","joinKey":"id"},"targetModel":{"tableRef":"catalog.schema.orders","joinKey":"user_id"}}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/relationships/validate", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -435,7 +435,7 @@ func TestValidateRelationship(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	result, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
-		DataGraphID: "dg-123",
+		AccountID:   "acc-123",
 		Cardinality: "one-to-many",
 		SourceModel: datagraph.ValidationModelRef{
 			TableRef: "catalog.schema.users",
@@ -460,7 +460,7 @@ func TestValidateRelationship(t *testing.T) {
 func TestValidateRelationship_NoIssues(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/dg-123/relationships/validate"
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/relationships/validate"
 		},
 		ResponseStatus: 200,
 		ResponseBody:   `{"issues": []}`,
@@ -469,7 +469,7 @@ func TestValidateRelationship_NoIssues(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	result, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
-		DataGraphID: "dg-123",
+		AccountID:   "acc-123",
 		Cardinality: "one-to-many",
 		SourceModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.users", JoinKey: "id"},
 		TargetModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.orders", JoinKey: "user_id"},
@@ -483,22 +483,22 @@ func TestValidateRelationship_NoIssues(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestValidateRelationship_EmptyDataGraphID(t *testing.T) {
+func TestValidateRelationship_EmptyAccountID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t)
 	store := newTestStore(t, httpClient)
 
 	_, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
-		DataGraphID: "",
+		AccountID:   "",
 		Cardinality: "one-to-many",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "data graph ID cannot be empty")
+	assert.Contains(t, err.Error(), "account ID cannot be empty")
 }
 
 func TestValidateRelationship_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/dg-123/relationships/validate"
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/relationships/validate"
 		},
 		ResponseStatus: 400,
 		ResponseBody:   `{"error":"Bad Request"}`,
@@ -507,7 +507,7 @@ func TestValidateRelationship_APIError(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
-		DataGraphID: "dg-123",
+		AccountID:   "acc-123",
 		Cardinality: "one-to-many",
 		SourceModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.users", JoinKey: "id"},
 		TargetModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.orders", JoinKey: "user_id"},

@@ -227,11 +227,11 @@ func (s *rudderDataGraphClient) SetModelExternalID(ctx context.Context, req *Set
 
 // ValidateModel validates a model against the warehouse
 func (s *rudderDataGraphClient) ValidateModel(ctx context.Context, req *ValidateModelRequest) (*ValidationReport, error) {
-	if req.DataGraphID == "" {
-		return nil, fmt.Errorf("data graph ID cannot be empty")
+	if req.AccountID == "" {
+		return nil, fmt.Errorf("account ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/models/validate", dataGraphsBasePath, req.DataGraphID)
+	path := fmt.Sprintf("%s/models/validate", dataGraphsBasePath)
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling request: %w", err)

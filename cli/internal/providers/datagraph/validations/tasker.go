@@ -82,12 +82,12 @@ func validateModel(ctx context.Context, client dgClient.DataGraphClient, unit *V
 	modelRes := unit.Resource.(*dgModel.ModelResource)
 
 	req := &dgClient.ValidateModelRequest{
-		DataGraphID: unit.DataGraphID,
-		Type:        modelRes.Type,
-		TableRef:    modelRes.Table,
-		PrimaryID:   modelRes.PrimaryID,
-		Root:        modelRes.Root,
-		Timestamp:   modelRes.Timestamp,
+		AccountID: unit.AccountID,
+		Type:      modelRes.Type,
+		TableRef:  modelRes.Table,
+		PrimaryID: modelRes.PrimaryID,
+		Root:      modelRes.Root,
+		Timestamp: modelRes.Timestamp,
 	}
 
 	report, err := client.ValidateModel(ctx, req)
@@ -133,7 +133,7 @@ func validateRelationship(ctx context.Context, client dgClient.DataGraphClient, 
 	}
 
 	req := &dgClient.ValidateRelationshipRequest{
-		DataGraphID: unit.DataGraphID,
+		AccountID:   unit.AccountID,
 		Cardinality: relRes.Cardinality,
 		SourceModel: dgClient.ValidationModelRef{
 			TableRef: sourceTableRef,

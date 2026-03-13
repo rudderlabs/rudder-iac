@@ -199,7 +199,7 @@ type ListRelationshipsResponse struct {
 
 // ValidateModelRequest is the request body for validating a model against the warehouse
 type ValidateModelRequest struct {
-	DataGraphID string `json:"-"` // Path parameter
+	AccountID string `json:"accountId"` // Account ID from the data graph spec
 
 	Type      string `json:"type"`               // "entity" or "event" - REQUIRED
 	TableRef  string `json:"tableRef"`           // REQUIRED - 3-part catalog.schema.table
@@ -210,7 +210,7 @@ type ValidateModelRequest struct {
 
 // ValidateRelationshipRequest is the request body for validating a relationship against the warehouse
 type ValidateRelationshipRequest struct {
-	DataGraphID string `json:"-"` // Path parameter
+	AccountID string `json:"accountId"` // Account ID from the data graph spec
 
 	Cardinality string               `json:"cardinality"` // REQUIRED
 	SourceModel ValidationModelRef   `json:"sourceModel"` // REQUIRED

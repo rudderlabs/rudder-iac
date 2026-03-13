@@ -24,7 +24,7 @@ type ValidationUnit struct {
 	ResourceType string // "model" or "relationship"
 	ID           string // local resource ID
 	Resource     any    // *dgModel.ModelResource or *dgModel.RelationshipResource
-	DataGraphID  string // resolved data graph remote ID
+	AccountID    string // resolved account ID from the parent data graph spec
 }
 
 // ValidationPlan holds the units to validate
