@@ -175,16 +175,16 @@ func TestTrackingPlanForExport(t *testing.T) {
 			"display_name": "Nested Properties Plan",
 			"rules": []any{
 				map[string]any{
-					"type":                 TypeEventRule,
-					"id":                   "checkout-completed-rule",
-					"event":                "#event:checkout-completed",
-					"additionalProperties": true,
-					"identity_section":     "context",
+					"type":                  TypeEventRule,
+					"id":                    "checkout-completed-rule",
+					"event":                 "#event:checkout-completed",
+					"additional_properties": true,
+					"identity_section":      "context",
 					"properties": []any{
 						map[string]any{
-							"property":             "#property:cart-object",
-							"required":             true,
-							"additionalProperties": false,
+							"property":              "#property:cart-object",
+							"required":              true,
+							"additional_properties": false,
 							"properties": []any{
 								map[string]any{
 									"property": "#property:cart-id",
@@ -273,11 +273,11 @@ func TestTrackingPlanForExport(t *testing.T) {
 					"identity_section": "properties",
 				},
 				map[string]any{
-					"type":                 TypeEventRule,
-					"id":                   "button-clicked-rule",
-					"event":                "#event:button-clicked",
-					"additionalProperties": true,
-					"identity_section":     "context",
+					"type":                  TypeEventRule,
+					"id":                    "button-clicked-rule",
+					"event":                 "#event:button-clicked",
+					"additional_properties": true,
+					"identity_section":      "context",
 					"properties": []any{
 						map[string]any{
 							"property": "#property:button-id",
