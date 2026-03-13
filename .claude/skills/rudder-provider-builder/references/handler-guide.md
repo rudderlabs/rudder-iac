@@ -45,14 +45,18 @@ Input data for CRUD operations. May include PropertyRefs.
 ```go
 // <Resource>Resource represents the input data for a <resource>
 type <Resource>Resource struct {
-    ID   string
-    Name string
+    ID   string `mapstructure:"id"`
+    Name string `mapstructure:"name"`
     // Add all configurable fields
 
     // For references to other resources:
-    RelatedResourceURN *resources.PropertyRef
+    RelatedResourceRef *resources.PropertyRef `mapstructure:"related_resource"`
 }
 ```
+
+Mapstructure tags on Resource structs are required for correct diff output. The diff engine uses `mapstructure.Decode` on `RawData()` to build comparison maps; without tags, field names appear in PascalCase instead of the names users wrote in their YAML specs.
+
+Use the **same tag values as the corresponding `Spec` struct** — the goal is that diffs show field names users recognize from their specs. Where a Resource field has no direct Spec counterpart (e.g. a resolved reference that's computed during the apply cycle), choose a name that clearly conveys the field's meaning.
 
 ### 1.3 State (Output State)
 

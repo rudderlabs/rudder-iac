@@ -8,14 +8,14 @@ import (
 
 // RelationshipResource represents a relationship resource
 type RelationshipResource struct {
-	ID             string
-	DisplayName    string
-	DataGraphRef   *resources.PropertyRef // Parent data graph
-	SourceModelRef *resources.PropertyRef // Source model
-	TargetModelRef *resources.PropertyRef // Target model
-	SourceJoinKey  string
-	TargetJoinKey  string
-	Cardinality    string // "one-to-one", "one-to-many", or "many-to-one"
+	ID             string                 `mapstructure:"id"`
+	DisplayName    string                 `mapstructure:"display_name"`
+	DataGraphRef   *resources.PropertyRef `mapstructure:"data_graph"`    // Parent data graph
+	SourceModelRef *resources.PropertyRef `mapstructure:"source"` // Source model
+	TargetModelRef *resources.PropertyRef `mapstructure:"target"` // Target model
+	SourceJoinKey  string                 `mapstructure:"source_join_key"`
+	TargetJoinKey  string                 `mapstructure:"target_join_key"`
+	Cardinality    string                 `mapstructure:"cardinality"` // "one-to-one", "one-to-many", or "many-to-one"
 }
 
 // RelationshipState represents the remote state of a relationship
