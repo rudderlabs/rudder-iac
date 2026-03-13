@@ -9,6 +9,7 @@ import (
 type KotlinOptions struct {
 	PackageName    string `mapstructure:"packageName" description:"Package name for generated Kotlin code (e.g., com.example.analytics)"`
 	OutputFileName string `mapstructure:"outputFileName" description:"Name of the generated Kotlin file (e.g., MyEvents.kt). Defaults to Main.kt"`
+	ComposeStable  bool   `mapstructure:"composeStable" description:"Add @Immutable annotations to generated data classes for Jetpack Compose stability"`
 }
 
 // GetAvailableOptions returns metadata about all supported Kotlin options
