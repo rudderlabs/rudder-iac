@@ -25,6 +25,7 @@ type KotlinDataClass struct {
 	Comment       string            // Documentation comment for the class
 	Properties    []KotlinProperty  // Properties of the data class
 	NestedClasses []KotlinDataClass // Nested data classes within this class
+	Annotations   []string          // Short annotation names to apply to this data class (e.g., "Immutable")
 }
 
 // KotlinEnumValue represents a single value in a Kotlin enum
@@ -47,6 +48,7 @@ type KotlinSealedSubclass struct {
 	Properties     []KotlinProperty // Constructor properties
 	BodyProperties []KotlinProperty // Body properties
 	IsDataClass    bool             // If false, generate as regular class instead of data class
+	Annotations    []string         // Short annotation names to apply to this subclass (e.g., "Immutable")
 }
 
 // KotlinSealedClass represents a Kotlin sealed class with subclasses
@@ -107,6 +109,7 @@ type KotlinContext struct {
 	TrackingPlanID         string                  // ID of the tracking plan
 	TrackingPlanVersion    int                     // Version of the tracking plan
 	TrackingPlanURL        string                  // URL to the tracking plan (if available)
+	Imports                []string                // Additional import paths (e.g., annotation FQNs like "androidx.compose.runtime.Immutable")
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices
