@@ -741,43 +741,33 @@ func TestLoadRemoteResources(t *testing.T) {
 			assert.Equal(t, "dg-1", req.DataGraphID)
 			require.NotNil(t, req.HasExternalID)
 			assert.True(t, *req.HasExternalID)
+			assert.Nil(t, req.ModelType)
 
-			// Return both entity and event models based on type filter
-			if req.ModelType != nil && *req.ModelType == "entity" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "em-1",
-								ExternalID:  "user",
-								Name:        "User",
-								Type:        "entity",
-								TableRef:    "users",
-								DataGraphID: "dg-1",
-								PrimaryID:   "id",
-								Root:        true,
-							},
+			if req.Page == 1 {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{
+						{
+							ID:          "em-1",
+							ExternalID:  "user",
+							Name:        "User",
+							Type:        "entity",
+							TableRef:    "users",
+							DataGraphID: "dg-1",
+							PrimaryID:   "id",
+							Root:        true,
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
-			} else if req.ModelType != nil && *req.ModelType == "event" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "evm-1",
-								ExternalID:  "purchase",
-								Name:        "Purchase",
-								Type:        "event",
-								TableRef:    "purchases",
-								DataGraphID: "dg-1",
-								Timestamp:   "event_time",
-							},
+						{
+							ID:          "evm-1",
+							ExternalID:  "purchase",
+							Name:        "Purchase",
+							Type:        "event",
+							TableRef:    "purchases",
+							DataGraphID: "dg-1",
+							Timestamp:   "event_time",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
 			}
 			return &dgClient.ListModelsResponse{}, nil
 		},
@@ -825,40 +815,30 @@ func TestLoadImportableResources(t *testing.T) {
 			assert.Equal(t, "dg-1", req.DataGraphID)
 			require.NotNil(t, req.HasExternalID)
 			assert.False(t, *req.HasExternalID)
+			assert.Nil(t, req.ModelType)
 
-			// Return both entity and event models based on type filter
-			if req.ModelType != nil && *req.ModelType == "entity" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "em-2",
-								Name:        "Account",
-								Type:        "entity",
-								TableRef:    "accounts",
-								DataGraphID: "dg-1",
-								PrimaryID:   "account_id",
-							},
+			if req.Page == 1 {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{
+						{
+							ID:          "em-2",
+							Name:        "Account",
+							Type:        "entity",
+							TableRef:    "accounts",
+							DataGraphID: "dg-1",
+							PrimaryID:   "account_id",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
-			} else if req.ModelType != nil && *req.ModelType == "event" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "evm-2",
-								Name:        "PageView",
-								Type:        "event",
-								TableRef:    "page_views",
-								DataGraphID: "dg-1",
-								Timestamp:   "ts",
-							},
+						{
+							ID:          "evm-2",
+							Name:        "PageView",
+							Type:        "event",
+							TableRef:    "page_views",
+							DataGraphID: "dg-1",
+							Timestamp:   "ts",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
 			}
 			return &dgClient.ListModelsResponse{}, nil
 		},
