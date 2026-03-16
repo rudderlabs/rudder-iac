@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+*.pem
+*.key
+credentials*
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml
