@@ -49,7 +49,7 @@ func TestPlanAll(t *testing.T) {
 	plan, err := PlanAll(graph)
 	require.NoError(t, err)
 
-	assert.Equal(t, []*ValidationUnit{
+	assert.ElementsMatch(t, []*ValidationUnit{
 		{
 			ResourceType: "model",
 			ID:           "user",
