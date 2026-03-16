@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
@@ -117,7 +115,7 @@ func NewCmdValidate() *cobra.Command {
 				Mode:        mode,
 				WorkspaceID: workspace.ID,
 				JSONOutput:  jsonOutput,
-				Writer:      os.Stdout,
+				Writer:      cmd.OutOrStdout(),
 			})
 			if err != nil {
 				if jsonOutput && errors.Is(err, validator.ErrValidationFailed) {
