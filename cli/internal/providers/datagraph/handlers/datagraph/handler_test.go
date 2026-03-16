@@ -124,6 +124,73 @@ func TestLoadImportableResources(t *testing.T) {
 	require.Len(t, remotes, 1)
 }
 
+func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
+	t.Run("resolves account name", func(t *testing.T) {
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+				if page == 1 {
+					return &dgClient.ListDataGraphsResponse{
+						Data: []dgClient.DataGraph{
+							{ID: "remote-1", AccountID: "account-1"},
+							{ID: "remote-2", AccountID: "account-2"},
+						},
+						Paging: client.Paging{Next: ""},
+					}, nil
+				}
+				return &dgClient.ListDataGraphsResponse{}, nil
+			},
+		}
+
+		mockResolver := &testutils.MockAccountNameResolver{
+			GetAccountNameFunc: func(ctx context.Context, accountID string) (string, error) {
+				names := map[string]string{
+					"account-1": "My Warehouse",
+					"account-2": "Production DB",
+				}
+				if name, ok := names[accountID]; ok {
+					return name, nil
+				}
+				return "", assert.AnError
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
+		remotes, err := h.LoadImportableResources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, remotes, 2)
+		assert.Equal(t, "My Warehouse", remotes[0].AccountName)
+		assert.Equal(t, "Production DB", remotes[1].AccountName)
+
+		// Verify Metadata() returns account name as Name
+		assert.Equal(t, "My Warehouse", remotes[0].Metadata().Name)
+		assert.Equal(t, "Production DB", remotes[1].Metadata().Name)
+	})
+
+	t.Run("returns error when account resolution fails", func(t *testing.T) {
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+				return &dgClient.ListDataGraphsResponse{
+					Data: []dgClient.DataGraph{
+						{ID: "remote-1", AccountID: "bad-account"},
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
+			},
+		}
+
+		mockResolver := &testutils.MockAccountNameResolver{
+			GetAccountNameFunc: func(ctx context.Context, accountID string) (string, error) {
+				return "", assert.AnError
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
+		_, err := h.LoadImportableResources(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resolving account name")
+	})
+}
+
 func TestMapRemoteToState(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	h := &HandlerImpl{client: mockClient}

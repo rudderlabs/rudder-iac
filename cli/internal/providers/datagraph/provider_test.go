@@ -17,7 +17,7 @@ import (
 
 func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	// Comprehensive spec with data graph and multiple inline models with relationships
 	spec := &specs.Spec{
@@ -205,7 +205,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 
 func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
 		Version: "rudder/v0.1",
@@ -269,7 +269,7 @@ func TestLoadSpec_DataGraphValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
+			provider := datagraph.NewProvider(mockClient, nil)
 
 			spec := &specs.Spec{
 				Version: "rudder/v0.1",
@@ -376,7 +376,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
+			provider := datagraph.NewProvider(mockClient, nil)
 
 			spec := &specs.Spec{
 				Version: "rudder/v0.1",
@@ -399,7 +399,7 @@ func TestLoadSpec_ModelValidationErrors(t *testing.T) {
 
 func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
 		Version: "rudder/v0.1",
@@ -433,7 +433,7 @@ func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 
 func TestProvider_SupportedKinds(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	kinds := provider.SupportedKinds()
 	assert.Contains(t, kinds, "data-graph")
@@ -441,7 +441,7 @@ func TestProvider_SupportedKinds(t *testing.T) {
 
 func TestProvider_SupportedTypes(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	types := provider.SupportedTypes()
 	assert.Contains(t, types, dgHandler.HandlerMetadata.ResourceType)
@@ -452,7 +452,7 @@ func TestProvider_SupportedTypes(t *testing.T) {
 
 func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
 		Version: "rudder/v0.1",
@@ -610,7 +610,7 @@ func TestLoadSpec_RelationshipCardinalityConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
+			provider := datagraph.NewProvider(mockClient, nil)
 
 			// Build spec with two models and a relationship
 			spec := buildRelationshipTestSpec(tt.sourceType, tt.targetType, tt.cardinality)
@@ -697,3 +697,4 @@ func buildRelationshipTestSpec(sourceType, targetType, cardinality string) *spec
 		},
 	}
 }
+
