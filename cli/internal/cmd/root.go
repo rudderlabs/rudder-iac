@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
@@ -19,7 +21,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
-	datagraphCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
+	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
@@ -60,6 +62,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
+	datagraphCmd    *cobra.Command
 )
 
 func init() {
@@ -97,7 +100,9 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
-	rootCmd.AddCommand(datagraphCmd.NewCmdDataGraph())
+
+	datagraphCmd = datagraphPkg.NewCmdDataGraph()
+	rootCmd.AddCommand(datagraphCmd)
 }
 
 func initConfig() {
@@ -112,6 +117,10 @@ func initConfig() {
 	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
 	if viper.GetBool("experimental") {
 		experimentalCmd.Hidden = false
+	}
+
+	if config.GetConfig().ExperimentalFlags.DataGraph {
+		datagraphCmd.Hidden = false
 	}
 }
 
@@ -144,11 +153,18 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// Execute runs the root command. If the command returns an error, it is printed
+// to stderr and the process exits with code 1. Errors wrapped in SilentError
+// skip the stderr output — the command is expected to have already communicated
+// the failure through its primary output (e.g., JSON to stdout).
 func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
-		ui.PrintError(err)
+		var silent *cmderrors.SilentError
+		if !errors.As(err, &silent) {
+			ui.PrintError(err)
+		}
 		os.Exit(1)
 	}
 }

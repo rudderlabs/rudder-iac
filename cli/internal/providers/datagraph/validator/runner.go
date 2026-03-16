@@ -15,6 +15,13 @@ import (
 
 var validationLog = logger.New("validator")
 
+// reporterLifecycle is an optional interface for reporters that need
+// to be notified about the start and end of a validation run.
+type reporterLifecycle interface {
+	start(total int)
+	done()
+}
+
 // remoteStateLoader abstracts provider methods needed by the runner
 type remoteStateLoader interface {
 	provider.ManagedRemoteResourceLoader
@@ -76,6 +83,11 @@ func (r *Runner) Run(ctx context.Context, mode Mode, workspaceID string) (*Valid
 	}
 
 	validationLog.Info("Validation plan created", "units", len(plan.Units))
+
+	if lc, ok := r.reporter.(reporterLifecycle); ok {
+		lc.start(len(plan.Units))
+		defer lc.done()
+	}
 
 	if err := r.resolveAccountIDs(plan); err != nil {
 		return nil, err

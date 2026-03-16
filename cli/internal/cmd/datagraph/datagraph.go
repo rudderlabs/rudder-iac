@@ -9,9 +9,10 @@ import (
 
 func NewCmdDataGraph() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "data-graphs <command>",
-		Short: "Manage data graphs",
-		Long:  "Manage the lifecycle of data graph resources (models and relationships)",
+		Use:    "data-graphs <command>",
+		Short:  "Manage data graphs",
+		Long:   "Manage the lifecycle of data graph resources (models and relationships)",
+		Hidden: true,
 		Example: heredoc.Doc(`
 			$ rudder-cli data-graphs validate --all
 			$ rudder-cli data-graphs validate --modified

@@ -4,21 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/display"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/validations"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/validator"
 )
-
-var ErrValidationFailed = errors.New("one or more validations failed")
 
 var validateLog = logger.New("datagraph", logger.Attr{
 	Key:   "cmd",
@@ -103,50 +101,29 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			graph, err := p.ResourceGraph()
-			if err != nil {
-				return fmt.Errorf("getting resource graph: %w", err)
-			}
-
-			dgProvider := deps.Providers().DataGraph
-
-			var (
-				mode         validations.Mode
-				resourceType string
-				targetID     string
-			)
-
+			var mode validator.Mode
 			if all {
-				mode = validations.ModeAll
+				mode = validator.ModeAll{}
 			} else if modified {
-				mode = validations.ModeModified
+				mode = validator.ModeModified{}
 			} else {
-				mode = validations.ModeSingle
-				resourceType = args[0]
-				targetID = args[1]
+				mode = validator.ModeSingle{
+					ResourceType: args[0],
+					TargetID:     args[1],
+				}
 			}
 
-			spinner := ui.NewSpinner("Running validations...")
-			spinner.Start()
-
-			runner := validations.NewRunner(dgProvider.Client(), dgProvider, graph)
-			results, err := runner.Run(ctx, mode, resourceType, targetID, workspace.ID)
-
-			spinner.Stop()
-
+			err = validator.Validate(ctx, p, deps.Providers().DataGraph, validator.Config{
+				Mode:        mode,
+				WorkspaceID: workspace.ID,
+				JSONOutput:  jsonOutput,
+				Writer:      os.Stdout,
+			})
 			if err != nil {
-				return fmt.Errorf("running validations: %w", err)
-			}
-
-			if results.Status == validations.RunStatusNoResources {
-				ui.Println("No resources to validate")
-				return nil
-			}
-
-			display.NewValidationDisplayer(cmd.OutOrStdout(), jsonOutput).Display(results)
-
-			if results.HasFailures() {
-				return ErrValidationFailed
+				if jsonOutput && errors.Is(err, validator.ErrValidationFailed) {
+					return &cmderrors.SilentError{Err: err}
+				}
+				return err
 			}
 
 			return nil
