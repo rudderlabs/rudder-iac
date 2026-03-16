@@ -20,6 +20,7 @@ type TransformationStore interface {
 	CreateTransformation(ctx context.Context, req *CreateTransformationRequest, publish bool) (*Transformation, error)
 	UpdateTransformation(ctx context.Context, id string, req *UpdateTransformationRequest, publish bool) (*Transformation, error)
 	GetTransformation(ctx context.Context, id string) (*Transformation, error)
+	GetTransformationVersion(ctx context.Context, id string, versionID string) (*Transformation, error)
 	ListTransformations(ctx context.Context) ([]*Transformation, error)
 	DeleteTransformation(ctx context.Context, id string) error
 	SetTransformationExternalID(ctx context.Context, id string, externalID string) error
@@ -28,6 +29,7 @@ type TransformationStore interface {
 	CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error)
 	UpdateLibrary(ctx context.Context, id string, req *UpdateLibraryRequest, publish bool) (*TransformationLibrary, error)
 	GetLibrary(ctx context.Context, id string) (*TransformationLibrary, error)
+	GetLibraryVersion(ctx context.Context, id string, versionID string) (*TransformationLibrary, error)
 	ListLibraries(ctx context.Context) ([]*TransformationLibrary, error)
 	DeleteLibrary(ctx context.Context, id string) error
 	SetLibraryExternalID(ctx context.Context, id string, externalID string) error
@@ -200,6 +202,21 @@ func (r *rudderTransformationStore) UpdateLibrary(ctx context.Context, id string
 	return &library, nil
 }
 
+func (r *rudderTransformationStore) GetTransformationVersion(ctx context.Context, id string, versionID string) (*Transformation, error) {
+	path := fmt.Sprintf("%s/%s/versions/%s", transformationsPrefix, id, versionID)
+	resp, err := r.client.Do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting transformation version: %w", err)
+	}
+
+	var transformation Transformation
+	if err := json.Unmarshal(resp, &transformation); err != nil {
+		return nil, fmt.Errorf("unmarshalling transformation version response: %w", err)
+	}
+
+	return &transformation, nil
+}
+
 // GetLibrary retrieves a library by ID
 func (r *rudderTransformationStore) GetLibrary(ctx context.Context, id string) (*TransformationLibrary, error) {
 	path := fmt.Sprintf("%s/%s", librariesPrefix, id)
@@ -211,6 +228,21 @@ func (r *rudderTransformationStore) GetLibrary(ctx context.Context, id string) (
 	var library TransformationLibrary
 	if err := json.Unmarshal(resp, &library); err != nil {
 		return nil, fmt.Errorf("unmarshalling get library response: %w", err)
+	}
+
+	return &library, nil
+}
+
+func (r *rudderTransformationStore) GetLibraryVersion(ctx context.Context, id string, versionID string) (*TransformationLibrary, error) {
+	path := fmt.Sprintf("%s/%s/versions/%s", librariesPrefix, id, versionID)
+	resp, err := r.client.Do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting library version: %w", err)
+	}
+
+	var library TransformationLibrary
+	if err := json.Unmarshal(resp, &library); err != nil {
+		return nil, fmt.Errorf("unmarshalling library version response: %w", err)
 	}
 
 	return &library, nil
