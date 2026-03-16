@@ -538,7 +538,7 @@ func (p *Provider) buildInlineModelSpecs(
 				ID:            relResource.ExternalID,
 				DisplayName:   remoteRel.Name,
 				Cardinality:   remoteRel.Cardinality,
-				Target:        fmt.Sprintf("#data-graph-model:%s", targetExternalID),
+				Target:        fmt.Sprintf("#%s:%s", model.HandlerMetadata.ResourceType, targetExternalID),
 				SourceJoinKey: remoteRel.SourceJoinKey,
 				TargetJoinKey: remoteRel.TargetJoinKey,
 			})
