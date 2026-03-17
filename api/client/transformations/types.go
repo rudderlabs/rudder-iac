@@ -157,6 +157,7 @@ type TransformationTestResult struct {
 
 // LibraryTestResult represents validation result for a library in batch test response
 type LibraryTestResult struct {
+	ID         string `json:"id"`
 	HandleName string `json:"handleName"`
 	VersionID  string `json:"versionId"`
 	Pass       bool   `json:"pass"`

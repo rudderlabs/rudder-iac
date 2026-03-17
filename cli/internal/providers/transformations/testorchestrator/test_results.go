@@ -6,24 +6,24 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 )
 
-type RunStatus int
+type RunStatus string
 
 const (
-	RunStatusExecuted RunStatus = iota
-	RunStatusNoResources
+	RunStatusExecuted    RunStatus = "executed"
+	RunStatusNoResources RunStatus = "no_resources"
 )
 
 // TransformationTestWithDefinitions combines test results with their original definitions
 type TransformationTestWithDefinitions struct {
-	Result      *transformations.TransformationTestResult
-	Definitions []*transformations.TestDefinition
+	Result      *transformations.TransformationTestResult `json:"result"`
+	Definitions []*transformations.TestDefinition         `json:"-"`
 }
 
 // TestResults contains the results of all test executions with their definitions
 type TestResults struct {
-	Status          RunStatus
-	Libraries       []transformations.LibraryTestResult
-	Transformations []*TransformationTestWithDefinitions
+	Status          RunStatus                             `json:"status"`
+	Libraries       []transformations.LibraryTestResult  `json:"libraries,omitempty"`
+	Transformations []*TransformationTestWithDefinitions `json:"transformations,omitempty"`
 }
 
 // HasFailures computes whether any tests failed or errored
