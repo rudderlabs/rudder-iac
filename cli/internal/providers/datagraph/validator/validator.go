@@ -26,12 +26,16 @@ type Project interface {
 	ResourceGraph() (*resources.Graph, error)
 }
 
+// DisplayFunc formats and renders a validation report.
+type DisplayFunc func(report *ValidationReport)
+
 // Config holds configuration for a validation run
 type Config struct {
 	Mode        Mode
 	WorkspaceID string
 	JSONOutput  bool
 	Writer      io.Writer
+	DisplayFunc DisplayFunc
 }
 
 // Validate orchestrates a complete validation run: builds a resource graph,
@@ -42,16 +46,10 @@ func Validate(ctx context.Context, project Project, p ValidatorProvider, cfg Con
 		return fmt.Errorf("getting resource graph: %w", err)
 	}
 
-	var (
-		displayer Displayer
-		reporter  ValidationReporter
-	)
-
+	var reporter ValidationReporter
 	if cfg.JSONOutput {
-		displayer = NewJSONDisplayer(cfg.Writer)
 		reporter = noopReporter{}
 	} else {
-		displayer = NewTerminalDisplayer(cfg.Writer)
 		reporter = newProgressReporterIfTerminal()
 	}
 
@@ -68,7 +66,7 @@ func Validate(ctx context.Context, project Project, p ValidatorProvider, cfg Con
 		return nil
 	}
 
-	displayer.Display(report)
+	cfg.DisplayFunc(report)
 
 	if report.HasFailures() {
 		return ErrValidationFailed

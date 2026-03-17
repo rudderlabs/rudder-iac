@@ -111,11 +111,20 @@ func NewCmdValidate() *cobra.Command {
 				}
 			}
 
+			w := cmd.OutOrStdout()
+			var displayFunc validator.DisplayFunc
+			if jsonOutput {
+				displayFunc = validator.NewJSONDisplayer(w).Display
+			} else {
+				displayFunc = validator.NewTerminalDisplayer(w).Display
+			}
+
 			err = validator.Validate(ctx, p, deps.Providers().DataGraph, validator.Config{
 				Mode:        mode,
 				WorkspaceID: workspace.ID,
 				JSONOutput:  jsonOutput,
-				Writer:      cmd.OutOrStdout(),
+				Writer:      w,
+				DisplayFunc: displayFunc,
 			})
 			if err != nil {
 				if jsonOutput && errors.Is(err, validator.ErrValidationFailed) {
