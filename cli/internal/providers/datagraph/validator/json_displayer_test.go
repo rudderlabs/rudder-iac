@@ -89,3 +89,19 @@ func TestDisplayJSON(t *testing.T) {
 `
 	assert.Equal(t, expected, buf.String())
 }
+
+func TestDisplayJSON_NoResources(t *testing.T) {
+	report := &ValidationReport{
+		Status:    RunStatusNoResources,
+		Resources: nil,
+	}
+
+	var buf bytes.Buffer
+	NewJSONDisplayer(&buf).Display(report)
+
+	expected := `{
+  "resources": []
+}
+`
+	assert.Equal(t, expected, buf.String())
+}

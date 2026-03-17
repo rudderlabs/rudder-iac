@@ -78,7 +78,9 @@ func Validate(ctx context.Context, project Project, p ValidatorProvider, cfg Con
 	}
 
 	if report.Status == RunStatusNoResources {
-		if !cfg.JSONOutput {
+		if cfg.JSONOutput {
+			cfg.DisplayFunc(report)
+		} else {
 			fmt.Fprintln(cfg.Writer, "No resources to validate")
 		}
 		return nil
