@@ -38,13 +38,13 @@ type Runner struct {
 }
 
 // NewRunner creates a new validation runner.
-// When concurrency is 0, it defaults to 4.
+// When concurrency is 0, it defaults to 1.
 func NewRunner(client dgClient.DataGraphClient, loader remoteStateLoader, graph *resources.Graph, reporter ValidationReporter, concurrency int) *Runner {
 	if reporter == nil {
 		reporter = noopReporter{}
 	}
 	if concurrency <= 0 {
-		concurrency = 4
+		concurrency = 1
 	}
 	return &Runner{
 		loader:      loader,
