@@ -36,7 +36,10 @@ func (m *mockRemoteStateLoader) MapRemoteToState(collection *resources.RemoteRes
 	return state.EmptyState(), nil
 }
 
+// mockTransformationStore keeps lowercase field names matching existing test call sites,
+// and overrides only the 5 methods that runner tests actually configure.
 type mockTransformationStore struct {
+	transformations.MockTransformationStore
 	batchTestFunc        func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
 	createTransformation func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
 	updateTransformation func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error)
@@ -62,13 +65,6 @@ func (m *mockTransformationStore) CreateTransformation(ctx context.Context, req 
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
-	if m.createLibraryFunc != nil {
-		return m.createLibraryFunc(ctx, req, publish)
-	}
-	return nil, errors.New("not implemented")
-}
-
 func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
 	if m.updateTransformation != nil {
 		return m.updateTransformation(ctx, id, req, publish)
@@ -76,54 +72,17 @@ func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id s
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockTransformationStore) GetTransformation(ctx context.Context, id string) (*transformations.Transformation, error) {
+func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
+	if m.createLibraryFunc != nil {
+		return m.createLibraryFunc(ctx, req, publish)
+	}
 	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) GetTransformationVersion(ctx context.Context, id string, versionID string) (*transformations.Transformation, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*transformations.Transformation, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
-	return errors.New("not implemented")
 }
 
 func (m *mockTransformationStore) UpdateLibrary(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
 	if m.updateLibraryFunc != nil {
 		return m.updateLibraryFunc(ctx, id, req, publish)
 	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) GetLibraryVersion(ctx context.Context, id string, versionID string) (*transformations.TransformationLibrary, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
 	return nil, errors.New("not implemented")
 }
 

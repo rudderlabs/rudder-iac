@@ -19,14 +19,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-// mockTransformationStore implements the TransformationStore interface for testing
+// mockTransformationStore wraps MockTransformationStore with call-tracking for the
+// three methods that provider tests assert on by side effect.
 type mockTransformationStore struct {
+	transformationsClient.MockTransformationStore
 	batchPublishCalled         bool
 	deleteTransformationCalled bool
 	deleteLibraryCalled        bool
-	batchPublishFunc           func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error)
-	deleteTransformationFunc   func(ctx context.Context, id string) error
-	deleteLibraryFunc          func(ctx context.Context, id string) error
 }
 
 func newMockTransformationStore() *mockTransformationStore {
@@ -35,78 +34,26 @@ func newMockTransformationStore() *mockTransformationStore {
 
 func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 	m.batchPublishCalled = true
-	if m.batchPublishFunc != nil {
-		return m.batchPublishFunc(ctx, req)
+	if m.BatchPublishFunc != nil {
+		return m.BatchPublishFunc(ctx, req)
 	}
 	return &transformationsClient.BatchPublishResponse{Published: true}, nil
 }
 
-func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformationsClient.BatchTestRequest) (*transformationsClient.BatchTestResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) CreateTransformation(ctx context.Context, req *transformationsClient.CreateTransformationRequest, publish bool) (*transformationsClient.Transformation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id string, req *transformationsClient.UpdateTransformationRequest, publish bool) (*transformationsClient.Transformation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) GetTransformation(ctx context.Context, id string) (*transformationsClient.Transformation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) GetTransformationVersion(ctx context.Context, id string, versionID string) (*transformationsClient.Transformation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*transformationsClient.Transformation, error) {
-	return []*transformationsClient.Transformation{}, nil
-}
-
 func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
 	m.deleteTransformationCalled = true
-	if m.deleteTransformationFunc != nil {
-		return m.deleteTransformationFunc(ctx, id)
+	if m.DeleteTransformationFunc != nil {
+		return m.DeleteTransformationFunc(ctx, id)
 	}
 	return nil
-}
-
-func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformationsClient.CreateLibraryRequest, publish bool) (*transformationsClient.TransformationLibrary, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) UpdateLibrary(ctx context.Context, id string, req *transformationsClient.UpdateLibraryRequest, publish bool) (*transformationsClient.TransformationLibrary, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*transformationsClient.TransformationLibrary, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) GetLibraryVersion(ctx context.Context, id string, versionID string) (*transformationsClient.TransformationLibrary, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transformationsClient.TransformationLibrary, error) {
-	return []*transformationsClient.TransformationLibrary{}, nil
 }
 
 func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
 	m.deleteLibraryCalled = true
-	if m.deleteLibraryFunc != nil {
-		return m.deleteLibraryFunc(ctx, id)
+	if m.DeleteLibraryFunc != nil {
+		return m.DeleteLibraryFunc(ctx, id)
 	}
 	return nil
-}
-
-func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
-	return fmt.Errorf("not implemented")
 }
 
 func TestProvider(t *testing.T) {
@@ -462,7 +409,7 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
 			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
@@ -538,7 +485,7 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
 			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
@@ -591,7 +538,7 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
 			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
@@ -650,7 +597,7 @@ func TestConsolidateSync(t *testing.T) {
 		t.Parallel()
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			return nil, fmt.Errorf("API error")
 		}
 
@@ -807,7 +754,7 @@ func TestConsolidateSync(t *testing.T) {
 		var capturedReq *transformationsClient.BatchPublishRequest
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			capturedReq = req
 			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
@@ -858,7 +805,7 @@ func TestConsolidateSync(t *testing.T) {
 		t.Parallel()
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			// Return validation failure with test results
 			return &transformationsClient.BatchPublishResponse{
 				Published: false,
@@ -1151,11 +1098,11 @@ func TestDeferredDeletes(t *testing.T) {
 		var callOrder []string
 
 		mockStore := newMockTransformationStore()
-		mockStore.batchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
 			callOrder = append(callOrder, "batch_publish")
 			return &transformationsClient.BatchPublishResponse{Published: true}, nil
 		}
-		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+		mockStore.DeleteLibraryFunc = func(ctx context.Context, id string) error {
 			callOrder = append(callOrder, "delete_library:"+id)
 			return nil
 		}
@@ -1208,7 +1155,7 @@ func TestDeferredDeletes(t *testing.T) {
 		t.Parallel()
 
 		mockStore := newMockTransformationStore()
-		mockStore.deleteTransformationFunc = func(ctx context.Context, id string) error {
+		mockStore.DeleteTransformationFunc = func(ctx context.Context, id string) error {
 			return nil
 		}
 
@@ -1233,11 +1180,11 @@ func TestDeferredDeletes(t *testing.T) {
 		var deleteOrder []string
 
 		mockStore := newMockTransformationStore()
-		mockStore.deleteTransformationFunc = func(ctx context.Context, id string) error {
+		mockStore.DeleteTransformationFunc = func(ctx context.Context, id string) error {
 			deleteOrder = append(deleteOrder, "transformation:"+id)
 			return nil
 		}
-		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+		mockStore.DeleteLibraryFunc = func(ctx context.Context, id string) error {
 			deleteOrder = append(deleteOrder, "library:"+id)
 			return nil
 		}
@@ -1270,7 +1217,7 @@ func TestDeferredDeletes(t *testing.T) {
 		t.Parallel()
 
 		mockStore := newMockTransformationStore()
-		mockStore.deleteLibraryFunc = func(ctx context.Context, id string) error {
+		mockStore.DeleteLibraryFunc = func(ctx context.Context, id string) error {
 			return fmt.Errorf("backend rejected delete")
 		}
 

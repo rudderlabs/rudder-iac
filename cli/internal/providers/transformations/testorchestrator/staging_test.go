@@ -187,8 +187,10 @@ func TestStageLibrary(t *testing.T) {
 }
 
 // stubStore is a minimal TransformationStore for staging tests.
-// Only the four methods used by StageTransformation / StageLibrary are configurable.
+// Only the four methods used by StageTransformation / StageLibrary are configurable;
+// everything else is handled by the embedded MockTransformationStore.
 type stubStore struct {
+	transformations.MockTransformationStore
 	createTransformation func(context.Context, *transformations.CreateTransformationRequest, bool) (*transformations.Transformation, error)
 	updateTransformation func(context.Context, string, *transformations.UpdateTransformationRequest, bool) (*transformations.Transformation, error)
 	createLibrary        func(context.Context, *transformations.CreateLibraryRequest, bool) (*transformations.TransformationLibrary, error)
@@ -221,41 +223,4 @@ func (s *stubStore) UpdateLibrary(ctx context.Context, id string, req *transform
 		return s.updateLibrary(ctx, id, req, publish)
 	}
 	return nil, fmt.Errorf("UpdateLibrary not configured")
-}
-
-func (s *stubStore) GetTransformation(_ context.Context, _ string) (*transformations.Transformation, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) GetTransformationVersion(_ context.Context, _, _ string) (*transformations.Transformation, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) ListTransformations(_ context.Context) ([]*transformations.Transformation, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) DeleteTransformation(_ context.Context, _ string) error {
-	panic("not used in staging tests")
-}
-func (s *stubStore) SetTransformationExternalID(_ context.Context, _, _ string) error {
-	panic("not used in staging tests")
-}
-func (s *stubStore) GetLibrary(_ context.Context, _ string) (*transformations.TransformationLibrary, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) GetLibraryVersion(_ context.Context, _, _ string) (*transformations.TransformationLibrary, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) ListLibraries(_ context.Context) ([]*transformations.TransformationLibrary, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) DeleteLibrary(_ context.Context, _ string) error {
-	panic("not used in staging tests")
-}
-func (s *stubStore) SetLibraryExternalID(_ context.Context, _, _ string) error {
-	panic("not used in staging tests")
-}
-func (s *stubStore) BatchPublish(_ context.Context, _ *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
-	panic("not used in staging tests")
-}
-func (s *stubStore) BatchTest(ctx context.Context, _ *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-	panic("not used in staging tests")
 }
