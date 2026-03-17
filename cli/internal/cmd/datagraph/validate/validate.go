@@ -7,6 +7,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
+	client "github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -94,7 +95,8 @@ func NewCmdValidate() *cobra.Command {
 
 			ctx := context.Background()
 
-			workspace, err := deps.Client().Workspaces.GetByAuthToken(ctx)
+				var workspace *client.Workspace
+			workspace, err = deps.Client().Workspaces.GetByAuthToken(ctx)
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}

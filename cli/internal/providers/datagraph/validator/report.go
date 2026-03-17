@@ -76,39 +76,6 @@ func (vr *ValidationReport) HasFailures() bool {
 	return false
 }
 
-// ErrorCount returns the number of resources with errors
-func (vr *ValidationReport) ErrorCount() int {
-	count := 0
-	for _, r := range vr.Resources {
-		if r.HasErrors() {
-			count++
-		}
-	}
-	return count
-}
-
-// WarningCount returns the number of resources with warnings (but no errors)
-func (vr *ValidationReport) WarningCount() int {
-	count := 0
-	for _, r := range vr.Resources {
-		if !r.HasErrors() && r.HasWarnings() {
-			count++
-		}
-	}
-	return count
-}
-
-// PassCount returns the number of resources that passed validation
-func (vr *ValidationReport) PassCount() int {
-	count := 0
-	for _, r := range vr.Resources {
-		if !r.HasErrors() && !r.HasWarnings() {
-			count++
-		}
-	}
-	return count
-}
-
 // ResourcesByType returns resources filtered by type, sorted by URN
 func (vr *ValidationReport) ResourcesByType(resourceType string) []*ResourceValidation {
 	var result []*ResourceValidation

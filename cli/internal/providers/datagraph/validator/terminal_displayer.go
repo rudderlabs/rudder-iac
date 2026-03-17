@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -174,7 +176,7 @@ func (d *TerminalDisplayer) printSeparator(char string, width int) {
 }
 
 func (d *TerminalDisplayer) printWithPadding(leftText, rightText string, rightTextStart int) {
-	padding := max(rightTextStart-len(leftText), 1)
+	padding := max(rightTextStart-lipgloss.Width(leftText), 1)
 	fmt.Fprintf(d.w, "%s%s%s\n", leftText, strings.Repeat(" ", padding), rightText)
 }
 
