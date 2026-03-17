@@ -11,6 +11,12 @@ import (
 )
 
 var validateRelationshipRefs = func(_ string, _ string, _ map[string]any, spec dgModel.DataGraphSpec, graph *resources.Graph) []rules.ValidationResult {
+	// Build set of model IDs defined in this spec for local resolution
+	localModelIDs := make(map[string]bool, len(spec.Models))
+	for _, m := range spec.Models {
+		localModelIDs[m.ID] = true
+	}
+
 	var results []rules.ValidationResult
 	for i, model := range spec.Models {
 		for j, rel := range model.Relationships {
@@ -20,6 +26,10 @@ var validateRelationshipRefs = func(_ string, _ string, _ map[string]any, spec d
 				continue
 			}
 
+			// Check if target exists locally or in the graph
+			if localModelIDs[targetModelID] {
+				continue
+			}
 			urn := resources.URN(targetModelID, modelHandler.HandlerMetadata.ResourceType)
 			if _, exists := graph.GetResource(urn); exists {
 				continue
@@ -41,6 +51,10 @@ func NewRelationshipRefsValidRule() rules.Rule {
 		rules.Error,
 		"relationship target references must resolve to existing models",
 		rules.Examples{},
+		prules.NewSemanticPatternValidator(
+			prules.LegacyVersionPatterns("data-graph"),
+			validateRelationshipRefs,
+		),
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),
 			validateRelationshipRefs,
