@@ -2,7 +2,7 @@
 
 <!-- Required for traceability -->
 
-[DEX-235](link-to-ticket)
+resolves [DEX-XXX](link-to-ticket)
 
 ---
 
@@ -14,9 +14,9 @@ Brief description of the change.
 
 ## Changes
 
-* Key change 1
-* Key change 2
-* Key change 3
+- Key change 1
+- Key change 2
+- Key change 3
 
 ---
 
@@ -24,7 +24,7 @@ Brief description of the change.
 
 How was this tested?
 
-* Unit tests / Integration tests / Manual testing
+- Unit tests / Integration tests / Manual testing
 
 ---
 
@@ -37,6 +37,6 @@ Notes (if any):
 
 ## Checklist
 
-* [ ] Ticket linked
-* [ ] Tests added/updated
-* [ ] No breaking changes (or documented)
+- [ ] Ticket linked
+- [ ] Tests added/updated
+- [ ] No breaking changes (or documented)
