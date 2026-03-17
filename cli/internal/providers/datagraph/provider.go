@@ -17,8 +17,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
+	dgRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // Provider wraps the base provider to provide a concrete type for dependency injection
@@ -77,6 +79,19 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	return p.BaseProvider.LoadSpec(path, s)
 }
 
+func (p *Provider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{
+		dgRules.NewDataGraphSpecSyntaxValidRule(),
+	}
+}
+
+func (p *Provider) SemanticRules() []rules.Rule {
+	return []rules.Rule{
+		dgRules.NewRelationshipCardinalityValidRule(),
+		dgRules.NewRelationshipRefsValidRule(),
+	}
+}
+
 func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedSpec, error) {
 	// Parse the data-graph spec to extract IDs
 	var dgSpec dgModel.DataGraphSpec
@@ -114,11 +129,6 @@ func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {
 	var dgSpec dgModel.DataGraphSpec
 	if err := mapstructure.Decode(s.Spec, &dgSpec); err != nil {
 		return fmt.Errorf("decoding data graph spec: %w", err)
-	}
-
-	// Validate the data graph spec
-	if err := p.validateDataGraphSpec(&dgSpec); err != nil {
-		return fmt.Errorf("validating data graph spec: %w", err)
 	}
 
 	// Extract the data graph resource
@@ -161,11 +171,6 @@ func (p *Provider) loadDataGraphWithInlineModels(s *specs.Spec) error {
 }
 
 func (p *Provider) processInlineModel(dataGraphID string, modelSpec dgModel.ModelSpec) error {
-	// Validate the inline model spec
-	if err := p.validateModelSpec(&modelSpec); err != nil {
-		return fmt.Errorf("validating model spec: %w", err)
-	}
-
 	// Extract model resource from spec
 	resource, err := p.extractModelResource(dataGraphID, &modelSpec)
 	if err != nil {
@@ -187,35 +192,6 @@ func (p *Provider) processInlineModel(dataGraphID string, modelSpec dgModel.Mode
 	return nil
 }
 
-// validateModelSpec validates an inline model spec
-func (p *Provider) validateModelSpec(spec *dgModel.ModelSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.DisplayName == "" {
-		return fmt.Errorf("display_name is required")
-	}
-	if spec.Type != "entity" && spec.Type != "event" {
-		return fmt.Errorf("type must be 'entity' or 'event'")
-	}
-	if !model.TableRefPattern.MatchString(spec.Table) {
-		return fmt.Errorf("table must be a 3-part reference in the format catalog.schema.table")
-	}
-
-	// Type-specific validation
-	switch spec.Type {
-	case "entity":
-		if spec.PrimaryID == "" {
-			return fmt.Errorf("primary_id is required for entity models")
-		}
-	case "event":
-		if spec.Timestamp == "" {
-			return fmt.Errorf("timestamp is required for event models")
-		}
-	}
-
-	return nil
-}
 
 // extractModelResource creates a ModelResource from an inline model spec
 func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelSpec) (*dgModel.ModelResource, error) {
@@ -240,16 +216,6 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 	return resource, nil
 }
 
-// validateDataGraphSpec validates a data graph spec
-func (p *Provider) validateDataGraphSpec(spec *dgModel.DataGraphSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.AccountID == "" {
-		return fmt.Errorf("account_id is required")
-	}
-	return nil
-}
 
 // extractDataGraphResource creates a DataGraphResource from a spec
 func (p *Provider) extractDataGraphResource(spec *dgModel.DataGraphSpec) (*dgModel.DataGraphResource, error) {
@@ -261,11 +227,6 @@ func (p *Provider) extractDataGraphResource(spec *dgModel.DataGraphSpec) (*dgMod
 }
 
 func (p *Provider) processInlineRelationship(dataGraphID, sourceModelID string, relSpec *dgModel.RelationshipSpec) error {
-	// Validate relationship spec
-	if err := p.validateRelationshipSpec(relSpec); err != nil {
-		return fmt.Errorf("validating relationship spec: %w", err)
-	}
-
 	// Extract relationship resource
 	resource, err := p.extractRelationshipResource(dataGraphID, sourceModelID, relSpec)
 	if err != nil {
@@ -280,36 +241,6 @@ func (p *Provider) processInlineRelationship(dataGraphID, sourceModelID string, 
 	return nil
 }
 
-func (p *Provider) validateRelationshipSpec(spec *dgModel.RelationshipSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.DisplayName == "" {
-		return fmt.Errorf("display_name is required")
-	}
-	if spec.Cardinality == "" {
-		return fmt.Errorf("cardinality is required")
-	}
-	// Validate cardinality value
-	validCardinalities := map[string]bool{
-		"one-to-one":  true,
-		"one-to-many": true,
-		"many-to-one": true,
-	}
-	if !validCardinalities[spec.Cardinality] {
-		return fmt.Errorf("cardinality must be one of: one-to-one, one-to-many, many-to-one")
-	}
-	if spec.Target == "" {
-		return fmt.Errorf("target is required")
-	}
-	if spec.SourceJoinKey == "" {
-		return fmt.Errorf("source_join_key is required")
-	}
-	if spec.TargetJoinKey == "" {
-		return fmt.Errorf("target_join_key is required")
-	}
-	return nil
-}
 
 func (p *Provider) extractRelationshipResource(dataGraphID, sourceModelID string, spec *dgModel.RelationshipSpec) (*dgModel.RelationshipResource, error) {
 	// Create URN for data graph (parent)
