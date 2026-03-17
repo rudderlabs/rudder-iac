@@ -61,7 +61,7 @@ func NewCmdValidate() *cobra.Command {
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.GetConfig()
 			if !cfg.ExperimentalFlags.DataGraph {
-				return fmt.Errorf("data-graphs commands require the experimental flag 'data_graph' to be enabled in your configuration")
+				return fmt.Errorf("data-graphs commands require the experimental flag 'dataGraph' to be enabled in your configuration")
 			}
 
 			if err := validateFlags(args, all, modified); err != nil {
