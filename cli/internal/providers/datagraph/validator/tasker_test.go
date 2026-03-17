@@ -46,6 +46,7 @@ func TestValidateModel_Success(t *testing.T) {
 
 	assert.Equal(t, &ResourceValidation{
 		ID:           "user",
+		URN:          "data-graph-model:user",
 		DisplayName:  "User",
 		ResourceType: "model",
 		Issues: []dgClient.ValidationIssue{
@@ -128,6 +129,7 @@ func TestValidateRelationship_Success(t *testing.T) {
 
 	assert.Equal(t, &ResourceValidation{
 		ID:           "user-orders",
+		URN:          "data-graph-relationship:user-orders",
 		DisplayName:  "User Orders",
 		ResourceType: "relationship",
 		Issues:       []dgClient.ValidationIssue{},

@@ -68,6 +68,7 @@ func (d *TerminalDisplayer) displayResource(rv *ResourceValidation, statusCol in
 	if name == "" {
 		name = rv.ID
 	}
+	name = fmt.Sprintf("%s (%s)", name, rv.URN)
 
 	if rv.Err != nil {
 		d.printWithPadding(

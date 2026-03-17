@@ -55,9 +55,10 @@ func runValidationTasks(
 		vt := task.(*validateTask)
 		u := vt.unit
 
-		reporter.TaskStarted(u.URN, u.ID)
+		description := fmt.Sprintf("Validating %s %s (%s)", u.ResourceType, u.DisplayName, u.URN)
+		reporter.TaskStarted(u.URN, description)
 		result := executeValidation(ctx, client, graph, u)
-		reporter.TaskCompleted(u.URN, u.ID, result.Err)
+		reporter.TaskCompleted(u.URN, description, result.completionError())
 
 		results.Store(u.URN, result)
 		return nil
@@ -89,6 +90,7 @@ func executeValidation(
 	default:
 		return &ResourceValidation{
 			ID:           unit.ID,
+			URN:          unit.URN,
 			ResourceType: unit.ResourceType,
 			Err:          fmt.Errorf("unknown resource type: %s", unit.ResourceType),
 		}
@@ -111,6 +113,7 @@ func validateModel(ctx context.Context, client dgClient.DataGraphClient, unit *V
 	if err != nil {
 		return &ResourceValidation{
 			ID:           unit.ID,
+			URN:          unit.URN,
 			DisplayName:  modelRes.DisplayName,
 			ResourceType: "model",
 			Err:          err,
@@ -119,6 +122,7 @@ func validateModel(ctx context.Context, client dgClient.DataGraphClient, unit *V
 
 	return &ResourceValidation{
 		ID:           unit.ID,
+		URN:          unit.URN,
 		DisplayName:  modelRes.DisplayName,
 		ResourceType: "model",
 		Issues:       report.Issues,
@@ -132,6 +136,7 @@ func validateRelationship(ctx context.Context, client dgClient.DataGraphClient, 
 	if err != nil {
 		return &ResourceValidation{
 			ID:           unit.ID,
+			URN:          unit.URN,
 			DisplayName:  relRes.DisplayName,
 			ResourceType: "relationship",
 			Err:          fmt.Errorf("resolving source model table ref: %w", err),
@@ -142,6 +147,7 @@ func validateRelationship(ctx context.Context, client dgClient.DataGraphClient, 
 	if err != nil {
 		return &ResourceValidation{
 			ID:           unit.ID,
+			URN:          unit.URN,
 			DisplayName:  relRes.DisplayName,
 			ResourceType: "relationship",
 			Err:          fmt.Errorf("resolving target model table ref: %w", err),
@@ -165,6 +171,7 @@ func validateRelationship(ctx context.Context, client dgClient.DataGraphClient, 
 	if err != nil {
 		return &ResourceValidation{
 			ID:           unit.ID,
+			URN:          unit.URN,
 			DisplayName:  relRes.DisplayName,
 			ResourceType: "relationship",
 			Err:          err,
@@ -173,6 +180,7 @@ func validateRelationship(ctx context.Context, client dgClient.DataGraphClient, 
 
 	return &ResourceValidation{
 		ID:           unit.ID,
+		URN:          unit.URN,
 		DisplayName:  relRes.DisplayName,
 		ResourceType: "relationship",
 		Issues:       report.Issues,

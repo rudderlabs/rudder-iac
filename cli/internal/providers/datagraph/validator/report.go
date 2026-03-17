@@ -1,6 +1,11 @@
 package validator
 
-import dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
+import (
+	"fmt"
+	"slices"
+
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
+)
 
 // RunStatus indicates whether validation was executed or skipped
 type RunStatus int
@@ -13,6 +18,7 @@ const (
 // ResourceValidation holds the validation result for a single resource
 type ResourceValidation struct {
 	ID           string
+	URN          string
 	DisplayName  string
 	ResourceType string // "model" or "relationship"
 	Issues       []dgClient.ValidationIssue
@@ -40,6 +46,18 @@ func (rv *ResourceValidation) HasWarnings() bool {
 		}
 	}
 	return false
+}
+
+// completionError returns a non-nil error if the validation has any issues or errors,
+// used to signal task failure in progress reporting.
+func (rv *ResourceValidation) completionError() error {
+	if rv.Err != nil {
+		return rv.Err
+	}
+	if len(rv.Issues) > 0 {
+		return fmt.Errorf("validation issues found")
+	}
+	return nil
 }
 
 // ValidationReport holds all validation results for a run
@@ -91,7 +109,7 @@ func (vr *ValidationReport) PassCount() int {
 	return count
 }
 
-// ResourcesByType returns resources filtered by type
+// ResourcesByType returns resources filtered by type, sorted by URN
 func (vr *ValidationReport) ResourcesByType(resourceType string) []*ResourceValidation {
 	var result []*ResourceValidation
 	for _, r := range vr.Resources {
@@ -99,5 +117,14 @@ func (vr *ValidationReport) ResourcesByType(resourceType string) []*ResourceVali
 			result = append(result, r)
 		}
 	}
+	slices.SortFunc(result, func(a, b *ResourceValidation) int {
+		if a.URN < b.URN {
+			return -1
+		}
+		if a.URN > b.URN {
+			return 1
+		}
+		return 0
+	})
 	return result
 }

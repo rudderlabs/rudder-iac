@@ -27,8 +27,8 @@ func TestDisplayTerminal_AllPassed(t *testing.T) {
 	report := &ValidationReport{
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
-			{ID: "user", DisplayName: "User Model", ResourceType: "model", Issues: nil},
-			{ID: "user-orders", DisplayName: "User Orders", ResourceType: "relationship", Issues: nil},
+			{ID: "user", URN: "data-graph-model:user", DisplayName: "User Model", ResourceType: "model", Issues: nil},
+			{ID: "user-orders", URN: "data-graph-relationship:user-orders", DisplayName: "User Orders", ResourceType: "relationship", Issues: nil},
 		},
 	}
 
@@ -46,7 +46,7 @@ func TestDisplayTerminal_AllPassed(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "User Model"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "User Model (data-graph-model:user)"),
 		"pass",
 		statusCol,
 	))
@@ -55,7 +55,7 @@ func TestDisplayTerminal_AllPassed(t *testing.T) {
 	sb.WriteString(ui.Bold("RELATIONSHIPS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "User Orders"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "User Orders (data-graph-relationship:user-orders)"),
 		"pass",
 		statusCol,
 	))
@@ -77,7 +77,7 @@ func TestDisplayTerminal_WithErrors(t *testing.T) {
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
 			{
-				ID: "user", DisplayName: "User Model", ResourceType: "model",
+				ID: "user", URN: "data-graph-model:user", DisplayName: "User Model", ResourceType: "model",
 				Issues: []dgClient.ValidationIssue{
 					{Rule: "model/table-exists", Severity: "error", Message: "Table does not exist"},
 				},
@@ -99,7 +99,7 @@ func TestDisplayTerminal_WithErrors(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model (data-graph-model:user)"),
 		"1 error",
 		statusCol,
 	))
@@ -121,7 +121,7 @@ func TestDisplayTerminal_WithWarnings(t *testing.T) {
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
 			{
-				ID: "user", DisplayName: "User Model", ResourceType: "model",
+				ID: "user", URN: "data-graph-model:user", DisplayName: "User Model", ResourceType: "model",
 				Issues: []dgClient.ValidationIssue{
 					{Rule: "model/table-has-recent-data", Severity: "warning", Message: "Table has no data in last 30 days"},
 				},
@@ -143,7 +143,7 @@ func TestDisplayTerminal_WithWarnings(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolWarning, ui.ColorYellow), "User Model"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolWarning, ui.ColorYellow), "User Model (data-graph-model:user)"),
 		"1 warning",
 		statusCol,
 	))
@@ -165,7 +165,7 @@ func TestDisplayTerminal_WithExecutionError(t *testing.T) {
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
 			{
-				ID: "user", DisplayName: "User Model", ResourceType: "model",
+				ID: "user", URN: "data-graph-model:user", DisplayName: "User Model", ResourceType: "model",
 				Err: fmt.Errorf("connection refused"),
 			},
 		},
@@ -185,7 +185,7 @@ func TestDisplayTerminal_WithExecutionError(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model (data-graph-model:user)"),
 		ui.Color("error", ui.ColorRed),
 		statusCol,
 	))
@@ -206,7 +206,7 @@ func TestDisplayTerminal_FallsBackToID(t *testing.T) {
 	report := &ValidationReport{
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
-			{ID: "user", ResourceType: "model", Issues: nil},
+			{ID: "user", URN: "data-graph-model:user", ResourceType: "model", Issues: nil},
 		},
 	}
 
@@ -224,7 +224,7 @@ func TestDisplayTerminal_FallsBackToID(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "user"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), "user (data-graph-model:user)"),
 		"pass",
 		statusCol,
 	))
@@ -245,7 +245,7 @@ func TestDisplayTerminal_MultipleErrorsAndWarnings(t *testing.T) {
 		Status: RunStatusExecuted,
 		Resources: []*ResourceValidation{
 			{
-				ID: "user", DisplayName: "User Model", ResourceType: "model",
+				ID: "user", URN: "data-graph-model:user", DisplayName: "User Model", ResourceType: "model",
 				Issues: []dgClient.ValidationIssue{
 					{Rule: "model/table-exists", Severity: "error", Message: "Table does not exist"},
 					{Rule: "model/column-exists", Severity: "error", Message: "Column missing"},
@@ -269,7 +269,7 @@ func TestDisplayTerminal_MultipleErrorsAndWarnings(t *testing.T) {
 	sb.WriteString(ui.Bold("MODELS") + "\n")
 	sb.WriteString(separator("-"))
 	sb.WriteString(buildPaddedLine(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model"),
+		fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), "User Model (data-graph-model:user)"),
 		"2 errors  1 warning",
 		statusCol,
 	))

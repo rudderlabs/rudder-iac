@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
@@ -15,6 +16,7 @@ type ValidationUnit struct {
 	ResourceType string // "model" or "relationship"
 	ID           string // local resource ID
 	URN          string // resource URN (resourceType:ID)
+	DisplayName  string // user-friendly display name
 	Resource     any    // *dgModel.ModelResource or *dgModel.RelationshipResource
 	AccountID    string // resolved account ID from the parent data graph spec
 }
@@ -31,6 +33,7 @@ func PlanAll(graph *resources.Graph) (*ValidationPlan, error) {
 	allResources = append(allResources, graph.ResourcesByType(relationship.HandlerMetadata.ResourceType)...)
 
 	units := resourcesToUnits(allResources)
+	sortUnitsByURN(units)
 	return &ValidationPlan{Units: units}, nil
 }
 
@@ -62,6 +65,7 @@ func PlanModified(graph *resources.Graph, remoteGraph *resources.Graph, opts dif
 	}
 
 	units := resourcesToUnits(modified)
+	sortUnitsByURN(units)
 	return &ValidationPlan{Units: units}, nil
 }
 
@@ -94,15 +98,18 @@ func resourcesToUnits(rs []*resources.Resource) []*ValidationUnit {
 	for _, r := range rs {
 		var (
 			resourceType string
+			displayName  string
 			resource     any
 		)
 
 		switch raw := r.RawData().(type) {
 		case *dgModel.ModelResource:
 			resourceType = "model"
+			displayName = raw.DisplayName
 			resource = raw
 		case *dgModel.RelationshipResource:
 			resourceType = "relationship"
+			displayName = raw.DisplayName
 			resource = raw
 		default:
 			continue
@@ -112,8 +119,21 @@ func resourcesToUnits(rs []*resources.Resource) []*ValidationUnit {
 			ResourceType: resourceType,
 			ID:           r.ID(),
 			URN:          r.URN(),
+			DisplayName:  displayName,
 			Resource:     resource,
 		})
 	}
 	return units
+}
+
+func sortUnitsByURN(units []*ValidationUnit) {
+	slices.SortFunc(units, func(a, b *ValidationUnit) int {
+		if a.URN < b.URN {
+			return -1
+		}
+		if a.URN > b.URN {
+			return 1
+		}
+		return 0
+	})
 }
