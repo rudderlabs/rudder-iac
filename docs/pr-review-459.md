@@ -5,8 +5,8 @@
 ---
 
 ## Thread: `cli/internal/cmd/datagraph/validate/validate.go:87` (ID: PRRT_kwDONNpQU850jR5K)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2939780299
 
 ### Comments
@@ -15,8 +15,8 @@
 ---
 
 ## Thread: `cli/internal/cmd/datagraph/datagraph.go:10` (ID: PRRT_kwDONNpQU850jTnm)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2939789354
 
 ### Comments
@@ -25,8 +25,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/display/validation.go:1` (ID: PRRT_kwDONNpQU850kSSG)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940125427
 
 ### Comments
@@ -35,8 +35,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/display/validation.go:43` (ID: PRRT_kwDONNpQU850kTqM)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940132728
 
 ### Comments
@@ -45,8 +45,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/display/validation.go:15` (ID: PRRT_kwDONNpQU850kVib)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940142485
 
 ### Comments
@@ -55,8 +55,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/display/validation_test.go:34` (ID: PRRT_kwDONNpQU850kXLw)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940151075
 
 ### Comments
@@ -65,8 +65,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/planner.go:107` (ID: PRRT_kwDONNpQU850kdtZ)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940185488
 
 ### Comments
@@ -75,8 +75,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/planner_test.go:65` (ID: PRRT_kwDONNpQU850kfH9)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940192963
 
 ### Comments
@@ -85,8 +85,8 @@
 ---
 
 ## Thread: `cli/internal/cmd/datagraph/validate/validate.go:135` (ID: PRRT_kwDONNpQU850ko2H)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940244429
 
 ### Comments
@@ -95,8 +95,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/results.go:46` (ID: PRRT_kwDONNpQU850ksb5)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940263391
 
 ### Comments
@@ -105,8 +105,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/runner.go:41` (ID: PRRT_kwDONNpQU850kx5f)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940292213
 
 ### Comments
@@ -115,8 +115,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/runner.go:95` (ID: PRRT_kwDONNpQU850k2KB)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940302464
 
 ### Comments
@@ -125,8 +125,8 @@
 ---
 
 ## Thread: `cli/internal/providers/datagraph/validations/tasker.go:50` (ID: PRRT_kwDONNpQU850k2KB_tasker)
-**Status:** New
-**Action:** Classify
+**Status:** Implemented
+**Action:** Done
 **First comment DB ID:** 2940314686
 
 ### Comments

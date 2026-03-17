@@ -25,6 +25,7 @@ func (d *JSONDisplayer) Display(report *ValidationReport) {
 	}
 	type jsonResource struct {
 		ID           string      `json:"id"`
+		URN          string      `json:"urn"`
 		DisplayName  string      `json:"displayName"`
 		ResourceType string      `json:"resourceType"`
 		Status       string      `json:"status"`
@@ -32,18 +33,17 @@ func (d *JSONDisplayer) Display(report *ValidationReport) {
 		Error        string      `json:"error,omitempty"`
 	}
 	type jsonOutput struct {
-		Status    string         `json:"status"`
 		Resources []jsonResource `json:"resources"`
 	}
 
 	out := jsonOutput{
-		Status:    "executed",
 		Resources: make([]jsonResource, 0, len(report.Resources)),
 	}
 
 	for _, rv := range report.Resources {
 		jr := jsonResource{
 			ID:           rv.ID,
+			URN:          rv.URN,
 			DisplayName:  rv.DisplayName,
 			ResourceType: rv.ResourceType,
 		}
