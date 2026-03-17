@@ -98,6 +98,10 @@ func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*t
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *mockTransformationStore) GetLibraryVersion(ctx context.Context, id string, versionID string) (*transformations.TransformationLibrary, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
 	m.setLibraryExternalIDCalled = true
 	if m.setLibraryExternalIDFunc != nil {
@@ -115,6 +119,10 @@ func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id s
 }
 
 func (m *mockTransformationStore) GetTransformation(ctx context.Context, id string) (*transformations.Transformation, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockTransformationStore) GetTransformationVersion(ctx context.Context, id string, versionID string) (*transformations.Transformation, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
