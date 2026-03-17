@@ -186,7 +186,7 @@ func TestRunValidationTasks_Concurrent(t *testing.T) {
 		},
 	}
 
-	results := runValidationTasks(context.Background(), mockClient, nil, units, noopReporter{})
+	results := runValidationTasks(context.Background(), mockClient, nil, units, noopReporter{}, 4)
 
 	assert.Len(t, results, 2)
 	assert.Equal(t, "model-1", results[0].ID)
@@ -211,7 +211,7 @@ func TestRunValidationTasks_ReporterCalled(t *testing.T) {
 	}
 
 	reporter := &mockReporter{}
-	runValidationTasks(context.Background(), mockClient, nil, units, reporter)
+	runValidationTasks(context.Background(), mockClient, nil, units, reporter, 4)
 
 	assert.Equal(t, []string{"data-graph-model:user"}, reporter.started)
 	assert.Equal(t, []string{"data-graph-model:user"}, reporter.completed)

@@ -10,8 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-const concurrency = 4
-
 // ValidationReporter receives notifications about validation task progress
 type ValidationReporter interface {
 	TaskStarted(id, description string)
@@ -44,6 +42,7 @@ func runValidationTasks(
 	graph *resources.Graph,
 	units []*ValidationUnit,
 	reporter ValidationReporter,
+	concurrency int,
 ) []*ResourceValidation {
 	tasks := make([]tasker.Task, 0, len(units))
 	for _, u := range units {

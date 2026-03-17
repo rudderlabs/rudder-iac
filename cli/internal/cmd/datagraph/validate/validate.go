@@ -125,6 +125,7 @@ func NewCmdValidate() *cobra.Command {
 				JSONOutput:  jsonOutput,
 				Writer:      w,
 				DisplayFunc: displayFunc,
+				Concurrency: config.GetConfig().Concurrency.DataGraph,
 			})
 			if err != nil {
 				if jsonOutput && errors.Is(err, validator.ErrValidationFailed) {

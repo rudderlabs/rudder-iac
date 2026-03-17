@@ -53,6 +53,7 @@ type Config struct {
 	JSONOutput  bool
 	Writer      io.Writer
 	DisplayFunc DisplayFunc
+	Concurrency int
 }
 
 // Validate orchestrates a complete validation run: builds a resource graph,
@@ -70,7 +71,7 @@ func Validate(ctx context.Context, project Project, p ValidatorProvider, cfg Con
 		reporter = newProgressReporterIfTerminal()
 	}
 
-	runner := NewRunner(p.Client(), p, graph, reporter)
+	runner := NewRunner(p.Client(), p, graph, reporter, cfg.Concurrency)
 	report, err := runner.Run(ctx, cfg.Mode, cfg.WorkspaceID)
 	if err != nil {
 		return fmt.Errorf("running validations: %w", err)

@@ -30,22 +30,28 @@ type remoteStateLoader interface {
 
 // Runner orchestrates data graph validation
 type Runner struct {
-	loader   remoteStateLoader
-	client   dgClient.DataGraphClient
-	graph    *resources.Graph
-	reporter ValidationReporter
+	loader      remoteStateLoader
+	client      dgClient.DataGraphClient
+	graph       *resources.Graph
+	reporter    ValidationReporter
+	concurrency int
 }
 
-// NewRunner creates a new validation runner
-func NewRunner(client dgClient.DataGraphClient, loader remoteStateLoader, graph *resources.Graph, reporter ValidationReporter) *Runner {
+// NewRunner creates a new validation runner.
+// When concurrency is 0, it defaults to 4.
+func NewRunner(client dgClient.DataGraphClient, loader remoteStateLoader, graph *resources.Graph, reporter ValidationReporter, concurrency int) *Runner {
 	if reporter == nil {
 		reporter = noopReporter{}
 	}
+	if concurrency <= 0 {
+		concurrency = 4
+	}
 	return &Runner{
-		loader:   loader,
-		client:   client,
-		graph:    graph,
-		reporter: reporter,
+		loader:      loader,
+		client:      client,
+		graph:       graph,
+		reporter:    reporter,
+		concurrency: concurrency,
 	}
 }
 
@@ -93,7 +99,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, workspaceID string) (*Valid
 		return nil, err
 	}
 
-	validations := runValidationTasks(ctx, r.client, r.graph, plan.Units, r.reporter)
+	validations := runValidationTasks(ctx, r.client, r.graph, plan.Units, r.reporter, r.concurrency)
 
 	return &ValidationReport{
 		Status:    RunStatusExecuted,
