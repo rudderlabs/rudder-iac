@@ -117,12 +117,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taskCompleteMsg:
 		delete(m.tasks, msg.id)
-		for i, id := range m.taskOrder {
-			if id == msg.id {
-				m.taskOrder = append(m.taskOrder[:i], m.taskOrder[i+1:]...)
-				break
-			}
-		}
 		m.completed++
 
 		var completionMsg string
