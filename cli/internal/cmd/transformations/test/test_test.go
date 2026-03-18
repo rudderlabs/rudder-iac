@@ -15,6 +15,12 @@ import (
 func TestValidateFlags(t *testing.T) {
 	t.Parallel()
 
+	// Create a file for the "not a directory" case; t.TempDir() cleans up automatically.
+	notADir := filepath.Join(t.TempDir(), "not-a-dir.json")
+	f, err := os.Create(notADir)
+	require.NoError(t, err)
+	f.Close()
+
 	tests := []struct {
 		name          string
 		args          []string
@@ -51,7 +57,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputPath:    os.TempDir(),
+			outputPath:    t.TempDir(),
 			expectedError: false,
 		},
 
@@ -118,21 +124,13 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputPath:    filepath.Join(os.TempDir(), "not-a-dir.json"),
+			outputPath:    notADir,
 			expectedError: true,
 			errorContains: "output-path is not a directory",
 		},
 	}
 
-	// Create a file in TempDir for the "not a directory" case
-	notADir := filepath.Join(os.TempDir(), "not-a-dir.json")
-	f, err := os.Create(notADir)
-	require.NoError(t, err)
-	f.Close()
-	t.Cleanup(func() { os.Remove(notADir) })
-
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
