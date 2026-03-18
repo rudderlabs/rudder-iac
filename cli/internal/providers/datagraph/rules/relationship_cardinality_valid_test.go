@@ -24,8 +24,8 @@ func TestNewRelationshipCardinalityValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, prules.V1VersionPatterns("data-graph"), rule.AppliesTo())
 }
 
-// buildCardinalityTestSpec creates a DataGraphSpec with two models and a relationship between them
-func buildCardinalityTestSpec(sourceType, targetType, cardinality string) dgModel.DataGraphSpec {
+// buildCardinalityTest creates a DataGraphSpec and a graph with the target model for cardinality testing
+func buildCardinalityTest(sourceType, targetType, cardinality string) (dgModel.DataGraphSpec, *resources.Graph) {
 	sourceModel := dgModel.ModelSpec{
 		ID:          "source-model",
 		DisplayName: "Source Model",
@@ -49,24 +49,22 @@ func buildCardinalityTestSpec(sourceType, targetType, cardinality string) dgMode
 		sourceModel.Timestamp = "created_at"
 	}
 
-	targetModel := dgModel.ModelSpec{
-		ID:          "target-model",
-		DisplayName: "Target Model",
-		Type:        targetType,
-		Table:       "db.schema.target_table",
-	}
-
-	if targetType == "entity" {
-		targetModel.PrimaryID = "id"
-	} else {
-		targetModel.Timestamp = "created_at"
-	}
-
-	return dgModel.DataGraphSpec{
+	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
 		AccountID: "wh-123",
-		Models:    []dgModel.ModelSpec{sourceModel, targetModel},
+		Models:    []dgModel.ModelSpec{sourceModel},
 	}
+
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("target-model", modelHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.ModelResource{
+			ID:   "target-model",
+			Type: targetType,
+		}),
+	))
+
+	return spec, graph
 }
 
 func TestRelationshipCardinalityValid(t *testing.T) {
@@ -159,8 +157,7 @@ func TestRelationshipCardinalityValid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec := buildCardinalityTestSpec(tt.sourceType, tt.targetType, tt.cardinality)
-			graph := resources.NewGraph()
+			spec, graph := buildCardinalityTest(tt.sourceType, tt.targetType, tt.cardinality)
 
 			results := validateRelationshipCardinality("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
@@ -175,46 +172,3 @@ func TestRelationshipCardinalityValid(t *testing.T) {
 	}
 }
 
-func TestRelationshipCardinalityValid_TargetInGraph(t *testing.T) {
-	t.Parallel()
-
-	// Source model is in the spec, target model is in the graph (from another spec)
-	spec := dgModel.DataGraphSpec{
-		ID:        "test-dg",
-		AccountID: "wh-123",
-		Models: []dgModel.ModelSpec{
-			{
-				ID:          "source-model",
-				DisplayName: "Source",
-				Type:        "event",
-				Table:       "db.schema.source",
-				Timestamp:   "ts",
-				Relationships: []dgModel.RelationshipSpec{
-					{
-						ID:            "test-rel",
-						DisplayName:   "Test Rel",
-						Cardinality:   "many-to-one",
-						Target:        "#data-graph-model:target-model",
-						SourceJoinKey: "key",
-						TargetJoinKey: "key",
-					},
-				},
-			},
-		},
-	}
-
-	graph := resources.NewGraph()
-	// Add target model to graph as an entity
-	targetURN := resources.URN("target-model", modelHandler.HandlerMetadata.ResourceType)
-	graph.AddResource(resources.NewResource("target-model", modelHandler.HandlerMetadata.ResourceType,
-		resources.ResourceData{}, nil,
-		resources.WithRawData(&dgModel.ModelResource{
-			ID:   "target-model",
-			Type: "entity",
-		}),
-	))
-	_ = targetURN
-
-	results := validateRelationshipCardinality("data-graph", specs.SpecVersionV1, nil, spec, graph)
-	assert.Empty(t, results, "event to entity many-to-one via graph should be valid")
-}
