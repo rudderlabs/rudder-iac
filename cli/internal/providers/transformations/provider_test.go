@@ -8,59 +8,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	transformationsClient "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	tc "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
-
-// mockTransformationStore wraps MockTransformationStore with call-tracking for the
-// three methods that provider tests assert on by side effect.
-type mockTransformationStore struct {
-	transformationsClient.MockTransformationStore
-	batchPublishCalled         bool
-	deleteTransformationCalled bool
-	deleteLibraryCalled        bool
-}
-
-func newMockTransformationStore() *mockTransformationStore {
-	return &mockTransformationStore{}
-}
-
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
-	m.batchPublishCalled = true
-	if m.BatchPublishFunc != nil {
-		return m.BatchPublishFunc(ctx, req)
-	}
-	return &transformationsClient.BatchPublishResponse{Published: true}, nil
-}
-
-func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
-	m.deleteTransformationCalled = true
-	if m.DeleteTransformationFunc != nil {
-		return m.DeleteTransformationFunc(ctx, id)
-	}
-	return nil
-}
-
-func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
-	m.deleteLibraryCalled = true
-	if m.DeleteLibraryFunc != nil {
-		return m.DeleteLibraryFunc(ctx, id)
-	}
-	return nil
-}
 
 func TestProvider(t *testing.T) {
 	t.Run("SupportedKinds", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		kinds := provider.SupportedKinds()
@@ -73,7 +37,7 @@ func TestProvider(t *testing.T) {
 	t.Run("SupportedTypes", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		types := provider.SupportedTypes()
@@ -86,7 +50,7 @@ func TestProvider(t *testing.T) {
 	t.Run("LoadLegacySpec requires V1 version", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		t.Run("rejects legacy version via LoadLegacySpec", func(t *testing.T) {
@@ -112,7 +76,7 @@ func TestProvider(t *testing.T) {
 	t.Run("validation rules", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		syntacticRules := provider.SyntacticRules()
@@ -133,7 +97,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("empty graph", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		graph, err := provider.ResourceGraph()
@@ -146,7 +110,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("libraries without transformations", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load a library spec
@@ -180,7 +144,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("transformation without library dependencies", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load a transformation spec without imports
@@ -213,7 +177,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("transformation with library dependency", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load a library spec
@@ -261,7 +225,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("transformation with multiple library dependencies", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load first library
@@ -325,7 +289,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("transformation with missing library dependency", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load transformation that imports a non-existent library
@@ -358,7 +322,7 @@ func TestResourceGraph(t *testing.T) {
 	t.Run("python transformation - no imports extracted", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Load a Python transformation (parser returns empty imports)
@@ -393,25 +357,35 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("empty state - no batch publish", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		var batchPublishCalled bool
+		mockStore := &testutil.MockTransformationStore{
+			BatchPublishFunc: func(_ context.Context, _ *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+				batchPublishCalled = true
+				return &tc.BatchPublishResponse{Published: true}, nil
+			},
+		}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		st := state.EmptyState()
 		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
-		assert.False(t, mockStore.batchPublishCalled)
+		assert.False(t, batchPublishCalled)
 	})
 
 	t.Run("state with transformations only", func(t *testing.T) {
 		t.Parallel()
 
-		var capturedReq *transformationsClient.BatchPublishRequest
+		var (
+			capturedReq        *tc.BatchPublishRequest
+			batchPublishCalled bool
+		)
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
 			capturedReq = req
-			return &transformationsClient.BatchPublishResponse{Published: true}, nil
+			return &tc.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -465,7 +439,7 @@ func TestConsolidateSync(t *testing.T) {
 		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
-		assert.True(t, mockStore.batchPublishCalled)
+		assert.True(t, batchPublishCalled)
 		require.NotNil(t, capturedReq)
 		assert.Len(t, capturedReq.Transformations, 2)
 		assert.Len(t, capturedReq.Libraries, 0)
@@ -482,12 +456,16 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("state with libraries only", func(t *testing.T) {
 		t.Parallel()
 
-		var capturedReq *transformationsClient.BatchPublishRequest
+		var (
+			capturedReq        *tc.BatchPublishRequest
+			batchPublishCalled bool
+		)
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
 			capturedReq = req
-			return &transformationsClient.BatchPublishResponse{Published: true}, nil
+			return &tc.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -518,7 +496,7 @@ func TestConsolidateSync(t *testing.T) {
 		err := provider.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
-		assert.True(t, mockStore.batchPublishCalled)
+		assert.True(t, batchPublishCalled)
 		require.NotNil(t, capturedReq)
 		assert.Len(t, capturedReq.Transformations, 0)
 		assert.Len(t, capturedReq.Libraries, 2)
@@ -535,12 +513,16 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("state with both transformations and libraries", func(t *testing.T) {
 		t.Parallel()
 
-		var capturedReq *transformationsClient.BatchPublishRequest
+		var (
+			capturedReq        *tc.BatchPublishRequest
+			batchPublishCalled bool
+		)
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
 			capturedReq = req
-			return &transformationsClient.BatchPublishResponse{Published: true}, nil
+			return &tc.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -584,7 +566,7 @@ func TestConsolidateSync(t *testing.T) {
 		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
-		assert.True(t, mockStore.batchPublishCalled)
+		assert.True(t, batchPublishCalled)
 		require.NotNil(t, capturedReq)
 		assert.Len(t, capturedReq.Transformations, 1)
 		assert.Len(t, capturedReq.Libraries, 1)
@@ -596,8 +578,8 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("API error during batch publish", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
 			return nil, fmt.Errorf("API error")
 		}
 
@@ -640,7 +622,7 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("invalid state - wrong OutputRaw type for transformation", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Build state with wrong OutputRaw type
@@ -664,7 +646,7 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("invalid state - wrong OutputRaw type for library", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Build state with wrong OutputRaw type
@@ -686,7 +668,7 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("invalid state - empty version ID for transformation", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Build graph with transformation
@@ -725,7 +707,7 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("invalid state - empty version ID for library", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		// Build state with empty version ID
@@ -751,12 +733,16 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("state with other resource types - ignored", func(t *testing.T) {
 		t.Parallel()
 
-		var capturedReq *transformationsClient.BatchPublishRequest
+		var (
+			capturedReq        *tc.BatchPublishRequest
+			batchPublishCalled bool
+		)
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
 			capturedReq = req
-			return &transformationsClient.BatchPublishResponse{Published: true}, nil
+			return &tc.BatchPublishResponse{Published: true}, nil
 		}
 
 		provider := transformations.NewProviderWithStore(mockStore)
@@ -795,7 +781,7 @@ func TestConsolidateSync(t *testing.T) {
 		err := provider.ConsolidateSync(context.Background(), graph, st)
 
 		require.NoError(t, err)
-		assert.True(t, mockStore.batchPublishCalled)
+		assert.True(t, batchPublishCalled)
 		require.NotNil(t, capturedReq)
 		assert.Len(t, capturedReq.Transformations, 1)
 		assert.Len(t, capturedReq.Libraries, 0)
@@ -804,21 +790,23 @@ func TestConsolidateSync(t *testing.T) {
 	t.Run("validation failure returns error", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		var batchPublishCalled bool
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
 			// Return validation failure with test results
-			return &transformationsClient.BatchPublishResponse{
+			return &tc.BatchPublishResponse{
 				Published: false,
-				ValidationOutput: transformationsClient.ValidationOutput{
-					Transformations: []transformationsClient.TransformationTestResult{
+				ValidationOutput: tc.ValidationOutput{
+					Transformations: []tc.TransformationTestResult{
 						{
 							Name:      "test-transformation",
 							VersionID: "ver-1",
-							TestSuiteResult: transformationsClient.TestSuiteRunResult{
-								Results: []transformationsClient.TestResult{
+							TestSuiteResult: tc.TestSuiteRunResult{
+								Results: []tc.TestResult{
 									{
 										Name:         "test-case-1",
-										Status:       transformationsClient.TestRunStatusFail,
+										Status:       tc.TestRunStatusFail,
 										ActualOutput: []any{map[string]any{"result": "unexpected"}},
 									},
 								},
@@ -863,7 +851,7 @@ func TestConsolidateSync(t *testing.T) {
 		// Should fail due to validation failure
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "batch publish validation failed")
-		assert.True(t, mockStore.batchPublishCalled)
+		assert.True(t, batchPublishCalled)
 	})
 }
 
@@ -874,11 +862,11 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		t.Parallel()
 
 		// Create request with test definitions
-		req := &transformationsClient.BatchPublishRequest{
-			Transformations: []transformationsClient.BatchPublishTransformation{
+		req := &tc.BatchPublishRequest{
+			Transformations: []tc.BatchPublishTransformation{
 				{
 					VersionID: "ver-1",
-					TestSuite: []transformationsClient.TestDefinition{
+					TestSuite: []tc.TestDefinition{
 						{
 							Name:           "test-case-1",
 							Input:          []any{map[string]any{"input": "data"}},
@@ -893,7 +881,7 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 				},
 				{
 					VersionID: "ver-2",
-					TestSuite: []transformationsClient.TestDefinition{
+					TestSuite: []tc.TestDefinition{
 						{
 							Name:           "another-test",
 							Input:          []any{map[string]any{"input": "other"}},
@@ -905,26 +893,26 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		}
 
 		// Create response with test results
-		resp := &transformationsClient.BatchPublishResponse{
+		resp := &tc.BatchPublishResponse{
 			Published: false,
-			ValidationOutput: transformationsClient.ValidationOutput{
-				Transformations: []transformationsClient.TransformationTestResult{
+			ValidationOutput: tc.ValidationOutput{
+				Transformations: []tc.TransformationTestResult{
 					{
 						Name:      "transformation-1",
 						VersionID: "ver-1",
-						TestSuiteResult: transformationsClient.TestSuiteRunResult{
-							Results: []transformationsClient.TestResult{
-								{Name: "test-case-1", Status: transformationsClient.TestRunStatusPass},
-								{Name: "test-case-2", Status: transformationsClient.TestRunStatusFail},
+						TestSuiteResult: tc.TestSuiteRunResult{
+							Results: []tc.TestResult{
+								{Name: "test-case-1", Status: tc.TestRunStatusPass},
+								{Name: "test-case-2", Status: tc.TestRunStatusFail},
 							},
 						},
 					},
 					{
 						Name:      "transformation-2",
 						VersionID: "ver-2",
-						TestSuiteResult: transformationsClient.TestSuiteRunResult{
-							Results: []transformationsClient.TestResult{
-								{Name: "another-test", Status: transformationsClient.TestRunStatusPass},
+						TestSuiteResult: tc.TestSuiteRunResult{
+							Results: []tc.TestResult{
+								{Name: "another-test", Status: tc.TestRunStatusPass},
 							},
 						},
 					},
@@ -937,14 +925,14 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 				{
 					Result: &resp.ValidationOutput.Transformations[0],
-					Definitions: []*transformationsClient.TestDefinition{
+					Definitions: []*tc.TestDefinition{
 						&req.Transformations[0].TestSuite[0],
 						&req.Transformations[0].TestSuite[1],
 					},
 				},
 				{
 					Result: &resp.ValidationOutput.Transformations[1],
-					Definitions: []*transformationsClient.TestDefinition{
+					Definitions: []*tc.TestDefinition{
 						&req.Transformations[1].TestSuite[0],
 					},
 				},
@@ -973,16 +961,16 @@ func TestBuildTestResultsFromResponse(t *testing.T) {
 		t.Parallel()
 
 		// Response without test definitions
-		resp := &transformationsClient.BatchPublishResponse{
+		resp := &tc.BatchPublishResponse{
 			Published: false,
-			ValidationOutput: transformationsClient.ValidationOutput{
-				Transformations: []transformationsClient.TransformationTestResult{
+			ValidationOutput: tc.ValidationOutput{
+				Transformations: []tc.TransformationTestResult{
 					{
 						Name:      "transformation-1",
 						VersionID: "ver-1",
-						TestSuiteResult: transformationsClient.TestSuiteRunResult{
-							Results: []transformationsClient.TestResult{
-								{Name: "test-1", Status: transformationsClient.TestRunStatusPass},
+						TestSuiteResult: tc.TestSuiteRunResult{
+							Results: []tc.TestResult{
+								{Name: "test-1", Status: tc.TestRunStatusPass},
 							},
 						},
 					},
@@ -1011,7 +999,7 @@ func TestMapRemoteToState(t *testing.T) {
 	t.Run("dependencies populated from imports field", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		collection := resources.NewRemoteResources()
@@ -1020,7 +1008,7 @@ func TestMapRemoteToState(t *testing.T) {
 				ID:         "remote-lib-1",
 				ExternalID: "lib-1",
 				Data: &model.RemoteLibrary{
-					TransformationLibrary: &transformationsClient.TransformationLibrary{
+					TransformationLibrary: &tc.TransformationLibrary{
 						ImportName: "mathLib",
 						ExternalID: "lib-1",
 					},
@@ -1030,7 +1018,7 @@ func TestMapRemoteToState(t *testing.T) {
 				ID:         "remote-lib-2",
 				ExternalID: "lib-2",
 				Data: &model.RemoteLibrary{
-					TransformationLibrary: &transformationsClient.TransformationLibrary{
+					TransformationLibrary: &tc.TransformationLibrary{
 						ImportName: "stringLib",
 						ExternalID: "lib-2",
 					},
@@ -1042,7 +1030,7 @@ func TestMapRemoteToState(t *testing.T) {
 				ID:         "remote-trans-1",
 				ExternalID: "trans-1",
 				Data: &model.RemoteTransformation{
-					Transformation: &transformationsClient.Transformation{
+					Transformation: &tc.Transformation{
 						Imports:    []string{"mathLib", "stringLib"},
 						ExternalID: "trans-1",
 					},
@@ -1063,7 +1051,7 @@ func TestMapRemoteToState(t *testing.T) {
 	t.Run("unresolved library import skipped", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		provider := transformations.NewProviderWithStore(mockStore)
 
 		collection := resources.NewRemoteResources()
@@ -1072,7 +1060,7 @@ func TestMapRemoteToState(t *testing.T) {
 				ID:         "remote-trans-1",
 				ExternalID: "trans-1",
 				Data: &model.RemoteTransformation{
-					Transformation: &transformationsClient.Transformation{
+					Transformation: &tc.Transformation{
 						Imports:    []string{"unmanagedLib"},
 						ExternalID: "trans-1",
 					},
@@ -1097,10 +1085,10 @@ func TestDeferredDeletes(t *testing.T) {
 
 		var callOrder []string
 
-		mockStore := newMockTransformationStore()
-		mockStore.BatchPublishFunc = func(ctx context.Context, req *transformationsClient.BatchPublishRequest) (*transformationsClient.BatchPublishResponse, error) {
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
 			callOrder = append(callOrder, "batch_publish")
-			return &transformationsClient.BatchPublishResponse{Published: true}, nil
+			return &tc.BatchPublishResponse{Published: true}, nil
 		}
 		mockStore.DeleteLibraryFunc = func(ctx context.Context, id string) error {
 			callOrder = append(callOrder, "delete_library:"+id)
@@ -1154,8 +1142,17 @@ func TestDeferredDeletes(t *testing.T) {
 	t.Run("deferred deletes only - nothing to publish", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		var (
+			batchPublishCalled         bool
+			deleteTransformationCalled bool
+		)
+		mockStore := &testutil.MockTransformationStore{}
+		mockStore.BatchPublishFunc = func(ctx context.Context, req *tc.BatchPublishRequest) (*tc.BatchPublishResponse, error) {
+			batchPublishCalled = true
+			return &tc.BatchPublishResponse{Published: true}, nil
+		}
 		mockStore.DeleteTransformationFunc = func(ctx context.Context, id string) error {
+			deleteTransformationCalled = true
 			return nil
 		}
 
@@ -1170,8 +1167,8 @@ func TestDeferredDeletes(t *testing.T) {
 		err = p.ConsolidateSync(context.Background(), resources.NewGraph(), st)
 
 		require.NoError(t, err)
-		assert.False(t, mockStore.batchPublishCalled)
-		assert.True(t, mockStore.deleteTransformationCalled)
+		assert.False(t, batchPublishCalled)
+		assert.True(t, deleteTransformationCalled)
 	})
 
 	t.Run("transformations deleted before libraries", func(t *testing.T) {
@@ -1179,7 +1176,7 @@ func TestDeferredDeletes(t *testing.T) {
 
 		var deleteOrder []string
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		mockStore.DeleteTransformationFunc = func(ctx context.Context, id string) error {
 			deleteOrder = append(deleteOrder, "transformation:"+id)
 			return nil
@@ -1216,7 +1213,7 @@ func TestDeferredDeletes(t *testing.T) {
 	t.Run("deferred delete failure propagates from ConsolidateSync", func(t *testing.T) {
 		t.Parallel()
 
-		mockStore := newMockTransformationStore()
+		mockStore := &testutil.MockTransformationStore{}
 		mockStore.DeleteLibraryFunc = func(ctx context.Context, id string) error {
 			return fmt.Errorf("backend rejected delete")
 		}
