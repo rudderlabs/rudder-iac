@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: simple_transform
+  name: Simple Transform
+  description: Adds source tag to events
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) {
+      event.properties = event.properties || {};
+      event.properties.source = "rudder";
+      return event;
+    }

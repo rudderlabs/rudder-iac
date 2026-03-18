@@ -1,0 +1,58 @@
+{
+  "userId": "user_123",
+  "type": "identify",
+  "context": {
+    "traits": {
+      "name": "Alice",
+      "email": "alice@example.com",
+      "phone": "+11234567891"
+    },
+    "sessionId": 1729095623786,
+    "app": {
+      "name": "RudderLabs JavaScript SDK",
+      "namespace": "com.rudderlabs.javascript",
+      "version": "3.0.3"
+    },
+    "library": {
+      "name": "RudderLabs JavaScript SDK",
+      "version": "3.0.3"
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "os": {
+      "name": "",
+      "version": ""
+    },
+    "locale": "en-US",
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "density": 1.5,
+      "innerWidth": 800,
+      "innerHeight": 750
+    },
+    "campaign": {},
+    "page": {
+      "initial_referrer": "$direct",
+      "initial_referring_domain": "",
+      "path": "/path",
+      "referrer": "https://www.website.com/product",
+      "referring_domain": "website.com",
+      "search": "",
+      "tab_url": "https://www.website.com/product/path",
+      "title": "RS 101",
+      "url": "https://www.website.com/product/path"
+    },
+    "timezone": "GMT-0400"
+  },
+  "properties": {
+    "name": "Alice"
+  },
+  "channel": "web",
+  "originalTimestamp": "2024-10-16T16:21:18.821Z",
+  "integrations": {
+    "All": true
+  },
+  "messageId": "170cd977-ebb3-416f-a00c-577eaf2b3c61",
+  "anonymousId": "sample_anonymous_id",
+  "sentAt": "2024-10-16T16:21:18.822Z"
+}

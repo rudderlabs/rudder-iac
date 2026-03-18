@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: py_greeting_transform
+  name: Py Greeting Transform
+  description: Greets user by name in Python
+  language: python
+  code: |
+    def transformEvent(event, metadata):
+        props = event.get("properties", {})
+        props["greeting"] = "Hello, " + props.get("name", "")
+        event["properties"] = props
+        return event
+  tests:
+    - name: py_greeting_suite
+      input: ./input/py_greeting_transform
+      output: ./output/py_greeting_transform
