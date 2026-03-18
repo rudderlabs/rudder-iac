@@ -52,10 +52,6 @@ func NewRelationshipRefsValidRule() rules.Rule {
 		"relationship target references must resolve to existing models",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
-			prules.LegacyVersionPatterns("data-graph"),
-			validateRelationshipRefs,
-		),
-		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),
 			validateRelationshipRefs,
 		),

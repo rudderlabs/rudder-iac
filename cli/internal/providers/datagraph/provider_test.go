@@ -21,7 +21,7 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 
 	// Comprehensive spec with data graph and multiple inline models with relationships
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "my-data-graph",
@@ -208,7 +208,7 @@ func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "simple-dg",
@@ -242,7 +242,7 @@ func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "test-dg",
@@ -295,7 +295,7 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "my-data-graph",

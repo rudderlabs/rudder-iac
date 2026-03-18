@@ -87,10 +87,6 @@ func NewDataGraphSpecSyntaxValidRule() rules.Rule {
 		"data graph spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
-			prules.LegacyVersionPatterns("data-graph"),
-			validateDataGraphSpec,
-		),
-		prules.NewPatternValidator(
 			prules.V1VersionPatterns("data-graph"),
 			validateDataGraphSpec,
 		),

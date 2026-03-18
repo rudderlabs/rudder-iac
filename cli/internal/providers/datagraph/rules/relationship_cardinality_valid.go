@@ -98,10 +98,6 @@ func NewRelationshipCardinalityValidRule() rules.Rule {
 		"relationship cardinality must be valid for the source and target model types",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
-			prules.LegacyVersionPatterns("data-graph"),
-			validateRelationshipCardinality,
-		),
-		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),
 			validateRelationshipCardinality,
 		),
