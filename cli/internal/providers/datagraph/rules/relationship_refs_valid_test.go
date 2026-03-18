@@ -21,11 +21,7 @@ func TestNewRelationshipRefsValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "datagraph/data-graph/relationship-refs-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 
-	expectedPatterns := append(
-		prules.LegacyVersionPatterns("data-graph"),
-		prules.V1VersionPatterns("data-graph")...,
-	)
-	assert.Equal(t, expectedPatterns, rule.AppliesTo())
+	assert.Equal(t, prules.V1VersionPatterns("data-graph"), rule.AppliesTo())
 }
 
 func TestRelationshipRefsValid_TargetExistsLocally(t *testing.T) {

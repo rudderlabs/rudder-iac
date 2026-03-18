@@ -27,14 +27,15 @@ type=event) are conditionally required. The `required_if` tag is not supported b
 **Decision**: Handle conditional required fields as custom validation logic in the
 syntactic rule function, after struct tag validation.
 
-### Semantic Rules: Graph-Only Model Lookup
+### Semantic Rules: Spec-Level Model Lookup
 
-Semantic rules receive the fully-populated resource graph. All models from all specs
-are guaranteed to be in the graph before semantic validation runs (LoadSpec → ResourceGraph
-→ SemanticValidation). No local model maps are needed.
+Semantic rules receive the `DataGraphSpec` (not individual resources). For cardinality
+validation, the target model type needs to be resolved. Models may exist in the same
+spec or in the graph from other specs.
 
-**Decision**: Resolve model types exclusively via graph lookup using `RawData()` type
-assertion. No spec-local maps.
+**Decision**: Build a local model type map from the spec, then fall back to graph
+lookup via `RawData()` type assertion. This handles both same-spec and cross-spec
+references.
 
 ### Handler ValidateResource: Return nil (not removed)
 
