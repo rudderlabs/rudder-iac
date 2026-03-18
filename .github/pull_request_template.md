@@ -2,7 +2,7 @@
 
 <!-- Required for traceability -->
 
-resolves [DEX-XXX](link-to-ticket)
+Resolves [DEX-XXX](link-to-ticket)
 
 ---
 
