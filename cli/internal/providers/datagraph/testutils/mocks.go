@@ -12,11 +12,11 @@ import (
 type MockDataGraphClient struct {
 	// DataGraph methods
 	DataGraphs          map[string]*dgClient.DataGraph
-	ListDataGraphsFunc  func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error)
+	ListDataGraphsFunc  func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error)
 	GetDataGraphFunc    func(ctx context.Context, id string) (*dgClient.DataGraph, error)
 	CreateDataGraphFunc func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error)
 	DeleteDataGraphFunc func(ctx context.Context, id string) error
-	SetExternalIDFunc   func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error)
+	SetExternalIDFunc   func(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error)
 
 	// Model methods
 	Models                 map[string]*dgClient.Model
@@ -39,9 +39,9 @@ type MockDataGraphClient struct {
 
 // DataGraph methods
 
-func (m *MockDataGraphClient) ListDataGraphs(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+func (m *MockDataGraphClient) ListDataGraphs(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 	if m.ListDataGraphsFunc != nil {
-		return m.ListDataGraphsFunc(ctx, page, perPage, hasExternalID)
+		return m.ListDataGraphsFunc(ctx, req)
 	}
 	return &dgClient.ListDataGraphsResponse{}, nil
 }
@@ -70,9 +70,9 @@ func (m *MockDataGraphClient) DeleteDataGraph(ctx context.Context, id string) er
 	return nil
 }
 
-func (m *MockDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
+func (m *MockDataGraphClient) SetExternalID(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error) {
 	if m.SetExternalIDFunc != nil {
-		return m.SetExternalIDFunc(ctx, id, externalID)
+		return m.SetExternalIDFunc(ctx, req)
 	}
 	return nil, nil
 }

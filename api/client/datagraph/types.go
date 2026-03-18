@@ -22,6 +22,19 @@ type CreateDataGraphRequest struct {
 	ExternalID string `json:"externalId,omitempty"`
 }
 
+// ListDataGraphsRequest is the request for listing data graphs
+type ListDataGraphsRequest struct {
+	Page          int
+	PageSize      int
+	HasExternalID *bool
+}
+
+// SetExternalIDRequest is the request for setting a data graph's external ID
+type SetExternalIDRequest struct {
+	ID         string
+	ExternalID string
+}
+
 // ListDataGraphsResponse represents the paginated response from listing data graphs
 type ListDataGraphsResponse struct {
 	Data   []DataGraph   `json:"data"`
