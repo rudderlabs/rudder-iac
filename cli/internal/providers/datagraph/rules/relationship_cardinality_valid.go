@@ -12,12 +12,6 @@ import (
 )
 
 var validateRelationshipCardinality = func(_ string, _ string, _ map[string]any, spec dgModel.DataGraphSpec, graph *resources.Graph) []rules.ValidationResult {
-	// Build a map of model ID -> type from the spec for source model lookup
-	modelTypes := make(map[string]string, len(spec.Models))
-	for _, m := range spec.Models {
-		modelTypes[m.ID] = m.Type
-	}
-
 	var results []rules.ValidationResult
 	for i, model := range spec.Models {
 		for j, rel := range model.Relationships {
@@ -26,14 +20,13 @@ var validateRelationshipCardinality = func(_ string, _ string, _ map[string]any,
 				continue
 			}
 
-			sourceType := model.Type
-			targetType := resolveModelType(targetModelID, modelTypes, graph)
+			targetType := resolveModelType(targetModelID, graph)
 			if targetType == "" {
 				// Target not found — handled by refs_valid rule
 				continue
 			}
 
-			if err := checkCardinality(sourceType, targetType, rel.Cardinality); err != "" {
+			if err := checkCardinality(model.Type, targetType, rel.Cardinality); err != "" {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/models/%d/relationships/%d/cardinality", i, j),
 					Message:   err,
@@ -54,12 +47,8 @@ func parseTargetModelID(target string) string {
 	return strings.TrimPrefix(target, prefix)
 }
 
-// resolveModelType looks up a model's type first from the local spec, then from the graph
-func resolveModelType(modelID string, localTypes map[string]string, graph *resources.Graph) string {
-	if t, ok := localTypes[modelID]; ok {
-		return t
-	}
-
+// resolveModelType looks up a model's type from the graph
+func resolveModelType(modelID string, graph *resources.Graph) string {
 	urn := resources.URN(modelID, modelHandler.HandlerMetadata.ResourceType)
 	res, exists := graph.GetResource(urn)
 	if !exists {

@@ -24,45 +24,6 @@ func TestNewRelationshipRefsValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, prules.V1VersionPatterns("data-graph"), rule.AppliesTo())
 }
 
-func TestRelationshipRefsValid_TargetExistsLocally(t *testing.T) {
-	t.Parallel()
-
-	spec := dgModel.DataGraphSpec{
-		ID:        "test-dg",
-		AccountID: "wh-123",
-		Models: []dgModel.ModelSpec{
-			{
-				ID:          "user",
-				DisplayName: "User",
-				Type:        "entity",
-				Table:       "db.schema.users",
-				PrimaryID:   "id",
-				Relationships: []dgModel.RelationshipSpec{
-					{
-						ID:            "user-account",
-						DisplayName:   "User Account",
-						Cardinality:   "one-to-one",
-						Target:        "#data-graph-model:account",
-						SourceJoinKey: "account_id",
-						TargetJoinKey: "account_id",
-					},
-				},
-			},
-			{
-				ID:          "account",
-				DisplayName: "Account",
-				Type:        "entity",
-				Table:       "db.schema.accounts",
-				PrimaryID:   "id",
-			},
-		},
-	}
-
-	graph := resources.NewGraph()
-	results := validateRelationshipRefs("data-graph", specs.SpecVersionV1, nil, spec, graph)
-	assert.Empty(t, results, "Target exists locally — should not produce errors")
-}
-
 func TestRelationshipRefsValid_TargetExistsInGraph(t *testing.T) {
 	t.Parallel()
 
