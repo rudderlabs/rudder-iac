@@ -18,8 +18,6 @@ import (
 )
 
 func TestTransformationsTestPass(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
-
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -29,13 +27,13 @@ func TestTransformationsTestPass(t *testing.T) {
 
 	// Apply base fixtures to establish remote state
 	output, err = executor.Execute(cliBinPath, "apply", "-l",
-		filepath.Join("testdata", "project", "transformations-test", "apply"),
+		filepath.Join("testdata", "project", "transformations-test", "setup"),
 		"--confirm=false")
 	require.NoError(t, err, "apply failed: %s", string(output))
 
 	t.Run("all transformations and libraries pass", func(t *testing.T) {
 		outputDir := t.TempDir()
-		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "pass")
+		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "success")
 
 		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
 			"-l", fixtureDir, "--output-path", outputDir)

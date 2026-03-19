@@ -9,9 +9,9 @@ spec:
   language: python
   code: |
     def transformEvent(event, metadata):
-        props = event.get("properties", {})
-        props["greeting"] = "Hello, " + props.get("name", "")
-        event["properties"] = props
+        props = event.get('properties', {})
+        props['greeting'] = 'Hello, ' + props.get('name', '')
+        event['properties'] = props
         return event
   tests:
     - name: py_greeting_suite
