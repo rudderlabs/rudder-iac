@@ -1,7 +1,7 @@
 {{ template "disclaimer.tmpl" . }}
-
 import Foundation
 import RudderStackAnalytics
+{{- if or .TypeAliases .VariantEnums }}
 
 // MARK: - Custom Types
 {{- range .TypeAliases }}
@@ -10,6 +10,8 @@ import RudderStackAnalytics
 {{- range .VariantEnums }}
 {{ template "variant.tmpl" . }}
 {{- end }}
+{{- end }}
+{{- if or .PropertyTypeAliases .Enums .MultiTypeEnums }}
 
 // MARK: - Property Types
 {{- range .PropertyTypeAliases }}
@@ -21,10 +23,13 @@ import RudderStackAnalytics
 {{- range .MultiTypeEnums }}
 {{ template "multitype.tmpl" . }}
 {{- end }}
+{{- end }}
+{{- if .Structs }}
 
 // MARK: - Event Properties
 {{- range .Structs }}
 {{ template "structwithindent" (mkSlice 0 .) }}
 {{- end }}
+{{- end }}
 
-{{ template "ruddertyperanalytics.tmpl" . }}
+{{ template "ruddertyperanalytics.tmpl" . -}}
