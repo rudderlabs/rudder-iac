@@ -128,7 +128,7 @@ func validateItemTypes(types []localcatalog.CustomTypeV1) []rules.ValidationResu
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/types/%d/item_types", i),
 				Message: fmt.Sprintf("'item_types' is invalid: must be unique one of [%s]",
-					strings.Join(ct.ItemTypes, ", "),
+					strings.Join(catalogRules.ValidPrimitiveTypes, ", "),
 				),
 			})
 		}

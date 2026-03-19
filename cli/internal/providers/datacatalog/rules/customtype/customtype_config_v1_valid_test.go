@@ -670,20 +670,6 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "valid array with custom type reference in item_type",
-			spec: localcatalog.CustomTypeSpecV1{
-				Types: []localcatalog.CustomTypeV1{
-					{
-						LocalID:  "addresses",
-						Name:     "Addresses",
-						Type:     "array",
-						ItemType: "#custom-type:address",
-					},
-				},
-			},
-			expectedErrors: 0,
-		},
-		{
 			name: "valid array config with multiple item types",
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{

@@ -188,6 +188,49 @@ func TestCustomTypeValidation(t *testing.T) {
 				expectedErrs:  1,
 				errorContains: []string{`config key "someKey" is not allowed on custom type of type object`},
 			},
+			{
+				name: "custom type with duplicate item_types is invalid",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type with duplicate item_types",
+						Type:        "array",
+						ItemTypes:   []string{"string", "string", "integer"},
+					},
+				},
+				expectedErrs:  1,
+				errorContains: []string{"duplicate item_type"},
+			},
+			{
+				name: "custom type with invalid item_type",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type with invalid item_type",
+						Type:        "array",
+						ItemType:    "invalid_type",
+					},
+				},
+				expectedErrs:  1,
+				errorContains: []string{"is invalid, valid type values are"},
+			},
+			{
+				name: "custom type with both item_type and item_types set",
+				customTypes: []catalog.CustomTypeV1{
+					{
+						LocalID:     "TestType1",
+						Name:        "TestType",
+						Description: "Test custom type with both item_type and item_types set",
+						Type:        "array",
+						ItemTypes:   []string{"string", "integer"},
+						ItemType:    "string",
+					},
+				},
+				expectedErrs:  1,
+				errorContains: []string{"'item_type' and 'item_types' fields are mutually exclusive, only one can be specified"},
+			},
 		}
 
 		for _, tc := range testCases {

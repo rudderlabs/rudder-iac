@@ -142,7 +142,16 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 			// Validate item_types field (multiple item types)
 			if len(prop.ItemTypes) > 0 {
+			itemTypesSet := make(map[string]bool, len(prop.ItemTypes))
 				for idx, itemType := range prop.ItemTypes {
+				if itemTypesSet[itemType] {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("duplicate item_type '%s' found in item_types array", itemType),
+						Reference: reference,
+					})
+				}
+				itemTypesSet[itemType] = true
+
 					// Check if it's a custom type reference
 					if catalog.CustomTypeRegex.Match([]byte(itemType)) {
 						if len(prop.ItemTypes) != 1 {
@@ -321,7 +330,16 @@ func (rk *RequiredKeysValidator) Validate(dc *catalog.DataCatalog) []ValidationE
 
 		// Validate item_types field (multiple item types)
 		if len(customType.ItemTypes) > 0 {
+			itemTypesSet := make(map[string]bool, len(customType.ItemTypes))
 			for idx, itemType := range customType.ItemTypes {
+				if itemTypesSet[itemType] {
+					errors = append(errors, ValidationError{
+						error:     fmt.Errorf("duplicate item_type '%s' found in item_types array", itemType),
+						Reference: reference,
+					})
+				}
+				itemTypesSet[itemType] = true
+
 				if !slices.Contains(ValidTypes, itemType) {
 					errors = append(errors, ValidationError{
 						error:     fmt.Errorf("item_types[%d] is invalid, valid type values are: %s", idx, strings.Join(ValidTypes, ", ")),
