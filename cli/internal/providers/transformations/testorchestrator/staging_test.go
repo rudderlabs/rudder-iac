@@ -226,6 +226,9 @@ func (s *stubStore) UpdateLibrary(ctx context.Context, id string, req *transform
 func (s *stubStore) GetTransformation(_ context.Context, _ string) (*transformations.Transformation, error) {
 	panic("not used in staging tests")
 }
+func (s *stubStore) GetTransformationVersion(_ context.Context, _, _ string) (*transformations.Transformation, error) {
+	panic("not used in staging tests")
+}
 func (s *stubStore) ListTransformations(_ context.Context) ([]*transformations.Transformation, error) {
 	panic("not used in staging tests")
 }
@@ -236,6 +239,9 @@ func (s *stubStore) SetTransformationExternalID(_ context.Context, _, _ string) 
 	panic("not used in staging tests")
 }
 func (s *stubStore) GetLibrary(_ context.Context, _ string) (*transformations.TransformationLibrary, error) {
+	panic("not used in staging tests")
+}
+func (s *stubStore) GetLibraryVersion(_ context.Context, _, _ string) (*transformations.TransformationLibrary, error) {
 	panic("not used in staging tests")
 }
 func (s *stubStore) ListLibraries(_ context.Context) ([]*transformations.TransformationLibrary, error) {

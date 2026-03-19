@@ -33,12 +33,6 @@ type HandlerImpl struct {
 }
 
 // NewHandler creates a new BaseHandler for model resources
-
-// stringPtr returns a pointer to the given string
-func stringPtr(s string) *string {
-	return &s
-}
-
 func NewHandler(client dgClient.DataGraphClient) *ModelHandler {
 	h := &HandlerImpl{client: client}
 	return handler.NewHandler(h)
@@ -98,85 +92,29 @@ func (h *HandlerImpl) ValidateResource(resource *dgModel.ModelResource, graph *r
 	return nil
 }
 
-// listAllEntityModels fetches all entity models for a data graph with pagination
-func (h *HandlerImpl) listAllEntityModels(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteModel, error) {
-	var allModels []*dgModel.RemoteModel
-	page := 1
-	perPage := 100
-
-	for {
-		resp, err := h.client.ListModels(ctx, &dgClient.ListModelsRequest{DataGraphID: dataGraphID, Page: page, PageSize: perPage, ModelType: stringPtr("entity"), HasExternalID: hasExternalID})
-		if err != nil {
-			return nil, fmt.Errorf("listing entity models: %w", err)
-		}
-
-		// Add all models from current page
-		for i := range resp.Data {
-			allModels = append(allModels, &dgModel.RemoteModel{
-				Model: &resp.Data[i],
-			})
-		}
-
-		// Check if there are more pages
-		if resp.Paging.Next == "" {
-			break
-		}
-		page++
-	}
-
-	return allModels, nil
-}
-
-// listAllEventModels fetches all event models for a data graph with pagination
-func (h *HandlerImpl) listAllEventModels(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteModel, error) {
-	var allModels []*dgModel.RemoteModel
-	page := 1
-	perPage := 100
-
-	for {
-		resp, err := h.client.ListModels(ctx, &dgClient.ListModelsRequest{DataGraphID: dataGraphID, Page: page, PageSize: perPage, ModelType: stringPtr("event"), HasExternalID: hasExternalID})
-		if err != nil {
-			return nil, fmt.Errorf("listing event models: %w", err)
-		}
-
-		// Add all models from current page
-		for i := range resp.Data {
-			// Set DataGraphID if not already set by API
-			if resp.Data[i].DataGraphID == "" {
-				resp.Data[i].DataGraphID = dataGraphID
-			}
-			allModels = append(allModels, &dgModel.RemoteModel{
-				Model: &resp.Data[i],
-			})
-		}
-
-		// Check if there are more pages
-		if resp.Paging.Next == "" {
-			break
-		}
-		page++
-	}
-
-	return allModels, nil
-}
-
 // listAllModelsForDataGraph fetches all models (entity and event) for a data graph
 func (h *HandlerImpl) listAllModelsForDataGraph(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteModel, error) {
 	var allModels []*dgModel.RemoteModel
+	page := 1
+	perPage := 100
 
-	// Fetch entity models
-	entityModels, err := h.listAllEntityModels(ctx, dataGraphID, hasExternalID)
-	if err != nil {
-		return nil, err
-	}
-	allModels = append(allModels, entityModels...)
+	for {
+		resp, err := h.client.ListModels(ctx, &dgClient.ListModelsRequest{DataGraphID: dataGraphID, Page: page, PageSize: perPage, HasExternalID: hasExternalID})
+		if err != nil {
+			return nil, fmt.Errorf("listing models: %w", err)
+		}
 
-	// Fetch event models
-	eventModels, err := h.listAllEventModels(ctx, dataGraphID, hasExternalID)
-	if err != nil {
-		return nil, err
+		for i := range resp.Data {
+			allModels = append(allModels, &dgModel.RemoteModel{
+				Model: &resp.Data[i],
+			})
+		}
+
+		if resp.Paging.Next == "" {
+			break
+		}
+		page++
 	}
-	allModels = append(allModels, eventModels...)
 
 	return allModels, nil
 }
@@ -206,8 +144,8 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.RemoteModel, error) {
 	hasExternalID := false
 
-	// First, get all data graphs
-	dataGraphs, err := h.listAllDataGraphs(ctx, nil)
+	// Only fetch unmanaged data graphs — models under managed DGs are not importable
+	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,14 +342,12 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *dgModel.Mo
 	return nil
 }
 
-// FormatForExport formats resources for export
-// Models are exported inline in data-graph specs, so this is not supported
+// FormatForExport is a no-op — export is handled at the provider level for composite specs
 func (h *HandlerImpl) FormatForExport(
 	collection map[string]*dgModel.RemoteModel,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
-	// Models don't have standalone specs - they're exported inline in data-graph specs
 	return nil, nil
 }
 

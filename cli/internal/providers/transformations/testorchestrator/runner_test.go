@@ -80,6 +80,10 @@ func (m *mockTransformationStore) GetTransformation(ctx context.Context, id stri
 	return nil, errors.New("not implemented")
 }
 
+func (m *mockTransformationStore) GetTransformationVersion(ctx context.Context, id string, versionID string) (*transformations.Transformation, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*transformations.Transformation, error) {
 	return nil, errors.New("not implemented")
 }
@@ -100,6 +104,10 @@ func (m *mockTransformationStore) UpdateLibrary(ctx context.Context, id string, 
 }
 
 func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockTransformationStore) GetLibraryVersion(ctx context.Context, id string, versionID string) (*transformations.TransformationLibrary, error) {
 	return nil, errors.New("not implemented")
 }
 

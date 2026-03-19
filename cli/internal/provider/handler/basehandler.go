@@ -102,7 +102,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 	return collection, nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) loadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 	workspaces := m.Workspaces
 	for _, workspaceMetadata := range workspaces {
 		workspaceId := workspaceMetadata.WorkspaceID
@@ -192,7 +192,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 	}
 
 	if commonMetadata.Import != nil {
-		if err := h.loadImportMetadata(commonMetadata.Import); err != nil {
+		if err := h.LoadImportMetadata(commonMetadata.Import); err != nil {
 			return fmt.Errorf("loading import metadata: %w", err)
 		}
 	}
