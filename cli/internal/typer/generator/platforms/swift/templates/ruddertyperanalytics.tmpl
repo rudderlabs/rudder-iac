@@ -47,12 +47,6 @@ public class RudderTyperAnalytics {
 {{ end }}
     // MARK: - Private Helpers
 
-    {{- /*
-        withRudderTyperContext injects RudderTyper metadata into every event's context.
-        RudderTyper context wins on merge — user's customContext is the base,
-        rudderTyperContext overwrites on key collision.
-        This differs from Kotlin where user context wins.
-    */ -}}
     private func withRudderTyperContext(options: RudderOption?) -> RudderOption {
         let rudderTyperContext: [String: Any] = [
             "ruddertyper": [

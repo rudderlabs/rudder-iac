@@ -313,7 +313,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 				if err != nil {
 					return err
 				}
-				ctx.TypeAliases = append(ctx.TypeAliases, SwiftTypeAlias{
+				ctx.PropertyTypeAliases = append(ctx.TypeAliases, SwiftTypeAlias{
 					Alias:   propTypeName,
 					Type:    "[" + itemTypeName + "]",
 					Comment: p.Description,
@@ -323,7 +323,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 				if err != nil {
 					return err
 				}
-				ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+				ctx.PropertyTypeAliases = append(ctx.TypeAliases, *alias)
 			}
 		} else {
 			// No types → Any
@@ -331,7 +331,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 			if err != nil {
 				return err
 			}
-			ctx.TypeAliases = append(ctx.TypeAliases, *alias)
+			ctx.PropertyTypeAliases = append(ctx.TypeAliases, *alias)
 		}
 	}
 
@@ -701,47 +701,13 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 	}
 
 	if plan.IsPrimitiveType(pt) {
-		primitive := *plan.AsPrimitiveType(pt)
-
-		if primitive == plan.PrimitiveTypeArray {
-			if len(prop.ItemTypes) == 0 {
-				return "[Any]", fieldName, nil
-			}
-			if len(prop.ItemTypes) > 1 {
-				// Multi-type items → item enum, serialize via .map { $0.value }
-				itemTypeName, err := getOrRegisterPropertyArrayItemTypeName(prop, nr)
-				if err != nil {
-					return "", "", err
-				}
-				return "[" + itemTypeName + "]", fieldName + ".map { $0.value }", nil
-			}
-			// Single item type
-			itemType := prop.ItemTypes[0]
-			if plan.IsPrimitiveType(itemType) {
-				inner, err := mapPrimitiveToSwiftType(*plan.AsPrimitiveType(itemType))
-				if err != nil {
-					return "", "", err
-				}
-				return "[" + inner + "]", fieldName, nil
-			}
-			if plan.IsCustomType(itemType) {
-				itemCT := plan.AsCustomType(itemType)
-				if itemCT != nil {
-					itemTypeName, err := getOrRegisterCustomTypeName(itemCT, nr)
-					if err != nil {
-						return "", "", err
-					}
-					return "[" + itemTypeName + "]", fieldName, nil
-				}
-			}
-			return "[Any]", fieldName, nil
-		}
-
-		swiftT, err := mapPrimitiveToSwiftType(primitive)
+		// All primitive-typed properties reference the registered type alias (e.g. PropertyFoo = String)
+		// so struct fields stay consistent with the generated typealias declarations.
+		typeName, err := getOrRegisterPropertyTypeName(prop, nr)
 		if err != nil {
 			return "", "", err
 		}
-		return swiftT, fieldName, nil
+		return typeName, fieldName, nil
 	}
 
 	return "Any", fieldName, nil

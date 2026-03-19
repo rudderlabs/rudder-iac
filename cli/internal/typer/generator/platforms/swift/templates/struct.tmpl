@@ -23,20 +23,19 @@ public struct {{ .Name }} {
     public init(
 {{- $hasRequired := false }}
 {{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
-{{- $hasOptional := false }}
-{{- range .Properties }}{{- if .Optional }}{{- $hasOptional = true }}{{- end }}{{- end }}
-{{- range $i, $p := .Properties }}
-{{- if not $p.Optional }}
-{{- if $i }},
-        {{ end }}{{ $p.Name }}: {{ $p.Type }}
+{{- $needComma := false }}
+{{- range .Properties }}
+{{- if not .Optional }}
+{{- if $needComma }},{{ end }}
+        {{ .Name }}: {{ .Type }}
+{{- $needComma = true }}
 {{- end }}
 {{- end }}
-{{- if and $hasRequired $hasOptional }},
-        {{ end }}
-{{- range $i, $p := .Properties }}
-{{- if $p.Optional }}
-{{- if $i }},
-        {{ end }}{{ $p.Name }}: {{ $p.Type }}? = nil
+{{- range .Properties }}
+{{- if .Optional }}
+{{- if $needComma }},{{ end }}
+        {{ .Name }}: {{ .Type }}? = nil
+{{- $needComma = true }}
 {{- end }}
 {{- end }}
     ) {
@@ -45,17 +44,6 @@ public struct {{ .Name }} {
 {{- end }}
     }
 
-    {{- /*
-        SerializeMethod is either "toProperties" (track/screen events) or "toTraits" (identify/group).
-        Required properties go directly into the initial dictionary literal.
-        Optional properties are appended only if non-nil using `if let` unwrapping.
-        SerializeExpr is pre-computed by the generator per property type:
-            plain primitive   → property name (e.g. "email")
-            String/Int enum   → "deviceType.rawValue"
-            multi-type enum   → "pageType.value"
-            nested struct     → "address.toProperties()"
-            variant enum      → "pageType.toProperties()"
-    */ -}}
     public func {{ .SerializeMethod }}() -> [String: Any] {
 {{- if $hasRequired }}
         var props: [String: Any] = [

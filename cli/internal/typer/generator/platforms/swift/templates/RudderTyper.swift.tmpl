@@ -12,6 +12,9 @@ import RudderStackAnalytics
 {{- end }}
 
 // MARK: - Property Types
+{{- range .PropertyTypeAliases }}
+{{ template "typealias.tmpl" . }}
+{{- end }}
 {{- range .Enums }}
 {{ template "enum.tmpl" . }}
 {{- end }}

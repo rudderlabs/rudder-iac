@@ -108,7 +108,10 @@ type SwiftAnalyticsMethod struct {
 
 // SwiftContext is the root data object passed to RudderTyper.swift.tmpl.
 type SwiftContext struct {
-	TypeAliases         []SwiftTypeAlias
+	// TypeAliases holds custom type aliases (e.g. CustomTypeFoo = String) → rendered in MARK: Custom Types
+	TypeAliases []SwiftTypeAlias
+	// PropertyTypeAliases holds property type aliases (e.g. PropertyFoo = String) → rendered in MARK: Property Types
+	PropertyTypeAliases []SwiftTypeAlias
 	Enums               []SwiftEnum
 	MultiTypeEnums      []SwiftMultiTypeEnum
 	VariantEnums        []SwiftVariantEnum
