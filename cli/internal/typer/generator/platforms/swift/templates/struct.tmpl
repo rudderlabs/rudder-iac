@@ -20,9 +20,10 @@ public struct {{ .Name }} {
 {{ include "structwithindent" (mkSlice 1 .) | indent 1 }}
 {{- end }}
 
-    public init(
 {{- $hasRequired := false }}
 {{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
+{{- if .Properties }}
+    public init(
 {{- $needComma := false }}
 {{- range .Properties }}
 {{- if not .Optional }}
@@ -43,15 +44,19 @@ public struct {{ .Name }} {
         self.{{ .Name }} = {{ .Name }}
 {{- end }}
     }
+{{- else }}
+    public init() {}
+{{- end }}
 
     public func {{ .SerializeMethod }}() -> [String: Any] {
 {{- if $hasRequired }}
         var props: [String: Any] = [
-{{- range $i, $p := .Properties }}
-{{- if not $p.Optional }}
-{{- if $i }},
-{{ end }}
-            "{{ escapeString $p.SerialName }}": {{ $p.SerializeExpr }}
+{{- $needComma := false }}
+{{- range .Properties }}
+{{- if not .Optional }}
+{{- if $needComma }},{{ end }}
+            "{{ escapeString .SerialName }}": {{ .SerializeExpr }}
+{{- $needComma = true }}
 {{- end }}
 {{- end }}
         ]

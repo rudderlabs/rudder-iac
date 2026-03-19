@@ -5,7 +5,7 @@
     Swift enums with a raw type (String or Int) expose .rawValue natively.
     No rudderSerialize() needed — .rawValue goes directly into [String: Any].
     CaseIterable allows iterating all cases at runtime (e.g. for validation).
-*/ -}}
+*/}}
 public enum {{ .Name }}: {{ .RawType }}, CaseIterable {
 {{- range .Values }}
     case {{ .Name }} = {{ formatLiteral .Value }}

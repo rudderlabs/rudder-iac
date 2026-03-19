@@ -6,7 +6,7 @@
     Each type becomes an enum case with an associated value.
     The `value: Any` computed property extracts the underlying value for [String: Any] serialization.
     Null is a special case — no associated value, returns NSNull() instead.
-*/ -}}
+*/}}
 public enum {{ .Name }} {
 {{- range .Cases }}
 {{- if .IsNull }}
