@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: mismatch_transform
+  name: Mismatch Transform
+  description: Deliberately mismatched expected output
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) {
+      event.properties = event.properties || {};
+      event.properties.processed = true;
+      return event;
+    }
+  tests:
+    - name: mismatch_suite
+      input: ./input/mismatch_transform
+      output: ./output/mismatch_transform

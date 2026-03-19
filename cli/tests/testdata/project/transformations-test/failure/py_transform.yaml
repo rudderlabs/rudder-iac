@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: py_transform
+  name: Py Transform
+  description: Adds source tag to events in Python
+  language: python
+  code: |
+    def transformEvent(event, metadata):
+        props = event.get("properties", {})
+        props["source"] = "rudder"
+        event["properties"] = props
+        return event

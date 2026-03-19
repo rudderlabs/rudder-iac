@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: error_transform
+  name: Error Transform
+  description: Calls a library function that throws
+  language: javascript
+  code: |
+    import { riskyOperation } from 'errorLibrary';
+
+    export function transformEvent(event, metadata) {
+      riskyOperation();
+      return event;
+    }
