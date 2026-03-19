@@ -88,11 +88,11 @@ type SwiftMethodArgument struct {
 }
 
 // SwiftSDKCallArgument is one argument in the underlying analytics.X() call.
+// Value is a pre-computed Swift expression — the generator handles all logic so the template stays dumb.
+// Examples: `"\"Event Name\""`, `"properties.toProperties()"`, `"traits?.toTraits()"`, `"nil"`, `"userId"`
 type SwiftSDKCallArgument struct {
-	Label           string // named argument label, e.g. "name", "properties"
-	Value           string // variable or literal expression
-	IsLiteral       bool   // wrap value in formatLiteral
-	ShouldSerialize bool   // append .toProperties() or .toTraits()
+	Label string
+	Value string
 }
 
 // SwiftAnalyticsMethod is one method in RudderTyperAnalytics.

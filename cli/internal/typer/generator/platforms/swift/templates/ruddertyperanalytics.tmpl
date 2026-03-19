@@ -39,7 +39,7 @@ public class RudderTyperAnalytics {
     ) {
         analytics.{{ .SDKMethodName }}(
 {{- range .SDKArguments }}
-            {{ .Label }}: {{- if .ShouldSerialize }} {{ .Value }}.toProperties(){{- else if .IsLiteral }} {{ formatLiteral .Value }}{{- else }} {{ .Value }}{{- end }},
+            {{ .Label }}: {{ .Value }},
 {{- end }}
             options: withRudderTyperContext(options: options)
         )
