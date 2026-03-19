@@ -118,6 +118,8 @@ func getOrRegisterEventStructName(rule *plan.EventRule, nr *core.NameRegistry) (
 		prefix = "Identify"
 	case plan.EventTypeScreen:
 		prefix = "Screen"
+	case plan.EventTypePage:
+		prefix = "Page"
 	case plan.EventTypeGroup:
 		prefix = "Group"
 	default:
@@ -148,6 +150,8 @@ func getOrRegisterEventMethodName(rule *plan.EventRule, nr *core.NameRegistry) (
 		methodName = "identify"
 	case plan.EventTypeScreen:
 		methodName = formatMethodName("screen " + rule.Event.Name)
+	case plan.EventTypePage:
+		methodName = formatMethodName("page " + rule.Event.Name)
 	case plan.EventTypeGroup:
 		methodName = "group"
 	default:
@@ -313,7 +317,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 				if err != nil {
 					return err
 				}
-				ctx.PropertyTypeAliases = append(ctx.TypeAliases, SwiftTypeAlias{
+				ctx.PropertyTypeAliases = append(ctx.PropertyTypeAliases, SwiftTypeAlias{
 					Alias:   propTypeName,
 					Type:    "[" + itemTypeName + "]",
 					Comment: p.Description,
@@ -323,7 +327,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 				if err != nil {
 					return err
 				}
-				ctx.PropertyTypeAliases = append(ctx.TypeAliases, *alias)
+				ctx.PropertyTypeAliases = append(ctx.PropertyTypeAliases, *alias)
 			}
 		} else {
 			// No types → Any
@@ -331,7 +335,7 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 			if err != nil {
 				return err
 			}
-			ctx.PropertyTypeAliases = append(ctx.TypeAliases, *alias)
+			ctx.PropertyTypeAliases = append(ctx.PropertyTypeAliases, *alias)
 		}
 	}
 
@@ -425,22 +429,7 @@ func createPropertyEnum(p *plan.Property, nr *core.NameRegistry) (*SwiftEnum, er
 }
 
 func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (*SwiftEnum, error) {
-	// Determine raw type from first value — all-integer values get Int, everything else String
-	rawType := "String"
-	if len(values) > 0 {
-		allInt := true
-		for _, v := range values {
-			switch v.(type) {
-			case int, int32, int64:
-				// ok
-			default:
-				allInt = false
-			}
-		}
-		if allInt {
-			rawType = "Int"
-		}
-	}
+	rawType := inferEnumRawType(values)
 
 	var enumValues []SwiftEnumValue
 	for _, v := range values {
@@ -448,7 +437,15 @@ func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (
 		if err != nil {
 			return nil, err
 		}
-		enumValues = append(enumValues, SwiftEnumValue{Name: caseName, Value: v})
+		// Non-string values in a String-typed enum must be coerced so the
+		// template emits valid string literals (e.g. true → "true", 1 → "1").
+		value := v
+		if rawType == "String" {
+			if _, ok := v.(string); !ok {
+				value = fmt.Sprintf("%v", v)
+			}
+		}
+		enumValues = append(enumValues, SwiftEnumValue{Name: caseName, Value: value})
 	}
 
 	return &SwiftEnum{
@@ -457,6 +454,39 @@ func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (
 		RawType: rawType,
 		Values:  enumValues,
 	}, nil
+}
+
+// inferEnumRawType chooses the Swift enum raw type based on the value set:
+//   - all integers → Int
+//   - all numeric (int or float mix) → Double
+//   - everything else → String (non-string values are coerced by the caller)
+func inferEnumRawType(values []any) string {
+	if len(values) == 0 {
+		return "String"
+	}
+	var (
+		allInt     = true
+		allNumeric = true
+	)
+	for _, v := range values {
+		switch v.(type) {
+		case int, int32, int64:
+			// integer — keeps allInt true
+		case float32, float64:
+			allInt = false
+		default:
+			allInt = false
+			allNumeric = false
+		}
+	}
+	switch {
+	case allInt:
+		return "Int"
+	case allNumeric:
+		return "Double"
+	default:
+		return "String"
+	}
 }
 
 // ========== Multi-Type Enum Builder ==========
@@ -827,6 +857,8 @@ func createAnalyticsMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftA
 		return buildIdentifyMethod(rule, nr)
 	case plan.EventTypeScreen:
 		return buildScreenMethod(rule, nr)
+	case plan.EventTypePage:
+		return buildPageMethod(rule, nr)
 	case plan.EventTypeGroup:
 		return buildGroupMethod(rule, nr)
 	default:
@@ -854,7 +886,7 @@ func validateEventSection(rule *plan.EventRule) bool {
 		return rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeIdentify:
 		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
-	case plan.EventTypeScreen:
+	case plan.EventTypeScreen, plan.EventTypePage:
 		return rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeGroup:
 		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
@@ -1055,6 +1087,70 @@ func buildScreenMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnaly
 	}
 
 	// category always comes after properties in the method signature
+	method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
+		Name:     "category",
+		Type:     "String",
+		Optional: true,
+		Default:  "nil",
+	})
+
+	return method, nil
+}
+
+func buildPageMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnalyticsMethod, error) {
+	methodName, err := getOrRegisterEventMethodName(rule, nr)
+	if err != nil {
+		return nil, err
+	}
+
+	method := &SwiftAnalyticsMethod{
+		Name:          methodName,
+		Comment:       rule.Event.Description,
+		EventName:     rule.Event.Name,
+		SDKMethodName: "page",
+		SDKArguments: []SwiftSDKCallArgument{
+			{Label: "pageName", Value: FormatSwiftLiteral(rule.Event.Name)},
+			{Label: "category", Value: "category"},
+		},
+		AddCategory: true,
+	}
+
+	if isEmptySchema(&rule.Schema) && rule.Schema.AdditionalProperties {
+		className, err := getOrRegisterEventStructName(rule, nr)
+		if err != nil {
+			return nil, err
+		}
+		method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
+			Name:     "properties",
+			Type:     className,
+			Optional: true,
+			Default:  "nil",
+		})
+		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
+			Label: "properties",
+			Value: "properties",
+		})
+	} else if !isEmptySchema(&rule.Schema) {
+		className, err := getOrRegisterEventStructName(rule, nr)
+		if err != nil {
+			return nil, err
+		}
+		method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
+			Name:    "properties",
+			Type:    className,
+			Comment: "The properties to include with this event",
+		})
+		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
+			Label: "properties",
+			Value: "properties.toProperties()",
+		})
+	} else {
+		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
+			Label: "properties",
+			Value: "nil",
+		})
+	}
+
 	method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
 		Name:     "category",
 		Type:     "String",
