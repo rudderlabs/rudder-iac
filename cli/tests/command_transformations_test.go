@@ -52,10 +52,6 @@ func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
 	assert.Len(t, results.Transformations, 4)
 	assert.Len(t, results.Libraries, 1)
 
-	fixtures := loadFixtureSpecs(t, fixtureDir)
-	store := newTransformationStore(t)
-	ctx := context.Background()
-
 	for _, tr := range results.Transformations {
 		assert.True(t, tr.Result.Pass, "transformation %s should pass", tr.Result.Name)
 		require.NotEmpty(t, tr.Result.TestSuiteResult.Results,
@@ -64,6 +60,26 @@ func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
 			assert.Equal(t, transformations.TestRunStatusPass, r.Status,
 				"test %s in %s should pass", r.Name, tr.Result.Name)
 		}
+	}
+
+	for _, lib := range results.Libraries {
+		assert.True(t, lib.Pass, "library %s should pass", lib.HandleName)
+		assert.Empty(t, lib.Message, "library %s should have no error message", lib.HandleName)
+	}
+
+	verifyVersions(t, fixtureDir, results)
+}
+
+// verifyVersions fetches each transformation and library version via the API
+// and compares name, description, and code against the fixture YAML spec.
+func verifyVersions(t *testing.T, fixtureDir string, results *testorchestrator.TestResults) {
+	t.Helper()
+
+	fixtures := loadFixtureSpecs(t, fixtureDir)
+	store := newTransformationStore(t)
+	ctx := context.Background()
+
+	for _, tr := range results.Transformations {
 		version, err := store.GetTransformationVersion(ctx, tr.Result.ID, tr.Result.VersionID)
 		require.NoError(t, err, "fetching version for %s", tr.Result.Name)
 		expected := fixtures[tr.Result.Name]
@@ -73,8 +89,6 @@ func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
 	}
 
 	for _, lib := range results.Libraries {
-		assert.True(t, lib.Pass, "library %s should pass", lib.HandleName)
-		assert.Empty(t, lib.Message, "library %s should have no error message", lib.HandleName)
 		version, err := store.GetLibraryVersion(ctx, lib.ID, lib.VersionID)
 		require.NoError(t, err, "fetching version for %s", lib.HandleName)
 		expected := fixtures[version.Name]
