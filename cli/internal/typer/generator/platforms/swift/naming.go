@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -21,11 +22,11 @@ var swiftReservedWords = map[string]bool{
 	"where": true, "while": true, "Any": true, "Type": true,
 }
 
-// tokenize splits a string into words by spaces, underscores, hyphens,
-// and camelCase boundaries.
+// tokenize splits a string into words by spaces, underscores, hyphens, dots,
+// and camelCase boundaries. Non-letter/digit characters are stripped.
 func tokenize(s string) []string {
-	// Replace separators with spaces
-	s = strings.NewReplacer("_", " ", "-", " ").Replace(s)
+	// Replace common separators (including dots for decimal numbers) with spaces
+	s = strings.NewReplacer("_", " ", "-", " ", ".", " ").Replace(s)
 
 	// Insert space before uppercase letters that follow lowercase (camelCase split)
 	var spaced strings.Builder
@@ -55,10 +56,12 @@ func FormatTypeName(s string) string {
 	tokens := tokenize(s)
 	var b strings.Builder
 	for _, t := range tokens {
-		if len(t) == 0 {
+		r := []rune(t)
+		if len(r) == 0 {
 			continue
 		}
-		b.WriteString(strings.ToUpper(t[:1]) + t[1:])
+		b.WriteRune(unicode.ToUpper(r[0]))
+		b.WriteString(string(r[1:]))
 	}
 	return b.String()
 }
@@ -75,10 +78,12 @@ func formatPropertyName(s string) string {
 		if len(t) == 0 {
 			continue
 		}
+		r := []rune(t)
 		if i == 0 {
-			b.WriteString(t)
+			b.WriteString(string(r))
 		} else {
-			b.WriteString(strings.ToUpper(t[:1]) + t[1:])
+			b.WriteRune(unicode.ToUpper(r[0]))
+			b.WriteString(string(r[1:]))
 		}
 	}
 	name := b.String()
@@ -96,11 +101,30 @@ func formatMethodName(s string) string {
 
 // formatEnumCaseName converts a value to a valid Swift enum case name.
 // Numeric values get an "n" prefix. Reserved words get backtick escaping.
-// e.g. "GET" → "get", 200 → "n200"
+// Strings that tokenize to nothing (pure emoji/symbols) are encoded as Unicode codepoints.
+// e.g. "GET" → "get", 200 → "n200", "1.5" → "n15", "🎯" → "u1F3AF"
 func formatEnumCaseName(s string) string {
 	name := formatPropertyName(s)
-	if len(name) > 0 && unicode.IsDigit(rune(name[0])) {
+
+	// If tokenize yielded nothing (pure emoji/symbols), formatPropertyName returns
+	// s unchanged and the result is not a valid identifier. Encode as codepoints.
+	if len(tokenize(s)) == 0 {
+		name = unicodeEscape(s)
+	}
+
+	if r := []rune(name); len(r) > 0 && unicode.IsDigit(r[0]) {
 		name = "n" + name
 	}
 	return name
+}
+
+// unicodeEscape encodes s as "u" followed by the hex codepoints of its runes.
+// Used as a fallback for strings that produce no valid identifier tokens.
+func unicodeEscape(s string) string {
+	var b strings.Builder
+	b.WriteRune('u')
+	for _, r := range s {
+		fmt.Fprintf(&b, "%X", r)
+	}
+	return b.String()
 }
