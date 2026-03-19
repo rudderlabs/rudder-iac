@@ -6,22 +6,6 @@ import (
 	"unicode"
 )
 
-var swiftReservedWords = map[string]bool{
-	"as": true, "associatedtype": true, "break": true, "case": true,
-	"catch": true, "class": true, "continue": true, "default": true,
-	"defer": true, "deinit": true, "do": true, "else": true,
-	"enum": true, "extension": true, "fallthrough": true, "false": true,
-	"fileprivate": true, "for": true, "func": true, "guard": true,
-	"if": true, "import": true, "in": true, "init": true, "inout": true,
-	"internal": true, "is": true, "let": true, "nil": true, "open": true,
-	"operator": true, "private": true, "protocol": true, "public": true,
-	"repeat": true, "rethrows": true, "return": true, "self": true,
-	"Self": true, "static": true, "struct": true, "subscript": true,
-	"super": true, "switch": true, "throw": true, "throws": true,
-	"true": true, "try": true, "typealias": true, "var": true,
-	"where": true, "while": true, "Any": true, "Type": true,
-}
-
 // tokenize splits a string into words by spaces, underscores, hyphens, dots,
 // and camelCase boundaries. Non-letter/digit characters are stripped.
 func tokenize(s string) []string {
