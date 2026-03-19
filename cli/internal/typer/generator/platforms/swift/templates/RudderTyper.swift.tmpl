@@ -1,0 +1,27 @@
+{{ template "disclaimer.tmpl" . }}
+
+import Foundation
+import RudderStackAnalytics
+
+// MARK: - Custom Types
+{{- range .TypeAliases }}
+{{ template "typealias.tmpl" . }}
+{{- end }}
+{{- range .VariantEnums }}
+{{ template "variant.tmpl" . }}
+{{- end }}
+
+// MARK: - Property Types
+{{- range .Enums }}
+{{ template "enum.tmpl" . }}
+{{- end }}
+{{- range .MultiTypeEnums }}
+{{ template "multitype.tmpl" . }}
+{{- end }}
+
+// MARK: - Event Properties
+{{- range .Structs }}
+{{ template "structwithindent" (mkSlice 0 .) }}
+{{- end }}
+
+{{ template "ruddertyperanalytics.tmpl" . }}
