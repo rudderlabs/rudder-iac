@@ -89,6 +89,26 @@ func TestValidateLibrarySpec_ValidSpecs(t *testing.T) {
 		results := validateLibrarySpec("", "", specPath, nil, spec)
 		assert.Empty(t, results)
 	})
+
+	t.Run("unknown language with file does not produce extension error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		specPath := filepath.Join(tmpDir, "spec.yaml")
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "lib.rb"), []byte("code"), 0o644))
+
+		spec := specs.TransformationLibrarySpec{
+			ID:         "lib-1",
+			Name:       "My Library",
+			ImportName: "myLibrary",
+			Language:   "ruby",
+			File:       "lib.rb",
+		}
+
+		results := validateLibrarySpec("", "", specPath, nil, spec)
+
+		assert.NotContains(t, extractMessages(results), "file extension must be")
+	})
 }
 
 func TestValidateLibrarySpec_InvalidSpecs(t *testing.T) {
