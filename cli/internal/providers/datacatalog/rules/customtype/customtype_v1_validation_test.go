@@ -269,10 +269,10 @@ func TestCustomTypeSemanticValid_V1(t *testing.T) {
 	})
 }
 
-func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
+func TestCustomTypeSemanticValid_V1_ItemTypeRefs(t *testing.T) {
 	t.Parallel()
 
-	t.Run("custom type ref found in item_types", func(t *testing.T) {
+	t.Run("custom type ref found in item_type", func(t *testing.T) {
 		t.Parallel()
 
 		graph := funcs.GraphWith("Address", "custom-type")
@@ -280,10 +280,10 @@ func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "address_list",
-					Name:    "AddressList",
-					Type:    "array",
-					Config:  map[string]any{"item_types": []any{"#custom-type:Address"}},
+					LocalID:  "address_list",
+					Name:     "AddressList",
+					Type:     "array",
+					ItemType: "#custom-type:Address",
 				},
 			},
 		}
@@ -292,7 +292,7 @@ func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 		assert.Empty(t, results, "custom type ref exists in graph - no error")
 	})
 
-	t.Run("custom type ref not found", func(t *testing.T) {
+	t.Run("custom type ref not found in item_type", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -300,10 +300,10 @@ func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "address_list",
-					Name:    "AddressList",
-					Type:    "array",
-					Config:  map[string]any{"item_types": []any{"#custom-type:Missing"}},
+					LocalID:  "address_list",
+					Name:     "AddressList",
+					Type:     "array",
+					ItemType: "#custom-type:Missing",
 				},
 			},
 		}
@@ -311,11 +311,11 @@ func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
 
 		require.Len(t, results, 1)
-		assert.Equal(t, "/types/0/config/item_types/0", results[0].Reference)
+		assert.Equal(t, "/types/0/item_type", results[0].Reference)
 		assert.Contains(t, results[0].Message, "referenced custom-type 'Missing' not found")
 	})
 
-	t.Run("primitive types skipped", func(t *testing.T) {
+	t.Run("primitive item_type skipped", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -323,77 +323,161 @@ func TestCustomTypeSemanticValid_V1_ConfigItemTypes(t *testing.T) {
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "string_list",
-					Name:    "StringList",
-					Type:    "array",
-					Config:  map[string]any{"item_types": []any{"string"}},
+					LocalID:  "string_list",
+					Name:     "StringList",
+					Type:     "array",
+					ItemType: "string",
 				},
 			},
 		}
 
 		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
-		assert.Empty(t, results, "primitive types should not trigger ref lookup")
+		assert.Empty(t, results, "primitive item_type should not trigger ref lookup")
+	})
+
+	t.Run("no item_type set", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "simple_type",
+					Name:    "SimpleType",
+					Type:    "string",
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		assert.Empty(t, results, "no item_type should not trigger ref check")
+	})
+
+}
+
+func TestCustomTypeSpecSyntaxValidRule_V1_ItemTypeValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid item_type primitive", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID:  "tags",
+					Name:     "Tags",
+					Type:     "array",
+					ItemType: "string",
+				},
+			},
+		}
+
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("valid item_type custom type ref", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID:  "address_list",
+					Name:     "AddressList",
+					Type:     "array",
+					ItemType: "#custom-type:Address",
+				},
+			},
+		}
+
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("invalid item_type value", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID:  "bad_list",
+					Name:     "BadList",
+					Type:     "array",
+					ItemType: "invalid_type",
+				},
+			},
+		}
+
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/item_type", results[0].Reference)
+		assert.Contains(t, results[0].Message, "'item_type' is invalid")
+	})
+
+	t.Run("duplicate item_types values", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID:   "dup_list",
+					Name:      "DupList",
+					Type:      "array",
+					ItemTypes: []string{"string", "string"},
+				},
+			},
+		}
+
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/item_types", results[0].Reference)
+		assert.Contains(t, results[0].Message, "'item_types' is invalid: must be unique")
 	})
 
 	t.Run("mixed primitives and custom type refs", func(t *testing.T) {
 		t.Parallel()
 
-		graph := funcs.GraphWith("Address", "custom-type")
 
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "mixed_list",
-					Name:    "MixedList",
-					Type:    "array",
-					Config:  map[string]any{"item_types": []any{"string", "#custom-type:Address", "#custom-type:Missing"}},
+					LocalID:  "mixed_list",
+					Name:     "MixedList",
+					Type:     "array",
+					ItemTypes: []string{"#custom-type:Address", "string"},
 				},
 			},
 		}
 
-		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
 
 		require.Len(t, results, 1)
-		assert.Equal(t, "/types/0/config/item_types/2", results[0].Reference)
-		assert.Contains(t, results[0].Message, "referenced custom-type 'Missing' not found")
+		assert.Equal(t, "/types/0/item_types/0", results[0].Reference)
+		assert.Contains(t, results[0].Message, "must be one of [string number integer boolean null array object]")
 	})
 
-	t.Run("no item_types in config", func(t *testing.T) {
+	t.Run("custom type ref in item_types", func(t *testing.T) {
 		t.Parallel()
 
-		graph := resources.NewGraph()
 
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID: "simple_type",
-					Name:    "SimpleType",
-					Type:    "string",
-					Config:  map[string]any{"min_length": 1},
+					LocalID:  "mixed_list",
+					Name:     "MixedList",
+					Type:     "array",
+					ItemTypes: []string{"#custom-type:Address"},
 				},
 			},
 		}
 
-		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
-		assert.Empty(t, results, "config without item_types should not trigger ref check")
-	})
+		results := validateCustomTypeSpecV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec)
 
-	t.Run("nil config", func(t *testing.T) {
-		t.Parallel()
-
-		graph := resources.NewGraph()
-
-		spec := localcatalog.CustomTypeSpecV1{
-			Types: []localcatalog.CustomTypeV1{
-				{
-					LocalID: "simple_type",
-					Name:    "SimpleType",
-					Type:    "string",
-				},
-			},
-		}
-
-		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
-		assert.Empty(t, results, "nil config should not trigger ref check")
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/item_types/0", results[0].Reference)
+		assert.Contains(t, results[0].Message, "must be one of [string number integer boolean null array object]")
 	})
 }

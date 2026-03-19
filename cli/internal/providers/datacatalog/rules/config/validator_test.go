@@ -888,7 +888,6 @@ func TestValidateConfigWithOptions(t *testing.T) {
 			{"exclusive_minimum", []string{"integer"}, map[string]any{"exclusive_minimum": 0}},
 			{"exclusive_maximum", []string{"integer"}, map[string]any{"exclusive_maximum": 100}},
 			{"multiple_of", []string{"integer"}, map[string]any{"multiple_of": 5}},
-			{"item_types primitives", []string{"array"}, map[string]any{"item_types": []any{"string", "number"}}},
 			{"min_items", []string{"array"}, map[string]any{"min_items": 1}},
 			{"max_items", []string{"array"}, map[string]any{"max_items": 10}},
 			{"unique_items", []string{"array"}, map[string]any{"unique_items": true}},
@@ -954,21 +953,9 @@ func TestValidateConfigWithOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("V1 item_types accepts #custom-type:<id>", func(t *testing.T) {
+	t.Run("V1 item_types in config is not applicable (spec-level field)", func(t *testing.T) {
 		cfg := map[string]any{
-			"item_types": []any{"#custom-type:Address"},
-		}
-		results := ValidateConfigWithOptions(
-			[]string{"array"}, cfg, "/test",
-			WithFieldAliases(V1FieldAliases),
-			WithCustomTypeRefMatcher(v1Matcher),
-		)
-		assert.Empty(t, results)
-	})
-
-	t.Run("V1 item_types rejects legacy #/custom-types/<group>/<id> through invalid-type path", func(t *testing.T) {
-		cfg := map[string]any{
-			"item_types": []any{"#/custom-types/foo/bar"},
+			"item_types": []any{"string"},
 		}
 		results := ValidateConfigWithOptions(
 			[]string{"array"}, cfg, "/test",
@@ -976,7 +963,7 @@ func TestValidateConfigWithOptions(t *testing.T) {
 			WithCustomTypeRefMatcher(v1Matcher),
 		)
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "invalid type")
+		assert.Contains(t, results[0].Message, "'item_types' is not applicable for type(s)")
 	})
 
 	t.Run("V1 custom type object config accepts additional_properties", func(t *testing.T) {

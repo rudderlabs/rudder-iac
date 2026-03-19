@@ -32,9 +32,8 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 
 	// Validate custom type references
 	for _, customType := range dc.CustomTypes {
+		reference := fmt.Sprintf("#%s:%s", catalog.KindCustomTypes, customType.LocalID)
 		if customType.Type == "object" {
-			reference := fmt.Sprintf("#%s:%s", catalog.KindCustomTypes, customType.LocalID)
-
 			// Step 1: Validate references in custom type properties
 			for i, prop := range customType.Properties {
 				matches := catalog.PropRegex.FindStringSubmatch(prop.Property)
@@ -69,6 +68,25 @@ func (rv *RefValidator) Validate(dc *catalog.DataCatalog) []ValidationError {
 							return matches[1] == id
 						})
 					})...)
+		}
+
+		// Check for custom type reference in item_type field (single)
+		if customType.ItemType != "" && strings.HasPrefix(customType.ItemType, "#custom-type:") {
+			matches := catalog.CustomTypeRegex.FindStringSubmatch(customType.ItemType)
+			if len(matches) != 2 {
+				errs = append(errs, ValidationError{
+					Reference: reference,
+					error:     fmt.Errorf("custom type reference in item_type has invalid format. Should be '#custom-type:<id>'"),
+				})
+			} else {
+				customTypeID := matches[1]
+				if ct := dc.CustomType(customTypeID); ct == nil {
+					errs = append(errs, ValidationError{
+						Reference: reference,
+						error:     fmt.Errorf("custom type reference '%s' in item_type not found in catalog", customType.ItemType),
+					})
+				}
+			}
 		}
 	}
 

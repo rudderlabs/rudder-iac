@@ -154,6 +154,8 @@ type CustomTypeV1 struct {
 	Name        string                 `mapstructure:"name" json:"name" validate:"required,gte=2,lte=65,pattern=custom_type_name"`
 	Description string                 `mapstructure:"description,omitempty" json:"description,omitempty" validate:"omitempty,gte=3,lte=2000,pattern=letter_start"`
 	Type        string                 `mapstructure:"type" json:"type" validate:"required,pattern=primitive_type"`
+	ItemType    string                 `mapstructure:"item_type,omitempty" json:"item_type,omitempty" validate:"excluded_with=ItemTypes"`
+	ItemTypes   []string               `mapstructure:"item_types,omitempty" json:"item_types,omitempty" validate:"excluded_with=ItemType,dive,oneof=string number integer boolean null array object"`
 	Config      map[string]any         `mapstructure:"config,omitempty" json:"config,omitempty"`
 	Properties  []CustomTypePropertyV1 `mapstructure:"properties,omitempty" json:"properties,omitempty" validate:"omitempty,dive"`
 	Variants    VariantsV1             `mapstructure:"variants,omitempty" json:"variants,omitempty" validate:"excluded_unless=Type object,omitempty,max=1,dive"`
@@ -171,6 +173,34 @@ func (c *CustomTypeV1) FromV0(v0 CustomType) error {
 	c.Description = v0.Description
 	c.Type = v0.Type
 	c.Config = ConvertConfigKeysToSnakeCase(v0.Config)
+
+	// Extract itemTypes from config and move to top-level fields
+	if c.Config != nil {
+		if itemTypes, ok := c.Config["item_types"]; ok {
+			itemTypesArray, ok := itemTypes.([]interface{})
+			if !ok {
+				return fmt.Errorf("config['item_types'] must be an array of strings")
+			}
+
+			if len(itemTypesArray) == 1 {
+				itemTypeStr, ok := itemTypesArray[0].(string)
+				if !ok {
+					return fmt.Errorf("config['item_types']: item type must be a string")
+				}
+				c.ItemType = itemTypeStr
+			} else if len(itemTypesArray) > 1 {
+				c.ItemTypes = make([]string, len(itemTypesArray))
+				for i, item := range itemTypesArray {
+					itemStr, ok := item.(string)
+					if !ok {
+						return fmt.Errorf("config['item_types']: item type must be a string")
+					}
+					c.ItemTypes[i] = itemStr
+				}
+			}
+			delete(c.Config, "item_types")
+		}
+	}
 
 	// Convert properties from V0 to V1
 	if len(v0.Properties) > 0 {
