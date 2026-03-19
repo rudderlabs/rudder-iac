@@ -8,7 +8,7 @@
     remain exhaustive even when new variants are added to the Tracking Plan.
     `discriminator` exposes the tag value for consumer code.
     `toProperties()` delegates to the matched payload struct.
-*/ -}}
+*/}}
 public enum {{ .Name }} {
 {{- range .Cases }}
 {{- if .Comment }}
@@ -29,7 +29,7 @@ public enum {{ .Name }} {
         switch self {
 {{- range .Cases }}
 {{- if .IsDefault }}
-        case .other(let data): return data.someString
+        case .other: return ""
 {{- else }}
         case .{{ .Name }}: return {{ formatLiteral .DiscriminatorValue }}
 {{- end }}
