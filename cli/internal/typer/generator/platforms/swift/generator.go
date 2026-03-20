@@ -118,8 +118,6 @@ func getOrRegisterEventStructName(rule *plan.EventRule, nr *core.NameRegistry) (
 		prefix = "Identify"
 	case plan.EventTypeScreen:
 		prefix = "Screen"
-	case plan.EventTypePage:
-		prefix = "Page"
 	case plan.EventTypeGroup:
 		prefix = "Group"
 	default:
@@ -150,8 +148,6 @@ func getOrRegisterEventMethodName(rule *plan.EventRule, nr *core.NameRegistry) (
 		methodName = "identify"
 	case plan.EventTypeScreen:
 		methodName = formatMethodName("screen " + rule.Event.Name)
-	case plan.EventTypePage:
-		methodName = formatMethodName("page " + rule.Event.Name)
 	case plan.EventTypeGroup:
 		methodName = "group"
 	default:
@@ -358,6 +354,10 @@ func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameReg
 
 	for _, key := range sortedKeys {
 		rule := ruleMap[key]
+
+		if !isSupportedEventType(rule.Event.EventType) {
+			continue
+		}
 
 		if !validateEventSection(rule) {
 			ui.PrintWarning(fmt.Sprintf("invalid section %q for event type %q, skipping", rule.Section, rule.Event.EventType))
@@ -857,8 +857,6 @@ func createAnalyticsMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftA
 		return buildIdentifyMethod(rule, nr)
 	case plan.EventTypeScreen:
 		return buildScreenMethod(rule, nr)
-	case plan.EventTypePage:
-		return buildPageMethod(rule, nr)
 	case plan.EventTypeGroup:
 		return buildGroupMethod(rule, nr)
 	default:
@@ -880,13 +878,21 @@ func sectionToSerializeMethod(section plan.IdentitySection) string {
 	}
 }
 
+func isSupportedEventType(eventType plan.EventType) bool {
+	switch eventType {
+	case plan.EventTypeTrack, plan.EventTypeIdentify, plan.EventTypeScreen, plan.EventTypeGroup:
+		return true
+	}
+	return false
+}
+
 func validateEventSection(rule *plan.EventRule) bool {
 	switch rule.Event.EventType {
 	case plan.EventTypeTrack:
 		return rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeIdentify:
 		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
-	case plan.EventTypeScreen, plan.EventTypePage:
+	case plan.EventTypeScreen:
 		return rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeGroup:
 		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
@@ -1097,66 +1103,3 @@ func buildScreenMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnaly
 	return method, nil
 }
 
-func buildPageMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnalyticsMethod, error) {
-	methodName, err := getOrRegisterEventMethodName(rule, nr)
-	if err != nil {
-		return nil, err
-	}
-
-	method := &SwiftAnalyticsMethod{
-		Name:          methodName,
-		Comment:       rule.Event.Description,
-		EventName:     rule.Event.Name,
-		SDKMethodName: "page",
-		SDKArguments: []SwiftSDKCallArgument{
-			{Label: "pageName", Value: FormatSwiftLiteral(rule.Event.Name)},
-			{Label: "category", Value: "category"},
-		},
-		AddCategory: true,
-	}
-
-	if isEmptySchema(&rule.Schema) && rule.Schema.AdditionalProperties {
-		className, err := getOrRegisterEventStructName(rule, nr)
-		if err != nil {
-			return nil, err
-		}
-		method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
-			Name:     "properties",
-			Type:     className,
-			Optional: true,
-			Default:  "nil",
-		})
-		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
-			Label: "properties",
-			Value: "properties",
-		})
-	} else if !isEmptySchema(&rule.Schema) {
-		className, err := getOrRegisterEventStructName(rule, nr)
-		if err != nil {
-			return nil, err
-		}
-		method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
-			Name:    "properties",
-			Type:    className,
-			Comment: "The properties to include with this event",
-		})
-		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
-			Label: "properties",
-			Value: "properties.toProperties()",
-		})
-	} else {
-		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
-			Label: "properties",
-			Value: "nil",
-		})
-	}
-
-	method.MethodArguments = append(method.MethodArguments, SwiftMethodArgument{
-		Name:     "category",
-		Type:     "String",
-		Optional: true,
-		Default:  "nil",
-	})
-
-	return method, nil
-}

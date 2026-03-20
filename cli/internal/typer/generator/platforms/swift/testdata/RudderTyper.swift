@@ -869,24 +869,6 @@ public struct IdentifyTraits {
     }
 }
 
-/// Page view event
-public struct PageProperties {
-    /// User profile data
-    public var profile: CustomTypeUserProfile
-    public init(
-        profile: CustomTypeUserProfile
-    ) {
-        self.profile = profile
-    }
-
-    public func toProperties() -> [String: Any] {
-        var props: [String: Any] = [
-            "profile": profile.toProperties()
-        ]
-        return props
-    }
-}
-
 /// Screen view event
 public struct ScreenProperties {
     /// User profile data
@@ -1285,23 +1267,6 @@ public class RudderTyperAnalytics {
         analytics.identify(
             userId: userId,
             traits: traits?.toTraits(),
-            options: withRudderTyperContext(options: options)
-        )
-    }
-
-    /// Page view event
-    /// - Parameters:
-    ///   - properties: The properties to include with this event
-    ///   - category:
-    ///   - options: Optional RudderOption for additional event configuration
-    public func page(properties: PageProperties,
-        category: String? = nil,
-        options: RudderOption? = nil
-    ) {
-        analytics.page(
-            pageName: "",
-            category: category,
-            properties: properties.toProperties(),
             options: withRudderTyperContext(options: options)
         )
     }
