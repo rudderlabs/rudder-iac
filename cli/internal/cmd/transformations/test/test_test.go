@@ -26,7 +26,7 @@ func TestValidateFlags(t *testing.T) {
 		args          []string
 		all           bool
 		modified      bool
-		outputPath    string
+		outputDir     string
 		expectedError bool
 		errorContains string
 	}{
@@ -53,11 +53,11 @@ func TestValidateFlags(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "valid --output-path with existing dir",
+			name:          "valid --output-dir with existing dir",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputPath:    t.TempDir(),
+			outputDir:     t.TempDir(),
 			expectedError: false,
 		},
 
@@ -111,22 +111,22 @@ func TestValidateFlags(t *testing.T) {
 			errorContains: "must specify either an ID, --all, or --modified",
 		},
 		{
-			name:          "invalid --output-path with non-existent dir",
+			name:          "invalid --output-dir with non-existent dir",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputPath:    "/nonexistent/dir",
+			outputDir:     "/nonexistent/dir",
 			expectedError: true,
-			errorContains: "output-path directory does not exist",
+			errorContains: "output-dir does not exist",
 		},
 		{
-			name:          "invalid --output-path pointing to a file",
+			name:          "invalid --output-dir pointing to a file",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputPath:    notADir,
+			outputDir:     notADir,
 			expectedError: true,
-			errorContains: "output-path is not a directory",
+			errorContains: "output-dir is not a directory",
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestValidateFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateFlags(tt.args, tt.all, tt.modified, tt.outputPath)
+			err := validateFlags(tt.args, tt.all, tt.modified, tt.outputDir)
 
 			if tt.expectedError {
 				require.Error(t, err)
@@ -147,15 +147,14 @@ func TestValidateFlags(t *testing.T) {
 }
 
 func TestWriteResultsFile(t *testing.T) {
-	t.Run("writes JSON to the given path", func(t *testing.T) {
+	t.Run("writes JSON to test-results/results.json", func(t *testing.T) {
 		dir := t.TempDir()
-		path := filepath.Join(dir, "test-results.json")
 
 		results := &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted}
-		err := writeResultsFile(path, results)
+		err := writeResultsFile(dir, results)
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
 		require.NoError(t, err)
 
 		var got testorchestrator.TestResults
@@ -163,9 +162,37 @@ func TestWriteResultsFile(t *testing.T) {
 		assert.Equal(t, testorchestrator.RunStatusExecuted, got.Status)
 	})
 
-	t.Run("returns error when path is not writable", func(t *testing.T) {
-		err := writeResultsFile("/nonexistent/dir/out.json", &testorchestrator.TestResults{})
+	t.Run("creates test-results dir if not exists", func(t *testing.T) {
+		dir := t.TempDir()
+
+		err := writeResultsFile(dir, &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted})
+		require.NoError(t, err)
+
+		info, err := os.Stat(filepath.Join(dir, "test-results"))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("silently overwrites existing results.json", func(t *testing.T) {
+		dir := t.TempDir()
+
+		first := &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted}
+		require.NoError(t, writeResultsFile(dir, first))
+
+		second := &testorchestrator.TestResults{Status: testorchestrator.RunStatusNoResources}
+		require.NoError(t, writeResultsFile(dir, second))
+
+		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
+		require.NoError(t, err)
+
+		var got testorchestrator.TestResults
+		require.NoError(t, json.Unmarshal(data, &got))
+		assert.Equal(t, testorchestrator.RunStatusNoResources, got.Status)
+	})
+
+	t.Run("returns error when dir is not writable", func(t *testing.T) {
+		err := writeResultsFile("/nonexistent/dir", &testorchestrator.TestResults{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "creating results file")
+		assert.Contains(t, err.Error(), "creating test-results directory")
 	})
 }
