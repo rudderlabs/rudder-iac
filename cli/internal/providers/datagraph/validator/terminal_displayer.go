@@ -3,21 +3,12 @@ package validator
 import (
 	"fmt"
 	"io"
-	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
-const (
-	symbolPass    = "✓"
-	symbolWarning = "⚠"
-	symbolError   = "✕"
-
-	minTerminalWidth = 60
-)
+const minTerminalWidth = 60
 
 // TerminalDisplayer renders a validation report to a terminal.
 type TerminalDisplayer struct {
@@ -38,8 +29,7 @@ func (d *TerminalDisplayer) Display(report *ValidationReport) {
 	statusCol := width * 3 / 4
 
 	fmt.Fprintln(d.w)
-	fmt.Fprintln(d.w, ui.Bold("Data Graph Validation Report"))
-	d.printSeparator("=", width)
+	fmt.Fprintln(d.w, ui.SectionHeader("Data Graph Validation Report", "=", width))
 
 	models := report.ResourcesByType("model")
 	relationships := report.ResourcesByType("relationship")
@@ -57,8 +47,7 @@ func (d *TerminalDisplayer) Display(report *ValidationReport) {
 
 func (d *TerminalDisplayer) displaySection(title string, rvs []*ResourceValidation, statusCol, width int) {
 	fmt.Fprintln(d.w)
-	fmt.Fprintln(d.w, ui.Bold(title))
-	d.printSeparator("-", width)
+	fmt.Fprintln(d.w, ui.SectionHeader(title, "-", width))
 
 	for _, rv := range rvs {
 		d.displayResource(rv, statusCol)
@@ -73,11 +62,11 @@ func (d *TerminalDisplayer) displayResource(rv *ResourceValidation, statusCol in
 	name = fmt.Sprintf("%s (%s)", name, rv.URN)
 
 	if rv.Err != nil {
-		d.printWithPadding(
-			fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), name),
+		fmt.Fprintln(d.w, ui.PadColumns(
+			fmt.Sprintf("  %s  %s", ui.Color(ui.SymbolError, ui.ColorRed), name),
 			ui.Color("error", ui.ColorRed),
 			statusCol,
-		)
+		))
 		fmt.Fprintf(d.w, "       %s\n", rv.Err.Error())
 		return
 	}
@@ -97,11 +86,11 @@ func (d *TerminalDisplayer) displayResource(rv *ResourceValidation, statusCol in
 				status += "s"
 			}
 		}
-		d.printWithPadding(
-			fmt.Sprintf("  %s  %s", ui.Color(symbolError, ui.ColorRed), name),
+		fmt.Fprintln(d.w, ui.PadColumns(
+			fmt.Sprintf("  %s  %s", ui.Color(ui.SymbolError, ui.ColorRed), name),
 			status,
 			statusCol,
-		)
+		))
 		d.printIssues(rv.Issues)
 		return
 	}
@@ -112,20 +101,20 @@ func (d *TerminalDisplayer) displayResource(rv *ResourceValidation, statusCol in
 		if warningCount > 1 {
 			status += "s"
 		}
-		d.printWithPadding(
-			fmt.Sprintf("  %s  %s", ui.Color(symbolWarning, ui.ColorYellow), name),
+		fmt.Fprintln(d.w, ui.PadColumns(
+			fmt.Sprintf("  %s  %s", ui.Color(ui.SymbolWarning, ui.ColorYellow), name),
 			status,
 			statusCol,
-		)
+		))
 		d.printIssues(rv.Issues)
 		return
 	}
 
-	d.printWithPadding(
-		fmt.Sprintf("  %s  %s", ui.Color(symbolPass, ui.ColorGreen), name),
+	fmt.Fprintln(d.w, ui.PadColumns(
+		fmt.Sprintf("  %s  %s", ui.Color(ui.SymbolPass, ui.ColorGreen), name),
 		"pass",
 		statusCol,
-	)
+	))
 }
 
 func (d *TerminalDisplayer) printIssues(issues []dgClient.ValidationIssue) {
@@ -140,8 +129,7 @@ func (d *TerminalDisplayer) printIssues(issues []dgClient.ValidationIssue) {
 
 func (d *TerminalDisplayer) displaySummary(models, relationships []*ResourceValidation, width int) {
 	fmt.Fprintln(d.w)
-	fmt.Fprintln(d.w, ui.Bold("SUMMARY"))
-	d.printSeparator("=", width)
+	fmt.Fprintln(d.w, ui.SectionHeader("SUMMARY", "=", width))
 
 	if len(models) > 0 {
 		p, e, w := countStatuses(models)
@@ -152,7 +140,7 @@ func (d *TerminalDisplayer) displaySummary(models, relationships []*ResourceVali
 		fmt.Fprintf(d.w, "Relationships:  %d passed   %d errors   %d warnings\n", p, e, w)
 	}
 
-	d.printSeparator("-", width)
+	fmt.Fprintln(d.w, ui.Separator("-", width))
 
 	hasFailures := false
 	for _, rv := range append(models, relationships...) {
@@ -168,16 +156,7 @@ func (d *TerminalDisplayer) displaySummary(models, relationships []*ResourceVali
 		fmt.Fprintln(d.w, ui.Color("Result: PASSED", ui.ColorGreen))
 	}
 
-	d.printSeparator("=", width)
-}
-
-func (d *TerminalDisplayer) printSeparator(char string, width int) {
-	fmt.Fprintf(d.w, "%s\n", strings.Repeat(char, width))
-}
-
-func (d *TerminalDisplayer) printWithPadding(leftText, rightText string, rightTextStart int) {
-	padding := max(rightTextStart-lipgloss.Width(leftText), 1)
-	fmt.Fprintf(d.w, "%s%s%s\n", leftText, strings.Repeat(" ", padding), rightText)
+	fmt.Fprintln(d.w, ui.Separator("=", width))
 }
 
 func countBySeverity(issues []dgClient.ValidationIssue, severity string) int {
