@@ -6,7 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-func (c *RulesDoc) Validate(registeredRuleIDs []string) []error {
+func (c *DocumentedRules) Validate(registeredRuleIDs []string) []error {
 	var errs []error
 	for i := range c.Rules {
 		structErrs := validateRuleStruct(&c.Rules[i])
@@ -25,7 +25,7 @@ func (c *RulesDoc) Validate(registeredRuleIDs []string) []error {
 	return errs
 }
 
-func validateUniqueExampleIDs(rule *ResolvedRule) []error {
+func validateUniqueExampleIDs(rule *DocumentedRule) []error {
 	seen := make(map[string]struct{})
 	var errs []error
 	for _, mb := range rule.MatchBehavior {
@@ -45,7 +45,7 @@ func validateUniqueExampleIDs(rule *ResolvedRule) []error {
 	return errs
 }
 
-func validateAppliesToCoverage(rule *ResolvedRule) []error {
+func validateAppliesToCoverage(rule *DocumentedRule) []error {
 	covered := make(map[string]struct{})
 	for _, mb := range rule.MatchBehavior {
 		for _, p := range mb.AppliesTo {
@@ -63,7 +63,7 @@ func validateAppliesToCoverage(rule *ResolvedRule) []error {
 	return errs
 }
 
-func validateRuleStruct(rule *ResolvedRule) []error {
+func validateRuleStruct(rule *DocumentedRule) []error {
 	validationErrs, err := rules.ValidateStruct(rule, "")
 	if err != nil {
 		return []error{fmt.Errorf("rule %s: structural validation failed: %w", rule.RuleID, err)}
@@ -76,7 +76,7 @@ func validateRuleStruct(rule *ResolvedRule) []error {
 	return errs
 }
 
-func (c *RulesDoc) validateRegisteredCompleteness(registeredRuleIDs []string) []error {
+func (c *DocumentedRules) validateRegisteredCompleteness(registeredRuleIDs []string) []error {
 	catalogSet := make(map[string]struct{}, len(c.Rules))
 	for _, r := range c.Rules {
 		catalogSet[r.RuleID] = struct{}{}
