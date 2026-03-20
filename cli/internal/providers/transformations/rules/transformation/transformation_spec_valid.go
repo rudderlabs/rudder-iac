@@ -51,7 +51,7 @@ func validateTransformationSpec(
 		ext := filepath.Ext(spec.File)
 		expectedExt := trules.GetExpectedExtension(spec.Language)
 
-		if ext != expectedExt {
+		if expectedExt != "" && ext != expectedExt {
 			results = append(results, rules.ValidationResult{
 				Reference: "/file",
 				Message:   fmt.Sprintf("file extension must be '%s'", expectedExt),
