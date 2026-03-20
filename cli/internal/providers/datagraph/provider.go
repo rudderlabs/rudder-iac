@@ -27,6 +27,7 @@ import (
 // The provider owns all spec parsing logic for data-graph specs
 type Provider struct {
 	*provider.BaseProvider
+	client              dgClient.DataGraphClient
 	dataGraphHandler    *datagraph.DataGraphHandler
 	modelHandler        *model.ModelHandler
 	relationshipHandler *relationship.RelationshipHandler
@@ -51,10 +52,16 @@ func NewProvider(client dgClient.DataGraphClient, accountGetter datagraph.Accoun
 
 	return &Provider{
 		BaseProvider:        provider.NewBaseProvider(handlers),
+		client:              client,
 		dataGraphHandler:    dgHandler,
 		modelHandler:        modelHandler,
 		relationshipHandler: relationshipHandler,
 	}
+}
+
+// Client returns the underlying DataGraphClient for direct API access
+func (p *Provider) Client() dgClient.DataGraphClient {
+	return p.client
 }
 
 // ParseSpec overrides BaseProvider.ParseSpec to extract IDs from data-graph specs with inline models
