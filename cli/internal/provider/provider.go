@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -206,6 +207,10 @@ type RuleProvider interface {
 	// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
 	// Example: "datacatalog/events/valid-property-ref"
 	SemanticRules() []rules.Rule
+
+	// RuleDocEntries returns authored YAML documentation fragments for this
+	// provider's rules. Returns nil until a provider populates real doc data.
+	RuleDocEntries() []docs.RuleDocEntry
 }
 
 // Provider is the complete interface that all providers must implement.

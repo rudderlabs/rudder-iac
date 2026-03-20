@@ -14,11 +14,11 @@ type mockRule struct {
 	appliesTo   []MatchPattern
 }
 
-func (m *mockRule) ID() string               { return m.id }
-func (m *mockRule) Severity() Severity       { return m.severity }
-func (m *mockRule) Description() string      { return m.description }
+func (m *mockRule) ID() string                { return m.id }
+func (m *mockRule) Severity() Severity        { return m.severity }
+func (m *mockRule) Description() string       { return m.description }
 func (m *mockRule) AppliesTo() []MatchPattern { return m.appliesTo }
-func (m *mockRule) Examples() Examples       { return Examples{} }
+func (m *mockRule) Examples() Examples        { return Examples{} }
 func (m *mockRule) Validate(ctx *ValidationContext) []ValidationResult {
 	return nil
 }
@@ -230,6 +230,34 @@ func TestRegistry_MultipleKindsPerRule(t *testing.T) {
 
 	t.Run("rule does not appear for other kinds", func(t *testing.T) {
 		assert.NotContains(t, ruleIDs(registry.SyntacticRulesFor("custom-types", "rudder/v1")), "multi-kind-rule")
+	})
+}
+
+func TestRegistry_AllSyntacticRules(t *testing.T) {
+	t.Run("returns all registered syntactic rules", func(t *testing.T) {
+		registry := NewRegistry()
+
+		registry.RegisterSyntactic(&mockRule{id: "rule-a", appliesTo: []MatchPattern{MatchKind("properties")}})
+		registry.RegisterSyntactic(&mockRule{id: "rule-b", appliesTo: []MatchPattern{MatchAll()}})
+
+		all := registry.AllSyntacticRules()
+		assert.Len(t, all, 2)
+		assert.Contains(t, ruleIDs(all), "rule-a")
+		assert.Contains(t, ruleIDs(all), "rule-b")
+	})
+}
+
+func TestRegistry_AllSemanticRules(t *testing.T) {
+	t.Run("returns all registered semantic rules", func(t *testing.T) {
+		registry := NewRegistry()
+
+		registry.RegisterSemantic(&mockRule{id: "sem-a", appliesTo: []MatchPattern{MatchKind("events")}})
+		registry.RegisterSemantic(&mockRule{id: "sem-b", appliesTo: []MatchPattern{MatchAll()}})
+
+		all := registry.AllSemanticRules()
+		assert.Len(t, all, 2)
+		assert.Contains(t, ruleIDs(all), "sem-a")
+		assert.Contains(t, ruleIDs(all), "sem-b")
 	})
 }
 
