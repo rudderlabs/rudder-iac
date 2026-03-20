@@ -52,10 +52,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("data graph handler does not handle spec extraction - handled by provider")
 }
 
-func (h *HandlerImpl) ValidateResource(resource *model.DataGraphResource, graph *resources.Graph) error {
-	if resource.AccountID == "" {
-		return fmt.Errorf("account_id is required")
-	}
+func (h *HandlerImpl) ValidateResource(_ *model.DataGraphResource, _ *resources.Graph) error {
 	return nil
 }
 
