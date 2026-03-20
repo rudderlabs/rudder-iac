@@ -1222,7 +1222,8 @@ public class RudderTyperAnalytics {
     ///   - groupId:
     ///   - traits: The traits to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func group(groupId: String,
+    public func group(
+        groupId: String,
         traits: GroupTraits? = nil,
         options: RudderOption? = nil
     ) {
@@ -1238,7 +1239,8 @@ public class RudderTyperAnalytics {
     ///   - userId:
     ///   - traits: The traits to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func identify(userId: String? = nil,
+    public func identify(
+        userId: String? = nil,
         traits: IdentifyTraits? = nil,
         options: RudderOption? = nil
     ) {
@@ -1254,7 +1256,8 @@ public class RudderTyperAnalytics {
     ///   - properties: The properties to include with this event
     ///   - category:
     ///   - options: Optional RudderOption for additional event configuration
-    public func screen(properties: ScreenProperties,
+    public func screen(
+        properties: ScreenProperties,
         category: String? = nil,
         options: RudderOption? = nil
     ) {
@@ -1270,7 +1273,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackVariable$string(properties: TrackVariable$stringProperties,
+    public func trackVariable$string(
+        properties: TrackVariable$stringProperties,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1284,7 +1288,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackEventWithNameCamelCase(properties: TrackEventWithNameCamelCaseProperties,
+    public func trackEventWithNameCamelCase(
+        properties: TrackEventWithNameCamelCaseProperties,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1297,8 +1302,7 @@ public class RudderTyperAnalytics {
     /// Empty event schema with additionalProperties false
     /// - Parameters:
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackEmptyEventNoAdditionalProps(options: RudderOption? = nil
-    ) {
+    public func trackEmptyEventNoAdditionalProps(options: RudderOption? = nil) {
         analytics.track(
             name: "Empty Event No Additional Props",
             properties: nil,
@@ -1310,7 +1314,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties? = nil,
+    public func trackEmptyEventWithAdditionalProps(
+        properties: TrackEmptyEventWithAdditionalPropsProperties? = nil,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1324,7 +1329,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackEventWithVariants(properties: TrackEventWithVariantsProperties,
+    public func trackEventWithVariants(
+        properties: TrackEventWithVariantsProperties,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1338,7 +1344,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties,
+    public func trackProductPremiumClicked(
+        properties: TrackProductPremiumClickedProperties,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1352,7 +1359,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackUserSignedUp(properties: TrackUserSignedUpProperties,
+    public func trackUserSignedUp(
+        properties: TrackUserSignedUpProperties,
         options: RudderOption? = nil
     ) {
         analytics.track(
@@ -1366,7 +1374,8 @@ public class RudderTyperAnalytics {
     /// - Parameters:
     ///   - properties: The properties to include with this event
     ///   - options: Optional RudderOption for additional event configuration
-    public func trackEventWithNameCamelCase1(properties: TrackEventWithNameCamelCaseProperties1,
+    public func trackEventWithNameCamelCase1(
+        properties: TrackEventWithNameCamelCaseProperties1,
         options: RudderOption? = nil
     ) {
         analytics.track(

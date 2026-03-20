@@ -29,14 +29,16 @@ public class RudderTyperAnalytics {
     ///   - {{ .Name }}:{{ if .Comment }} {{ escapeComment .Comment }}{{ end }}
 {{- end }}
     ///   - options: Optional RudderOption for additional event configuration
+{{- if .MethodArguments }}
     public func {{ .Name }}(
-{{- range $i, $arg := .MethodArguments }}
-{{- if $i }},
-        {{ end }}{{ $arg.Name }}: {{ $arg.Type }}{{- if $arg.Optional }}?{{ end }}{{- if $arg.Default }} = {{ $arg.Default }}{{ end }}
+{{- range $arg := .MethodArguments }}
+        {{ $arg.Name }}: {{ $arg.Type }}{{- if $arg.Optional }}?{{ end }}{{- if $arg.Default }} = {{ $arg.Default }}{{ end }},
 {{- end }}
-{{- if .MethodArguments }},
-        {{ end }}options: RudderOption? = nil
+        options: RudderOption? = nil
     ) {
+{{- else }}
+    public func {{ .Name }}(options: RudderOption? = nil) {
+{{- end }}
         analytics.{{ .SDKMethodName }}(
 {{- range .SDKArguments }}
             {{ .Label }}: {{ .Value }},
