@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
@@ -52,6 +53,8 @@ func (g *Generator) Generate(p *plan.TrackingPlan, opts core.GenerateOptions, pl
 	if err := processEventRules(p, ctx, nr); err != nil {
 		return nil, err
 	}
+
+	pruneUnreferencedPropertyAliases(ctx)
 
 	file, err := GenerateFile(outputFileName, ctx)
 	if err != nil {
@@ -338,6 +341,39 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 	return nil
 }
 
+// pruneUnreferencedPropertyAliases removes PropertyTypeAliases that are not
+// referenced by any struct property. Object-typed properties that are rendered
+// as inline nested structs register a top-level alias that is never used;
+// this removes that dead code from the generated output.
+func pruneUnreferencedPropertyAliases(ctx *SwiftContext) {
+	referenced := make(map[string]bool)
+	for i := range ctx.Structs {
+		collectTypesFromStruct(&ctx.Structs[i], referenced)
+	}
+	for i := range ctx.VariantEnums {
+		for j := range ctx.VariantEnums[i].PayloadStructs {
+			collectTypesFromStruct(&ctx.VariantEnums[i].PayloadStructs[j], referenced)
+		}
+	}
+
+	filtered := make([]SwiftTypeAlias, 0, len(ctx.PropertyTypeAliases))
+	for _, alias := range ctx.PropertyTypeAliases {
+		if referenced[alias.Alias] {
+			filtered = append(filtered, alias)
+		}
+	}
+	ctx.PropertyTypeAliases = filtered
+}
+
+func collectTypesFromStruct(s *SwiftStruct, out map[string]bool) {
+	for _, prop := range s.Properties {
+		out[prop.Type] = true
+	}
+	for i := range s.NestedStructs {
+		collectTypesFromStruct(&s.NestedStructs[i], out)
+	}
+}
+
 func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameRegistry) error {
 	ruleMap := make(map[string]*plan.EventRule)
 	for i := range p.Rules {
@@ -561,7 +597,15 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 		if len(vc.Match) == 1 {
 			for i := range s.Properties {
 				if s.Properties[i].SerialName == variant.Discriminator {
-					s.Properties[i].ConstantValue = FormatSwiftLiteral(vc.Match[0])
+					prop := &s.Properties[i]
+					matchStr := fmt.Sprintf("%v", vc.Match[0])
+					// Enum-typed discriminators serialize via .rawValue, so the constant
+					// must use enum case syntax (.post) rather than a string literal ("POST").
+					if strings.HasSuffix(prop.SerializeExpr, ".rawValue") {
+						prop.ConstantValue = "." + formatEnumCaseName(matchStr)
+					} else {
+						prop.ConstantValue = FormatSwiftLiteral(vc.Match[0])
+					}
 					break
 				}
 			}

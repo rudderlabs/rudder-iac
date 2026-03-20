@@ -73,6 +73,20 @@ func GenerateFile(path string, ctx *SwiftContext) (*core.File, error) {
 			}
 			return result
 		},
+		// formatInitParams renders init parameter lines (required first, then optional)
+		// joined by commas with no trailing comma, ready to embed in a multi-line init.
+		"formatInitParams": func(props []SwiftStructProperty) string {
+			var required, optional []string
+			for _, p := range props {
+				if p.Optional {
+					optional = append(optional, "        "+p.Name+": "+p.Type+"? = nil")
+				} else {
+					required = append(required, "        "+p.Name+": "+p.Type)
+				}
+			}
+			all := append(required, optional...)
+			return strings.Join(all, ",\n")
+		},
 	}
 
 	var err error

@@ -116,8 +116,7 @@ public enum CustomTypeFeatureConfig {
         public init() {}
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [:]
-            return props
+            return [:]
         }
     }
 
@@ -287,8 +286,7 @@ public enum CustomTypeUserAccess {
         public init() {}
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [:]
-            return props
+            return [:]
         }
     }
 
@@ -320,7 +318,7 @@ public enum TrackEventWithVariantsProperties {
     /// Mobile device page view
     public struct CaseMobile {
         /// Type of device
-        public let deviceType: PropertyDeviceType = "mobile"
+        public let deviceType: PropertyDeviceType = .mobile
         /// Page context information
         public var pageContext: CustomTypePageContext?
         /// User profile data
@@ -330,7 +328,7 @@ public enum TrackEventWithVariantsProperties {
         public init(
             profile: CustomTypeUserProfile,
             pageContext: CustomTypePageContext? = nil,
-            tags: PropertyTags? = nil,
+            tags: PropertyTags? = nil
         ) {
             self.pageContext = pageContext
             self.profile = profile
@@ -351,7 +349,7 @@ public enum TrackEventWithVariantsProperties {
     /// Desktop page view
     public struct CaseDesktop {
         /// Type of device
-        public let deviceType: PropertyDeviceType = "desktop"
+        public let deviceType: PropertyDeviceType = .desktop
         /// User's first name
         public var firstName: PropertyFirstName
         /// User's last name
@@ -364,7 +362,7 @@ public enum TrackEventWithVariantsProperties {
             firstName: PropertyFirstName,
             profile: CustomTypeUserProfile,
             lastName: PropertyLastName? = nil,
-            pageContext: CustomTypePageContext? = nil,
+            pageContext: CustomTypePageContext? = nil
         ) {
             self.firstName = firstName
             self.lastName = lastName
@@ -418,15 +416,6 @@ public enum TrackEventWithVariantsProperties {
 
 // MARK: - Property Types
 
-/// User active status
-public typealias PropertyActive = CustomTypeActive
-
-/// User's addresses
-public typealias PropertyAddresses = CustomTypeAddressList
-
-/// User's age
-public typealias PropertyAge = CustomTypeAge
-
 /// An array that can contain any type of items
 public typealias PropertyArrayOfAny = [Any]
 
@@ -439,29 +428,8 @@ public typealias PropertyCity = String
 /// Array of user contacts
 public typealias PropertyContacts = [CustomTypeEmail]
 
-/// example of object property
-public typealias PropertyContext = [String: Any]
-
-/// Property using custom null type
-public typealias PropertyCustomNullField = CustomTypeNullType
-
-/// User's email address
-public typealias PropertyEmail = CustomTypeEmail
-
-/// User's email addresses
-public typealias PropertyEmailList = CustomTypeEmailList
-
-/// Property with empty object not allowing additional properties
-public typealias PropertyEmptyObjectNoAdditionalProps = CustomTypeEmptyObjectNoAdditionalProps
-
-/// Property with empty object allowing additional properties
-public typealias PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
-
 /// Array of favorite colors using custom type
 public typealias PropertyFavoriteColors = [CustomTypeColor]
-
-/// Feature configuration information
-public typealias PropertyFeatureConfig = CustomTypeFeatureConfig
 
 /// User's first name
 public typealias PropertyFirstName = String
@@ -478,9 +446,6 @@ public typealias PropertyMixedUnicode = String
 /// An array with items that can be string or integer
 public typealias PropertyMultiTypeArray = [PropertyMultiTypeArrayItem]
 
-/// demonstrates multiple levels of nesting
-public typealias PropertyNestedContext = [String: Any]
-
 /// Nested property with empty object allowing additional properties
 public typealias PropertyNestedEmptyObject = [String: Any]
 
@@ -492,9 +457,6 @@ public typealias PropertyNullField = NSNull
 
 /// An object field with no defined structure
 public typealias PropertyObjectProperty = [String: Any]
-
-/// Page context information
-public typealias PropertyPageContext = CustomTypePageContext
 
 /// Additional page data
 public typealias PropertyPageData = [String: Any]
@@ -511,23 +473,11 @@ public typealias PropertyPostalCode = String
 /// Product identifier
 public typealias PropertyProductId = String
 
-/// User profile data
-public typealias PropertyProfile = CustomTypeUserProfile
-
-/// List of related user profiles
-public typealias PropertyProfileList = CustomTypeProfileList
-
-/// A field that can contain any type of value
-public typealias PropertyPropertyOfAny = Any
-
 /// Search query
 public typealias PropertyQuery = String
 
 /// Field with special chars: "quotes", backslash\path, and /* comment */
 public typealias PropertySpecialField = String
-
-/// User account status
-public typealias PropertyStatus = CustomTypeStatus
 
 /// Street address
 public typealias PropertyStreet = String
@@ -535,17 +485,8 @@ public typealias PropertyStreet = String
 /// User tags as array of strings
 public typealias PropertyTags = [String]
 
-/// Property using custom type with Unicode
-public typealias PropertyUnicodeCustomType = CustomTypeТипыДанных
-
 /// An array with no explicit item type (treated as any)
 public typealias PropertyUntypedArray = [Any]
-
-/// A field with no explicit type (treated as any)
-public typealias PropertyUntypedField = Any
-
-/// User access information
-public typealias PropertyUserAccess = CustomTypeUserAccess
 
 /// Username in Chinese characters
 public typealias Property用户名 = String
@@ -738,7 +679,7 @@ public struct CustomTypeAddressDetails {
     public init(
         city: PropertyCity,
         street: PropertyStreet,
-        postalCode: PropertyPostalCode? = nil,
+        postalCode: PropertyPostalCode? = nil
     ) {
         self.city = city
         self.postalCode = postalCode
@@ -766,7 +707,7 @@ public struct CustomTypeUserProfile {
     public init(
         email: CustomTypeEmail,
         firstName: PropertyFirstName,
-        lastName: PropertyLastName? = nil,
+        lastName: PropertyLastName? = nil
     ) {
         self.email = email
         self.firstName = firstName
@@ -791,7 +732,7 @@ public struct GroupTraits {
     public var status: CustomTypeStatus?
     public init(
         active: CustomTypeActive,
-        status: CustomTypeStatus? = nil,
+        status: CustomTypeStatus? = nil
     ) {
         self.active = active
         self.status = status
@@ -814,7 +755,7 @@ public struct IdentifyTraits {
     public var email: CustomTypeEmail
     public init(
         email: CustomTypeEmail,
-        active: CustomTypeActive? = nil,
+        active: CustomTypeActive? = nil
     ) {
         self.active = active
         self.email = email
@@ -883,7 +824,7 @@ public struct TrackProductPremiumClickedProperties {
     public var statusCode: PropertyStatusCode?
     public init(
         specialField: PropertySpecialField,
-        statusCode: PropertyStatusCode? = nil,
+        statusCode: PropertyStatusCode? = nil
     ) {
         self.specialField = specialField
         self.statusCode = statusCode
@@ -994,7 +935,7 @@ public struct TrackUserSignedUpProperties {
             public var profile: CustomTypeUserProfile?
             public init(
                 favoriteColors: PropertyFavoriteColors? = nil,
-                profile: CustomTypeUserProfile? = nil,
+                profile: CustomTypeUserProfile? = nil
             ) {
                 self.favoriteColors = favoriteColors
                 self.profile = profile
@@ -1009,7 +950,7 @@ public struct TrackUserSignedUpProperties {
         }
         public init(
             ipAddress: PropertyIpAddress,
-            nestedContext: NestedContext,
+            nestedContext: NestedContext
         ) {
             self.ipAddress = ipAddress
             self.nestedContext = nestedContext
@@ -1062,7 +1003,7 @@ public struct TrackUserSignedUpProperties {
         untypedArray: PropertyUntypedArray? = nil,
         untypedField: Any? = nil,
         userAccess: CustomTypeUserAccess? = nil,
-        用户名: Property用户名? = nil,
+        用户名: Property用户名? = nil
     ) {
         self.active = active
         self.addresses = addresses

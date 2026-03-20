@@ -34,16 +34,7 @@ public struct {{ .Name }} {
 {{- end }}
 {{- else if $initProps }}
     public init(
-{{- range $initProps }}
-{{- if not .Optional }}
-        {{ .Name }}: {{ .Type }},
-{{- end }}
-{{- end }}
-{{- range $initProps }}
-{{- if .Optional }}
-        {{ .Name }}: {{ .Type }}? = nil,
-{{- end }}
-{{- end }}
+{{ formatInitParams $initProps }}
     ) {
 {{- range $initProps }}
         self.{{ .Name }} = {{ .Name }}
@@ -54,7 +45,9 @@ public struct {{ .Name }} {
 {{- end }}
 
     public func {{ .SerializeMethod }}() -> [String: Any] {
-{{- if $hasRequired }}
+{{- if not .Properties }}
+        return [:]
+{{- else if $hasRequired }}
         var props: [String: Any] = [
 {{- $needComma := false }}
 {{- range .Properties }}
@@ -73,7 +66,9 @@ public struct {{ .Name }} {
         if let {{ .Name }} = {{ .Name }} { props["{{ escapeString .SerialName }}"] = {{ .SerializeExpr }} }
 {{- end }}
 {{- end }}
+{{- if .Properties }}
         return props
+{{- end }}
     }
 }
 {{- end }}
