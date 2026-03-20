@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func minimalRule(ruleID string) ResolvedRule {
-	return ResolvedRule{
+func minimalRule(ruleID string) DocumentedRule {
+	return DocumentedRule{
 		RuleID:      ruleID,
 		Provider:    "test-provider",
 		Phase:       "syntactic",
@@ -30,7 +30,7 @@ func minimalRule(ruleID string) ResolvedRule {
 func TestCatalogValidate_StructuralValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		rule      ResolvedRule
+		rule      DocumentedRule
 		wantEmpty bool
 		wantField string
 	}{
@@ -41,22 +41,22 @@ func TestCatalogValidate_StructuralValidation(t *testing.T) {
 		},
 		{
 			name:      "empty rule_id is rejected",
-			rule:      func() ResolvedRule { r := minimalRule(""); return r }(),
+			rule:      func() DocumentedRule { r := minimalRule(""); return r }(),
 			wantField: "rule_id",
 		},
 		{
 			name:      "invalid phase value is rejected",
-			rule:      func() ResolvedRule { r := minimalRule("rule-A"); r.Phase = "invalid-phase"; return r }(),
+			rule:      func() DocumentedRule { r := minimalRule("rule-A"); r.Phase = "invalid-phase"; return r }(),
 			wantField: "phase",
 		},
 		{
 			name:      "empty applies_to slice is rejected",
-			rule:      func() ResolvedRule { r := minimalRule("rule-A"); r.AppliesTo = []MatchPatternDoc{}; return r }(),
+			rule:      func() DocumentedRule { r := minimalRule("rule-A"); r.AppliesTo = []MatchPatternDoc{}; return r }(),
 			wantField: "applies_to",
 		},
 		{
 			name: "invalid ExpectedDiagnostic severity is rejected",
-			rule: func() ResolvedRule {
+			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
 				r.MatchBehavior[0].Invalid = []InvalidExample{
 					{
@@ -76,7 +76,7 @@ func TestCatalogValidate_StructuralValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			catalog := &RulesDoc{Rules: []ResolvedRule{tt.rule}}
+			catalog := &DocumentedRules{Rules: []DocumentedRule{tt.rule}}
 			registered := []string{}
 			if tt.rule.RuleID != "" {
 				registered = []string{tt.rule.RuleID}
@@ -96,7 +96,7 @@ func TestCatalogValidate_StructuralValidation(t *testing.T) {
 func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 	tests := []struct {
 		name    string
-		rule    ResolvedRule
+		rule    DocumentedRule
 		wantLen int
 	}{
 		{
@@ -106,7 +106,7 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 		},
 		{
 			name: "duplicate example_id across valid and invalid in same entry is flagged",
-			rule: func() ResolvedRule {
+			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
 				r.MatchBehavior = append(r.MatchBehavior, MatchBehaviorEntry{
 					AppliesTo: []MatchPatternDoc{{Kind: "source", Version: "v2"}},
@@ -130,7 +130,7 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 		},
 		{
 			name: "duplicate example_id across match_behavior entries is flagged",
-			rule: func() ResolvedRule {
+			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
 				mbWithDup := func(kind, version string) MatchBehaviorEntry {
 					return MatchBehaviorEntry{
@@ -152,7 +152,7 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			catalog := &RulesDoc{Rules: []ResolvedRule{tt.rule}}
+			catalog := &DocumentedRules{Rules: []DocumentedRule{tt.rule}}
 			errs := catalog.Validate([]string{tt.rule.RuleID})
 			assert.Len(t, errs, tt.wantLen)
 		})
@@ -162,7 +162,7 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 	tests := []struct {
 		name    string
-		rule    ResolvedRule
+		rule    DocumentedRule
 		wantLen int
 	}{
 		{
@@ -172,7 +172,7 @@ func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 		},
 		{
 			name: "one top-level pair absent from match_behavior is flagged",
-			rule: func() ResolvedRule {
+			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
 				r.AppliesTo = append(r.AppliesTo, MatchPatternDoc{Kind: "destination", Version: "v1"})
 				return r
@@ -181,7 +181,7 @@ func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 		},
 		{
 			name: "multiple uncovered pairs each produce an error",
-			rule: func() ResolvedRule {
+			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
 				r.AppliesTo = append(r.AppliesTo,
 					MatchPatternDoc{Kind: "destination", Version: "v1"},
@@ -195,7 +195,7 @@ func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			catalog := &RulesDoc{Rules: []ResolvedRule{tt.rule}}
+			catalog := &DocumentedRules{Rules: []DocumentedRule{tt.rule}}
 			errs := catalog.Validate([]string{tt.rule.RuleID})
 			assert.Len(t, errs, tt.wantLen)
 		})
@@ -205,31 +205,31 @@ func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 func TestCatalogValidate_RegisteredCompleteness(t *testing.T) {
 	tests := []struct {
 		name       string
-		rules      []ResolvedRule
+		rules      []DocumentedRule
 		registered []string
 		wantLen    int
 	}{
 		{
 			name:       "perfect 1:1 mapping produces no errors",
-			rules:      []ResolvedRule{minimalRule("rule-A")},
+			rules:      []DocumentedRule{minimalRule("rule-A")},
 			registered: []string{"rule-A"},
 			wantLen:    0,
 		},
 		{
 			name:       "registered rule with no catalog entry is flagged",
-			rules:      []ResolvedRule{},
+			rules:      []DocumentedRule{},
 			registered: []string{"rule-missing"},
 			wantLen:    1,
 		},
 		{
 			name:       "catalog entry without registration is flagged as orphan",
-			rules:      []ResolvedRule{minimalRule("rule-orphan")},
+			rules:      []DocumentedRule{minimalRule("rule-orphan")},
 			registered: []string{},
 			wantLen:    1,
 		},
 		{
 			name:       "both missing and orphan produce two errors",
-			rules:      []ResolvedRule{minimalRule("rule-orphan")},
+			rules:      []DocumentedRule{minimalRule("rule-orphan")},
 			registered: []string{"rule-missing"},
 			wantLen:    2,
 		},
@@ -237,7 +237,7 @@ func TestCatalogValidate_RegisteredCompleteness(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			catalog := &RulesDoc{Rules: tt.rules}
+			catalog := &DocumentedRules{Rules: tt.rules}
 			errs := catalog.Validate(tt.registered)
 			assert.Len(t, errs, tt.wantLen)
 		})

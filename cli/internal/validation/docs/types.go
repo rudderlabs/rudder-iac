@@ -40,10 +40,10 @@ type ExpectedDiagnostic struct {
 
 // Resolved types — what the generator emits in the YAML catalog.
 
-type RulesDoc struct {
-	SchemaVersion int            `yaml:"schema_version"`
-	ToolMetadata  ToolMetadata   `yaml:"tool_metadata"`
-	Rules         []ResolvedRule `yaml:"rules"`
+type DocumentedRules struct {
+	SchemaVersion int              `yaml:"schema_version"`
+	ToolMetadata  ToolMetadata     `yaml:"tool_metadata"`
+	Rules         []DocumentedRule `yaml:"rules"`
 }
 
 type ToolMetadata struct {
@@ -51,7 +51,7 @@ type ToolMetadata struct {
 	GeneratedAt string `yaml:"generated_at"`
 }
 
-type ResolvedRule struct {
+type DocumentedRule struct {
 	RuleID        string               `yaml:"rule_id"        validate:"required"`
 	Provider      string               `yaml:"provider"       validate:"required"`
 	Phase         string               `yaml:"phase"          validate:"required,oneof=syntactic semantic"`

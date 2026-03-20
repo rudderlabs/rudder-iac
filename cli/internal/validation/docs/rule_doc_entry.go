@@ -3,7 +3,7 @@ package docs
 import (
 	"fmt"
 	"io/fs"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -39,7 +39,7 @@ func isYAMLFile(name string) bool {
 }
 
 func loadYAMLEntry(fsys fs.FS, dir, name string) (RuleDocEntry, error) {
-	data, err := fs.ReadFile(fsys, filepath.Join(dir, name))
+	data, err := fs.ReadFile(fsys, path.Join(dir, name))
 	if err != nil {
 		return RuleDocEntry{}, fmt.Errorf("reading %s: %w", name, err)
 	}
