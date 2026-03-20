@@ -17,20 +17,26 @@ Enforce a rigorous test-driven development cycle augmented with complexity monit
 
 ## The Workflow: Red-Green-Refactor
 
-Every code change follows this cycle. **One test case at a time — never batch multiple tests or write a full test table before implementing.**
+Every code change follows this cycle. 
+> ⛔ **HARD STOP — MANDATORY RULE**
+>
+> **One test case at a time — never batch multiple tests or write a full test table before implementing.**
+> You MUST write **exactly one** test case per RED phase. Writing two or more tests at once — even for the same function — is a violation of this workflow and you must stop, revert the extra tests, and restart the cycle one behavior at a time.
+>
+> This applies even when the implementation is "obvious". The discipline is the point.
 
 ### Phase 1: RED — Write Exactly ONE Failing Test
 
 1. Write **one test case** (or one table row) that expresses a single desired behavior.
    - For table-driven tests: add only the next row, not the full table.
-   - **STOP. Do not write more tests yet.**
+   - **STOP. Do not write more tests yet. Do not add additional sub-tests. Do not add additional t.Run blocks.**
 2. Run the test and **confirm it fails for the right reason** — a behavior mismatch, not a compilation error.
    ```bash
    go test ./path/to/package/... -run TestFunctionName -v
    ```
 3. If the failure reason is wrong (e.g. panics instead of a wrong value), fix the test until the failure is correct. Do not proceed until RED is confirmed.
 
-> **FORBIDDEN**: Writing multiple test cases or an entire test file before any implementation. Each RED step covers exactly one behavior.
+> **FORBIDDEN**: Writing multiple `t.Run` sub-tests, multiple test functions, or an entire test table before any implementation. Each RED step covers **exactly one behavior — one `t.Run` block**. If you find yourself writing more than one `t.Run` in a single RED phase, you are doing it wrong. Stop and revert.
 
 ### Phase 2: GREEN — Minimum Code to Pass That One Test
 
