@@ -66,8 +66,8 @@ type ValidationReport struct {
 	Resources []*ResourceValidation
 }
 
-// HasFailures returns true if any resource has errors
-func (vr *ValidationReport) HasFailures() bool {
+// HasErrors returns true if any resource has errors
+func (vr *ValidationReport) HasErrors() bool {
 	for _, r := range vr.Resources {
 		if r.HasErrors() {
 			return true

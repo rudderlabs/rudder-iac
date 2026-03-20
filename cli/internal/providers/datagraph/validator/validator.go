@@ -88,7 +88,7 @@ func Validate(ctx context.Context, project Project, p ValidatorProvider, cfg Con
 
 	cfg.DisplayFunc(report)
 
-	if report.HasFailures() {
+	if report.HasErrors() {
 		return ErrValidationFailed
 	}
 
