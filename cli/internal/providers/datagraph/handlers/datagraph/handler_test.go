@@ -58,12 +58,12 @@ func TestValidateResource(t *testing.T) {
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify that hasExternalID is set to true
-			require.NotNil(t, hasExternalID)
-			assert.True(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.True(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -97,12 +97,12 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify that hasExternalID is set to false
-			require.NotNil(t, hasExternalID)
-			assert.False(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -127,8 +127,8 @@ func TestLoadImportableResources(t *testing.T) {
 func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 	t.Run("resolves account name", func(t *testing.T) {
 		mockClient := &testutils.MockDataGraphClient{
-			ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-				if page == 1 {
+			ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				if req.Page == 1 {
 					return &dgClient.ListDataGraphsResponse{
 						Data: []dgClient.DataGraph{
 							{ID: "remote-1", AccountID: "account-1"},
@@ -168,7 +168,7 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 
 	t.Run("returns error when account resolution fails", func(t *testing.T) {
 		mockClient := &testutils.MockDataGraphClient{
-			ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+			ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{ID: "remote-1", AccountID: "bad-account"},
@@ -290,12 +290,12 @@ func TestUpdate(t *testing.T) {
 
 func TestImport(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		SetExternalIDFunc: func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "remote-1", id)
-			assert.Equal(t, "test-dg", externalID)
+		SetExternalIDFunc: func(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error) {
+			assert.Equal(t, "remote-1", req.ID)
+			assert.Equal(t, "test-dg", req.ExternalID)
 			return &dgClient.DataGraph{
-				ID:         id,
-				ExternalID: externalID,
+				ID:         req.ID,
+				ExternalID: req.ExternalID,
 			}, nil
 		},
 	}
