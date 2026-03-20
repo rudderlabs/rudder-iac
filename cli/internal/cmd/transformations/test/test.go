@@ -2,8 +2,11 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
@@ -28,13 +31,14 @@ var (
 
 func NewCmdTest() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		all      bool
-		modified bool
-		verbose  bool
+		deps      app.Deps
+		p         project.Project
+		err       error
+		location  string
+		all       bool
+		modified  bool
+		verbose   bool
+		outputDir string
 	)
 
 	cmd := &cobra.Command{
@@ -62,7 +66,7 @@ func NewCmdTest() *cobra.Command {
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flags first
-			if err := validateFlags(args, all, modified); err != nil {
+			if err := validateFlags(args, all, modified, outputDir); err != nil {
 				return err
 			}
 
@@ -135,6 +139,15 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
+			resultsDir := outputDir
+			if resultsDir == "" {
+				resultsDir = location
+			}
+
+			if err = writeResultsFile(resultsDir, results); err != nil {
+				return fmt.Errorf("writing results file: %w", err)
+			}
+
 			if results.Status == testorchestrator.RunStatusNoResources {
 				ui.Println("No resources to test")
 				return nil
@@ -155,12 +168,13 @@ func NewCmdTest() *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")
+	cmd.Flags().StringVar(&outputDir, "output-dir", "", "Directory to write test-results/results.json (default: project directory)")
 
 	return cmd
 }
 
 // validateFlags validates the command flags and arguments
-func validateFlags(args []string, all, modified bool) error {
+func validateFlags(args []string, all, modified bool, outputDir string) error {
 	// Count active modes
 	modes := 0
 	hasID := len(args) > 0
@@ -185,6 +199,37 @@ func validateFlags(args []string, all, modified bool) error {
 	// Only one ID allowed
 	if len(args) > 1 {
 		return fmt.Errorf("only one transformation/library ID allowed, got %d arguments", len(args))
+	}
+
+	if outputDir != "" {
+		info, err := os.Stat(outputDir)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("output-dir does not exist: %s", outputDir)
+		}
+		if err == nil && !info.IsDir() {
+			return fmt.Errorf("output-dir is not a directory: %s", outputDir)
+		}
+	}
+
+	return nil
+}
+
+func writeResultsFile(dir string, results *testorchestrator.TestResults) error {
+	resultsDir := filepath.Join(dir, "test-results")
+	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
+		return fmt.Errorf("creating test-results directory: %w", err)
+	}
+
+	f, err := os.Create(filepath.Join(resultsDir, "results.json"))
+	if err != nil {
+		return fmt.Errorf("creating results file: %w", err)
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(results); err != nil {
+		return fmt.Errorf("encoding results: %w", err)
 	}
 
 	return nil
