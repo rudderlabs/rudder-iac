@@ -60,9 +60,7 @@ public enum CustomTypeFeatureConfig {
         public var age: CustomTypeAge?
         /// Feature flag that can be boolean or string
         public let featureFlag: PropertyFeatureFlag = true
-        public init(
-            age: CustomTypeAge? = nil
-        ) {
+        public init(age: CustomTypeAge? = nil) {
             self.age = age
         }
 
@@ -81,9 +79,7 @@ public enum CustomTypeFeatureConfig {
         public let featureFlag: PropertyFeatureFlag = false
         /// User's first name
         public var firstName: PropertyFirstName?
-        public init(
-            firstName: PropertyFirstName? = nil
-        ) {
+        public init(firstName: PropertyFirstName? = nil) {
             self.firstName = firstName
         }
 
@@ -102,9 +98,7 @@ public enum CustomTypeFeatureConfig {
         public let featureFlag: PropertyFeatureFlag = "beta"
         /// User tags as array of strings
         public var tags: PropertyTags?
-        public init(
-            tags: PropertyTags? = nil
-        ) {
+        public init(tags: PropertyTags? = nil) {
             self.tags = tags
         }
 
@@ -162,9 +156,7 @@ public enum CustomTypePageContext {
         public let pageType: PropertyPageType = "search"
         /// Search query
         public var query: PropertyQuery
-        public init(
-            query: PropertyQuery
-        ) {
+        public init(query: PropertyQuery) {
             self.query = query
         }
 
@@ -183,9 +175,7 @@ public enum CustomTypePageContext {
         public let pageType: PropertyPageType = "product"
         /// Product identifier
         public var productId: PropertyProductId
-        public init(
-            productId: PropertyProductId
-        ) {
+        public init(productId: PropertyProductId) {
             self.productId = productId
         }
 
@@ -216,9 +206,7 @@ public enum CustomTypePageContext {
     public struct Default {
         /// Additional page data
         public var pageData: PropertyPageData?
-        public init(
-            pageData: PropertyPageData? = nil
-        ) {
+        public init(pageData: PropertyPageData? = nil) {
             self.pageData = pageData
         }
 
@@ -262,9 +250,7 @@ public enum CustomTypeUserAccess {
         public let active: CustomTypeActive = true
         /// User's email address
         public var email: CustomTypeEmail
-        public init(
-            email: CustomTypeEmail
-        ) {
+        public init(email: CustomTypeEmail) {
             self.email = email
         }
 
@@ -283,9 +269,7 @@ public enum CustomTypeUserAccess {
         public let active: CustomTypeActive = false
         /// User account status
         public var status: CustomTypeStatus
-        public init(
-            status: CustomTypeStatus
-        ) {
+        public init(status: CustomTypeStatus) {
             self.status = status
         }
 
@@ -346,7 +330,7 @@ public enum TrackEventWithVariantsProperties {
         public init(
             profile: CustomTypeUserProfile,
             pageContext: CustomTypePageContext? = nil,
-            tags: PropertyTags? = nil
+            tags: PropertyTags? = nil,
         ) {
             self.pageContext = pageContext
             self.profile = profile
@@ -380,7 +364,7 @@ public enum TrackEventWithVariantsProperties {
             firstName: PropertyFirstName,
             profile: CustomTypeUserProfile,
             lastName: PropertyLastName? = nil,
-            pageContext: CustomTypePageContext? = nil
+            pageContext: CustomTypePageContext? = nil,
         ) {
             self.firstName = firstName
             self.lastName = lastName
@@ -404,9 +388,7 @@ public enum TrackEventWithVariantsProperties {
     public struct Default {
         /// A field with no explicit type (treated as any)
         public var untypedField: Any?
-        public init(
-            untypedField: Any? = nil
-        ) {
+        public init(untypedField: Any? = nil) {
             self.untypedField = untypedField
         }
 
@@ -756,7 +738,7 @@ public struct CustomTypeAddressDetails {
     public init(
         city: PropertyCity,
         street: PropertyStreet,
-        postalCode: PropertyPostalCode? = nil
+        postalCode: PropertyPostalCode? = nil,
     ) {
         self.city = city
         self.postalCode = postalCode
@@ -784,7 +766,7 @@ public struct CustomTypeUserProfile {
     public init(
         email: CustomTypeEmail,
         firstName: PropertyFirstName,
-        lastName: PropertyLastName? = nil
+        lastName: PropertyLastName? = nil,
     ) {
         self.email = email
         self.firstName = firstName
@@ -809,7 +791,7 @@ public struct GroupTraits {
     public var status: CustomTypeStatus?
     public init(
         active: CustomTypeActive,
-        status: CustomTypeStatus? = nil
+        status: CustomTypeStatus? = nil,
     ) {
         self.active = active
         self.status = status
@@ -832,7 +814,7 @@ public struct IdentifyTraits {
     public var email: CustomTypeEmail
     public init(
         email: CustomTypeEmail,
-        active: CustomTypeActive? = nil
+        active: CustomTypeActive? = nil,
     ) {
         self.active = active
         self.email = email
@@ -851,9 +833,7 @@ public struct IdentifyTraits {
 public struct ScreenProperties {
     /// User profile data
     public var profile: CustomTypeUserProfile?
-    public init(
-        profile: CustomTypeUserProfile? = nil
-    ) {
+    public init(profile: CustomTypeUserProfile? = nil) {
         self.profile = profile
     }
 
@@ -868,9 +848,7 @@ public struct ScreenProperties {
 public struct TrackVariable$stringProperties {
     /// Field with $ for testing string interpolation: $variable and ${expression}
     public var dollarField: PropertyDollarField
-    public init(
-        dollarField: PropertyDollarField
-    ) {
+    public init(dollarField: PropertyDollarField) {
         self.dollarField = dollarField
     }
 
@@ -886,9 +864,7 @@ public struct TrackVariable$stringProperties {
 public struct TrackEventWithNameCamelCaseProperties {
     /// User's email address
     public var email: CustomTypeEmail?
-    public init(
-        email: CustomTypeEmail? = nil
-    ) {
+    public init(email: CustomTypeEmail? = nil) {
         self.email = email
     }
 
@@ -907,7 +883,7 @@ public struct TrackProductPremiumClickedProperties {
     public var statusCode: PropertyStatusCode?
     public init(
         specialField: PropertySpecialField,
-        statusCode: PropertyStatusCode? = nil
+        statusCode: PropertyStatusCode? = nil,
     ) {
         self.specialField = specialField
         self.statusCode = statusCode
@@ -1018,7 +994,7 @@ public struct TrackUserSignedUpProperties {
             public var profile: CustomTypeUserProfile?
             public init(
                 favoriteColors: PropertyFavoriteColors? = nil,
-                profile: CustomTypeUserProfile? = nil
+                profile: CustomTypeUserProfile? = nil,
             ) {
                 self.favoriteColors = favoriteColors
                 self.profile = profile
@@ -1033,7 +1009,7 @@ public struct TrackUserSignedUpProperties {
         }
         public init(
             ipAddress: PropertyIpAddress,
-            nestedContext: NestedContext
+            nestedContext: NestedContext,
         ) {
             self.ipAddress = ipAddress
             self.nestedContext = nestedContext
@@ -1086,7 +1062,7 @@ public struct TrackUserSignedUpProperties {
         untypedArray: PropertyUntypedArray? = nil,
         untypedField: Any? = nil,
         userAccess: CustomTypeUserAccess? = nil,
-        用户名: Property用户名? = nil
+        用户名: Property用户名? = nil,
     ) {
         self.active = active
         self.addresses = addresses
@@ -1179,9 +1155,7 @@ public struct TrackUserSignedUpProperties {
 public struct TrackEventWithNameCamelCaseProperties1 {
     /// User active status
     public var active: CustomTypeActive?
-    public init(
-        active: CustomTypeActive? = nil
-    ) {
+    public init(active: CustomTypeActive? = nil) {
         self.active = active
     }
 

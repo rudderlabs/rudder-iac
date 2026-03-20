@@ -26,34 +26,27 @@ public struct {{ .Name }} {
 
 {{- $hasRequired := false }}
 {{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
-{{- $hasNonConstant := false }}
-{{- range .Properties }}{{- if not .ConstantValue }}{{- $hasNonConstant = true }}{{- end }}{{- end }}
-{{- if $hasNonConstant }}
+{{- $initProps := filterNonConstant .Properties }}
+{{- if eq (len $initProps) 1 }}{{- with index $initProps 0 }}
+    public init({{ .Name }}: {{ .Type }}{{ if .Optional }}? = nil{{ end }}) {
+        self.{{ .Name }} = {{ .Name }}
+    }
+{{- end }}
+{{- else if $initProps }}
     public init(
-{{- $needComma := false }}
-{{- range .Properties }}
-{{- if not .ConstantValue }}
+{{- range $initProps }}
 {{- if not .Optional }}
-{{- if $needComma }},{{ end }}
-        {{ .Name }}: {{ .Type }}
-{{- $needComma = true }}
+        {{ .Name }}: {{ .Type }},
 {{- end }}
 {{- end }}
-{{- end }}
-{{- range .Properties }}
-{{- if not .ConstantValue }}
+{{- range $initProps }}
 {{- if .Optional }}
-{{- if $needComma }},{{ end }}
-        {{ .Name }}: {{ .Type }}? = nil
-{{- $needComma = true }}
-{{- end }}
+        {{ .Name }}: {{ .Type }}? = nil,
 {{- end }}
 {{- end }}
     ) {
-{{- range .Properties }}
-{{- if not .ConstantValue }}
+{{- range $initProps }}
         self.{{ .Name }} = {{ .Name }}
-{{- end }}
 {{- end }}
     }
 {{- else }}

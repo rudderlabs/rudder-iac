@@ -62,6 +62,17 @@ func GenerateFile(path string, ctx *SwiftContext) (*core.File, error) {
 		"mkSlice": func(args ...any) []any {
 			return args
 		},
+		// filterNonConstant returns only the properties that participate in init
+		// (i.e. those without a hardcoded ConstantValue).
+		"filterNonConstant": func(props []SwiftStructProperty) []SwiftStructProperty {
+			var result []SwiftStructProperty
+			for _, p := range props {
+				if p.ConstantValue == "" {
+					result = append(result, p)
+				}
+			}
+			return result
+		},
 	}
 
 	var err error
