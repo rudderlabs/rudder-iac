@@ -47,25 +47,23 @@ public typealias TrackEmptyEventWithAdditionalPropsProperties = [String: Any]
 /// Feature configuration with variants based on multi-type flag
 public enum CustomTypeFeatureConfig {
     /// Feature enabled (boolean true)
-    case caseTrue(CaseTrue)
+    case caseTrue(CaseEnabled)
     /// Feature disabled (boolean false)
-    case caseFalse(CaseFalse)
+    case caseFalse(CaseDisabled)
     /// Feature in beta (string 'beta')
     case caseBeta(CaseBeta)
     case other(Default)
 
     /// Feature enabled (boolean true)
-    public struct CaseTrue {
+    public struct CaseEnabled {
         /// User's age
         public var age: CustomTypeAge?
         /// Feature flag that can be boolean or string
-        public var featureFlag: PropertyFeatureFlag
+        public let featureFlag: PropertyFeatureFlag = true
         public init(
-            featureFlag: PropertyFeatureFlag,
             age: CustomTypeAge? = nil
         ) {
             self.age = age
-            self.featureFlag = featureFlag
         }
 
         public func toProperties() -> [String: Any] {
@@ -78,16 +76,14 @@ public enum CustomTypeFeatureConfig {
     }
 
     /// Feature disabled (boolean false)
-    public struct CaseFalse {
+    public struct CaseDisabled {
         /// Feature flag that can be boolean or string
-        public var featureFlag: PropertyFeatureFlag
+        public let featureFlag: PropertyFeatureFlag = false
         /// User's first name
         public var firstName: PropertyFirstName?
         public init(
-            featureFlag: PropertyFeatureFlag,
             firstName: PropertyFirstName? = nil
         ) {
-            self.featureFlag = featureFlag
             self.firstName = firstName
         }
 
@@ -103,14 +99,12 @@ public enum CustomTypeFeatureConfig {
     /// Feature in beta (string 'beta')
     public struct CaseBeta {
         /// Feature flag that can be boolean or string
-        public var featureFlag: PropertyFeatureFlag
+        public let featureFlag: PropertyFeatureFlag = "beta"
         /// User tags as array of strings
         public var tags: PropertyTags?
         public init(
-            featureFlag: PropertyFeatureFlag,
             tags: PropertyTags? = nil
         ) {
-            self.featureFlag = featureFlag
             self.tags = tags
         }
 
@@ -165,14 +159,12 @@ public enum CustomTypePageContext {
     /// Search page variant
     public struct CaseSearch {
         /// Type of page
-        public var pageType: PropertyPageType
+        public let pageType: PropertyPageType = "search"
         /// Search query
         public var query: PropertyQuery
         public init(
-            pageType: PropertyPageType,
             query: PropertyQuery
         ) {
-            self.pageType = pageType
             self.query = query
         }
 
@@ -188,14 +180,12 @@ public enum CustomTypePageContext {
     /// Product page variant
     public struct CaseProduct {
         /// Type of page
-        public var pageType: PropertyPageType
+        public let pageType: PropertyPageType = "product"
         /// Product identifier
         public var productId: PropertyProductId
         public init(
-            pageType: PropertyPageType,
             productId: PropertyProductId
         ) {
-            self.pageType = pageType
             self.productId = productId
         }
 
@@ -211,12 +201,8 @@ public enum CustomTypePageContext {
     /// Home page variant with no additional properties
     public struct CaseHome {
         /// Type of page
-        public var pageType: PropertyPageType
-        public init(
-            pageType: PropertyPageType
-        ) {
-            self.pageType = pageType
-        }
+        public let pageType: PropertyPageType = "home"
+        public init() {}
 
         public func toProperties() -> [String: Any] {
             var props: [String: Any] = [
@@ -265,22 +251,20 @@ public enum CustomTypePageContext {
 /// User access with variants based on active status
 public enum CustomTypeUserAccess {
     /// Active user access
-    case caseTrue(CaseTrue)
+    case caseTrue(CaseActive)
     /// Inactive user access
-    case caseFalse(CaseFalse)
+    case caseFalse(CaseInactive)
     case other(Default)
 
     /// Active user access
-    public struct CaseTrue {
+    public struct CaseActive {
         /// User active status
-        public var active: CustomTypeActive
+        public let active: CustomTypeActive = true
         /// User's email address
         public var email: CustomTypeEmail
         public init(
-            active: CustomTypeActive,
             email: CustomTypeEmail
         ) {
-            self.active = active
             self.email = email
         }
 
@@ -294,16 +278,14 @@ public enum CustomTypeUserAccess {
     }
 
     /// Inactive user access
-    public struct CaseFalse {
+    public struct CaseInactive {
         /// User active status
-        public var active: CustomTypeActive
+        public let active: CustomTypeActive = false
         /// User account status
         public var status: CustomTypeStatus
         public init(
-            active: CustomTypeActive,
             status: CustomTypeStatus
         ) {
-            self.active = active
             self.status = status
         }
 
@@ -354,7 +336,7 @@ public enum TrackEventWithVariantsProperties {
     /// Mobile device page view
     public struct CaseMobile {
         /// Type of device
-        public var deviceType: PropertyDeviceType
+        public let deviceType: PropertyDeviceType = "mobile"
         /// Page context information
         public var pageContext: CustomTypePageContext?
         /// User profile data
@@ -362,12 +344,10 @@ public enum TrackEventWithVariantsProperties {
         /// User tags as array of strings
         public var tags: PropertyTags?
         public init(
-            deviceType: PropertyDeviceType,
             profile: CustomTypeUserProfile,
             pageContext: CustomTypePageContext? = nil,
             tags: PropertyTags? = nil
         ) {
-            self.deviceType = deviceType
             self.pageContext = pageContext
             self.profile = profile
             self.tags = tags
@@ -387,7 +367,7 @@ public enum TrackEventWithVariantsProperties {
     /// Desktop page view
     public struct CaseDesktop {
         /// Type of device
-        public var deviceType: PropertyDeviceType
+        public let deviceType: PropertyDeviceType = "desktop"
         /// User's first name
         public var firstName: PropertyFirstName
         /// User's last name
@@ -397,13 +377,11 @@ public enum TrackEventWithVariantsProperties {
         /// User profile data
         public var profile: CustomTypeUserProfile
         public init(
-            deviceType: PropertyDeviceType,
             firstName: PropertyFirstName,
             profile: CustomTypeUserProfile,
             lastName: PropertyLastName? = nil,
             pageContext: CustomTypePageContext? = nil
         ) {
-            self.deviceType = deviceType
             self.firstName = firstName
             self.lastName = lastName
             self.pageContext = pageContext

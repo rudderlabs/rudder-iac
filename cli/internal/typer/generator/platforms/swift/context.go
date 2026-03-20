@@ -49,6 +49,10 @@ type SwiftStructProperty struct {
 	//   struct            → "address.toProperties()"
 	//   variant enum      → "pageType.toProperties()"
 	SerializeExpr string
+	// ConstantValue is set for discriminator fields in single-match variant cases.
+	// When non-empty the property renders as `public let name: Type = value` and
+	// is excluded from init — the value is fixed by the variant definition.
+	ConstantValue string
 }
 
 // SwiftStruct → public struct X { public var p: T; init(...); toProperties()/toTraits() }

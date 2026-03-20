@@ -542,17 +542,35 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 	var payloadStructs []SwiftStruct
 
 	for _, vc := range variant.Cases {
+		// All match values in a case share the same schema, so one struct covers them all.
+		// Use DisplayName for the struct; fall back to the first match value if unset.
+		structLabel := vc.DisplayName
+		if structLabel == "" {
+			structLabel = fmt.Sprintf("%v", vc.Match[0])
+		}
+		payloadName := FormatTypeName("Case " + structLabel)
+
+		merged := mergeSchemas(baseSchema, &vc.Schema)
+		s, err := createSwiftStruct(payloadName, vc.Description, "toProperties", merged, nr)
+		if err != nil {
+			return nil, err
+		}
+
+		// For single-match cases the discriminator value is fixed by definition,
+		// so embed it as a hardcoded constant — callers cannot supply the wrong value.
+		if len(vc.Match) == 1 {
+			for i := range s.Properties {
+				if s.Properties[i].SerialName == variant.Discriminator {
+					s.Properties[i].ConstantValue = FormatSwiftLiteral(vc.Match[0])
+					break
+				}
+			}
+		}
+		payloadStructs = append(payloadStructs, *s)
+
+		// One enum case per match value, all pointing to the shared struct.
 		for _, matchValue := range vc.Match {
 			caseName := formatPropertyName(fmt.Sprintf("case %v", matchValue))
-			payloadName := FormatTypeName(fmt.Sprintf("Case %v", matchValue))
-
-			merged := mergeSchemas(baseSchema, &vc.Schema)
-			s, err := createSwiftStruct(payloadName, vc.Description, "toProperties", merged, nr)
-			if err != nil {
-				return nil, err
-			}
-			payloadStructs = append(payloadStructs, *s)
-
 			cases = append(cases, SwiftVariantCase{
 				Name:               caseName,
 				Comment:            vc.Description,

@@ -14,7 +14,11 @@ public struct {{ .Name }} {
 {{- if .Comment }}
     /// {{ escapeComment .Comment }}
 {{- end }}
+{{- if .ConstantValue }}
+    public let {{ .Name }}: {{ .Type }} = {{ .ConstantValue }}
+{{- else }}
     public var {{ .Name }}: {{ .Type }}{{ if .Optional }}?{{ end }}
+{{- end }}
 {{- end }}
 {{- range .NestedStructs }}
 {{ include "structwithindent" (mkSlice 1 .) | indent 1 }}
@@ -22,26 +26,34 @@ public struct {{ .Name }} {
 
 {{- $hasRequired := false }}
 {{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
-{{- if .Properties }}
+{{- $hasNonConstant := false }}
+{{- range .Properties }}{{- if not .ConstantValue }}{{- $hasNonConstant = true }}{{- end }}{{- end }}
+{{- if $hasNonConstant }}
     public init(
 {{- $needComma := false }}
 {{- range .Properties }}
+{{- if not .ConstantValue }}
 {{- if not .Optional }}
 {{- if $needComma }},{{ end }}
         {{ .Name }}: {{ .Type }}
 {{- $needComma = true }}
 {{- end }}
 {{- end }}
+{{- end }}
 {{- range .Properties }}
+{{- if not .ConstantValue }}
 {{- if .Optional }}
 {{- if $needComma }},{{ end }}
         {{ .Name }}: {{ .Type }}? = nil
 {{- $needComma = true }}
 {{- end }}
 {{- end }}
+{{- end }}
     ) {
 {{- range .Properties }}
+{{- if not .ConstantValue }}
         self.{{ .Name }} = {{ .Name }}
+{{- end }}
 {{- end }}
     }
 {{- else }}
