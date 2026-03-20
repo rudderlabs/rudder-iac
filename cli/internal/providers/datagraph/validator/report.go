@@ -48,14 +48,14 @@ func (rv *ResourceValidation) HasWarnings() bool {
 	return false
 }
 
-// completionError returns a non-nil error if the validation has any issues or errors,
+// completionError returns a non-nil error if the validation has errors,
 // used to signal task failure in progress reporting.
 func (rv *ResourceValidation) completionError() error {
 	if rv.Err != nil {
 		return rv.Err
 	}
-	if len(rv.Issues) > 0 {
-		return fmt.Errorf("validation issues found")
+	if rv.HasErrors() {
+		return fmt.Errorf("validation errors found")
 	}
 	return nil
 }
