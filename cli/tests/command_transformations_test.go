@@ -12,6 +12,7 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -40,6 +41,17 @@ func TestTransformationsTestPass(t *testing.T) {
 		require.NoError(t, err, "test command failed: %s", string(output))
 
 		verifyTestResults(t, fixtureDir, filepath.Join(outputDir, "test-results.json"))
+	})
+
+	t.Run("failures detected alongside passing resources", func(t *testing.T) {
+		outputDir := t.TempDir()
+		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "failure")
+
+		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
+			"-l", fixtureDir, "--output-path", outputDir)
+		require.Error(t, err, "test command should fail: %s", string(output))
+
+		verifyFailureTestResults(t, fixtureDir, filepath.Join(outputDir, "test-results.json"))
 	})
 }
 
@@ -140,6 +152,54 @@ func loadFixtureSpecs(t *testing.T, fixtureDir string) map[string]fixtureSpec {
 		}
 	}
 	return specs
+}
+
+func verifyFailureTestResults(t *testing.T, fixtureDir, resultsFile string) {
+	t.Helper()
+
+	results := readResultsFile(t, resultsFile)
+	assert.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
+	assert.True(t, results.HasFailures())
+	assert.Len(t, results.Transformations, 5)
+	assert.Len(t, results.Libraries, 3)
+
+	// Group transformations by suite-level status
+	passNames := trNamesWithStatus(results, transformations.TestRunStatusPass)
+	failNames := trNamesWithStatus(results, transformations.TestRunStatusFail)
+	errorNames := trNamesWithStatus(results, transformations.TestRunStatusError)
+
+	assert.ElementsMatch(t, []string{"Simple Transform", "Py Transform", "Greeting Transform"}, passNames)
+	assert.ElementsMatch(t, []string{"Mismatch Transform"}, failNames)
+	assert.ElementsMatch(t, []string{"Error Transform"}, errorNames)
+
+	// Group libraries by pass/fail
+	passingLibs := libNamesWithPass(results, true)
+	failingLibs := libNamesWithPass(results, false)
+
+	assert.ElementsMatch(t, []string{"utilsLibrary", "errorLibrary"}, passingLibs)
+	assert.ElementsMatch(t, []string{"badPyLibrary"}, failingLibs)
+
+	for _, lib := range results.Libraries {
+		if !lib.Pass {
+			assert.NotEmpty(t, lib.Message, "failing library %s should have an error message", lib.HandleName)
+		}
+	}
+
+	verifyVersions(t, fixtureDir, results)
+}
+
+// trNamesWithStatus returns names of transformations whose TestSuiteResult.Status matches.
+func trNamesWithStatus(results *testorchestrator.TestResults, status transformations.TestRunStatus) []string {
+	return lo.FilterMap(results.Transformations, func(tr *testorchestrator.TransformationTestWithDefinitions, _ int) (string, bool) {
+		return tr.Result.Name, tr.Result.TestSuiteResult.Status == status
+	})
+}
+
+// libNamesWithPass returns handle names of libraries whose Pass field matches.
+func libNamesWithPass(results *testorchestrator.TestResults, pass bool) []string {
+	return lo.FilterMap(results.Libraries, func(lib transformations.LibraryTestResult, _ int) (string, bool) {
+		return lib.HandleName, lib.Pass == pass
+	})
 }
 
 func newTransformationStore(t *testing.T) transformations.TransformationStore {

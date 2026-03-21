@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: test_libraries
+spec:
+  id: bad_py_library
+  name: Bad Py Library
+  description: Python library with syntax error
+  language: python
+  import_name: badPyLibrary
+  code: |
+    def broken_function(
+      return "this has a syntax error"

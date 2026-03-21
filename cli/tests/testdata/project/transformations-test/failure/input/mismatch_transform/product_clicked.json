@@ -1,0 +1,65 @@
+{
+  "userId": "user_789",
+  "type": "track",
+  "event": "Product Clicked",
+  "context": {
+    "app": {
+      "name": "RudderLabs JavaScript SDK",
+      "namespace": "com.rudderlabs.javascript",
+      "version": "3.0.3"
+    },
+    "library": {
+      "name": "RudderLabs JavaScript SDK",
+      "version": "3.0.3"
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "os": {
+      "name": "",
+      "version": ""
+    },
+    "locale": "en-US",
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "density": 1.5,
+      "innerWidth": 800,
+      "innerHeight": 750
+    },
+    "campaign": {},
+    "page": {
+      "initial_referrer": "$direct",
+      "initial_referring_domain": "",
+      "path": "/products",
+      "referrer": "https://www.website.com/",
+      "referring_domain": "website.com",
+      "search": "",
+      "tab_url": "https://www.website.com/products",
+      "title": "Products",
+      "url": "https://www.website.com/products"
+    },
+    "timezone": "GMT-0400"
+  },
+  "properties": {
+    "product_id": "prod_123",
+    "sku": "SKU-9876",
+    "category": "Electronics",
+    "name": "Wireless Headphones",
+    "brand": "AudioTech",
+    "variant": "Black",
+    "price": 79.99,
+    "currency": "USD",
+    "quantity": 1,
+    "coupon": "",
+    "position": 3,
+    "url": "https://www.website.com/products/wireless-headphones",
+    "image_url": "https://www.website.com/images/wireless-headphones.jpg"
+  },
+  "channel": "web",
+  "originalTimestamp": "2024-10-16T16:21:18.821Z",
+  "integrations": {
+    "All": true
+  },
+  "messageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "anonymousId": "sample_anonymous_id",
+  "sentAt": "2024-10-16T16:21:18.822Z"
+}
