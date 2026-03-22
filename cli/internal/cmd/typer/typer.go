@@ -44,8 +44,9 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("tracking-plan-id is required")
 			}
 
-			if platform != "kotlin" {
-				return fmt.Errorf("unsupported platform: %s (supported platforms: kotlin)", platform)
+			validPlatforms := map[string]bool{"kotlin": true, "swift": true}
+			if !validPlatforms[platform] {
+				return fmt.Errorf("unsupported platform: %s (supported platforms: kotlin, swift)", platform)
 			}
 
 			defer func() {
@@ -91,7 +92,7 @@ func newCmdGenerate() *cobra.Command {
 	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from")
 	cmd.MarkFlagRequired("tracking-plan-id")
 
-	cmd.Flags().StringVar(&platform, "platform", "kotlin", "Platform to generate code for (kotlin)")
+	cmd.Flags().StringVar(&platform, "platform", "kotlin", "Platform to generate code for (kotlin, swift)")
 	cmd.MarkFlagRequired("platform")
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")

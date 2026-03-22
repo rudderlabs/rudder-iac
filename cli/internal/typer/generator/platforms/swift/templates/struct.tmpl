@@ -1,0 +1,75 @@
+{{- /*
+    "structwithindent" is a named template so it can be called recursively for nested structs.
+    It receives a slice: [indentLevel int, struct SwiftStruct].
+    The indent level is unused here — indentation is applied by the caller via the `indent` func.
+*/ -}}
+{{- define "structwithindent" -}}
+{{- $struct := (index . 1) -}}
+{{- with $struct -}}
+{{- if .Comment }}
+/// {{ escapeComment .Comment }}
+{{- end }}
+public struct {{ .Name }} {
+{{- range .Properties }}
+{{- if .Comment }}
+    /// {{ escapeComment .Comment }}
+{{- end }}
+{{- if .ConstantValue }}
+    public let {{ .Name }}: {{ .Type }} = {{ .ConstantValue }}
+{{- else }}
+    public var {{ .Name }}: {{ .Type }}{{ if .Optional }}?{{ end }}
+{{- end }}
+{{- end }}
+{{- range .NestedStructs }}
+{{ include "structwithindent" (mkSlice 1 .) | indent 1 }}
+{{- end }}
+
+{{- $hasRequired := false }}
+{{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
+{{- $initProps := filterNonConstant .Properties }}
+{{- if eq (len $initProps) 1 }}{{- with index $initProps 0 }}
+    public init({{ .Name }}: {{ .Type }}{{ if .Optional }}? = nil{{ end }}) {
+        self.{{ .Name }} = {{ .Name }}
+    }
+{{- end }}
+{{- else if $initProps }}
+    public init(
+{{ formatInitParams $initProps }}
+    ) {
+{{- range $initProps }}
+        self.{{ .Name }} = {{ .Name }}
+{{- end }}
+    }
+{{- else }}
+    public init() {}
+{{- end }}
+
+    public func {{ .SerializeMethod }}() -> [String: Any] {
+{{- if not .Properties }}
+        return [:]
+{{- else if $hasRequired }}
+        var props: [String: Any] = [
+{{- $needComma := false }}
+{{- range .Properties }}
+{{- if not .Optional }}
+{{- if $needComma }},{{ end }}
+            "{{ escapeString .SerialName }}": {{ .SerializeExpr }}
+{{- $needComma = true }}
+{{- end }}
+{{- end }}
+        ]
+{{- else }}
+        var props: [String: Any] = [:]
+{{- end }}
+{{- range .Properties }}
+{{- if .Optional }}
+        if let {{ .Name }} = {{ .Name }} { props["{{ escapeString .SerialName }}"] = {{ .SerializeExpr }} }
+{{- end }}
+{{- end }}
+{{- if .Properties }}
+        return props
+{{- end }}
+    }
+}
+{{- end }}
+{{- end }}
