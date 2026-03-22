@@ -3,6 +3,7 @@ package swift
 import (
 	"fmt"
 	"maps"
+	"math"
 	"sort"
 	"strings"
 
@@ -473,12 +474,21 @@ func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (
 		if err != nil {
 			return nil, err
 		}
-		// Non-string values in a String-typed enum must be coerced so the
-		// template emits valid string literals (e.g. true → "true", 1 → "1").
+		// Coerce values to match the chosen raw type so the template emits valid literals.
 		value := v
-		if rawType == "String" {
+		switch rawType {
+		case "String":
 			if _, ok := v.(string); !ok {
 				value = fmt.Sprintf("%v", v)
+			}
+		case "Int":
+			// YAML parses integer literals as float64; convert to int so the
+			// template emits `case n200 = 200` not `case n200 = 200.0`.
+			switch vt := v.(type) {
+			case float64:
+				value = int(vt)
+			case float32:
+				value = int(vt)
 			}
 		}
 		enumValues = append(enumValues, SwiftEnumValue{Name: caseName, Value: value})
@@ -493,8 +503,8 @@ func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (
 }
 
 // inferEnumRawType chooses the Swift enum raw type based on the value set:
-//   - all integers → Int
-//   - all numeric (int or float mix) → Double
+//   - all integers (or whole-number floats, as YAML parsers emit float64 for all numbers) → Int
+//   - all numeric (int or float mix with fractional values) → Double
 //   - everything else → String (non-string values are coerced by the caller)
 func inferEnumRawType(values []any) string {
 	if len(values) == 0 {
@@ -505,11 +515,19 @@ func inferEnumRawType(values []any) string {
 		allNumeric = true
 	)
 	for _, v := range values {
-		switch v.(type) {
+		switch vt := v.(type) {
 		case int, int32, int64:
 			// integer — keeps allInt true
-		case float32, float64:
-			allInt = false
+		case float32:
+			// YAML/JSON parsers emit float64 for all numbers; treat whole-number
+			// floats as integers so status codes like 200 map to Int, not Double.
+			if float64(vt) != math.Trunc(float64(vt)) {
+				allInt = false
+			}
+		case float64:
+			if vt != math.Trunc(vt) {
+				allInt = false
+			}
 		default:
 			allInt = false
 			allNumeric = false
