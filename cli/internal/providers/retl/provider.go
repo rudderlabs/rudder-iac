@@ -124,6 +124,12 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	}
 }
 
+func (p *Provider) SemanticRules() []rules.Rule {
+	return []rules.Rule{
+		sqlmodelRules.NewSQLModelSemanticValidRule(),
+	}
+}
+
 // Validate validates all loaded specs
 func (p *Provider) Validate(_ *resources.Graph) error {
 	for resourceType, handler := range p.handlers {
