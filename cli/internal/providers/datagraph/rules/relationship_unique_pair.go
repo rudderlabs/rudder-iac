@@ -46,7 +46,7 @@ var validateRelationshipUniquePair = func(_ string, _ string, _ map[string]any, 
 				if urn != relURN {
 					results = append(results, rules.ValidationResult{
 						Reference: fmt.Sprintf("/models/%d/relationships/%d", i, j),
-						Message:   fmt.Sprintf("a relationship from model %q to model %q already exists; at most one relationship is allowed per source-target pair", model.ID, relRes.TargetModelRef.URN),
+						Message:   fmt.Sprintf("a relationship from model %q to model %q already exists; at most one relationship is allowed per source-target pair", relRes.SourceModelRef.URN, relRes.TargetModelRef.URN),
 					})
 					break
 				}
