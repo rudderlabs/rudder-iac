@@ -817,6 +817,11 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 		if err != nil {
 			return "", "", err
 		}
+		// Array with multi-item-type enum: each element is a custom enum that AnyCodable cannot
+		// encode directly — unwrap to primitives via .value before storing in the properties dict.
+		if *plan.AsPrimitiveType(pt) == plan.PrimitiveTypeArray && len(prop.ItemTypes) > 1 {
+			return typeName, fieldName + ".map { $0.value }", nil
+		}
 		return typeName, fieldName, nil
 	}
 

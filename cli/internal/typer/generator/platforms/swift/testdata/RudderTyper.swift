@@ -1054,7 +1054,7 @@ public struct TrackUserSignedUpProperties {
         if let addresses = addresses { props["addresses"] = addresses }
         if let age = age { props["age"] = age }
         if let arrayOfAny = arrayOfAny { props["array_of_any"] = arrayOfAny }
-        if let arrayWithNullItems = arrayWithNullItems { props["array_with_null_items"] = arrayWithNullItems }
+        if let arrayWithNullItems = arrayWithNullItems { props["array_with_null_items"] = arrayWithNullItems.map { $0.value } }
         if let contacts = contacts { props["contacts"] = contacts }
         if let context = context { props["context"] = context.toProperties() }
         if let customNullField = customNullField { props["custom_null_field"] = customNullField }
@@ -1066,7 +1066,7 @@ public struct TrackUserSignedUpProperties {
         if let featureConfig = featureConfig { props["feature_config"] = featureConfig.toProperties() }
         if let mixedUnicode = mixedUnicode { props["mixed_unicode"] = mixedUnicode }
         if let mixedValue = mixedValue { props["mixed_value"] = mixedValue.rawValue }
-        if let multiTypeArray = multiTypeArray { props["multi_type_array"] = multiTypeArray }
+        if let multiTypeArray = multiTypeArray { props["multi_type_array"] = multiTypeArray.map { $0.value } }
         if let multiTypeField = multiTypeField { props["multi_type_field"] = multiTypeField.value }
         if let multiTypeWithNull = multiTypeWithNull { props["multi_type_with_null"] = multiTypeWithNull.value }
         if let nestedEmptyObject = nestedEmptyObject { props["nested_empty_object"] = nestedEmptyObject }
