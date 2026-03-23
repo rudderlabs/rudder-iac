@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
-	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	relationshipHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -17,10 +16,22 @@ type modelPair struct {
 }
 
 var validateRelationshipUniquePair = func(_ string, _ string, _ map[string]any, spec dgModel.DataGraphSpec, graph *resources.Graph) []rules.ValidationResult {
+	// Build set of relationship IDs from this spec so we can exclude them
+	// when seeding from the graph (the graph already contains them).
+	specRelIDs := make(map[string]bool)
+	for _, model := range spec.Models {
+		for _, rel := range model.Relationships {
+			specRelIDs[rel.ID] = true
+		}
+	}
+
 	seen := make(map[modelPair]bool)
 
-	// Collect existing (source, target) pairs from the resource graph.
+	// Seed with existing pairs from other specs in the graph.
 	for _, res := range graph.ResourcesByType(relationshipHandler.HandlerMetadata.ResourceType) {
+		if specRelIDs[res.ID()] {
+			continue
+		}
 		rel, ok := res.RawData().(*dgModel.RelationshipResource)
 		if !ok || rel.SourceModelRef == nil || rel.TargetModelRef == nil {
 			continue
@@ -31,20 +42,17 @@ var validateRelationshipUniquePair = func(_ string, _ string, _ map[string]any, 
 	var results []rules.ValidationResult
 
 	for i, model := range spec.Models {
-		sourceURN := resources.URN(model.ID, modelHandler.HandlerMetadata.ResourceType)
-
 		for j, rel := range model.Relationships {
-			targetID := parseTargetModelID(rel.Target)
-			if targetID == "" {
+			relRes := lookupRelationship(rel.ID, graph)
+			if relRes == nil || relRes.SourceModelRef == nil || relRes.TargetModelRef == nil {
 				continue
 			}
-			targetURN := resources.URN(targetID, modelHandler.HandlerMetadata.ResourceType)
 
-			p := modelPair{sourceURN, targetURN}
+			p := modelPair{relRes.SourceModelRef.URN, relRes.TargetModelRef.URN}
 			if seen[p] {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/models/%d/relationships/%d", i, j),
-					Message:   fmt.Sprintf("a relationship from model %q to model %q already exists; at most one relationship is allowed per source-target pair", model.ID, targetID),
+					Message:   fmt.Sprintf("a relationship from model %q to model %q already exists; at most one relationship is allowed per source-target pair", model.ID, relRes.TargetModelRef.URN),
 				})
 			} else {
 				seen[p] = true

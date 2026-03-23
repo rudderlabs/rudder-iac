@@ -48,6 +48,11 @@ func TestRelationshipUniquePair_NoRelationships(t *testing.T) {
 func TestRelationshipUniquePair_SingleRelationship(t *testing.T) {
 	t.Parallel()
 
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+	)
+
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
 		AccountID: "wh-123",
@@ -72,12 +77,27 @@ func TestRelationshipUniquePair_SingleRelationship(t *testing.T) {
 		},
 	}
 
-	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("user-account", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
+	))
+
+	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 	assert.Empty(t, results)
 }
 
 func TestRelationshipUniquePair_DuplicateInSameModel(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -111,7 +131,25 @@ func TestRelationshipUniquePair_DuplicateInSameModel(t *testing.T) {
 		},
 	}
 
-	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("user-account-v1", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account-v1",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
+	))
+	graph.AddResource(resources.NewResource("user-account-v2", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account-v2",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
+	))
+
+	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
 	require.Len(t, results, 1)
 	assert.Equal(t, "/models/0/relationships/1", results[0].Reference)
@@ -121,6 +159,12 @@ func TestRelationshipUniquePair_DuplicateInSameModel(t *testing.T) {
 
 func TestRelationshipUniquePair_DifferentTargets(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+		profileURN = resources.URN("profile", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -154,12 +198,35 @@ func TestRelationshipUniquePair_DifferentTargets(t *testing.T) {
 		},
 	}
 
-	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("user-account", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
+	))
+	graph.AddResource(resources.NewResource("user-profile", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-profile",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: profileURN},
+		}),
+	))
+
+	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 	assert.Empty(t, results)
 }
 
 func TestRelationshipUniquePair_ReversedPairAllowed(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -202,14 +269,38 @@ func TestRelationshipUniquePair_ReversedPairAllowed(t *testing.T) {
 		},
 	}
 
-	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("user-to-account", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-to-account",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
+	))
+	graph.AddResource(resources.NewResource("account-to-user", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "account-to-user",
+			SourceModelRef: &resources.PropertyRef{URN: accountURN},
+			TargetModelRef: &resources.PropertyRef{URN: userURN},
+		}),
+	))
+
+	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 	assert.Empty(t, results, "A->B and B->A are distinct pairs and should both be allowed")
 }
 
 func TestRelationshipUniquePair_ConflictWithExistingGraphRelationship(t *testing.T) {
 	t.Parallel()
 
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+	)
+
 	graph := resources.NewGraph()
+	// Existing relationship from another spec (not in specRelIDs)
 	graph.AddResource(resources.NewResource(
 		"existing-rel",
 		relationshipHandler.HandlerMetadata.ResourceType,
@@ -219,8 +310,24 @@ func TestRelationshipUniquePair_ConflictWithExistingGraphRelationship(t *testing
 			ID:             "existing-rel",
 			DisplayName:    "Existing Rel",
 			Cardinality:    "one-to-one",
-			SourceModelRef: &resources.PropertyRef{URN: resources.URN("user", modelHandler.HandlerMetadata.ResourceType)},
-			TargetModelRef: &resources.PropertyRef{URN: resources.URN("account", modelHandler.HandlerMetadata.ResourceType)},
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+			SourceJoinKey:  "account_id",
+			TargetJoinKey:  "id",
+		}),
+	))
+	// The spec's own relationship is also in the graph
+	graph.AddResource(resources.NewResource(
+		"user-account-new",
+		relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{},
+		nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account-new",
+			DisplayName:    "User Account New",
+			Cardinality:    "one-to-many",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
 			SourceJoinKey:  "account_id",
 			TargetJoinKey:  "id",
 		}),
@@ -260,6 +367,12 @@ func TestRelationshipUniquePair_ConflictWithExistingGraphRelationship(t *testing
 
 func TestRelationshipUniquePair_MultipleDuplicates(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+		profileURN = resources.URN("profile", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -309,7 +422,29 @@ func TestRelationshipUniquePair_MultipleDuplicates(t *testing.T) {
 		},
 	}
 
-	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
+	graph := resources.NewGraph()
+	for _, relID := range []string{"dup-account-1", "dup-account-2"} {
+		graph.AddResource(resources.NewResource(relID, relationshipHandler.HandlerMetadata.ResourceType,
+			resources.ResourceData{}, nil,
+			resources.WithRawData(&dgModel.RelationshipResource{
+				ID:             relID,
+				SourceModelRef: &resources.PropertyRef{URN: userURN},
+				TargetModelRef: &resources.PropertyRef{URN: accountURN},
+			}),
+		))
+	}
+	for _, relID := range []string{"dup-profile-1", "dup-profile-2"} {
+		graph.AddResource(resources.NewResource(relID, relationshipHandler.HandlerMetadata.ResourceType,
+			resources.ResourceData{}, nil,
+			resources.WithRawData(&dgModel.RelationshipResource{
+				ID:             relID,
+				SourceModelRef: &resources.PropertyRef{URN: userURN},
+				TargetModelRef: &resources.PropertyRef{URN: profileURN},
+			}),
+		))
+	}
+
+	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
 	require.Len(t, results, 2)
 	assert.Equal(t, "/models/0/relationships/1", results[0].Reference)
@@ -318,7 +453,7 @@ func TestRelationshipUniquePair_MultipleDuplicates(t *testing.T) {
 	assert.Contains(t, results[1].Message, "profile")
 }
 
-func TestRelationshipUniquePair_InvalidTargetRef(t *testing.T) {
+func TestRelationshipUniquePair_RelationshipNotInGraph(t *testing.T) {
 	t.Parallel()
 
 	spec := dgModel.DataGraphSpec{
@@ -346,5 +481,5 @@ func TestRelationshipUniquePair_InvalidTargetRef(t *testing.T) {
 	}
 
 	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, resources.NewGraph())
-	assert.Empty(t, results, "invalid target refs should be skipped (handled by refs-valid rule)")
+	assert.Empty(t, results, "relationships not in graph should be skipped")
 }
