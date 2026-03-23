@@ -572,6 +572,7 @@ func TestBatchPublish(t *testing.T) {
 							"versionId": "trans-ver-1",
 							"testSuite": [
 								{
+									"id": "test-1",
 									"name": "Test 1",
 									"input": [{"event": "test1"}]
 								}
@@ -581,6 +582,7 @@ func TestBatchPublish(t *testing.T) {
 							"versionId": "trans-ver-2",
 							"testSuite": [
 								{
+									"id": "test-2",
 									"name": "Test 2",
 									"input": [{"event": "test2"}]
 								}
@@ -619,6 +621,7 @@ func TestBatchPublish(t *testing.T) {
 				VersionID: "trans-ver-1",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:    "test-1",
 						Name:  "Test 1",
 						Input: []any{map[string]string{"event": "test1"}},
 					},
@@ -628,6 +631,7 @@ func TestBatchPublish(t *testing.T) {
 				VersionID: "trans-ver-2",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:    "test-2",
 						Name:  "Test 2",
 						Input: []any{map[string]string{"event": "test2"}},
 					},
@@ -663,6 +667,7 @@ func TestBatchTest(t *testing.T) {
 							"versionId": "trans-ver-123",
 							"testSuite": [
 								{
+									"id": "test-case-1",
 									"name": "Test Case 1",
 									"description": "Test description",
 									"input": [{"type": "track", "event": "Button Clicked"}],
@@ -717,6 +722,7 @@ func TestBatchTest(t *testing.T) {
 				VersionID: "trans-ver-123",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:             "test-case-1",
 						Name:           "Test Case 1",
 						Description:    "Test description",
 						Input:          []any{map[string]any{"type": "track", "event": "Button Clicked"}},
@@ -802,6 +808,7 @@ func TestBatchTestErrors(t *testing.T) {
 									"versionId": "trans-ver-123",
 									"testSuite": [
 										{
+											"id": "test-case-1",
 											"name": "Test Case 1",
 											"input": [{"event": "test"}],
 											"expectedOutput": [{"event": "test"}]
@@ -827,6 +834,7 @@ func TestBatchTestErrors(t *testing.T) {
 						VersionID: "trans-ver-123",
 						TestSuite: []transformations.TestDefinition{
 							{
+								ID:             "test-case-1",
 								Name:           "Test Case 1",
 								Input:          []any{map[string]any{"event": "test"}},
 								ExpectedOutput: []any{map[string]any{"event": "test"}},
