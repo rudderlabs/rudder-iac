@@ -398,6 +398,46 @@ func TestDataGraphSpecSyntaxValid_InvalidSpecs(t *testing.T) {
 			expectedMsgs:   []string{"'cardinality' must be one of [one-to-one one-to-many many-to-one]"},
 		},
 		{
+			name: "entity model with timestamp",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "user_id",
+						Timestamp:   "created_at",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/models/0/timestamp"},
+			expectedMsgs:   []string{"'timestamp' is not allowed on entity models"},
+		},
+		{
+			name: "event model with primary_id",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "purchase",
+						DisplayName: "Purchase",
+						Type:        "event",
+						Table:       "db.schema.purchases",
+						Timestamp:   "purchased_at",
+						PrimaryID:   "user_id",
+					},
+				},
+			},
+			expectedErrors: 1,
+			expectedRefs:   []string{"/models/0/primary_id"},
+			expectedMsgs:   []string{"'primary_id' is not allowed on event models"},
+		},
+		{
 			name: "errors across multiple models",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
