@@ -253,6 +253,49 @@ func TestCustomTypeForExport(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 
+	t.Run("converts additionalProperties config key to snake_case", func(t *testing.T) {
+		upstream := &catalog.CustomType{
+			Name:        "Strict Object",
+			Description: "Object with no additional properties allowed",
+			Type:        "object",
+			Config: map[string]any{
+				"additionalProperties": false,
+			},
+			Properties: []catalog.CustomTypeProperty{
+				{ID: "prop_name_123", Required: true},
+			},
+		}
+
+		mockRes := &mockResolver{
+			resolveFunc: func(entityType string, remoteID string) (string, error) {
+				if remoteID == "prop_name_123" {
+					return "#property:name", nil
+				}
+				return "", fmt.Errorf("unknown property: %s", remoteID)
+			},
+		}
+
+		ct := &ImportableCustomTypeV1{}
+		result, err := ct.ForExport("strict_object", upstream, mockRes)
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"id":          "strict_object",
+			"name":        "Strict Object",
+			"description": "Object with no additional properties allowed",
+			"type":        "object",
+			"config": map[string]any{
+				"additional_properties": false,
+			},
+			"properties": []any{
+				map[string]any{
+					"property": "#property:name",
+					"required": true,
+				},
+			},
+		}, result)
+	})
+
 	t.Run("errors when property resolver fails", func(t *testing.T) {
 		upstream := &catalog.CustomType{
 			Name: "Error CustomType",

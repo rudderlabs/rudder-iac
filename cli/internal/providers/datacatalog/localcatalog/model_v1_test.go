@@ -13,20 +13,22 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		t.Parallel()
 
 		config := map[string]interface{}{
-			"minLength":        5,
-			"maxLength":        50,
-			"multipleOf":       3,
-			"itemTypes":        []interface{}{"string", "integer"},
-			"enum":             []interface{}{"value1", "value2"},
-			"minimum":          0,
-			"maximum":          100,
-			"pattern":          "^[a-z]+$",
-			"exclusiveMinimum": 1,
-			"exclusiveMaximum": 99,
+			"additionalProperties": false,
+			"minLength":            5,
+			"maxLength":            50,
+			"multipleOf":           3,
+			"itemTypes":            []interface{}{"string", "integer"},
+			"enum":                 []interface{}{"value1", "value2"},
+			"minimum":              0,
+			"maximum":              100,
+			"pattern":              "^[a-z]+$",
+			"exclusiveMinimum":     1,
+			"exclusiveMaximum":     99,
 		}
 
 		result := ConvertConfigKeysToSnakeCase(config)
 
+		assert.Equal(t, false, result["additional_properties"])
 		assert.Equal(t, 5, result["min_length"])
 		assert.Equal(t, 50, result["max_length"])
 		assert.Equal(t, 3, result["multiple_of"])
@@ -39,6 +41,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		assert.Equal(t, 99, result["exclusive_maximum"])
 
 		// Verify camelCase keys don't exist
+		assert.NotContains(t, result, "additionalProperties")
 		assert.NotContains(t, result, "minLength")
 		assert.NotContains(t, result, "maxLength")
 		assert.NotContains(t, result, "multipleOf")
