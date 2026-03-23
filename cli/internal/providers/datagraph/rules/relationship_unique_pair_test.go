@@ -151,10 +151,13 @@ func TestRelationshipUniquePair_DuplicateInSameModel(t *testing.T) {
 
 	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
-	require.Len(t, results, 1)
-	assert.Equal(t, "/models/0/relationships/1", results[0].Reference)
+	require.Len(t, results, 2)
+	assert.Equal(t, "/models/0/relationships/0", results[0].Reference)
 	assert.Contains(t, results[0].Message, "user")
 	assert.Contains(t, results[0].Message, "account")
+	assert.Equal(t, "/models/0/relationships/1", results[1].Reference)
+	assert.Contains(t, results[1].Message, "user")
+	assert.Contains(t, results[1].Message, "account")
 }
 
 func TestRelationshipUniquePair_DifferentTargets(t *testing.T) {
@@ -300,7 +303,7 @@ func TestRelationshipUniquePair_ConflictWithExistingGraphRelationship(t *testing
 	)
 
 	graph := resources.NewGraph()
-	// Existing relationship from another spec (not in specRelIDs)
+	// Existing relationship from another spec (different URN than the spec's)
 	graph.AddResource(resources.NewResource(
 		"existing-rel",
 		relationshipHandler.HandlerMetadata.ResourceType,
@@ -446,11 +449,15 @@ func TestRelationshipUniquePair_MultipleDuplicates(t *testing.T) {
 
 	results := validateRelationshipUniquePair("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
-	require.Len(t, results, 2)
-	assert.Equal(t, "/models/0/relationships/1", results[0].Reference)
+	require.Len(t, results, 4)
+	assert.Equal(t, "/models/0/relationships/0", results[0].Reference)
 	assert.Contains(t, results[0].Message, "account")
-	assert.Equal(t, "/models/0/relationships/3", results[1].Reference)
-	assert.Contains(t, results[1].Message, "profile")
+	assert.Equal(t, "/models/0/relationships/1", results[1].Reference)
+	assert.Contains(t, results[1].Message, "account")
+	assert.Equal(t, "/models/0/relationships/2", results[2].Reference)
+	assert.Contains(t, results[2].Message, "profile")
+	assert.Equal(t, "/models/0/relationships/3", results[3].Reference)
+	assert.Contains(t, results[3].Message, "profile")
 }
 
 func TestRelationshipUniquePair_RelationshipNotInGraph(t *testing.T) {
