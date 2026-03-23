@@ -67,11 +67,23 @@ var validateDataGraphSpec = func(_ string, _ string, _ map[string]any, spec dgMo
 					Message:   "'primary_id' is required for entity models",
 				})
 			}
+			if model.Timestamp != "" {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/models/%d/timestamp", i),
+					Message:   "'timestamp' is not allowed on entity models",
+				})
+			}
 		case "event":
 			if model.Timestamp == "" {
 				results = append(results, rules.ValidationResult{
 					Reference: fmt.Sprintf("/models/%d/timestamp", i),
 					Message:   "'timestamp' is required for event models",
+				})
+			}
+			if model.PrimaryID != "" {
+				results = append(results, rules.ValidationResult{
+					Reference: fmt.Sprintf("/models/%d/primary_id", i),
+					Message:   "'primary_id' is not allowed on event models",
 				})
 			}
 		}

@@ -86,6 +86,50 @@ func TestCustomTypeForExport(t *testing.T) {
 		}, result)
 	})
 
+	t.Run("converts additionalProperties camelCase config key to snake_case", func(t *testing.T) {
+		upstream := &catalog.CustomType{
+			Name:        "Restricted Object",
+			Description: "Object with additional properties restriction",
+			Type:        "object",
+			Config: map[string]any{
+				"additionalProperties": false,
+			},
+			Properties: []catalog.CustomTypeProperty{
+				{ID: "prop_field_123", Required: true},
+			},
+		}
+
+		mockRes := &mockResolver{
+			resolveFunc: func(entityType string, remoteID string) (string, error) {
+				assert.Equal(t, types.PropertyResourceType, entityType)
+				if remoteID == "prop_field_123" {
+					return "#property:field", nil
+				}
+				return "", fmt.Errorf("unknown property: %s", remoteID)
+			},
+		}
+
+		ct := &ImportableCustomTypeV1{}
+		result, err := ct.ForExport("restricted_object", upstream, mockRes)
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"id":          "restricted_object",
+			"name":        "Restricted Object",
+			"description": "Object with additional properties restriction",
+			"type":        "object",
+			"config": map[string]any{
+				"additional_properties": false,
+			},
+			"properties": []any{
+				map[string]any{
+					"property": "#property:field",
+					"required": true,
+				},
+			},
+		}, result)
+	})
+
 	t.Run("resolves itemTypes custom type references in config", func(t *testing.T) {
 		customTypeID := "ct_product_123"
 		expectedRef := "#custom-type:Product"
