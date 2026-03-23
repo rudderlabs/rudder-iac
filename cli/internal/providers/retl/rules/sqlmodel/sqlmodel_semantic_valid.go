@@ -23,14 +23,18 @@ func validateDisplayNameUniqueness(spec sqlmodel.SQLModelSpec, graph *resources.
 	countMap := make(map[string]int)
 	for _, resource := range graph.ResourcesByType(sqlmodel.ResourceType) {
 		data := resource.Data()
-		displayName, _ := data[sqlmodel.DisplayNameKey].(string)
+		displayName := data[sqlmodel.DisplayNameKey].(string)
 		countMap[displayName]++
 	}
 
 	if countMap[spec.DisplayName] > 1 {
 		return []rules.ValidationResult{{
 			Reference: "/display_name",
-			Message:   fmt.Sprintf("duplicate display_name '%s' within kind '%s'", spec.DisplayName, sqlmodel.ResourceKind),
+			Message: fmt.Sprintf(
+				"duplicate display_name '%s' within kind '%s'",
+				spec.DisplayName,
+				sqlmodel.ResourceKind,
+			),
 		}}
 	}
 
