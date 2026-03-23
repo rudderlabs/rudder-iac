@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -67,4 +68,8 @@ func (p *EmptyProvider) SyntacticRules() []rules.Rule {
 
 func (p *EmptyProvider) SemanticRules() []rules.Rule {
 	return []rules.Rule{}
+}
+
+func (p *EmptyProvider) RuleDocEntries() []docs.RuleDocEntry {
+	return nil
 }

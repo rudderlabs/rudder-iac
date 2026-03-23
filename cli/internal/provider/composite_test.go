@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -354,6 +355,33 @@ func TestCompositeProvider_ResourceGraph(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompositeProvider_RuleDocEntries(t *testing.T) {
+	t.Run("aggregates entries from all child providers", func(t *testing.T) {
+		p1 := testutils.NewMockProvider([]string{"kindA"}, nil)
+		p1.RuleDocEntriesVal = []docs.RuleDocEntry{{RuleID: "rule-1"}}
+
+		p2 := testutils.NewMockProvider([]string{"kindB"}, nil)
+		p2.RuleDocEntriesVal = []docs.RuleDocEntry{{RuleID: "rule-2"}, {RuleID: "rule-3"}}
+
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
+		assert.NoError(t, err)
+
+		entries := cp.RuleDocEntries()
+		assert.Len(t, entries, 3)
+
+		ids := make([]string, len(entries))
+		for i, e := range entries {
+			ids[i] = e.RuleID
+		}
+		assert.Contains(t, ids, "rule-1")
+		assert.Contains(t, ids, "rule-2")
+		assert.Contains(t, ids, "rule-3")
+	})
 }
 
 func TestCompositeProvider_ResourceOperations(t *testing.T) {
