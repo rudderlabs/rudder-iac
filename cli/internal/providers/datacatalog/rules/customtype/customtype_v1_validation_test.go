@@ -148,6 +148,22 @@ func TestCustomTypeSpecSyntaxValidRule_V1InvalidSpecs(t *testing.T) {
 			expectedRefs: []string{"/types/0/variants"},
 			expectedMsgs: []string{"'variants' is not allowed unless 'type object'"},
 		},
+		{
+			name: "both item_type and item_types set(not allowed)",
+			spec: localcatalog.CustomTypeSpecV1{
+				Types: []localcatalog.CustomTypeV1{
+					{
+						LocalID: "ct1",
+						Name: "CT1",
+						Type: "array",
+						ItemType: "string",
+						ItemTypes: []string{"number"},
+					},
+				},
+			},
+			expectedRefs: []string{"/types/0/item_type", "/types/0/item_types"},
+			expectedMsgs: []string{"'item_type' and 'item_types' cannot be specified together", "'item_types' and 'item_type' cannot be specified together"},
+		},
 	}
 
 	for _, tt := range tests {

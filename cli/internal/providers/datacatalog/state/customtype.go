@@ -153,7 +153,7 @@ func (args *CustomTypeArgs) FromCatalogCustomType(from *localcatalog.CustomTypeV
 	case from.ItemType != "":
 		args.Config["item_types"] = []any{from.ItemType}
 		// override item_types with a PropertyRef if the item_type is a custom type reference
-		if strings.HasPrefix(from.ItemType, "#custom-type:") {
+		if strings.HasPrefix(from.ItemType, "#") {
 			customTypeURN := urnFromRef(from.ItemType)
 			if customTypeURN == "" {
 				return fmt.Errorf("unable to resolve ref to the custom type urn: %s", from.ItemType)

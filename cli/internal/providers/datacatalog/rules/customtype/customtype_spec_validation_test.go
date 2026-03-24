@@ -731,25 +731,4 @@ func TestValidateItemTypes(t *testing.T) {
 		assert.Equal(t, "/types/0/item_types", results[0].Reference)
 		assert.Contains(t, results[0].Message, "'item_types' is invalid: must be unique")
 	})
-
-	t.Run("invalid item_type and duplicate item_types emits both", func(t *testing.T) {
-		t.Parallel()
-
-		results := validateItemTypes([]localcatalog.CustomTypeV1{
-			{
-				LocalID:   "ct1",
-				Name:      "CT1",
-				Type:      "array",
-				ItemType:  "not_a_type",
-				ItemTypes: []string{"string", "string"},
-			},
-		})
-
-		require.Len(t, results, 2)
-		assert.ElementsMatch(
-			t,
-			[]string{"/types/0/item_type", "/types/0/item_types"},
-			[]string{results[0].Reference, results[1].Reference},
-		)
-	})
 }
