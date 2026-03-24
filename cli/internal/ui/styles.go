@@ -16,6 +16,12 @@ const (
 	ColorGrey   string = "#999999"
 )
 
+const (
+	SymbolPass    = "✓"
+	SymbolWarning = "⚠"
+	SymbolError   = "✕"
+)
+
 // Color returns the input string styled with the specified color,
 // supported by lipgloss. This can be either an ANSI color (https://en.wikipedia.org/wiki/ANSI_escape_code#Colors)
 // or an RGBA hex code.

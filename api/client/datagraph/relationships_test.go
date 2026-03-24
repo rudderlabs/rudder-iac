@@ -416,6 +416,108 @@ func TestSetRelationshipExternalID(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+// Validate Relationship Tests
+
+func TestValidateRelationship(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"accountId":"acc-123","cardinality":"one-to-many","sourceModel":{"tableRef":"catalog.schema.users","joinKey":"id"},"targetModel":{"tableRef":"catalog.schema.orders","joinKey":"user_id"}}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/relationships/validate", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"issues": [
+				{"rule": "relationship/join-keys-type-match", "severity": "error", "message": "Join key types do not match"}
+			]
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
+		AccountID:   "acc-123",
+		Cardinality: "one-to-many",
+		SourceModel: datagraph.ValidationModelRef{
+			TableRef: "catalog.schema.users",
+			JoinKey:  "id",
+		},
+		TargetModel: datagraph.ValidationModelRef{
+			TableRef: "catalog.schema.orders",
+			JoinKey:  "user_id",
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ValidationReport{
+		Issues: []datagraph.ValidationIssue{
+			{Rule: "relationship/join-keys-type-match", Severity: "error", Message: "Join key types do not match"},
+		},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestValidateRelationship_NoIssues(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/relationships/validate"
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"issues": []}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
+		AccountID:   "acc-123",
+		Cardinality: "one-to-many",
+		SourceModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.users", JoinKey: "id"},
+		TargetModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.orders", JoinKey: "user_id"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ValidationReport{
+		Issues: []datagraph.ValidationIssue{},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestValidateRelationship_EmptyAccountID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t)
+	store := newTestStore(t, httpClient)
+
+	_, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
+		AccountID:   "",
+		Cardinality: "one-to-many",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "account ID cannot be empty")
+}
+
+func TestValidateRelationship_APIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/relationships/validate"
+		},
+		ResponseStatus: 400,
+		ResponseBody:   `{"error":"Bad Request"}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	_, err := store.ValidateRelationship(context.Background(), &datagraph.ValidateRelationshipRequest{
+		AccountID:   "acc-123",
+		Cardinality: "one-to-many",
+		SourceModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.users", JoinKey: "id"},
+		TargetModel: datagraph.ValidationModelRef{TableRef: "catalog.schema.orders", JoinKey: "user_id"},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validating relationship")
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestRelationshipErrorHandling(t *testing.T) {
 	tests := []struct {
 		name      string

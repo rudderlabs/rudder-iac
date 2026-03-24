@@ -80,6 +80,7 @@ func (p *PropertyV1) FromV0(v0 Property) error {
 }
 
 var SupportedV0ConfigKeys = []string{
+	"additionalProperties",
 	"enum",
 	"exclusiveMaximum",
 	"exclusiveMinimum",
