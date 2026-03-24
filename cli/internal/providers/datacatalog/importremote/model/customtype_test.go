@@ -130,7 +130,7 @@ func TestCustomTypeForExport(t *testing.T) {
 		}, result)
 	})
 
-	t.Run("resolves itemTypes custom type references in config", func(t *testing.T) {
+	t.Run("resolves itemTypes custom type references in top-level item_type", func(t *testing.T) {
 		customTypeID := "ct_product_123"
 		expectedRef := "#custom-type:Product"
 
@@ -168,10 +168,10 @@ func TestCustomTypeForExport(t *testing.T) {
 			"name":        "Product List",
 			"description": "Array of products",
 			"type":        "array",
+			"item_type":   expectedRef,
 			"config": map[string]any{
-				"min_items":  float64(1),
-				"max_items":  float64(5),
-				"item_types": []any{expectedRef},
+				"min_items": float64(1),
+				"max_items": float64(5),
 			},
 		}, result)
 	})

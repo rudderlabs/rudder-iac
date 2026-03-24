@@ -243,7 +243,9 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 		// Add CustomTypeArgs
 		args := pstate.CustomTypeArgs{}
-		args.FromCatalogCustomType(&customType, getURNFromRef)
+		if err := args.FromCatalogCustomType(&customType, getURNFromRef); err != nil {
+			return nil, fmt.Errorf("creating custom type args from catalog custom type: %s, err:%w", customType.LocalID, err)
+		}
 		resource := resources.NewResource(
 			customType.LocalID,
 			types.CustomTypeResourceType,
