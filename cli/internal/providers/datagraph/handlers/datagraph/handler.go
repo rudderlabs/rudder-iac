@@ -63,7 +63,11 @@ func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
+		resp, err := h.client.ListDataGraphs(ctx, &dgClient.ListDataGraphsRequest{
+			Page:          page,
+			PageSize:      perPage,
+			HasExternalID: hasExternalID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("listing data graphs: %w", err)
 		}
@@ -154,7 +158,10 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.DataGraphResour
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.DataGraphResource, remoteID string) (*model.DataGraphState, error) {
 	// Set external ID on the remote resource and get the updated data graph
-	remote, err := h.client.SetExternalID(ctx, remoteID, data.ID)
+	remote, err := h.client.SetExternalID(ctx, &dgClient.SetExternalIDRequest{
+		ID:         remoteID,
+		ExternalID: data.ID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("setting external ID: %w", err)
 	}

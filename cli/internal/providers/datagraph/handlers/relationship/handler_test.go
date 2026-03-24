@@ -518,11 +518,11 @@ func TestCRUDOperations_Errors(t *testing.T) {
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-			require.NotNil(t, hasExternalID)
-			assert.True(t, *hasExternalID)
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			require.NotNil(t, req.HasExternalID)
+			assert.True(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -595,12 +595,12 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify only unmanaged data graphs are fetched
-			require.NotNil(t, hasExternalID)
-			assert.False(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -668,7 +668,7 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 			loadRemote: true,
 			setupMock: func() *testutils.MockDataGraphClient {
 				return &testutils.MockDataGraphClient{
-					ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+					ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 						return nil, fmt.Errorf("API error: failed to list data graphs")
 					},
 				}
@@ -680,8 +680,8 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 			loadRemote: true,
 			setupMock: func() *testutils.MockDataGraphClient {
 				return &testutils.MockDataGraphClient{
-					ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-						if page == 1 {
+					ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+						if req.Page == 1 {
 							return &dgClient.ListDataGraphsResponse{
 								Data:   []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}},
 								Paging: client.Paging{Next: ""},
@@ -701,7 +701,7 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 			loadRemote: false,
 			setupMock: func() *testutils.MockDataGraphClient {
 				return &testutils.MockDataGraphClient{
-					ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+					ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 						return nil, fmt.Errorf("API error: failed to list data graphs")
 					},
 				}
@@ -713,8 +713,8 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 			loadRemote: false,
 			setupMock: func() *testutils.MockDataGraphClient {
 				return &testutils.MockDataGraphClient{
-					ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-						if page == 1 {
+					ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+						if req.Page == 1 {
 							return &dgClient.ListDataGraphsResponse{
 								Data:   []dgClient.DataGraph{{ID: "dg-1", ExternalID: ""}},
 								Paging: client.Paging{Next: ""},
@@ -756,15 +756,15 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 
 func TestLoadRemoteResourcesWithPagination(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-			if page == 1 {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{ID: "dg-1", ExternalID: "my-dg-1"},
 					},
 					Paging: client.Paging{Next: "page2"},
 				}, nil
-			} else if page == 2 {
+			} else if req.Page == 2 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{ID: "dg-2", ExternalID: "my-dg-2"},

@@ -501,11 +501,11 @@ func TestDelete(t *testing.T) {
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-			require.NotNil(t, hasExternalID)
-			assert.True(t, *hasExternalID)
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			require.NotNil(t, req.HasExternalID)
+			assert.True(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -574,12 +574,12 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify only unmanaged data graphs are fetched
-			require.NotNil(t, hasExternalID)
-			assert.False(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
