@@ -9,52 +9,9 @@ import (
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestValidateResource(t *testing.T) {
-	mockClient := &testutils.MockDataGraphClient{}
-	h := &HandlerImpl{client: mockClient}
-	graph := resources.NewGraph()
-
-	tests := []struct {
-		name     string
-		resource *model.DataGraphResource
-		wantErr  bool
-		errMsg   string
-	}{
-		{
-			name: "valid resource",
-			resource: &model.DataGraphResource{
-				ID:        "test-dg",
-				AccountID: "account-123",
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing account_id",
-			resource: &model.DataGraphResource{
-				ID: "test-dg",
-			},
-			wantErr: true,
-			errMsg:  "account_id is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := h.ValidateResource(tt.resource, graph)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{

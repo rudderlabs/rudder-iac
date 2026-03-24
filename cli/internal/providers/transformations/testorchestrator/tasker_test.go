@@ -8,17 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	tc "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testutil"
 )
 
 // --- resolveTransformationVersion ---
 
 func TestResolveTransformationVersion(t *testing.T) {
 	t.Run("modified transformation without remoteID is created and versionID returned", func(t *testing.T) {
-		store := &stubStore{
-			createTransformation: func(_ context.Context, req *transformations.CreateTransformationRequest, _ bool) (*transformations.Transformation, error) {
-				return &transformations.Transformation{VersionID: "staged-ver"}, nil
+		store := &testutil.MockTransformationStore{
+			CreateTransformationFunc: func(_ context.Context, req *tc.CreateTransformationRequest, _ bool) (*tc.Transformation, error) {
+				return &tc.Transformation{VersionID: "staged-ver"}, nil
 			},
 		}
 		trans := &model.TransformationResource{ID: "t1", Name: "T1", Code: "code"}
@@ -30,10 +31,10 @@ func TestResolveTransformationVersion(t *testing.T) {
 	})
 
 	t.Run("transformation with remoteID is updated and versionID returned", func(t *testing.T) {
-		store := &stubStore{
-			updateTransformation: func(_ context.Context, id string, _ *transformations.UpdateTransformationRequest, _ bool) (*transformations.Transformation, error) {
+		store := &testutil.MockTransformationStore{
+			UpdateTransformationFunc: func(_ context.Context, id string, _ *tc.UpdateTransformationRequest, _ bool) (*tc.Transformation, error) {
 				assert.Equal(t, "remote-id", id)
-				return &transformations.Transformation{VersionID: "updated-ver"}, nil
+				return &tc.Transformation{VersionID: "updated-ver"}, nil
 			},
 		}
 		trans := &model.TransformationResource{ID: "t1"}
@@ -45,7 +46,7 @@ func TestResolveTransformationVersion(t *testing.T) {
 	})
 
 	t.Run("unmodified transformation with no remoteID returns error", func(t *testing.T) {
-		store := &stubStore{}
+		store := &testutil.MockTransformationStore{}
 		trans := &model.TransformationResource{ID: "t1"}
 
 		_, err := getTransformationVersionID(context.Background(), store, trans, false, "")
@@ -55,8 +56,8 @@ func TestResolveTransformationVersion(t *testing.T) {
 	})
 
 	t.Run("staging error is propagated", func(t *testing.T) {
-		store := &stubStore{
-			createTransformation: func(_ context.Context, _ *transformations.CreateTransformationRequest, _ bool) (*transformations.Transformation, error) {
+		store := &testutil.MockTransformationStore{
+			CreateTransformationFunc: func(_ context.Context, _ *tc.CreateTransformationRequest, _ bool) (*tc.Transformation, error) {
 				return nil, fmt.Errorf("stage failed")
 			},
 		}
@@ -73,9 +74,9 @@ func TestResolveTransformationVersion(t *testing.T) {
 
 func TestResolveLibraryVersion(t *testing.T) {
 	t.Run("modified library without remoteID is created and versionID returned", func(t *testing.T) {
-		store := &stubStore{
-			createLibrary: func(_ context.Context, req *transformations.CreateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
-				return &transformations.TransformationLibrary{VersionID: "lib-staged-ver"}, nil
+		store := &testutil.MockTransformationStore{
+			CreateLibraryFunc: func(_ context.Context, req *tc.CreateLibraryRequest, _ bool) (*tc.TransformationLibrary, error) {
+				return &tc.TransformationLibrary{VersionID: "lib-staged-ver"}, nil
 			},
 		}
 		lib := &model.LibraryResource{ID: "lib-1", Name: "L1", Code: "code"}
@@ -87,10 +88,10 @@ func TestResolveLibraryVersion(t *testing.T) {
 	})
 
 	t.Run("library with remoteID is updated and versionID returned", func(t *testing.T) {
-		store := &stubStore{
-			updateLibrary: func(_ context.Context, id string, _ *transformations.UpdateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
+		store := &testutil.MockTransformationStore{
+			UpdateLibraryFunc: func(_ context.Context, id string, _ *tc.UpdateLibraryRequest, _ bool) (*tc.TransformationLibrary, error) {
 				assert.Equal(t, "remote-lib-id", id)
-				return &transformations.TransformationLibrary{VersionID: "lib-updated-ver"}, nil
+				return &tc.TransformationLibrary{VersionID: "lib-updated-ver"}, nil
 			},
 		}
 		lib := &model.LibraryResource{ID: "lib-1"}
@@ -102,7 +103,7 @@ func TestResolveLibraryVersion(t *testing.T) {
 	})
 
 	t.Run("unmodified library with no remoteID returns error", func(t *testing.T) {
-		store := &stubStore{}
+		store := &testutil.MockTransformationStore{}
 		lib := &model.LibraryResource{ID: "lib-1"}
 
 		_, err := getLibraryVersionID(context.Background(), store, lib, false, "")
@@ -112,8 +113,8 @@ func TestResolveLibraryVersion(t *testing.T) {
 	})
 
 	t.Run("staging error is propagated", func(t *testing.T) {
-		store := &stubStore{
-			createLibrary: func(_ context.Context, _ *transformations.CreateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
+		store := &testutil.MockTransformationStore{
+			CreateLibraryFunc: func(_ context.Context, _ *tc.CreateLibraryRequest, _ bool) (*tc.TransformationLibrary, error) {
 				return nil, fmt.Errorf("lib stage failed")
 			},
 		}
@@ -130,9 +131,9 @@ func TestResolveLibraryVersion(t *testing.T) {
 
 func TestRunTransformationVersionTasks(t *testing.T) {
 	t.Run("returns versionID map for each task", func(t *testing.T) {
-		store := &stubStore{
-			createTransformation: func(_ context.Context, req *transformations.CreateTransformationRequest, _ bool) (*transformations.Transformation, error) {
-				return &transformations.Transformation{VersionID: "ver-" + req.ExternalID}, nil
+		store := &testutil.MockTransformationStore{
+			CreateTransformationFunc: func(_ context.Context, req *tc.CreateTransformationRequest, _ bool) (*tc.Transformation, error) {
+				return &tc.Transformation{VersionID: "ver-" + req.ExternalID}, nil
 			},
 		}
 
@@ -149,15 +150,15 @@ func TestRunTransformationVersionTasks(t *testing.T) {
 	})
 
 	t.Run("empty task list returns empty map", func(t *testing.T) {
-		result, err := runTransformationVersionTasks(context.Background(), &stubStore{}, nil)
+		result, err := runTransformationVersionTasks(context.Background(), &testutil.MockTransformationStore{}, nil)
 
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
 	t.Run("task failure returns error", func(t *testing.T) {
-		store := &stubStore{
-			createTransformation: func(_ context.Context, _ *transformations.CreateTransformationRequest, _ bool) (*transformations.Transformation, error) {
+		store := &testutil.MockTransformationStore{
+			CreateTransformationFunc: func(_ context.Context, _ *tc.CreateTransformationRequest, _ bool) (*tc.Transformation, error) {
 				return nil, fmt.Errorf("API failure")
 			},
 		}
@@ -176,9 +177,9 @@ func TestRunTransformationVersionTasks(t *testing.T) {
 
 func TestRunLibraryVersionTasks(t *testing.T) {
 	t.Run("returns versionID map for each task", func(t *testing.T) {
-		store := &stubStore{
-			createLibrary: func(_ context.Context, req *transformations.CreateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
-				return &transformations.TransformationLibrary{VersionID: "lib-ver-" + req.ExternalID}, nil
+		store := &testutil.MockTransformationStore{
+			CreateLibraryFunc: func(_ context.Context, req *tc.CreateLibraryRequest, _ bool) (*tc.TransformationLibrary, error) {
+				return &tc.TransformationLibrary{VersionID: "lib-ver-" + req.ExternalID}, nil
 			},
 		}
 
@@ -195,15 +196,15 @@ func TestRunLibraryVersionTasks(t *testing.T) {
 	})
 
 	t.Run("empty task list returns empty map", func(t *testing.T) {
-		result, err := runLibraryVersionTasks(context.Background(), &stubStore{}, nil)
+		result, err := runLibraryVersionTasks(context.Background(), &testutil.MockTransformationStore{}, nil)
 
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
 	t.Run("task failure returns error", func(t *testing.T) {
-		store := &stubStore{
-			createLibrary: func(_ context.Context, _ *transformations.CreateLibraryRequest, _ bool) (*transformations.TransformationLibrary, error) {
+		store := &testutil.MockTransformationStore{
+			CreateLibraryFunc: func(_ context.Context, _ *tc.CreateLibraryRequest, _ bool) (*tc.TransformationLibrary, error) {
 				return nil, fmt.Errorf("API failure")
 			},
 		}

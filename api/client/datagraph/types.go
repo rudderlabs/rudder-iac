@@ -196,3 +196,41 @@ type ListRelationshipsResponse struct {
 	Data   []Relationship `json:"data"`
 	Paging client.Paging  `json:"paging"`
 }
+
+// ValidateModelRequest is the request body for validating a model against the warehouse
+type ValidateModelRequest struct {
+	AccountID string `json:"accountId"` // Account ID from the data graph spec
+
+	Type      string `json:"type"`               // "entity" or "event" - REQUIRED
+	TableRef  string `json:"tableRef"`           // REQUIRED - 3-part catalog.schema.table
+	PrimaryID string `json:"primaryId,omitempty"` // Required for entity models
+	Root      bool   `json:"root,omitempty"`      // Optional, entity models only
+	Timestamp string `json:"timestamp,omitempty"` // Required for event models
+}
+
+// ValidateRelationshipRequest is the request body for validating a relationship against the warehouse
+type ValidateRelationshipRequest struct {
+	AccountID string `json:"accountId"` // Account ID from the data graph spec
+
+	Cardinality string               `json:"cardinality"` // REQUIRED
+	SourceModel ValidationModelRef   `json:"sourceModel"` // REQUIRED
+	TargetModel ValidationModelRef   `json:"targetModel"` // REQUIRED
+}
+
+// ValidationModelRef is a reference to a model used in relationship validation
+type ValidationModelRef struct {
+	TableRef string `json:"tableRef"` // 3-part catalog.schema.table
+	JoinKey  string `json:"joinKey"`
+}
+
+// ValidationIssue represents a single validation issue found during validation
+type ValidationIssue struct {
+	Rule     string `json:"rule"`
+	Severity string `json:"severity"` // "error" or "warning"
+	Message  string `json:"message"`
+}
+
+// ValidationReport is the response from a validation endpoint
+type ValidationReport struct {
+	Issues []ValidationIssue `json:"issues"`
+}
