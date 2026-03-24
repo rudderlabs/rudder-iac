@@ -11,6 +11,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
+ 
+const noResourcesFoundMsg = "No resources found"
 
 type model struct {
 	table     table.Model
@@ -79,7 +81,7 @@ func (m model) View() string {
 		selected := m.resources[m.table.Cursor()]
 		detailsView = ui.FormattedMap(selected)
 	} else {
-		detailsView = "No resources found."
+		detailsView = noResourcesFoundMsg
 	}
 
 	// Details View with Header
@@ -105,6 +107,11 @@ func (m model) View() string {
 }
 
 func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
+	if len(rs) == 0 {
+		ui.Println(noResourcesFoundMsg)
+		return nil
+	}
+
 	// Default column widths
 	idWidth := 27
 	nameWidth := 30
