@@ -64,6 +64,12 @@ spec:
       description: A test event
 `
 
+// engineTestSupportedPatterns matches kinds/versions used in engine_test raw specs (rudder/v0.1).
+var engineTestSupportedPatterns = []rules.MatchPattern{
+	rules.MatchKindVersion("properties", "rudder/v0.1"),
+	rules.MatchKindVersion("events", "rudder/v0.1"),
+}
+
 func TestValidationEngine_ValidateSyntax(t *testing.T) {
 	t.Parallel()
 
@@ -124,8 +130,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(passingRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(passingRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -159,8 +165,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(rule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(rule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -205,9 +211,9 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(propsRule)
-			registry.RegisterSyntactic(eventsRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(propsRule))
+			require.NoError(t, registry.RegisterSyntactic(eventsRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -255,8 +261,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(rule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(rule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -291,8 +297,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(rule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(rule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -326,8 +332,8 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSyntactic(rule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSyntactic(rule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -386,8 +392,8 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSemantic(passingRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSemantic(passingRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -417,8 +423,8 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSemantic(failingRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSemantic(failingRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -455,8 +461,8 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSemantic(graphCheckRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSemantic(graphCheckRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -499,9 +505,9 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry(nil)
-			registry.RegisterSemantic(propsRule)
-			registry.RegisterSemantic(eventsRule)
+			registry := rules.NewRegistry(engineTestSupportedPatterns)
+			require.NoError(t, registry.RegisterSemantic(propsRule))
+			require.NoError(t, registry.RegisterSemantic(eventsRule))
 
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
@@ -562,7 +568,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		}
 
 		registry := rules.NewRegistry(nil)
-		registry.RegisterSyntactic(pr)
+		require.NoError(t, registry.RegisterSyntactic(pr))
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)
@@ -612,9 +618,9 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		registry := rules.NewRegistry(nil)
-		registry.RegisterSyntactic(failingPerSpec)
-		registry.RegisterSyntactic(pr)
+		registry := rules.NewRegistry(engineTestSupportedPatterns)
+		require.NoError(t, registry.RegisterSyntactic(failingPerSpec))
+		require.NoError(t, registry.RegisterSyntactic(pr))
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)
@@ -650,8 +656,8 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		registry := rules.NewRegistry(nil)
-		registry.RegisterSyntactic(pr)
+		registry := rules.NewRegistry(engineTestSupportedPatterns)
+		require.NoError(t, registry.RegisterSyntactic(pr))
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)
@@ -688,7 +694,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		}
 
 		registry := rules.NewRegistry(nil)
-		registry.RegisterSyntactic(pr)
+		require.NoError(t, registry.RegisterSyntactic(pr))
 
 		engine, err := NewValidationEngine(registry, nil)
 		require.NoError(t, err)

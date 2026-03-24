@@ -2,7 +2,7 @@ package rules
 
 // ProjectRule is an optional interface for project-wide validation.
 // Rules implementing both Rule and ProjectRule are:
-//   - Registered via RegisterSyntactic() like any rule
+//   - Registered via RegisterSyntactic(), which returns an error if AppliesTo() fails registry validation
 //   - Skipped during per-spec validation (engine detects via type assertion)
 //   - Called with ALL parsed specs after per-spec rules pass
 //
