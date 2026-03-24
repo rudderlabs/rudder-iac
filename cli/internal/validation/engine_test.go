@@ -73,7 +73,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 		t.Run("empty specs map returns empty diagnostics", func(t *testing.T) {
 			t.Parallel()
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
 
@@ -98,7 +98,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 			}
 
 			// Registry with no rules for "properties" kind
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
 
@@ -124,7 +124,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(passingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -159,7 +159,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -205,7 +205,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(propsRule)
 			registry.RegisterSyntactic(eventsRule)
 
@@ -255,7 +255,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -291,7 +291,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -326,7 +326,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSyntactic(rule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -355,7 +355,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 		t.Run("empty specs map returns empty diagnostics", func(t *testing.T) {
 			t.Parallel()
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			engine, err := NewValidationEngine(registry, nil)
 			require.NoError(t, err)
 
@@ -386,7 +386,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSemantic(passingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -417,7 +417,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSemantic(failingRule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -455,7 +455,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSemantic(graphCheckRule)
 
 			engine, err := NewValidationEngine(registry, nil)
@@ -499,7 +499,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 				},
 			}
 
-			registry := rules.NewRegistry()
+			registry := rules.NewRegistry(nil)
 			registry.RegisterSemantic(propsRule)
 			registry.RegisterSemantic(eventsRule)
 
@@ -561,7 +561,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		registry := rules.NewRegistry()
+		registry := rules.NewRegistry(nil)
 		registry.RegisterSyntactic(pr)
 
 		engine, err := NewValidationEngine(registry, nil)
@@ -612,7 +612,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		registry := rules.NewRegistry()
+		registry := rules.NewRegistry(nil)
 		registry.RegisterSyntactic(failingPerSpec)
 		registry.RegisterSyntactic(pr)
 
@@ -625,6 +625,42 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		assert.False(t, projectRuleCalled)
 		require.Len(t, diagnostics, 1)
 		assert.Equal(t, "syntax error", diagnostics[0].Message)
+	})
+
+	t.Run("project rule with exact patterns is discovered via AllSyntacticRules", func(t *testing.T) {
+		t.Parallel()
+
+		rawSpecs := map[string]*specs.RawSpec{
+			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
+		}
+
+		pr := &mockProjectRule{
+			mockRule: mockRule{
+				id:       "exact-pattern-project-rule",
+				severity: rules.Error,
+				// Exact pattern, NOT MatchAll — old SyntacticRulesFor("","") would miss this
+				appliesTo: []rules.MatchPattern{rules.MatchKindVersion("properties", "rudder/v0.1")},
+			},
+			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				return map[string][]rules.ValidationResult{
+					"/path/to/test.yaml": {
+						{Reference: "/spec/group", Message: "exact-pattern project error"},
+					},
+				}
+			},
+		}
+
+		registry := rules.NewRegistry(nil)
+		registry.RegisterSyntactic(pr)
+
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSyntax(context.Background(), rawSpecs)
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, "exact-pattern-project-rule", diagnostics[0].RuleID)
+		assert.Equal(t, "exact-pattern project error", diagnostics[0].Message)
 	})
 
 	t.Run("project rule receives all specs", func(t *testing.T) {
@@ -651,7 +687,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		registry := rules.NewRegistry()
+		registry := rules.NewRegistry(nil)
 		registry.RegisterSyntactic(pr)
 
 		engine, err := NewValidationEngine(registry, nil)

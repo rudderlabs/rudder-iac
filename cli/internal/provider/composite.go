@@ -55,6 +55,15 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 	}, nil
 }
 
+// SupportedMatchPatterns aggregates match patterns from all providers.
+func (p *CompositeProvider) SupportedMatchPatterns() []rules.MatchPattern {
+	var all []rules.MatchPattern
+	for _, provider := range p.Providers {
+		all = append(all, provider.SupportedMatchPatterns()...)
+	}
+	return all
+}
+
 func (p *CompositeProvider) SupportedKinds() []string {
 	return maps.Keys(p.registeredKinds)
 }

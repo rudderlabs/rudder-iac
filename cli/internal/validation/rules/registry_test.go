@@ -25,7 +25,7 @@ func (m *mockRule) Validate(ctx *ValidationContext) []ValidationResult {
 
 func TestRegistry_SyntacticRulesFor(t *testing.T) {
 	t.Run("kind-specific rule matches", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		rule := &mockRule{
 			id:        "prop-rule",
@@ -39,7 +39,7 @@ func TestRegistry_SyntacticRulesFor(t *testing.T) {
 	})
 
 	t.Run("wildcard kind rule matches any kind", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		rule := &mockRule{
 			id:        "wildcard-rule",
@@ -55,7 +55,7 @@ func TestRegistry_SyntacticRulesFor(t *testing.T) {
 	})
 
 	t.Run("kind-specific plus wildcard rules combined", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "prop-rule",
@@ -73,7 +73,7 @@ func TestRegistry_SyntacticRulesFor(t *testing.T) {
 	})
 
 	t.Run("unknown kind only gets wildcard", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "prop-rule",
@@ -90,7 +90,7 @@ func TestRegistry_SyntacticRulesFor(t *testing.T) {
 	})
 
 	t.Run("no matching rules returns empty", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "prop-rule",
@@ -103,7 +103,7 @@ func TestRegistry_SyntacticRulesFor(t *testing.T) {
 }
 
 func TestRegistry_SemanticRulesFor(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewRegistry(nil)
 
 	registry.RegisterSemantic(&mockRule{
 		id:        "ref-rule",
@@ -137,7 +137,7 @@ func TestRegistry_SemanticRulesFor(t *testing.T) {
 
 func TestRegistry_VersionFiltering(t *testing.T) {
 	t.Run("version-specific rule only matches that version", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "v1-only",
@@ -152,7 +152,7 @@ func TestRegistry_VersionFiltering(t *testing.T) {
 	})
 
 	t.Run("wildcard version matches any version", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "all-versions",
@@ -167,7 +167,7 @@ func TestRegistry_VersionFiltering(t *testing.T) {
 	})
 
 	t.Run("mixed patterns with selective version matching", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		// Rule applies to all kinds for v1, but only foo-a for v2
 		registry.RegisterSyntactic(&mockRule{
@@ -192,7 +192,7 @@ func TestRegistry_VersionFiltering(t *testing.T) {
 	})
 
 	t.Run("multiple rules with same ID different patterns", func(t *testing.T) {
-		registry := NewRegistry()
+		registry := NewRegistry(nil)
 
 		registry.RegisterSyntactic(&mockRule{
 			id:        "shared-id",
@@ -215,7 +215,7 @@ func TestRegistry_VersionFiltering(t *testing.T) {
 }
 
 func TestRegistry_MultipleKindsPerRule(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewRegistry(nil)
 
 	registry.RegisterSyntactic(&mockRule{
 		id:        "multi-kind-rule",
@@ -230,6 +230,22 @@ func TestRegistry_MultipleKindsPerRule(t *testing.T) {
 
 	t.Run("rule does not appear for other kinds", func(t *testing.T) {
 		assert.NotContains(t, ruleIDs(registry.SyntacticRulesFor("custom-types", "rudder/v1")), "multi-kind-rule")
+	})
+}
+
+func TestRegistry_AllSyntacticRules(t *testing.T) {
+	t.Run("returns all syntactic rules regardless of pattern", func(t *testing.T) {
+		registry := NewRegistry(nil)
+
+		registry.RegisterSyntactic(&mockRule{id: "wildcard-rule", appliesTo: []MatchPattern{MatchAll()}})
+		registry.RegisterSyntactic(&mockRule{id: "kind-rule", appliesTo: []MatchPattern{MatchKind("properties")}})
+		registry.RegisterSyntactic(&mockRule{id: "exact-rule", appliesTo: []MatchPattern{MatchKindVersion("events", "rudder/v1")}})
+
+		all := registry.AllSyntacticRules()
+		assert.Len(t, all, 3)
+		assert.Contains(t, ruleIDs(all), "wildcard-rule")
+		assert.Contains(t, ruleIDs(all), "kind-rule")
+		assert.Contains(t, ruleIDs(all), "exact-rule")
 	})
 }
 

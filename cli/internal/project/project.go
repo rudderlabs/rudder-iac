@@ -307,7 +307,11 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	baseRegistry := rules.NewRegistry()
+	// Two distinct sources feed the validation pipeline:
+	// 1. SupportedKinds() + specs module versions → gatekeeper inputs (known kinds/versions)
+	// 2. SupportedMatchPatterns() → combo validation + non-gatekeeper rule targeting
+	supportedKinds := p.provider.SupportedKinds()
+
 	validVersions := []string{
 		specs.SpecVersionV0_1,
 		specs.SpecVersionV0_1Variant,
@@ -316,15 +320,18 @@ func (p *project) registry() (rules.Registry, error) {
 		validVersions = append(validVersions, specs.SpecVersionV1)
 	}
 
-	// Add project-level syntactic rules along with aggregated
-	// syntactic rules from each provider.
+	activePatterns := p.provider.SupportedMatchPatterns()
+	baseRegistry := rules.NewRegistry(activePatterns)
+
 	syntactic := []rules.Rule{
-		prules.NewSpecSyntaxValidRule(
-			p.provider.SupportedKinds(),
-			validVersions,
-		),
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
-		prules.NewDuplicateURNRule(p.provider.ParseSpec),
+		// Gatekeeper: MatchAll, checks structure + known kinds/versions independently
+		prules.NewSpecSyntaxValidRule(supportedKinds, validVersions),
+		// Combo checker: uses same gatekeeper sources for internal filtering,
+		// then checks (kind,version) pair against provider patterns
+		prules.NewResourceKindVersionValidRule(supportedKinds, validVersions, activePatterns),
+		// Remaining rules: exact match patterns from provider, only fire for supported combos
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
+		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
@@ -332,9 +339,7 @@ func (p *project) registry() (rules.Registry, error) {
 		baseRegistry.RegisterSyntactic(rule)
 	}
 
-	semantic := p.provider.SemanticRules()
-
-	for _, rule := range semantic {
+	for _, rule := range p.provider.SemanticRules() {
 		baseRegistry.RegisterSemantic(rule)
 	}
 

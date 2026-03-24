@@ -17,18 +17,25 @@ type Registry interface {
 	// SemanticRulesFor returns semantic rules whose AppliesTo() patterns
 	// match the given (kind, version).
 	SemanticRulesFor(kind, version string) []Rule
+
+	// AllSyntacticRules returns every registered syntactic rule regardless of pattern.
+	// Used to discover ProjectRule implementations which are not limited to MatchAll().
+	AllSyntacticRules() []Rule
 }
 
 // defaultRegistry stores rules in flat slices per phase.
 // Matching is done at query time by checking each rule's AppliesTo() patterns.
 type defaultRegistry struct {
-	syntactic []Rule
-	semantic  []Rule
+	syntactic         []Rule
+	semantic          []Rule
+	supportedPatterns []MatchPattern
 }
 
 // NewRegistry creates a new empty rule registry.
-func NewRegistry() Registry {
-	return &defaultRegistry{}
+// supportedPatterns is the aggregated set of (kind, version) pairs from all providers,
+// used to validate rule AppliesTo() patterns at registration time.
+func NewRegistry(supportedPatterns []MatchPattern) Registry {
+	return &defaultRegistry{supportedPatterns: supportedPatterns}
 }
 
 func (r *defaultRegistry) RegisterSyntactic(rule Rule) {
@@ -45,6 +52,10 @@ func (r *defaultRegistry) SyntacticRulesFor(kind, version string) []Rule {
 
 func (r *defaultRegistry) SemanticRulesFor(kind, version string) []Rule {
 	return matchRules(r.semantic, kind, version)
+}
+
+func (r *defaultRegistry) AllSyntacticRules() []Rule {
+	return r.syntactic
 }
 
 // matchRules returns rules that have at least one AppliesTo() pattern

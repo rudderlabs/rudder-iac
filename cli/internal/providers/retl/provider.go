@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -58,6 +59,15 @@ func (p *Provider) SupportedKinds() []string {
 		kinds = append(kinds, kind)
 	}
 	return kinds
+}
+
+func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
+	var patterns []rules.MatchPattern
+	for kind := range p.kindToType {
+		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
+	}
+	return patterns
 }
 
 // SupportedTypes returns the list of supported resource types
