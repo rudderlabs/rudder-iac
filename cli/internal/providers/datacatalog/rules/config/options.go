@@ -65,7 +65,6 @@ var V1FieldAliases = map[string]ConfigKeyword{
 	"exclusive_minimum":     KeywordExclusiveMinimum,
 	"exclusive_maximum":     KeywordExclusiveMaximum,
 	"multiple_of":           KeywordMultipleOf,
-	"item_types":            KeywordItemTypes,
 	"min_items":             KeywordMinItems,
 	"max_items":             KeywordMaxItems,
 	"unique_items":          KeywordUniqueItems,

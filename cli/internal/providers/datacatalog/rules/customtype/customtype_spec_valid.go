@@ -3,6 +3,7 @@ package customtype
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -10,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 const (
@@ -22,6 +24,7 @@ const (
 var (
 	customTypeTypeRegexPattern = fmt.Sprintf("^(%s)$", strings.Join(catalogRules.ValidPrimitiveTypes, "|"))
 	customTypeTypeErrorMessage = fmt.Sprintf("must be one of the following: %s", strings.Join(catalogRules.ValidPrimitiveTypes, ", "))
+	customTypeRefRegex         = regexp.MustCompile(catalogRules.CustomTypeReferenceRegex)
 )
 
 func init() {
@@ -100,10 +103,56 @@ var validateCustomTypeSpecV1 = func(Kind string, Version string, Metadata map[st
 		}
 	}
 
-	return funcs.ParseValidationErrors(
+	results := funcs.ParseValidationErrors(
 		validationErrors,
 		reflect.TypeOf(Spec),
 	)
+
+	results = append(results, validateItemTypes(Spec.Types)...)
+	return results
+}
+
+func validateItemTypes(types []localcatalog.CustomTypeV1) []rules.ValidationResult {
+	results := []rules.ValidationResult{}
+	for i, ct := range types {
+		if ct.ItemType != "" && !isValidV1TypeOrCustomTypeRef(ct.ItemType) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/types/%d/item_type", i),
+				Message: fmt.Sprintf("'item_type' is invalid: must be one of [%s] or of pattern #custom-type:<id>",
+					strings.Join(catalogRules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+
+		if hasDuplicateValues(ct.ItemTypes) {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/types/%d/item_types", i),
+				Message: fmt.Sprintf("'item_types' is invalid: must be unique one of [%s]",
+					strings.Join(catalogRules.ValidPrimitiveTypes, ", "),
+				),
+			})
+		}
+	}
+	return results
+}
+
+func hasDuplicateValues(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if _, found := seen[value]; found {
+			return true
+		}
+		seen[value] = struct{}{}
+	}
+	return false
+}
+
+func isValidV1TypeOrCustomTypeRef(typeValue string) bool {
+	if lo.Contains(catalogRules.ValidPrimitiveTypes, typeValue) {
+		return true
+	}
+
+	return customTypeRefRegex.MatchString(typeValue)
 }
 
 func NewCustomTypeSpecSyntaxValidRule() rules.Rule {

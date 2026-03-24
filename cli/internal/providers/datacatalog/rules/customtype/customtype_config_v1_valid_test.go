@@ -655,11 +655,11 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{
 					{
-						LocalID: "tags",
-						Name:    "Tags",
-						Type:    "array",
+						LocalID:   "tags",
+						Name:      "Tags",
+						Type:      "array",
+						ItemType:  "string",
 						Config: map[string]any{
-							"item_types":   []any{"string"},
 							"min_items":    1,
 							"max_items":    10,
 							"unique_items": true,
@@ -670,15 +670,17 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "valid array config with current custom type reference",
+			name: "valid array config with multiple item types",
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{
 					{
-						LocalID: "addresses",
-						Name:    "Addresses",
-						Type:    "array",
+						LocalID:   "mixed",
+						Name:      "Mixed",
+						Type:      "array",
+						ItemTypes: []string{"string", "number"},
 						Config: map[string]any{
-							"item_types": []any{"#custom-type:address"},
+							"min_items": 0,
+							"max_items": 10,
 						},
 					},
 				},
@@ -686,7 +688,7 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "item_types not array",
+			name: "item_types in config",
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{
 					{
@@ -701,60 +703,7 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/types/0/config/item_types"},
-			expectedMsgs:   []string{"'item_types' must be an array"},
-		},
-		{
-			name: "item_types element not string",
-			spec: localcatalog.CustomTypeSpecV1{
-				Types: []localcatalog.CustomTypeV1{
-					{
-						LocalID: "tags",
-						Name:    "Tags",
-						Type:    "array",
-						Config: map[string]any{
-							"item_types": []any{123},
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
-			expectedMsgs:   []string{"'123' must be a string value"},
-		},
-		{
-			name: "custom type paired with other types",
-			spec: localcatalog.CustomTypeSpecV1{
-				Types: []localcatalog.CustomTypeV1{
-					{
-						LocalID: "mixed",
-						Name:    "Mixed",
-						Type:    "array",
-						Config: map[string]any{
-							"item_types": []any{"#custom-type:address", "string"},
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
-			expectedMsgs:   []string{"'#custom-type:address' custom type reference cannot be paired with other types"},
-		},
-		{
-			name: "invalid primitive type",
-			spec: localcatalog.CustomTypeSpecV1{
-				Types: []localcatalog.CustomTypeV1{
-					{
-						LocalID: "tags",
-						Name:    "Tags",
-						Type:    "array",
-						Config: map[string]any{
-							"item_types": []any{"invalid-type"},
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/types/0/config/item_types/0"},
+			expectedMsgs:   []string{"'item_types' is not applicable for type(s)"},
 		},
 		{
 			name: "min_items not integer",
@@ -830,6 +779,7 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		
 		t.Run(tt.name, func(t *testing.T) {
 			results := validateCustomTypeConfigV1(
 				localcatalog.KindCustomTypes,

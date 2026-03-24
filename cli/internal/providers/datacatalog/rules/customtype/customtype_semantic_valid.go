@@ -31,7 +31,7 @@ var validateCustomTypeSemantic = func(_ string, _ string, _ map[string]any, spec
 
 var validateCustomTypeSemanticV1 = func(_ string, _ string, _ map[string]any, spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
 	results := funcs.ValidateReferences(spec, graph)
-	results = append(results, validateConfigItemTypesV1(spec, graph)...)
+	results = append(results, validateItemTypeRefsV1(spec, graph)...)
 	results = append(results, validateCustomTypeVariantsV1(spec, graph)...)
 	results = append(results, validateCustomTypeNameUniquenessV1(spec, graph)...)
 	return results
@@ -120,6 +120,42 @@ func validateCustomTypeNameUniquenessV1(spec localcatalog.CustomTypeSpecV1, grap
 	return results
 }
 
+// validateItemTypeRefsV1 checks custom type references in the top-level ItemType field.
+func validateItemTypeRefsV1(spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, ct := range spec.Types {
+		if strings.HasPrefix(ct.ItemType, "#") {
+			results = append(
+				results,
+				checkRef(ct.ItemType, fmt.Sprintf("/types/%d/item_type", i), graph)...,
+			)
+		}
+	}
+
+	return results
+}
+
+func checkRef(ref, jsonPointer string, graph *resources.Graph) []rules.ValidationResult {
+	resourceType, localID, err := funcs.ParseURNRef(ref)
+	if err != nil {
+		return []rules.ValidationResult{{
+			Reference: jsonPointer,
+			Message:   fmt.Sprintf("'%s' is invalid: must be of pattern #custom-type:<id>", ref),
+		}}
+	}
+
+	urn := resources.URN(localID, resourceType)
+	if _, exists := graph.GetResource(urn); !exists {
+		return []rules.ValidationResult{{
+			Reference: jsonPointer,
+			Message:   fmt.Sprintf("referenced %s '%s' not found in resource graph", resourceType, localID),
+		}}
+	}
+
+	return nil
+}
+
 // validateConfigItemTypesV0 checks custom type references in Config["itemTypes"].
 func validateConfigItemTypesV0(spec localcatalog.CustomTypeSpec, graph *resources.Graph) []rules.ValidationResult {
 	var results []rules.ValidationResult
@@ -128,20 +164,6 @@ func validateConfigItemTypesV0(spec localcatalog.CustomTypeSpec, graph *resource
 		results = append(
 			results,
 			validateConfigItemTypes(ct.Config, "itemTypes", fmt.Sprintf("/types/%d/config/itemTypes", i), graph)...,
-		)
-	}
-
-	return results
-}
-
-// validateConfigItemTypesV1 checks custom type references in Config["item_types"].
-func validateConfigItemTypesV1(spec localcatalog.CustomTypeSpecV1, graph *resources.Graph) []rules.ValidationResult {
-	var results []rules.ValidationResult
-
-	for i, ct := range spec.Types {
-		results = append(
-			results,
-			validateConfigItemTypes(ct.Config, "item_types", fmt.Sprintf("/types/%d/config/item_types", i), graph)...,
 		)
 	}
 
