@@ -26,9 +26,6 @@ public typealias CustomTypeEmail = String
 /// List of email addresses
 public typealias CustomTypeEmailList = [CustomTypeEmail]
 
-/// Empty object that does not allow additional properties
-public typealias CustomTypeEmptyObjectNoAdditionalProps = [String: Any]
-
 /// Empty object that allows additional properties
 public typealias CustomTypeEmptyObjectWithAdditionalProps = [String: Any]
 
@@ -696,6 +693,15 @@ public struct CustomTypeAddressDetails {
     }
 }
 
+/// Empty object that does not allow additional properties
+public struct CustomTypeEmptyObjectNoAdditionalProps {
+    public init() {}
+
+    public func toProperties() -> [String: Any] {
+        return [:]
+    }
+}
+
 /// User profile information
 public struct CustomTypeUserProfile {
     /// User's email address
@@ -1051,7 +1057,7 @@ public struct TrackUserSignedUpProperties {
             "active": active,
             "profile": profile.toProperties()
         ]
-        if let addresses = addresses { props["addresses"] = addresses }
+        if let addresses = addresses { props["addresses"] = addresses.map { $0.toProperties() } }
         if let age = age { props["age"] = age }
         if let arrayOfAny = arrayOfAny { props["array_of_any"] = arrayOfAny }
         if let arrayWithNullItems = arrayWithNullItems { props["array_with_null_items"] = arrayWithNullItems.map { $0.value } }
@@ -1060,7 +1066,7 @@ public struct TrackUserSignedUpProperties {
         if let customNullField = customNullField { props["custom_null_field"] = customNullField }
         if let deviceType = deviceType { props["device_type"] = deviceType.rawValue }
         if let emailList = emailList { props["email_list"] = emailList }
-        if let emptyObjectNoAdditionalProps = emptyObjectNoAdditionalProps { props["empty_object_no_additional_props"] = emptyObjectNoAdditionalProps }
+        if let emptyObjectNoAdditionalProps = emptyObjectNoAdditionalProps { props["empty_object_no_additional_props"] = emptyObjectNoAdditionalProps.toProperties() }
         if let emptyObjectWithAdditionalProps = emptyObjectWithAdditionalProps { props["empty_object_with_additional_props"] = emptyObjectWithAdditionalProps }
         if let enabled = enabled { props["enabled"] = enabled.rawValue }
         if let featureConfig = featureConfig { props["feature_config"] = featureConfig.toProperties() }
@@ -1076,7 +1082,7 @@ public struct TrackUserSignedUpProperties {
         if let objectProperty = objectProperty { props["object_property"] = objectProperty }
         if let phoneNumbers = phoneNumbers { props["phone_numbers"] = phoneNumbers }
         if let priority = priority { props["priority"] = priority.rawValue }
-        if let profileList = profileList { props["profile_list"] = profileList }
+        if let profileList = profileList { props["profile_list"] = profileList.map { $0.toProperties() } }
         if let propertyOfAny = propertyOfAny { props["property_of_any"] = propertyOfAny }
         if let rating = rating { props["rating"] = rating.rawValue }
         if let status = status { props["status"] = status.rawValue }
@@ -1144,8 +1150,7 @@ public class RudderTyperAnalytics {
     ) {
         analytics.group(
             groupId: groupId,
-            traits: traits?.toTraits(),
-            options: withRudderTyperContext(options: options)
+            options: withRudderTyperContext(options: options, contextTraits: traits?.toTraits())
         )
     }
 
@@ -1168,16 +1173,18 @@ public class RudderTyperAnalytics {
 
     /// Screen view event
     /// - Parameters:
+    ///   - screenName:
     ///   - properties: The properties to include with this event
     ///   - category:
     ///   - options: Optional RudderOption for additional event configuration
     public func screen(
+        screenName: String,
         properties: ScreenProperties,
         category: String? = nil,
         options: RudderOption? = nil
     ) {
         analytics.screen(
-            screenName: "",
+            screenName: screenName,
             category: category,
             properties: properties.toProperties(),
             options: withRudderTyperContext(options: options)
@@ -1302,8 +1309,8 @@ public class RudderTyperAnalytics {
 
     // MARK: - Private Helpers
 
-    private func withRudderTyperContext(options: RudderOption?) -> RudderOption {
-        let rudderTyperContext: [String: Any] = [
+    private func withRudderTyperContext(options: RudderOption?, contextTraits: [String: Any]? = nil) -> RudderOption {
+        var rudderTyperContext: [String: Any] = [
             "ruddertyper": [
                 "language": "swift",
                 "rudderTyperVersion": "1.0.0",
@@ -1312,6 +1319,9 @@ public class RudderTyperAnalytics {
                 "trackingPlanVersion": 13,
             ] as [String: Any]
         ]
+        if let traits = contextTraits {
+            rudderTyperContext["traits"] = traits
+        }
 
         if let options = options {
             let mergedContext = (options.customContext ?? [:]).merging(rudderTyperContext) { _, new in new }

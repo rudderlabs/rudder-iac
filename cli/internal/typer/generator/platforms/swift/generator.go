@@ -108,6 +108,14 @@ func getOrRegisterEnumCaseName(enumName string, value any, nr *core.NameRegistry
 	if formatted == "" {
 		formatted = "_"
 	}
+	// '_' is the Swift wildcard pattern and cannot be used as an enum case identifier.
+	// Pre-register a placeholder so the collision handler suffixes the actual value to '_1'.
+	if formatted == "_" {
+		_, err := nr.RegisterName(fmt.Sprintf("enum:placeholder:%s", formatted), scope, formatted)
+		if err != nil {
+			return "", err
+		}
+	}
 	valueKey := fmt.Sprintf("%v", value)
 	return nr.RegisterName(valueKey, scope, formatted)
 }
@@ -226,6 +234,27 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 				return err
 			}
 			ctx.VariantEnums = append(ctx.VariantEnums, *variantEnum)
+		} else if ct.Type == plan.PrimitiveTypeObject && ct.Schema != nil && isEmptySchema(ct.Schema) {
+			typeName, err := getOrRegisterCustomTypeName(ct, nr)
+			if err != nil {
+				return err
+			}
+			if ct.Schema.AdditionalProperties {
+				// Empty object with additionalProperties: true → open [String: Any] alias
+				ctx.TypeAliases = append(ctx.TypeAliases, SwiftTypeAlias{
+					Alias:   typeName,
+					Type:    "[String: Any]",
+					Comment: ct.Description,
+				})
+			} else {
+				// Empty object with additionalProperties: false → empty struct so callers
+				// cannot pass arbitrary keys (mirrors Kotlin's Unit mapping)
+				s, err := createSwiftStruct(typeName, ct.Description, "toProperties", ct.Schema, nr)
+				if err != nil {
+					return err
+				}
+				ctx.Structs = append(ctx.Structs, *s)
+			}
 		} else if ct.IsPrimitive() {
 			if hasEnumConfig(ct.Config) {
 				enum, err := createCustomTypeEnum(ct, nr)
@@ -240,17 +269,6 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 				}
 				ctx.TypeAliases = append(ctx.TypeAliases, *alias)
 			}
-		} else if ct.Schema != nil && isEmptySchema(ct.Schema) && ct.Schema.AdditionalProperties {
-			// Empty object with additionalProperties: true → [String: Any] alias
-			typeName, err := getOrRegisterCustomTypeName(ct, nr)
-			if err != nil {
-				return err
-			}
-			ctx.TypeAliases = append(ctx.TypeAliases, SwiftTypeAlias{
-				Alias:   typeName,
-				Type:    "[String: Any]",
-				Comment: ct.Description,
-			})
 		} else {
 			// Object custom type → struct
 			typeName, err := getOrRegisterCustomTypeName(ct, nr)
@@ -798,13 +816,18 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 			return "", "", err
 		}
 		// Determine serialize expression based on custom type kind
+		itemCT := plan.AsCustomType(ct.ItemType)
 		switch {
 		case len(ct.Variants) > 0:
 			return typeName, fieldName + ".toProperties()", nil
 		case hasEnumConfig(ct.Config):
 			return typeName, fieldName + ".rawValue", nil
-		case ct.Type == plan.PrimitiveTypeObject && ct.Schema != nil && len(ct.Schema.Properties) > 0:
+		case ct.Type == plan.PrimitiveTypeObject && ct.Schema != nil &&
+			(len(ct.Schema.Properties) > 0 || !ct.Schema.AdditionalProperties):
 			return typeName, fieldName + ".toProperties()", nil
+		case ct.Type == plan.PrimitiveTypeArray && itemCT != nil &&
+			itemCT.Type == plan.PrimitiveTypeObject && itemCT.Schema != nil && len(itemCT.Schema.Properties) > 0:
+			return typeName, fieldName + ".map { $0.toProperties() }", nil
 		default:
 			return typeName, fieldName, nil
 		}
@@ -1074,10 +1097,14 @@ func buildIdentifyMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAna
 			Optional: true,
 			Default:  "nil",
 		})
-		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
-			Label: "traits",
-			Value: "traits?.toTraits()",
-		})
+		if rule.Section == plan.IdentitySectionContextTraits {
+			method.AddDataToContext = true
+		} else {
+			method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
+				Label: "traits",
+				Value: "traits?.toTraits()",
+			})
+		}
 	}
 
 	return method, nil
@@ -1114,10 +1141,14 @@ func buildGroupMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnalyt
 			Optional: true,
 			Default:  "nil",
 		})
-		method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
-			Label: "traits",
-			Value: "traits?.toTraits()",
-		})
+		if rule.Section == plan.IdentitySectionContextTraits {
+			method.AddDataToContext = true
+		} else {
+			method.SDKArguments = append(method.SDKArguments, SwiftSDKCallArgument{
+				Label: "traits",
+				Value: "traits?.toTraits()",
+			})
+		}
 	}
 
 	return method, nil
@@ -1134,8 +1165,11 @@ func buildScreenMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnaly
 		Comment:       rule.Event.Description,
 		EventName:     rule.Event.Name,
 		SDKMethodName: "screen",
+		MethodArguments: []SwiftMethodArgument{
+			{Name: "screenName", Type: "String"},
+		},
 		SDKArguments: []SwiftSDKCallArgument{
-			{Label: "screenName", Value: FormatSwiftLiteral(rule.Event.Name)},
+			{Label: "screenName", Value: "screenName"},
 			{Label: "category", Value: "category"},
 		},
 		AddCategory: true,

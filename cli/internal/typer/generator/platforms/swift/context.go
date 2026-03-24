@@ -107,7 +107,8 @@ type SwiftAnalyticsMethod struct {
 	MethodArguments []SwiftMethodArgument
 	SDKMethodName   string // "track", "identify", "screen", "group", "alias"
 	SDKArguments    []SwiftSDKCallArgument
-	AddCategory     bool // screen events have an extra category param
+	AddCategory      bool // screen events have an extra category param
+	AddDataToContext bool // context.traits: merge traits into customContext instead of SDK traits param
 }
 
 // SwiftContext is the root data object passed to RudderTyper.swift.tmpl.

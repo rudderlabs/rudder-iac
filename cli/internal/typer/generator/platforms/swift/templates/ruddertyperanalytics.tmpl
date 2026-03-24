@@ -43,20 +43,23 @@ public class RudderTyperAnalytics {
 {{- range .SDKArguments }}
             {{ .Label }}: {{ .Value }},
 {{- end }}
-            options: withRudderTyperContext(options: options)
+            options: withRudderTyperContext(options: options{{ if .AddDataToContext }}, contextTraits: traits?.toTraits(){{ end }})
         )
     }
 {{ end }}
     // MARK: - Private Helpers
 
-    private func withRudderTyperContext(options: RudderOption?) -> RudderOption {
-        let rudderTyperContext: [String: Any] = [
+    private func withRudderTyperContext(options: RudderOption?, contextTraits: [String: Any]? = nil) -> RudderOption {
+        var rudderTyperContext: [String: Any] = [
             "ruddertyper": [
 {{- range $key, $value := .EventContext }}
                 "{{ escapeString $key }}": {{ $value }},
 {{- end }}
             ] as [String: Any]
         ]
+        if let traits = contextTraits {
+            rudderTyperContext["traits"] = traits
+        }
 
         if let options = options {
             let mergedContext = (options.customContext ?? [:]).merging(rudderTyperContext) { _, new in new }
