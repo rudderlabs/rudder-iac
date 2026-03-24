@@ -137,7 +137,11 @@ func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
+		resp, err := h.client.ListDataGraphs(ctx, &dgClient.ListDataGraphsRequest{
+			Page:          page,
+			PageSize:      perPage,
+			HasExternalID: hasExternalID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("listing data graphs: %w", err)
 		}
