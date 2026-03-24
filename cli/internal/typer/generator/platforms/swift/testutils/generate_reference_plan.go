@@ -6,14 +6,14 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/swift"
-	plantestutils "github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
 )
 
 func main() {
-	plan := plantestutils.GetReferenceTrackingPlan()
+	trackingPlan := testutils.GetReferenceTrackingPlan()
 	gen := &swift.Generator{}
 
-	files, err := gen.Generate(plan, core.GenerateOptions{RudderCLIVersion: "1.0.0"}, swift.SwiftOptions{})
+	files, err := gen.Generate(trackingPlan, core.GenerateOptions{RudderCLIVersion: "1.0.0"}, swift.SwiftOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

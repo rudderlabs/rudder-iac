@@ -3,6 +3,7 @@ package typer
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -13,6 +14,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
 	"github.com/spf13/cobra"
+)
+
+const (
+	platformKotlin = "kotlin"
+	platformSwift  = "swift"
 )
 
 func NewCmdTyper() *cobra.Command {
@@ -44,9 +50,14 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("tracking-plan-id is required")
 			}
 
-			validPlatforms := map[string]bool{"kotlin": true, "swift": true}
+			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true}
 			if !validPlatforms[platform] {
-				return fmt.Errorf("unsupported platform: %s (supported platforms: kotlin, swift)", platform)
+				supported := make([]string, 0, len(validPlatforms))
+				for p := range validPlatforms {
+					supported = append(supported, p)
+				}
+				sort.Strings(supported)
+				return fmt.Errorf("unsupported platform: %s (supported platforms: %s)", platform, strings.Join(supported, ", "))
 			}
 
 			defer func() {
@@ -92,7 +103,7 @@ func newCmdGenerate() *cobra.Command {
 	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from")
 	cmd.MarkFlagRequired("tracking-plan-id")
 
-	cmd.Flags().StringVar(&platform, "platform", "kotlin", "Platform to generate code for (kotlin, swift)")
+	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s)", platformKotlin, platformSwift))
 	cmd.MarkFlagRequired("platform")
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
