@@ -26,7 +26,6 @@ func TestValidateFlags(t *testing.T) {
 		args          []string
 		all           bool
 		modified      bool
-		location      string
 		output        string
 		force         bool
 		expectedError bool
@@ -38,7 +37,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{"my-transformation"},
 			all:           false,
 			modified:      false,
-			location:      t.TempDir(),
+
 			expectedError: false,
 		},
 		{
@@ -46,7 +45,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			location:      t.TempDir(),
+
 			expectedError: false,
 		},
 		{
@@ -54,7 +53,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           false,
 			modified:      true,
-			location:      t.TempDir(),
+
 			expectedError: false,
 		},
 		{
@@ -148,7 +147,7 @@ func TestValidateFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateFlags(tt.args, tt.all, tt.modified, tt.location, tt.output, tt.force)
+			err := validateFlags(tt.args, tt.all, tt.modified, tt.output, tt.force)
 
 			if tt.expectedError {
 				require.Error(t, err)

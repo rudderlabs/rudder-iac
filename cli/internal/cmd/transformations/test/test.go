@@ -64,10 +64,19 @@ func NewCmdTest() *cobra.Command {
 
 			# Test with verbose output (shows diffs)
 			$ rudder-cli transformations test --all --verbose
+
+			# Test from a specific project directory
+			$ rudder-cli transformations test --all -l ./my-project
+
+			# Write results to a custom file path
+			$ rudder-cli transformations test --all -o /tmp/results.json
+
+			# Overwrite an existing results file
+			$ rudder-cli transformations test --all --force
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flags first
-			if err := validateFlags(args, all, modified, location, output, force); err != nil {
+			if err := validateFlags(args, all, modified, output, force); err != nil {
 				return err
 			}
 
@@ -142,7 +151,7 @@ func NewCmdTest() *cobra.Command {
 
 			outputPath := output
 			if outputPath == "" {
-				outputPath = filepath.Join(location, "test-results.json")
+				outputPath = "test-results.json"
 			}
 
 			if err = writeResultsFile(outputPath, results); err != nil {
@@ -176,7 +185,7 @@ func NewCmdTest() *cobra.Command {
 }
 
 // validateFlags validates the command flags and arguments
-func validateFlags(args []string, all, modified bool, location, output string, force bool) error {
+func validateFlags(args []string, all, modified bool, output string, force bool) error {
 	// Count active modes
 	modes := 0
 	hasID := len(args) > 0
@@ -205,7 +214,7 @@ func validateFlags(args []string, all, modified bool, location, output string, f
 
 	outputPath := output
 	if outputPath == "" {
-		outputPath = filepath.Join(location, "test-results.json")
+		outputPath = "test-results.json"
 	}
 
 	dir := filepath.Dir(outputPath)
