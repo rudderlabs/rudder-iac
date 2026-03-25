@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 )
 
@@ -147,19 +148,37 @@ func TestValidateFlags(t *testing.T) {
 }
 
 func TestWriteResultsFile(t *testing.T) {
-	t.Run("writes JSON to test-results/results.json", func(t *testing.T) {
+	t.Run("writes JSON to test-results/results.json with flattened structure", func(t *testing.T) {
 		dir := t.TempDir()
 
-		results := &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted}
+		results := &testorchestrator.TestResults{
+			Status: testorchestrator.RunStatusExecuted,
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
+				{
+					Result: &transformations.TransformationTestResult{
+						ID:        "tr-1",
+						Name:      "My Transform",
+						VersionID: "v-1",
+						Pass:      true,
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Status: transformations.TestRunStatusPass,
+						},
+					},
+				},
+			},
+		}
 		err := writeResultsFile(dir, results)
 		require.NoError(t, err)
 
 		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
 		require.NoError(t, err)
 
-		var got testorchestrator.TestResults
+		var got testorchestrator.TestResultsOutput
 		require.NoError(t, json.Unmarshal(data, &got))
 		assert.Equal(t, testorchestrator.RunStatusExecuted, got.Status)
+		require.Len(t, got.Transformations, 1)
+		assert.Equal(t, "tr-1", got.Transformations[0].ID)
+		assert.Equal(t, "v-1", got.Transformations[0].VersionID)
 	})
 
 	t.Run("creates test-results dir if not exists", func(t *testing.T) {
@@ -185,7 +204,7 @@ func TestWriteResultsFile(t *testing.T) {
 		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
 		require.NoError(t, err)
 
-		var got testorchestrator.TestResults
+		var got testorchestrator.TestResultsOutput
 		require.NoError(t, json.Unmarshal(data, &got))
 		assert.Equal(t, testorchestrator.RunStatusNoResources, got.Status)
 	})
@@ -194,5 +213,102 @@ func TestWriteResultsFile(t *testing.T) {
 		err := writeResultsFile("/nonexistent/dir", &testorchestrator.TestResults{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "creating test-results directory")
+	})
+
+	t.Run("writes actual output files and references them in results.json", func(t *testing.T) {
+		dir := t.TempDir()
+
+		results := &testorchestrator.TestResults{
+			Status: testorchestrator.RunStatusExecuted,
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
+				{
+					Result: &transformations.TransformationTestResult{
+						ID:   "tr-1",
+						Name: "My Transform",
+						Pass: true,
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Status: transformations.TestRunStatusPass,
+							Results: []transformations.TestResult{
+								{
+									ID:           "suite/input/event.json",
+									Name:         "suite",
+									Status:       transformations.TestRunStatusPass,
+									ActualOutput: []any{map[string]any{"key": "value"}},
+								},
+							},
+						},
+					},
+					Definitions: []*transformations.TestDefinition{
+						{
+							ID:        "suite/input/event.json",
+							Filename:  "event.json",
+							InputFile: "input/event.json",
+						},
+					},
+				},
+			},
+		}
+		err := writeResultsFile(dir, results)
+		require.NoError(t, err)
+
+		// Verify actual output file exists with correct content
+		actualOutputPath := filepath.Join(dir, "test-results", "My Transform", "suite", "event.json")
+		actualData, err := os.ReadFile(actualOutputPath)
+		require.NoError(t, err)
+
+		var actualOutput []any
+		require.NoError(t, json.Unmarshal(actualData, &actualOutput))
+		require.Len(t, actualOutput, 1)
+		assert.Equal(t, "value", actualOutput[0].(map[string]any)["key"])
+
+		// Verify results.json references the file
+		resultsData, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
+		require.NoError(t, err)
+
+		var got testorchestrator.TestResultsOutput
+		require.NoError(t, json.Unmarshal(resultsData, &got))
+
+		testResult := got.Transformations[0].TestSuiteResult.Results[0]
+		assert.Equal(t, "My Transform/suite/event.json", testResult.ActualOutputFile)
+		assert.Equal(t, "input/event.json", testResult.InputLocation)
+	})
+
+	t.Run("writes default_events.json for default-events tests", func(t *testing.T) {
+		dir := t.TempDir()
+
+		results := &testorchestrator.TestResults{
+			Status: testorchestrator.RunStatusExecuted,
+			Transformations: []*testorchestrator.TransformationTestWithDefinitions{
+				{
+					Result: &transformations.TransformationTestResult{
+						Name: "Transform",
+						TestSuiteResult: transformations.TestSuiteRunResult{
+							Status: transformations.TestRunStatusPass,
+							Results: []transformations.TestResult{
+								{
+									ID:           "default-events",
+									Name:         "default-events",
+									Status:       transformations.TestRunStatusPass,
+									ActualOutput: []any{map[string]any{"event": "data"}},
+								},
+							},
+						},
+					},
+					Definitions: []*transformations.TestDefinition{
+						{
+							ID:       "default-events",
+							Name:     "default-events",
+							Filename: "default_events.json",
+						},
+					},
+				},
+			},
+		}
+		err := writeResultsFile(dir, results)
+		require.NoError(t, err)
+
+		actualOutputPath := filepath.Join(dir, "test-results", "Transform", "default-events", "default_events.json")
+		_, err = os.Stat(actualOutputPath)
+		require.NoError(t, err)
 	})
 }

@@ -220,6 +220,14 @@ func writeResultsFile(dir string, results *testorchestrator.TestResults) error {
 		return fmt.Errorf("creating test-results directory: %w", err)
 	}
 
+	output, outputEntries := results.ToOutput()
+
+	for _, entry := range outputEntries {
+		if err := writeActualOutputFile(resultsDir, entry); err != nil {
+			return fmt.Errorf("writing actual output file: %w", err)
+		}
+	}
+
 	f, err := os.Create(filepath.Join(resultsDir, "results.json"))
 	if err != nil {
 		return fmt.Errorf("creating results file: %w", err)
@@ -228,9 +236,23 @@ func writeResultsFile(dir string, results *testorchestrator.TestResults) error {
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(results); err != nil {
+	if err := enc.Encode(output); err != nil {
 		return fmt.Errorf("encoding results: %w", err)
 	}
 
 	return nil
+}
+
+func writeActualOutputFile(resultsDir string, entry testorchestrator.ActualOutputEntry) error {
+	fullPath := filepath.Join(resultsDir, entry.RelPath)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		return fmt.Errorf("creating directory for %s: %w", entry.RelPath, err)
+	}
+
+	data, err := json.MarshalIndent(entry.ActualOutput, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling actual output for %s: %w", entry.RelPath, err)
+	}
+
+	return os.WriteFile(fullPath, data, 0o644)
 }

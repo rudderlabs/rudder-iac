@@ -93,6 +93,7 @@ type TestDefinition struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
+	Filename       string `json:"filename,omitempty"`
 	InputFile      string `json:"inputFile,omitempty"`
 	OutputFile     string `json:"outputFile,omitempty"`
 	Input          []any  `json:"input"`

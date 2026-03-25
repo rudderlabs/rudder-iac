@@ -21,7 +21,7 @@ type TransformationTestWithDefinitions struct {
 
 // TestResults contains the results of all test executions with their definitions
 type TestResults struct {
-	Status          RunStatus                             `json:"status"`
+	Status          RunStatus                            `json:"status"`
 	Libraries       []transformations.LibraryTestResult  `json:"libraries,omitempty"`
 	Transformations []*TransformationTestWithDefinitions `json:"transformations,omitempty"`
 }
