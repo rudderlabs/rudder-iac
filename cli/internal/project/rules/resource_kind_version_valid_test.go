@@ -10,8 +10,6 @@ import (
 func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
-	supportedKinds := []string{"properties", "events"}
-	supportedVersions := []string{"rudder/0.1", "rudder/v1"}
 	supportedPatterns := []rules.MatchPattern{
 		rules.MatchKindVersion("properties", "rudder/0.1"),
 		rules.MatchKindVersion("properties", "rudder/v1"),
@@ -19,7 +17,7 @@ func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 	}
 
 	t.Run("valid combo produces no errors", func(t *testing.T) {
-		rule := NewResourceKindVersionValidRule(supportedKinds, supportedVersions, supportedPatterns)
+		rule := NewResourceKindVersionValidRule(supportedPatterns)
 		results := rule.Validate(&rules.ValidationContext{
 			Kind:    "properties",
 			Version: "rudder/v1",
@@ -28,7 +26,7 @@ func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 	})
 
 	t.Run("unknown kind returns empty - gatekeeper handles it", func(t *testing.T) {
-		rule := NewResourceKindVersionValidRule(supportedKinds, supportedVersions, supportedPatterns)
+		rule := NewResourceKindVersionValidRule(supportedPatterns)
 		results := rule.Validate(&rules.ValidationContext{
 			Kind:    "blah",
 			Version: "rudder/v1",
@@ -37,7 +35,7 @@ func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 	})
 
 	t.Run("invalid combo returns error", func(t *testing.T) {
-		rule := NewResourceKindVersionValidRule(supportedKinds, supportedVersions, supportedPatterns)
+		rule := NewResourceKindVersionValidRule(supportedPatterns)
 		results := rule.Validate(&rules.ValidationContext{
 			Kind:    "events",
 			Version: "rudder/0.1",
@@ -50,7 +48,7 @@ func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 	t.Run("unknown version returns empty - gatekeeper handles it", func(t *testing.T) {
 		// gatekeeper is spec-syntax-valid rule which checks for
 		// valid kind and version
-		rule := NewResourceKindVersionValidRule(supportedKinds, supportedVersions, supportedPatterns)
+		rule := NewResourceKindVersionValidRule(supportedPatterns)
 		results := rule.Validate(&rules.ValidationContext{
 			Kind:    "properties",
 			Version: "rudder/v2",
@@ -62,7 +60,7 @@ func TestResourceKindVersionValidRule_Validate(t *testing.T) {
 func TestResourceKindVersionValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewResourceKindVersionValidRule(nil, nil, nil)
+	rule := NewResourceKindVersionValidRule(nil)
 
 	t.Run("rule metadata is correct", func(t *testing.T) {
 		assert.Equal(t, "project/resource-kind-version-valid", rule.ID())

@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 type SpecSyntaxValidRule struct {
@@ -14,10 +15,10 @@ type SpecSyntaxValidRule struct {
 	validVersions []string
 }
 
-func NewSpecSyntaxValidRule(validKinds []string, validVersions []string) rules.Rule {
+func NewSpecSyntaxValidRule(patterns []rules.MatchPattern) rules.Rule {
 	return &SpecSyntaxValidRule{
-		validKinds:    validKinds,
-		validVersions: validVersions,
+		validKinds:    lo.Uniq(lo.Map(patterns, func(p rules.MatchPattern, _ int) string { return p.Kind })),
+		validVersions: lo.Uniq(lo.Map(patterns, func(p rules.MatchPattern, _ int) string { return p.Version })),
 	}
 }
 

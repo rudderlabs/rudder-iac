@@ -307,29 +307,18 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	// Two distinct sources feed the validation pipeline:
-	// 1. SupportedKinds() + specs module versions → gatekeeper inputs (known kinds/versions)
-	// 2. SupportedMatchPatterns() → combo validation + non-gatekeeper rule targeting
-	supportedKinds := p.provider.SupportedKinds()
-
-	validVersions := []string{
-		specs.SpecVersionV0_1,
-		specs.SpecVersionV0_1Variant,
-	}
-	if p.loadV1Specs {
-		validVersions = append(validVersions, specs.SpecVersionV1)
-	}
-
+	// Active patterns become the source of truth for the
+	// validation pipeline to determine which unique kinds and versions
+	// are supported in the system.
 	activePatterns := p.provider.SupportedMatchPatterns()
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
-		// Gatekeeper: MatchAll, checks structure + known kinds/versions independently
-		prules.NewSpecSyntaxValidRule(supportedKinds, validVersions),
-		// Combo checker: uses same gatekeeper sources for internal filtering,
-		// then checks (kind,version) pair against provider patterns
-		prules.NewResourceKindVersionValidRule(supportedKinds, validVersions, activePatterns),
-		// Remaining rules: exact match patterns from provider, only fire for supported combos
+		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
+		// independently. They use activePatterns as source of truth for the supported kinds and versions.
+		prules.NewSpecSyntaxValidRule(activePatterns),
+		prules.NewResourceKindVersionValidRule(activePatterns),
+
 		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
 		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
 	}

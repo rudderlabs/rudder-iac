@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 type resourceKindVersionValidRule struct {
@@ -13,10 +14,10 @@ type resourceKindVersionValidRule struct {
 	supportedPatterns []rules.MatchPattern
 }
 
-func NewResourceKindVersionValidRule(supportedKinds []string, supportedVersions []string, supportedPatterns []rules.MatchPattern) rules.Rule {
+func NewResourceKindVersionValidRule(supportedPatterns []rules.MatchPattern) rules.Rule {
 	return &resourceKindVersionValidRule{
-		supportedKinds:    supportedKinds,
-		supportedVersions: supportedVersions,
+		supportedKinds:    lo.Uniq(lo.Map(supportedPatterns, func(p rules.MatchPattern, _ int) string { return p.Kind })),
+		supportedVersions: lo.Uniq(lo.Map(supportedPatterns, func(p rules.MatchPattern, _ int) string { return p.Version })),
 		supportedPatterns: supportedPatterns,
 	}
 }
