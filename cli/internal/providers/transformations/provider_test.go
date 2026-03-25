@@ -10,6 +10,7 @@ import (
 
 	tc "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
@@ -18,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestProvider(t *testing.T) {
@@ -45,6 +47,17 @@ func TestProvider(t *testing.T) {
 		assert.Len(t, types, 2)
 		assert.Contains(t, types, "transformation-library")
 		assert.Contains(t, types, "transformation")
+	})
+
+	t.Run("SupportedMatchPatterns", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := &testutil.MockTransformationStore{}
+		p := transformations.NewProviderWithStore(mockStore)
+		var want []vrules.MatchPattern
+		want = append(want, prules.V1VersionPatterns("transformation")...)
+		want = append(want, prules.V1VersionPatterns("transformation-library")...)
+		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
 	t.Run("LoadLegacySpec requires V1 version", func(t *testing.T) {

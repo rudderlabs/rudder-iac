@@ -21,6 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 )
 
 // Provider wraps the base provider to provide a concrete type for dependency injection
@@ -84,6 +85,12 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 	// For other specs, use base implementation
 	return p.BaseProvider.LoadSpec(path, s)
+}
+
+// SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.
+// Data-graph specs only support the V1 version; no legacy version support.
+func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
+	return prules.V1VersionPatterns("data-graph")
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {

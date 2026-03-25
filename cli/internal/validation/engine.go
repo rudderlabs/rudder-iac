@@ -83,13 +83,13 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	return toReturn, nil
 }
 
-// runProjectValidationRules discovers rules implementing ProjectRule from the wildcard bucket
-// and executes them with all specs at once.
+// runProjectValidationRules discovers rules implementing ProjectRule from all registered
+// syntactic rules and executes them with all specs at once.
 func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
-	// ProjectValidationRules are registered with AppliesTo: ["*"],
-	// so they live in the wildcard bucket.
+	// ProjectRules may have any AppliesTo() pattern (not just MatchAll), so we
+	// scan all registered syntactic rules and filter by the ProjectRule interface.
 	var projectRules []rules.ProjectRule
-	for _, rule := range e.registry.SyntacticRulesFor("", "") {
+	for _, rule := range e.registry.AllSyntacticRules() {
 		if pr, ok := rule.(rules.ProjectRule); ok {
 			projectRules = append(projectRules, pr)
 		}

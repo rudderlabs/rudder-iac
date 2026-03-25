@@ -11,13 +11,9 @@ import (
 func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
-	appliesToKinds := []string{
-		"properties",
-		"events",
-	}
-	appliesToVersions := []string{
-		specs.SpecVersionV0_1,
-		specs.SpecVersionV0_1Variant,
+	activePatterns := []rules.MatchPattern{
+		{Kind: "properties", Version: specs.SpecVersionV0_1},
+		{Kind: "events", Version: specs.SpecVersionV0_1Variant},
 	}
 
 	tests := []struct {
@@ -118,7 +114,7 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewSpecSyntaxValidRule(appliesToKinds, appliesToVersions)
+			rule := NewSpecSyntaxValidRule(activePatterns)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -141,15 +137,12 @@ func TestSpecSyntaxValidRule_Validate(t *testing.T) {
 func TestSpecSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	appliesToKinds := []string{
-		"properties",
-		"events",
+	activePatterns := []rules.MatchPattern{
+		{Kind: "properties", Version: specs.SpecVersionV0_1},
+		{Kind: "events", Version: specs.SpecVersionV0_1Variant},
 	}
-	appliesToVersions := []string{
-		specs.SpecVersionV0_1,
-		specs.SpecVersionV0_1Variant,
-	}
-	rule := NewSpecSyntaxValidRule(appliesToKinds, appliesToVersions)
+
+	rule := NewSpecSyntaxValidRule(activePatterns)
 
 	assert.Equal(t, "project/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())

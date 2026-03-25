@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
@@ -361,4 +362,10 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	assert.ElementsMatch(t, expectedURNs, parsed.URNs)
 }
 
+func TestProvider_SupportedMatchPatterns(t *testing.T) {
+	t.Parallel()
 
+	p := datagraph.NewProvider(&testutils.MockDataGraphClient{}, nil)
+	want := prules.V1VersionPatterns("data-graph")
+	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+}

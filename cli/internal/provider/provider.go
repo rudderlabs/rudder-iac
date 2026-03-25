@@ -23,6 +23,14 @@ type TypeProvider interface {
 	// SupportedTypes returns the list of resource types that this provider can manage.
 	// This is used to route resource operations to the appropriate provider based on type.
 	SupportedTypes() []string
+
+	// SupportedMatchPatterns returns the set of (kind, version) pairs for which this
+	// provider has complete handling — spec loading, resource graph building, CRUD
+	// lifecycle, AND validation rules. It is the provider's full capability declaration.
+	//
+	// Providers must explicitly declare their supported patterns. Returning nil means
+	// the provider does not handle any (kind, version) combinations for validation.
+	SupportedMatchPatterns() []rules.MatchPattern
 }
 
 type SpecLoader interface {
