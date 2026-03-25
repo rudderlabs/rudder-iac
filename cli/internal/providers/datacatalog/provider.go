@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	categoryRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/category"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
@@ -77,6 +78,25 @@ func (p *Provider) SupportedKinds() []string {
 		localcatalog.KindCustomTypes,
 		localcatalog.KindCategories,
 	}
+}
+
+func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
+	var patterns []rules.MatchPattern
+	// properties, events, categories, custom-types support both legacy and v1 versions
+	for _, kind := range []string{
+		localcatalog.KindProperties,
+		localcatalog.KindEvents,
+		localcatalog.KindCategories,
+		localcatalog.KindCustomTypes,
+	} {
+		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
+	}
+	// tp (KindTrackingPlans) is legacy-only
+	patterns = append(patterns, prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
+	// tracking-plan (KindTrackingPlansV1) is v1-only
+	patterns = append(patterns, prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
+	return patterns
 }
 
 func (p *Provider) SupportedTypes() []string {
@@ -243,7 +263,9 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 		// Add CustomTypeArgs
 		args := pstate.CustomTypeArgs{}
-		args.FromCatalogCustomType(&customType, getURNFromRef)
+		if err := args.FromCatalogCustomType(&customType, getURNFromRef); err != nil {
+			return nil, fmt.Errorf("creating custom type args from catalog custom type: %s, err:%w", customType.LocalID, err)
+		}
 		resource := resources.NewResource(
 			customType.LocalID,
 			types.CustomTypeResourceType,

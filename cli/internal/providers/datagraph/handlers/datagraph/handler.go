@@ -24,12 +24,13 @@ var HandlerMetadata = handler.HandlerMetadata{
 // HandlerImpl implements the HandlerImpl interface for data graph resources
 // Note: The provider handles all spec parsing and resource extraction for data-graph specs
 type HandlerImpl struct {
-	client dgClient.DataGraphStore
+	client          dgClient.DataGraphStore
+	accountResolver AccountNameResolver
 }
 
 // NewHandler creates a new BaseHandler for data graph resources
-func NewHandler(client dgClient.DataGraphStore) *DataGraphHandler {
-	h := &HandlerImpl{client: client}
+func NewHandler(client dgClient.DataGraphStore, accountResolver AccountNameResolver) *DataGraphHandler {
+	h := &HandlerImpl{client: client, accountResolver: accountResolver}
 	return handler.NewHandler(h)
 }
 
@@ -51,10 +52,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("data graph handler does not handle spec extraction - handled by provider")
 }
 
-func (h *HandlerImpl) ValidateResource(resource *model.DataGraphResource, graph *resources.Graph) error {
-	if resource.AccountID == "" {
-		return fmt.Errorf("account_id is required")
-	}
+func (h *HandlerImpl) ValidateResource(_ *model.DataGraphResource, _ *resources.Graph) error {
 	return nil
 }
 
@@ -65,7 +63,11 @@ func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
+		resp, err := h.client.ListDataGraphs(ctx, &dgClient.ListDataGraphsRequest{
+			Page:          page,
+			PageSize:      perPage,
+			HasExternalID: hasExternalID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("listing data graphs: %w", err)
 		}
@@ -94,9 +96,24 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteD
 }
 
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
-	// Fetch all data graphs without external IDs using API filtering
 	hasExternalID := false
-	return h.listAllDataGraphs(ctx, &hasExternalID)
+	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve account names for human-readable naming during import
+	for _, dg := range dataGraphs {
+		if h.accountResolver != nil && dg.AccountID != "" {
+			name, err := h.accountResolver.GetAccountName(ctx, dg.AccountID)
+			if err != nil {
+				return nil, fmt.Errorf("resolving account name for data graph %s: %w", dg.ID, err)
+			}
+			dg.AccountName = name
+		}
+	}
+
+	return dataGraphs, nil
 }
 
 func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteDataGraph, urnResolver handler.URNResolver) (*model.DataGraphResource, *model.DataGraphState, error) {
@@ -141,7 +158,10 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.DataGraphResour
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.DataGraphResource, remoteID string) (*model.DataGraphState, error) {
 	// Set external ID on the remote resource and get the updated data graph
-	remote, err := h.client.SetExternalID(ctx, remoteID, data.ID)
+	remote, err := h.client.SetExternalID(ctx, &dgClient.SetExternalIDRequest{
+		ID:         remoteID,
+		ExternalID: data.ID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("setting external ID: %w", err)
 	}
@@ -158,14 +178,12 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Data
 	return nil
 }
 
-// FormatForExport formats resources for export
-// Export is not currently implemented for data graphs
+// FormatForExport is a no-op — export is handled at the provider level for composite specs
 func (h *HandlerImpl) FormatForExport(
 	collection map[string]*model.RemoteDataGraph,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, error) {
-	// Export is handled directly by the provider for data graphs
 	return nil, nil
 }
 

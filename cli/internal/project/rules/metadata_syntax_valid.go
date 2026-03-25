@@ -18,11 +18,7 @@ type MetadataSyntaxValidRule struct {
 	appliesTo []rules.MatchPattern
 }
 
-func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, appliesToVersions []string) rules.Rule {
-	patterns := make([]rules.MatchPattern, len(appliesToVersions))
-	for i, v := range appliesToVersions {
-		patterns[i] = rules.MatchPattern{Kind: "*", Version: v}
-	}
+func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
 	return &MetadataSyntaxValidRule{
 		parseSpec: parseSpec,
 		appliesTo: patterns,

@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -82,6 +83,55 @@ func TestCompositeProvider_SupportedKinds(t *testing.T) {
 			assert.Equal(t, tt.expected, actual, "Expected kinds do not match")
 		})
 	}
+}
+
+func TestCompositeProvider_SupportedMatchPatterns(t *testing.T) {
+	t.Parallel()
+
+	t.Run("aggregates patterns from all providers", func(t *testing.T) {
+		t.Parallel()
+
+		p1 := testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"})
+		p1.MatchPatterns = []vrules.MatchPattern{
+			vrules.MatchKindVersion("kindA", "rudder/v1"),
+		}
+		p2 := testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"})
+		p2.MatchPatterns = []vrules.MatchPattern{
+			vrules.MatchKindVersion("kindB", "rudder/0.1"),
+			vrules.MatchKindVersion("kindB", "rudder/v0.1"),
+		}
+
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, cp)
+
+		want := []vrules.MatchPattern{
+			vrules.MatchKindVersion("kindA", "rudder/v1"),
+			vrules.MatchKindVersion("kindB", "rudder/0.1"),
+			vrules.MatchKindVersion("kindB", "rudder/v0.1"),
+		}
+		assert.ElementsMatch(t, want, cp.SupportedMatchPatterns())
+	})
+
+	t.Run("nil patterns from embedded EmptyProvider are omitted", func(t *testing.T) {
+		t.Parallel()
+
+		p1 := testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"})
+		p1.MatchPatterns = []vrules.MatchPattern{
+			vrules.MatchKindVersion("kindA", "rudder/v1"),
+		}
+		p2 := testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"})
+
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, p1.MatchPatterns, cp.SupportedMatchPatterns())
+	})
 }
 
 func TestCompositeProvider_SupportedTypes(t *testing.T) {

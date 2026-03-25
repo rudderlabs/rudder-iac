@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
@@ -13,226 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestValidateModelResource(t *testing.T) {
-	mockClient := &testutils.MockDataGraphClient{}
-	h := &HandlerImpl{client: mockClient}
-
-	graph := resources.NewGraph()
-	// Add a data graph node for dependency validation
-	graph.AddResource(resources.NewResource(
-		"my-dg",
-		"data-graph",
-		resources.ResourceData{},
-		[]string{},
-	))
-
-	// Create URNs and PropertyRefs
-	dataGraphURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
-	dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
-
-	nonExistentURN := resources.URN("non-existent-dg", datagraph.HandlerMetadata.ResourceType)
-	nonExistentRef := datagraph.CreateDataGraphReference(nonExistentURN)
-
-	tests := []struct {
-		name     string
-		resource *model.ModelResource
-		wantErr  bool
-		errMsg   string
-	}{
-		{
-			name: "valid entity model",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "db.schema.users",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-				Root:         true,
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid event model",
-			resource: &model.ModelResource{
-				ID:           "purchase",
-				DisplayName:  "Purchase",
-				Type:         "event",
-				Table:        "db.schema.purchases",
-				DataGraphRef: dataGraphRef,
-				Timestamp:    "event_time",
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid quoted parts",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        `"my db"."schema".users`,
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-				Root:         true,
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing display_name",
-			resource: &model.ModelResource{
-				ID:           "user",
-				Type:         "entity",
-				Table:        "db.schema.users",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "display_name is required",
-		},
-		{
-			name: "invalid type",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "invalid",
-				Table:        "db.schema.users",
-				DataGraphRef: dataGraphRef,
-			},
-			wantErr: true,
-			errMsg:  "type must be 'entity' or 'event'",
-		},
-		{
-			name: "missing table",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "3-part reference",
-		},
-		{
-			name: "invalid 1-part table ref",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "users",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "3-part reference",
-		},
-		{
-			name: "invalid 2-part table ref",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "schema.users",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "3-part reference",
-		},
-		{
-			name: "invalid 4-part table ref",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "a.b.c.d",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "3-part reference",
-		},
-		{
-			name: "invalid empty part",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        ".schema.table",
-				DataGraphRef: dataGraphRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "3-part reference",
-		},
-		{
-			name: "missing data_graph reference",
-			resource: &model.ModelResource{
-				ID:          "user",
-				DisplayName: "User",
-				Type:        "entity",
-				Table:       "db.schema.users",
-				PrimaryID:   "id",
-			},
-			wantErr: true,
-			errMsg:  "data_graph reference is required",
-		},
-		{
-			name: "entity model missing primary_id",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "db.schema.users",
-				DataGraphRef: dataGraphRef,
-			},
-			wantErr: true,
-			errMsg:  "primary_id is required for entity models",
-		},
-		{
-			name: "event model missing timestamp",
-			resource: &model.ModelResource{
-				ID:           "purchase",
-				DisplayName:  "Purchase",
-				Type:         "event",
-				Table:        "db.schema.purchases",
-				DataGraphRef: dataGraphRef,
-			},
-			wantErr: true,
-			errMsg:  "timestamp is required for event models",
-		},
-		{
-			name: "referenced data graph does not exist",
-			resource: &model.ModelResource{
-				ID:           "user",
-				DisplayName:  "User",
-				Type:         "entity",
-				Table:        "db.schema.users",
-				DataGraphRef: nonExistentRef,
-				PrimaryID:    "id",
-			},
-			wantErr: true,
-			errMsg:  "referenced data graph data-graph:non-existent-dg does not exist",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := h.ValidateResource(tt.resource, graph)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-// ============================================================================
-// MapRemoteToState Tests
-// ============================================================================
 
 func TestMapRemoteToState(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
@@ -720,11 +501,11 @@ func TestDelete(t *testing.T) {
 
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-			require.NotNil(t, hasExternalID)
-			assert.True(t, *hasExternalID)
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			require.NotNil(t, req.HasExternalID)
+			assert.True(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -741,43 +522,33 @@ func TestLoadRemoteResources(t *testing.T) {
 			assert.Equal(t, "dg-1", req.DataGraphID)
 			require.NotNil(t, req.HasExternalID)
 			assert.True(t, *req.HasExternalID)
+			assert.Nil(t, req.ModelType)
 
-			// Return both entity and event models based on type filter
-			if req.ModelType != nil && *req.ModelType == "entity" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "em-1",
-								ExternalID:  "user",
-								Name:        "User",
-								Type:        "entity",
-								TableRef:    "users",
-								DataGraphID: "dg-1",
-								PrimaryID:   "id",
-								Root:        true,
-							},
+			if req.Page == 1 {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{
+						{
+							ID:          "em-1",
+							ExternalID:  "user",
+							Name:        "User",
+							Type:        "entity",
+							TableRef:    "users",
+							DataGraphID: "dg-1",
+							PrimaryID:   "id",
+							Root:        true,
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
-			} else if req.ModelType != nil && *req.ModelType == "event" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "evm-1",
-								ExternalID:  "purchase",
-								Name:        "Purchase",
-								Type:        "event",
-								TableRef:    "purchases",
-								DataGraphID: "dg-1",
-								Timestamp:   "event_time",
-							},
+						{
+							ID:          "evm-1",
+							ExternalID:  "purchase",
+							Name:        "Purchase",
+							Type:        "event",
+							TableRef:    "purchases",
+							DataGraphID: "dg-1",
+							Timestamp:   "event_time",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
 			}
 			return &dgClient.ListModelsResponse{}, nil
 		},
@@ -803,8 +574,12 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
-			if page == 1 {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			// Verify only unmanaged data graphs are fetched
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
+
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -821,40 +596,30 @@ func TestLoadImportableResources(t *testing.T) {
 			assert.Equal(t, "dg-1", req.DataGraphID)
 			require.NotNil(t, req.HasExternalID)
 			assert.False(t, *req.HasExternalID)
+			assert.Nil(t, req.ModelType)
 
-			// Return both entity and event models based on type filter
-			if req.ModelType != nil && *req.ModelType == "entity" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "em-2",
-								Name:        "Account",
-								Type:        "entity",
-								TableRef:    "accounts",
-								DataGraphID: "dg-1",
-								PrimaryID:   "account_id",
-							},
+			if req.Page == 1 {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{
+						{
+							ID:          "em-2",
+							Name:        "Account",
+							Type:        "entity",
+							TableRef:    "accounts",
+							DataGraphID: "dg-1",
+							PrimaryID:   "account_id",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
-			} else if req.ModelType != nil && *req.ModelType == "event" {
-				if req.Page == 1 {
-					return &dgClient.ListModelsResponse{
-						Data: []dgClient.Model{
-							{
-								ID:          "evm-2",
-								Name:        "PageView",
-								Type:        "event",
-								TableRef:    "page_views",
-								DataGraphID: "dg-1",
-								Timestamp:   "ts",
-							},
+						{
+							ID:          "evm-2",
+							Name:        "PageView",
+							Type:        "event",
+							TableRef:    "page_views",
+							DataGraphID: "dg-1",
+							Timestamp:   "ts",
 						},
-						Paging: client.Paging{Next: ""},
-					}, nil
-				}
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
 			}
 			return &dgClient.ListModelsResponse{}, nil
 		},
@@ -876,4 +641,39 @@ func TestLoadImportableResources(t *testing.T) {
 	assert.Equal(t, "", remotes[1].ExternalID)
 	assert.Equal(t, "event", remotes[1].Type)
 	assert.Equal(t, "dg-1", remotes[1].DataGraphID)
+}
+
+// TestModelResourceMapstructureTags verifies that mapstructure.Decode produces
+// snake_case keys from ModelResource, matching what the diff engine expects.
+func TestModelResourceMapstructureTags(t *testing.T) {
+	dataGraphURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
+	dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
+
+	resource := &model.ModelResource{
+		ID:           "user",
+		DisplayName:  "User",
+		Type:         "entity",
+		Table:        "users",
+		Description:  "User entity",
+		DataGraphRef: dataGraphRef,
+		PrimaryID:    "id",
+		Root:         true,
+		Timestamp:    "",
+	}
+
+	var result map[string]interface{}
+	err := mapstructure.Decode(resource, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{
+		"id":           "user",
+		"display_name": "User",
+		"type":         "entity",
+		"table":        "users",
+		"description":  "User entity",
+		"data_graph":   dataGraphRef,
+		"primary_id":   "id",
+		"root":         true,
+		"timestamp":    "",
+	}, result)
 }

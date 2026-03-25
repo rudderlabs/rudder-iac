@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
@@ -17,11 +18,11 @@ import (
 
 func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	// Comprehensive spec with data graph and multiple inline models with relationships
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "my-data-graph",
@@ -205,10 +206,10 @@ func TestLoadSpec_ComprehensiveDataGraphWithInlineModels(t *testing.T) {
 
 func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "simple-dg",
@@ -236,173 +237,13 @@ func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	}, dgData)
 }
 
-func TestLoadSpec_DataGraphValidationErrors(t *testing.T) {
-	tests := []struct {
-		name     string
-		spec     map[string]interface{}
-		errorMsg string
-	}{
-		{
-			name: "missing id",
-			spec: map[string]interface{}{
-				"account_id": "wh-123",
-			},
-			errorMsg: "id is required",
-		},
-		{
-			name: "missing account_id",
-			spec: map[string]interface{}{
-				"id": "test-dg",
-			},
-			errorMsg: "account_id is required",
-		},
-		{
-			name: "empty id",
-			spec: map[string]interface{}{
-				"id":         "",
-				"account_id": "wh-123",
-			},
-			errorMsg: "id is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
-
-			spec := &specs.Spec{
-				Version: "rudder/v0.1",
-				Kind:    "data-graph",
-				Spec:    tt.spec,
-			}
-
-			err := provider.LoadSpec("test.yaml", spec)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errorMsg)
-		})
-	}
-}
-
-func TestLoadSpec_ModelValidationErrors(t *testing.T) {
-	tests := []struct {
-		name      string
-		modelSpec map[string]interface{}
-		errorMsg  string
-	}{
-		{
-			name: "missing id",
-			modelSpec: map[string]interface{}{
-				"display_name": "User",
-				"type":         "entity",
-				"table":        "db.schema.users",
-				"primary_id":   "id",
-			},
-			errorMsg: "id is required",
-		},
-		{
-			name: "missing display_name",
-			modelSpec: map[string]interface{}{
-				"id":         "user",
-				"table":      "db.schema.users",
-				"primary_id": "id",
-			},
-			errorMsg: "display_name is required",
-		},
-		{
-			name: "missing type",
-			modelSpec: map[string]interface{}{
-				"id":           "user",
-				"display_name": "User",
-				"table":        "db.schema.users",
-				"primary_id":   "id",
-			},
-			errorMsg: "type must be 'entity' or 'event'",
-		},
-		{
-			name: "invalid type",
-			modelSpec: map[string]interface{}{
-				"id":           "user",
-				"display_name": "User",
-				"type":         "invalid",
-				"table":        "db.schema.users",
-				"primary_id":   "id",
-			},
-			errorMsg: "type must be 'entity' or 'event'",
-		},
-		{
-			name: "missing table",
-			modelSpec: map[string]interface{}{
-				"id":           "user",
-				"display_name": "User",
-				"type":         "entity",
-				"primary_id":   "id",
-			},
-			errorMsg: "3-part reference",
-		},
-		{
-			name: "invalid 1-part table ref",
-			modelSpec: map[string]interface{}{
-				"id":           "user",
-				"display_name": "User",
-				"type":         "entity",
-				"table":        "users",
-				"primary_id":   "id",
-			},
-			errorMsg: "3-part reference",
-		},
-		{
-			name: "entity model missing primary_id",
-			modelSpec: map[string]interface{}{
-				"id":           "user",
-				"display_name": "User",
-				"type":         "entity",
-				"table":        "db.schema.users",
-			},
-			errorMsg: "primary_id is required for entity models",
-		},
-		{
-			name: "event model missing timestamp",
-			modelSpec: map[string]interface{}{
-				"id":           "purchase",
-				"display_name": "Purchase",
-				"type":         "event",
-				"table":        "db.schema.purchases",
-			},
-			errorMsg: "timestamp is required for event models",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
-
-			spec := &specs.Spec{
-				Version: "rudder/v0.1",
-				Kind:    "data-graph",
-				Spec: map[string]interface{}{
-					"id":         "test-dg",
-					"account_id": "wh-123",
-					"models": []map[string]interface{}{
-						tt.modelSpec,
-					},
-				},
-			}
-
-			err := provider.LoadSpec("test.yaml", spec)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errorMsg)
-		})
-	}
-}
 
 func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "test-dg",
@@ -433,7 +274,7 @@ func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 
 func TestProvider_SupportedKinds(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	kinds := provider.SupportedKinds()
 	assert.Contains(t, kinds, "data-graph")
@@ -441,7 +282,7 @@ func TestProvider_SupportedKinds(t *testing.T) {
 
 func TestProvider_SupportedTypes(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	types := provider.SupportedTypes()
 	assert.Contains(t, types, dgHandler.HandlerMetadata.ResourceType)
@@ -452,10 +293,10 @@ func TestProvider_SupportedTypes(t *testing.T) {
 
 func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
-	provider := datagraph.NewProvider(mockClient)
+	provider := datagraph.NewProvider(mockClient, nil)
 
 	spec := &specs.Spec{
-		Version: "rudder/v0.1",
+		Version: "rudder/v1",
 		Kind:    "data-graph",
 		Spec: map[string]interface{}{
 			"id":         "my-data-graph",
@@ -521,179 +362,10 @@ func TestParseSpec_DataGraphWithInlineModels(t *testing.T) {
 	assert.ElementsMatch(t, expectedURNs, parsed.URNs)
 }
 
-func TestLoadSpec_RelationshipCardinalityConstraints(t *testing.T) {
-	tests := []struct {
-		name          string
-		sourceType    string
-		targetType    string
-		cardinality   string
-		shouldSucceed bool
-		errorContains string
-	}{
-		{
-			name:          "event to event - rejected",
-			sourceType:    "event",
-			targetType:    "event",
-			cardinality:   "many-to-one",
-			shouldSucceed: false,
-			errorContains: "event models cannot be connected to other event models",
-		},
-		{
-			name:          "event to entity - valid many-to-one",
-			sourceType:    "event",
-			targetType:    "entity",
-			cardinality:   "many-to-one",
-			shouldSucceed: true,
-		},
-		{
-			name:          "event to entity - invalid one-to-many",
-			sourceType:    "event",
-			targetType:    "entity",
-			cardinality:   "one-to-many",
-			shouldSucceed: false,
-			errorContains: "must have cardinality 'many-to-one'",
-		},
-		{
-			name:          "event to entity - invalid one-to-one",
-			sourceType:    "event",
-			targetType:    "entity",
-			cardinality:   "one-to-one",
-			shouldSucceed: false,
-			errorContains: "must have cardinality 'many-to-one'",
-		},
-		{
-			name:          "entity to event - valid one-to-many",
-			sourceType:    "entity",
-			targetType:    "event",
-			cardinality:   "one-to-many",
-			shouldSucceed: true,
-		},
-		{
-			name:          "entity to event - invalid many-to-one",
-			sourceType:    "entity",
-			targetType:    "event",
-			cardinality:   "many-to-one",
-			shouldSucceed: false,
-			errorContains: "must have cardinality 'one-to-many'",
-		},
-		{
-			name:          "entity to event - invalid one-to-one",
-			sourceType:    "entity",
-			targetType:    "event",
-			cardinality:   "one-to-one",
-			shouldSucceed: false,
-			errorContains: "must have cardinality 'one-to-many'",
-		},
-		{
-			name:          "entity to entity - valid one-to-one",
-			sourceType:    "entity",
-			targetType:    "entity",
-			cardinality:   "one-to-one",
-			shouldSucceed: true,
-		},
-		{
-			name:          "entity to entity - valid one-to-many",
-			sourceType:    "entity",
-			targetType:    "entity",
-			cardinality:   "one-to-many",
-			shouldSucceed: true,
-		},
-		{
-			name:          "entity to entity - valid many-to-one",
-			sourceType:    "entity",
-			targetType:    "entity",
-			cardinality:   "many-to-one",
-			shouldSucceed: true,
-		},
-	}
+func TestProvider_SupportedMatchPatterns(t *testing.T) {
+	t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &testutils.MockDataGraphClient{}
-			provider := datagraph.NewProvider(mockClient)
-
-			// Build spec with two models and a relationship
-			spec := buildRelationshipTestSpec(tt.sourceType, tt.targetType, tt.cardinality)
-
-			// Load spec
-			err := provider.LoadSpec("test.yaml", spec)
-			require.NoError(t, err, "LoadSpec should not fail")
-
-			// Validate the graph - this triggers ValidateResource
-			graph, graphErr := provider.ResourceGraph()
-			require.NoError(t, graphErr)
-
-			validateErr := provider.Validate(graph)
-
-			if tt.shouldSucceed {
-				require.NoError(t, validateErr, "Validation should pass")
-
-				// Verify relationship exists
-				relResource, exists := graph.GetResource(resources.URN("test-rel", relationshipHandler.HandlerMetadata.ResourceType))
-				require.True(t, exists, "relationship resource should exist")
-				require.NotNil(t, relResource)
-			} else {
-				require.Error(t, validateErr, "Validation should fail")
-				assert.Contains(t, validateErr.Error(), tt.errorContains)
-			}
-		})
-	}
-}
-
-// buildRelationshipTestSpec creates a test spec with a data graph, two models, and a relationship
-func buildRelationshipTestSpec(sourceType, targetType, cardinality string) *specs.Spec {
-	// Build source model
-	sourceModel := map[string]interface{}{
-		"id":           "source-model",
-		"display_name": "Source Model",
-		"type":         sourceType,
-		"table":        "db.schema.source_table",
-		"relationships": []map[string]interface{}{
-			{
-				"id":              "test-rel",
-				"display_name":    "Test Relationship",
-				"cardinality":     cardinality,
-				"target":          "#data-graph-model:target-model",
-				"source_join_key": "join_key",
-				"target_join_key": "join_key",
-			},
-		},
-	}
-
-	// Add type-specific fields for source model
-	if sourceType == "entity" {
-		sourceModel["primary_id"] = "id"
-		sourceModel["root"] = true
-	} else {
-		sourceModel["timestamp"] = "created_at"
-	}
-
-	// Build target model
-	targetModel := map[string]interface{}{
-		"id":           "target-model",
-		"display_name": "Target Model",
-		"type":         targetType,
-		"table":        "db.schema.target_table",
-	}
-
-	// Add type-specific fields for target model
-	if targetType == "entity" {
-		targetModel["primary_id"] = "id"
-		targetModel["root"] = false
-	} else {
-		targetModel["timestamp"] = "created_at"
-	}
-
-	return &specs.Spec{
-		Version: "rudder/v0.1",
-		Kind:    "data-graph",
-		Spec: map[string]interface{}{
-			"id":         "test-dg",
-			"account_id": "wh-123",
-			"models": []map[string]interface{}{
-				sourceModel,
-				targetModel,
-			},
-		},
-	}
+	p := datagraph.NewProvider(&testutils.MockDataGraphClient{}, nil)
+	want := prules.V1VersionPatterns("data-graph")
+	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 }

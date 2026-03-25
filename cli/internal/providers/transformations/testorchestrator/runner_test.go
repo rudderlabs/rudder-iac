@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	tc "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -34,89 +35,6 @@ func (m *mockRemoteStateLoader) MapRemoteToState(collection *resources.RemoteRes
 		return m.mapRemoteToStateFunc(collection)
 	}
 	return state.EmptyState(), nil
-}
-
-type mockTransformationStore struct {
-	batchTestFunc        func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error)
-	createTransformation func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error)
-	updateTransformation func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error)
-	createLibraryFunc    func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
-	updateLibraryFunc    func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error)
-}
-
-func newMockStore() *mockTransformationStore {
-	return &mockTransformationStore{}
-}
-
-func (m *mockTransformationStore) BatchTest(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
-	if m.batchTestFunc != nil {
-		return m.batchTestFunc(ctx, req)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) CreateTransformation(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-	if m.createTransformation != nil {
-		return m.createTransformation(ctx, req, publish)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) CreateLibrary(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
-	if m.createLibraryFunc != nil {
-		return m.createLibraryFunc(ctx, req, publish)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) UpdateTransformation(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-	if m.updateTransformation != nil {
-		return m.updateTransformation(ctx, id, req, publish)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) GetTransformation(ctx context.Context, id string) (*transformations.Transformation, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) ListTransformations(ctx context.Context) ([]*transformations.Transformation, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) DeleteTransformation(ctx context.Context, id string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) SetTransformationExternalID(ctx context.Context, id string, externalID string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) UpdateLibrary(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
-	if m.updateLibraryFunc != nil {
-		return m.updateLibraryFunc(ctx, id, req, publish)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) GetLibrary(ctx context.Context, id string) (*transformations.TransformationLibrary, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) ListLibraries(ctx context.Context) ([]*transformations.TransformationLibrary, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) DeleteLibrary(ctx context.Context, id string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) SetLibraryExternalID(ctx context.Context, id string, externalID string) error {
-	return errors.New("not implemented")
-}
-
-func (m *mockTransformationStore) BatchPublish(ctx context.Context, req *transformations.BatchPublishRequest) (*transformations.BatchPublishResponse, error) {
-	return nil, errors.New("not implemented")
 }
 
 // --- Helper functions ---
@@ -204,7 +122,7 @@ func TestRunnerRun(t *testing.T) {
 	t.Run("returns error when transformation version resolution fails", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{}
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 		trans := resources.NewResource(
@@ -228,7 +146,7 @@ func TestRunnerRun(t *testing.T) {
 		}
 
 		expectedErr := errors.New("version creation failed")
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
 			return nil, expectedErr
 		}
 
@@ -242,7 +160,7 @@ func TestRunnerRun(t *testing.T) {
 	t.Run("successfully runs tests for transformation without dependencies", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{}
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 		trans := resources.NewResource(
@@ -265,11 +183,11 @@ func TestRunnerRun(t *testing.T) {
 			workspaceID: "ws-123",
 		}
 
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-			return &transformations.Transformation{ID: "remote-trans-1", VersionID: "trans-ver-1"}, nil
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
+			return &tc.Transformation{ID: "remote-trans-1", VersionID: "trans-ver-1"}, nil
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Transformations) != 1 {
 				return nil, errors.New("expected exactly 1 transformation in request")
 			}
@@ -280,10 +198,10 @@ func TestRunnerRun(t *testing.T) {
 				return nil, errors.New("expected no libraries in request")
 			}
 
-			return &transformations.BatchTestResponse{
+			return &tc.BatchTestResponse{
 				Pass: true,
-				ValidationOutput: transformations.ValidationOutput{
-					Transformations: []transformations.TransformationTestResult{
+				ValidationOutput: tc.ValidationOutput{
+					Transformations: []tc.TransformationTestResult{
 						{
 							ID:        "remote-trans-1",
 							VersionID: "trans-ver-1",
@@ -306,7 +224,7 @@ func TestRunnerRun(t *testing.T) {
 	t.Run("successfully runs tests for standalone libraries", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{}
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 		lib := resources.NewResource(
@@ -330,11 +248,11 @@ func TestRunnerRun(t *testing.T) {
 			workspaceID: "ws-123",
 		}
 
-		mockStore.createLibraryFunc = func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
-			return &transformations.TransformationLibrary{ID: "remote-lib-standalone", VersionID: "lib-ver-standalone"}, nil
+		mockStore.CreateLibraryFunc = func(ctx context.Context, req *tc.CreateLibraryRequest, publish bool) (*tc.TransformationLibrary, error) {
+			return &tc.TransformationLibrary{ID: "remote-lib-standalone", VersionID: "lib-ver-standalone"}, nil
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Libraries) != 1 {
 				return nil, errors.New("expected exactly 1 library in request")
 			}
@@ -345,10 +263,10 @@ func TestRunnerRun(t *testing.T) {
 				return nil, errors.New("expected no transformations in request")
 			}
 
-			return &transformations.BatchTestResponse{
+			return &tc.BatchTestResponse{
 				Pass: true,
-				ValidationOutput: transformations.ValidationOutput{
-					Libraries: []transformations.LibraryTestResult{
+				ValidationOutput: tc.ValidationOutput{
+					Libraries: []tc.LibraryTestResult{
 						{VersionID: "lib-ver-standalone", Pass: true},
 					},
 				},
@@ -366,7 +284,7 @@ func TestRunnerRun(t *testing.T) {
 	t.Run("aggregates results from multiple test units", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{}
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 
@@ -403,19 +321,19 @@ func TestRunnerRun(t *testing.T) {
 			workspaceID: "ws-123",
 		}
 
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-			return &transformations.Transformation{ID: "remote-" + req.Name, VersionID: "ver-" + req.Name}, nil
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
+			return &tc.Transformation{ID: "remote-" + req.Name, VersionID: "ver-" + req.Name}, nil
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Transformations) != 1 {
 				return nil, errors.New("expected exactly 1 transformation in request")
 			}
 
-			return &transformations.BatchTestResponse{
+			return &tc.BatchTestResponse{
 				Pass: true,
-				ValidationOutput: transformations.ValidationOutput{
-					Transformations: []transformations.TransformationTestResult{
+				ValidationOutput: tc.ValidationOutput{
+					Transformations: []tc.TransformationTestResult{
 						{
 							ID:        req.Transformations[0].VersionID,
 							VersionID: req.Transformations[0].VersionID,
@@ -435,7 +353,7 @@ func TestRunnerRun(t *testing.T) {
 	t.Run("returns error when batch test fails", func(t *testing.T) {
 		ctx := context.Background()
 		mockLoader := &mockRemoteStateLoader{}
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 		trans := resources.NewResource(
@@ -458,12 +376,12 @@ func TestRunnerRun(t *testing.T) {
 			workspaceID: "ws-123",
 		}
 
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-			return &transformations.Transformation{ID: "remote-trans-1", VersionID: "ver-1"}, nil
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
+			return &tc.Transformation{ID: "remote-trans-1", VersionID: "ver-1"}, nil
 		}
 
 		expectedErr := errors.New("batch test API failure")
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			return nil, expectedErr
 		}
 
@@ -476,7 +394,7 @@ func TestRunnerRun(t *testing.T) {
 
 	t.Run("uses remote ID from importable resources for version resolution", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		// Create graph with importable transformation (has import metadata)
 		graph := resources.NewGraph()
@@ -503,7 +421,7 @@ func TestRunnerRun(t *testing.T) {
 						ID:         "remote-imported-id",
 						ExternalID: "trans-imported",
 						Data: &model.RemoteTransformation{
-							Transformation: &transformations.Transformation{
+							Transformation: &tc.Transformation{
 								ID:         "remote-imported-id",
 								ExternalID: "trans-imported",
 								Name:       "Imported Transformation",
@@ -536,16 +454,16 @@ func TestRunnerRun(t *testing.T) {
 
 		// Track which remote ID is used for update
 		var usedRemoteID string
-		mockStore.updateTransformation = func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+		mockStore.UpdateTransformationFunc = func(ctx context.Context, id string, req *tc.UpdateTransformationRequest, publish bool) (*tc.Transformation, error) {
 			usedRemoteID = id
-			return &transformations.Transformation{
+			return &tc.Transformation{
 				ID:         id,
 				VersionID:  "ver-updated",
 				ExternalID: "trans-imported",
 			}, nil
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Transformations) != 1 {
 				return nil, errors.New("expected exactly 1 transformation in request")
 			}
@@ -553,10 +471,10 @@ func TestRunnerRun(t *testing.T) {
 				return nil, errors.New("expected version ID to be ver-updated")
 			}
 
-			return &transformations.BatchTestResponse{
+			return &tc.BatchTestResponse{
 				Pass: true,
-				ValidationOutput: transformations.ValidationOutput{
-					Transformations: []transformations.TransformationTestResult{
+				ValidationOutput: tc.ValidationOutput{
+					Transformations: []tc.TransformationTestResult{
 						{
 							ID:        "remote-imported-id",
 							VersionID: "ver-updated",
@@ -581,7 +499,7 @@ func TestRunnerRun(t *testing.T) {
 
 func TestBuildTestRequest(t *testing.T) {
 	t.Run("produces request with correct transformation versionID and test suite", func(t *testing.T) {
-		testDefs := []*transformations.TestDefinition{
+		testDefs := []*tc.TestDefinition{
 			{Name: "test-a", Input: []any{map[string]any{"type": "track"}}},
 			{Name: "test-b", Input: []any{map[string]any{"type": "identify"}}},
 		}
@@ -611,7 +529,7 @@ func TestBuildTestRequest(t *testing.T) {
 
 	t.Run("test suite preserves expectedOutput", func(t *testing.T) {
 		expected := []any{map[string]any{"type": "track", "processed": true}}
-		testDefs := []*transformations.TestDefinition{
+		testDefs := []*tc.TestDefinition{
 			{
 				Name:           "with-output",
 				Input:          []any{map[string]any{"type": "track"}},
@@ -626,7 +544,7 @@ func TestBuildTestRequest(t *testing.T) {
 	})
 
 	t.Run("preserves test definition order", func(t *testing.T) {
-		testDefs := []*transformations.TestDefinition{
+		testDefs := []*tc.TestDefinition{
 			{Name: "first"},
 			{Name: "second"},
 			{Name: "third"},
@@ -689,9 +607,9 @@ func TestGetVersionIDsForUnitLibraries(t *testing.T) {
 func TestRunTestUnitTask(t *testing.T) {
 	t.Run("executes test for a single unit and stores result", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
-		testDefs := []*transformations.TestDefinition{
+		testDefs := []*tc.TestDefinition{
 			{Name: "test1", Input: []any{map[string]any{"type": "track"}}},
 		}
 
@@ -703,21 +621,21 @@ func TestRunTestUnitTask(t *testing.T) {
 			libraryVersionIDs:     []string{"lib-ver-1"},
 		}
 
-		expectedResponse := &transformations.BatchTestResponse{
+		expectedResponse := &tc.BatchTestResponse{
 			Pass: true,
-			ValidationOutput: transformations.ValidationOutput{
-				Libraries: []transformations.LibraryTestResult{
+			ValidationOutput: tc.ValidationOutput{
+				Libraries: []tc.LibraryTestResult{
 					{VersionID: "lib-ver-1", Pass: true},
 				},
-				Transformations: []transformations.TransformationTestResult{
+				Transformations: []tc.TransformationTestResult{
 					{
 						ID:        "trans-1",
 						VersionID: "ver-1",
 						Pass:      true,
-						TestSuiteResult: transformations.TestSuiteRunResult{
-							Status: transformations.TestRunStatusPass,
-							Results: []transformations.TestResult{
-								{Name: "test1", Status: transformations.TestRunStatusPass},
+						TestSuiteResult: tc.TestSuiteRunResult{
+							Status: tc.TestRunStatusPass,
+							Results: []tc.TestResult{
+								{Name: "test1", Status: tc.TestRunStatusPass},
 							},
 						},
 					},
@@ -725,7 +643,7 @@ func TestRunTestUnitTask(t *testing.T) {
 			},
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Transformations) != 1 {
 				return nil, errors.New("expected exactly 1 transformation in request")
 			}
@@ -751,17 +669,17 @@ func TestRunTestUnitTask(t *testing.T) {
 
 	t.Run("returns error when batch test fails", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		unitTask := &testUnitTask{
 			ID:                    "trans-1",
 			Name:                  "Test Transformation",
-			testDefs:              []*transformations.TestDefinition{},
+			testDefs:              []*tc.TestDefinition{},
 			transformationVersion: "ver-1",
 		}
 
 		expectedErr := errors.New("API error")
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			return nil, expectedErr
 		}
 
@@ -793,7 +711,7 @@ func TestRunTestUnitTask(t *testing.T) {
 func TestResolveAllTransformationVersions(t *testing.T) {
 	t.Run("resolves versions for all transformations in test plan", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		graph := resources.NewGraph()
 		transformation1 := &model.TransformationResource{
@@ -831,12 +749,12 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 			OutputRaw: &model.TransformationState{ID: "remote-trans-2", VersionID: "ver-2-existing"},
 		})
 
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-			return &transformations.Transformation{VersionID: "ver-1-new"}, nil
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
+			return &tc.Transformation{VersionID: "ver-1-new"}, nil
 		}
 
-		mockStore.updateTransformation = func(ctx context.Context, id string, req *transformations.UpdateTransformationRequest, publish bool) (*transformations.Transformation, error) {
-			return &transformations.Transformation{VersionID: "ver-2-existing"}, nil
+		mockStore.UpdateTransformationFunc = func(ctx context.Context, id string, req *tc.UpdateTransformationRequest, publish bool) (*tc.Transformation, error) {
+			return &tc.Transformation{VersionID: "ver-2-existing"}, nil
 		}
 
 		urnToRemoteID := map[string]string{
@@ -852,7 +770,7 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 
 	t.Run("deduplicates transformations by ID", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		transformation := &model.TransformationResource{
 			ID:   "trans-1",
@@ -871,9 +789,9 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 		}
 
 		callCount := 0
-		mockStore.createTransformation = func(ctx context.Context, req *transformations.CreateTransformationRequest, publish bool) (*transformations.Transformation, error) {
+		mockStore.CreateTransformationFunc = func(ctx context.Context, req *tc.CreateTransformationRequest, publish bool) (*tc.Transformation, error) {
 			callCount++
-			return &transformations.Transformation{VersionID: "ver-1"}, nil
+			return &tc.Transformation{VersionID: "ver-1"}, nil
 		}
 
 		graph := resources.NewGraph()
@@ -899,7 +817,7 @@ func TestResolveAllTransformationVersions(t *testing.T) {
 func TestResolveAllLibraryVersions(t *testing.T) {
 	t.Run("resolves versions for all unique libraries", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		lib1 := &model.LibraryResource{ID: "lib-1", Name: "Lib 1", Code: "code1"}
 		lib2 := &model.LibraryResource{ID: "lib-2", Name: "Lib 2", Code: "code2"}
@@ -928,16 +846,16 @@ func TestResolveAllLibraryVersions(t *testing.T) {
 			OutputRaw: &model.LibraryState{ID: "remote-lib-3", VersionID: "ver-3-existing"},
 		})
 
-		mockStore.createLibraryFunc = func(ctx context.Context, req *transformations.CreateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
-			return &transformations.TransformationLibrary{VersionID: "ver-1-new"}, nil
+		mockStore.CreateLibraryFunc = func(ctx context.Context, req *tc.CreateLibraryRequest, publish bool) (*tc.TransformationLibrary, error) {
+			return &tc.TransformationLibrary{VersionID: "ver-1-new"}, nil
 		}
 
-		mockStore.updateLibraryFunc = func(ctx context.Context, id string, req *transformations.UpdateLibraryRequest, publish bool) (*transformations.TransformationLibrary, error) {
+		mockStore.UpdateLibraryFunc = func(ctx context.Context, id string, req *tc.UpdateLibraryRequest, publish bool) (*tc.TransformationLibrary, error) {
 			if id == "remote-lib-2" {
-				return &transformations.TransformationLibrary{VersionID: "ver-2-existing"}, nil
+				return &tc.TransformationLibrary{VersionID: "ver-2-existing"}, nil
 			}
 			if id == "remote-lib-3" {
-				return &transformations.TransformationLibrary{VersionID: "ver-3-existing"}, nil
+				return &tc.TransformationLibrary{VersionID: "ver-3-existing"}, nil
 			}
 			return nil, errors.New("unexpected library ID")
 		}
@@ -992,7 +910,7 @@ func TestTestStandaloneLibraries(t *testing.T) {
 
 	t.Run("executes batch test for standalone libraries", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		runner := &Runner{
 			store: mockStore,
@@ -1008,20 +926,20 @@ func TestTestStandaloneLibraries(t *testing.T) {
 			"lib-2": "ver-2",
 		}
 
-		expectedResponse := &transformations.BatchTestResponse{
+		expectedResponse := &tc.BatchTestResponse{
 			Pass: true,
-			ValidationOutput: transformations.ValidationOutput{
-				Libraries: []transformations.LibraryTestResult{
+			ValidationOutput: tc.ValidationOutput{
+				Libraries: []tc.LibraryTestResult{
 					{VersionID: "ver-1", Pass: true},
 					{VersionID: "ver-2", Pass: true},
 				},
-				Transformations: []transformations.TransformationTestResult{
+				Transformations: []tc.TransformationTestResult{
 					{ID: "trans-remote", VersionID: "ver-remote", Pass: true},
 				},
 			},
 		}
 
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			if len(req.Libraries) != 2 {
 				return nil, errors.New("expected exactly 2 libraries in request")
 			}
@@ -1045,7 +963,7 @@ func TestTestStandaloneLibraries(t *testing.T) {
 
 	t.Run("returns error when batch test fails", func(t *testing.T) {
 		ctx := context.Background()
-		mockStore := newMockStore()
+		mockStore := &testutil.MockTransformationStore{}
 
 		runner := &Runner{
 			store: mockStore,
@@ -1055,7 +973,7 @@ func TestTestStandaloneLibraries(t *testing.T) {
 		versionMap := map[string]string{"lib-1": "ver-1"}
 
 		expectedErr := errors.New("batch test failed")
-		mockStore.batchTestFunc = func(ctx context.Context, req *transformations.BatchTestRequest) (*transformations.BatchTestResponse, error) {
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
 			return nil, expectedErr
 		}
 

@@ -854,7 +854,7 @@ func TestTrackingPlanSemanticValid_V1PropertyNesting(t *testing.T) {
 		assert.Contains(t, results[0].Message, "nested properties are not allowed for property 'email'")
 	})
 
-	t.Run("string properties do not allow additionalProperties", func(t *testing.T) {
+	t.Run("string properties do not allow additional_properties", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -886,7 +886,7 @@ func TestTrackingPlanSemanticValid_V1PropertyNesting(t *testing.T) {
 		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
 		require.Len(t, results, 2)
 		assert.Contains(t, extractRefs(results), "/rules/0/properties/0")
-		assert.Contains(t, extractRefs(results), "/rules/0/properties/0/additionalProperties")
+		assert.Contains(t, extractRefs(results), "/rules/0/properties/0/additional_properties")
 	})
 }
 

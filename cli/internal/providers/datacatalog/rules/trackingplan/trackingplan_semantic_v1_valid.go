@@ -128,7 +128,7 @@ func validatePropertyNestingAllowedV1(
 	}
 	if hasAdditionalProps {
 		results = append(results, rules.ValidationResult{
-			Reference: baseRef + "/additionalProperties",
+			Reference: baseRef + "/additional_properties",
 			Message:   fmt.Sprintf("additional_properties is not allowed for property '%s'", localID),
 		})
 	}

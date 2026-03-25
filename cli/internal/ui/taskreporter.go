@@ -77,6 +77,7 @@ type tasksDoneMsg struct{}
 type model struct {
 	tasksMsgChan chan tea.Msg
 	tasks        map[string]*taskState
+	taskOrder    []string // maintains insertion order for stable rendering
 	total        int
 	completed    int
 	sp           spinner.Model
@@ -111,6 +112,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taskStartMsg:
 		m.tasks[msg.id] = &taskState{id: msg.id, message: msg.message}
+		m.taskOrder = append(m.taskOrder, msg.id)
 		return m, listenForTaskMessages(m.tasksMsgChan)
 
 	case taskCompleteMsg:
@@ -144,8 +146,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	var output strings.Builder
 
-	for _, task := range m.tasks {
-		output.WriteString(fmt.Sprintf("%s %s\n", m.sp.View(), task.message))
+	for _, id := range m.taskOrder {
+		if task, ok := m.tasks[id]; ok {
+			output.WriteString(fmt.Sprintf("%s %s\n", m.sp.View(), task.message))
+		}
 	}
 
 	if m.total > 0 && m.completed < m.total {

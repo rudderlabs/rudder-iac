@@ -49,6 +49,24 @@ func TestPropertyArrayItemTypesValidation(t *testing.T) {
 			expectedErrors: 1,
 			errorContains:  "cannot be paired with other types",
 		},
+		{
+			name: "invalid property with duplicate item_types",
+			properties: []catalog.PropertyV1{
+				{
+					LocalID:     "array-prop",
+					Name:        "Array Property",
+					Description: "Property with array type",
+					Type:        "array",
+					ItemTypes: []string{
+						"string",
+						"string",
+						"integer",
+					},
+				},
+			},
+			expectedErrors: 1,
+			errorContains:  "duplicate item_type",
+		},
 	}
 
 	for _, tc := range testCases {

@@ -72,16 +72,23 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest) ([]*transforma
 			return nil, fmt.Errorf("parsing input file %s: %w", filename, err)
 		}
 
-		var expectedOutput []any
+		var (
+			expectedOutput []any
+			outputFile     string
+		)
 		if outputPath, exists := outputFiles[filename]; exists {
 			expectedOutput, err = parseJSONFile(outputPath)
 			if err != nil {
 				return nil, fmt.Errorf("parsing output file %s: %w", filename, err)
 			}
+			outputFile = filepath.Join(suite.Output, filename)
 		}
 
 		testDef := &transformations.TestDefinition{
-			Name:           fmt.Sprintf("%s (%s/%s)", suite.Name, suite.Input, filename),
+			ID:             fmt.Sprintf("%s/%s/%s", suite.Name, suite.Input, filename),
+			Name:           fmt.Sprintf("%s (%s)", suite.Name, filename),
+			InputFile:      filepath.Join(suite.Input, filename),
+			OutputFile:     outputFile,
 			Input:          inputEvents,
 			ExpectedOutput: expectedOutput,
 		}
@@ -100,6 +107,7 @@ func defaultTestDefinitions() ([]*transformations.TestDefinition, error) {
 	}
 
 	testDef := &transformations.TestDefinition{
+		ID:             "default-events",
 		Name:           "default-events",
 		Input:          allEvents,
 		ExpectedOutput: nil,

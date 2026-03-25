@@ -1,0 +1,11 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: test_libraries
+spec:
+  id: python_utils_library
+  name: Python Utils Library
+  description: Python utility functions for data formatting
+  language: python
+  import_name: pythonUtilsLibrary
+  file: python/python_utils_library.py

@@ -4,65 +4,23 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateResource(t *testing.T) {
-	mockClient := &testutils.MockDataGraphClient{}
-	h := &HandlerImpl{client: mockClient}
-	graph := resources.NewGraph()
-
-	tests := []struct {
-		name     string
-		resource *model.DataGraphResource
-		wantErr  bool
-		errMsg   string
-	}{
-		{
-			name: "valid resource",
-			resource: &model.DataGraphResource{
-				ID:        "test-dg",
-				AccountID: "account-123",
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing account_id",
-			resource: &model.DataGraphResource{
-				ID: "test-dg",
-			},
-			wantErr: true,
-			errMsg:  "account_id is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := h.ValidateResource(tt.resource, graph)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestLoadRemoteResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify that hasExternalID is set to true
-			require.NotNil(t, hasExternalID)
-			assert.True(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.True(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -96,12 +54,12 @@ func TestLoadRemoteResources(t *testing.T) {
 
 func TestLoadImportableResources(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		ListDataGraphsFunc: func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+		ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 			// Verify that hasExternalID is set to false
-			require.NotNil(t, hasExternalID)
-			assert.False(t, *hasExternalID)
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
 
-			if page == 1 {
+			if req.Page == 1 {
 				return &dgClient.ListDataGraphsResponse{
 					Data: []dgClient.DataGraph{
 						{
@@ -121,6 +79,73 @@ func TestLoadImportableResources(t *testing.T) {
 	remotes, err := h.LoadImportableResources(context.Background())
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
+}
+
+func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
+	t.Run("resolves account name", func(t *testing.T) {
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				if req.Page == 1 {
+					return &dgClient.ListDataGraphsResponse{
+						Data: []dgClient.DataGraph{
+							{ID: "remote-1", AccountID: "account-1"},
+							{ID: "remote-2", AccountID: "account-2"},
+						},
+						Paging: client.Paging{Next: ""},
+					}, nil
+				}
+				return &dgClient.ListDataGraphsResponse{}, nil
+			},
+		}
+
+		mockResolver := &testutils.MockAccountNameResolver{
+			GetAccountNameFunc: func(ctx context.Context, accountID string) (string, error) {
+				names := map[string]string{
+					"account-1": "My Warehouse",
+					"account-2": "Production DB",
+				}
+				if name, ok := names[accountID]; ok {
+					return name, nil
+				}
+				return "", assert.AnError
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
+		remotes, err := h.LoadImportableResources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, remotes, 2)
+		assert.Equal(t, "My Warehouse", remotes[0].AccountName)
+		assert.Equal(t, "Production DB", remotes[1].AccountName)
+
+		// Verify Metadata() returns account name as Name
+		assert.Equal(t, "My Warehouse", remotes[0].Metadata().Name)
+		assert.Equal(t, "Production DB", remotes[1].Metadata().Name)
+	})
+
+	t.Run("returns error when account resolution fails", func(t *testing.T) {
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				return &dgClient.ListDataGraphsResponse{
+					Data: []dgClient.DataGraph{
+						{ID: "remote-1", AccountID: "bad-account"},
+					},
+					Paging: client.Paging{Next: ""},
+				}, nil
+			},
+		}
+
+		mockResolver := &testutils.MockAccountNameResolver{
+			GetAccountNameFunc: func(ctx context.Context, accountID string) (string, error) {
+				return "", assert.AnError
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
+		_, err := h.LoadImportableResources(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resolving account name")
+	})
 }
 
 func TestMapRemoteToState(t *testing.T) {
@@ -222,12 +247,12 @@ func TestUpdate(t *testing.T) {
 
 func TestImport(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
-		SetExternalIDFunc: func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
-			assert.Equal(t, "remote-1", id)
-			assert.Equal(t, "test-dg", externalID)
+		SetExternalIDFunc: func(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error) {
+			assert.Equal(t, "remote-1", req.ID)
+			assert.Equal(t, "test-dg", req.ExternalID)
 			return &dgClient.DataGraph{
-				ID:         id,
-				ExternalID: externalID,
+				ID:         req.ID,
+				ExternalID: req.ExternalID,
 			}, nil
 		},
 	}
@@ -269,4 +294,22 @@ func TestDelete(t *testing.T) {
 
 	err := h.Delete(context.Background(), "test-dg", oldData, oldState)
 	require.NoError(t, err)
+}
+
+// TestDataGraphResourceMapstructureTags verifies that mapstructure.Decode produces
+// snake_case keys from DataGraphResource, matching what the diff engine expects.
+func TestDataGraphResourceMapstructureTags(t *testing.T) {
+	resource := &model.DataGraphResource{
+		ID:        "test-dg",
+		AccountID: "account-123",
+	}
+
+	var result map[string]interface{}
+	err := mapstructure.Decode(resource, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]interface{}{
+		"id":         "test-dg",
+		"account_id": "account-123",
+	}, result)
 }

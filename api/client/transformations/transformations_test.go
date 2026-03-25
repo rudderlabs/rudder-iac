@@ -572,6 +572,7 @@ func TestBatchPublish(t *testing.T) {
 							"versionId": "trans-ver-1",
 							"testSuite": [
 								{
+									"id": "test-1",
 									"name": "Test 1",
 									"input": [{"event": "test1"}]
 								}
@@ -581,6 +582,7 @@ func TestBatchPublish(t *testing.T) {
 							"versionId": "trans-ver-2",
 							"testSuite": [
 								{
+									"id": "test-2",
 									"name": "Test 2",
 									"input": [{"event": "test2"}]
 								}
@@ -619,6 +621,7 @@ func TestBatchPublish(t *testing.T) {
 				VersionID: "trans-ver-1",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:    "test-1",
 						Name:  "Test 1",
 						Input: []any{map[string]string{"event": "test1"}},
 					},
@@ -628,6 +631,7 @@ func TestBatchPublish(t *testing.T) {
 				VersionID: "trans-ver-2",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:    "test-2",
 						Name:  "Test 2",
 						Input: []any{map[string]string{"event": "test2"}},
 					},
@@ -663,6 +667,7 @@ func TestBatchTest(t *testing.T) {
 							"versionId": "trans-ver-123",
 							"testSuite": [
 								{
+									"id": "test-case-1",
 									"name": "Test Case 1",
 									"description": "Test description",
 									"input": [{"type": "track", "event": "Button Clicked"}],
@@ -717,6 +722,7 @@ func TestBatchTest(t *testing.T) {
 				VersionID: "trans-ver-123",
 				TestSuite: []transformations.TestDefinition{
 					{
+						ID:             "test-case-1",
 						Name:           "Test Case 1",
 						Description:    "Test description",
 						Input:          []any{map[string]any{"type": "track", "event": "Button Clicked"}},
@@ -802,6 +808,7 @@ func TestBatchTestErrors(t *testing.T) {
 									"versionId": "trans-ver-123",
 									"testSuite": [
 										{
+											"id": "test-case-1",
 											"name": "Test Case 1",
 											"input": [{"event": "test"}],
 											"expectedOutput": [{"event": "test"}]
@@ -827,6 +834,7 @@ func TestBatchTestErrors(t *testing.T) {
 						VersionID: "trans-ver-123",
 						TestSuite: []transformations.TestDefinition{
 							{
+								ID:             "test-case-1",
 								Name:           "Test Case 1",
 								Input:          []any{map[string]any{"event": "test"}},
 								ExpectedOutput: []any{map[string]any{"event": "test"}},
@@ -898,6 +906,192 @@ func TestUpdateTransformationClearDescription(t *testing.T) {
 	assert.Equal(t, "", result.Description)
 
 	httpClient.AssertNumberOfCalls()
+}
+
+func TestGetTransformationVersion(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/transformations/trans-123/versions/ver-456", "")
+				},
+				ResponseStatus: 200,
+				ResponseBody: `{
+					"id": "trans-123",
+					"versionId": "ver-456",
+					"name": "test-transformation",
+					"description": "Test description",
+					"code": "function transform(event) { return event; }",
+					"language": "javascript",
+					"imports": ["lib-1"],
+					"workspaceId": "ws-789",
+					"externalId": "ext-123"
+				}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetTransformationVersion(ctx, "trans-123", "ver-456")
+		require.NoError(t, err)
+		assert.Equal(t, &transformations.Transformation{
+			ID:          "trans-123",
+			VersionID:   "ver-456",
+			Name:        "test-transformation",
+			Description: "Test description",
+			Code:        "function transform(event) { return event; }",
+			Language:    "javascript",
+			Imports:     []string{"lib-1"},
+			WorkspaceID: "ws-789",
+			ExternalID:  "ext-123",
+		}, result)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("non-200 status code", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 404,
+				ResponseBody:   `{"message": "not found"}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetTransformationVersion(ctx, "trans-123", "ver-456")
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "getting transformation version")
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("unmarshal failure", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 200,
+				ResponseBody:   `not valid json`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetTransformationVersion(ctx, "trans-123", "ver-456")
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "unmarshalling transformation version response")
+
+		httpClient.AssertNumberOfCalls()
+	})
+}
+
+func TestGetLibraryVersion(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/libraries/lib-123/versions/ver-789", "")
+				},
+				ResponseStatus: 200,
+				ResponseBody: `{
+					"id": "lib-123",
+					"versionId": "ver-789",
+					"name": "test-library",
+					"description": "Test library description",
+					"code": "function helper() { return true; }",
+					"language": "javascript",
+					"importName": "testLibrary",
+					"workspaceId": "ws-789",
+					"externalId": "lib-ext-123"
+				}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetLibraryVersion(ctx, "lib-123", "ver-789")
+		require.NoError(t, err)
+		assert.Equal(t, &transformations.TransformationLibrary{
+			ID:          "lib-123",
+			VersionID:   "ver-789",
+			Name:        "test-library",
+			Description: "Test library description",
+			Code:        "function helper() { return true; }",
+			Language:    "javascript",
+			ImportName:  "testLibrary",
+			WorkspaceID: "ws-789",
+			ExternalID:  "lib-ext-123",
+		}, result)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("non-200 status code", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 404,
+				ResponseBody:   `{"message": "not found"}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetLibraryVersion(ctx, "lib-123", "ver-789")
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "getting library version")
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("unmarshal failure", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 200,
+				ResponseBody:   `not valid json`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.GetLibraryVersion(ctx, "lib-123", "ver-789")
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "unmarshalling library version response")
+
+		httpClient.AssertNumberOfCalls()
+	})
 }
 
 func TestSetTransformationExternalID(t *testing.T) {

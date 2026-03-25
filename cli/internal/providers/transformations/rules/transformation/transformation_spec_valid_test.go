@@ -81,6 +81,25 @@ func TestValidateTransformationSpec_ValidSpecs(t *testing.T) {
 		results := validateTransformationSpec("", "", specPath, nil, spec)
 		assert.Empty(t, results)
 	})
+
+	t.Run("unknown language with file does not produce extension error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		specPath := filepath.Join(tmpDir, "spec.yaml")
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "transform.rb"), []byte("code"), 0o644))
+
+		spec := specs.TransformationSpec{
+			ID:       "trans-1",
+			Name:     "Transformation",
+			Language: "ruby",
+			File:     "transform.rb",
+		}
+
+		results := validateTransformationSpec("", "", specPath, nil, spec)
+
+		assert.NotContains(t, extractMessages(results), "file extension must be")
+	})
 }
 
 func TestValidateTransformationSpec_InvalidSpecs(t *testing.T) {

@@ -307,35 +307,33 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	baseRegistry := rules.NewRegistry()
-	validVersions := []string{
-		specs.SpecVersionV0_1,
-		specs.SpecVersionV0_1Variant,
-	}
-	if p.loadV1Specs {
-		validVersions = append(validVersions, specs.SpecVersionV1)
-	}
+	// Active patterns become the source of truth for the
+	// validation pipeline to determine which unique kinds and versions
+	// are supported in the system.
+	activePatterns := p.provider.SupportedMatchPatterns()
+	baseRegistry := rules.NewRegistry(activePatterns)
 
-	// Add project-level syntactic rules along with aggregated
-	// syntactic rules from each provider.
 	syntactic := []rules.Rule{
-		prules.NewSpecSyntaxValidRule(
-			p.provider.SupportedKinds(),
-			validVersions,
-		),
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, validVersions),
-		prules.NewDuplicateURNRule(p.provider.ParseSpec),
+		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
+		// independently. They use activePatterns as source of truth for the supported kinds and versions.
+		prules.NewSpecSyntaxValidRule(activePatterns),
+		prules.NewResourceKindVersionValidRule(activePatterns),
+
+		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
+		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
-		baseRegistry.RegisterSyntactic(rule)
+		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
+			return nil, fmt.Errorf("registering syntactic rule %s: %w", rule.ID(), err)
+		}
 	}
 
-	semantic := p.provider.SemanticRules()
-
-	for _, rule := range semantic {
-		baseRegistry.RegisterSemantic(rule)
+	for _, rule := range p.provider.SemanticRules() {
+		if err := baseRegistry.RegisterSemantic(rule); err != nil {
+			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
+		}
 	}
 
 	return baseRegistry, nil

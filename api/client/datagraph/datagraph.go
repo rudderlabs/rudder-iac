@@ -11,7 +11,7 @@ import (
 
 type DataGraphStore interface {
 	// ListDataGraphs lists all data graphs with optional pagination and filtering
-	ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error)
+	ListDataGraphs(ctx context.Context, req *ListDataGraphsRequest) (*ListDataGraphsResponse, error)
 
 	// GetDataGraph retrieves a data graph by ID
 	GetDataGraph(ctx context.Context, id string) (*DataGraph, error)
@@ -23,22 +23,22 @@ type DataGraphStore interface {
 	DeleteDataGraph(ctx context.Context, id string) error
 
 	// SetExternalID sets the external ID for a data graph and returns the updated data graph
-	SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error)
+	SetExternalID(ctx context.Context, req *SetExternalIDRequest) (*DataGraph, error)
 }
 
 // ListDataGraphs lists all data graphs with optional pagination and filtering
-func (s *rudderDataGraphClient) ListDataGraphs(ctx context.Context, page, pageSize int, hasExternalID *bool) (*ListDataGraphsResponse, error) {
+func (s *rudderDataGraphClient) ListDataGraphs(ctx context.Context, req *ListDataGraphsRequest) (*ListDataGraphsResponse, error) {
 	path := dataGraphsBasePath
 
 	query := url.Values{}
-	if page > 0 {
-		query.Add("page", strconv.Itoa(page))
+	if req.Page > 0 {
+		query.Add("page", strconv.Itoa(req.Page))
 	}
-	if pageSize > 0 {
-		query.Add("pageSize", strconv.Itoa(pageSize))
+	if req.PageSize > 0 {
+		query.Add("pageSize", strconv.Itoa(req.PageSize))
 	}
-	if hasExternalID != nil {
-		query.Add("hasExternalId", strconv.FormatBool(*hasExternalID))
+	if req.HasExternalID != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*req.HasExternalID))
 	}
 
 	if len(query) > 0 {
@@ -114,13 +114,13 @@ func (s *rudderDataGraphClient) DeleteDataGraph(ctx context.Context, id string) 
 }
 
 // SetExternalID sets the external ID for a data graph and returns the updated data graph
-func (s *rudderDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) (*DataGraph, error) {
-	if id == "" {
+func (s *rudderDataGraphClient) SetExternalID(ctx context.Context, req *SetExternalIDRequest) (*DataGraph, error) {
+	if req.ID == "" {
 		return nil, fmt.Errorf("data graph ID cannot be empty")
 	}
 
-	path := fmt.Sprintf("%s/%s/external-id", dataGraphsBasePath, id)
-	data, err := json.Marshal(map[string]string{"externalId": externalID})
+	path := fmt.Sprintf("%s/%s/external-id", dataGraphsBasePath, req.ID)
+	data, err := json.Marshal(map[string]string{"externalId": req.ExternalID})
 	if err != nil {
 		return nil, fmt.Errorf("marshalling external ID: %w", err)
 	}

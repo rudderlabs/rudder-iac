@@ -8,19 +8,19 @@ import (
 
 // ModelResource represents the resource for a model (entity or event)
 type ModelResource struct {
-	ID           string
-	DisplayName  string
-	Type         string // "entity" or "event"
-	Table        string
-	Description  string
-	DataGraphRef *resources.PropertyRef // Reference to parent data graph's remote ID
+	ID           string                 `mapstructure:"id"`
+	DisplayName  string                 `mapstructure:"display_name"`
+	Type         string                 `mapstructure:"type"` // "entity" or "event"
+	Table        string                 `mapstructure:"table"`
+	Description  string                 `mapstructure:"description"`
+	DataGraphRef *resources.PropertyRef `mapstructure:"data_graph"` // Reference to parent data graph's remote ID
 
 	// Entity model fields
-	PrimaryID string
-	Root      bool
+	PrimaryID string `mapstructure:"primary_id"`
+	Root      bool   `mapstructure:"root"`
 
 	// Event model fields
-	Timestamp string
+	Timestamp string `mapstructure:"timestamp"`
 }
 
 // ModelState represents the output state from the remote system

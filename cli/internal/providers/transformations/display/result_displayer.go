@@ -49,6 +49,8 @@ const (
 	labelVerboseTip      = "Tip: Run with --verbose for full diffs and input payloads"
 	labelSuiteField      = "Suite:       %s"
 	labelTestField       = "Test:        %s"
+	labelInputFileField  = "Input:       %s"
+	labelOutputFileField = "Output:      %s"
 	labelErrorField      = "Error: %s"
 	labelLibrarySummary  = "Libraries: %d passed, %d errored"
 	labelTestCaseSummary = "Test cases: %d passed, %d errored, %d mismatched"
@@ -139,6 +141,8 @@ func printFullStackTrace(lines []string, indent int) {
 type failureDetail struct {
 	transformationName string
 	testName           string
+	inputFile          string
+	outputFile         string
 	status             transformations.TestRunStatus
 	expectedOutput     []any
 	actualOutput       []any
@@ -273,8 +277,7 @@ func (rd *ResultDisplayer) displayTransformations(transformations []*testorchest
 	printSection(sectionTransformationTests)
 
 	for _, trWithDef := range transformations {
-		expectedOutputMap := buildExpectedOutputMap(trWithDef.Definitions)
-		rd.displayTransformation(trWithDef.Result, expectedOutputMap)
+		rd.displayTransformation(trWithDef)
 	}
 
 	ui.Printf(labelTestCaseSummary+"\n",
@@ -330,10 +333,13 @@ func (rd *ResultDisplayer) printSummary() {
 	printSeparator("=")
 }
 
-func (rd *ResultDisplayer) displayTransformation(
-	result *transformations.TransformationTestResult,
-	expectedOutputMap map[string][]any,
-) {
+func (rd *ResultDisplayer) displayTransformation(trWithDef *testorchestrator.TransformationTestWithDefinitions) {
+	result := trWithDef.Result
+
+	defsByID := lo.SliceToMap(trWithDef.Definitions, func(def *transformations.TestDefinition) (string, transformations.TestDefinition) {
+		return def.ID, *def
+	})
+
 	ui.Println(result.Name)
 
 	if len(result.Imports) > 0 {
@@ -342,8 +348,7 @@ func (rd *ResultDisplayer) displayTransformation(
 	}
 
 	for _, testResult := range result.TestSuiteResult.Results {
-		expectedOutput := expectedOutputMap[testResult.Name]
-		rd.displayTestResult(result.Name, testResult, expectedOutput)
+		rd.displayTestResult(result.Name, testResult, defsByID[testResult.ID])
 	}
 
 	newLine()
@@ -352,7 +357,7 @@ func (rd *ResultDisplayer) displayTransformation(
 func (rd *ResultDisplayer) displayTestResult(
 	transformationName string,
 	testResult transformations.TestResult,
-	expectedOutput []any,
+	def transformations.TestDefinition,
 ) {
 	switch testResult.Status {
 	case transformations.TestRunStatusPass:
@@ -374,8 +379,10 @@ func (rd *ResultDisplayer) displayTestResult(
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
 			testName:           testResult.Name,
+			inputFile:          def.InputFile,
+			outputFile:         def.OutputFile,
 			status:             testResult.Status,
-			expectedOutput:     expectedOutput,
+			expectedOutput:     def.ExpectedOutput,
 			actualOutput:       testResult.ActualOutput,
 			errors:             testResult.Errors,
 		})
@@ -391,6 +398,8 @@ func (rd *ResultDisplayer) displayTestResult(
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
 			testName:           testResult.Name,
+			inputFile:          def.InputFile,
+			outputFile:         def.OutputFile,
 			status:             testResult.Status,
 			errors:             testResult.Errors,
 		})
@@ -422,6 +431,12 @@ func (rd *ResultDisplayer) printFailureDetail(detail failureDetail, failureNum i
 
 	ui.Printf(labelSuiteField+"\n", detail.transformationName)
 	ui.Printf(labelTestField+"\n", detail.testName)
+	if detail.inputFile != "" {
+		ui.Printf(labelInputFileField+"\n", detail.inputFile)
+	}
+	if detail.outputFile != "" {
+		ui.Printf(labelOutputFileField+"\n", detail.outputFile)
+	}
 
 	if detail.status == transformations.TestRunStatusError {
 		rd.printErrorDetail(detail)
@@ -579,12 +594,4 @@ func generateDiff(expected, actual string, contextLines int) string {
 	}
 
 	return result
-}
-
-func buildExpectedOutputMap(definitions []*transformations.TestDefinition) map[string][]any {
-	expectedOutputMap := make(map[string][]any)
-	for _, def := range definitions {
-		expectedOutputMap[def.Name] = def.ExpectedOutput
-	}
-	return expectedOutputMap
 }
