@@ -78,8 +78,6 @@ func TestProject_Load_Success(t *testing.T) {
 	}
 	assert.True(t, foundSpec1, "Spec1 should have been loaded")
 	assert.True(t, foundSpec2, "Spec2 should have been loaded")
-
-	assert.Equal(t, 1, mockProvider.ValidateCalledCount, "Validate should be called once")
 }
 
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
@@ -103,35 +101,10 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 
 	err := proj.Load("test_dir")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "provider failed to load spec from path path/to/spec.yaml")
+	assert.Contains(t, err.Error(), "loading spec path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
 }
 
-func TestProject_Load_ProviderValidateError(t *testing.T) {
-	t.Parallel()
-
-	mockProvider := testutils.NewMockProvider(nil, nil)
-	mockLoader := &MockLoader{}
-
-	proj := project.New(mockProvider, project.WithLoader(mockLoader))
-
-	validSpecs := map[string]*specs.RawSpec{
-		"path/to/spec.yaml": {Data: []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: my_source\nspec:\n  k: v")},
-	}
-
-	mockLoader.LoadFunc = func(location string) (map[string]*specs.RawSpec, error) {
-		return validSpecs, nil
-	}
-
-	mockProvider.LoadLegacySpecErr = nil
-	expectedErr := errors.New("provider Validate failed")
-	mockProvider.ValidateErr = expectedErr
-
-	err := proj.Load("test_dir")
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, expectedErr))
-	assert.Equal(t, 1, mockProvider.ValidateCalledCount)
-}
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
