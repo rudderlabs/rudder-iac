@@ -325,7 +325,8 @@ func TestResultDisplayer_Display_WithMismatchFailures_ShowsFilePaths(t *testing.
 	testDefinitions := []*transformations.TestDefinition{
 		{
 			ID:             "suite/inputs/event.json",
-			Name:           "suite (event.json)",
+			Name:           "suite",
+			Filename:       "event.json",
 			InputFile:      "inputs/event.json",
 			OutputFile:     "outputs/event.json",
 			ExpectedOutput: []any{map[string]any{"status": "success"}},
@@ -341,7 +342,7 @@ func TestResultDisplayer_Display_WithMismatchFailures_ShowsFilePaths(t *testing.
 						Results: []transformations.TestResult{
 							{
 								ID:           "suite/inputs/event.json",
-								Name:         "suite (event.json)",
+								Name:         "suite",
 								Status:       transformations.TestRunStatusFail,
 								ActualOutput: []any{map[string]any{"status": "failed"}},
 							},
@@ -356,6 +357,7 @@ func TestResultDisplayer_Display_WithMismatchFailures_ShowsFilePaths(t *testing.
 	displayer.Display(results)
 
 	output := buf.String()
+	assert.Contains(t, output, "suite (event.json)")
 	assert.Contains(t, output, "inputs/event.json")
 	assert.Contains(t, output, "outputs/event.json")
 }

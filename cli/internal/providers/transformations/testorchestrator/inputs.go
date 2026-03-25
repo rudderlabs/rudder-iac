@@ -86,7 +86,8 @@ func buildTestDefinitionsForSuite(suite specs.TransformationTest) ([]*transforma
 
 		testDef := &transformations.TestDefinition{
 			ID:             fmt.Sprintf("%s/%s/%s", suite.Name, suite.Input, filename),
-			Name:           fmt.Sprintf("%s (%s)", suite.Name, filename),
+			Name:           suite.Name,
+			Filename:       filename,
 			InputFile:      filepath.Join(suite.Input, filename),
 			OutputFile:     outputFile,
 			Input:          inputEvents,
@@ -109,6 +110,7 @@ func defaultTestDefinitions() ([]*transformations.TestDefinition, error) {
 	testDef := &transformations.TestDefinition{
 		ID:             "default-events",
 		Name:           "default-events",
+		Filename:       defaultEventsOutputFilename,
 		Input:          allEvents,
 		ExpectedOutput: nil,
 	}

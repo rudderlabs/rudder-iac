@@ -26,6 +26,7 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.Len(t, result, 1)
 		assert.Equal(t, "default-events", result[0].ID)
 		assert.Equal(t, "default-events", result[0].Name)
+		assert.Equal(t, defaultEventsOutputFilename, result[0].Filename)
 		assert.NotEmpty(t, result[0].Input)
 		assert.Nil(t, result[0].ExpectedOutput)
 		assert.Empty(t, result[0].InputFile)
@@ -52,6 +53,7 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.Len(t, result, 1)
 		assert.Equal(t, "default-events", result[0].ID)
 		assert.Equal(t, "default-events", result[0].Name)
+		assert.Equal(t, defaultEventsOutputFilename, result[0].Filename)
 	})
 
 	t.Run("suite with input files only", func(t *testing.T) {
@@ -80,7 +82,8 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 		assert.Equal(t, fmt.Sprintf("My Suite/%s/event.json", inputDir), result[0].ID)
-		assert.Equal(t, "My Suite (event.json)", result[0].Name)
+		assert.Equal(t, "My Suite", result[0].Name)
+		assert.Equal(t, "event.json", result[0].Filename)
 		assert.Equal(t, filepath.Join(inputDir, "event.json"), result[0].InputFile)
 		assert.Empty(t, result[0].OutputFile)
 		require.Len(t, result[0].Input, 1)
@@ -122,7 +125,8 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 		assert.Equal(t, fmt.Sprintf("Suite/%s/event.json", inputDir), result[0].ID)
-		assert.Equal(t, "Suite (event.json)", result[0].Name)
+		assert.Equal(t, "Suite", result[0].Name)
+		assert.Equal(t, "event.json", result[0].Filename)
 		assert.Equal(t, filepath.Join(inputDir, "event.json"), result[0].InputFile)
 		assert.Equal(t, filepath.Join(outputDir, "event.json"), result[0].OutputFile)
 		assert.NotNil(t, result[0].ExpectedOutput)
@@ -152,8 +156,12 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.Len(t, result, 2)
 
 		names := []string{result[0].Name, result[1].Name}
-		assert.Contains(t, names, "Suite One (a.json)")
-		assert.Contains(t, names, "Suite Two (b.json)")
+		assert.Contains(t, names, "Suite One")
+		assert.Contains(t, names, "Suite Two")
+
+		filenames := []string{result[0].Filename, result[1].Filename}
+		assert.Contains(t, filenames, "a.json")
+		assert.Contains(t, filenames, "b.json")
 
 		ids := []string{result[0].ID, result[1].ID}
 		assert.Contains(t, ids, fmt.Sprintf("Suite One/%s/a.json", suite1))

@@ -359,10 +359,12 @@ func (rd *ResultDisplayer) displayTestResult(
 	testResult transformations.TestResult,
 	def transformations.TestDefinition,
 ) {
+	displayName := testDisplayName(testResult.Name, def.Filename)
+
 	switch testResult.Status {
 	case transformations.TestRunStatusPass:
 		printWithPadding(
-			fmt.Sprintf("  %s %s", ui.Color(symbolPass, ui.ColorGreen), testResult.Name),
+			fmt.Sprintf("  %s %s", ui.Color(symbolPass, ui.ColorGreen), displayName),
 			testStatusPassed,
 			statusColumn,
 		)
@@ -370,7 +372,7 @@ func (rd *ResultDisplayer) displayTestResult(
 
 	case transformations.TestRunStatusFail:
 		printWithPadding(
-			fmt.Sprintf("  %s %s", ui.Color(symbolMismatch, ui.ColorYellow), testResult.Name),
+			fmt.Sprintf("  %s %s", ui.Color(symbolMismatch, ui.ColorYellow), displayName),
 			testStatusMismatch,
 			statusColumn,
 		)
@@ -378,7 +380,7 @@ func (rd *ResultDisplayer) displayTestResult(
 
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
-			testName:           testResult.Name,
+			testName:           displayName,
 			inputFile:          def.InputFile,
 			outputFile:         def.OutputFile,
 			status:             testResult.Status,
@@ -389,7 +391,7 @@ func (rd *ResultDisplayer) displayTestResult(
 
 	case transformations.TestRunStatusError:
 		printWithPadding(
-			fmt.Sprintf("  %s %s", ui.Color(symbolError, ui.ColorRed), testResult.Name),
+			fmt.Sprintf("  %s %s", ui.Color(symbolError, ui.ColorRed), displayName),
 			testStatusError,
 			statusColumn,
 		)
@@ -397,13 +399,22 @@ func (rd *ResultDisplayer) displayTestResult(
 
 		rd.suiteCounter.failures = append(rd.suiteCounter.failures, failureDetail{
 			transformationName: transformationName,
-			testName:           testResult.Name,
+			testName:           displayName,
 			inputFile:          def.InputFile,
 			outputFile:         def.OutputFile,
 			status:             testResult.Status,
 			errors:             testResult.Errors,
 		})
 	}
+}
+
+// testDisplayName builds a display-friendly name by combining the test name with
+// the filename when available. Returns "name (filename)" or just "name".
+func testDisplayName(name, filename string) string {
+	if filename == "" {
+		return name
+	}
+	return fmt.Sprintf("%s (%s)", name, filename)
 }
 
 func (rd *ResultDisplayer) printSuiteFailures() {
