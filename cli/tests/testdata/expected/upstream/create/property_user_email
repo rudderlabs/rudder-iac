@@ -1,0 +1,17 @@
+{
+    "propConfig": {
+        "$ref": "#/$defs/EmailString"
+    },
+    "id": "prop_IGNORED",
+    "externalId": "user_email",
+    "name": "User Email",
+    "description": "User email validated against the email_string custom type",
+    "type": "EmailString",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}
