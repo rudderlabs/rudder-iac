@@ -13,16 +13,17 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		t.Parallel()
 
 		config := map[string]interface{}{
-			"minLength":        5,
-			"maxLength":        50,
-			"multipleOf":       3,
-			"itemTypes":        []interface{}{"string", "integer"},
-			"enum":             []interface{}{"value1", "value2"},
-			"minimum":          0,
-			"maximum":          100,
-			"pattern":          "^[a-z]+$",
-			"exclusiveMinimum": 1,
-			"exclusiveMaximum": 99,
+			"minLength":            5,
+			"maxLength":            50,
+			"multipleOf":           3,
+			"itemTypes":            []interface{}{"string", "integer"},
+			"enum":                 []interface{}{"value1", "value2"},
+			"minimum":              0,
+			"maximum":              100,
+			"pattern":              "^[a-z]+$",
+			"exclusiveMinimum":     1,
+			"exclusiveMaximum":     99,
+			"additionalProperties": false,
 		}
 
 		result := ConvertConfigKeysToSnakeCase(config)
@@ -37,6 +38,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		assert.Equal(t, "^[a-z]+$", result["pattern"])
 		assert.Equal(t, 1, result["exclusive_minimum"])
 		assert.Equal(t, 99, result["exclusive_maximum"])
+		assert.Equal(t, false, result["additional_properties"])
 
 		// Verify camelCase keys don't exist
 		assert.NotContains(t, result, "minLength")
@@ -45,6 +47,7 @@ func TestConvertConfigKeysToSnakeCase(t *testing.T) {
 		assert.NotContains(t, result, "itemTypes")
 		assert.NotContains(t, result, "exclusiveMinimum")
 		assert.NotContains(t, result, "exclusiveMaximum")
+		assert.NotContains(t, result, "additionalProperties")
 	})
 
 	t.Run("returns nil for nil config", func(t *testing.T) {
@@ -301,6 +304,82 @@ func TestPropertySpecV1_FromV0(t *testing.T) {
 
 func TestCustomTypeV1_FromV0(t *testing.T) {
 	t.Parallel()
+
+	t.Run("extracts single itemType from config", func(t *testing.T) {
+		t.Parallel()
+
+		v0 := CustomType{
+			LocalID: "tags",
+			Name:    "Tags",
+			Type:    "array",
+			Config:  map[string]any{"itemTypes": []interface{}{"string"}},
+		}
+
+		var v1 CustomTypeV1
+		err := v1.FromV0(v0)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "string", v1.ItemType)
+		assert.Nil(t, v1.ItemTypes)
+		assert.NotContains(t, v1.Config, "item_types")
+	})
+
+	t.Run("extracts multiple itemTypes from config", func(t *testing.T) {
+		t.Parallel()
+
+		v0 := CustomType{
+			LocalID: "mixed_list",
+			Name:    "MixedList",
+			Type:    "array",
+			Config:  map[string]any{"itemTypes": []interface{}{"string", "number"}},
+		}
+
+		var v1 CustomTypeV1
+		err := v1.FromV0(v0)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "", v1.ItemType)
+		assert.Equal(t, []string{"string", "number"}, v1.ItemTypes)
+		assert.NotContains(t, v1.Config, "item_types")
+	})
+
+	t.Run("extracts custom type ref from itemTypes", func(t *testing.T) {
+		t.Parallel()
+
+		v0 := CustomType{
+			LocalID: "address_list",
+			Name:    "AddressList",
+			Type:    "array",
+			Config:  map[string]any{"itemTypes": []interface{}{"#custom-type:Address"}},
+		}
+
+		var v1 CustomTypeV1
+		err := v1.FromV0(v0)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "#custom-type:Address", v1.ItemType)
+		assert.Nil(t, v1.ItemTypes)
+		assert.NotContains(t, v1.Config, "item_types")
+	})
+
+	t.Run("no itemTypes in config", func(t *testing.T) {
+		t.Parallel()
+
+		v0 := CustomType{
+			LocalID: "simple_type",
+			Name:    "SimpleType",
+			Type:    "string",
+			Config:  map[string]any{"minLength": 5},
+		}
+
+		var v1 CustomTypeV1
+		err := v1.FromV0(v0)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "", v1.ItemType)
+		assert.Nil(t, v1.ItemTypes)
+		assert.Equal(t, map[string]any{"min_length": 5}, v1.Config)
+	})
 
 	t.Run("converts V0 custom type with variants to V1 format", func(t *testing.T) {
 		t.Parallel()

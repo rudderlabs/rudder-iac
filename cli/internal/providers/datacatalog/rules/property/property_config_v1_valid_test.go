@@ -395,7 +395,6 @@ func TestPropertyConfigV1ValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types":   []any{"string"},
 							"min_items":    1,
 							"max_items":    10,
 							"unique_items": true,
@@ -406,7 +405,7 @@ func TestPropertyConfigV1ValidRule_ArrayType(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "item_types not array",
+			name: "item_types in config is not applicable (spec-level field)",
 			spec: localcatalog.PropertySpecV1{
 				Properties: []localcatalog.PropertyV1{
 					{
@@ -414,32 +413,14 @@ func TestPropertyConfigV1ValidRule_ArrayType(t *testing.T) {
 						Name:    "Tags",
 						Type:    "array",
 						Config: map[string]any{
-							"item_types": "string",
+							"item_types": []any{"string"},
 						},
 					},
 				},
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/properties/0/propConfig/item_types"},
-			expectedMsgs:   []string{"'item_types' must be an array"},
-		},
-		{
-			name: "item_types element not string",
-			spec: localcatalog.PropertySpecV1{
-				Properties: []localcatalog.PropertyV1{
-					{
-						LocalID: "tags",
-						Name:    "Tags",
-						Type:    "array",
-						Config: map[string]any{
-							"item_types": []any{123},
-						},
-					},
-				},
-			},
-			expectedErrors: 1,
-			expectedRefs:   []string{"/properties/0/propConfig/item_types/0"},
-			expectedMsgs:   []string{"'123' must be a string value"},
+			expectedMsgs:   []string{"'item_types' is not applicable for type(s)"},
 		},
 		{
 			name: "min_items not integer",
