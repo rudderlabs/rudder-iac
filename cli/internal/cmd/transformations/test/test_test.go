@@ -15,9 +15,9 @@ import (
 func TestValidateFlags(t *testing.T) {
 	t.Parallel()
 
-	// Create a file for the "not a directory" case; t.TempDir() cleans up automatically.
-	notADir := filepath.Join(t.TempDir(), "not-a-dir.json")
-	f, err := os.Create(notADir)
+	// Create an existing file for the "already exists" and "force" cases.
+	existingFile := filepath.Join(t.TempDir(), "test-results.json")
+	f, err := os.Create(existingFile)
 	require.NoError(t, err)
 	f.Close()
 
@@ -26,7 +26,9 @@ func TestValidateFlags(t *testing.T) {
 		args          []string
 		all           bool
 		modified      bool
-		outputDir     string
+		location      string
+		output        string
+		force         bool
 		expectedError bool
 		errorContains string
 	}{
@@ -36,6 +38,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{"my-transformation"},
 			all:           false,
 			modified:      false,
+			location:      t.TempDir(),
 			expectedError: false,
 		},
 		{
@@ -43,6 +46,7 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           true,
 			modified:      false,
+			location:      t.TempDir(),
 			expectedError: false,
 		},
 		{
@@ -50,14 +54,24 @@ func TestValidateFlags(t *testing.T) {
 			args:          []string{},
 			all:           false,
 			modified:      true,
+			location:      t.TempDir(),
 			expectedError: false,
 		},
 		{
-			name:          "valid --output-dir with existing dir",
+			name:          "valid -o with existing dir base",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputDir:     t.TempDir(),
+			output:        filepath.Join(t.TempDir(), "results.json"),
+			expectedError: false,
+		},
+		{
+			name:          "valid -o with --force on existing file",
+			args:          []string{},
+			all:           true,
+			modified:      false,
+			output:        existingFile,
+			force:         true,
 			expectedError: false,
 		},
 
@@ -111,22 +125,22 @@ func TestValidateFlags(t *testing.T) {
 			errorContains: "must specify either an ID, --all, or --modified",
 		},
 		{
-			name:          "invalid --output-dir with non-existent dir",
+			name:          "invalid -o with non-existent base dir",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputDir:     "/nonexistent/dir",
+			output:        "/nonexistent/dir/results.json",
 			expectedError: true,
-			errorContains: "output-dir does not exist",
+			errorContains: "output directory does not exist",
 		},
 		{
-			name:          "invalid --output-dir pointing to a file",
+			name:          "invalid -o file already exists without --force",
 			args:          []string{},
 			all:           true,
 			modified:      false,
-			outputDir:     notADir,
+			output:        existingFile,
 			expectedError: true,
-			errorContains: "output-dir is not a directory",
+			errorContains: "output file already exists",
 		},
 	}
 
@@ -134,7 +148,7 @@ func TestValidateFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateFlags(tt.args, tt.all, tt.modified, tt.outputDir)
+			err := validateFlags(tt.args, tt.all, tt.modified, tt.location, tt.output, tt.force)
 
 			if tt.expectedError {
 				require.Error(t, err)
@@ -147,14 +161,14 @@ func TestValidateFlags(t *testing.T) {
 }
 
 func TestWriteResultsFile(t *testing.T) {
-	t.Run("writes JSON to test-results/results.json", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("writes JSON to given path", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "results.json")
 
 		results := &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted}
-		err := writeResultsFile(dir, results)
+		err := writeResultsFile(path, results)
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
+		data, err := os.ReadFile(path)
 		require.NoError(t, err)
 
 		var got testorchestrator.TestResults
@@ -162,27 +176,16 @@ func TestWriteResultsFile(t *testing.T) {
 		assert.Equal(t, testorchestrator.RunStatusExecuted, got.Status)
 	})
 
-	t.Run("creates test-results dir if not exists", func(t *testing.T) {
-		dir := t.TempDir()
-
-		err := writeResultsFile(dir, &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted})
-		require.NoError(t, err)
-
-		info, err := os.Stat(filepath.Join(dir, "test-results"))
-		require.NoError(t, err)
-		assert.True(t, info.IsDir())
-	})
-
-	t.Run("silently overwrites existing results.json", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("overwrites existing file", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "results.json")
 
 		first := &testorchestrator.TestResults{Status: testorchestrator.RunStatusExecuted}
-		require.NoError(t, writeResultsFile(dir, first))
+		require.NoError(t, writeResultsFile(path, first))
 
 		second := &testorchestrator.TestResults{Status: testorchestrator.RunStatusNoResources}
-		require.NoError(t, writeResultsFile(dir, second))
+		require.NoError(t, writeResultsFile(path, second))
 
-		data, err := os.ReadFile(filepath.Join(dir, "test-results", "results.json"))
+		data, err := os.ReadFile(path)
 		require.NoError(t, err)
 
 		var got testorchestrator.TestResults
@@ -190,9 +193,9 @@ func TestWriteResultsFile(t *testing.T) {
 		assert.Equal(t, testorchestrator.RunStatusNoResources, got.Status)
 	})
 
-	t.Run("returns error when dir is not writable", func(t *testing.T) {
-		err := writeResultsFile("/nonexistent/dir", &testorchestrator.TestResults{})
+	t.Run("returns error when path is not writable", func(t *testing.T) {
+		err := writeResultsFile("/nonexistent/dir/results.json", &testorchestrator.TestResults{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "creating test-results directory")
+		assert.Contains(t, err.Error(), "creating results file")
 	})
 }

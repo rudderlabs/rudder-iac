@@ -31,14 +31,15 @@ var (
 
 func NewCmdTest() *cobra.Command {
 	var (
-		deps      app.Deps
-		p         project.Project
-		err       error
-		location  string
-		all       bool
-		modified  bool
-		verbose   bool
-		outputDir string
+		deps     app.Deps
+		p        project.Project
+		err      error
+		location string
+		all      bool
+		modified bool
+		verbose  bool
+		output   string
+		force    bool
 	)
 
 	cmd := &cobra.Command{
@@ -66,7 +67,7 @@ func NewCmdTest() *cobra.Command {
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flags first
-			if err := validateFlags(args, all, modified, outputDir); err != nil {
+			if err := validateFlags(args, all, modified, location, output, force); err != nil {
 				return err
 			}
 
@@ -139,12 +140,12 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
-			resultsDir := outputDir
-			if resultsDir == "" {
-				resultsDir = location
+			outputPath := output
+			if outputPath == "" {
+				outputPath = filepath.Join(location, "test-results.json")
 			}
 
-			if err = writeResultsFile(resultsDir, results); err != nil {
+			if err = writeResultsFile(outputPath, results); err != nil {
 				return fmt.Errorf("writing results file: %w", err)
 			}
 
@@ -168,13 +169,14 @@ func NewCmdTest() *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")
-	cmd.Flags().StringVar(&outputDir, "output-dir", "", "Directory to write test-results/results.json (default: project directory)")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "Path to write test results JSON file (default: test-results.json)")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it already exists")
 
 	return cmd
 }
 
 // validateFlags validates the command flags and arguments
-func validateFlags(args []string, all, modified bool, outputDir string) error {
+func validateFlags(args []string, all, modified bool, location, output string, force bool) error {
 	// Count active modes
 	modes := 0
 	hasID := len(args) > 0
@@ -201,26 +203,31 @@ func validateFlags(args []string, all, modified bool, outputDir string) error {
 		return fmt.Errorf("only one transformation/library ID allowed, got %d arguments", len(args))
 	}
 
-	if outputDir != "" {
-		info, err := os.Stat(outputDir)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("output-dir does not exist: %s", outputDir)
-		}
-		if err == nil && !info.IsDir() {
-			return fmt.Errorf("output-dir is not a directory: %s", outputDir)
+	outputPath := output
+	if outputPath == "" {
+		outputPath = filepath.Join(location, "test-results.json")
+	}
+
+	dir := filepath.Dir(outputPath)
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("output directory does not exist: %s", dir)
+	}
+	if err == nil && !info.IsDir() {
+		return fmt.Errorf("output path is not valid: %s is not a directory", dir)
+	}
+
+	if !force {
+		if _, err := os.Stat(outputPath); err == nil {
+			return fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
 		}
 	}
 
 	return nil
 }
 
-func writeResultsFile(dir string, results *testorchestrator.TestResults) error {
-	resultsDir := filepath.Join(dir, "test-results")
-	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
-		return fmt.Errorf("creating test-results directory: %w", err)
-	}
-
-	f, err := os.Create(filepath.Join(resultsDir, "results.json"))
+func writeResultsFile(path string, results *testorchestrator.TestResults) error {
+	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("creating results file: %w", err)
 	}
