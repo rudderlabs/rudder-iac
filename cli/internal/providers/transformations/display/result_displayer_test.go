@@ -208,27 +208,6 @@ func TestGenerateDiff(t *testing.T) {
 	assert.Contains(t, diff, "Actual")
 }
 
-func TestBuildExpectedOutputMap(t *testing.T) {
-	definitions := []*transformations.TestDefinition{
-		{
-			Name:           "test1",
-			ExpectedOutput: []any{map[string]any{"result": "ok"}},
-		},
-		{
-			Name:           "test2",
-			ExpectedOutput: []any{map[string]any{"result": "failed"}},
-		},
-	}
-
-	result := buildExpectedOutputMap(definitions)
-
-	assert.Len(t, result, 2)
-	assert.Contains(t, result, "test1")
-	assert.Contains(t, result, "test2")
-	assert.Equal(t, definitions[0].ExpectedOutput, result["test1"])
-	assert.Equal(t, definitions[1].ExpectedOutput, result["test2"])
-}
-
 func TestNewResultDisplayer(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -298,6 +277,7 @@ func TestResultDisplayer_Display_WithMismatchFailures(t *testing.T) {
 	displayer := NewResultDisplayer(false)
 	testDefinitions := []*transformations.TestDefinition{
 		{
+			ID:             "mismatch-id",
 			Name:           "test-mismatch",
 			ExpectedOutput: []any{map[string]any{"status": "success"}},
 		},
@@ -312,6 +292,7 @@ func TestResultDisplayer_Display_WithMismatchFailures(t *testing.T) {
 						Results: []transformations.TestResult{
 							{Name: "test-pass", Status: transformations.TestRunStatusPass},
 							{
+								ID:           "mismatch-id",
 								Name:         "test-mismatch",
 								Status:       transformations.TestRunStatusFail,
 								ActualOutput: []any{map[string]any{"status": "failed"}},
@@ -333,6 +314,50 @@ func TestResultDisplayer_Display_WithMismatchFailures(t *testing.T) {
 	assert.Contains(t, output, sectionFailures)
 	assert.Contains(t, output, failureTypeOutputMismatch)
 	assert.Contains(t, output, labelResultFailed)
+}
+
+func TestResultDisplayer_Display_WithMismatchFailures_ShowsFilePaths(t *testing.T) {
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	defer ui.RestoreWriter()
+
+	displayer := NewResultDisplayer(false)
+	testDefinitions := []*transformations.TestDefinition{
+		{
+			ID:             "suite/inputs/event.json",
+			Name:           "suite (event.json)",
+			InputFile:      "inputs/event.json",
+			OutputFile:     "outputs/event.json",
+			ExpectedOutput: []any{map[string]any{"status": "success"}},
+		},
+	}
+
+	results := &testorchestrator.TestResults{
+		Transformations: []*testorchestrator.TransformationTestWithDefinitions{
+			{
+				Result: &transformations.TransformationTestResult{
+					Name: "my-transformation",
+					TestSuiteResult: transformations.TestSuiteRunResult{
+						Results: []transformations.TestResult{
+							{
+								ID:           "suite/inputs/event.json",
+								Name:         "suite (event.json)",
+								Status:       transformations.TestRunStatusFail,
+								ActualOutput: []any{map[string]any{"status": "failed"}},
+							},
+						},
+					},
+				},
+				Definitions: testDefinitions,
+			},
+		},
+	}
+
+	displayer.Display(results)
+
+	output := buf.String()
+	assert.Contains(t, output, "inputs/event.json")
+	assert.Contains(t, output, "outputs/event.json")
 }
 
 func TestResultDisplayer_Display_WithExecutionErrors(t *testing.T) {

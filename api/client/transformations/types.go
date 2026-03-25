@@ -90,8 +90,11 @@ type SetExternalIDRequest struct {
 
 // TestDefinition defines the structure of a test case
 type TestDefinition struct {
+	ID             string `json:"id"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
+	InputFile      string `json:"inputFile,omitempty"`
+	OutputFile     string `json:"outputFile,omitempty"`
 	Input          []any  `json:"input"`
 	ExpectedOutput []any  `json:"expectedOutput,omitempty"`
 }
@@ -131,6 +134,7 @@ type TestError struct {
 
 // TestResult represents the result of a single test run
 type TestResult struct {
+	ID           string        `json:"id"`
 	Name         string        `json:"name"`
 	Description  string        `json:"description,omitempty"`
 	Status       TestRunStatus `json:"status"`

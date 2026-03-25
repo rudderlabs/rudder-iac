@@ -41,6 +41,7 @@ type Config = struct {
 		CatalogClient     int `mapstructure:"catalogClient"`
 		CompositeProvider int `mapstructure:"compositeProvider"`
 		CatalogProvider   int `mapstructure:"catalogProvider"`
+		DataGraph         int `mapstructure:"dataGraph"`
 	}
 }
 
@@ -80,6 +81,7 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("concurrency.catalogClient", 10)
 	viper.SetDefault("concurrency.compositeProvider", 2)
 	viper.SetDefault("concurrency.catalogProvider", 4)
+	viper.SetDefault("concurrency.dataGraph", 4)
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")

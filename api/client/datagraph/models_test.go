@@ -730,7 +730,109 @@ func TestSetModelExternalID_Event(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-// Validation Tests
+// Validate Model Tests
+
+func TestValidateModel_Entity(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"accountId":"acc-123","type":"entity","tableRef":"catalog.schema.users","primaryId":"id","root":true}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/models/validate", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"issues": [
+				{"rule": "model/table-exists", "severity": "error", "message": "Table does not exist"},
+				{"rule": "model/table-has-recent-data", "severity": "warning", "message": "Table has no data in the last 30 days"}
+			]
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
+		AccountID: "acc-123",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
+		Root:      true,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ValidationReport{
+		Issues: []datagraph.ValidationIssue{
+			{Rule: "model/table-exists", Severity: "error", Message: "Table does not exist"},
+			{Rule: "model/table-has-recent-data", Severity: "warning", Message: "Table has no data in the last 30 days"},
+		},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestValidateModel_Event(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"accountId":"acc-123","type":"event","tableRef":"catalog.schema.purchases","timestamp":"event_time"}`
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/data-graphs/models/validate", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"issues": []}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
+		AccountID: "acc-123",
+		Type:      "event",
+		TableRef:  "catalog.schema.purchases",
+		Timestamp: "event_time",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ValidationReport{
+		Issues: []datagraph.ValidationIssue{},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestValidateModel_EmptyAccountID(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t)
+	store := newTestStore(t, httpClient)
+
+	_, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
+		AccountID: "",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "account ID cannot be empty")
+}
+
+func TestValidateModel_APIError(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return req.Method == "POST" && req.URL.Path == "/v2/data-graphs/models/validate"
+		},
+		ResponseStatus: 400,
+		ResponseBody:   `{"error":"Bad Request"}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	_, err := store.ValidateModel(context.Background(), &datagraph.ValidateModelRequest{
+		AccountID: "acc-123",
+		Type:      "entity",
+		TableRef:  "catalog.schema.users",
+		PrimaryID: "id",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validating model")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+// Input Validation Tests
 
 func TestModelValidation(t *testing.T) {
 	// Mock HTTP client is not called since validation happens before HTTP request
