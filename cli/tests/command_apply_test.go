@@ -31,6 +31,7 @@ func TestProjectApply(t *testing.T) {
 
 	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
+		verifyNoDiffAfterMigration(t, executor, migratedDir)
 		applyAndVerify(t, executor, migratedDir)
 	})
 }
@@ -53,6 +54,15 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
 	})
+}
+
+func verifyNoDiffAfterMigration(t *testing.T, executor *CmdExecutor, migratedDir string) {
+	t.Helper()
+
+	// we only verify no diff after migration for the update directory, as the last apply was run on it
+	output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(migratedDir, "update"), "--dry-run", "--confirm=false")
+	require.NoError(t, err, "Dry run failed for update: %s", string(output))
+	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
