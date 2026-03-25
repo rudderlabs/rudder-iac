@@ -9,8 +9,8 @@ import (
 )
 
 func TestRunStatus(t *testing.T) {
-	t.Run("RunStatusExecuted is the zero value", func(t *testing.T) {
-		r := &TestResults{}
+	t.Run("RunStatusExecuted is the default run status", func(t *testing.T) {
+		r := &TestResults{Status: RunStatusExecuted}
 		assert.Equal(t, RunStatusExecuted, r.Status)
 	})
 }

@@ -2,8 +2,11 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
@@ -35,6 +38,8 @@ func NewCmdTest() *cobra.Command {
 		all      bool
 		modified bool
 		verbose  bool
+		output   string
+		force    bool
 	)
 
 	cmd := &cobra.Command{
@@ -59,10 +64,19 @@ func NewCmdTest() *cobra.Command {
 
 			# Test with verbose output (shows diffs)
 			$ rudder-cli transformations test --all --verbose
+
+			# Test from a specific project directory
+			$ rudder-cli transformations test --all -l ./my-project
+
+			# Write results to a custom file path
+			$ rudder-cli transformations test --all -o /tmp/results.json
+
+			# Overwrite an existing results file
+			$ rudder-cli transformations test --all --force
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flags first
-			if err := validateFlags(args, all, modified); err != nil {
+			if err := validateFlags(args, all, modified, output, force); err != nil {
 				return err
 			}
 
@@ -135,6 +149,15 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("running tests: %w", err)
 			}
 
+			outputPath := output
+			if outputPath == "" {
+				outputPath = "test-results.json"
+			}
+
+			if err = writeResultsFile(outputPath, results); err != nil {
+				return fmt.Errorf("writing results file: %w", err)
+			}
+
 			if results.Status == testorchestrator.RunStatusNoResources {
 				ui.Println("No resources to test")
 				return nil
@@ -155,12 +178,14 @@ func NewCmdTest() *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "Path to write test results JSON file (default: test-results.json)")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it already exists")
 
 	return cmd
 }
 
 // validateFlags validates the command flags and arguments
-func validateFlags(args []string, all, modified bool) error {
+func validateFlags(args []string, all, modified bool, output string, force bool) error {
 	// Count active modes
 	modes := 0
 	hasID := len(args) > 0
@@ -185,6 +210,42 @@ func validateFlags(args []string, all, modified bool) error {
 	// Only one ID allowed
 	if len(args) > 1 {
 		return fmt.Errorf("only one transformation/library ID allowed, got %d arguments", len(args))
+	}
+
+	outputPath := output
+	if outputPath == "" {
+		outputPath = "test-results.json"
+	}
+
+	dir := filepath.Dir(outputPath)
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("output directory does not exist: %s", dir)
+	}
+	if err == nil && !info.IsDir() {
+		return fmt.Errorf("output path is not valid: %s is not a directory", dir)
+	}
+
+	if !force {
+		if _, err := os.Stat(outputPath); err == nil {
+			return fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
+		}
+	}
+
+	return nil
+}
+
+func writeResultsFile(path string, results *testorchestrator.TestResults) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("creating results file: %w", err)
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(results); err != nil {
+		return fmt.Errorf("encoding results: %w", err)
 	}
 
 	return nil
