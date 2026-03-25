@@ -160,6 +160,121 @@ func TestFromCatalogCustomType(t *testing.T) {
 	assert.False(t, args.Properties[1].Required)
 }
 
+func TestFromCatalogCustomType_ItemType(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single primitive item type", func(t *testing.T) {
+		t.Parallel()
+
+		customType := &localcatalog.CustomTypeV1{
+			LocalID:  "tags",
+			Name:     "Tags",
+			Type:     "array",
+			ItemType: "string",
+			Config:   map[string]any{},
+		}
+
+		urnFromRef := func(ref string) string { return "" }
+
+		args := CustomTypeArgs{}
+		err := args.FromCatalogCustomType(customType, urnFromRef)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []any{"string"}, args.Config["item_types"])
+	})
+
+	t.Run("single custom type ref item type", func(t *testing.T) {
+		t.Parallel()
+
+		customType := &localcatalog.CustomTypeV1{
+			LocalID:  "address_list",
+			Name:     "AddressList",
+			Type:     "array",
+			ItemType: "#custom-type:Address",
+			Config:   map[string]any{},
+		}
+
+		urnFromRef := func(ref string) string {
+			if ref == "#custom-type:Address" {
+				return "custom-type:Address"
+			}
+			return ""
+		}
+
+		args := CustomTypeArgs{}
+		err := args.FromCatalogCustomType(customType, urnFromRef)
+
+		assert.NoError(t, err)
+		itemTypes := args.Config["item_types"].([]any)
+		assert.Equal(t, []any{
+			resources.PropertyRef{
+				URN:      "custom-type:Address",
+				Property: "name",
+			},
+		}, itemTypes)
+	})
+
+	t.Run("multiple primitive item types", func(t *testing.T) {
+		t.Parallel()
+
+		customType := &localcatalog.CustomTypeV1{
+			LocalID:   "mixed_list",
+			Name:      "MixedList",
+			Type:      "array",
+			ItemTypes: []string{"number", "string"},
+			Config:    map[string]any{},
+		}
+
+		urnFromRef := func(ref string) string { return "" }
+
+		args := CustomTypeArgs{}
+		err := args.FromCatalogCustomType(customType, urnFromRef)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []any{"number", "string"}, args.Config["item_types"])
+	})
+
+	t.Run("no item type fields", func(t *testing.T) {
+		t.Parallel()
+
+		customType := &localcatalog.CustomTypeV1{
+			LocalID: "simple",
+			Name:    "Simple",
+			Type:    "string",
+			Config:  map[string]any{},
+		}
+
+		urnFromRef := func(ref string) string { return "" }
+
+		args := CustomTypeArgs{}
+		err := args.FromCatalogCustomType(customType, urnFromRef)
+
+		assert.NoError(t, err)
+		_, hasItemTypes := args.Config["item_types"]
+		assert.False(t, hasItemTypes)
+	})
+
+	t.Run("unresolvable custom type ref returns error", func(t *testing.T) {
+		t.Parallel()
+
+		customType := &localcatalog.CustomTypeV1{
+			LocalID:  "address_list",
+			Name:     "AddressList",
+			Type:     "array",
+			ItemType: "#custom-type:Missing",
+			Config:   map[string]any{},
+		}
+
+		urnFromRef := func(ref string) string { return "" }
+
+		args := CustomTypeArgs{}
+		err := args.FromCatalogCustomType(customType, urnFromRef)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to resolve ref to the custom type urn")
+	})
+}
+
 func TestCustomTypePropertyDiff(t *testing.T) {
 	tests := []struct {
 		name     string

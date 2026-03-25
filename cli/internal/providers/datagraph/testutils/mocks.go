@@ -12,11 +12,11 @@ import (
 type MockDataGraphClient struct {
 	// DataGraph methods
 	DataGraphs          map[string]*dgClient.DataGraph
-	ListDataGraphsFunc  func(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error)
+	ListDataGraphsFunc  func(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error)
 	GetDataGraphFunc    func(ctx context.Context, id string) (*dgClient.DataGraph, error)
 	CreateDataGraphFunc func(ctx context.Context, req *dgClient.CreateDataGraphRequest) (*dgClient.DataGraph, error)
 	DeleteDataGraphFunc func(ctx context.Context, id string) error
-	SetExternalIDFunc   func(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error)
+	SetExternalIDFunc   func(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error)
 
 	// Model methods
 	Models                 map[string]*dgClient.Model
@@ -28,20 +28,24 @@ type MockDataGraphClient struct {
 	SetModelExternalIDFunc func(ctx context.Context, req *dgClient.SetModelExternalIDRequest) (*dgClient.Model, error)
 
 	// Relationship methods
-	Relationships                    map[string]*dgClient.Relationship
-	ListRelationshipsFunc            func(ctx context.Context, req *dgClient.ListRelationshipsRequest) (*dgClient.ListRelationshipsResponse, error)
-	GetRelationshipFunc              func(ctx context.Context, req *dgClient.GetRelationshipRequest) (*dgClient.Relationship, error)
-	CreateRelationshipFunc           func(ctx context.Context, req *dgClient.CreateRelationshipRequest) (*dgClient.Relationship, error)
-	UpdateRelationshipFunc           func(ctx context.Context, req *dgClient.UpdateRelationshipRequest) (*dgClient.Relationship, error)
-	DeleteRelationshipFunc           func(ctx context.Context, req *dgClient.DeleteRelationshipRequest) error
-	SetRelationshipExternalIDFunc    func(ctx context.Context, req *dgClient.SetRelationshipExternalIDRequest) (*dgClient.Relationship, error)
+	Relationships                 map[string]*dgClient.Relationship
+	ListRelationshipsFunc         func(ctx context.Context, req *dgClient.ListRelationshipsRequest) (*dgClient.ListRelationshipsResponse, error)
+	GetRelationshipFunc           func(ctx context.Context, req *dgClient.GetRelationshipRequest) (*dgClient.Relationship, error)
+	CreateRelationshipFunc        func(ctx context.Context, req *dgClient.CreateRelationshipRequest) (*dgClient.Relationship, error)
+	UpdateRelationshipFunc        func(ctx context.Context, req *dgClient.UpdateRelationshipRequest) (*dgClient.Relationship, error)
+	DeleteRelationshipFunc        func(ctx context.Context, req *dgClient.DeleteRelationshipRequest) error
+	SetRelationshipExternalIDFunc func(ctx context.Context, req *dgClient.SetRelationshipExternalIDRequest) (*dgClient.Relationship, error)
+
+	// Validation methods
+	ValidateModelFunc        func(ctx context.Context, req *dgClient.ValidateModelRequest) (*dgClient.ValidationReport, error)
+	ValidateRelationshipFunc func(ctx context.Context, req *dgClient.ValidateRelationshipRequest) (*dgClient.ValidationReport, error)
 }
 
 // DataGraph methods
 
-func (m *MockDataGraphClient) ListDataGraphs(ctx context.Context, page, perPage int, hasExternalID *bool) (*dgClient.ListDataGraphsResponse, error) {
+func (m *MockDataGraphClient) ListDataGraphs(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
 	if m.ListDataGraphsFunc != nil {
-		return m.ListDataGraphsFunc(ctx, page, perPage, hasExternalID)
+		return m.ListDataGraphsFunc(ctx, req)
 	}
 	return &dgClient.ListDataGraphsResponse{}, nil
 }
@@ -70,9 +74,9 @@ func (m *MockDataGraphClient) DeleteDataGraph(ctx context.Context, id string) er
 	return nil
 }
 
-func (m *MockDataGraphClient) SetExternalID(ctx context.Context, id string, externalID string) (*dgClient.DataGraph, error) {
+func (m *MockDataGraphClient) SetExternalID(ctx context.Context, req *dgClient.SetExternalIDRequest) (*dgClient.DataGraph, error) {
 	if m.SetExternalIDFunc != nil {
-		return m.SetExternalIDFunc(ctx, id, externalID)
+		return m.SetExternalIDFunc(ctx, req)
 	}
 	return nil, nil
 }
@@ -181,6 +185,22 @@ func (m *MockAccountNameResolver) GetAccountName(ctx context.Context, accountID 
 		return m.GetAccountNameFunc(ctx, accountID)
 	}
 	return "", fmt.Errorf("account not found: %s", accountID)
+}
+
+// Validation methods
+
+func (m *MockDataGraphClient) ValidateModel(ctx context.Context, req *dgClient.ValidateModelRequest) (*dgClient.ValidationReport, error) {
+	if m.ValidateModelFunc != nil {
+		return m.ValidateModelFunc(ctx, req)
+	}
+	return &dgClient.ValidationReport{}, nil
+}
+
+func (m *MockDataGraphClient) ValidateRelationship(ctx context.Context, req *dgClient.ValidateRelationshipRequest) (*dgClient.ValidationReport, error) {
+	if m.ValidateRelationshipFunc != nil {
+		return m.ValidateRelationshipFunc(ctx, req)
+	}
+	return &dgClient.ValidationReport{}, nil
 }
 
 // MockURNResolver implements handler.URNResolver for testing

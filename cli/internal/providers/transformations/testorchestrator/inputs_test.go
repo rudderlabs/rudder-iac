@@ -24,9 +24,12 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
+		assert.Equal(t, "default-events", result[0].ID)
 		assert.Equal(t, "default-events", result[0].Name)
 		assert.NotEmpty(t, result[0].Input)
 		assert.Nil(t, result[0].ExpectedOutput)
+		assert.Empty(t, result[0].InputFile)
+		assert.Empty(t, result[0].OutputFile)
 	})
 
 	t.Run("suite with no resolvable input files - returns default events", func(t *testing.T) {
@@ -47,6 +50,7 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
+		assert.Equal(t, "default-events", result[0].ID)
 		assert.Equal(t, "default-events", result[0].Name)
 	})
 
@@ -75,8 +79,10 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		expectedName := fmt.Sprintf("My Suite (%s/event.json)", inputDir)
-		assert.Equal(t, expectedName, result[0].Name)
+		assert.Equal(t, fmt.Sprintf("My Suite/%s/event.json", inputDir), result[0].ID)
+		assert.Equal(t, "My Suite (event.json)", result[0].Name)
+		assert.Equal(t, filepath.Join(inputDir, "event.json"), result[0].InputFile)
+		assert.Empty(t, result[0].OutputFile)
 		require.Len(t, result[0].Input, 1)
 		assert.Nil(t, result[0].ExpectedOutput)
 	})
@@ -115,8 +121,10 @@ func TestResolveTestDefinitions(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, result, 1)
-		expectedName := fmt.Sprintf("Suite (%s/event.json)", inputDir)
-		assert.Equal(t, expectedName, result[0].Name)
+		assert.Equal(t, fmt.Sprintf("Suite/%s/event.json", inputDir), result[0].ID)
+		assert.Equal(t, "Suite (event.json)", result[0].Name)
+		assert.Equal(t, filepath.Join(inputDir, "event.json"), result[0].InputFile)
+		assert.Equal(t, filepath.Join(outputDir, "event.json"), result[0].OutputFile)
 		assert.NotNil(t, result[0].ExpectedOutput)
 		assert.Len(t, result[0].ExpectedOutput, 1)
 	})
@@ -144,10 +152,12 @@ func TestResolveTestDefinitions(t *testing.T) {
 		require.Len(t, result, 2)
 
 		names := []string{result[0].Name, result[1].Name}
-		expectedName1 := fmt.Sprintf("Suite One (%s/a.json)", suite1)
-		expectedName2 := fmt.Sprintf("Suite Two (%s/b.json)", suite2)
-		assert.Contains(t, names, expectedName1)
-		assert.Contains(t, names, expectedName2)
+		assert.Contains(t, names, "Suite One (a.json)")
+		assert.Contains(t, names, "Suite Two (b.json)")
+
+		ids := []string{result[0].ID, result[1].ID}
+		assert.Contains(t, ids, fmt.Sprintf("Suite One/%s/a.json", suite1))
+		assert.Contains(t, ids, fmt.Sprintf("Suite Two/%s/b.json", suite2))
 	})
 
 	t.Run("invalid JSON in input file returns error", func(t *testing.T) {
