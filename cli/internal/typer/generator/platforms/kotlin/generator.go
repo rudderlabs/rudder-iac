@@ -57,6 +57,10 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 		return nil, err
 	}
 
+	if kotlinOptions.ComposeStable {
+		applyComposeImmutable(ctx)
+	}
+
 	mainFile, err := GenerateFile(outputFileName, ctx)
 	if err != nil {
 		return nil, err
@@ -618,6 +622,34 @@ func createNestedDataClass(propSchema *plan.PropertySchema, propName string, par
 // isEmptySchema checks if an ObjectSchema has no defined properties
 func isEmptySchema(schema *plan.ObjectSchema) bool {
 	return schema != nil && len(schema.Properties) == 0
+}
+
+// applyComposeImmutable adds @Immutable to all data classes (top-level, nested, and sealed subclasses)
+// and the corresponding import. Sealed classes and enums are skipped — sealed classes are abstract
+// and enums are already treated as stable by the Compose compiler.
+func applyComposeImmutable(ctx *KotlinContext) {
+	annotations := []string{"Immutable"}
+	ctx.Imports = append(ctx.Imports, "androidx.compose.runtime.Immutable")
+
+	for i := range ctx.DataClasses {
+		setAnnotationsRecursive(&ctx.DataClasses[i], annotations)
+	}
+
+	for i := range ctx.SealedClasses {
+		for j := range ctx.SealedClasses[i].Subclasses {
+			if ctx.SealedClasses[i].Subclasses[j].IsDataClass {
+				ctx.SealedClasses[i].Subclasses[j].Annotations = annotations
+			}
+		}
+	}
+}
+
+// setAnnotationsRecursive sets annotations on a data class and all its nested classes
+func setAnnotationsRecursive(dc *KotlinDataClass, annotations []string) {
+	dc.Annotations = annotations
+	for i := range dc.NestedClasses {
+		setAnnotationsRecursive(&dc.NestedClasses[i], annotations)
+	}
 }
 
 // createEventSchemaTypeAlias creates a type alias to JsonObject for an empty event schema
