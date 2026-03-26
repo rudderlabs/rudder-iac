@@ -5,10 +5,7 @@
   "description": "Adds source tag and timestamp to events",
   "code": "export function transformEvent(event, metadata) {\n  event.properties = event.properties || {};\n  event.properties.source = \"rudder\";\n  event.properties.timestamp = new Date().toISOString();\n  return event;\n}\n",
   "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
-  "codeVersion": "1",
   "language": "javascript",
   "imports": [],
-  "createdBy": "2N3mvKrWo8SQynb0ppqu5XX31mi",
-  "createdAt": "2026-01-23T09:23:02.461Z",
-  "updatedAt": "2026-01-23T09:23:02.786Z"
+  "externalId": "simple_transform"
 }

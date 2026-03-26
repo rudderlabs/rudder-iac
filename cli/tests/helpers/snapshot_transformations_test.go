@@ -131,22 +131,22 @@ func TestVersionRefs(t *testing.T) {
 	results := &testorchestrator.TestResults{
 		Transformations: []*testorchestrator.TransformationTestWithDefinitions{
 			{Result: &transformations.TransformationTestResult{
-				ID: "tr-1", ExternalID: "simple_transform", Name: "Simple Transform", VersionID: "v-1",
+				ID: "tr-1", Name: "Simple Transform", VersionID: "v-1",
 			}},
 			{Result: &transformations.TransformationTestResult{
-				ID: "tr-2", ExternalID: "greeting_transform", Name: "Greeting Transform", VersionID: "v-2",
+				ID: "tr-2", Name: "Greeting Transform", VersionID: "v-2",
 			}},
 		},
 		Libraries: []transformations.LibraryTestResult{
-			{ID: "lib-1", ExternalID: "utils_library", HandleName: "utilsLibrary", VersionID: "v-1"},
+			{ID: "lib-1", Name: "Utils Library", HandleName: "utilsLibrary", VersionID: "v-1"},
 		},
 	}
 
 	refs := VersionRefs(results)
 
 	assert.Equal(t, map[string]VersionedResourceRef{
-		"transformation:simple_transform":      {ResourceID: "tr-1", VersionID: "v-1"},
-		"transformation:greeting_transform":    {ResourceID: "tr-2", VersionID: "v-2"},
-		"transformation-library:utils_library": {ResourceID: "lib-1", VersionID: "v-1"},
+		"transformation:Simple Transform":      {ResourceID: "tr-1", VersionID: "v-1"},
+		"transformation:Greeting Transform":    {ResourceID: "tr-2", VersionID: "v-2"},
+		"transformation-library:Utils Library": {ResourceID: "lib-1", VersionID: "v-1"},
 	}, refs)
 }

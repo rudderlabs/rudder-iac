@@ -164,6 +164,7 @@ type TransformationTestResult struct {
 type LibraryTestResult struct {
 	ID         string `json:"id"`
 	ExternalID string `json:"externalId,omitempty"`
+	Name       string `json:"name"`
 	HandleName string `json:"handleName"`
 	VersionID  string `json:"versionId"`
 	Pass       bool   `json:"pass"`

@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // VersionedResourceRef holds the IDs needed to fetch a specific version of a resource.
@@ -97,10 +96,10 @@ func (t *TransformationSnapshotTester) upstreamVersion(ctx context.Context, ref 
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
 
-	return marshalToMap(v)
+	return toMap(v)
 }
 
-func marshalToMap(v any) (map[string]any, error) {
+func toMap(v any) (map[string]any, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling resource: %w", err)
@@ -118,14 +117,16 @@ func VersionRefs(results *testorchestrator.TestResults) map[string]VersionedReso
 	refs := make(map[string]VersionedResourceRef, len(results.Transformations)+len(results.Libraries))
 
 	for _, tr := range results.Transformations {
-		refs[resources.URN(tr.Result.ExternalID, transformation.HandlerMetadata.ResourceType)] = VersionedResourceRef{
+		key := fmt.Sprintf("%s:%s", transformation.HandlerMetadata.ResourceType, tr.Result.Name)
+		refs[key] = VersionedResourceRef{
 			ResourceID: tr.Result.ID,
 			VersionID:  tr.Result.VersionID,
 		}
 	}
 
 	for _, lib := range results.Libraries {
-		refs[resources.URN(lib.ExternalID, library.HandlerMetadata.ResourceType)] = VersionedResourceRef{
+		key := fmt.Sprintf("%s:%s", library.HandlerMetadata.ResourceType, lib.Name)
+		refs[key] = VersionedResourceRef{
 			ResourceID: lib.ID,
 			VersionID:  lib.VersionID,
 		}

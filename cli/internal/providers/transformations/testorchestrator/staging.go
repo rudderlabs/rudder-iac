@@ -79,6 +79,7 @@ func StageLibrary(
 		Name:     library.Name,
 		Code:     library.Code,
 		Language: library.Language,
+		Description: library.Description,
 	}
 
 	result, err := store.UpdateLibrary(ctx, remoteID, updateReq, false)

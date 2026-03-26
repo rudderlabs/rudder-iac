@@ -5,10 +5,7 @@
   "description": "Adds source tag to events in Python",
   "code": "def transformEvent(event, metadata):\n    props = event.get(\"properties\", {})\n    props[\"source\"] = \"rudder\"\n    event[\"properties\"] = props\n    return event\n",
   "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
-  "codeVersion": "1",
   "language": "python",
   "imports": [],
-  "createdBy": "2N3mvKrWo8SQynb0ppqu5XX31mi",
-  "createdAt": "2026-01-23T09:23:02.461Z",
-  "updatedAt": "2026-01-23T09:23:02.786Z"
+  "externalId": "py_transform"
 }
