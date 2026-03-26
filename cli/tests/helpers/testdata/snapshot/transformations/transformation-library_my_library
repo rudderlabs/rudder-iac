@@ -1,0 +1,10 @@
+{
+  "id": "lib-1",
+  "versionId": "v-1",
+  "name": "My Library",
+  "description": "A test library",
+  "code": "export function helper() { return true; }",
+  "language": "javascript",
+  "importName": "myLibrary",
+  "workspaceId": "ws-123"
+}
