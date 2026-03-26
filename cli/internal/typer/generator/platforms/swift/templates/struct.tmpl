@@ -17,7 +17,7 @@ public struct {{ .Name }} {
 {{- if .ConstantValue }}
     public let {{ .Name }}: {{ .Type }} = {{ .ConstantValue }}
 {{- else }}
-    public var {{ .Name }}: {{ .Type }}{{ if .Optional }}?{{ end }}
+    public let {{ .Name }}: {{ .Type }}{{ if .Optional }}?{{ end }}
 {{- end }}
 {{- end }}
 {{- range .NestedStructs }}
@@ -26,6 +26,8 @@ public struct {{ .Name }} {
 
 {{- $hasRequired := false }}
 {{- range .Properties }}{{- if not .Optional }}{{- $hasRequired = true }}{{- end }}{{- end }}
+{{- $hasOptional := false }}
+{{- range .Properties }}{{- if .Optional }}{{- $hasOptional = true }}{{- end }}{{- end }}
 {{- $initProps := filterNonConstant .Properties }}
 {{- if eq (len $initProps) 1 }}{{- with index $initProps 0 }}
     public init({{ .Name }}: {{ .Type }}{{ if .Optional }}? = nil{{ end }}) {
@@ -48,7 +50,7 @@ public struct {{ .Name }} {
 {{- if not .Properties }}
         return [:]
 {{- else if $hasRequired }}
-        var props: [String: Any] = [
+        {{ if $hasOptional }}var{{ else }}let{{ end }} props: [String: Any] = [
 {{- $needComma := false }}
 {{- range .Properties }}
 {{- if not .Optional }}

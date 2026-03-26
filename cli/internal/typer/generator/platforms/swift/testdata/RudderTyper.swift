@@ -54,7 +54,7 @@ public enum CustomTypeFeatureConfig {
     /// Feature enabled (boolean true)
     public struct CaseEnabled {
         /// User's age
-        public var age: CustomTypeAge?
+        public let age: CustomTypeAge?
         /// Feature flag that can be boolean or string
         public let featureFlag: PropertyFeatureFlag = true
         public init(age: CustomTypeAge? = nil) {
@@ -75,7 +75,7 @@ public enum CustomTypeFeatureConfig {
         /// Feature flag that can be boolean or string
         public let featureFlag: PropertyFeatureFlag = false
         /// User's first name
-        public var firstName: PropertyFirstName?
+        public let firstName: PropertyFirstName?
         public init(firstName: PropertyFirstName? = nil) {
             self.firstName = firstName
         }
@@ -94,7 +94,7 @@ public enum CustomTypeFeatureConfig {
         /// Feature flag that can be boolean or string
         public let featureFlag: PropertyFeatureFlag = "beta"
         /// User tags as array of strings
-        public var tags: PropertyTags?
+        public let tags: PropertyTags?
         public init(tags: PropertyTags? = nil) {
             self.tags = tags
         }
@@ -151,13 +151,13 @@ public enum CustomTypePageContext {
         /// Type of page
         public let pageType: PropertyPageType = "search"
         /// Search query
-        public var query: PropertyQuery
+        public let query: PropertyQuery
         public init(query: PropertyQuery) {
             self.query = query
         }
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "page_type": pageType,
                 "query": query
             ]
@@ -170,13 +170,13 @@ public enum CustomTypePageContext {
         /// Type of page
         public let pageType: PropertyPageType = "product"
         /// Product identifier
-        public var productId: PropertyProductId
+        public let productId: PropertyProductId
         public init(productId: PropertyProductId) {
             self.productId = productId
         }
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "page_type": pageType,
                 "product_id": productId
             ]
@@ -191,7 +191,7 @@ public enum CustomTypePageContext {
         public init() {}
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "page_type": pageType
             ]
             return props
@@ -201,7 +201,7 @@ public enum CustomTypePageContext {
     /// Default case for unmatched discriminator values
     public struct Default {
         /// Additional page data
-        public var pageData: PropertyPageData?
+        public let pageData: PropertyPageData?
         public init(pageData: PropertyPageData? = nil) {
             self.pageData = pageData
         }
@@ -245,13 +245,13 @@ public enum CustomTypeUserAccess {
         /// User active status
         public let active: CustomTypeActive = true
         /// User's email address
-        public var email: CustomTypeEmail
+        public let email: CustomTypeEmail
         public init(email: CustomTypeEmail) {
             self.email = email
         }
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "active": active,
                 "email": email
             ]
@@ -264,13 +264,13 @@ public enum CustomTypeUserAccess {
         /// User active status
         public let active: CustomTypeActive = false
         /// User account status
-        public var status: CustomTypeStatus
+        public let status: CustomTypeStatus
         public init(status: CustomTypeStatus) {
             self.status = status
         }
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "active": active,
                 "status": status.rawValue
             ]
@@ -317,11 +317,11 @@ public enum TrackEventWithVariantsProperties {
         /// Type of device
         public let deviceType: PropertyDeviceType = .mobile
         /// Page context information
-        public var pageContext: CustomTypePageContext?
+        public let pageContext: CustomTypePageContext?
         /// User profile data
-        public var profile: CustomTypeUserProfile
+        public let profile: CustomTypeUserProfile
         /// User tags as array of strings
-        public var tags: PropertyTags?
+        public let tags: PropertyTags?
         public init(
             profile: CustomTypeUserProfile,
             pageContext: CustomTypePageContext? = nil,
@@ -348,13 +348,13 @@ public enum TrackEventWithVariantsProperties {
         /// Type of device
         public let deviceType: PropertyDeviceType = .desktop
         /// User's first name
-        public var firstName: PropertyFirstName
+        public let firstName: PropertyFirstName
         /// User's last name
-        public var lastName: PropertyLastName?
+        public let lastName: PropertyLastName?
         /// Page context information
-        public var pageContext: CustomTypePageContext?
+        public let pageContext: CustomTypePageContext?
         /// User profile data
-        public var profile: CustomTypeUserProfile
+        public let profile: CustomTypeUserProfile
         public init(
             firstName: PropertyFirstName,
             profile: CustomTypeUserProfile,
@@ -382,7 +382,7 @@ public enum TrackEventWithVariantsProperties {
     /// Default case for unmatched discriminator values
     public struct Default {
         /// A field with no explicit type (treated as any)
-        public var untypedField: Any?
+        public let untypedField: Any?
         public init(untypedField: Any? = nil) {
             self.untypedField = untypedField
         }
@@ -668,11 +668,11 @@ public enum PropertyStringOrNull {
 /// Address details object
 public struct CustomTypeAddressDetails {
     /// City name
-    public var city: PropertyCity
+    public let city: PropertyCity
     /// Postal code
-    public var postalCode: PropertyPostalCode?
+    public let postalCode: PropertyPostalCode?
     /// Street address
-    public var street: PropertyStreet
+    public let street: PropertyStreet
     public init(
         city: PropertyCity,
         street: PropertyStreet,
@@ -705,11 +705,11 @@ public struct CustomTypeEmptyObjectNoAdditionalProps {
 /// User profile information
 public struct CustomTypeUserProfile {
     /// User's email address
-    public var email: CustomTypeEmail
+    public let email: CustomTypeEmail
     /// User's first name
-    public var firstName: PropertyFirstName
+    public let firstName: PropertyFirstName
     /// User's last name
-    public var lastName: PropertyLastName?
+    public let lastName: PropertyLastName?
     public init(
         email: CustomTypeEmail,
         firstName: PropertyFirstName,
@@ -733,9 +733,9 @@ public struct CustomTypeUserProfile {
 /// Group association event
 public struct GroupTraits {
     /// User active status
-    public var active: CustomTypeActive
+    public let active: CustomTypeActive
     /// User account status
-    public var status: CustomTypeStatus?
+    public let status: CustomTypeStatus?
     public init(
         active: CustomTypeActive,
         status: CustomTypeStatus? = nil
@@ -756,9 +756,9 @@ public struct GroupTraits {
 /// User identification event
 public struct IdentifyTraits {
     /// User active status
-    public var active: CustomTypeActive?
+    public let active: CustomTypeActive?
     /// User's email address
-    public var email: CustomTypeEmail
+    public let email: CustomTypeEmail
     public init(
         email: CustomTypeEmail,
         active: CustomTypeActive? = nil
@@ -779,7 +779,7 @@ public struct IdentifyTraits {
 /// Screen view event
 public struct ScreenProperties {
     /// User profile data
-    public var profile: CustomTypeUserProfile?
+    public let profile: CustomTypeUserProfile?
     public init(profile: CustomTypeUserProfile? = nil) {
         self.profile = profile
     }
@@ -794,13 +794,13 @@ public struct ScreenProperties {
 /// Event with dollar signs to test string interpolation escaping
 public struct TrackVariable$stringProperties {
     /// Field with $ for testing string interpolation: $variable and ${expression}
-    public var dollarField: PropertyDollarField
+    public let dollarField: PropertyDollarField
     public init(dollarField: PropertyDollarField) {
         self.dollarField = dollarField
     }
 
     public func toProperties() -> [String: Any] {
-        var props: [String: Any] = [
+        let props: [String: Any] = [
             "dollar_field": dollarField.rawValue
         ]
         return props
@@ -810,7 +810,7 @@ public struct TrackVariable$stringProperties {
 /// Event with special characters that collide after sanitization
 public struct TrackEventWithNameCamelCaseProperties {
     /// User's email address
-    public var email: CustomTypeEmail?
+    public let email: CustomTypeEmail?
     public init(email: CustomTypeEmail? = nil) {
         self.email = email
     }
@@ -825,9 +825,9 @@ public struct TrackEventWithNameCamelCaseProperties {
 /// Triggered when user clicks on a "premium" product /* important */
 public struct TrackProductPremiumClickedProperties {
     /// Field with special chars: "quotes", backslash\path, and /* comment */
-    public var specialField: PropertySpecialField
+    public let specialField: PropertySpecialField
     /// HTTP status with special characters
-    public var statusCode: PropertyStatusCode?
+    public let statusCode: PropertyStatusCode?
     public init(
         specialField: PropertySpecialField,
         statusCode: PropertyStatusCode? = nil
@@ -848,97 +848,97 @@ public struct TrackProductPremiumClickedProperties {
 /// Triggered when a user signs up
 public struct TrackUserSignedUpProperties {
     /// User active status
-    public var active: CustomTypeActive
+    public let active: CustomTypeActive
     /// User's addresses
-    public var addresses: CustomTypeAddressList?
+    public let addresses: CustomTypeAddressList?
     /// User's age
-    public var age: CustomTypeAge?
+    public let age: CustomTypeAge?
     /// An array that can contain any type of items
-    public var arrayOfAny: PropertyArrayOfAny?
+    public let arrayOfAny: PropertyArrayOfAny?
     /// Array with items that can be string or null
-    public var arrayWithNullItems: PropertyArrayWithNullItems?
+    public let arrayWithNullItems: PropertyArrayWithNullItems?
     /// Array of user contacts
-    public var contacts: PropertyContacts?
+    public let contacts: PropertyContacts?
     /// example of object property
-    public var context: Context?
+    public let context: Context?
     /// Property using custom null type
-    public var customNullField: CustomTypeNullType?
+    public let customNullField: CustomTypeNullType?
     /// Type of device
-    public var deviceType: PropertyDeviceType?
+    public let deviceType: PropertyDeviceType?
     /// User's email addresses
-    public var emailList: CustomTypeEmailList?
+    public let emailList: CustomTypeEmailList?
     /// Property with empty object not allowing additional properties
-    public var emptyObjectNoAdditionalProps: CustomTypeEmptyObjectNoAdditionalProps?
+    public let emptyObjectNoAdditionalProps: CustomTypeEmptyObjectNoAdditionalProps?
     /// Property with empty object allowing additional properties
-    public var emptyObjectWithAdditionalProps: CustomTypeEmptyObjectWithAdditionalProps?
+    public let emptyObjectWithAdditionalProps: CustomTypeEmptyObjectWithAdditionalProps?
     /// Feature enabled flag
-    public var enabled: PropertyEnabled?
+    public let enabled: PropertyEnabled?
     /// Feature configuration information
-    public var featureConfig: CustomTypeFeatureConfig?
+    public let featureConfig: CustomTypeFeatureConfig?
     /// Property with mixed unicode: café, naïve, 日本語
-    public var mixedUnicode: PropertyMixedUnicode?
+    public let mixedUnicode: PropertyMixedUnicode?
     /// Mixed type enum
-    public var mixedValue: PropertyMixedValue?
+    public let mixedValue: PropertyMixedValue?
     /// An array with items that can be string or integer
-    public var multiTypeArray: PropertyMultiTypeArray?
+    public let multiTypeArray: PropertyMultiTypeArray?
     /// A field that can be string, integer, or boolean
-    public var multiTypeField: PropertyMultiTypeField?
+    public let multiTypeField: PropertyMultiTypeField?
     /// Property that can be string, integer, or null
-    public var multiTypeWithNull: PropertyMultiTypeWithNull?
+    public let multiTypeWithNull: PropertyMultiTypeWithNull?
     /// Nested property with empty object allowing additional properties
-    public var nestedEmptyObject: PropertyNestedEmptyObject?
+    public let nestedEmptyObject: PropertyNestedEmptyObject?
     /// Nested property with empty object not allowing additional properties
-    public var nestedEmptyObjectNoAdditionalProps: PropertyNestedEmptyObjectNoAdditionalProps?
+    public let nestedEmptyObjectNoAdditionalProps: PropertyNestedEmptyObjectNoAdditionalProps?
     /// Property that is always null
-    public var nullField: PropertyNullField?
+    public let nullField: PropertyNullField?
     /// Property that can be number or null
-    public var numberOrNull: PropertyNumberOrNull?
+    public let numberOrNull: PropertyNumberOrNull?
     /// An object field with no defined structure
-    public var objectProperty: PropertyObjectProperty?
+    public let objectProperty: PropertyObjectProperty?
     /// Array of phone numbers using custom type
-    public var phoneNumbers: PropertyPhoneNumbers?
+    public let phoneNumbers: PropertyPhoneNumbers?
     /// Priority level
-    public var priority: PropertyPriority?
+    public let priority: PropertyPriority?
     /// User profile data
-    public var profile: CustomTypeUserProfile
+    public let profile: CustomTypeUserProfile
     /// List of related user profiles
-    public var profileList: CustomTypeProfileList?
+    public let profileList: CustomTypeProfileList?
     /// A field that can contain any type of value
-    public var propertyOfAny: Any?
+    public let propertyOfAny: Any?
     /// Rating value
-    public var rating: PropertyRating?
+    public let rating: PropertyRating?
     /// User account status
-    public var status: CustomTypeStatus?
+    public let status: CustomTypeStatus?
     /// Property that can be string or null
-    public var stringOrNull: PropertyStringOrNull?
+    public let stringOrNull: PropertyStringOrNull?
     /// User tags as array of strings
-    public var tags: PropertyTags?
+    public let tags: PropertyTags?
     /// Property using custom type with Unicode
-    public var unicodeCustomType: CustomTypeТипыДанных?
+    public let unicodeCustomType: CustomTypeТипыДанных?
     /// Field demonstrating various Unicode characters in enum values
-    public var unicodeEnumField: PropertyUnicodeEnumField?
+    public let unicodeEnumField: PropertyUnicodeEnumField?
     /// An array with no explicit item type (treated as any)
-    public var untypedArray: PropertyUntypedArray?
+    public let untypedArray: PropertyUntypedArray?
     /// A field with no explicit type (treated as any)
-    public var untypedField: Any?
+    public let untypedField: Any?
     /// User access information
-    public var userAccess: CustomTypeUserAccess?
+    public let userAccess: CustomTypeUserAccess?
     /// Username in Chinese characters
-    public var 用户名: Property用户名?
+    public let 用户名: Property用户名?
 
     /// example of object property
     public struct Context {
         /// IP address of the user
-        public var ipAddress: PropertyIpAddress
+        public let ipAddress: PropertyIpAddress
         /// demonstrates multiple levels of nesting
-        public var nestedContext: NestedContext
+        public let nestedContext: NestedContext
 
         /// demonstrates multiple levels of nesting
         public struct NestedContext {
             /// Array of favorite colors using custom type
-            public var favoriteColors: PropertyFavoriteColors?
+            public let favoriteColors: PropertyFavoriteColors?
             /// User profile data
-            public var profile: CustomTypeUserProfile?
+            public let profile: CustomTypeUserProfile?
             public init(
                 favoriteColors: PropertyFavoriteColors? = nil,
                 profile: CustomTypeUserProfile? = nil
@@ -963,7 +963,7 @@ public struct TrackUserSignedUpProperties {
         }
 
         public func toProperties() -> [String: Any] {
-            var props: [String: Any] = [
+            let props: [String: Any] = [
                 "ip_address": ipAddress,
                 "nested_context": nestedContext.toProperties()
             ]
@@ -1101,7 +1101,7 @@ public struct TrackUserSignedUpProperties {
 /// Event with camel case name
 public struct TrackEventWithNameCamelCaseProperties1 {
     /// User active status
-    public var active: CustomTypeActive?
+    public let active: CustomTypeActive?
     public init(active: CustomTypeActive? = nil) {
         self.active = active
     }
