@@ -5,6 +5,7 @@ import (
 	"maps"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
@@ -102,9 +103,23 @@ func getOrRegisterPropertyFieldName(structName, propName string, nr *core.NameRe
 	return nr.RegisterName(propName, scope, name)
 }
 
+// formatEnumValue converts an enum value to its string representation for case
+// name generation. Float values use fixed-point notation to avoid scientific
+// notation (e.g. 1e+06) which produces invalid Swift identifiers.
+func formatEnumValue(value any) string {
+	switch v := value.(type) {
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
 func getOrRegisterEnumCaseName(enumName string, value any, nr *core.NameRegistry) (string, error) {
 	scope := fmt.Sprintf("enum:%s", enumName)
-	formatted := formatEnumCaseName(fmt.Sprintf("%v", value))
+	formatted := formatEnumCaseName(formatEnumValue(value))
 	if formatted == "" {
 		formatted = "_"
 	}
