@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTransformationsTestPass(t *testing.T) {
+func TestTransformationsTest_Success(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -31,14 +31,14 @@ func TestTransformationsTestPass(t *testing.T) {
 	require.NoError(t, err, "apply failed: %s", string(output))
 
 	t.Run("all transformations and libraries pass", func(t *testing.T) {
-		outputDir := t.TempDir()
+		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
 		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "success")
 
 		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
-			"-l", fixtureDir, "--output-path", outputDir)
+			"-l", fixtureDir, "-o", resultsFile)
 		require.NoError(t, err, "test command failed: %s", string(output))
 
-		verifyTestResults(t, filepath.Join(outputDir, "test-results.json"))
+		verifyTestResults(t, resultsFile)
 	})
 }
 
@@ -46,8 +46,8 @@ func verifyTestResults(t *testing.T, resultsFile string) {
 	t.Helper()
 
 	results := readResultsFile(t, resultsFile)
-	assert.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
-	assert.False(t, results.HasFailures())
+	require.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
+	require.False(t, results.HasFailures())
 	assert.Len(t, results.Transformations, 4)
 	assert.Len(t, results.Libraries, 1)
 
