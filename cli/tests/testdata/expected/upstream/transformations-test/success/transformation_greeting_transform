@@ -1,0 +1,16 @@
+{
+  "id": "38eVmTk7eJQ4KzAcowplKjslOwe",
+  "versionId": "38eVmYaIbynskkTEXhc5dlxoMaB",
+  "name": "Greeting Transform",
+  "description": "Greets user by name using utils library",
+  "code": "import { greet } from 'utilsLibrary';\n\nexport function transformEvent(event, metadata) {\n  if (event.properties && event.properties.name) {\n    event.properties.greeting = greet(event.properties.name);\n  }\n  return event;\n}\n",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "codeVersion": "1",
+  "language": "javascript",
+  "imports": [
+    "utilsLibrary"
+  ],
+  "createdBy": "2N3mvKrWo8SQynb0ppqu5XX31mi",
+  "createdAt": "2026-01-23T09:23:02.099Z",
+  "updatedAt": "2026-01-23T09:23:02.786Z"
+}

@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
+	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestTransformationsTestPass(t *testing.T) {
@@ -39,11 +38,11 @@ func TestTransformationsTestPass(t *testing.T) {
 			"-l", fixtureDir, "--output-path", outputDir)
 		require.NoError(t, err, "test command failed: %s", string(output))
 
-		verifyTestResults(t, fixtureDir, filepath.Join(outputDir, "test-results.json"))
+		verifyTestResults(t, filepath.Join(outputDir, "test-results.json"))
 	})
 }
 
-func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
+func verifyTestResults(t *testing.T, resultsFile string) {
 	t.Helper()
 
 	results := readResultsFile(t, resultsFile)
@@ -67,35 +66,37 @@ func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
 		assert.Empty(t, lib.Message, "library %s should have no error message", lib.HandleName)
 	}
 
-	verifyVersions(t, fixtureDir, results)
+	snapshotDir := filepath.Join("testdata", "expected", "upstream", "transformations-test", "success")
+	verifyVersions(t, snapshotDir, results)
 }
 
-// verifyVersions fetches each transformation and library version via the API
-// and compares name, description, and code against the fixture YAML spec.
-func verifyVersions(t *testing.T, fixtureDir string, results *testorchestrator.TestResults) {
+// verifyVersions uses the snapshot framework to compare each transformation and
+// library version fetched from the API against expected snapshot files.
+func verifyVersions(t *testing.T, snapshotDir string, results *testorchestrator.TestResults) {
 	t.Helper()
 
-	fixtures := loadFixtureSpecs(t, fixtureDir)
 	store := newTransformationStore(t)
-	ctx := context.Background()
+	fileManager, err := helpers.NewSnapshotFileManager(snapshotDir)
+	require.NoError(t, err)
 
-	for _, tr := range results.Transformations {
-		version, err := store.GetTransformationVersion(ctx, tr.Result.ID, tr.Result.VersionID)
-		require.NoError(t, err, "fetching version for %s", tr.Result.Name)
-		expected := fixtures[tr.Result.Name]
-		assert.Equal(t, expected.Name, version.Name)
-		assert.Equal(t, expected.Description, version.Description)
-		assert.Equal(t, strings.TrimSpace(expected.Code), strings.TrimSpace(version.Code))
-	}
-
-	for _, lib := range results.Libraries {
-		version, err := store.GetLibraryVersion(ctx, lib.ID, lib.VersionID)
-		require.NoError(t, err, "fetching version for %s", lib.HandleName)
-		expected := fixtures[version.Name]
-		assert.Equal(t, expected.Name, version.Name)
-		assert.Equal(t, expected.Description, version.Description)
-		assert.Equal(t, strings.TrimSpace(expected.Code), strings.TrimSpace(version.Code))
-	}
+	tester := helpers.NewTransformationSnapshotTester(
+		store,
+		helpers.VersionRefs(results),
+		fileManager,
+		[]string{
+			"id",
+			"versionId",
+			"codeVersion",
+			"workspaceId",
+			"externalId",
+			"createdAt",
+			"updatedAt",
+			"createdBy",
+			"updatedBy",
+		},
+	)
+	assert.NoError(t, tester.SnapshotTest(context.Background()),
+		"version snapshot verification failed")
 }
 
 func readResultsFile(t *testing.T, path string) *testorchestrator.TestResults {
@@ -105,41 +106,6 @@ func readResultsFile(t *testing.T, path string) *testorchestrator.TestResults {
 	var results testorchestrator.TestResults
 	require.NoError(t, json.Unmarshal(data, &results), "deserializing results file")
 	return &results
-}
-
-type fixtureSpec struct {
-	Name        string
-	Description string
-	Code        string
-}
-
-// loadFixtureSpecs parses all *.yaml files at the top level of fixtureDir into
-// a map of spec.name → fixtureSpec. Subdirectories (input/, output/) are ignored.
-func loadFixtureSpecs(t *testing.T, fixtureDir string) map[string]fixtureSpec {
-	t.Helper()
-	specs := make(map[string]fixtureSpec)
-	files, err := filepath.Glob(filepath.Join(fixtureDir, "*.yaml"))
-	require.NoError(t, err)
-	for _, f := range files {
-		data, err := os.ReadFile(f)
-		require.NoError(t, err)
-		var fixture struct {
-			Spec struct {
-				Name        string `yaml:"name"`
-				Description string `yaml:"description"`
-				Code        string `yaml:"code"`
-			} `yaml:"spec"`
-		}
-		require.NoError(t, yaml.Unmarshal(data, &fixture))
-		if fixture.Spec.Name != "" && fixture.Spec.Code != "" {
-			specs[fixture.Spec.Name] = fixtureSpec{
-				Name:        fixture.Spec.Name,
-				Description: fixture.Spec.Description,
-				Code:        fixture.Spec.Code,
-			}
-		}
-	}
-	return specs
 }
 
 func newTransformationStore(t *testing.T) transformations.TransformationStore {

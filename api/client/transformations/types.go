@@ -151,6 +151,7 @@ type TestSuiteRunResult struct {
 // TransformationTestResult represents result for a single transformation's test suite
 type TransformationTestResult struct {
 	ID              string             `json:"id"`
+	ExternalID      string             `json:"externalId,omitempty"`
 	Name            string             `json:"name"`
 	VersionID       string             `json:"versionId"`
 	Imports         []string           `json:"imports,omitempty"`
@@ -162,6 +163,7 @@ type TransformationTestResult struct {
 // LibraryTestResult represents validation result for a library in batch test response
 type LibraryTestResult struct {
 	ID         string `json:"id"`
+	ExternalID string `json:"externalId,omitempty"`
 	HandleName string `json:"handleName"`
 	VersionID  string `json:"versionId"`
 	Pass       bool   `json:"pass"`

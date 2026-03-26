@@ -1,0 +1,14 @@
+{
+  "id": "38eVnQm9fKR6LzCeqyrnMluoQyg",
+  "versionId": "38eVnQbKd0pumoVGZje7fnzqOcD",
+  "name": "Py Greeting Transform",
+  "description": "Greets user by name in Python",
+  "code": "def transformEvent(event, metadata):\n    props = event.get('properties', {})\n    props['greeting'] = 'Hello, ' + props.get('name', '')\n    event['properties'] = props\n    return event\n",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "codeVersion": "1",
+  "language": "python",
+  "imports": [],
+  "createdBy": "2N3mvKrWo8SQynb0ppqu5XX31mi",
+  "createdAt": "2026-01-23T09:23:02.099Z",
+  "updatedAt": "2026-01-23T09:23:02.786Z"
+}
