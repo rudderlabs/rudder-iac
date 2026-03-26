@@ -244,7 +244,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 			if err != nil {
 				return err
 			}
-			variantEnum, err := createVariantEnum(typeName, ct.Description, ct.Schema, ct.Variants, nr)
+			variantEnum, err := createVariantEnum(typeName, ct.Description, ct.Schema, ct.Variants, nr, nil)
 			if err != nil {
 				return err
 			}
@@ -264,7 +264,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 			} else {
 				// Empty object with additionalProperties: false → empty struct so callers
 				// cannot pass arbitrary keys (mirrors Kotlin's Unit mapping)
-				s, err := createSwiftStruct(typeName, ct.Description, "toProperties", ct.Schema, nr)
+				s, err := createSwiftStruct(typeName, ct.Description, "toProperties", ct.Schema, nr, nil)
 				if err != nil {
 					return err
 				}
@@ -290,7 +290,7 @@ func processCustomTypesIntoContext(customTypes map[string]*plan.CustomType, ctx 
 			if err != nil {
 				return err
 			}
-			s, err := createSwiftStruct(typeName, ct.Description, "toProperties", ct.Schema, nr)
+			s, err := createSwiftStruct(typeName, ct.Description, "toProperties", ct.Schema, nr, nil)
 			if err != nil {
 				return err
 			}
@@ -363,12 +363,21 @@ func processPropertiesIntoContext(properties map[string]*plan.Property, ctx *Swi
 				ctx.PropertyTypeAliases = append(ctx.PropertyTypeAliases, *alias)
 			}
 		} else {
-			// No types → Any
+			// No types → RudderValue (unbounded property)
+			ctx.UsesRudderValue = true
 			alias, err := createPropertyAlias(p, nr)
 			if err != nil {
 				return err
 			}
 			ctx.PropertyTypeAliases = append(ctx.PropertyTypeAliases, *alias)
+		}
+
+		// Array with no item type is also unbounded → [RudderValue]
+		if len(p.Types) == 1 {
+			pt := p.Types[0]
+			if plan.IsPrimitiveType(pt) && *plan.AsPrimitiveType(pt) == plan.PrimitiveTypeArray && len(p.ItemTypes) == 0 {
+				ctx.UsesRudderValue = true
+			}
 		}
 	}
 
@@ -409,6 +418,19 @@ func collectTypesFromStruct(s *SwiftStruct, out map[string]bool) {
 }
 
 func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameRegistry) error {
+	// Build a map of type name → serialize suffix for all registered enum and
+	// multi-type enum types. resolveStructPropertyType consults this instead of
+	// re-checking the local property config, so the serialize expression stays
+	// consistent with the type declaration even when two events share a property
+	// name but differ in their type constraint.
+	typeSerializeSuffix := make(map[string]string, len(ctx.Enums)+len(ctx.MultiTypeEnums))
+	for _, e := range ctx.Enums {
+		typeSerializeSuffix[e.Name] = ".rawValue"
+	}
+	for _, e := range ctx.MultiTypeEnums {
+		typeSerializeSuffix[e.Name] = ".value"
+	}
+
 	ruleMap := make(map[string]*plan.EventRule)
 	for i := range p.Rules {
 		rule := &p.Rules[i]
@@ -439,7 +461,7 @@ func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameReg
 			if err != nil {
 				return err
 			}
-			variantEnum, err := createVariantEnum(structName, rule.Event.Description, &rule.Schema, rule.Variants, nr)
+			variantEnum, err := createVariantEnum(structName, rule.Event.Description, &rule.Schema, rule.Variants, nr, typeSerializeSuffix)
 			if err != nil {
 				return err
 			}
@@ -461,7 +483,7 @@ func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameReg
 				return err
 			}
 			serializeMethod := sectionToSerializeMethod(rule.Section)
-			s, err := createSwiftStruct(structName, rule.Event.Description, serializeMethod, &rule.Schema, nr)
+			s, err := createSwiftStruct(structName, rule.Event.Description, serializeMethod, &rule.Schema, nr, typeSerializeSuffix)
 			if err != nil {
 				return err
 			}
@@ -616,7 +638,7 @@ func primitiveToMultiTypeCase(t plan.PrimitiveType) (SwiftMultiTypeCase, error) 
 
 // ========== Variant Enum Builder ==========
 
-func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, variants []plan.Variant, nr *core.NameRegistry) (*SwiftVariantEnum, error) {
+func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, variants []plan.Variant, nr *core.NameRegistry, typeSerializeSuffix map[string]string) (*SwiftVariantEnum, error) {
 	if len(variants) == 0 {
 		return nil, fmt.Errorf("no variants provided for %q", name)
 	}
@@ -638,7 +660,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 		payloadName := FormatTypeName("Case " + structLabel)
 
 		merged := mergeSchemas(baseSchema, &vc.Schema)
-		s, err := createSwiftStruct(payloadName, vc.Description, "toProperties", merged, nr)
+		s, err := createSwiftStruct(payloadName, vc.Description, "toProperties", merged, nr, typeSerializeSuffix)
 		if err != nil {
 			return nil, err
 		}
@@ -684,7 +706,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 			AdditionalProperties: false,
 		}
 	}
-	defaultStruct, err := createSwiftStruct("Default", "Default case for unmatched discriminator values", "toProperties", defaultSchema, nr)
+	defaultStruct, err := createSwiftStruct("Default", "Default case for unmatched discriminator values", "toProperties", defaultSchema, nr, typeSerializeSuffix)
 	if err != nil {
 		return nil, err
 	}
@@ -721,7 +743,7 @@ func mergeSchemas(base, caseSchema *plan.ObjectSchema) *plan.ObjectSchema {
 
 // ========== Struct Builder ==========
 
-func createSwiftStruct(name, comment, serializeMethod string, schema *plan.ObjectSchema, nr *core.NameRegistry) (*SwiftStruct, error) {
+func createSwiftStruct(name, comment, serializeMethod string, schema *plan.ObjectSchema, nr *core.NameRegistry, typeSerializeSuffix map[string]string) (*SwiftStruct, error) {
 	if isEmptySchema(schema) {
 		return &SwiftStruct{
 			Name:            name,
@@ -752,7 +774,7 @@ func createSwiftStruct(name, comment, serializeMethod string, schema *plan.Objec
 		if propSchema.Schema != nil && len(propSchema.Schema.Properties) > 0 {
 			// Nested object → nested struct (always uses toProperties)
 			nestedName := FormatTypeName(propName)
-			nestedStruct, err := createSwiftStruct(nestedName, propSchema.Property.Description, "toProperties", propSchema.Schema, nr)
+			nestedStruct, err := createSwiftStruct(nestedName, propSchema.Property.Description, "toProperties", propSchema.Schema, nr, typeSerializeSuffix)
 			if err != nil {
 				return nil, err
 			}
@@ -767,7 +789,7 @@ func createSwiftStruct(name, comment, serializeMethod string, schema *plan.Objec
 				SerializeExpr: fieldName + ".toProperties()",
 			})
 		} else {
-			swiftType, serializeExpr, err := resolveStructPropertyType(fieldName, &propSchema, nr)
+			swiftType, serializeExpr, err := resolveStructPropertyType(fieldName, &propSchema, nr, typeSerializeSuffix)
 			if err != nil {
 				return nil, fmt.Errorf("resolving type for property %q in struct %q: %w", propName, name, err)
 			}
@@ -794,29 +816,39 @@ func createSwiftStruct(name, comment, serializeMethod string, schema *plan.Objec
 // resolveStructPropertyType returns the Swift type string and serialize expression for a struct property.
 // SerializeExpr references the unwrapped variable (same as fieldName) so it works for both
 // required (direct dict assignment) and optional (if let unwrapping) properties.
-func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema, nr *core.NameRegistry) (swiftType string, serializeExpr string, err error) {
+func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema, nr *core.NameRegistry, typeSerializeSuffix map[string]string) (swiftType string, serializeExpr string, err error) {
 	prop := &propSchema.Property
 
-	// Enum constraint → registered enum type, serialize via .rawValue
-	if hasEnumConfig(prop.Config) {
+	// For enum-constrained and multi-type properties, the serialize expression
+	// must match the type that was actually registered during
+	// processPropertiesAndCustomTypes. Two events can share a property name but
+	// define different type constraints; the registered type is authoritative —
+	// not the local schema. typeSerializeSuffix maps registered type names to
+	// their correct suffix (.rawValue for enums, .value for multi-type enums).
+	//
+	// typeSerializeSuffix is nil in the custom type context (no cross-event
+	// deduplication), so fall back to direct type signals there.
+	if hasEnumConfig(prop.Config) || len(prop.Types) > 1 {
 		typeName, err := getOrRegisterPropertyTypeName(prop, nr)
 		if err != nil {
 			return "", "", err
 		}
-		return typeName, fieldName + ".rawValue", nil
-	}
-
-	// Multi-type → registered multi-type enum, serialize via .value
-	if len(prop.Types) > 1 {
-		typeName, err := getOrRegisterPropertyTypeName(prop, nr)
-		if err != nil {
-			return "", "", err
+		if typeSerializeSuffix != nil {
+			if suffix, ok := typeSerializeSuffix[typeName]; ok {
+				return typeName, fieldName + suffix, nil
+			}
+			// Not in map → registered as a plain alias due to deduplication — fall through.
+		} else {
+			// Custom type context: no cross-event deduplication, use direct signals.
+			if hasEnumConfig(prop.Config) {
+				return typeName, fieldName + ".rawValue", nil
+			}
+			return typeName, fieldName + ".value", nil
 		}
-		return typeName, fieldName + ".value", nil
 	}
 
 	if len(prop.Types) == 0 {
-		return "Any", fieldName, nil
+		return "RudderValue", fieldName + ".value", nil
 	}
 
 	pt := prop.Types[0]
@@ -855,10 +887,15 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 		if err != nil {
 			return "", "", err
 		}
-		// Array with multi-item-type enum: each element is a custom enum that AnyCodable cannot
-		// encode directly — unwrap to primitives via .value before storing in the properties dict.
-		if *plan.AsPrimitiveType(pt) == plan.PrimitiveTypeArray && len(prop.ItemTypes) > 1 {
-			return typeName, fieldName + ".map { $0.value }", nil
+		if *plan.AsPrimitiveType(pt) == plan.PrimitiveTypeArray {
+			switch {
+			case len(prop.ItemTypes) == 0:
+				// Unbounded array → [RudderValue], unwrap each element for serialization.
+				return typeName, fieldName + ".map { $0.value }", nil
+			case len(prop.ItemTypes) > 1:
+				// Multi-item-type enum: unwrap each element via .value.
+				return typeName, fieldName + ".map { $0.value }", nil
+			}
 		}
 		return typeName, fieldName, nil
 	}
@@ -926,7 +963,7 @@ func createPropertyAlias(p *plan.Property, nr *core.NameRegistry) (*SwiftTypeAli
 
 func resolvePropertyAliasType(p *plan.Property, nr *core.NameRegistry) (string, error) {
 	if len(p.Types) == 0 {
-		return "Any", nil
+		return "RudderValue", nil
 	}
 	if len(p.Types) > 1 {
 		return "Any", nil
@@ -936,26 +973,32 @@ func resolvePropertyAliasType(p *plan.Property, nr *core.NameRegistry) (string, 
 
 	if plan.IsPrimitiveType(pt) {
 		primitive := *plan.AsPrimitiveType(pt)
-		if primitive == plan.PrimitiveTypeArray && len(p.ItemTypes) == 1 {
-			itemType := p.ItemTypes[0]
-			if plan.IsPrimitiveType(itemType) {
-				inner, err := mapPrimitiveToSwiftType(*plan.AsPrimitiveType(itemType))
-				if err != nil {
-					return "", err
-				}
-				return "[" + inner + "]", nil
+		if primitive == plan.PrimitiveTypeArray {
+			if len(p.ItemTypes) == 0 {
+				// Unbounded array — no item type constraint.
+				return "[RudderValue]", nil
 			}
-			if plan.IsCustomType(itemType) {
-				ct := plan.AsCustomType(itemType)
-				if ct != nil {
-					itemName, err := getOrRegisterCustomTypeName(ct, nr)
+			if len(p.ItemTypes) == 1 {
+				itemType := p.ItemTypes[0]
+				if plan.IsPrimitiveType(itemType) {
+					inner, err := mapPrimitiveToSwiftType(*plan.AsPrimitiveType(itemType))
 					if err != nil {
 						return "", err
 					}
-					return "[" + itemName + "]", nil
+					return "[" + inner + "]", nil
 				}
+				if plan.IsCustomType(itemType) {
+					ct := plan.AsCustomType(itemType)
+					if ct != nil {
+						itemName, err := getOrRegisterCustomTypeName(ct, nr)
+						if err != nil {
+							return "", err
+						}
+						return "[" + itemName + "]", nil
+					}
+				}
+				return "[RudderValue]", nil
 			}
-			return "[Any]", nil
 		}
 		return mapPrimitiveToSwiftType(primitive)
 	}

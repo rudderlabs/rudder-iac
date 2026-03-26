@@ -113,6 +113,9 @@ type SwiftAnalyticsMethod struct {
 
 // SwiftContext is the root data object passed to RudderTyper.swift.tmpl.
 type SwiftContext struct {
+	// UsesRudderValue is true when at least one property has no type constraint,
+	// triggering emission of the RudderValue enum in the generated file.
+	UsesRudderValue bool
 	// TypeAliases holds custom type aliases (e.g. CustomTypeFoo = String) → rendered in MARK: Custom Types
 	TypeAliases []SwiftTypeAlias
 	// PropertyTypeAliases holds property type aliases (e.g. PropertyFoo = String) → rendered in MARK: Property Types

@@ -6,6 +6,31 @@
 import Foundation
 import RudderStackAnalytics
 
+// MARK: - Foundation Types
+
+/// Represents any valid JSON value. Used for properties with no type constraint.
+public enum RudderValue {
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    case object([String: RudderValue])
+    case array([RudderValue])
+    case null
+
+    public var value: Any {
+        switch self {
+        case .string(let v):  return v
+        case .int(let v):     return v
+        case .double(let v):  return v
+        case .bool(let v):    return v
+        case .null:           return NSNull()
+        case .object(let v):  return v.mapValues { $0.value }
+        case .array(let v):   return v.map { $0.value }
+        }
+    }
+}
+
 // MARK: - Custom Types
 
 /// Whether user is active
@@ -382,14 +407,14 @@ public enum TrackEventWithVariantsProperties {
     /// Default case for unmatched discriminator values
     public struct Default {
         /// A field with no explicit type (treated as any)
-        public let untypedField: Any?
-        public init(untypedField: Any? = nil) {
+        public let untypedField: RudderValue?
+        public init(untypedField: RudderValue? = nil) {
             self.untypedField = untypedField
         }
 
         public func toProperties() -> [String: Any] {
             var props: [String: Any] = [:]
-            if let untypedField = untypedField { props["untyped_field"] = untypedField }
+            if let untypedField = untypedField { props["untyped_field"] = untypedField.value }
             return props
         }
     }
@@ -414,7 +439,7 @@ public enum TrackEventWithVariantsProperties {
 // MARK: - Property Types
 
 /// An array that can contain any type of items
-public typealias PropertyArrayOfAny = [Any]
+public typealias PropertyArrayOfAny = [RudderValue]
 
 /// Array with items that can be string or null
 public typealias PropertyArrayWithNullItems = [PropertyArrayWithNullItemsItem]
@@ -483,7 +508,7 @@ public typealias PropertyStreet = String
 public typealias PropertyTags = [String]
 
 /// An array with no explicit item type (treated as any)
-public typealias PropertyUntypedArray = [Any]
+public typealias PropertyUntypedArray = [RudderValue]
 
 /// Username in Chinese characters
 public typealias Property用户名 = String
@@ -904,7 +929,7 @@ public struct TrackUserSignedUpProperties {
     /// List of related user profiles
     public let profileList: CustomTypeProfileList?
     /// A field that can contain any type of value
-    public let propertyOfAny: Any?
+    public let propertyOfAny: RudderValue?
     /// Rating value
     public let rating: PropertyRating?
     /// User account status
@@ -920,7 +945,7 @@ public struct TrackUserSignedUpProperties {
     /// An array with no explicit item type (treated as any)
     public let untypedArray: PropertyUntypedArray?
     /// A field with no explicit type (treated as any)
-    public let untypedField: Any?
+    public let untypedField: RudderValue?
     /// User access information
     public let userAccess: CustomTypeUserAccess?
     /// Username in Chinese characters
@@ -999,7 +1024,7 @@ public struct TrackUserSignedUpProperties {
         phoneNumbers: PropertyPhoneNumbers? = nil,
         priority: PropertyPriority? = nil,
         profileList: CustomTypeProfileList? = nil,
-        propertyOfAny: Any? = nil,
+        propertyOfAny: RudderValue? = nil,
         rating: PropertyRating? = nil,
         status: CustomTypeStatus? = nil,
         stringOrNull: PropertyStringOrNull? = nil,
@@ -1007,7 +1032,7 @@ public struct TrackUserSignedUpProperties {
         unicodeCustomType: CustomTypeТипыДанных? = nil,
         unicodeEnumField: PropertyUnicodeEnumField? = nil,
         untypedArray: PropertyUntypedArray? = nil,
-        untypedField: Any? = nil,
+        untypedField: RudderValue? = nil,
         userAccess: CustomTypeUserAccess? = nil,
         用户名: Property用户名? = nil
     ) {
@@ -1059,7 +1084,7 @@ public struct TrackUserSignedUpProperties {
         ]
         if let addresses = addresses { props["addresses"] = addresses.map { $0.toProperties() } }
         if let age = age { props["age"] = age }
-        if let arrayOfAny = arrayOfAny { props["array_of_any"] = arrayOfAny }
+        if let arrayOfAny = arrayOfAny { props["array_of_any"] = arrayOfAny.map { $0.value } }
         if let arrayWithNullItems = arrayWithNullItems { props["array_with_null_items"] = arrayWithNullItems.map { $0.value } }
         if let contacts = contacts { props["contacts"] = contacts }
         if let context = context { props["context"] = context.toProperties() }
@@ -1083,15 +1108,15 @@ public struct TrackUserSignedUpProperties {
         if let phoneNumbers = phoneNumbers { props["phone_numbers"] = phoneNumbers }
         if let priority = priority { props["priority"] = priority.rawValue }
         if let profileList = profileList { props["profile_list"] = profileList.map { $0.toProperties() } }
-        if let propertyOfAny = propertyOfAny { props["property_of_any"] = propertyOfAny }
+        if let propertyOfAny = propertyOfAny { props["property_of_any"] = propertyOfAny.value }
         if let rating = rating { props["rating"] = rating.rawValue }
         if let status = status { props["status"] = status.rawValue }
         if let stringOrNull = stringOrNull { props["string_or_null"] = stringOrNull.value }
         if let tags = tags { props["tags"] = tags }
         if let unicodeCustomType = unicodeCustomType { props["unicode_custom_type"] = unicodeCustomType.rawValue }
         if let unicodeEnumField = unicodeEnumField { props["unicode_enum_field"] = unicodeEnumField.rawValue }
-        if let untypedArray = untypedArray { props["untyped_array"] = untypedArray }
-        if let untypedField = untypedField { props["untyped_field"] = untypedField }
+        if let untypedArray = untypedArray { props["untyped_array"] = untypedArray.map { $0.value } }
+        if let untypedField = untypedField { props["untyped_field"] = untypedField.value }
         if let userAccess = userAccess { props["user_access"] = userAccess.toProperties() }
         if let 用户名 = 用户名 { props["用户名"] = 用户名 }
         return props
