@@ -56,8 +56,7 @@ func NewCmdValidate() *cobra.Command {
 				}...)
 			}()
 
-			// Load and validate the project
-			// The Load method internally calls the provider's Validate method
+			// Load and validate the project (validation engine + RuleProvider rules)
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("validating project: %w", err)
 			}

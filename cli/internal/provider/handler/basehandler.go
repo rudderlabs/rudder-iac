@@ -15,7 +15,7 @@ import (
 )
 
 // BaseHandler provides a generic, reusable foundation for implementing resource handlers
-// across different resource types. It abstracts common lifecycle operations (load, validate,
+// across different resource types. It abstracts common lifecycle operations (load,
 // create, update, delete, import) while delegating resource-specific logic to the HandlerImpl.
 //
 // Type parameters:
@@ -171,10 +171,6 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 		return fmt.Errorf("converting spec: %w", err)
 	}
 
-	if err := h.Impl.ValidateSpec(spec); err != nil {
-		return fmt.Errorf("validating spec: %w", err)
-	}
-
 	rs, err := h.Impl.ExtractResourcesFromSpec(path, spec)
 	if err != nil {
 		return fmt.Errorf("extracting resources from spec: %w", err)
@@ -197,15 +193,6 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 		}
 	}
 
-	return nil
-}
-
-func (h *BaseHandler[Spec, Res, State, Remote]) Validate(graph *resources.Graph) error {
-	for _, source := range h.resources {
-		if err := h.Impl.ValidateResource(source, graph); err != nil {
-			return fmt.Errorf("validating %s resource: %w", h.metadata.ResourceType, err)
-		}
-	}
 	return nil
 }
 

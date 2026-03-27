@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -64,31 +63,6 @@ func (h *HandlerImpl) NewSpec() *model.TransformationSpec {
 	return &model.TransformationSpec{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if spec.Code != "" && spec.File != "" {
-		return fmt.Errorf("code and file are mutually exclusive")
-	}
-	if spec.Code == "" && spec.File == "" {
-		return fmt.Errorf("either code or file must be specified")
-	}
-	if spec.Language == "" {
-		return fmt.Errorf("language is required")
-	}
-	for _, test := range spec.Tests {
-		if test.Name == "" {
-			return fmt.Errorf("name is required for each spec tests block")
-		}
-	}
-
-	return nil
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {
 	// Extract and enrich tests with SpecDir and apply defaults
 	tests := extractTestsFromSpec(path, spec)
@@ -116,6 +90,14 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.Transfor
 		resource.Code = string(codeBytes)
 	} else {
 		resource.Code = spec.Code
+	}
+
+	codeParser, err := parser.NewParser(resource.Language)
+	if err != nil {
+		return nil, fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
+	}
+	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
+		return nil, fmt.Errorf("validating code syntax: %w", err)
 	}
 
 	return map[string]*model.TransformationResource{
@@ -147,38 +129,6 @@ func extractTestsFromSpec(path string, spec *model.TransformationSpec) []specs.T
 	}
 
 	return enriched
-}
-
-func (h *HandlerImpl) ValidateResource(resource *model.TransformationResource, graph *resources.Graph) error {
-	if resource.Code == "" {
-		return fmt.Errorf("code is required")
-	}
-
-	if resource.Language != handlers.JavaScript && resource.Language != handlers.Python {
-		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, resource.Language)
-	}
-
-	// Validate code syntax
-	codeParser, err := parser.NewParser(resource.Language)
-	if err != nil {
-		return fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
-	}
-
-	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
-		return fmt.Errorf("validating code syntax: %w", err)
-	}
-
-	for _, test := range resource.Tests {
-		if strings.TrimSpace(test.Name) == "" {
-			return fmt.Errorf("test name is required")
-		}
-
-		if !TestNameRegex.MatchString(test.Name) {
-			return fmt.Errorf("invalid test name %q: use only letters, numbers, spaces, '-', '_', or '/'", test.Name)
-		}
-	}
-
-	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteTransformation, error) {

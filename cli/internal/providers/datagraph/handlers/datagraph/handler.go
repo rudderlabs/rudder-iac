@@ -42,18 +42,9 @@ func (h *HandlerImpl) NewSpec() *struct{} {
 	return &struct{}{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *struct{}) error {
-	// Spec validation is handled by the provider
-	return fmt.Errorf("data graph handler does not handle spec validation - handled by provider")
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map[string]*model.DataGraphResource, error) {
 	// Resource extraction is handled by the provider
 	return nil, fmt.Errorf("data graph handler does not handle spec extraction - handled by provider")
-}
-
-func (h *HandlerImpl) ValidateResource(_ *model.DataGraphResource, _ *resources.Graph) error {
-	return nil
 }
 
 // listAllDataGraphs fetches all data graphs with pagination and optional filtering

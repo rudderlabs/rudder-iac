@@ -6,7 +6,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // HandlerImpl defines the resource-specific operations that each handler implementation must
@@ -14,8 +13,7 @@ import (
 // common handler infrastructure, following the strategy pattern.
 //
 // Implementations must provide:
-//   - Spec lifecycle: creation, validation, and resource extraction from configuration files
-//   - Resource validation: ensuring resources are valid within the dependency graph
+//   - Spec lifecycle: creation and resource extraction from configuration files
 //   - Remote operations: loading resources from remote APIs, both for sync and import scenarios
 //   - State mapping: converting remote API responses to local resource and state representations
 //   - CRUD operations: creating, updating, importing, and deleting resources via API calls
@@ -31,13 +29,7 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	// during configuration file parsing without knowing the concrete type.
 	NewSpec() *Spec
 
-	// ValidateSpec checks that the parsed specification contains valid values
-	// and required fields. It should return descriptive errors for any validation
-	// failures. This is called after decoding the YAML/JSON spec but before
-	// extracting resources from it.
-	ValidateSpec(spec *Spec) error
-
-	// ExtractResourcesFromSpec parses a validated spec and extracts individual
+	// ExtractResourcesFromSpec parses a decoded spec and extracts individual
 	// resource instances from it, returning them as a map keyed by resource ID.
 	// The path parameter provides the file path for error reporting and context.
 	// Multiple resources may be extracted from a single spec file (e.g., a spec
@@ -45,13 +37,6 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	//
 	// NOTE: path should be part of the spec
 	ExtractResourcesFromSpec(path string, spec *Spec) (map[string]*Res, error)
-
-	// ValidateResource performs validation on a single resource within the context
-	// of the full dependency graph. This enables cross-resource validation such as
-	// checking that referenced resources exist (e.g., verifying a tracking plan
-	// URN references an actual tracking plan resource). The graph provides access
-	// to all loaded resources across all types.
-	ValidateResource(resource *Res, graph *resources.Graph) error
 
 	// LoadRemoteResources fetches all resources of this type from the remote API
 	// that have external IDs (i.e., resources managed by this IaC system).

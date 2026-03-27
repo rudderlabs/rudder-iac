@@ -1,8 +1,6 @@
 package sqlmodel
 
 import (
-	"fmt"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -87,32 +85,6 @@ type SQLModelResource struct {
 	PrimaryKey       string `json:"primary_key"`
 	SourceDefinition string `json:"source_definition"`
 	Enabled          bool   `json:"enabled"`
-}
-
-// ValidateSQLModelResource validates a SQL Model resource
-func ValidateSQLModelResource(spec *SQLModelResource) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.DisplayName == "" {
-		return fmt.Errorf("display_name is required")
-	}
-	if spec.AccountID == "" {
-		return fmt.Errorf("account_id is required")
-	}
-	if spec.PrimaryKey == "" {
-		return fmt.Errorf("primary_key is required")
-	}
-	if spec.SourceDefinition == "" {
-		return fmt.Errorf("source_definition is required")
-	}
-	if !isValidSourceDefinition(SourceDefinition(spec.SourceDefinition)) {
-		return fmt.Errorf("source_definition '%s' is invalid, must be one of: %v", spec.SourceDefinition, validSourceDefinitions)
-	}
-	if spec.SQL == "" {
-		return fmt.Errorf("sql is required")
-	}
-	return nil
 }
 
 func (s *SQLModelResource) FromResourceData(data resources.ResourceData) {
