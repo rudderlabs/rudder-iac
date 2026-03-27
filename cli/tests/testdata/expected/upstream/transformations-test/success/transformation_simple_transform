@@ -1,0 +1,11 @@
+{
+  "id": "38eVmTzdCeXagnBjHt1hcKoCbEO",
+  "versionId": "38eVmTB6qggBfe5hxVJNDoLnpn1",
+  "name": "Simple Transform",
+  "description": "Adds source tag and timestamp to events",
+  "code": "export function transformEvent(event, metadata) {\n  event.properties = event.properties || {};\n  event.properties.source = \"rudder\";\n  event.properties.timestamp = new Date().toISOString();\n  return event;\n}\n",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "language": "javascript",
+  "imports": [],
+  "externalId": "simple_transform"
+}
