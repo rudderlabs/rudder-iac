@@ -43,12 +43,6 @@ func (h *HandlerImpl) NewSpec() *struct{} {
 	return &struct{}{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *struct{}) error {
-	// Models don't have standalone specs - they're inline in data-graph specs
-	// The provider handles all spec validation
-	return fmt.Errorf("model handler does not support standalone specs - models are inline in data-graph specs")
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map[string]*dgModel.ModelResource, error) {
 	// Models don't have standalone specs - they're inline in data-graph specs
 	// The provider handles all resource extraction

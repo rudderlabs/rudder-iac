@@ -126,11 +126,8 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		Enabled:          enabled,
 		SQL:              sqlStr,
 	}
-	if err := ValidateSQLModelResource(res); err != nil {
-		return fmt.Errorf("validating sql model spec: %w", err)
-	}
-	h.resources[spec.ID] = res
 
+	h.resources[spec.ID] = res
 	return h.loadImportMetadata(s)
 }
 

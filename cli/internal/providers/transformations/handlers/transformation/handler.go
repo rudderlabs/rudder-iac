@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -62,37 +61,6 @@ func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
 
 func (h *HandlerImpl) NewSpec() *model.TransformationSpec {
 	return &model.TransformationSpec{}
-}
-
-func (h *HandlerImpl) ValidateSpec(spec *model.TransformationSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if spec.Code != "" && spec.File != "" {
-		return fmt.Errorf("code and file are mutually exclusive")
-	}
-	if spec.Code == "" && spec.File == "" {
-		return fmt.Errorf("either code or file must be specified")
-	}
-	if spec.Language == "" {
-		return fmt.Errorf("language is required")
-	}
-	if spec.Language != handlers.JavaScript && spec.Language != handlers.Python {
-		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, spec.Language)
-	}
-	for _, test := range spec.Tests {
-		if strings.TrimSpace(test.Name) == "" {
-			return fmt.Errorf("test name is required")
-		}
-		if !TestNameRegex.MatchString(test.Name) {
-			return fmt.Errorf("invalid test name %q: use only letters, numbers, spaces, '-', '_', or '/'", test.Name)
-		}
-	}
-
-	return nil
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.TransformationSpec) (map[string]*model.TransformationResource, error) {

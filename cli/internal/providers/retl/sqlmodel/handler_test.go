@@ -228,8 +228,8 @@ func TestSQLModelHandler(t *testing.T) {
 						"source_definition": "postgres",
 					},
 				},
-				expectedIDs: []string{"test-model"},
-				expectedError:    false,
+				expectedIDs:   []string{"test-model"},
+				expectedError: false,
 			},
 			{
 				name: "error - id not found in spec",
@@ -241,8 +241,8 @@ func TestSQLModelHandler(t *testing.T) {
 					},
 				},
 
-				expectedError:    true,
-				errorContains:    "id not found in sql model spec",
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
 			},
 			{
 				name: "error - id is not a string",
@@ -255,8 +255,8 @@ func TestSQLModelHandler(t *testing.T) {
 					},
 				},
 
-				expectedError:    true,
-				errorContains:    "id not found in sql model spec",
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
 			},
 			{
 				name: "error - empty spec",
@@ -265,8 +265,8 @@ func TestSQLModelHandler(t *testing.T) {
 					Spec: map[string]any{},
 				},
 
-				expectedError:    true,
-				errorContains:    "id not found in sql model spec",
+				expectedError: true,
+				errorContains: "id not found in sql model spec",
 			},
 		}
 
@@ -1231,141 +1231,6 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Nil(t, results)
 			assert.Contains(t, err.Error(), "listing RETL sources")
 		})
-	})
-
-	t.Run("ValidateSQLModelResource", func(t *testing.T) {
-		t.Parallel()
-
-		testCases := []struct {
-			name          string
-			resource      *sqlmodel.SQLModelResource
-			expectedError string
-		}{
-			{
-				name: "Valid resource",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					AccountID:        "acc123",
-					PrimaryKey:       "id",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "",
-			},
-			{
-				name: "Missing ID",
-				resource: &sqlmodel.SQLModelResource{
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					AccountID:        "acc123",
-					PrimaryKey:       "id",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "id is required",
-			},
-			{
-				name: "Missing DisplayName",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					AccountID:        "acc123",
-					PrimaryKey:       "id",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "display_name is required",
-			},
-			{
-				name: "Missing SQL",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					AccountID:        "acc123",
-					PrimaryKey:       "id",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "sql is required",
-			},
-			{
-				name: "Missing AccountID",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					PrimaryKey:       "id",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "account_id is required",
-			},
-			{
-				name: "Missing PrimaryKey",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					AccountID:        "acc123",
-					SourceDefinition: "postgres",
-					Enabled:          true,
-				},
-				expectedError: "primary_key is required",
-			},
-			{
-				name: "Missing SourceDefinitionName",
-				resource: &sqlmodel.SQLModelResource{
-					ID:          "test-model",
-					DisplayName: "Test Model",
-					Description: "Test description",
-					SQL:         "SELECT * FROM users",
-					AccountID:   "acc123",
-					PrimaryKey:  "id",
-					Enabled:     true,
-				},
-				expectedError: "source_definition is required",
-			},
-			{
-				name: "Invalid SourceDefinition",
-				resource: &sqlmodel.SQLModelResource{
-					ID:               "test-model",
-					DisplayName:      "Test Model",
-					Description:      "Test description",
-					SQL:              "SELECT * FROM users",
-					AccountID:        "acc123",
-					PrimaryKey:       "id",
-					SourceDefinition: "invalid-source",
-					Enabled:          true,
-				},
-				expectedError: "source_definition 'invalid-source' is invalid, must be one of:",
-			},
-		}
-
-		for _, tc := range testCases {
-			tc := tc // capture range variable
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
-				// Execute
-				err := sqlmodel.ValidateSQLModelResource(tc.resource)
-
-				// Verify
-				if tc.expectedError != "" {
-					assert.Error(t, err)
-					assert.Contains(t, err.Error(), tc.expectedError)
-				} else {
-					assert.NoError(t, err)
-				}
-			})
-		}
 	})
 
 	t.Run("FetchImportData", func(t *testing.T) {

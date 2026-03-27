@@ -171,10 +171,6 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.S
 		return fmt.Errorf("converting spec: %w", err)
 	}
 
-	if err := h.Impl.ValidateSpec(spec); err != nil {
-		return fmt.Errorf("validating spec: %w", err)
-	}
-
 	rs, err := h.Impl.ExtractResourcesFromSpec(path, spec)
 	if err != nil {
 		return fmt.Errorf("extracting resources from spec: %w", err)

@@ -41,24 +41,6 @@ func (h *HandlerImpl) NewSpec() *model.BookSpec {
 	return &model.BookSpec{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.BookSpec) error {
-	if len(spec.Books) == 0 {
-		return fmt.Errorf("at least one book is required")
-	}
-	for i, book := range spec.Books {
-		if book.ID == "" {
-			return fmt.Errorf("book[%d]: id is required", i)
-		}
-		if book.Name == "" {
-			return fmt.Errorf("book[%d]: name is required", i)
-		}
-		if book.Author == "" {
-			return fmt.Errorf("book[%d]: author is required", i)
-		}
-	}
-	return nil
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec) (map[string]*model.BookResource, error) {
 	res := make(map[string]*model.BookResource)
 	for _, bookItem := range spec.Books {

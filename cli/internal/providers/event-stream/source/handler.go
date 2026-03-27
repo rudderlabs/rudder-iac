@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"slices"
 
 	"github.com/go-viper/mapstructure/v2"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
@@ -98,18 +97,8 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
-	sourceResource.addImportMetadata(s)
-	if _, exists := h.resources[spec.LocalID]; exists {
-		return fmt.Errorf("validating event stream source spec: event stream source with id '%s' already exists", spec.LocalID)
-	}
-	for _, existing := range h.resources {
-		if existing.Name == sourceResource.Name {
-			return fmt.Errorf("validating event stream source spec: source with name '%s' is not unique", sourceResource.Name)
-		}
-	}
-	if err := validateSourceFields(sourceResource); err != nil {
-		return fmt.Errorf("validating event stream source spec: %w", err)
-	}
+	// When we are at this point, we expect the spec
+	// along with the localID to be valid and unique
 	h.resources[spec.LocalID] = sourceResource
 	return nil
 }
@@ -215,22 +204,6 @@ func buildEventConfigFromSpec(specConfig *EventConfigSpec) *EventConfigResource 
 		DropUnplannedProperties: specConfig.DropUnplannedProperties,
 		DropOtherViolations:     specConfig.DropOtherViolations,
 	}
-}
-
-func validateSourceFields(source *sourceResource) error {
-	if source.LocalID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if source.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if source.SourceDefinition == "" {
-		return fmt.Errorf("type is required")
-	}
-	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
-		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
-	}
-	return nil
 }
 
 func (h *Handler) GetResources() ([]*resources.Resource, error) {

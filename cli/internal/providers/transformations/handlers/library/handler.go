@@ -18,7 +18,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -53,35 +52,6 @@ func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
 
 func (h *HandlerImpl) NewSpec() *model.LibrarySpec {
 	return &model.LibrarySpec{}
-}
-
-func (h *HandlerImpl) ValidateSpec(spec *model.LibrarySpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if spec.ImportName == "" {
-		return fmt.Errorf("import_name is required")
-	}
-	if spec.Code != "" && spec.File != "" {
-		return fmt.Errorf("code and file are mutually exclusive")
-	}
-	if spec.Code == "" && spec.File == "" {
-		return fmt.Errorf("either code or file must be specified")
-	}
-	if spec.Language == "" {
-		return fmt.Errorf("language is required")
-	}
-	expectedImportName := lo.CamelCase(spec.Name)
-	if spec.ImportName != expectedImportName {
-		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, spec.ImportName)
-	}
-	if spec.Language != handlers.JavaScript && spec.Language != handlers.Python {
-		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, spec.Language)
-	}
-	return nil
 }
 
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.LibrarySpec) (map[string]*model.LibraryResource, error) {

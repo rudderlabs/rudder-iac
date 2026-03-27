@@ -41,16 +41,6 @@ func (h *HandlerImpl) NewSpec() *model.WriterSpec {
 	return &model.WriterSpec{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.WriterSpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	return nil
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.WriterSpec) (map[string]*model.WriterResource, error) {
 	resource := &model.WriterResource{
 		ID:   spec.ID,

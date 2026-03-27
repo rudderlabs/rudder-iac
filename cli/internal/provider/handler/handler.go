@@ -13,7 +13,7 @@ import (
 // common handler infrastructure, following the strategy pattern.
 //
 // Implementations must provide:
-//   - Spec lifecycle: creation, validation, and resource extraction from configuration files
+//   - Spec lifecycle: creation and resource extraction from configuration files
 //   - Remote operations: loading resources from remote APIs, both for sync and import scenarios
 //   - State mapping: converting remote API responses to local resource and state representations
 //   - CRUD operations: creating, updating, importing, and deleting resources via API calls
@@ -29,13 +29,7 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	// during configuration file parsing without knowing the concrete type.
 	NewSpec() *Spec
 
-	// ValidateSpec checks that the parsed specification contains valid values
-	// and required fields. It should return descriptive errors for any validation
-	// failures. This is called after decoding the YAML/JSON spec but before
-	// extracting resources from it.
-	ValidateSpec(spec *Spec) error
-
-	// ExtractResourcesFromSpec parses a validated spec and extracts individual
+	// ExtractResourcesFromSpec parses a decoded spec and extracts individual
 	// resource instances from it, returning them as a map keyed by resource ID.
 	// The path parameter provides the file path for error reporting and context.
 	// Multiple resources may be extracted from a single spec file (e.g., a spec
