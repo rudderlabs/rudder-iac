@@ -193,10 +193,6 @@ func (d *deps) NewProject() project.Project {
 		opts = append(opts, project.WithV1SpecSupport())
 	}
 
-	if cfg.ExperimentalFlags.ValidationFramework {
-		opts = append(opts, project.WithValidateUsingEngine())
-	}
-
 	return project.New(d.CompositeProvider(), opts...)
 }
 
@@ -208,10 +204,6 @@ func (d *deps) NewDataCatalogProject() project.Project {
 
 	if cfg.ExperimentalFlags.V1SpecSupport {
 		opts = append(opts, project.WithV1SpecSupport())
-	}
-
-	if cfg.ExperimentalFlags.ValidationFramework {
-		opts = append(opts, project.WithValidateUsingEngine())
 	}
 
 	return project.New(d.Providers().DataCatalog, opts...)
