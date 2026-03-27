@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -22,22 +23,64 @@ func TestProjectApply(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
+	projectDir := filepath.Join("testdata", "project")
+
+	t.Run("rudder/v0.1 specs", func(t *testing.T) {
+		applyAndVerify(t, executor, projectDir)
+	})
+
+	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
+		migratedDir := copyAndMigrateProject(t, executor, projectDir)
+		verifyNoDiffAfterMigration(t, executor, migratedDir)
+		applyAndVerify(t, executor, migratedDir)
+	})
+}
+
+func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
+	t.Helper()
+
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
 
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "project", "create"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "create"), "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
 		verifyState(t, "create")
 	})
 
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join("testdata", "project", "update"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "update"), "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
 	})
+}
 
+func verifyNoDiffAfterMigration(t *testing.T, executor *CmdExecutor, migratedDir string) {
+	t.Helper()
+
+	// we only verify no diff after migration for the update directory, as the last apply was run on it
+	output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(migratedDir, "update"), "--dry-run", "--confirm=false")
+	require.NoError(t, err, "Dry run failed for update: %s", string(output))
+	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+}
+
+func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
+	t.Helper()
+
+	tempDir := t.TempDir()
+	for _, dir := range []string{"create", "update"} {
+		src := filepath.Join(projectDir, dir)
+		dst := filepath.Join(tempDir, dir)
+
+		out, err := exec.Command("cp", "-r", src, dst).CombinedOutput()
+		require.NoError(t, err, "Failed to copy %s to %s: %s", src, dst, string(out))
+
+		output, err := executor.Execute(cliBinPath, "migrate", "-l", dst, "--confirm=false")
+		require.NoError(t, err, "Migration failed for %s: %s", dir, string(output))
+	}
+
+	return tempDir
 }
 
 func verifyState(t *testing.T, dir string) {

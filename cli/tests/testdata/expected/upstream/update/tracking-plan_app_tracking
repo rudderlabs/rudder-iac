@@ -1,0 +1,80 @@
+{
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "creationType": "Data catalog API",
+    "description": "Tracking plan for general application events.",
+    "externalId": "app_tracking",
+    "events": [
+        {
+            "categoryId": null,
+            "createdAt": "2025-01-01T00:00:00.000Z",
+            "createdBy": "IGNORED",
+            "description": "Triggered when a user loads a new page.",
+            "eventType": "page",
+            "id": "ev_IGNORED",
+            "identitySection": "properties",
+            "externalId": "page_view",
+            "name": "",
+            "additionalProperties": false,
+            "updatedAt": "2025-01-01T00:00:00.000Z",
+            "updatedBy": "IGNORED",
+            "workspaceId": "IGNORED"
+        },
+        {
+            "categoryId": null,
+            "createdAt": "2025-01-01T00:00:00.000Z",
+            "createdBy": "IGNORED",
+            "description": "Triggered when a user completes the checkout process.",
+            "eventType": "track",
+            "id": "ev_IGNORED",
+            "identitySection": "properties",
+            "externalId": "checkout",
+            "name": "Checkout",
+            "additionalProperties": false,
+            "properties": [
+                {
+                    "id": "prop_IGNORED",
+                    "name": "User Email",
+                    "required": true,
+                    "additionalProperties": false
+                }
+            ],
+            "updatedAt": "2025-01-01T00:00:00.000Z",
+            "updatedBy": "IGNORED",
+            "workspaceId": "IGNORED"
+        },
+        {
+            "categoryId": null,
+            "createdAt": "2025-01-01T00:00:00.000Z",
+            "createdBy": "IGNORED",
+            "description": "Triggered when a new user registers.",
+            "eventType": "track",
+            "id": "ev_IGNORED",
+            "identitySection": "properties",
+            "externalId": "signup",
+            "name": "Signup",
+            "additionalProperties": false,
+            "properties": [
+                {
+                    "id": "prop_IGNORED",
+                    "name": "Email Address",
+                    "required": true,
+                    "additionalProperties": false
+                },
+                {
+                    "id": "prop_IGNORED",
+                    "name": "User Email",
+                    "required": false,
+                    "additionalProperties": false
+                }
+            ],
+            "updatedAt": "2025-01-01T00:00:00.000Z",
+            "updatedBy": "IGNORED",
+            "workspaceId": "IGNORED"
+        }
+    ],
+    "id": "tp_IGNORED",
+    "name": "App Tracking",
+    "version": 2,
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "workspaceId": "IGNORED"
+}

@@ -1,0 +1,15 @@
+{
+    "propConfig": {},
+    "id": "prop_IGNORED",
+    "externalId": "status_code",
+    "name": "Status Code",
+    "description": "HTTP status code, nullable",
+    "type": "integer,null",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}

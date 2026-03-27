@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: app_tracking
+spec:
+  id: app_tracking
+  display_name: "App Tracking"
+  description: "Tracking plan for general application events."
+  rules:
+    - type: event_rule
+      id: page_view_rule
+      event: "#event:page_view"
+      additional_properties: false
+
+    - type: event_rule
+      id: signup_rule
+      event: "#event:signup"
+      additional_properties: false
+      properties:
+        - property: "#property:email_address"
+          required: true
+        - property: "#property:user_email"
+          required: false
+
+    - type: event_rule
+      id: checkout_rule
+      event: "#event:checkout"
+      additional_properties: false
+      properties:
+        - property: "#property:user_email"
+          required: true

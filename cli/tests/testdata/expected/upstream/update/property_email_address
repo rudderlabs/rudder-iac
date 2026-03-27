@@ -1,0 +1,19 @@
+{
+    "propConfig": {
+        "format": "email",
+        "minLength": 3,
+        "maxLength": 255
+    },
+    "id": "prop_IGNORED",
+    "externalId": "email_address",
+    "name": "Email Address",
+    "description": "User's email address",
+    "type": "string",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}
