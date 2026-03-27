@@ -97,6 +97,9 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
+	if err := sourceResource.addImportMetadata(s); err != nil {
+		return fmt.Errorf("loading import metadata: %w", err)
+	}
 	// When we are at this point, we expect the spec
 	// along with the localID to be valid and unique
 	h.resources[spec.LocalID] = sourceResource

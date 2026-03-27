@@ -11,7 +11,6 @@ import (
 
 func TestProjectLoad(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
-	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
 
 	t.Run("Load project and verify resource graph", func(t *testing.T) {
 		graph, err := project.Load(context.Background(), "../../../tests/testdata/project/create")

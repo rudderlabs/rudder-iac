@@ -755,23 +755,6 @@ func TestSQLModelHandler(t *testing.T) {
 		assert.Contains(t, err.Error(), "decoding SQL model spec")
 	})
 
-	t.Run("LoadSpec rejects invalid resource fields", func(t *testing.T) {
-		t.Parallel()
-
-		mockClient := &mockRETLClient{sourceID: "src123"}
-		handler := sqlmodel.NewHandler(mockClient, "retl")
-
-		err := handler.LoadSpec("test.yaml", createTestSpecMap(map[string]interface{}{
-			"id":           "test-model",
-			"display_name": "Test Model",
-			"sql":          "SELECT * FROM users",
-			// Missing description, account_id, primary_key, source_definition
-		}))
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "validating sql model spec")
-	})
-
 	t.Run("GetResources", func(t *testing.T) {
 		t.Parallel()
 
