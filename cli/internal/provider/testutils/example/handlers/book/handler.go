@@ -11,7 +11,6 @@ import (
 	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type BookHandler = handler.BaseHandler[model.BookSpec, model.BookResource, model.BookState, model.RemoteBook]
@@ -42,24 +41,6 @@ func (h *HandlerImpl) NewSpec() *model.BookSpec {
 	return &model.BookSpec{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.BookSpec) error {
-	if len(spec.Books) == 0 {
-		return fmt.Errorf("at least one book is required")
-	}
-	for i, book := range spec.Books {
-		if book.ID == "" {
-			return fmt.Errorf("book[%d]: id is required", i)
-		}
-		if book.Name == "" {
-			return fmt.Errorf("book[%d]: name is required", i)
-		}
-		if book.Author == "" {
-			return fmt.Errorf("book[%d]: author is required", i)
-		}
-	}
-	return nil
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec) (map[string]*model.BookResource, error) {
 	res := make(map[string]*model.BookResource)
 	for _, bookItem := range spec.Books {
@@ -77,22 +58,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec
 		res[bookItem.ID] = resource
 	}
 	return res, nil
-}
-
-func (h *HandlerImpl) ValidateResource(resource *model.BookResource, graph *resources.Graph) error {
-	if resource.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if resource.Author == nil {
-		return fmt.Errorf("author is required")
-	}
-
-	// Validate that the author URN exists in the graph
-	if _, exists := graph.GetResource(resource.Author.URN); !exists {
-		return fmt.Errorf("author URN %s does not exist", resource.Author.URN)
-	}
-
-	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteBook, error) {

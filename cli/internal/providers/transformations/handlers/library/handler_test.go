@@ -15,7 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // mockTransformationStore implements the TransformationStore interface for testing
@@ -171,129 +170,6 @@ func TestNewSpec(t *testing.T) {
 	assert.IsType(t, &model.LibrarySpec{}, spec)
 }
 
-func TestValidateSpec(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		spec          *model.LibrarySpec
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid spec with inline code",
-			spec: &model.LibrarySpec{
-				ID:          "test-lib",
-				Name:        "Test Library",
-				Description: "Test description",
-				Language:    "javascript",
-				Code:        "export function helper() { return true; }",
-				ImportName:  "testLibrary",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid spec with file reference",
-			spec: &model.LibrarySpec{
-				ID:          "test-lib",
-				Name:        "Test Library",
-				Description: "Test description",
-				Language:    "python",
-				File:        "library.py",
-				ImportName:  "testLibrary",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid spec with python language",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "python",
-				Code:       "def helper():\n    return True",
-				ImportName: "testLibrary",
-			},
-			expectedError: false,
-		},
-		{
-			name: "missing id",
-			spec: &model.LibrarySpec{
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "export function helper() { return true; }",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "id is required",
-		},
-		{
-			name: "missing name",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Language:   "javascript",
-				Code:       "export function helper() { return true; }",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "name is required",
-		},
-		{
-			name: "missing import_name",
-			spec: &model.LibrarySpec{
-				ID:       "test-lib",
-				Name:     "Test Library",
-				Language: "javascript",
-				Code:     "export function helper() { return true; }",
-			},
-			expectedError: true,
-			errorContains: "import_name is required",
-		},
-		{
-			name: "both code and file specified",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "export function helper() { return true; }",
-				File:       "library.js",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "code and file are mutually exclusive",
-		},
-		{
-			name: "neither code nor file specified",
-			spec: &model.LibrarySpec{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "either code or file must be specified",
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockStore := newMockTransformationStore()
-			handler := library.NewHandler(mockStore)
-
-			err := handler.Impl.ValidateSpec(tc.spec)
-
-			if tc.expectedError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorContains)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestExtractResourcesFromSpec(t *testing.T) {
 	t.Parallel()
 
@@ -418,110 +294,26 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 		assert.Contains(t, err.Error(), "reading code file")
 		assert.Nil(t, resources)
 	})
-}
 
-func TestValidateResource(t *testing.T) {
-	t.Parallel()
+	t.Run("invalid javascript syntax", func(t *testing.T) {
+		t.Parallel()
 
-	testCases := []struct {
-		name          string
-		resource      *model.LibraryResource
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid javascript resource",
-			resource: &model.LibraryResource{
-				ID:          "test-lib",
-				Name:        "Test Library",
-				Description: "Test description",
-				Language:    "javascript",
-				Code:        "export function helper() { return true; }",
-				ImportName:  "testLibrary",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid python resource - no syntax validation",
-			resource: &model.LibraryResource{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "python",
-				Code:       "def helper():\n    return True",
-				ImportName: "testLibrary",
-			},
-			expectedError: false,
-		},
-		{
-			name: "missing code",
-			resource: &model.LibraryResource{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "code is required",
-		},
-		{
-			name: "invalid javascript syntax",
-			resource: &model.LibraryResource{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "export function helper() { return true;",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "validating code syntax",
-		},
-		{
-			name: "import_name not camelCase of name",
-			resource: &model.LibraryResource{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "javascript",
-				Code:       "export function helper() { return true; }",
-				ImportName: "wrongName",
-			},
-			expectedError: true,
-			errorContains: "import_name must be camelCase of name",
-		},
-		{
-			name: "invalid language",
-			resource: &model.LibraryResource{
-				ID:         "test-lib",
-				Name:       "Test Library",
-				Language:   "rust",
-				Code:       "fn helper() {}",
-				ImportName: "testLibrary",
-			},
-			expectedError: true,
-			errorContains: "language must be javascript or python",
-		},
-	}
+		mockStore := newMockTransformationStore()
+		handler := library.NewHandler(mockStore)
 
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		spec := &model.LibrarySpec{
+			ID:         "test-lib",
+			Name:       "Test Library",
+			Language:   "javascript",
+			Code:       "export function helper() { return true;",
+			ImportName: "testLibrary",
+		}
 
-			mockStore := newMockTransformationStore()
-			handler := library.NewHandler(mockStore)
-
-			graph := resources.NewGraph()
-
-			err := handler.Impl.ValidateResource(tc.resource, graph)
-
-			if tc.expectedError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorContains)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		resources, err := handler.Impl.ExtractResourcesFromSpec("/path/to/spec.yaml", spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "validating code syntax")
+		assert.Nil(t, resources)
+	})
 }
 
 func TestLoadRemoteResources(t *testing.T) {

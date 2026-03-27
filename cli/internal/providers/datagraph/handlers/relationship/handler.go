@@ -44,20 +44,10 @@ func (h *HandlerImpl) NewSpec() *struct{} {
 	return &struct{}{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *struct{}) error {
-	// Relationships don't have standalone specs - they're inline in model specs
-	// The provider handles all spec validation
-	return fmt.Errorf("relationship handler does not support standalone specs - relationships are inline in data-graph specs")
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map[string]*dgModel.RelationshipResource, error) {
 	// Relationships don't have standalone specs - they're inline in model specs
 	// The provider handles all resource extraction
 	return nil, fmt.Errorf("relationship handler does not support standalone spec extraction - relationships are inline in data-graph specs")
-}
-
-func (h *HandlerImpl) ValidateResource(_ *dgModel.RelationshipResource, _ *resources.Graph) error {
-	return nil
 }
 
 // listAllRelationshipsForDataGraph fetches all relationships for a data graph with pagination

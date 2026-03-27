@@ -15,7 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // mockTransformationStore implements the TransformationStore interface for testing
@@ -167,152 +166,6 @@ func TestNewSpec(t *testing.T) {
 
 	require.NotNil(t, spec)
 	assert.IsType(t, &model.TransformationSpec{}, spec)
-}
-
-func TestValidateSpec(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		spec          *model.TransformationSpec
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid spec with inline code",
-			spec: &model.TransformationSpec{
-				ID:          "test-trans",
-				Name:        "Test Transformation",
-				Description: "Test description",
-				Language:    "javascript",
-				Code:        "export function transformEvent(event, metadata) { return event; }",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid spec with file reference",
-			spec: &model.TransformationSpec{
-				ID:          "test-trans",
-				Name:        "Test Transformation",
-				Description: "Test description",
-				Language:    "python",
-				File:        "transformation.py",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid spec with python language",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "python",
-				Code:     "def transform(event):\n    return event",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid spec with empty language - validation deferred to resource",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-			},
-			expectedError: true,
-			errorContains: "language is required",
-		},
-		{
-			name: "missing id",
-			spec: &model.TransformationSpec{
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-			},
-			expectedError: true,
-			errorContains: "id is required",
-		},
-		{
-			name: "missing name",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-			},
-			expectedError: true,
-			errorContains: "name is required",
-		},
-		{
-			name: "both code and file specified",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				File:     "transform.js",
-			},
-			expectedError: true,
-			errorContains: "code and file are mutually exclusive",
-		},
-		{
-			name: "neither code nor file specified",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-			},
-			expectedError: true,
-			errorContains: "either code or file must be specified",
-		},
-		{
-			name: "valid spec with tests containing names",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: "Suite 1"},
-					{Name: "Suite 2"},
-				},
-			},
-			expectedError: false,
-		},
-		{
-			name: "multiple tests with one missing name",
-			spec: &model.TransformationSpec{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: "Suite 1"},
-					{Name: ""},
-					{Name: "Suite 3"},
-				},
-			},
-			expectedError: true,
-			errorContains: "name is required for each spec tests block",
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockStore := newMockTransformationStore()
-			handler := transformation.NewHandler(mockStore)
-
-			err := handler.Impl.ValidateSpec(tc.spec)
-
-			if tc.expectedError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorContains)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
 }
 
 func TestExtractResourcesFromSpec(t *testing.T) {
@@ -483,151 +336,24 @@ func TestExtractResourcesFromSpec(t *testing.T) {
 		assert.Equal(t, "./custom-input", resource.Tests[1].Input)
 		assert.Equal(t, "./custom-output", resource.Tests[1].Output)
 	})
-}
 
-func TestValidateResource(t *testing.T) {
-	t.Parallel()
+	t.Run("invalid javascript syntax", func(t *testing.T) {
+		t.Parallel()
 
-	testCases := []struct {
-		name          string
-		resource      *model.TransformationResource
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid javascript resource",
-			resource: &model.TransformationResource{
-				ID:          "test-trans",
-				Name:        "Test Transformation",
-				Description: "Test description",
-				Language:    "javascript",
-				Code:        "export function transformEvent(event, metadata) { return event; }",
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid python resource - no syntax validation",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "python",
-				Code:     "def transform(event):\n    return event",
-			},
-			expectedError: false,
-		},
-		{
-			name: "missing code",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "",
-			},
-			expectedError: true,
-			errorContains: "code is required",
-		},
-		{
-			name: "invalid javascript syntax",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event;",
-			},
-			expectedError: true,
-			errorContains: "validating code syntax",
-		},
-		{
-			name: "invalid language",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "golang",
-				Code:     "package main",
-			},
-			expectedError: true,
-			errorContains: "language must be javascript or python",
-		},
-		{
-			name: "valid test names with allowed characters",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: "Suite 1"},
-					{Name: "Suite-1"},
-					{Name: "Suite_1"},
-					{Name: "Suite/1"},
-				},
-			},
-			expectedError: false,
-		},
-		{
-			name: "empty test name",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: ""},
-				},
-			},
-			expectedError: true,
-			errorContains: "test name is required",
-		},
-		{
-			name: "whitespace-only test name",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: "    "},
-				},
-			},
-			expectedError: true,
-			errorContains: "test name is required",
-		},
-		{
-			name: "invalid test name character",
-			resource: &model.TransformationResource{
-				ID:       "test-trans",
-				Name:     "Test Transformation",
-				Language: "javascript",
-				Code:     "export function transformEvent(event, metadata) { return event; }",
-				Tests: []specs.TransformationTest{
-					{Name: "Suite@1"},
-				},
-			},
-			expectedError: true,
-			errorContains: "invalid test name",
-		},
-	}
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
 
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		spec := &model.TransformationSpec{
+			ID:       "test-trans",
+			Name:     "Test Transformation",
+			Language: "javascript",
+			Code:     "export function transformEvent(event, metadata) { return event;",
+		}
 
-			mockStore := newMockTransformationStore()
-			handler := transformation.NewHandler(mockStore)
-
-			graph := resources.NewGraph()
-
-			err := handler.Impl.ValidateResource(tc.resource, graph)
-
-			if tc.expectedError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorContains)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		_, err := handler.Impl.ExtractResourcesFromSpec("/path/to/spec.yaml", spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "validating code syntax")
+	})
 }
 
 func TestLoadRemoteResources(t *testing.T) {

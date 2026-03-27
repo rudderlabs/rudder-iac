@@ -22,7 +22,6 @@ import (
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
-	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
@@ -127,15 +126,6 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 	return handler.MigrateSpec(s)
-}
-
-func (p *Provider) Validate(graph *resources.Graph) error {
-	for resourceType, handler := range p.handlers {
-		if err := handler.Validate(graph); err != nil {
-			return fmt.Errorf("validating %s: %w", resourceType, err)
-		}
-	}
-	return nil
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"slices"
 
 	"github.com/go-viper/mapstructure/v2"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
@@ -98,7 +97,11 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
-	sourceResource.addImportMetadata(s)
+	if err := sourceResource.addImportMetadata(s); err != nil {
+		return fmt.Errorf("loading import metadata: %w", err)
+	}
+	// When we are at this point, we expect the spec
+	// along with the localID to be valid and unique
 	h.resources[spec.LocalID] = sourceResource
 	return nil
 }
@@ -204,70 +207,6 @@ func buildEventConfigFromSpec(specConfig *EventConfigSpec) *EventConfigResource 
 		DropUnplannedProperties: specConfig.DropUnplannedProperties,
 		DropOtherViolations:     specConfig.DropOtherViolations,
 	}
-}
-
-func validateSource(source *sourceResource, graph *resources.Graph) error {
-	if source.LocalID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if source.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if source.SourceDefinition == "" {
-		return fmt.Errorf("type is required")
-	}
-	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
-		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
-	}
-	if source.Governance != nil && source.Governance.Validations != nil {
-		ref := source.Governance.Validations.TrackingPlanRef
-		if ref == nil {
-			return fmt.Errorf("governance.validations.tracking_plan is required")
-		}
-
-		tp, ok := graph.GetResource(ref.URN)
-		if !ok {
-			return fmt.Errorf("tracking plan with URN '%s' not found in the project", ref.URN)
-		}
-
-		if tp.Type() != types.TrackingPlanResourceType {
-			return fmt.Errorf("referenced URN '%s' is not a tracking plan", ref.URN)
-		}
-	}
-	return nil
-}
-
-func (h *Handler) Validate(graph *resources.Graph) error {
-	// Duplicate IDs are checked first using seenIDs (not h.resources) because
-	// the resources map is keyed by LocalID and overwrites on collision.
-	idCount := make(map[string]int)
-	for _, id := range h.seenIDs {
-		idCount[id]++
-	}
-	for id, count := range idCount {
-		if count > 1 {
-			return fmt.Errorf("validating event stream source spec: event stream source with id '%s' already exists", id)
-		}
-	}
-
-	// Safe to check names from h.resources: if we reach here, all IDs are unique
-	// so no entries were overwritten during loading.
-	nameCount := make(map[string]int)
-	for _, source := range h.resources {
-		nameCount[source.Name]++
-	}
-	for _, source := range h.resources {
-		if nameCount[source.Name] > 1 {
-			return fmt.Errorf("validating event stream source spec: source with name '%s' is not unique", source.Name)
-		}
-	}
-
-	for _, source := range h.resources {
-		if err := validateSource(source, graph); err != nil {
-			return fmt.Errorf("validating event stream source spec: %w", err)
-		}
-	}
-	return nil
 }
 
 func (h *Handler) GetResources() ([]*resources.Resource, error) {
