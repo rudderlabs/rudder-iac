@@ -1,0 +1,75 @@
+// MARK: - RudderTyperAnalytics
+
+/// Type-safe wrappers for RudderStack tracking based on your Tracking Plan.
+///
+/// Tracking Plan: {{ if .TrackingPlanURL }}{{ .TrackingPlanName }} ({{ .TrackingPlanURL }}){{ else }}{{ .TrackingPlanName }}{{ end }}
+/// - ID: {{ .TrackingPlanID }}
+/// - Version: {{ .TrackingPlanVersion }}
+///
+/// ## Quick Start
+/// ```swift
+/// let analytics = Analytics(configuration: Configuration(
+///     writeKey: "YOUR_WRITE_KEY",
+///     dataPlaneUrl: "YOUR_DATA_PLANE_URL"
+/// ))
+/// let rudderTyper = RudderTyperAnalytics(analytics: analytics)
+/// ```
+public class RudderTyperAnalytics {
+    private let analytics: Analytics
+
+    public init(analytics: Analytics) {
+        self.analytics = analytics
+    }
+
+    // MARK: - Events
+{{ range .AnalyticsMethods }}
+    /// {{ escapeComment .Comment }}
+    /// - Parameters:
+{{- range .MethodArguments }}
+    ///   - {{ .Name }}:{{ if .Comment }} {{ escapeComment .Comment }}{{ end }}
+{{- end }}
+    ///   - options: Optional RudderOption for additional event configuration
+{{- if .MethodArguments }}
+    public func {{ .Name }}(
+{{- range $arg := .MethodArguments }}
+        {{ $arg.Name }}: {{ $arg.Type }}{{- if $arg.Optional }}?{{ end }}{{- if $arg.Default }} = {{ $arg.Default }}{{ end }},
+{{- end }}
+        options: RudderOption? = nil
+    ) {
+{{- else }}
+    public func {{ .Name }}(options: RudderOption? = nil) {
+{{- end }}
+        analytics.{{ .SDKMethodName }}(
+{{- range .SDKArguments }}
+            {{ .Label }}: {{ .Value }},
+{{- end }}
+            options: withRudderTyperContext(options: options{{ if .AddDataToContext }}, contextTraits: traits?.toTraits(){{ end }})
+        )
+    }
+{{ end }}
+    // MARK: - Private Helpers
+
+    private func withRudderTyperContext(options: RudderOption?, contextTraits: [String: Any]? = nil) -> RudderOption {
+        var rudderTyperContext: [String: Any] = [
+            "ruddertyper": [
+{{- range $key, $value := .EventContext }}
+                "{{ escapeString $key }}": {{ $value }},
+{{- end }}
+            ] as [String: Any]
+        ]
+        if let traits = contextTraits {
+            rudderTyperContext["traits"] = traits
+        }
+
+        if let options = options {
+            let mergedContext = (options.customContext ?? [:]).merging(rudderTyperContext) { _, new in new }
+            return RudderOption(
+                integrations: options.integrations,
+                customContext: mergedContext,
+                externalIds: options.externalIds
+            )
+        } else {
+            return RudderOption(customContext: rudderTyperContext)
+        }
+    }
+}
