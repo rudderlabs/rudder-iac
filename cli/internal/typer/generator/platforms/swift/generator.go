@@ -448,6 +448,7 @@ func processEventRules(p *plan.TrackingPlan, ctx *SwiftContext, nr *core.NameReg
 		rule := ruleMap[key]
 
 		if !isSupportedEventType(rule.Event.EventType) {
+			ui.PrintWarning(fmt.Sprintf("unsupported event type %q, skipping", rule.Event.EventType))
 			continue
 		}
 
