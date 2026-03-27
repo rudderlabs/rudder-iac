@@ -585,15 +585,14 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("Validate", func(t *testing.T) {
+	t.Run("LoadSpec_field_and_uniqueness_checks", func(t *testing.T) {
 		t.Parallel()
 
 		testCases := []struct {
-			name                   string
-			externalGraphResources []*resources.Resource
-			specs                  []*specs.Spec
-			expectedError          bool
-			errorMessage           string
+			name          string
+			specs         []*specs.Spec
+			expectedError bool
+			errorMessage  string
 		}{
 			{
 				name: "Valid sources",
@@ -687,10 +686,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				errorMessage:  "type 'InvalidSDK' is invalid",
 			},
 			{
-				name: "Validates existence of tracking plan resource reference",
-				externalGraphResources: []*resources.Resource{
-					resources.NewResource("tp-123", types.TrackingPlanResourceType, resources.ResourceData{}, nil),
-				},
+				name: "Source with tracking plan ref loads",
 				specs: []*specs.Spec{
 					{
 						Version: "rudder/v0.1",
@@ -709,28 +705,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					},
 				},
 				expectedError: false,
-			},
-			{
-				name: "Invalid tracking plan reference",
-				specs: []*specs.Spec{
-					{
-						Version: "rudder/v0.1",
-						Kind:    "event-stream-source",
-						Spec: map[string]interface{}{
-							"id":   "test-source-3",
-							"name": "Test Source 3",
-							"type": "ios",
-							"governance": map[string]interface{}{
-								"validations": map[string]interface{}{
-									"tracking_plan": "#/tp/some-name/non-existent-tp",
-									"config":        map[string]interface{}{},
-								},
-							},
-						},
-					},
-				},
-				expectedError: true,
-				errorMessage:  "validating event stream source spec: tracking plan with URN 'tracking-plan:non-existent-tp' not found in the project",
 			},
 			{
 				name: "Duplicate source ID",
@@ -793,25 +767,21 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
 				handler := source.NewHandler(mockClient, importDir)
 
+				var lastErr error
 				for _, spec := range tc.specs {
-					err := handler.LoadSpec("", spec)
-					require.NoError(t, err)
+					lastErr = handler.LoadSpec("", spec)
+					if lastErr != nil {
+						break
+					}
 				}
-
-				// Add external resources to the graph
-				graph := resources.NewGraph()
-				for _, res := range tc.externalGraphResources {
-					graph.AddResource(res)
-				}
-				err := handler.Validate(graph)
 
 				if tc.expectedError {
-					assert.Error(t, err)
+					require.Error(t, lastErr)
 					if tc.errorMessage != "" {
-						assert.Contains(t, err.Error(), tc.errorMessage)
+						assert.Contains(t, lastErr.Error(), tc.errorMessage)
 					}
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, lastErr)
 				}
 			})
 		}

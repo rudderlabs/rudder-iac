@@ -55,10 +55,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("model handler does not support standalone spec extraction - models are inline in data-graph specs")
 }
 
-func (h *HandlerImpl) ValidateResource(_ *dgModel.ModelResource, _ *resources.Graph) error {
-	return nil
-}
-
 // listAllModelsForDataGraph fetches all models (entity and event) for a data graph
 func (h *HandlerImpl) listAllModelsForDataGraph(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteModel, error) {
 	var allModels []*dgModel.RemoteModel

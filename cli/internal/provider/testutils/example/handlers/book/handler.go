@@ -11,7 +11,6 @@ import (
 	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type BookHandler = handler.BaseHandler[model.BookSpec, model.BookResource, model.BookState, model.RemoteBook]
@@ -77,22 +76,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec
 		res[bookItem.ID] = resource
 	}
 	return res, nil
-}
-
-func (h *HandlerImpl) ValidateResource(resource *model.BookResource, graph *resources.Graph) error {
-	if resource.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if resource.Author == nil {
-		return fmt.Errorf("author is required")
-	}
-
-	// Validate that the author URN exists in the graph
-	if _, exists := graph.GetResource(resource.Author.URN); !exists {
-		return fmt.Errorf("author URN %s does not exist", resource.Author.URN)
-	}
-
-	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteBook, error) {

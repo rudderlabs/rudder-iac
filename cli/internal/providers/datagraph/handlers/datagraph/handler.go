@@ -52,10 +52,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("data graph handler does not handle spec extraction - handled by provider")
 }
 
-func (h *HandlerImpl) ValidateResource(_ *model.DataGraphResource, _ *resources.Graph) error {
-	return nil
-}
-
 // listAllDataGraphs fetches all data graphs with pagination and optional filtering
 func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool) ([]*model.RemoteDataGraph, error) {
 	var allDataGraphs []*model.RemoteDataGraph

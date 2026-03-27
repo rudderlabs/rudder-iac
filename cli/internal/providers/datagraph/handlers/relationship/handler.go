@@ -56,10 +56,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("relationship handler does not support standalone spec extraction - relationships are inline in data-graph specs")
 }
 
-func (h *HandlerImpl) ValidateResource(_ *dgModel.RelationshipResource, _ *resources.Graph) error {
-	return nil
-}
-
 // listAllRelationshipsForDataGraph fetches all relationships for a data graph with pagination
 func (h *HandlerImpl) listAllRelationshipsForDataGraph(ctx context.Context, dataGraphID string, hasExternalID *bool) ([]*dgModel.RemoteRelationship, error) {
 	var allRelationships []*dgModel.RemoteRelationship

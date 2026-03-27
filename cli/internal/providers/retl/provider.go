@@ -140,16 +140,6 @@ func (p *Provider) SemanticRules() []rules.Rule {
 	}
 }
 
-// Validate validates all loaded specs
-func (p *Provider) Validate(_ *resources.Graph) error {
-	for resourceType, handler := range p.handlers {
-		if err := handler.Validate(); err != nil {
-			return fmt.Errorf("validating %s: %w", resourceType, err)
-		}
-	}
-	return nil
-}
-
 // GetResourceGraph returns a graph of all resources
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	graph := resources.NewGraph()

@@ -332,7 +332,7 @@ func TestProvider(t *testing.T) {
 		})
 	})
 
-	t.Run("Validate", func(t *testing.T) {
+	t.Run("LoadSpec_validation", func(t *testing.T) {
 		testCases := []struct {
 			name          string
 			specs         []*specs.Spec
@@ -390,7 +390,6 @@ func TestProvider(t *testing.T) {
 				t.Parallel()
 				provider := retl.New(newDefaultMockClient())
 
-				// Load all specs
 				for _, spec := range tc.specs {
 					err := provider.LoadSpec("test.yaml", spec)
 					if tc.loadError {
@@ -401,17 +400,6 @@ func TestProvider(t *testing.T) {
 						return
 					}
 					require.NoError(t, err, "LoadSpec should not fail")
-				}
-
-				// Validate all specs
-				err := provider.Validate(nil)
-				if tc.expectedError {
-					assert.Error(t, err)
-					if tc.errorMessage != "" {
-						assert.Contains(t, err.Error(), tc.errorMessage)
-					}
-				} else {
-					assert.NoError(t, err)
 				}
 			})
 		}

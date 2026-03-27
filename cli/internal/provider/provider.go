@@ -68,20 +68,6 @@ type SpecLoader interface {
 	ResourceGraph() (*resources.Graph, error)
 }
 
-// Validator performs provider-specific validation on a resource graph.
-// It ensures that resources conform to the provider's requirements and constraints.
-type Validator interface {
-	// Validate checks the resource graph for provider-specific errors.
-	// Providers should validate their own resources but may leverage the full graph
-	// for cross-resource validations (e.g., checking references, ensuring dependencies exist).
-	// Returns an error if validation fails.
-	//
-	// NOTE: A possible improvement could be to have this method return a list of validation errors
-	// instead of a single error. This would allow reporting multiple issues in one pass,
-	// providing more comprehensive feedback to the user. The list could also include warnings for non-critical issues.
-	Validate(graph *resources.Graph) error
-}
-
 // ManagedRemoteResourceLoader loads resources from a remote system that are currently
 // managed by this tool (i.e., they exist in the local state).
 type ManagedRemoteResourceLoader interface {
@@ -221,21 +207,22 @@ type RuleProvider interface {
 //
 //   - Discovery: Identifying what resource types and spec kinds are supported
 //   - Loading: Reading and parsing configuration files into resource graphs
-//   - Validation: Ensuring resource configurations meet provider-specific requirements
 //   - Remote interaction: Fetching both managed and importable resources from remote systems
 //   - State management: Converting remote resources into state format for tracking
 //   - Lifecycle: Creating, updating, deleting, and importing resources in the remote system
 //   - Export: Generating configuration files from existing remote resources
 //   - Migration: Migrating project specifications from one version to another
 //   - Consolidation: Post-sync operations like batch publishing
-//   - Rules: Providing syntactic and semantic validation rules for resources
+//   - Rules: Providing syntactic and semantic validation rules for resources (see [RuleProvider])
+//
+// Cross-resource and structural validation runs in the validation engine using rules from
+// [RuleProvider] implementations, not via a separate provider graph-validation pass.
 //
 // Providers act as adapters between the generic infrastructure management framework
 // and specific resource types or backend systems.
 type Provider interface {
 	TypeProvider
 	SpecLoader
-	Validator
 	RemoteResourceLoader
 	StateLoader
 	LifecycleManager

@@ -20,8 +20,6 @@ type MockProvider struct {
 	supportedTypes             []string
 	// MatchPatterns when non-nil is returned by SupportedMatchPatterns; when nil, defers to EmptyProvider (nil).
 	MatchPatterns []rules.MatchPattern
-	ValidateArg                *resources.Graph
-	ValidateErr                error
 	LoadSpecErr                error
 	LoadLegacySpecErr          error
 	GetResourceGraphVal        *resources.Graph
@@ -41,8 +39,6 @@ type MockProvider struct {
 	ParseSpecErr               error
 
 	// Tracking calls
-	ValidateCalledCount                int
-	ValidateErrorReturnedCount         int
 	LoadSpecCalledWithArgs             []LoadSpecArgs
 	LoadLegacySpecCalledWithArgs       []LoadSpecArgs
 	ParseSpecCalledWithArgs            []ParseSpecArgs
@@ -124,15 +120,6 @@ func (m *MockProvider) SupportedMatchPatterns() []rules.MatchPattern {
 	return m.EmptyProvider.SupportedMatchPatterns()
 }
 
-func (m *MockProvider) Validate(graph *resources.Graph) error {
-	m.ValidateArg = graph
-	m.ValidateCalledCount++
-	if m.ValidateErr != nil {
-		m.ValidateErrorReturnedCount++
-	}
-	return m.ValidateErr
-}
-
 func (m *MockProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	m.ParseSpecCalledWithArgs = append(m.ParseSpecCalledWithArgs, ParseSpecArgs{Path: path, Spec: s})
 	return m.ParseSpecVal, m.ParseSpecErr
@@ -200,8 +187,6 @@ func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 
 // ResetCallCounters resets all call counters and argument trackers.
 func (m *MockProvider) ResetCallCounters() {
-	m.ValidateCalledCount = 0
-	m.ValidateErrorReturnedCount = 0
 	m.LoadSpecCalledWithArgs = make([]LoadSpecArgs, 0)
 	m.ParseSpecCalledWithArgs = make([]ParseSpecArgs, 0)
 	m.GetResourceGraphCalledCount = 0

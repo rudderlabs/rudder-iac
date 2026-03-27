@@ -61,13 +61,6 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.WriterSp
 	}, nil
 }
 
-func (h *HandlerImpl) ValidateResource(resource *model.WriterResource, graph *resources.Graph) error {
-	if resource.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	return nil
-}
-
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteWriter, error) {
 	remoteWriters := h.backend.AllWriters()
 

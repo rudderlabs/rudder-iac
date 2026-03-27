@@ -27,7 +27,6 @@ type Loader interface {
 
 type ProjectProvider interface {
 	provider.SpecLoader
-	provider.Validator
 	provider.RuleProvider
 	provider.TypeProvider
 }
@@ -114,7 +113,7 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 }
 
 // Load loads the project specifications from the given location using the configured SpecLoader
-// and then validates them with the provider.
+// and runs them through the validation engine (syntax, then semantic rules from RuleProvider).
 func (p *project) Load(location string) error {
 	var err error
 
@@ -278,51 +277,6 @@ func (p *project) registry() (rules.Registry, error) {
 	}
 
 	return baseRegistry, nil
-}
-
-func ValidateSpec(spec *specs.Spec, parsed *specs.ParsedSpec) error {
-	metadata, err := spec.CommonMetadata()
-	if err != nil {
-		return err
-	}
-
-	err = metadata.Validate()
-	if err != nil {
-		return fmt.Errorf("invalid spec metadata: %w", err)
-	}
-
-	if metadata.Import == nil {
-		return nil
-	}
-
-	// Build URN lookup set from parsed spec
-	specURNs := make(map[string]bool)
-	for _, entry := range parsed.URNs {
-		specURNs[entry.URN] = true
-	}
-
-	for _, workspace := range metadata.Import.Workspaces {
-		for _, resource := range workspace.Resources {
-			var urn string
-
-			if resource.URN != "" {
-				// Modern: use URN directly
-				urn = resource.URN
-			} else if resource.LocalID != "" {
-				// Legacy: construct URN from local_id + LegacyResourceType
-				if parsed.LegacyResourceType == "" {
-					return fmt.Errorf("local_id %q used but spec only supports urn", resource.LocalID)
-				}
-				urn = resources.URN(resource.LocalID, parsed.LegacyResourceType)
-			}
-
-			if urn != "" && !specURNs[urn] {
-				return fmt.Errorf("import metadata URN %q not found in spec", urn)
-			}
-		}
-	}
-
-	return nil
 }
 
 func (p *project) ResourceGraph() (*resources.Graph, error) {

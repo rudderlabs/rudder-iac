@@ -99,6 +99,17 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		return err
 	}
 	sourceResource.addImportMetadata(s)
+	if _, exists := h.resources[spec.LocalID]; exists {
+		return fmt.Errorf("validating event stream source spec: event stream source with id '%s' already exists", spec.LocalID)
+	}
+	for _, existing := range h.resources {
+		if existing.Name == sourceResource.Name {
+			return fmt.Errorf("validating event stream source spec: source with name '%s' is not unique", sourceResource.Name)
+		}
+	}
+	if err := validateSourceFields(sourceResource); err != nil {
+		return fmt.Errorf("validating event stream source spec: %w", err)
+	}
 	h.resources[spec.LocalID] = sourceResource
 	return nil
 }
@@ -206,7 +217,7 @@ func buildEventConfigFromSpec(specConfig *EventConfigSpec) *EventConfigResource 
 	}
 }
 
-func validateSource(source *sourceResource, graph *resources.Graph) error {
+func validateSourceFields(source *sourceResource) error {
 	if source.LocalID == "" {
 		return fmt.Errorf("id is required")
 	}
@@ -218,54 +229,6 @@ func validateSource(source *sourceResource, graph *resources.Graph) error {
 	}
 	if !slices.Contains(sourceDefinitions, source.SourceDefinition) {
 		return fmt.Errorf("type '%s' is invalid, must be one of: %v", source.SourceDefinition, sourceDefinitions)
-	}
-	if source.Governance != nil && source.Governance.Validations != nil {
-		ref := source.Governance.Validations.TrackingPlanRef
-		if ref == nil {
-			return fmt.Errorf("governance.validations.tracking_plan is required")
-		}
-
-		tp, ok := graph.GetResource(ref.URN)
-		if !ok {
-			return fmt.Errorf("tracking plan with URN '%s' not found in the project", ref.URN)
-		}
-
-		if tp.Type() != types.TrackingPlanResourceType {
-			return fmt.Errorf("referenced URN '%s' is not a tracking plan", ref.URN)
-		}
-	}
-	return nil
-}
-
-func (h *Handler) Validate(graph *resources.Graph) error {
-	// Duplicate IDs are checked first using seenIDs (not h.resources) because
-	// the resources map is keyed by LocalID and overwrites on collision.
-	idCount := make(map[string]int)
-	for _, id := range h.seenIDs {
-		idCount[id]++
-	}
-	for id, count := range idCount {
-		if count > 1 {
-			return fmt.Errorf("validating event stream source spec: event stream source with id '%s' already exists", id)
-		}
-	}
-
-	// Safe to check names from h.resources: if we reach here, all IDs are unique
-	// so no entries were overwritten during loading.
-	nameCount := make(map[string]int)
-	for _, source := range h.resources {
-		nameCount[source.Name]++
-	}
-	for _, source := range h.resources {
-		if nameCount[source.Name] > 1 {
-			return fmt.Errorf("validating event stream source spec: source with name '%s' is not unique", source.Name)
-		}
-	}
-
-	for _, source := range h.resources {
-		if err := validateSource(source, graph); err != nil {
-			return fmt.Errorf("validating event stream source spec: %w", err)
-		}
 	}
 	return nil
 }
