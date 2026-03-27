@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.14.0](https://github.com/rudderlabs/rudder-iac/compare/v0.13.1...v0.14.0) (2026-03-27)
+
+
+### Features
+
+* add workspace info command ([#469](https://github.com/rudderlabs/rudder-iac/issues/469)) ([6ee8fa5](https://github.com/rudderlabs/rudder-iac/commit/6ee8fa59befa34fe150f2e9a2f4c84e1d9adaf24))
+* **cli:** add v1 properties validation rules ([#434](https://github.com/rudderlabs/rudder-iac/issues/434)) ([41e225e](https://github.com/rudderlabs/rudder-iac/commit/41e225efa7782c7c019226bf8bde3577fb25bbf6))
+* **datacatalog:** add tracking plan v1 validations ([#447](https://github.com/rudderlabs/rudder-iac/issues/447)) ([d34bc93](https://github.com/rudderlabs/rudder-iac/commit/d34bc9380c5d26f715e36fb086482f6d7f354ddd))
+* **datacatalog:** add V1 config validation with keyword aliasing ([#449](https://github.com/rudderlabs/rudder-iac/issues/449)) ([e0d5b48](https://github.com/rudderlabs/rudder-iac/commit/e0d5b48c6d1d52fb68c678f2cf2943147f241cf3))
+* **datacatalog:** add v1 custom type validation ([#446](https://github.com/rudderlabs/rudder-iac/issues/446)) ([a155a2a](https://github.com/rudderlabs/rudder-iac/commit/a155a2a816fd372daf1fec9dfb439ef4f68546a8))
+* **datacatalog:** add V1 spec validation rules for categories ([#432](https://github.com/rudderlabs/rudder-iac/issues/432)) ([91833ce](https://github.com/rudderlabs/rudder-iac/commit/91833ce817a1edfdde8741fbc9066973a25b8c41))
+* **datacatalog:** add V1 spec validation rules for events ([#433](https://github.com/rudderlabs/rudder-iac/issues/433)) ([e677879](https://github.com/rudderlabs/rudder-iac/commit/e6778794640effe6e5f434687ac7ff227f403540))
+* **datacatalog:** support additionalProperties in object custom type config ([#410](https://github.com/rudderlabs/rudder-iac/issues/410)) ([c44e494](https://github.com/rudderlabs/rudder-iac/commit/c44e49412deda7d4d997ab28fa3a56c7d5a8ec44))
+* **datagraph:** add data-graph validate command ([#459](https://github.com/rudderlabs/rudder-iac/issues/459)) ([224bf3f](https://github.com/rudderlabs/rudder-iac/commit/224bf3fd67b0ba1a5e9751b287efd94a0dd84d59))
+* **datagraph:** add import support with composite FormatForExport ([#456](https://github.com/rudderlabs/rudder-iac/issues/456)) ([b7227a2](https://github.com/rudderlabs/rudder-iac/commit/b7227a2fd3efe98acb66c2b728fa2a864dd3e0b0))
+* **datagraph:** add semantic validation rule for duplicate display names ([#481](https://github.com/rudderlabs/rudder-iac/issues/481)) ([8e1f41b](https://github.com/rudderlabs/rudder-iac/commit/8e1f41b81e00b2e8ac29cac33824aacfa19bd69a))
+* **datagraph:** enforce 3-part table reference format in model validation ([#438](https://github.com/rudderlabs/rudder-iac/issues/438)) ([28c39f3](https://github.com/rudderlabs/rudder-iac/commit/28c39f3656ad71684627c6e8399c41d97cbe0e98))
+* **datagraph:** migrate inline validation to rule-based framework ([#467](https://github.com/rudderlabs/rudder-iac/issues/467)) ([2c2cd5b](https://github.com/rudderlabs/rudder-iac/commit/2c2cd5bb7c8ffc24672c354c8f8329825f7795fb))
+* **event-stream:** add V1 spec validation for event-stream-source ([#445](https://github.com/rudderlabs/rudder-iac/issues/445)) ([6522fc5](https://github.com/rudderlabs/rudder-iac/commit/6522fc539b42ff092f1d62a850aab2275043d719))
+* **retl:** add V1 spec validation for retl-source-sql-model ([#443](https://github.com/rudderlabs/rudder-iac/issues/443)) ([a10d0d3](https://github.com/rudderlabs/rudder-iac/commit/a10d0d33ff32ff42925a4651fc082c5e0fde97c0))
+* revamp project rules using patterns ([#483](https://github.com/rudderlabs/rudder-iac/issues/483)) ([b85bacb](https://github.com/rudderlabs/rudder-iac/commit/b85bacb22d37e6e3bd13b9c2b7a574b821bcc1c6))
+* transformation library v1 spec validation ([#455](https://github.com/rudderlabs/rudder-iac/issues/455)) ([5c72f6d](https://github.com/rudderlabs/rudder-iac/commit/5c72f6d529abeb015c1d8f58a936e4c159ba11a4))
+* **transformations:** add v1 transformation validation ([#453](https://github.com/rudderlabs/rudder-iac/issues/453)) ([235c3fd](https://github.com/rudderlabs/rudder-iac/commit/235c3fd1b37559826149320c46b9185c6c81f3d0))
+* **typer-kotlin:** support configurable output filename for generated file ([#439](https://github.com/rudderlabs/rudder-iac/issues/439)) ([9b6f36a](https://github.com/rudderlabs/rudder-iac/commit/9b6f36a637bb1ea433671970b8df29cc282dddcd))
+
+
+### Bug Fixes
+
+* add missing semantic valid rule for checking duplicate display_name on sqlmodel spec ([#482](https://github.com/rudderlabs/rudder-iac/issues/482)) ([cab303a](https://github.com/rudderlabs/rudder-iac/commit/cab303a4fa5afa331ad60b100f649e0d70e444a8))
+* **datacatalog:** convert additionalProperties to additional_properties in V1 custom type import ([#477](https://github.com/rudderlabs/rudder-iac/issues/477)) ([ad4b564](https://github.com/rudderlabs/rudder-iac/commit/ad4b564357da466680f4135bfdd12168cb694d8b))
+* **datacatalog:** updated additionalProperties to snake cased additional_properties ([#457](https://github.com/rudderlabs/rudder-iac/issues/457)) ([f5a7ea4](https://github.com/rudderlabs/rudder-iac/commit/f5a7ea4d0e8288caa24e5932ef69c100b25a5258))
+* **datagraph:** reject type-incompatible fields on model specs ([#480](https://github.com/rudderlabs/rudder-iac/issues/480)) ([ae117ea](https://github.com/rudderlabs/rudder-iac/commit/ae117ea694f23ba170eacb02a4adb32f49553258))
+* filter Python builtin modules in import extraction ([#451](https://github.com/rudderlabs/rudder-iac/issues/451)) ([d20aabe](https://github.com/rudderlabs/rudder-iac/commit/d20aabe86c06fdae937936825c6efa89b2c15230))
+* print no resources found instead of an empty table ([#470](https://github.com/rudderlabs/rudder-iac/issues/470)) ([b961bc1](https://github.com/rudderlabs/rudder-iac/commit/b961bc169c0e899dfa4dcc11d87c5a7730e4775c))
+* render PropertyRef as URN in property diffs ([#430](https://github.com/rudderlabs/rudder-iac/issues/430)) ([115a994](https://github.com/rudderlabs/rudder-iac/commit/115a994b6ffa2d5c4f16c010903fd6f44674ccf3))
+* skip file extension check when language is invalid ([#468](https://github.com/rudderlabs/rudder-iac/issues/468)) ([404203f](https://github.com/rudderlabs/rudder-iac/commit/404203fb3e4d848fad0d897bc0b841e94433a2ee))
+* use snake_case field names in data graph diffs ([#431](https://github.com/rudderlabs/rudder-iac/issues/431)) ([bc7c025](https://github.com/rudderlabs/rudder-iac/commit/bc7c025cbc2aad6332841e12302aad85fe203614))
+
+
+### Miscellaneous
+
+* add e2e tests for v1 YAMLs ([#442](https://github.com/rudderlabs/rudder-iac/issues/442)) ([5c267bf](https://github.com/rudderlabs/rudder-iac/commit/5c267bff60f3ad40bb4438e5378bc3f12b70b1fd))
+* add GetTransformationVersion and GetLibraryVersion to TransformationStore ([#462](https://github.com/rudderlabs/rudder-iac/issues/462)) ([9389623](https://github.com/rudderlabs/rudder-iac/commit/9389623a579e667b6de69e0f10071b62b97cbb33))
+* add input and output locations in test results display ([#476](https://github.com/rudderlabs/rudder-iac/issues/476)) ([1b6e683](https://github.com/rudderlabs/rudder-iac/commit/1b6e683839674ab9283752178b1c1e21a52d7ce8))
+* add output flag to write transformations test results ([#464](https://github.com/rudderlabs/rudder-iac/issues/464)) ([7b91f5f](https://github.com/rudderlabs/rudder-iac/commit/7b91f5f236404cc4ba97e2352efdd8007f545c7f))
+* add python transform e2e tests on apply ([#454](https://github.com/rudderlabs/rudder-iac/issues/454)) ([fcd3165](https://github.com/rudderlabs/rudder-iac/commit/fcd3165ef49b150794d46176dd5c22942cde4511))
+* add resolves keyword to PR template for Linear auto-linking ([#465](https://github.com/rudderlabs/rudder-iac/issues/465)) ([54d7844](https://github.com/rudderlabs/rudder-iac/commit/54d78443bb3a0c9968a48f8122f3f8683e790d91))
+* **api:** use request structs for DataGraphStore ListDataGraphs and SetExternalID ([#473](https://github.com/rudderlabs/rudder-iac/issues/473)) ([df0a1a6](https://github.com/rudderlabs/rudder-iac/commit/df0a1a65daf1de78344439463e21c308731ca5b9))
+* consolidate TransformationStore mocks into shared MockTransformationStore ([#463](https://github.com/rudderlabs/rudder-iac/issues/463)) ([93fac89](https://github.com/rudderlabs/rudder-iac/commit/93fac89d0992dc8f4761ba8c43929b4710dcb864))
+* **custom-types:** extract item_type(s) from config into dedicated fields ([#460](https://github.com/rudderlabs/rudder-iac/issues/460)) ([0e44e25](https://github.com/rudderlabs/rudder-iac/commit/0e44e2533ea3cec5f32584291241a6b8b86f8014))
+* display "No resources to test" for empty results ([#452](https://github.com/rudderlabs/rudder-iac/issues/452)) ([b1f6afc](https://github.com/rudderlabs/rudder-iac/commit/b1f6afcdba094e94ab880b29f390bb6d9cf8fb12))
+* make handleValidation the default, remove legacy validation and experimental flag ([#485](https://github.com/rudderlabs/rudder-iac/issues/485)) ([3d0506e](https://github.com/rudderlabs/rudder-iac/commit/3d0506e85308ac4254b2959c680d58767c440984))
+
 ## [0.13.1](https://github.com/rudderlabs/rudder-iac/compare/v0.13.0...v0.13.1) (2026-03-04)
 
 
