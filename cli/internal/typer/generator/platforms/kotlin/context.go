@@ -25,6 +25,7 @@ type KotlinDataClass struct {
 	Comment       string            // Documentation comment for the class
 	Properties    []KotlinProperty  // Properties of the data class
 	NestedClasses []KotlinDataClass // Nested data classes within this class
+	Annotations   []string          // Short annotation names to apply to this data class (e.g., "Stable")
 }
 
 // KotlinEnumValue represents a single value in a Kotlin enum
@@ -107,6 +108,7 @@ type KotlinContext struct {
 	TrackingPlanID         string                  // ID of the tracking plan
 	TrackingPlanVersion    int                     // Version of the tracking plan
 	TrackingPlanURL        string                  // URL to the tracking plan (if available)
+	Imports                []string                // Additional import paths (e.g., annotation FQNs like "androidx.compose.runtime.Stable")
 }
 
 // NewKotlinContext creates a new KotlinContext with initialized slices

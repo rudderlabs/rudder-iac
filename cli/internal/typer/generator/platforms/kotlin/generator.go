@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
@@ -45,6 +46,14 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 	ctx.TrackingPlanID = plan.Metadata.TrackingPlanID
 	ctx.TrackingPlanVersion = plan.Metadata.TrackingPlanVersion
 	ctx.TrackingPlanURL = plan.Metadata.URL
+
+	var annotations []string
+	for _, fqn := range kotlinOptions.ParsedAnnotations() {
+		shortName := fqn[strings.LastIndex(fqn, ".")+1:]
+		annotations = append(annotations, shortName)
+		ctx.Imports = append(ctx.Imports, fqn)
+	}
+
 	nameRegistry := core.NewNameRegistry(KotlinCollisionHandler)
 
 	err := processPropertiesAndCustomTypes(plan, ctx, nameRegistry)
@@ -55,6 +64,12 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 	err = processEventRules(plan, ctx, nameRegistry)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(annotations) > 0 {
+		for i := range ctx.DataClasses {
+			setAnnotationsRecursive(&ctx.DataClasses[i], annotations)
+		}
 	}
 
 	mainFile, err := GenerateFile(outputFileName, ctx)
@@ -613,6 +628,14 @@ func createNestedDataClass(propSchema *plan.PropertySchema, propName string, par
 	dataClass.Name = nestedClassName
 
 	return dataClass, nil
+}
+
+// setAnnotationsRecursive sets annotations on a data class and all its nested classes
+func setAnnotationsRecursive(dc *KotlinDataClass, annotations []string) {
+	dc.Annotations = annotations
+	for i := range dc.NestedClasses {
+		setAnnotationsRecursive(&dc.NestedClasses[i], annotations)
+	}
 }
 
 // isEmptySchema checks if an ObjectSchema has no defined properties
