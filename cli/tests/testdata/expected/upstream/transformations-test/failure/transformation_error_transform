@@ -1,0 +1,11 @@
+{
+  "id": "38eVnQm9fKR6LzCeqyrnMluoQyg",
+  "versionId": "38eVnQbKd0pumoVGZje7fnzqOcD",
+  "name": "Error Transform",
+  "description": "Calls a library function that throws",
+  "code": "import { riskyOperation } from 'errorLibrary';\n\nexport function transformEvent(event, metadata) {\n  riskyOperation();\n  return event;\n}\n",
+  "language": "javascript",
+  "imports": ["errorLibrary"],
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "externalId": "error_transform"
+}

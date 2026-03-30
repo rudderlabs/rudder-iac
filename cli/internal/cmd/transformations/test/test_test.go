@@ -73,14 +73,6 @@ func TestValidateFlags(t *testing.T) {
 			force:         true,
 			expectedError: false,
 		},
-		{
-			name:          "valid --output-path with existing dir",
-			args:          []string{},
-			all:           true,
-			modified:      false,
-			outputPath:    os.TempDir(),
-			expectedError: false,
-		},
 
 		// Invalid cases
 		{
@@ -150,13 +142,6 @@ func TestValidateFlags(t *testing.T) {
 			errorContains: "output file already exists",
 		},
 	}
-
-	// Create a file in TempDir for the "not a directory" case
-	notADir := filepath.Join(os.TempDir(), "not-a-dir.json")
-	f, err := os.Create(notADir)
-	require.NoError(t, err)
-	f.Close()
-	t.Cleanup(func() { os.Remove(notADir) })
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

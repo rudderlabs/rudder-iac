@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTransformationsTest_Success(t *testing.T) {
+func TestTransformationsTest(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -32,7 +32,7 @@ func TestTransformationsTest_Success(t *testing.T) {
 		"--confirm=false")
 	require.NoError(t, err, "apply failed: %s", string(output))
 
-	t.Run("all transformations and libraries pass", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
 		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "success")
 
@@ -40,14 +40,25 @@ func TestTransformationsTest_Success(t *testing.T) {
 			"-l", fixtureDir, "-o", resultsFile)
 		require.NoError(t, err, "test command failed: %s", string(output))
 
-		verifyTestResults(t, resultsFile)
+		verifyTestResults(t, "success", resultsFile)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
+		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "failure")
+
+		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
+			"-l", fixtureDir, "-o", resultsFile)
+		require.Error(t, err, "test command should fail: %s", string(output))
+
+		verifyTestResults(t, "failure", resultsFile)
 	})
 }
 
-func verifyTestResults(t *testing.T, resultsFile string) {
+func verifyTestResults(t *testing.T, dir, resultsFile string) {
 	t.Helper()
 
-	snapshotDir := filepath.Join("testdata", "expected", "upstream", "transformations-test", "success")
+	snapshotDir := filepath.Join("testdata", "expected", "upstream", "transformations-test", dir)
 
 	// Snapshot-compare the full test results output against expected.
 	actual := readJSONFile(t, resultsFile)
