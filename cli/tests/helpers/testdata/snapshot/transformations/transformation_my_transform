@@ -1,0 +1,10 @@
+{
+  "id": "tr-1",
+  "versionId": "v-1",
+  "name": "My Transform",
+  "description": "A test transformation",
+  "code": "export function transformEvent(event) { return event; }",
+  "language": "javascript",
+  "imports": [],
+  "workspaceId": "ws-123"
+}
