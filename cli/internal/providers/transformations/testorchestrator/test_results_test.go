@@ -182,7 +182,7 @@ func TestTestResults_DefaultSuiteTransformationNames(t *testing.T) {
 					{
 						Result: &transformations.TransformationTestResult{Name: "my-transform"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "custom-suite"},
+							{ID: "custom-suite", Name: "custom-suite"},
 						},
 					},
 				},
@@ -196,8 +196,8 @@ func TestTestResults_DefaultSuiteTransformationNames(t *testing.T) {
 					{
 						Result: &transformations.TransformationTestResult{Name: "my-transform"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "default-events"},
-							{Name: "custom-suite"},
+							{ID: "default-events", Name: "default-events"},
+							{ID: "custom-suite", Name: "custom-suite"},
 						},
 					},
 				},
@@ -223,26 +223,26 @@ func TestTestResults_DefaultSuiteTransformationNames(t *testing.T) {
 					{
 						Result: &transformations.TransformationTestResult{Name: "default-only"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "default-events"},
+							{ID: "default-events", Name: "default-events"},
 						},
 					},
 					{
 						Result: &transformations.TransformationTestResult{Name: "custom-only"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "my-custom-suite"},
+							{ID: "my-custom-suite", Name: "my-custom-suite"},
 						},
 					},
 					{
 						Result: &transformations.TransformationTestResult{Name: "multi-suite"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "default-events"},
-							{Name: "extra-suite"},
+							{ID: "default-events", Name: "default-events"},
+							{ID: "extra-suite", Name: "extra-suite"},
 						},
 					},
 					{
 						Result: &transformations.TransformationTestResult{Name: "another-default"},
 						Definitions: []*transformations.TestDefinition{
-							{Name: "default-events"},
+							{ID: "default-events", Name: "default-events"},
 						},
 					},
 				},

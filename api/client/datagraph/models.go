@@ -28,6 +28,9 @@ type ModelStore interface {
 
 	// SetModelExternalID sets the external ID for a model and returns the updated model (works for both entity and event models)
 	SetModelExternalID(ctx context.Context, req *SetModelExternalIDRequest) (*Model, error)
+
+	// ValidateModel validates a model against the warehouse and returns a validation report
+	ValidateModel(ctx context.Context, req *ValidateModelRequest) (*ValidationReport, error)
 }
 
 // ListModels lists models in a data graph with optional type filtering
@@ -215,6 +218,31 @@ func (s *rudderDataGraphClient) SetModelExternalID(ctx context.Context, req *Set
 	}
 
 	var result Model
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("unmarshalling response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// ValidateModel validates a model against the warehouse
+func (s *rudderDataGraphClient) ValidateModel(ctx context.Context, req *ValidateModelRequest) (*ValidationReport, error) {
+	if req.AccountID == "" {
+		return nil, fmt.Errorf("account ID cannot be empty")
+	}
+
+	path := fmt.Sprintf("%s/models/validate", dataGraphsBasePath)
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling request: %w", err)
+	}
+
+	resp, err := s.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("validating model: %w", err)
+	}
+
+	var result ValidationReport
 	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("unmarshalling response: %w", err)
 	}

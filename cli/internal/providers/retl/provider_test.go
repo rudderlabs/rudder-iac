@@ -13,9 +13,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // mockRETLStore mocks the RETL client for testing
@@ -155,6 +157,17 @@ func TestProvider(t *testing.T) {
 		provider := retl.New(newDefaultMockClient())
 		types := provider.SupportedTypes()
 		assert.Contains(t, types, sqlmodel.ResourceType)
+	})
+
+	t.Run("SupportedMatchPatterns", func(t *testing.T) {
+		t.Parallel()
+
+		p := retl.New(newDefaultMockClient())
+		kind := "retl-source-sql-model"
+		var want []vrules.MatchPattern
+		want = append(want, prules.LegacyVersionPatterns(kind)...)
+		want = append(want, prules.V1VersionPatterns(kind)...)
+		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {

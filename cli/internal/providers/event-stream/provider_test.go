@@ -11,10 +11,12 @@ import (
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestProvider(t *testing.T) {
@@ -30,6 +32,17 @@ func TestProvider(t *testing.T) {
 		types := provider.SupportedTypes()
 		assert.Contains(t, types, source.ResourceType)
 		assert.Len(t, types, 1)
+	})
+
+	t.Run("SupportedMatchPatterns", func(t *testing.T) {
+		t.Parallel()
+
+		p := eventstream.New(source.NewMockSourceClient())
+		kind := "event-stream-source"
+		var want []vrules.MatchPattern
+		want = append(want, prules.LegacyVersionPatterns(kind)...)
+		want = append(want, prules.V1VersionPatterns(kind)...)
+		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {

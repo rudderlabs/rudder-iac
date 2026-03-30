@@ -8,6 +8,7 @@ import (
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	validationRules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // extractRefs extracts Reference fields from ValidationResults
@@ -647,4 +648,87 @@ func TestCustomTypeSpecSyntaxValidRule_EdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateItemTypes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no item_type and unique item_types", func(t *testing.T) {
+		t.Parallel()
+
+		results := validateItemTypes([]localcatalog.CustomTypeV1{
+			{
+				LocalID:   "ct1",
+				Name:      "CT1",
+				Type:      "array",
+				ItemTypes: []string{"string", "integer"},
+			},
+		})
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("invalid item_type", func(t *testing.T) {
+		t.Parallel()
+
+		results := validateItemTypes([]localcatalog.CustomTypeV1{
+			{
+				LocalID:  "ct1",
+				Name:     "CT1",
+				Type:     "array",
+				ItemType: "not_a_type",
+			},
+		})
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/item_type", results[0].Reference)
+		assert.Contains(t, results[0].Message, "'item_type' is invalid")
+	})
+
+	t.Run("valid item_type primitive", func(t *testing.T) {
+		t.Parallel()
+
+		results := validateItemTypes([]localcatalog.CustomTypeV1{
+			{
+				LocalID:  "ct1",
+				Name:     "CT1",
+				Type:     "array",
+				ItemType: "string",
+			},
+		})
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("valid item_type custom type ref", func(t *testing.T) {
+		t.Parallel()
+
+		results := validateItemTypes([]localcatalog.CustomTypeV1{
+			{
+				LocalID:  "ct1",
+				Name:     "CT1",
+				Type:     "array",
+				ItemType: "#custom-type:Address",
+			},
+		})
+
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate item_types", func(t *testing.T) {
+		t.Parallel()
+
+		results := validateItemTypes([]localcatalog.CustomTypeV1{
+			{
+				LocalID:   "ct1",
+				Name:      "CT1",
+				Type:      "array",
+				ItemTypes: []string{"string", "string"},
+			},
+		})
+
+		require.Len(t, results, 1)
+		assert.Equal(t, "/types/0/item_types", results[0].Reference)
+		assert.Contains(t, results[0].Message, "'item_types' is invalid: must be unique")
+	})
 }

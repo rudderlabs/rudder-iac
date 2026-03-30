@@ -135,6 +135,9 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
+		if len(plan.Operations) == 0 {
+			fmt.Println("No changes to apply")
+		}
 		return nil
 	}
 

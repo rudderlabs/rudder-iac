@@ -5,11 +5,12 @@ metadata:
 spec:
   id: simple_transform
   name: Simple Transform
-  description: Adds source tag to events
+  description: Adds source tag and timestamp to events
   language: javascript
   code: |
     export function transformEvent(event, metadata) {
       event.properties = event.properties || {};
       event.properties.source = "rudder";
+      event.properties.timestamp = new Date().toISOString();
       return event;
     }

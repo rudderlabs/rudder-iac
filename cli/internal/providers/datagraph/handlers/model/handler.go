@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -14,8 +13,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
-
-var TableRefPattern = regexp.MustCompile(`^[^.]+\.[^.]+\.[^.]+$`)
 
 type ModelHandler = handler.BaseHandler[struct{}, dgModel.ModelResource, dgModel.ModelState, dgModel.RemoteModel]
 
@@ -58,37 +55,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *struct{}) (map
 	return nil, fmt.Errorf("model handler does not support standalone spec extraction - models are inline in data-graph specs")
 }
 
-func (h *HandlerImpl) ValidateResource(resource *dgModel.ModelResource, graph *resources.Graph) error {
-	if resource.DisplayName == "" {
-		return fmt.Errorf("display_name is required")
-	}
-	if resource.Type != "entity" && resource.Type != "event" {
-		return fmt.Errorf("type must be 'entity' or 'event'")
-	}
-	if !TableRefPattern.MatchString(resource.Table) {
-		return fmt.Errorf("table must be a 3-part reference in the format catalog.schema.table")
-	}
-	if resource.DataGraphRef == nil {
-		return fmt.Errorf("data_graph reference is required")
-	}
-
-	// Type-specific validation
-	switch resource.Type {
-	case "entity":
-		if resource.PrimaryID == "" {
-			return fmt.Errorf("primary_id is required for entity models")
-		}
-	case "event":
-		if resource.Timestamp == "" {
-			return fmt.Errorf("timestamp is required for event models")
-		}
-	}
-
-	// Validate that the referenced data graph exists
-	if _, exists := graph.GetResource(resource.DataGraphRef.URN); !exists {
-		return fmt.Errorf("referenced data graph %s does not exist", resource.DataGraphRef.URN)
-	}
-
+func (h *HandlerImpl) ValidateResource(_ *dgModel.ModelResource, _ *resources.Graph) error {
 	return nil
 }
 
@@ -170,7 +137,11 @@ func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool
 	perPage := 100
 
 	for {
-		resp, err := h.client.ListDataGraphs(ctx, page, perPage, hasExternalID)
+		resp, err := h.client.ListDataGraphs(ctx, &dgClient.ListDataGraphsRequest{
+			Page:          page,
+			PageSize:      perPage,
+			HasExternalID: hasExternalID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("listing data graphs: %w", err)
 		}

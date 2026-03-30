@@ -3,22 +3,22 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"sort"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
-	"github.com/samber/lo"
+	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
-func TestTransformationsTestPass(t *testing.T) {
+func TestTransformationsTest_Success(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -33,81 +33,115 @@ func TestTransformationsTestPass(t *testing.T) {
 	require.NoError(t, err, "apply failed: %s", string(output))
 
 	t.Run("all transformations and libraries pass", func(t *testing.T) {
-		outputDir := t.TempDir()
+		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
 		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "success")
 
 		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
-			"-l", fixtureDir, "--output-path", outputDir)
+			"-l", fixtureDir, "-o", resultsFile)
 		require.NoError(t, err, "test command failed: %s", string(output))
 
-		verifyTestResults(t, fixtureDir, filepath.Join(outputDir, "test-results.json"))
-	})
-
-	t.Run("failures detected alongside passing resources", func(t *testing.T) {
-		outputDir := t.TempDir()
-		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "failure")
-
-		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
-			"-l", fixtureDir, "--output-path", outputDir)
-		require.Error(t, err, "test command should fail: %s", string(output))
-
-		verifyFailureTestResults(t, fixtureDir, filepath.Join(outputDir, "test-results.json"))
+		verifyTestResults(t, resultsFile)
 	})
 }
 
-func verifyTestResults(t *testing.T, fixtureDir, resultsFile string) {
+func verifyTestResults(t *testing.T, resultsFile string) {
 	t.Helper()
 
-	results := readResultsFile(t, resultsFile)
-	assert.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
-	assert.False(t, results.HasFailures())
-	assert.Len(t, results.Transformations, 4)
-	assert.Len(t, results.Libraries, 1)
+	snapshotDir := filepath.Join("testdata", "expected", "upstream", "transformations-test", "success")
 
-	for _, tr := range results.Transformations {
-		assert.True(t, tr.Result.Pass, "transformation %s should pass", tr.Result.Name)
-		require.NotEmpty(t, tr.Result.TestSuiteResult.Results,
-			"transformation %s should have test results", tr.Result.Name)
-		for _, r := range tr.Result.TestSuiteResult.Results {
-			assert.Equal(t, transformations.TestRunStatusPass, r.Status,
-				"test %s in %s should pass", r.Name, tr.Result.Name)
+	// Snapshot-compare the full test results output against expected.
+	actual := readJSONFile(t, resultsFile)
+	expected := readJSONFile(t, filepath.Join(snapshotDir, "expected_results.json"))
+	sortResultsByName(actual)
+	sortResultsByName(expected)
+
+	assert.NoError(t, helpers.CompareStates(actual, expected,
+		testResultsIgnoreFields(actual)),
+		"test results snapshot comparison failed")
+
+	// Verify upstream versions via API
+	results := readResultsFile(t, resultsFile)
+	verifyVersions(t, snapshotDir, results)
+}
+
+// sortResultsByName sorts both transformations and libraries in-place by name
+// so that CompareStates can do index-based comparison deterministically.
+func sortResultsByName(results map[string]any) {
+	if trs, ok := results["transformations"].([]any); ok {
+		sort.Slice(trs, func(i, j int) bool {
+			iName := trs[i].(map[string]any)["result"].(map[string]any)["name"].(string)
+			jName := trs[j].(map[string]any)["result"].(map[string]any)["name"].(string)
+			return iName < jName
+		})
+	}
+
+	if libs, ok := results["libraries"].([]any); ok {
+		sort.Slice(libs, func(i, j int) bool {
+			iName := libs[i].(map[string]any)["name"].(string)
+			jName := libs[j].(map[string]any)["name"].(string)
+			return iName < jName
+		})
+	}
+}
+
+// testResultsIgnoreFields builds ignore paths for dynamic fields in test results,
+// based on the actual transformation and library counts.
+func testResultsIgnoreFields(results map[string]any) []string {
+	var ignore []string
+
+	if trs, ok := results["transformations"].([]any); ok {
+		for i := range trs {
+			prefix := fmt.Sprintf("transformations[%d].result", i)
+			ignore = append(ignore,
+				prefix+".id",
+				prefix+".versionId",
+				prefix+".externalId",
+				prefix+".testResult.results",
+			)
 		}
 	}
 
-	for _, lib := range results.Libraries {
-		assert.True(t, lib.Pass, "library %s should pass", lib.HandleName)
-		assert.Empty(t, lib.Message, "library %s should have no error message", lib.HandleName)
+	if libs, ok := results["libraries"].([]any); ok {
+		for i := range libs {
+			prefix := fmt.Sprintf("libraries[%d]", i)
+			ignore = append(ignore,
+				prefix+".id",
+				prefix+".versionId",
+				prefix+".externalId",
+			)
+		}
 	}
 
-	verifyVersions(t, fixtureDir, results)
+	return ignore
 }
 
-// verifyVersions fetches each transformation and library version via the API
-// and compares name, description, and code against the fixture YAML spec.
-func verifyVersions(t *testing.T, fixtureDir string, results *testorchestrator.TestResults) {
+// verifyVersions uses the snapshot framework to compare each transformation and
+// library version fetched from the API against expected snapshot files.
+func verifyVersions(t *testing.T, snapshotDir string, results *testorchestrator.TestResults) {
 	t.Helper()
 
-	fixtures := loadFixtureSpecs(t, fixtureDir)
 	store := newTransformationStore(t)
-	ctx := context.Background()
+	fileManager, err := helpers.NewSnapshotFileManager(snapshotDir)
+	require.NoError(t, err)
 
-	for _, tr := range results.Transformations {
-		version, err := store.GetTransformationVersion(ctx, tr.Result.ID, tr.Result.VersionID)
-		require.NoError(t, err, "fetching version for %s", tr.Result.Name)
-		expected := fixtures[tr.Result.Name]
-		assert.Equal(t, expected.Name, version.Name)
-		assert.Equal(t, expected.Description, version.Description)
-		assert.Equal(t, strings.TrimSpace(expected.Code), strings.TrimSpace(version.Code))
-	}
-
-	for _, lib := range results.Libraries {
-		version, err := store.GetLibraryVersion(ctx, lib.ID, lib.VersionID)
-		require.NoError(t, err, "fetching version for %s", lib.HandleName)
-		expected := fixtures[version.Name]
-		assert.Equal(t, expected.Name, version.Name)
-		assert.Equal(t, expected.Description, version.Description)
-		assert.Equal(t, strings.TrimSpace(expected.Code), strings.TrimSpace(version.Code))
-	}
+	tester := helpers.NewTransformationSnapshotTester(
+		store,
+		helpers.VersionRefs(results),
+		fileManager,
+		[]string{
+			"id",
+			"versionId",
+			"codeVersion",
+			"workspaceId",
+			"externalId",
+			"createdAt",
+			"updatedAt",
+			"createdBy",
+			"updatedBy",
+		},
+	)
+	assert.NoError(t, tester.SnapshotTest(context.Background()),
+		"version snapshot verification failed")
 }
 
 func readResultsFile(t *testing.T, path string) *testorchestrator.TestResults {
@@ -119,87 +153,13 @@ func readResultsFile(t *testing.T, path string) *testorchestrator.TestResults {
 	return &results
 }
 
-type fixtureSpec struct {
-	Name        string
-	Description string
-	Code        string
-}
-
-// loadFixtureSpecs parses all *.yaml files at the top level of fixtureDir into
-// a map of spec.name → fixtureSpec. Subdirectories (input/, output/) are ignored.
-func loadFixtureSpecs(t *testing.T, fixtureDir string) map[string]fixtureSpec {
+func readJSONFile(t *testing.T, path string) map[string]any {
 	t.Helper()
-	specs := make(map[string]fixtureSpec)
-	files, err := filepath.Glob(filepath.Join(fixtureDir, "*.yaml"))
-	require.NoError(t, err)
-	for _, f := range files {
-		data, err := os.ReadFile(f)
-		require.NoError(t, err)
-		var fixture struct {
-			Spec struct {
-				Name        string `yaml:"name"`
-				Description string `yaml:"description"`
-				Code        string `yaml:"code"`
-			} `yaml:"spec"`
-		}
-		require.NoError(t, yaml.Unmarshal(data, &fixture))
-		if fixture.Spec.Name != "" && fixture.Spec.Code != "" {
-			specs[fixture.Spec.Name] = fixtureSpec{
-				Name:        fixture.Spec.Name,
-				Description: fixture.Spec.Description,
-				Code:        fixture.Spec.Code,
-			}
-		}
-	}
-	return specs
-}
-
-func verifyFailureTestResults(t *testing.T, fixtureDir, resultsFile string) {
-	t.Helper()
-
-	results := readResultsFile(t, resultsFile)
-	assert.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
-	assert.True(t, results.HasFailures())
-	assert.Len(t, results.Transformations, 5)
-	assert.Len(t, results.Libraries, 3)
-
-	// Group transformations by suite-level status
-	passNames := trNamesWithStatus(results, transformations.TestRunStatusPass)
-	failNames := trNamesWithStatus(results, transformations.TestRunStatusFail)
-	errorNames := trNamesWithStatus(results, transformations.TestRunStatusError)
-
-	assert.ElementsMatch(t, []string{"Simple Transform", "Py Transform", "Greeting Transform"}, passNames)
-	assert.ElementsMatch(t, []string{"Mismatch Transform"}, failNames)
-	assert.ElementsMatch(t, []string{"Error Transform"}, errorNames)
-
-	// Group libraries by pass/fail
-	passingLibs := libNamesWithPass(results, true)
-	failingLibs := libNamesWithPass(results, false)
-
-	assert.ElementsMatch(t, []string{"utilsLibrary", "errorLibrary"}, passingLibs)
-	assert.ElementsMatch(t, []string{"badPyLibrary"}, failingLibs)
-
-	for _, lib := range results.Libraries {
-		if !lib.Pass {
-			assert.NotEmpty(t, lib.Message, "failing library %s should have an error message", lib.HandleName)
-		}
-	}
-
-	verifyVersions(t, fixtureDir, results)
-}
-
-// trNamesWithStatus returns names of transformations whose TestSuiteResult.Status matches.
-func trNamesWithStatus(results *testorchestrator.TestResults, status transformations.TestRunStatus) []string {
-	return lo.FilterMap(results.Transformations, func(tr *testorchestrator.TransformationTestWithDefinitions, _ int) (string, bool) {
-		return tr.Result.Name, tr.Result.TestSuiteResult.Status == status
-	})
-}
-
-// libNamesWithPass returns handle names of libraries whose Pass field matches.
-func libNamesWithPass(results *testorchestrator.TestResults, pass bool) []string {
-	return lo.FilterMap(results.Libraries, func(lib transformations.LibraryTestResult, _ int) (string, bool) {
-		return lib.HandleName, lib.Pass == pass
-	})
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "reading JSON file at %s", path)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(data, &result), "deserializing JSON file")
+	return result
 }
 
 func newTransformationStore(t *testing.T) transformations.TransformationStore {

@@ -61,6 +61,10 @@ func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *resources.Graph, _
 	return nil
 }
 
+func (p *EmptyProvider) SupportedMatchPatterns() []rules.MatchPattern {
+	return nil
+}
+
 func (p *EmptyProvider) SyntacticRules() []rules.Rule {
 	return []rules.Rule{}
 }

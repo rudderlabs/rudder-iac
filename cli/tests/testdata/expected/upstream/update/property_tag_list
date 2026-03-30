@@ -1,0 +1,19 @@
+{
+    "propConfig": {
+        "itemTypes": [
+            "string"
+        ]
+    },
+    "id": "prop_IGNORED",
+    "externalId": "tag_list",
+    "name": "Tag List",
+    "description": "List of string tags",
+    "type": "array",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}

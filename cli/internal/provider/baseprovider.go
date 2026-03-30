@@ -72,6 +72,12 @@ func NewBaseProvider(handlers []Handler) *BaseProvider {
 
 }
 
+// SupportedMatchPatterns returns nil by default — every provider must explicitly
+// declare its supported (kind, version) patterns via an override.
+func (p *BaseProvider) SupportedMatchPatterns() []rules.MatchPattern {
+	return nil
+}
+
 func (p *BaseProvider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {

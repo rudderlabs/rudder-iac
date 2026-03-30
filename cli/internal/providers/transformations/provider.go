@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	lrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/library"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
@@ -68,6 +69,15 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("transformation specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
+}
+
+// SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.
+// Transformations only support the V1 version; legacy versions are explicitly rejected.
+func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
+	var patterns []vrules.MatchPattern
+	patterns = append(patterns, prules.V1VersionPatterns("transformation")...)
+	patterns = append(patterns, prules.V1VersionPatterns("transformation-library")...)
+	return patterns
 }
 
 func (p *Provider) SyntacticRules() []vrules.Rule {

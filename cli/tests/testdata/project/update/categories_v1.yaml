@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: categories
+metadata:
+  name: v1_categories
+spec:
+  categories:
+    - id: page_tracking
+      name: "Page Tracking"
+    - id: checkout_tracking
+      name: "Checkout Tracking"

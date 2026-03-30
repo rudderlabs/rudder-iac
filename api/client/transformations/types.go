@@ -90,8 +90,11 @@ type SetExternalIDRequest struct {
 
 // TestDefinition defines the structure of a test case
 type TestDefinition struct {
+	ID             string `json:"id"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
+	InputFile      string `json:"inputFile,omitempty"`
+	OutputFile     string `json:"outputFile,omitempty"`
 	Input          []any  `json:"input"`
 	ExpectedOutput []any  `json:"expectedOutput,omitempty"`
 }
@@ -131,6 +134,7 @@ type TestError struct {
 
 // TestResult represents the result of a single test run
 type TestResult struct {
+	ID           string        `json:"id"`
 	Name         string        `json:"name"`
 	Description  string        `json:"description,omitempty"`
 	Status       TestRunStatus `json:"status"`
@@ -147,6 +151,7 @@ type TestSuiteRunResult struct {
 // TransformationTestResult represents result for a single transformation's test suite
 type TransformationTestResult struct {
 	ID              string             `json:"id"`
+	ExternalID      string             `json:"externalId,omitempty"`
 	Name            string             `json:"name"`
 	VersionID       string             `json:"versionId"`
 	Imports         []string           `json:"imports,omitempty"`
@@ -158,6 +163,8 @@ type TransformationTestResult struct {
 // LibraryTestResult represents validation result for a library in batch test response
 type LibraryTestResult struct {
 	ID         string `json:"id"`
+	ExternalID string `json:"externalId,omitempty"`
+	Name       string `json:"name"`
 	HandleName string `json:"handleName"`
 	VersionID  string `json:"versionId"`
 	Pass       bool   `json:"pass"`

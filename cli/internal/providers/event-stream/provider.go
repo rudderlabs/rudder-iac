@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -69,6 +70,15 @@ func (p *Provider) SupportedKinds() []string {
 		kinds = append(kinds, kind)
 	}
 	return kinds
+}
+
+func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
+	var patterns []rules.MatchPattern
+	for kind := range p.kindToType {
+		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
+	}
+	return patterns
 }
 
 func (p *Provider) SupportedTypes() []string {

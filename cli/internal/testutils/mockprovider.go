@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
@@ -17,6 +18,8 @@ type MockProvider struct {
 	provider.EmptyProvider
 	supportedKinds             []string
 	supportedTypes             []string
+	// MatchPatterns when non-nil is returned by SupportedMatchPatterns; when nil, defers to EmptyProvider (nil).
+	MatchPatterns []rules.MatchPattern
 	ValidateArg                *resources.Graph
 	ValidateErr                error
 	LoadSpecErr                error
@@ -112,6 +115,13 @@ func (m *MockProvider) SupportedKinds() []string {
 
 func (m *MockProvider) SupportedTypes() []string {
 	return m.supportedTypes
+}
+
+func (m *MockProvider) SupportedMatchPatterns() []rules.MatchPattern {
+	if m.MatchPatterns != nil {
+		return m.MatchPatterns
+	}
+	return m.EmptyProvider.SupportedMatchPatterns()
 }
 
 func (m *MockProvider) Validate(graph *resources.Graph) error {

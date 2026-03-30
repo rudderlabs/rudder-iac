@@ -13,11 +13,14 @@ import (
 func TestDuplicateURNRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewDuplicateURNRule(nil)
+	patterns := []rules.MatchPattern{
+		rules.MatchKindVersion("properties", "rudder/v1"),
+	}
+	rule := NewDuplicateURNRule(nil, patterns)
 
 	assert.Equal(t, "project/duplicate-urn", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchAll()}, rule.AppliesTo())
+	assert.Equal(t, patterns, rule.AppliesTo())
 	assert.Nil(t, rule.Validate(nil))
 }
 
@@ -67,7 +70,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("no duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -90,7 +93,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("duplicate URN across files", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -116,7 +119,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("duplicate URN within same file", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -137,7 +140,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("same local ID across different resource types is allowed", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -160,7 +163,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("three files with same URN", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -184,7 +187,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("mixed duplicates and unique", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
@@ -210,7 +213,7 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 	t.Run("tracking plan duplicate URNs", func(t *testing.T) {
 		t.Parallel()
 
-		rule := NewDuplicateURNRule(parseSpec)
+		rule := NewDuplicateURNRule(parseSpec, nil)
 		pr := rule.(rules.ProjectRule)
 
 		results := pr.ValidateProject(map[string]*rules.ValidationContext{
