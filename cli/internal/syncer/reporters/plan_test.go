@@ -213,21 +213,21 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 
 	expectedOutput := `Updated resources:
   - resource.with_arrays
-    - items.1: 2 => 5
+    - items[1]: 2 => 5
   - resource.with_mixed_structures
-    - config.servers.1.port: 443 => 8443
+    - config.servers[1].port: 443 => 8443
   - resource.with_nested_maps
     - complex.b: 2 => 3
     - name: old-name => new-name
     - size: 10 => 20
   - resource.with_property_refs
-    - properties.0.id: property:slotPosition => property:slotType
-    - properties.0.localId: slotPosition => slotType
-    - properties.0.required: false => true
-    - properties.1.id: property:slotType => property:totalSlotItems
-    - properties.1.localId: slotType => totalSlotItems
-    - properties.1.required: false => true
-    - properties.2: map[id:{property:totalSlotItems id false  <nil>} localId:totalSlotItems required:true] => <nil>
+    - properties[0].id: property:slotPosition => property:slotType
+    - properties[0].localId: slotPosition => slotType
+    - properties[0].required: false => true
+    - properties[1].id: property:slotType => property:totalSlotItems
+    - properties[1].localId: slotType => totalSlotItems
+    - properties[1].required: false => true
+    - properties[2]: map[id:{property:totalSlotItems id false  <nil>} localId:totalSlotItems required:true] => <nil>
 
 `
 
@@ -238,9 +238,9 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 	assert.Contains(t, output, "property:slotType => property:totalSlotItems")
 
 	// Verify all three array indices are reported (not just the last one)
-	assert.Contains(t, output, "properties.0")
-	assert.Contains(t, output, "properties.1")
-	assert.Contains(t, output, "properties.2")
+	assert.Contains(t, output, "properties[0]")
+	assert.Contains(t, output, "properties[1]")
+	assert.Contains(t, output, "properties[2]")
 
 	assert.Equal(t, expectedOutput, output)
 }

@@ -117,7 +117,7 @@ func TestComputeNestedDiffs_Arrays(t *testing.T) {
 			source: []any{1, 2, 3},
 			target: []any{1, 5, 3},
 			expected: map[string]ValuePair{
-				"1": {Source: 2, Target: 5},
+				"[1]": {Source: 2, Target: 5},
 			},
 		},
 		{
@@ -125,8 +125,8 @@ func TestComputeNestedDiffs_Arrays(t *testing.T) {
 			source: []any{1, 2, 3},
 			target: []any{10, 2, 30},
 			expected: map[string]ValuePair{
-				"0": {Source: 1, Target: 10},
-				"2": {Source: 3, Target: 30},
+				"[0]": {Source: 1, Target: 10},
+				"[2]": {Source: 3, Target: 30},
 			},
 		},
 		{
@@ -134,8 +134,8 @@ func TestComputeNestedDiffs_Arrays(t *testing.T) {
 			source: []any{1, 2},
 			target: []any{2, 1},
 			expected: map[string]ValuePair{
-				"0": {Source: 1, Target: 2},
-				"1": {Source: 2, Target: 1},
+				"[0]": {Source: 1, Target: 2},
+				"[1]": {Source: 2, Target: 1},
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func TestComputeNestedDiffs_Arrays(t *testing.T) {
 			source: []any{1},
 			target: []any{1, 2},
 			expected: map[string]ValuePair{
-				"1": {Source: nil, Target: 2},
+				"[1]": {Source: nil, Target: 2},
 			},
 		},
 		{
@@ -151,7 +151,7 @@ func TestComputeNestedDiffs_Arrays(t *testing.T) {
 			source: []any{1, 2},
 			target: []any{1},
 			expected: map[string]ValuePair{
-				"1": {Source: 2, Target: nil},
+				"[1]": {Source: 2, Target: nil},
 			},
 		},
 		{
@@ -194,7 +194,7 @@ func TestComputeNestedDiffs_Mixed(t *testing.T) {
 				"items": []any{1, 3},
 			},
 			expected: map[string]ValuePair{
-				"items.1": {Source: 2, Target: 3},
+				"items[1]": {Source: 2, Target: 3},
 			},
 		},
 		{
@@ -206,7 +206,7 @@ func TestComputeNestedDiffs_Mixed(t *testing.T) {
 				map[string]any{"a": 2},
 			},
 			expected: map[string]ValuePair{
-				"0.a": {Source: 1, Target: 2},
+				"[0].a": {Source: 1, Target: 2},
 			},
 		},
 		{
@@ -226,7 +226,7 @@ func TestComputeNestedDiffs_Mixed(t *testing.T) {
 				},
 			},
 			expected: map[string]ValuePair{
-				"x.items.0.y": {Source: 1, Target: 2},
+				"x.items[0].y": {Source: 1, Target: 2},
 			},
 		},
 		{
@@ -244,7 +244,7 @@ func TestComputeNestedDiffs_Mixed(t *testing.T) {
 				},
 			},
 			expected: map[string]ValuePair{
-				"servers.1.port": {Source: 443, Target: 8443},
+				"servers[1].port": {Source: 443, Target: 8443},
 			},
 		},
 	}
@@ -468,12 +468,12 @@ func TestComputeNestedDiffs_MultipleArrayElementsChanged(t *testing.T) {
 				},
 			},
 			expected: map[string]ValuePair{
-				"rules.0.enabled": {Source: true, Target: false},
-				"rules.0.value":   {Source: 10, Target: 15},
-				"rules.1.enabled": {Source: true, Target: false},
-				"rules.1.value":   {Source: 20, Target: 25},
-				"rules.2.enabled": {Source: true, Target: false},
-				"rules.2.value":   {Source: 30, Target: 35},
+				"rules[0].enabled": {Source: true, Target: false},
+				"rules[0].value":   {Source: 10, Target: 15},
+				"rules[1].enabled": {Source: true, Target: false},
+				"rules[1].value":   {Source: 20, Target: 25},
+				"rules[2].enabled": {Source: true, Target: false},
+				"rules[2].value":   {Source: 30, Target: 35},
 			},
 		},
 		{
@@ -493,8 +493,8 @@ func TestComputeNestedDiffs_MultipleArrayElementsChanged(t *testing.T) {
 				},
 			},
 			expected: map[string]ValuePair{
-				"rules.0.enabled": {Source: true, Target: false},
-				"rules.1.enabled": {Source: true, Target: false},
+				"rules[0].enabled": {Source: true, Target: false},
+				"rules[1].enabled": {Source: true, Target: false},
 			},
 		},
 	}

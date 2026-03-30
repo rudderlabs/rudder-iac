@@ -149,8 +149,8 @@ func flattenSliceDiffs(basePath string, sourceSlice, targetSlice []any) map[stri
 			targetItem = nil
 		}
 
-		// Build new path with index
-		newPath := buildPath(basePath, fmt.Sprintf("%d", i))
+		// Build new path with index using bracket notation
+		newPath := buildArrayPath(basePath, i)
 
 		// Recursively compare
 		subDiffs := flattenDiffs(newPath, sourceItem, targetItem)
@@ -162,12 +162,17 @@ func flattenSliceDiffs(basePath string, sourceSlice, targetSlice []any) map[stri
 	return result
 }
 
-// buildPath constructs a dot-notation path
+// buildPath constructs a dot-notation path for map keys
 func buildPath(basePath, key string) string {
 	if basePath == "" {
 		return key
 	}
 	return basePath + "." + key
+}
+
+// buildArrayPath constructs a bracket-notation path for array indices
+func buildArrayPath(basePath string, index int) string {
+	return fmt.Sprintf("%s[%d]", basePath, index)
 }
 
 // toMap attempts to convert a value to map[string]any

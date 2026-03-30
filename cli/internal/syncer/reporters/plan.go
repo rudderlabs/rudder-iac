@@ -154,7 +154,13 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 
 	for _, path := range paths {
 		pair := nestedDiffs[path]
-		fullPath := diff.Property + "." + path
+		// if path is a bracket notation, use it as is, otherwise add a dot
+		var fullPath string
+		if strings.HasPrefix(path, "[") {
+			fullPath = diff.Property + path
+		} else {
+			fullPath = diff.Property + "." + path
+		}
 		line := formattedLine(fullPath, pair)
 		lines = append(lines, line)
 	}
