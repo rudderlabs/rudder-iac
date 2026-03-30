@@ -1,0 +1,27 @@
+{
+    "config": {
+        "minimum": 100,
+        "maximum": 599
+    },
+    "rules": {
+        "minimum": 100,
+        "maximum": 599,
+        "type": [
+            "integer"
+        ]
+    },
+    "itemDefinitions": [],
+    "id": "def_IGNORED",
+    "externalId": "http_status",
+    "name": "HttpStatus",
+    "type": "integer",
+    "dataType": "integer",
+    "version": 1,
+    "description": "HTTP response status code",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedBy": null,
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "properties": []
+}

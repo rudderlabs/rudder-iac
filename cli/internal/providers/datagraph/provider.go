@@ -103,6 +103,7 @@ func (p *Provider) SemanticRules() []rules.Rule {
 	return []rules.Rule{
 		dgRules.NewRelationshipCardinalityValidRule(),
 		dgRules.NewRelationshipRefsValidRule(),
+		dgRules.NewRelationshipUniquePairRule(),
 		dgRules.NewUniqueNamesValidRule(),
 	}
 }

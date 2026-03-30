@@ -32,11 +32,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_V1_SPEC_SUPPORT",
 		},
 		{
-			name:     "validationFramework",
-			flagName: "validationFramework",
-			want:     "RUDDERSTACK_X_VALIDATION_FRAMEWORK",
-		},
-		{
 			name:     "transformations",
 			flagName: "transformations",
 			want:     "RUDDERSTACK_X_TRANSFORMATIONS",

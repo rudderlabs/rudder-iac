@@ -40,24 +40,17 @@ type Project interface {
 }
 
 type project struct {
-	location            string
-	provider            ProjectProvider
-	loader              Loader
-	specs               map[string]*specs.Spec
-	loadV1Specs         bool
-	validationEngine    validation.ValidationEngine
-	renderer            renderer.Renderer
-	validateUsingEngine bool
+	location         string
+	provider         ProjectProvider
+	loader           Loader
+	specs            map[string]*specs.Spec
+	loadV1Specs      bool
+	validationEngine validation.ValidationEngine
+	renderer         renderer.Renderer
 }
 
 // ProjectOption defines a functional option for configuring a Project.
 type ProjectOption func(*project)
-
-func WithValidateUsingEngine() ProjectOption {
-	return func(p *project) {
-		p.validateUsingEngine = true
-	}
-}
 
 // WithSpecLoader allows providing a custom SpecLoader.
 func WithLoader(l Loader) ProjectOption {
@@ -132,59 +125,7 @@ func (p *project) Load(location string) error {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
 	}
 
-	if p.validateUsingEngine {
-		return p.handleValidation(rawSpecs)
-	}
-
-	// TODO: once the validation engine is stable, remove this
-	// legacy validation handler.
-	return p.handleLegacyValidation(rawSpecs)
-}
-
-func (p *project) handleLegacyValidation(rawSpecs map[string]*specs.RawSpec) error {
-	// loop over the raw specs and hydrate the provider's state
-	// by parsing the spec and then loading it into the provider.
-
-	for path, rawSpec := range rawSpecs {
-		spec, err := rawSpec.Parse()
-		if err != nil {
-			return fmt.Errorf("failed to parse spec from path %s: %w", path, err)
-		}
-
-		if err := spec.Validate(); err != nil {
-			return fmt.Errorf("failed to validate spec from path %s: %w", path, err)
-		}
-
-		p.specs[path] = spec
-	}
-
-	for path, spec := range p.specs {
-		parsed, err := p.provider.ParseSpec(path, spec)
-		if err != nil {
-			return fmt.Errorf("provider failed to parse spec from path %s: %w", path, err)
-		}
-
-		if err := ValidateSpec(spec, parsed); err != nil {
-			return fmt.Errorf("provider failed to validate spec from path %s: %w", path, err)
-		}
-
-		if err := p.loadSpec(path, spec); err != nil {
-			return fmt.Errorf("provider failed to load spec from path %s: %w", path, err)
-		}
-	}
-
-	graph, err := p.provider.ResourceGraph()
-	if err != nil {
-		return fmt.Errorf("getting resource graph: %w", err)
-	}
-
-	// Detect circular dependencies
-	_, err = graph.DetectCycles()
-	if err != nil {
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	return p.provider.Validate(graph)
+	return p.handleValidation(rawSpecs)
 }
 
 // handleValidation orchestrates the two-phase validation workflow:

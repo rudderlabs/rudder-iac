@@ -2,10 +2,9 @@ package rules
 
 import (
 	"fmt"
-	"strings"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
-	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	relationshipHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -15,12 +14,12 @@ var validateRelationshipCardinality = func(_ string, _ string, _ map[string]any,
 	var results []rules.ValidationResult
 	for i, model := range spec.Models {
 		for j, rel := range model.Relationships {
-			targetModelID := parseTargetModelID(rel.Target)
-			if targetModelID == "" {
+			relRes := lookupRelationship(rel.ID, graph)
+			if relRes == nil || relRes.TargetModelRef == nil {
 				continue
 			}
 
-			targetType := resolveModelType(targetModelID, graph)
+			targetType := resolveModelType(relRes.TargetModelRef.URN, graph)
 			if targetType == "" {
 				// Target not found — handled by refs_valid rule
 				continue
@@ -38,19 +37,23 @@ var validateRelationshipCardinality = func(_ string, _ string, _ map[string]any,
 	return results
 }
 
-// parseTargetModelID extracts the model ID from a target reference like "#data-graph-model:user"
-func parseTargetModelID(target string) string {
-	const prefix = "#data-graph-model:"
-	if !strings.HasPrefix(target, prefix) {
-		return ""
+// lookupRelationship finds a relationship resource in the graph by its spec ID
+func lookupRelationship(id string, graph *resources.Graph) *dgModel.RelationshipResource {
+	urn := resources.URN(id, relationshipHandler.HandlerMetadata.ResourceType)
+	res, exists := graph.GetResource(urn)
+	if !exists {
+		return nil
 	}
-	return strings.TrimPrefix(target, prefix)
+	rel, ok := res.RawData().(*dgModel.RelationshipResource)
+	if !ok {
+		return nil
+	}
+	return rel
 }
 
-// resolveModelType looks up a model's type from the graph
-func resolveModelType(modelID string, graph *resources.Graph) string {
-	urn := resources.URN(modelID, modelHandler.HandlerMetadata.ResourceType)
-	res, exists := graph.GetResource(urn)
+// resolveModelType looks up a model's type from the graph by URN
+func resolveModelType(modelURN string, graph *resources.Graph) string {
+	res, exists := graph.GetResource(modelURN)
 	if !exists {
 		return ""
 	}

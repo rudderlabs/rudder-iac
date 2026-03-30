@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: api_tracking_custom_types
+spec:
+  types:
+    - id: email_string
+      name: EmailString
+      description: "Custom type for email validation"
+      type: string
+      config:
+        format: email
+        min_length: 5
+        max_length: 255
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+    - id: http_status
+      name: HttpStatus
+      description: "HTTP response status code"
+      type: integer
+      config:
+        minimum: 100
+        maximum: 599

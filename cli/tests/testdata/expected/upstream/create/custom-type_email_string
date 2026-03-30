@@ -1,0 +1,31 @@
+{
+    "config": {
+        "format": "email",
+        "minLength": 5,
+        "maxLength": 255,
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    },
+    "rules": {
+        "format": "email",
+        "minLength": 5,
+        "maxLength": 255,
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+        "type": [
+            "string"
+        ]
+    },
+    "itemDefinitions": [],
+    "id": "def_IGNORED",
+    "externalId": "email_string",
+    "name": "EmailString",
+    "type": "string",
+    "dataType": "string",
+    "version": 1,
+    "description": "Custom type for email validation",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedBy": null,
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "properties": []
+}
