@@ -23,6 +23,7 @@ func StageTransformation(
 			Name:       transformation.Name,
 			Code:       transformation.Code,
 			Language:   transformation.Language,
+			Description: transformation.Description,
 			ExternalID: transformation.ID,
 		}
 		result, err := store.CreateTransformation(ctx, req, false)
@@ -37,6 +38,7 @@ func StageTransformation(
 		Name:     transformation.Name,
 		Code:     transformation.Code,
 		Language: transformation.Language,
+		Description: transformation.Description,
 	}
 
 	result, err := store.UpdateTransformation(ctx, remoteID, updateReq, false)
@@ -77,6 +79,7 @@ func StageLibrary(
 		Name:     library.Name,
 		Code:     library.Code,
 		Language: library.Language,
+		Description: library.Description,
 	}
 
 	result, err := store.UpdateLibrary(ctx, remoteID, updateReq, false)

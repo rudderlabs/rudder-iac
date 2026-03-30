@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	relationshipHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -51,9 +52,22 @@ func TestRelationshipRefsValid_TargetExistsInGraph(t *testing.T) {
 		},
 	}
 
+	var (
+		userURN    = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		accountURN = resources.URN("account", modelHandler.HandlerMetadata.ResourceType)
+	)
+
 	graph := resources.NewGraph()
 	graph.AddResource(resources.NewResource("account", modelHandler.HandlerMetadata.ResourceType,
 		resources.ResourceData{}, nil,
+	))
+	graph.AddResource(resources.NewResource("user-account", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: accountURN},
+		}),
 	))
 
 	results := validateRelationshipRefs("data-graph", specs.SpecVersionV1, nil, spec, graph)
@@ -62,6 +76,11 @@ func TestRelationshipRefsValid_TargetExistsInGraph(t *testing.T) {
 
 func TestRelationshipRefsValid_TargetMissing(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN        = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		nonExistentURN = resources.URN("non-existent", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -88,6 +107,15 @@ func TestRelationshipRefsValid_TargetMissing(t *testing.T) {
 	}
 
 	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("user-account", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "user-account",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: nonExistentURN},
+		}),
+	))
+
 	results := validateRelationshipRefs("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
 	require.Len(t, results, 1)
@@ -98,6 +126,12 @@ func TestRelationshipRefsValid_TargetMissing(t *testing.T) {
 
 func TestRelationshipRefsValid_MultipleFailures(t *testing.T) {
 	t.Parallel()
+
+	var (
+		userURN     = resources.URN("user", modelHandler.HandlerMetadata.ResourceType)
+		missingAURN = resources.URN("missing-a", modelHandler.HandlerMetadata.ResourceType)
+		missingBURN = resources.URN("missing-b", modelHandler.HandlerMetadata.ResourceType)
+	)
 
 	spec := dgModel.DataGraphSpec{
 		ID:        "test-dg",
@@ -132,6 +166,23 @@ func TestRelationshipRefsValid_MultipleFailures(t *testing.T) {
 	}
 
 	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("rel-1", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "rel-1",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: missingAURN},
+		}),
+	))
+	graph.AddResource(resources.NewResource("rel-2", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "rel-2",
+			SourceModelRef: &resources.PropertyRef{URN: userURN},
+			TargetModelRef: &resources.PropertyRef{URN: missingBURN},
+		}),
+	))
+
 	results := validateRelationshipRefs("data-graph", specs.SpecVersionV1, nil, spec, graph)
 
 	require.Len(t, results, 2)

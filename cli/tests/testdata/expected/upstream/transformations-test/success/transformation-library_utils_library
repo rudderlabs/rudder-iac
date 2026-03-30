@@ -1,0 +1,11 @@
+{
+  "id": "38eVmNAv8dGCx47neNzLYpLHtIW",
+  "versionId": "38eVmLKvFwSFCT54md9M7Mgg3OC",
+  "name": "Utils Library",
+  "description": "Utility functions for transformations",
+  "code": "export function greet(name) {\n  return \"Hello, \" + name + \"!\";\n}\n\nexport function toUpperCase(str) {\n  return str.toUpperCase();\n}\n\nexport function toLowerCase(str) {\n  return str.toLowerCase();\n}\n",
+  "language": "javascript",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "importName": "utilsLibrary",
+  "externalId": "utils_library"
+}

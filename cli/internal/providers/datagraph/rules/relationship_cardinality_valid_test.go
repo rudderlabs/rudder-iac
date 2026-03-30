@@ -6,6 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	modelHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
+	relationshipHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -24,8 +25,13 @@ func TestNewRelationshipCardinalityValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, prules.V1VersionPatterns("data-graph"), rule.AppliesTo())
 }
 
-// buildCardinalityTest creates a DataGraphSpec and a graph with the target model for cardinality testing
+// buildCardinalityTest creates a DataGraphSpec and a graph with the relationship and target model for cardinality testing
 func buildCardinalityTest(sourceType, targetType, cardinality string) (dgModel.DataGraphSpec, *resources.Graph) {
+	var (
+		sourceModelURN = resources.URN("source-model", modelHandler.HandlerMetadata.ResourceType)
+		targetModelURN = resources.URN("target-model", modelHandler.HandlerMetadata.ResourceType)
+	)
+
 	sourceModel := dgModel.ModelSpec{
 		ID:          "source-model",
 		DisplayName: "Source Model",
@@ -61,6 +67,14 @@ func buildCardinalityTest(sourceType, targetType, cardinality string) (dgModel.D
 		resources.WithRawData(&dgModel.ModelResource{
 			ID:   "target-model",
 			Type: targetType,
+		}),
+	))
+	graph.AddResource(resources.NewResource("test-rel", relationshipHandler.HandlerMetadata.ResourceType,
+		resources.ResourceData{}, nil,
+		resources.WithRawData(&dgModel.RelationshipResource{
+			ID:             "test-rel",
+			SourceModelRef: &resources.PropertyRef{URN: sourceModelURN},
+			TargetModelRef: &resources.PropertyRef{URN: targetModelURN},
 		}),
 	))
 
