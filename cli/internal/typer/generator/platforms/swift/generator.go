@@ -1231,7 +1231,6 @@ func buildScreenMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnaly
 			{Label: "screenName", Value: "screenName"},
 			{Label: "category", Value: "category"},
 		},
-		AddCategory: true,
 	}
 
 	if isEmptySchema(&rule.Schema) && rule.Schema.AdditionalProperties {
