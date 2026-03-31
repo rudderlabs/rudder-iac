@@ -1,0 +1,15 @@
+{
+  "task": "Deprecate all tp subcommands as described in the spec file .specs/deprecate-tp-commands.md.\n\n## Task Summary\n\nDeprecate tp apply, tp validate, tp destroy, and the parent tp command using Cobra's built-in Deprecated field. Each command prints a deprecation banner and stops executing (no-op RunE).\n\n## Files to Modify\n\n1. cli/internal/cmd/trackingplan/apply/apply.go\n   - Set Deprecated: use rudder-cli apply instead. This command will be removed in a future release.\n   - Remove PreRunE\n   - Replace RunE body with return nil\n   - Remove all unused imports and flag definitions\n\n2. cli/internal/cmd/trackingplan/validate/validate.go\n   - Set Deprecated: use rudder-cli validate instead. This command will be removed in a future release.\n   - Replace RunE body with return nil\n   - Remove all unused imports and flag definitions\n\n3. cli/internal/cmd/trackingplan/destroy/destroy.go\n   - Set Deprecated: use rudder-cli destroy instead. This command will be removed in a future release.\n   - Replace RunE body with return nil\n   - Remove all unused imports and flag definitions\n\n4. cli/internal/cmd/trackingplan/trackingplan.go\n   - Set Deprecated: all tp subcommands have been replaced by top-level commands (apply, validate, destroy). This command group will be removed in a future release.\n   - Update Short to: [Deprecated] Manage datacatalog resources\n   - Remove Example heredoc (references deprecated subcommands)\n   - Remove heredoc import if no longer used\n\n## Verification Steps\n\nAfter making changes:\n1. Run make lint - ensure no unused imports or variables\n2. Run make test - ensure no test breakages",
+  "branch": "feat/dex-297-handle-deprecation-1r5y3u7nv3",
+  "worktree_path": "/workspace",
+  "files_changed": [
+    "cli/internal/cmd/trackingplan/apply/apply.go",
+    "cli/internal/cmd/trackingplan/validate/validate.go",
+    "cli/internal/cmd/trackingplan/destroy/destroy.go",
+    "cli/internal/cmd/trackingplan/trackingplan.go",
+    ".sandbox-status.json"
+  ],
+  "summary": "Deprecated tp apply, tp validate, tp destroy, and the parent tp command using Cobra's Deprecated field, replacing each RunE with a no-op and removing all unused imports and flag definitions. Lint passes with 0 issues.",
+  "status": "success",
+  "error": ""
+}
