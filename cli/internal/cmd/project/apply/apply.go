@@ -5,12 +5,15 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -76,6 +79,8 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
+			printWorkspaceBanner(workspace)
+
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
 			if err != nil {
@@ -119,4 +124,16 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 
 	return cmd
+}
+
+func printWorkspaceBanner(workspace *client.Workspace) {
+	cols := []table.Column{
+		{Title: "Field", Width: 20},
+		{Title: "Value", Width: 80},
+	}
+	rows := []table.Row{
+		{"WorkspaceID", workspace.ID},
+		{"Name", workspace.Name},
+	}
+	ui.PrintTable(cols, rows)
 }
