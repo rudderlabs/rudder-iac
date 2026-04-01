@@ -24,11 +24,11 @@ func TestPlanReporter(t *testing.T) {
 	)
 
 	diff := &differ.Diff{
-		ImportableResources: []string{"importable.resource1", "importable.resource2"},
-		NewResources:        []string{"new.resource1"},
+		ImportableResources: []string{"resource_type:resource1", "resource_type:resource2"},
+		NewResources:        []string{"resource_type:resource3"},
 		UpdatedResources: map[string]differ.ResourceDiff{
-			"updated.resource1": {
-				URN: "updated.resource1",
+			"resource_type:resource4": {
+				URN: "resource_type:resource4",
 				Diffs: map[string]differ.PropertyDiff{
 					"name": {
 						Property:    "name",
@@ -67,8 +67,8 @@ func TestPlanReporter(t *testing.T) {
 					},
 				},
 			},
-			"updated.resource2": {
-				URN: "updated.resource2",
+			"resource_type:resource5": {
+				URN: "resource_type:resource5",
 				Diffs: map[string]differ.PropertyDiff{
 					"items": {
 						Property:    "items",
@@ -78,20 +78,20 @@ func TestPlanReporter(t *testing.T) {
 				},
 			},
 		},
-		RemovedResources: []string{"removed.resource1"},
+		RemovedResources: []string{"resource_type:resource6"},
 	}
 
 	r.ReportPlan(&planner.Plan{Diff: diff})
 
 	expectedOutput := "Importable resources:\n" +
-		"  - importable.resource1\n" +
-		"  - importable.resource2\n" +
+		"  - resource_type:resource1\n" +
+		"  - resource_type:resource2\n" +
 		"\n" +
 		"New resources:\n" +
-		"  - new.resource1\n" +
+		"  - resource_type:resource3\n" +
 		"\n" +
 		"Updated resources:\n" +
-		"  - updated.resource1\n" +
+		"  - resource_type:resource4\n" +
 		"    - complex: map[a:1 b:2] => map[a:1 b:3]\n" +
 		"    - name: old-name => new-name\n" +
 		"    - ref_ptr_changed: " + oldRefURN + " => " + newRefURN + "\n" +
@@ -99,11 +99,11 @@ func TestPlanReporter(t *testing.T) {
 		"    - ref_ptr_nil_target: " + oldRefURN + " => <nil>\n" +
 		"    - ref_val_changed: " + oldRefURN + " => " + newRefURN + "\n" +
 		"    - size: 10 => 20\n" +
-		"  - updated.resource2\n" +
+		"  - resource_type:resource5\n" +
 		"    - items: [1 2 3] => [1 5 3]\n" +
 		"\n" +
 		"Removed resources:\n" +
-		"  - removed.resource1\n" +
+		"  - resource_type:resource6\n" +
 		"\n"
 
 	assert.Equal(t, expectedOutput, buf.String())
@@ -119,8 +119,8 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 
 	diff := &differ.Diff{
 		UpdatedResources: map[string]differ.ResourceDiff{
-			"resource.with_nested_maps": {
-				URN: "resource.with_nested_maps",
+			"resource_type:with_nested_maps": {
+				URN: "resource_type:with_nested_maps",
 				Diffs: map[string]differ.PropertyDiff{
 					"name": {
 						Property:    "name",
@@ -139,8 +139,8 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 					},
 				},
 			},
-			"resource.with_arrays": {
-				URN: "resource.with_arrays",
+			"resource_type:with_arrays": {
+				URN: "resource_type:with_arrays",
 				Diffs: map[string]differ.PropertyDiff{
 					"items": {
 						Property:    "items",
@@ -149,8 +149,8 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 					},
 				},
 			},
-			"resource.with_mixed_structures": {
-				URN: "resource.with_mixed_structures",
+			"resource_type:with_mixed_structures": {
+				URN: "resource_type:with_mixed_structures",
 				Diffs: map[string]differ.PropertyDiff{
 					"config": {
 						Property: "config",
@@ -169,8 +169,8 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 					},
 				},
 			},
-			"resource.with_property_refs": {
-				URN: "resource.with_property_refs",
+			"resource_type:with_property_refs": {
+				URN: "resource_type:with_property_refs",
 				Diffs: map[string]differ.PropertyDiff{
 					"properties": {
 						Property: "properties",
@@ -212,15 +212,15 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 	r.ReportPlan(&planner.Plan{Diff: diff})
 
 	expectedOutput := `Updated resources:
-  - resource.with_arrays
+  - resource_type:with_arrays
     - items[1]: 2 => 5
-  - resource.with_mixed_structures
+  - resource_type:with_mixed_structures
     - config.servers[1].port: 443 => 8443
-  - resource.with_nested_maps
+  - resource_type:with_nested_maps
     - complex.b: 2 => 3
     - name: old-name => new-name
     - size: 10 => 20
-  - resource.with_property_refs
+  - resource_type:with_property_refs
     - properties[0].id: property:slotPosition => property:slotType
     - properties[0].localId: slotPosition => slotType
     - properties[0].required: false => true

@@ -72,6 +72,14 @@ func TestComputeNestedDiffs_Maps(t *testing.T) {
 			expected: map[string]ValuePair{},
 		},
 		{
+			name:   "key containing dot is quoted",
+			source: map[string]any{"config": map[string]any{"uni.host": "old.example.com"}},
+			target: map[string]any{"config": map[string]any{"uni.host": "new.example.com"}},
+			expected: map[string]ValuePair{
+				"config.\"uni.host\"": {Source: "old.example.com", Target: "new.example.com"},
+			},
+		},
+		{
 			name:   "property refs (pointers)",
 			source: map[string]any{"a": mockPropertRef1, "b": 2},
 			target: map[string]any{"a": mockPropertRef2, "b": 2},

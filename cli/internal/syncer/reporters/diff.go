@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // ValuePair holds a source/target value pair for diff comparison
@@ -162,8 +163,13 @@ func flattenSliceDiffs(basePath string, sourceSlice, targetSlice []any) map[stri
 	return result
 }
 
-// buildPath constructs a dot-notation path for map keys
+// buildPath constructs a dot-notation path for map keys.
+// Keys containing dots are quoted to avoid ambiguity with path separators.
 func buildPath(basePath, key string) string {
+	// if key contains a dot, quote it to avoid ambiguity
+	if strings.Contains(key, ".") {
+		key = "\"" + key + "\""
+	}
 	if basePath == "" {
 		return key
 	}
