@@ -1,0 +1,11 @@
+{
+  "id": "38eVmNAv8dGCx47neNzLYpLHtIW",
+  "versionId": "38eVmLKvFwSFCT54md9M7Mgg3OC",
+  "name": "Error Library",
+  "description": "Library that throws at runtime",
+  "code": "export function riskyOperation() {\n  throw new Error(\"intentional error\");\n}\n",
+  "language": "javascript",
+  "importName": "errorLibrary",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "externalId": "error_library"
+}

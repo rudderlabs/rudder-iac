@@ -1,0 +1,11 @@
+{
+  "id": "38eVnPk8eJQ5KzBdpxqmLktmPxf",
+  "versionId": "38eVnPaJczotllUFYid6emypNbC",
+  "name": "Bad Py Library",
+  "description": "Python library with syntax error",
+  "code": "def broken_function(\n  return \"this has a syntax error\"\n",
+  "language": "python",
+  "importName": "badPyLibrary",
+  "workspaceId": "2tFmsZb34zJSV7lgmI7bt3NJDRD",
+  "externalId": "bad_py_library"
+}

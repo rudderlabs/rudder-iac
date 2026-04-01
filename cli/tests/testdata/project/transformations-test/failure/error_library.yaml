@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: test_libraries
+spec:
+  id: error_library
+  name: Error Library
+  description: Library that throws at runtime
+  language: javascript
+  import_name: errorLibrary
+  code: |
+    export function riskyOperation() {
+      throw new Error("intentional error");
+    }

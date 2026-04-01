@@ -1,0 +1,22 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: test_libraries
+spec:
+  id: utils_library
+  name: Utils Library
+  description: Utility functions for transformations
+  language: javascript
+  import_name: utilsLibrary
+  code: |
+    export function greet(name) {
+      return "Hello, " + name + "!";
+    }
+
+    export function toUpperCase(str) {
+      return str.toUpperCase();
+    }
+
+    export function toLowerCase(str) {
+      return str.toLowerCase();
+    }
