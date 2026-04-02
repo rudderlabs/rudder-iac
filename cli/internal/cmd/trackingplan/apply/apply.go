@@ -1,6 +1,8 @@
 package apply
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,7 +12,7 @@ func NewCmdTPApply() *cobra.Command {
 		Short:      "Apply the changes to upstream catalog",
 		Deprecated: "use rudder-cli apply instead. This command will be removed in a future release.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return errors.New("tp apply is deprecated: use rudder-cli apply instead")
 		},
 	}
 

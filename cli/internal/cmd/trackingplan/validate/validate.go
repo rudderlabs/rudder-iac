@@ -1,6 +1,8 @@
 package validate
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,7 +12,7 @@ func NewCmdTPValidate() *cobra.Command {
 		Short:      "Validate locally defined catalog",
 		Deprecated: "use rudder-cli validate instead. This command will be removed in a future release.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return errors.New("tp validate is deprecated: use rudder-cli validate instead")
 		},
 	}
 
