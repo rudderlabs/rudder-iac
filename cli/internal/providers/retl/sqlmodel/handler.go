@@ -116,7 +116,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	}
 
 	// Create resource with SQL directly from spec
-	h.resources[spec.ID] = &SQLModelResource{
+	res := &SQLModelResource{
 		ID:               spec.ID,
 		DisplayName:      spec.DisplayName,
 		Description:      spec.Description,
@@ -127,6 +127,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		SQL:              sqlStr,
 	}
 
+	h.resources[spec.ID] = res
 	return h.loadImportMetadata(s)
 }
 
@@ -156,16 +157,6 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 		}
 	}
 
-	return nil
-}
-
-// Validate validates all loaded SQL Model specs
-func (h *Handler) Validate() error {
-	for _, spec := range h.resources {
-		if err := ValidateSQLModelResource(spec); err != nil {
-			return fmt.Errorf("validating sql model spec: %w", err)
-		}
-	}
 	return nil
 }
 

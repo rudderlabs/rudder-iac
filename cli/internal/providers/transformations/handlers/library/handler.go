@@ -18,7 +18,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 type LibraryHandler = handler.BaseHandler[
@@ -55,28 +54,6 @@ func (h *HandlerImpl) NewSpec() *model.LibrarySpec {
 	return &model.LibrarySpec{}
 }
 
-func (h *HandlerImpl) ValidateSpec(spec *model.LibrarySpec) error {
-	if spec.ID == "" {
-		return fmt.Errorf("id is required")
-	}
-	if spec.Name == "" {
-		return fmt.Errorf("name is required")
-	}
-	if spec.ImportName == "" {
-		return fmt.Errorf("import_name is required")
-	}
-	if spec.Code != "" && spec.File != "" {
-		return fmt.Errorf("code and file are mutually exclusive")
-	}
-	if spec.Code == "" && spec.File == "" {
-		return fmt.Errorf("either code or file must be specified")
-	}
-	if spec.Language == "" {
-		return fmt.Errorf("language is required")
-	}
-	return nil
-}
-
 func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.LibrarySpec) (map[string]*model.LibraryResource, error) {
 	resource := &model.LibraryResource{
 		ID:          spec.ID,
@@ -103,35 +80,17 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.LibraryS
 		resource.Code = spec.Code
 	}
 
+	codeParser, err := parser.NewParser(resource.Language)
+	if err != nil {
+		return nil, fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
+	}
+	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
+		return nil, fmt.Errorf("validating code syntax: %w", err)
+	}
+
 	return map[string]*model.LibraryResource{
 		spec.ID: resource,
 	}, nil
-}
-
-func (h *HandlerImpl) ValidateResource(resource *model.LibraryResource, graph *resources.Graph) error {
-	expectedImportName := lo.CamelCase(resource.Name)
-	if resource.ImportName != expectedImportName {
-		return fmt.Errorf("import_name must be camelCase of name: expected '%s', got '%s'", expectedImportName, resource.ImportName)
-	}
-
-	if resource.Language != handlers.JavaScript && resource.Language != handlers.Python {
-		return fmt.Errorf("language must be %s or %s, got: %s", handlers.JavaScript, handlers.Python, resource.Language)
-	}
-
-	if resource.Code == "" {
-		return fmt.Errorf("code is required")
-	}
-	// Validate code syntax
-	codeParser, err := parser.NewParser(resource.Language)
-	if err != nil {
-		return fmt.Errorf("creating parser for language %s: %w", resource.Language, err)
-	}
-
-	if err := codeParser.ValidateSyntax(resource.Code); err != nil {
-		return fmt.Errorf("validating code syntax: %w", err)
-	}
-
-	return nil
 }
 
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteLibrary, error) {

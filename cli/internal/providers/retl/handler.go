@@ -24,11 +24,6 @@ type resourceHandler interface {
 	// the parsed spec data. Returns an error if the spec is invalid or cannot be loaded.
 	LoadSpec(path string, s *specs.Spec) error
 
-	// Validate performs validation of all loaded specs for this resource type.
-	// This is called after all specs are loaded to ensure consistency and
-	// validate cross-references between resources.
-	Validate() error
-
 	// GetResources returns all resources managed by this handler.
 	// The returned resources will be added to the resource graph for
 	// dependency resolution and state management.

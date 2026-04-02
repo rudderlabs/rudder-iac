@@ -813,20 +813,6 @@ func TestLoadRemoteResourcesWithPagination(t *testing.T) {
 }
 
 // ============================================================================
-// Spec Validation Tests (ValidateSpec should error)
-// ============================================================================
-
-func TestValidateSpec(t *testing.T) {
-	mockClient := &testutils.MockDataGraphClient{}
-	h := &HandlerImpl{client: mockClient}
-
-	spec := &struct{}{}
-	err := h.ValidateSpec(spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "relationship handler does not support standalone specs")
-}
-
-// ============================================================================
 // ExtractResourcesFromSpec Tests (should error)
 // ============================================================================
 

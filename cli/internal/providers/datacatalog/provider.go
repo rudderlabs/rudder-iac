@@ -21,7 +21,6 @@ import (
 	trackingplanRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/trackingplan"
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/validate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -111,19 +110,6 @@ func (p *Provider) SupportedTypes() []string {
 
 func (p *Provider) GetLocalCatalog() *localcatalog.DataCatalog {
 	return p.dc
-}
-
-// Validate validates the provider's data catalog.
-// The method accepts a *resources.Graph but currently ignores it and validates directly from the catalog
-// (same behavior as earlier); future implementations may validate against the graph.
-func (p *Provider) Validate(_ *resources.Graph) error {
-	err := validate.ValidateCatalog(p.dc)
-	if err == nil {
-		log.Info("successfully validated the catalog")
-		return nil
-	}
-
-	return fmt.Errorf("catalog is invalid: %s", err.Error())
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {

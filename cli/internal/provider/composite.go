@@ -72,15 +72,6 @@ func (p *CompositeProvider) SupportedTypes() []string {
 	return maps.Keys(p.registeredTypes)
 }
 
-func (p *CompositeProvider) Validate(graph *resources.Graph) error {
-	for _, provider := range p.Providers {
-		if err := provider.Validate(graph); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (p *CompositeProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	provider, err := p.providerForKind(s.Kind)
 	if err != nil {

@@ -17,7 +17,6 @@ type Handler interface {
 	ResourceType() string
 	SpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
-	Validate(graph *resources.Graph) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	Resources() ([]*resources.Resource, error)
 	Create(ctx context.Context, data any) (any, error)
@@ -121,15 +120,6 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
 	// fallback to LoadSpec for now till we implement legacy spec loading for all providers
 	return p.LoadSpec(path, s)
-}
-
-func (p *BaseProvider) Validate(graph *resources.Graph) error {
-	for resourceType, handler := range p.handlers {
-		if err := handler.Validate(graph); err != nil {
-			return fmt.Errorf("validating %s: %w", resourceType, err)
-		}
-	}
-	return nil
 }
 
 func (p *BaseProvider) ResourceGraph() (*resources.Graph, error) {
