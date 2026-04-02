@@ -68,9 +68,8 @@ func (g *Generator) Generate(p *plan.TrackingPlan, opts core.GenerateOptions, pl
 
 func formatEventContext(meta plan.PlanMetadata, version string) map[string]string {
 	return map[string]string{
-		"sdk":                 `"rudder-sdk-swift"`,
-		"language":            `"swift"`,
-		"rudderTyperVersion":  fmt.Sprintf("%q", version),
+		"platform":            fmt.Sprintf("%q", Platform),
+		"rudderCLIVersion":    fmt.Sprintf("%q", version),
 		"trackingPlanId":      fmt.Sprintf("%q", meta.TrackingPlanID),
 		"trackingPlanVersion": fmt.Sprintf("%d", meta.TrackingPlanVersion),
 	}
@@ -83,23 +82,23 @@ func swiftCollisionHandler(name string, existing []string) string {
 // ========== Naming Helpers ==========
 
 func getOrRegisterCustomTypeName(ct *plan.CustomType, nr *core.NameRegistry) (string, error) {
-	name := FormatTypeName("CustomType " + ct.Name)
+	name := FormatTypeName("CustomType", ct.Name)
 	return nr.RegisterName("customtype:"+ct.Name, globalTypeScope, name)
 }
 
 func getOrRegisterPropertyTypeName(p *plan.Property, nr *core.NameRegistry) (string, error) {
-	name := FormatTypeName("Property " + p.Name)
+	name := FormatTypeName("Property", p.Name)
 	return nr.RegisterName("property:"+p.Name, globalTypeScope, name)
 }
 
 func getOrRegisterPropertyArrayItemTypeName(p *plan.Property, nr *core.NameRegistry) (string, error) {
-	name := FormatTypeName("Property " + p.Name + " Item")
+	name := FormatTypeName("Property", p.Name+" Item")
 	return nr.RegisterName("property:item:"+p.Name, globalTypeScope, name)
 }
 
 func getOrRegisterPropertyFieldName(structName, propName string, nr *core.NameRegistry) (string, error) {
 	scope := fmt.Sprintf("struct:%s:fields", structName)
-	name := formatPropertyName(propName)
+	name := FormatPropertyName(propName)
 	return nr.RegisterName(propName, scope, name)
 }
 
@@ -119,7 +118,7 @@ func formatEnumValue(value any) string {
 
 func getOrRegisterEnumCaseName(enumName string, value any, nr *core.NameRegistry) (string, error) {
 	scope := fmt.Sprintf("enum:%s", enumName)
-	formatted := formatEnumCaseName(formatEnumValue(value))
+	formatted := FormatEnumCaseName(formatEnumValue(value))
 	if formatted == "" {
 		formatted = "_"
 	}
@@ -160,7 +159,7 @@ func getOrRegisterEventStructName(rule *plan.EventRule, nr *core.NameRegistry) (
 		return "", fmt.Errorf("unsupported section: %s", rule.Section)
 	}
 
-	name := FormatTypeName(prefix + " " + rule.Event.Name + " " + suffix)
+	name := FormatTypeName(prefix, rule.Event.Name+" "+suffix)
 	key := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
 	return nr.RegisterName(key, globalTypeScope, name)
 }
@@ -170,11 +169,11 @@ func getOrRegisterEventMethodName(rule *plan.EventRule, nr *core.NameRegistry) (
 
 	switch rule.Event.EventType {
 	case plan.EventTypeTrack:
-		methodName = formatMethodName("track " + rule.Event.Name)
+		methodName = FormatMethodName("track", rule.Event.Name)
 	case plan.EventTypeIdentify:
 		methodName = "identify"
 	case plan.EventTypeScreen:
-		methodName = formatMethodName("screen " + rule.Event.Name)
+		methodName = FormatMethodName("screen", rule.Event.Name)
 	case plan.EventTypeGroup:
 		methodName = "group"
 	default:
@@ -658,7 +657,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 		if structLabel == "" {
 			structLabel = fmt.Sprintf("%v", vc.Match[0])
 		}
-		payloadName := FormatTypeName("Case " + structLabel)
+		payloadName := FormatTypeName("Case", structLabel)
 
 		merged := mergeSchemas(baseSchema, &vc.Schema)
 		s, err := createSwiftStruct(payloadName, vc.Description, "toProperties", merged, nr, typeSerializeSuffix)
@@ -676,7 +675,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 					// Enum-typed discriminators serialize via .rawValue, so the constant
 					// must use enum case syntax (.post) rather than a string literal ("POST").
 					if strings.HasSuffix(prop.SerializeExpr, ".rawValue") {
-						prop.ConstantValue = "." + formatEnumCaseName(matchStr)
+						prop.ConstantValue = "." + FormatEnumCaseName(matchStr)
 					} else {
 						prop.ConstantValue = FormatSwiftLiteral(vc.Match[0])
 					}
@@ -688,7 +687,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 
 		// One enum case per match value, all pointing to the shared struct.
 		for _, matchValue := range vc.Match {
-			caseName := formatPropertyName(fmt.Sprintf("case %v", matchValue))
+			caseName := FormatPropertyName(fmt.Sprintf("case %v", matchValue))
 			cases = append(cases, SwiftVariantCase{
 				Name:               caseName,
 				Comment:            vc.Description,
@@ -774,7 +773,7 @@ func createSwiftStruct(name, comment, serializeMethod string, schema *plan.Objec
 
 		if propSchema.Schema != nil && len(propSchema.Schema.Properties) > 0 {
 			// Nested object → nested struct (always uses toProperties)
-			nestedName := FormatTypeName(propName)
+			nestedName := FormatTypeName("", propName)
 			nestedStruct, err := createSwiftStruct(nestedName, propSchema.Property.Description, "toProperties", propSchema.Schema, nr, typeSerializeSuffix)
 			if err != nil {
 				return nil, err
@@ -1047,6 +1046,7 @@ func sectionToSerializeMethod(section plan.IdentitySection) string {
 
 func isSupportedEventType(eventType plan.EventType) bool {
 	switch eventType {
+	// Page is intentionally excluded: the RudderStack Swift SDK does not expose a page() API.
 	case plan.EventTypeTrack, plan.EventTypeIdentify, plan.EventTypeScreen, plan.EventTypeGroup:
 		return true
 	}

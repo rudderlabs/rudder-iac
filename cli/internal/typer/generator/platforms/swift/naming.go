@@ -34,10 +34,15 @@ func tokenize(s string) []string {
 	return tokens
 }
 
-// FormatTypeName converts a string to PascalCase for use as a Swift type name.
-// e.g. "user signed up" → "UserSignedUp"
-func FormatTypeName(s string) string {
-	tokens := tokenize(s)
+// FormatTypeName converts prefix and name to PascalCase for use as a Swift type name.
+// e.g. ("Track", "User Signed Up") → "TrackUserSignedUp"
+// prefix may be empty when no prefix is needed.
+func FormatTypeName(prefix, name string) string {
+	combined := name
+	if prefix != "" {
+		combined = prefix + " " + name
+	}
+	tokens := tokenize(combined)
 	var b strings.Builder
 	for _, t := range tokens {
 		r := []rune(t)
@@ -50,9 +55,9 @@ func FormatTypeName(s string) string {
 	return b.String()
 }
 
-// formatPropertyName converts a string to camelCase for Swift property/variable names.
+// FormatPropertyName converts a string to camelCase for Swift property/variable names.
 // e.g. "device_type" → "deviceType"
-func formatPropertyName(s string) string {
+func FormatPropertyName(s string) string {
 	tokens := tokenize(s)
 	if len(tokens) == 0 {
 		return s
@@ -77,20 +82,25 @@ func formatPropertyName(s string) string {
 	return name
 }
 
-// formatMethodName converts a string to camelCase for Swift method names.
-// e.g. "Track User Signed Up" → "trackUserSignedUp"
-func formatMethodName(s string) string {
-	return formatPropertyName(s)
+// FormatMethodName converts prefix and name to camelCase for Swift method names.
+// e.g. ("track", "User Signed Up") → "trackUserSignedUp"
+// prefix may be empty when no prefix is needed.
+func FormatMethodName(prefix, name string) string {
+	combined := name
+	if prefix != "" {
+		combined = prefix + " " + name
+	}
+	return FormatPropertyName(combined)
 }
 
-// formatEnumCaseName converts a value to a valid Swift enum case name.
+// FormatEnumCaseName converts a value to a valid Swift enum case name.
 // Numeric values get an "n" prefix. Reserved words get backtick escaping.
 // Strings that tokenize to nothing (pure emoji/symbols) are encoded as Unicode codepoints.
 // e.g. "GET" → "get", 200 → "n200", "1.5" → "n15", "🎯" → "u1F3AF"
-func formatEnumCaseName(s string) string {
-	name := formatPropertyName(s)
+func FormatEnumCaseName(s string) string {
+	name := FormatPropertyName(s)
 
-	// If tokenize yielded nothing (pure emoji/symbols), formatPropertyName returns
+	// If tokenize yielded nothing (pure emoji/symbols), FormatPropertyName returns
 	// s unchanged and the result is not a valid identifier. Encode as codepoints.
 	if len(tokenize(s)) == 0 {
 		name = unicodeEscape(s)

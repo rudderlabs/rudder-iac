@@ -1337,9 +1337,8 @@ public class RudderTyperAnalytics {
     private func withRudderTyperContext(options: RudderOption?, contextTraits: [String: Any]? = nil) -> RudderOption {
         var rudderTyperContext: [String: Any] = [
             "ruddertyper": [
-                "language": "swift",
-                "rudderTyperVersion": "1.0.0",
-                "sdk": "rudder-sdk-swift",
+                "platform": "swift",
+                "rudderCLIVersion": "1.0.0",
                 "trackingPlanId": "plan_12345",
                 "trackingPlanVersion": 13,
             ] as [String: Any]
