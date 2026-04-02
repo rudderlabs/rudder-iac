@@ -1,0 +1,5 @@
+{{- if .Comment }}
+/// {{ escapeComment .Comment }}
+{{- end }}
+public typealias {{ .Alias }} = {{ .Type }}
+{{- "" -}}
