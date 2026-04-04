@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
@@ -55,8 +56,8 @@ type Planner struct {
 func NewPlanner(graph *resources.Graph) *Planner {
 	return &Planner{
 		graph:              graph,
-		transformationType: "transformation",
-		libraryType:        "transformation-library",
+		transformationType: ttypes.TransformationResourceType,
+		libraryType:        ttypes.LibraryResourceType,
 	}
 }
 

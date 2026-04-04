@@ -17,6 +17,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	lrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/library"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -75,8 +76,8 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 // Transformations only support the V1 version; legacy versions are explicitly rejected.
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	var patterns []vrules.MatchPattern
-	patterns = append(patterns, prules.V1VersionPatterns("transformation")...)
-	patterns = append(patterns, prules.V1VersionPatterns("transformation-library")...)
+	patterns = append(patterns, prules.V1VersionPatterns(ttypes.TransformationResourceType)...)
+	patterns = append(patterns, prules.V1VersionPatterns(ttypes.LibraryResourceType)...)
 	return patterns
 }
 
