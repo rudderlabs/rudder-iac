@@ -5,8 +5,8 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
-	libraryhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -19,7 +19,7 @@ func validateLibrarySemanticValid(
 	spec specs.TransformationLibrarySpec,
 	graph *resources.Graph,
 ) []vrules.ValidationResult {
-	resource, exists := graph.GetResource(resources.URN(spec.ID, libraryhandler.HandlerMetadata.ResourceType))
+	resource, exists := graph.GetResource(resources.URN(spec.ID, ttypes.LibraryResourceType))
 	if !exists {
 		return []vrules.ValidationResult{{
 			Reference: "/id",
@@ -38,7 +38,7 @@ func validateLibrarySemanticValid(
 	var results []vrules.ValidationResult
 
 	importNameCounts := make(map[string]int)
-	for _, lib := range graph.ResourcesByType(libraryhandler.HandlerMetadata.ResourceType) {
+	for _, lib := range graph.ResourcesByType(ttypes.LibraryResourceType) {
 		libData := lib.RawData().(*model.LibraryResource)
 		importNameCounts[libData.ImportName]++
 	}
@@ -60,7 +60,7 @@ func NewLibrarySemanticValidRule() vrules.Rule {
 		"transformation library must be semantically valid",
 		vrules.Examples{},
 		rules.NewSemanticPatternValidator(
-			rules.V1VersionPatterns(libraryhandler.HandlerMetadata.SpecKind),
+			rules.V1VersionPatterns(ttypes.LibrarySpecKind),
 			validateLibrarySemanticValid,
 		),
 	)

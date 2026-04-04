@@ -16,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -37,9 +38,9 @@ type TransformationHandler = handler.BaseHandler[
 ]
 
 var HandlerMetadata = handler.HandlerMetadata{
-	ResourceType:     "transformation",
-	SpecKind:         "transformation",
-	SpecMetadataName: "transformations",
+	ResourceType:     ttypes.TransformationResourceType,
+	SpecKind:         ttypes.TransformationSpecKind,
+	SpecMetadataName: ttypes.TransformationMetadataName,
 }
 
 // HandlerImpl implements the HandlerImpl interface for transformation resources
