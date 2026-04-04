@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	transformationhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -196,7 +197,7 @@ func NewTransformationSpecSyntaxValidRule() rules.Rule {
 		"transformation spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPathAwarePatternValidator(
-			prules.V1VersionPatterns(transformationhandler.HandlerMetadata.SpecKind),
+			prules.V1VersionPatterns(ttypes.TransformationSpecKind),
 			validateTransformationSpec,
 		),
 	)

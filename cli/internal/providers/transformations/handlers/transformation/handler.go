@@ -39,8 +39,8 @@ type TransformationHandler = handler.BaseHandler[
 
 var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     ttypes.TransformationResourceType,
-	SpecKind:         ttypes.TransformationResourceType,
-	SpecMetadataName: "transformations",
+	SpecKind:         ttypes.TransformationSpecKind,
+	SpecMetadataName: ttypes.TransformationMetadataName,
 }
 
 // HandlerImpl implements the HandlerImpl interface for transformation resources

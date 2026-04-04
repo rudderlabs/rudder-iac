@@ -30,8 +30,8 @@ type LibraryHandler = handler.BaseHandler[
 
 var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     ttypes.LibraryResourceType,
-	SpecKind:         ttypes.LibraryResourceType,
-	SpecMetadataName: "transformation-libraries",
+	SpecKind:         ttypes.LibrarySpecKind,
+	SpecMetadataName: ttypes.LibraryMetadataName,
 }
 
 // HandlerImpl implements the HandlerImpl interface for library resources

@@ -2,5 +2,10 @@ package types
 
 const (
 	TransformationResourceType = "transformation"
-	LibraryResourceType        = "transformation-library"
+	TransformationSpecKind     = "transformation"
+	TransformationMetadataName = "transformations"
+
+	LibraryResourceType = "transformation-library"
+	LibrarySpecKind     = "transformation-library"
+	LibraryMetadataName = "transformation-libraries"
 )
