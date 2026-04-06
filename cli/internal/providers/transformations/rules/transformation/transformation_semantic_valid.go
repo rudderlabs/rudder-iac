@@ -5,10 +5,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
-	libraryhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
-	transformationhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -22,7 +21,7 @@ func validateTransformationSemanticValid(
 	spec specs.TransformationSpec,
 	graph *resources.Graph,
 ) []vrules.ValidationResult {
-	resource, exists := graph.GetResource(resources.URN(spec.ID, transformationhandler.HandlerMetadata.ResourceType))
+	resource, exists := graph.GetResource(resources.URN(spec.ID, ttypes.TransformationResourceType))
 	if !exists {
 		return []vrules.ValidationResult{{
 			Reference: "/id",
@@ -55,7 +54,7 @@ func validateTransformationSemanticValid(
 	}
 
 	availableHandles := make(map[string]struct{})
-	for _, libraryResource := range graph.ResourcesByType(libraryhandler.HandlerMetadata.ResourceType) {
+	for _, libraryResource := range graph.ResourcesByType(ttypes.LibraryResourceType) {
 		libraryData, ok := libraryResource.RawData().(*model.LibraryResource)
 		if !ok || libraryData.ImportName == "" {
 			continue
@@ -102,7 +101,7 @@ func NewTransformationSemanticValidRule() vrules.Rule {
 		"transformation imports must resolve to existing transformation libraries",
 		vrules.Examples{},
 		rules.NewSemanticPatternValidator(
-			rules.V1VersionPatterns(transformationhandler.HandlerMetadata.SpecKind),
+			rules.V1VersionPatterns(ttypes.TransformationSpecKind),
 			validateTransformationSemanticValid,
 		),
 	)

@@ -96,10 +96,10 @@ func TestResolveSpecRelativePath(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
-			name           string
-			specFilePath   string
-			targetPath     string
-			expectedError  string
+			name          string
+			specFilePath  string
+			targetPath    string
+			expectedError string
 		}{
 			{
 				name:          "absolute path",
