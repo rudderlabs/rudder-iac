@@ -10,9 +10,9 @@ func NewCmdTPValidate() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "validate",
 		Short:      "Validate locally defined catalog",
-		Deprecated: "use rudder-cli validate instead. This command will be removed in a future release.",
+		Deprecated: "use `rudder-cli validate` instead",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("tp validate is deprecated: use rudder-cli validate instead")
+			return errors.New("tp validate is deprecated: use `rudder-cli validate` instead")
 		},
 	}
 

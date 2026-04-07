@@ -14,7 +14,7 @@ func NewCmdTrackingPlan() *cobra.Command {
 		Use:        "tp <command>",
 		Short:      "[Deprecated] Manage datacatalog resources",
 		Long:       "Manage the lifecycle of datacatalog resources using user defined state",
-		Deprecated: "all tp subcommands have been replaced by top-level commands (apply, validate, destroy). This command group will be removed in a future release.",
+		Deprecated: "All tp subcommands have been replaced by top-level commands (apply, validate, destroy), this command group will be removed in a future release.",
 	}
 
 	cmd.AddCommand(tpValidateCmd.NewCmdTPValidate())
