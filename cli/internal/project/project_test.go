@@ -139,63 +139,34 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
 }
 
-func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
+func TestProject_LoadSpec_VersionRouting(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name                       string
 		specVersion                string
-		useV1SpecSupport           bool
 		expectError                bool
 		expectLoadSpecCalled       bool
 		expectLoadLegacySpecCalled bool
 		errorContains              string
 	}{
 		{
-			name:                       "rudder/v1 spec without v1 support - calls LoadSpec",
+			name:                       "rudder/v1 spec calls LoadSpec",
 			specVersion:                "rudder/v1",
-			useV1SpecSupport:           false,
 			expectError:                false,
 			expectLoadSpecCalled:       true,
 			expectLoadLegacySpecCalled: false,
 		},
 		{
-			name:                       "rudder/v1 spec with v1 support - calls LoadSpec",
-			specVersion:                "rudder/v1",
-			useV1SpecSupport:           true,
-			expectError:                false,
-			expectLoadSpecCalled:       true,
-			expectLoadLegacySpecCalled: false,
-		},
-		{
-			name:                       "rudder/0.1 spec without v1 support - calls LoadLegacySpec (backward compatible)",
+			name:                       "rudder/0.1 spec calls LoadLegacySpec",
 			specVersion:                "rudder/0.1",
-			useV1SpecSupport:           false,
 			expectError:                false,
 			expectLoadSpecCalled:       false,
 			expectLoadLegacySpecCalled: true,
 		},
 		{
-			name:                       "rudder/0.1 spec with v1 support - calls LoadLegacySpec (backward compatible)",
-			specVersion:                "rudder/0.1",
-			useV1SpecSupport:           true,
-			expectError:                false,
-			expectLoadSpecCalled:       false,
-			expectLoadLegacySpecCalled: true,
-		},
-		{
-			name:                       "unsupported version without v1 support - returns error",
+			name:                       "unsupported version returns error",
 			specVersion:                "rudder/v2.0",
-			useV1SpecSupport:           false,
-			expectError:                true,
-			expectLoadSpecCalled:       false,
-			expectLoadLegacySpecCalled: false,
-			errorContains:              "unsupported spec version: rudder/v2.0",
-		},
-		{
-			name:                       "unsupported version with v1 support - returns error",
-			specVersion:                "rudder/v2.0",
-			useV1SpecSupport:           true,
 			expectError:                true,
 			expectLoadSpecCalled:       false,
 			expectLoadLegacySpecCalled: false,
@@ -211,11 +182,7 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 			mockProvider := testutils.NewMockProvider(nil, nil)
 			mockLoader := &MockLoader{}
 
-			var opts []project.ProjectOption
-			opts = append(opts, project.WithLoader(mockLoader))
-			if tc.useV1SpecSupport {
-				opts = append(opts, project.WithV1SpecSupport())
-			}
+			opts := []project.ProjectOption{project.WithLoader(mockLoader)}
 
 			proj := project.New(mockProvider, opts...)
 

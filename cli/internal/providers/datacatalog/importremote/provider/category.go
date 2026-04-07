@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -29,18 +28,16 @@ var (
 )
 
 type CategoryImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *CategoryImportProvider {
 	return &CategoryImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, CategoriesRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, CategoriesRelativePath),
+		client:   client,
 	}
 }
 
@@ -102,10 +99,7 @@ func (p *CategoryImportProvider) idResources(
 		}
 
 		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, externalID)
-		if p.v1SpecSupport {
-			category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
-		}
+		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
 	}
 	return nil
 }
@@ -126,10 +120,7 @@ func (p *CategoryImportProvider) FormatForExport(
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedCategories := make([]map[string]any, 0)
 	for _, category := range categories {
@@ -147,15 +138,8 @@ func (p *CategoryImportProvider) FormatForExport(
 			RemoteID: category.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableCategory := &model.ImportableCategoryV1{}
-			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
-		} else {
-			importableCategory := &model.ImportableCategory{}
-			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
-		}
+		importableCategory := &model.ImportableCategoryV1{}
+		formatted, err := importableCategory.ForExport(category.ExternalID, data, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("formatting category: %w", err)
 		}

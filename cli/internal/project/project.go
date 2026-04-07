@@ -43,7 +43,6 @@ type project struct {
 	provider         ProjectProvider
 	loader           Loader
 	specs            map[string]*specs.Spec
-	loadV1Specs      bool
 	validationEngine validation.ValidationEngine
 	renderer         renderer.Renderer
 }
@@ -57,13 +56,6 @@ func WithLoader(l Loader) ProjectOption {
 		if l != nil {
 			p.loader = l
 		}
-	}
-}
-
-// WithV1SpecSupport enables loading v1 specs (rudder/v1).
-func WithV1SpecSupport() ProjectOption {
-	return func(p *project) {
-		p.loadV1Specs = true
 	}
 }
 

@@ -58,12 +58,11 @@ type Deps interface {
 	// used by components that operate across multiple providers.
 	CompositeProvider() provider.Provider
 
-	// NewProject creates a new project instance with the composite provider and wires
-	// experimental flags from config. This centralizes project configuration.
+	// NewProject creates a new project instance with the composite provider.
 	NewProject() project.Project
 
-	// NewDataCatalogProject creates a new project instance with only the DataCatalog provider
-	// and wires experimental flags. Used by trackingplan commands.
+	// NewDataCatalogProject creates a new project instance with only the DataCatalog provider.
+	// Used by trackingplan commands.
 	NewDataCatalogProject() project.Project
 }
 
@@ -183,30 +182,15 @@ func (d *deps) CompositeProvider() provider.Provider {
 	return d.compositeProvider
 }
 
-// NewProject creates a project with composite provider and wires experimental flags.
-// This centralizes project configuration so commands don't need to wire flags manually.
+// NewProject creates a project with composite provider.
 func (d *deps) NewProject() project.Project {
-	cfg := config.GetConfig()
-	opts := []project.ProjectOption{}
-
-	if cfg.ExperimentalFlags.V1SpecSupport {
-		opts = append(opts, project.WithV1SpecSupport())
-	}
-
-	return project.New(d.CompositeProvider(), opts...)
+	return project.New(d.CompositeProvider())
 }
 
 // NewDataCatalogProject creates a project with only the DataCatalog provider.
 // Used by trackingplan commands that only need data catalog functionality.
 func (d *deps) NewDataCatalogProject() project.Project {
-	cfg := config.GetConfig()
-	opts := []project.ProjectOption{}
-
-	if cfg.ExperimentalFlags.V1SpecSupport {
-		opts = append(opts, project.WithV1SpecSupport())
-	}
-
-	return project.New(d.Providers().DataCatalog, opts...)
+	return project.New(d.Providers().DataCatalog)
 }
 
 func GetVersion() string {

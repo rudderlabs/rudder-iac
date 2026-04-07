@@ -21,7 +21,6 @@ import (
 func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 	tests := []struct {
 		name                string
-		v1SpecSupport       bool // when true, pass WithV1SpecSupport() to match provider when experimental flag is on
 		setupImportable     func() *resources.RemoteResources
 		setupRemote         func() *resources.RemoteResources
 		setupGraph          func() *resources.Graph
@@ -29,194 +28,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 		expectedErrContains string
 	}{
 		{
-			name:          "source with tracking plan already managed by CLI",
-			v1SpecSupport: false,
-			setupImportable: func() *resources.RemoteResources {
-				importable := resources.NewRemoteResources()
-				importableSourceMap := map[string]*resources.RemoteResource{
-					"remote123": {
-						ID:         "remote123",
-						ExternalID: "test-source-1",
-						Reference:  "#/event-stream-source/event-stream-source/test-source-1",
-						Data: &sourceClient.EventStreamSource{
-							ID:          "remote123",
-							ExternalID:  "test-source-1",
-							Name:        "Test Source 1",
-							Type:        "javascript",
-							Enabled:     true,
-							WorkspaceID: "workspace-123",
-							TrackingPlan: &sourceClient.TrackingPlan{
-								ID: "remote-tp-456",
-								Config: &sourceClient.TrackingPlanConfig{
-									Track: &sourceClient.TrackConfig{
-										DropUnplannedEvents: boolPtr(true),
-										EventTypeConfig: &sourceClient.EventTypeConfig{
-											PropagateViolations: boolPtr(false),
-											DropOtherViolations: boolPtr(true),
-										},
-									},
-								},
-							},
-						},
-					},
-				}
-				importable.Set(source.ResourceType, importableSourceMap)
-				return importable
-			},
-			setupRemote: func() *resources.RemoteResources {
-				remote := resources.NewRemoteResources()
-				remoteTpMap := map[string]*resources.RemoteResource{
-					"remote-tp-456": {
-						ID:         "remote-tp-456",
-						ExternalID: "existing-tp-456",
-						Reference:  "#/tracking-plans/tracking-plan/existing-tp-456",
-					},
-				}
-				remote.Set(types.TrackingPlanResourceType, remoteTpMap)
-				return remote
-			},
-			setupGraph: func() *resources.Graph {
-				graph := resources.NewGraph()
-				tpResource := resources.NewResource(
-					"existing-tp-456",
-					types.TrackingPlanResourceType,
-					nil,
-					nil,
-					resources.WithResourceFileMetadata("#/tracking-plans/tracking-plan/existing-tp-456"),
-				)
-				graph.AddResource(tpResource)
-				return graph
-			},
-			expectedSpec: &specs.Spec{
-				Kind:    "event-stream-source",
-				Version: "rudder/v0.1",
-				Spec: map[string]any{
-					"id":      "test-source-1",
-					"name":    "Test Source 1",
-					"type":    "javascript",
-					"enabled": true,
-					"governance": map[string]any{
-						"validations": map[string]any{
-							"tracking_plan": "#/tracking-plans/tracking-plan/existing-tp-456",
-							"config": map[string]any{
-								"track": map[string]any{
-									"drop_unplanned_events": true,
-									"propagate_violations":  false,
-									"drop_other_violations": true,
-								},
-							},
-						},
-					},
-				},
-				Metadata: map[string]any{
-					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name:          "source with tracking plan being imported together",
-			v1SpecSupport: false,
-			setupImportable: func() *resources.RemoteResources {
-				importable := resources.NewRemoteResources()
-				importableSourceMap := map[string]*resources.RemoteResource{
-					"remote123": {
-						ID:         "remote123",
-						ExternalID: "test-source-1",
-						Reference:  "#/event-stream-source/event-stream-source/test-source-1",
-						Data: &sourceClient.EventStreamSource{
-							ID:          "remote123",
-							ExternalID:  "test-source-1",
-							Name:        "Test Source 1",
-							Type:        "javascript",
-							Enabled:     true,
-							WorkspaceID: "workspace-123",
-							TrackingPlan: &sourceClient.TrackingPlan{
-								ID: "remote-tp-456",
-								Config: &sourceClient.TrackingPlanConfig{
-									Track: &sourceClient.TrackConfig{
-										DropUnplannedEvents: boolPtr(false),
-										EventTypeConfig: &sourceClient.EventTypeConfig{
-											PropagateViolations: boolPtr(true),
-										},
-									},
-								},
-							},
-						},
-					},
-				}
-				importable.Set(source.ResourceType, importableSourceMap)
-
-				// Tracking plan is also in importable (being imported together)
-				importableTpMap := map[string]*resources.RemoteResource{
-					"remote-tp-456": {
-						ID:         "remote-tp-456",
-						ExternalID: "new-tp-456",
-						Reference:  "#/tracking-plans/tracking-plan/new-tp-456",
-					},
-				}
-				importable.Set(types.TrackingPlanResourceType, importableTpMap)
-				return importable
-			},
-			setupRemote: func() *resources.RemoteResources {
-				return resources.NewRemoteResources()
-			},
-			setupGraph: func() *resources.Graph {
-				return resources.NewGraph()
-			},
-			expectedSpec: &specs.Spec{
-				Kind:    "event-stream-source",
-				Version: "rudder/v0.1",
-				Spec: map[string]any{
-					"id":      "test-source-1",
-					"name":    "Test Source 1",
-					"type":    "javascript",
-					"enabled": true,
-					"governance": map[string]any{
-						"validations": map[string]any{
-							"tracking_plan": "#/tracking-plans/tracking-plan/new-tp-456",
-							"config": map[string]any{
-								"track": map[string]any{
-									"drop_unplanned_events": false,
-									"propagate_violations":  true,
-								},
-							},
-						},
-					},
-				},
-				Metadata: map[string]any{
-					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name:          "source with tracking plan already managed by CLI (v1 spec)",
-			v1SpecSupport: true,
+			name: "source with tracking plan already managed by CLI",
 			setupImportable: func() *resources.RemoteResources {
 				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
@@ -313,8 +125,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 			},
 		},
 		{
-			name:          "source with tracking plan being imported together (v1 spec)",
-			v1SpecSupport: true,
+			name: "source with tracking plan being imported together",
 			setupImportable: func() *resources.RemoteResources {
 				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
@@ -344,6 +155,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 					},
 				}
 				importable.Set(source.ResourceType, importableSourceMap)
+
 				importableTpMap := map[string]*resources.RemoteResource{
 					"remote-tp-456": {
 						ID:         "remote-tp-456",
@@ -399,64 +211,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 			},
 		},
 		{
-			name:          "source without tracking plan",
-			v1SpecSupport: false,
-			setupImportable: func() *resources.RemoteResources {
-				importable := resources.NewRemoteResources()
-				importableSourceMap := map[string]*resources.RemoteResource{
-					"remote123": {
-						ID:         "remote123",
-						ExternalID: "test-source-1",
-						Reference:  "#/event-stream-source/event-stream-source/test-source-1",
-						Data: &sourceClient.EventStreamSource{
-							ID:          "remote123",
-							ExternalID:  "test-source-1",
-							Name:        "Test Source 1",
-							Type:        "javascript",
-							Enabled:     true,
-							WorkspaceID: "workspace-123",
-						},
-					},
-				}
-				importable.Set(source.ResourceType, importableSourceMap)
-				return importable
-			},
-			setupRemote: func() *resources.RemoteResources {
-				return resources.NewRemoteResources()
-			},
-			setupGraph: func() *resources.Graph {
-				return resources.NewGraph()
-			},
-			expectedSpec: &specs.Spec{
-				Kind:    "event-stream-source",
-				Version: "rudder/v0.1",
-				Spec: map[string]any{
-					"id":      "test-source-1",
-					"name":    "Test Source 1",
-					"type":    "javascript",
-					"enabled": true,
-				},
-				Metadata: map[string]any{
-					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name:          "source without tracking plan (v1 spec)",
-			v1SpecSupport: true,
+			name: "source without tracking plan",
 			setupImportable: func() *resources.RemoteResources {
 				importable := resources.NewRemoteResources()
 				importableSourceMap := map[string]*resources.RemoteResource{
@@ -515,11 +270,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := source.NewMockSourceClient()
-			opts := []source.HandlerOption{}
-			if tt.v1SpecSupport {
-				opts = append(opts, source.WithV1SpecSupport())
-			}
-			handler := source.NewHandler(mockClient, importDir, opts...)
+			handler := source.NewHandler(mockClient, importDir)
 			importable := tt.setupImportable()
 			remote := tt.setupRemote()
 			graph := tt.setupGraph()

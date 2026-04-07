@@ -7,7 +7,6 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -44,11 +43,7 @@ func New(client retlClient.RETLStore) *Provider {
 	}
 
 	// Register handlers
-	options := []sqlmodel.HandlerOption{}
-	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-		options = append(options, sqlmodel.WithV1SpecSupport())
-	}
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir, options...)
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
 	return p
 }

@@ -19,33 +19,18 @@ import (
 
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
-	client        retlClient.RETLStore
-	resources     map[string]*SQLModelResource
-	importDir     string
-	v1SpecSupport bool
-}
-
-// HandlerOption configures a Handler (e.g. for tests).
-type HandlerOption func(*Handler)
-
-// WithV1SpecSupport sets the v1 spec support flag (used in tests to override config).
-func WithV1SpecSupport() HandlerOption {
-	return func(h *Handler) {
-		h.v1SpecSupport = true
-	}
+	client    retlClient.RETLStore
+	resources map[string]*SQLModelResource
+	importDir string
 }
 
 // NewHandler creates a new SQL Model resource handler
-func NewHandler(client retlClient.RETLStore, importDir string, options ...HandlerOption) *Handler {
-	h := &Handler{
+func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
+	return &Handler{
 		client:    client,
 		resources: make(map[string]*SQLModelResource),
 		importDir: filepath.Join(importDir, ImportPath),
 	}
-	for _, opt := range options {
-		opt(h)
-	}
-	return h
 }
 
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -505,13 +490,8 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			return nil, err
 		}
 
-		version := specs.SpecVersionV0_1Variant
-		if h.v1SpecSupport {
-			version = specs.SpecVersionV1
-		}
-
 		spec := &specs.Spec{
-			Version:  version,
+			Version:  specs.SpecVersionV1,
 			Kind:     ResourceKind,
 			Metadata: metadataMap,
 			Spec: map[string]interface{}{

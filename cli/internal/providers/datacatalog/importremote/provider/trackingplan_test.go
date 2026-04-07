@@ -60,7 +60,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "tp2"))
 	})
 
-	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and compact reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockTrackingPlanDataCatalog{
 			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
 				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
@@ -72,39 +72,6 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 			client:        mockClient,
 			log:           *logger.New("test"),
 			baseImportDir: "data-catalog",
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.Nil(t, err)
-
-		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
-		require.Equal(t, 2, len(trackingPlans))
-
-		tp1, ok := trackingPlans["tp1"]
-		require.True(t, ok)
-		assert.NotEmpty(t, tp1.ExternalID)
-		assert.Equal(t, tp1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, tp1.ExternalID, tp1.ExternalID))
-
-		tp2, ok := trackingPlans["tp2"]
-		require.True(t, ok)
-		assert.NotEmpty(t, tp2.ExternalID)
-		assert.Equal(t, tp2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, tp2.ExternalID, tp2.ExternalID))
-	})
-
-	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
-		mockClient := &mockTrackingPlanDataCatalog{
-			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "Mobile Tracking Plan", WorkspaceID: "ws1"}},
-				{TrackingPlan: catalog.TrackingPlan{ID: "tp2", Name: "Web Tracking Plan", WorkspaceID: "ws1"}},
-			},
-		}
-
-		provider := &TrackingPlanImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			baseImportDir: "data-catalog",
-			v1SpecSupport: true,
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
@@ -187,195 +154,19 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		spec, ok := entity.Content.(*specs.Spec)
 		require.True(t, ok)
 
-		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersionV0_1,
-			Kind:    "tp",
-			Metadata: map[string]any{
-				"name": "e-commerce-tracking",
-				"import": map[string]any{
-					"workspaces": []any{
-						map[string]any{
-							"workspace_id": "ws1",
-							"resources": []any{
-								map[string]any{
-									"urn":       "tracking-plan:e-commerce-tracking",
-									"remote_id": "tp1",
-								},
-							},
-						},
-					},
-				},
-			},
-			Spec: map[string]any{
-				"id":           "e-commerce-tracking",
-				"display_name": "E-commerce Tracking",
-				"rules": []any{
-					map[string]any{
-						"type": "event_rule",
-						"id":   "product-viewed-rule",
-						"event": map[string]any{
-							"$ref":             "#event:product-viewed",
-							"allow_unplanned":  false,
-							"identity_section": "properties",
-						},
-						"properties": []any{
-							map[string]any{
-								"$ref":     "#property:product-id",
-								"required": true,
-							},
-						},
-					},
-				},
-			},
-		}, spec)
-	})
-
-	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
-		mockResolver := &mockResolver{
-			references: map[string]map[string]string{
-				types.EventResourceType: {
-					"evt1": "#/events/default/product-viewed",
-				},
-				types.PropertyResourceType: {
-					"prop1": "#/properties/default/product-id",
-				},
-			},
-		}
-
-		mockClient := &mockTrackingPlanDataCatalog{
-			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{
-					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
-					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
-						{
-							ID:   "evt1",
-							Name: "Product Viewed",
-							Properties: []*catalog.TrackingPlanEventProperty{
-								{
-									ID:       "prop1",
-									Required: true,
-								},
-							},
-							AdditionalProperties: false,
-							IdentitySection:      "properties",
-						},
-					},
-				},
-			},
-		}
-
-		provider := &TrackingPlanImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			baseImportDir: "data-catalog",
-			v1SpecSupport: false,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.NoError(t, err)
-
-		result, err := provider.FormatForExport(
-			collection,
-			externalIdNamer,
-			mockResolver,
-		)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
-
-		spec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, "tp", spec.Kind)
-		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
-
-		rules, ok := spec.Spec["rules"].([]any)
-		require.True(t, ok)
-		require.Len(t, rules, 1)
-
-		rule, ok := rules[0].(map[string]any)
-		require.True(t, ok)
-		event, ok := rule["event"].(map[string]any)
-		require.True(t, ok)
-		assert.Contains(t, event["$ref"], "#/events/")
-
-		properties, ok := rule["properties"].([]any)
-		require.True(t, ok)
-		require.Len(t, properties, 1)
-		prop, ok := properties[0].(map[string]any)
-		require.True(t, ok)
-		assert.Contains(t, prop["$ref"], "#/properties/")
-	})
-
-	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
-		mockResolver := &mockResolver{
-			references: map[string]map[string]string{
-				types.EventResourceType: {
-					"evt1": "#event:product-viewed",
-				},
-				types.PropertyResourceType: {
-					"prop1": "#property:product-id",
-				},
-			},
-		}
-
-		mockClient := &mockTrackingPlanDataCatalog{
-			trackingPlans: []*catalog.TrackingPlanWithIdentifiers{
-				{
-					TrackingPlan: catalog.TrackingPlan{ID: "tp1", Name: "E-commerce Tracking", WorkspaceID: "ws1"},
-					Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
-						{
-							ID:   "evt1",
-							Name: "Product Viewed",
-							Properties: []*catalog.TrackingPlanEventProperty{
-								{
-									ID:       "prop1",
-									Required: true,
-								},
-							},
-							AdditionalProperties: false,
-							IdentitySection:      "properties",
-						},
-					},
-				},
-			},
-		}
-
-		provider := &TrackingPlanImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			baseImportDir: "data-catalog",
-			v1SpecSupport: true,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.NoError(t, err)
-
-		result, err := provider.FormatForExport(
-			collection,
-			externalIdNamer,
-			mockResolver,
-		)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
-
-		spec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, "tracking-plan", spec.Kind)
 		assert.Equal(t, specs.SpecVersionV1, spec.Version)
+		assert.Equal(t, localcatalog.KindTrackingPlansV1, spec.Kind)
+		assert.Equal(t, "e-commerce-tracking", spec.Metadata["name"])
 
 		rules, ok := spec.Spec["rules"].([]any)
 		require.True(t, ok)
 		require.Len(t, rules, 1)
-
 		rule, ok := rules[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "#event:product-viewed", rule["event"])
-
 		properties, ok := rule["properties"].([]any)
 		require.True(t, ok)
 		require.Len(t, properties, 1)
-
 		prop, ok := properties[0].(map[string]any)
 		require.True(t, ok)
 		assert.Contains(t, prop, "property")
@@ -463,89 +254,15 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 			}
 		}
 
-		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersionV0_1,
-			Kind:    "tp",
-			Metadata: map[string]any{
-				"name": "e-commerce-tracking",
-				"import": map[string]any{
-					"workspaces": []any{
-						map[string]any{
-							"workspace_id": "ws1",
-							"resources": []any{
-								map[string]any{
-									"urn":       "tracking-plan:e-commerce-tracking",
-									"remote_id": "tp1",
-								},
-							},
-						},
-					},
-				},
-			},
-			Spec: map[string]any{
-				"id":           "e-commerce-tracking",
-				"display_name": "E-commerce Tracking",
-				"rules": []any{
-					map[string]any{
-						"type": "event_rule",
-						"id":   "product-viewed-rule",
-						"event": map[string]any{
-							"$ref":             "#event:product-viewed",
-							"allow_unplanned":  false,
-							"identity_section": "properties",
-						},
-						"properties": []any{
-							map[string]any{
-								"$ref":     "#property:product-id",
-								"required": true,
-							},
-						},
-					},
-				},
-			},
-		}, ecommerceSpec)
+		require.NotNil(t, ecommerceSpec)
+		assert.Equal(t, specs.SpecVersionV1, ecommerceSpec.Version)
+		assert.Equal(t, localcatalog.KindTrackingPlansV1, ecommerceSpec.Kind)
+		assert.Equal(t, "e-commerce-tracking", ecommerceSpec.Metadata["name"])
 
-		assert.Equal(t, &specs.Spec{
-			Version: specs.SpecVersionV0_1,
-			Kind:    "tp",
-			Metadata: map[string]any{
-				"name": "user-analytics",
-				"import": map[string]any{
-					"workspaces": []any{
-						map[string]any{
-							"workspace_id": "ws2",
-							"resources": []any{
-								map[string]any{
-									"urn":       "tracking-plan:user-analytics",
-									"remote_id": "tp2",
-								},
-							},
-						},
-					},
-				},
-			},
-			Spec: map[string]any{
-				"id":           "user-analytics",
-				"display_name": "User Analytics",
-				"rules": []any{
-					map[string]any{
-						"type": "event_rule",
-						"id":   "user-signup-rule",
-						"event": map[string]any{
-							"$ref":             "#event:user-signup",
-							"allow_unplanned":  true,
-							"identity_section": "context",
-						},
-						"properties": []any{
-							map[string]any{
-								"$ref":     "#property:user-email",
-								"required": false,
-							},
-						},
-					},
-				},
-			},
-		}, userAnalyticsSpec)
+		require.NotNil(t, userAnalyticsSpec)
+		assert.Equal(t, specs.SpecVersionV1, userAnalyticsSpec.Version)
+		assert.Equal(t, localcatalog.KindTrackingPlansV1, userAnalyticsSpec.Kind)
+		assert.Equal(t, "user-analytics", userAnalyticsSpec.Metadata["name"])
 
 	})
 

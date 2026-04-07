@@ -14,7 +14,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -73,7 +72,7 @@ func TestLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "prop2"))
 	})
 
-	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and compact reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockDataCatalog{
 			properties: []*catalog.Property{
 				{ID: "prop1", Name: "User Email", Type: "string", WorkspaceId: "ws1"},
@@ -97,45 +96,12 @@ func TestLoadImportable(t *testing.T) {
 		prop1, ok := properties["prop1"]
 		require.True(t, ok)
 		assert.NotEmpty(t, prop1.ExternalID)
-		assert.Equal(t, prop1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, prop1.ExternalID))
-
-		prop2, ok := properties["prop2"]
-		require.True(t, ok)
-		assert.NotEmpty(t, prop2.ExternalID)
-		assert.Equal(t, prop2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, prop2.ExternalID))
-	})
-
-	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
-		mockClient := &mockDataCatalog{
-			properties: []*catalog.Property{
-				{ID: "prop1", Name: "User Email", Type: "string", WorkspaceId: "ws1"},
-				{ID: "prop2", Name: "User Age", Type: "number", WorkspaceId: "ws1"},
-			},
-		}
-
-		provider := &PropertyImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: true,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.Nil(t, err)
-
-		properties := collection.GetAll(types.PropertyResourceType)
-		require.Equal(t, 2, len(properties))
-
-		prop1, ok := properties["prop1"]
-		require.True(t, ok)
-		assert.NotEmpty(t, prop1.ExternalID)
 		assert.Equal(t, prop1.Reference, fmt.Sprintf("#%s:%s", types.PropertyResourceType, prop1.ExternalID))
 
 		prop2, ok := properties["prop2"]
 		require.True(t, ok)
 		assert.NotEmpty(t, prop2.ExternalID)
-		assert.NotEmpty(t, prop2.Reference)
+		assert.Equal(t, prop2.Reference, fmt.Sprintf("#%s:%s", types.PropertyResourceType, prop2.ExternalID))
 	})
 }
 
@@ -180,6 +146,7 @@ func TestFormatForExport(t *testing.T) {
 		spec, ok := entity.Content.(*specs.Spec)
 		require.True(t, ok)
 
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "properties", spec.Kind)
 		assert.Equal(t, "properties", spec.Metadata["name"])
 		assert.NotNil(t, spec.Metadata["import"])
@@ -189,7 +156,7 @@ func TestFormatForExport(t *testing.T) {
 		assert.Equal(t, 2, len(properties))
 	})
 
-	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+	t.Run("export uses rudder/v1 and v1 property config shape", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{},
 		}
@@ -209,57 +176,9 @@ func TestFormatForExport(t *testing.T) {
 		}
 
 		provider := &PropertyImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: false,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.NoError(t, err)
-
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
-
-		spec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
-
-		properties, ok := spec.Spec["properties"].([]map[string]any)
-		require.True(t, ok)
-		require.Len(t, properties, 1)
-
-		config, ok := properties[0]["propConfig"].(map[string]any)
-		require.True(t, ok)
-		assert.Contains(t, config, "minLength")
-	})
-
-	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
-		mockResolver := &mockResolver{
-			references: map[string]map[string]string{},
-		}
-
-		mockClient := &mockDataCatalog{
-			properties: []*catalog.Property{
-				{
-					ID:          "prop1",
-					Name:        "User Email",
-					Type:        "string",
-					WorkspaceId: "ws1",
-					Config: map[string]interface{}{
-						"minLength": float64(5),
-					},
-				},
-			},
-		}
-
-		provider := &PropertyImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: true,
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())

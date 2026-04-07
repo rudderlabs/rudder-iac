@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -55,11 +54,7 @@ func New(client esClient.EventStreamStore) *Provider {
 		},
 		handlers: make(map[string]handler),
 	}
-	options := []sourceHandler.HandlerOption{}
-	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-		options = append(options, sourceHandler.WithV1SpecSupport())
-	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir, options...)
+	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	return p
 }
 

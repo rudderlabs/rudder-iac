@@ -22,34 +22,19 @@ import (
 )
 
 type Handler struct {
-	resources     map[string]*sourceResource
-	seenIDs       []string
-	client        esClient.EventStreamStore
-	importDir     string
-	v1SpecSupport bool
+	resources map[string]*sourceResource
+	seenIDs   []string
+	client    esClient.EventStreamStore
+	importDir string
 }
 
-// HandlerOption configures a Handler (e.g. for tests).
-type HandlerOption func(*Handler)
-
-// WithV1SpecSupport sets the v1 spec support flag (used in tests to override config).
-func WithV1SpecSupport() HandlerOption {
-	return func(h *Handler) {
-		h.v1SpecSupport = true
-	}
-}
-
-func NewHandler(client esClient.EventStreamStore, importDir string, opts ...HandlerOption) *Handler {
-	h := &Handler{
+func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
+	return &Handler{
 		resources: make(map[string]*sourceResource),
 		seenIDs:   make([]string, 0),
 		client:    client,
 		importDir: filepath.Join(importDir, ImportPath),
 	}
-	for _, opt := range opts {
-		opt(h)
-	}
-	return h
 }
 
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -221,10 +206,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
 		}
-		ref := getFileMetadata(s.LocalID)
-		if h.v1SpecSupport {
-			ref = fmt.Sprintf("#%s:%s", ResourceType, s.LocalID)
-		}
+		ref := fmt.Sprintf("#%s:%s", ResourceType, s.LocalID)
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(ref),
 		}
@@ -577,10 +559,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
 		}
-		ref := getFileMetadata(externalID)
-		if h.v1SpecSupport {
-			ref = fmt.Sprintf("#%s:%s", ResourceType, externalID)
-		}
+		ref := fmt.Sprintf("#%s:%s", ResourceType, externalID)
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
@@ -680,12 +659,8 @@ func (p *Handler) toImportSpec(
 		}
 	}
 
-	version := specs.SpecVersionV0_1Variant
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
 	return &specs.Spec{
-		Version:  version,
+		Version:  specs.SpecVersionV1,
 		Kind:     ResourceKind,
 		Metadata: metadataMap,
 		Spec:     specMap,
@@ -984,12 +959,4 @@ func dropToAction(drop bool) trackingplanClient.Action {
 		return trackingplanClient.Drop
 	}
 	return trackingplanClient.Forward
-}
-
-func getFileMetadata(externalID string) string {
-	return fmt.Sprintf("#/%s/%s/%s",
-		ResourceKind,
-		MetadataName,
-		externalID,
-	)
 }
