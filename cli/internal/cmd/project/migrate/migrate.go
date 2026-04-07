@@ -5,8 +5,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/spf13/cobra"
 )
 
@@ -50,9 +52,18 @@ func NewCmdMigrate() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create migrator and run migration
+			defer func() {
+				telemetry.TrackCommand("migrate", err, []telemetry.KV{
+					{K: "location", V: location},
+					{K: "confirm", V: confirm},
+					{K: "from_version", V: specs.SpecVersionV0_1},
+					{K: "to_version", V: specs.SpecVersionV1},
+				}...)
+			}()
+
 			m := migrator.New(proj, deps.CompositeProvider())
-			return m.Migrate(confirm)
+			err = m.Migrate(confirm)
+			return err
 		},
 	}
 
