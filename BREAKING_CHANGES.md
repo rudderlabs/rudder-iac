@@ -8,6 +8,14 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 All changes below are part of the `rudder/v1` spec format rework.
 
+To migrate automatically, run:
+
+```bash
+rudder-cli migrate --location <path-to-project>
+```
+
+This rewrites spec files in place — commit or back up your project before running.
+
 ### 1. Version field
 
 **Scope:** spec
