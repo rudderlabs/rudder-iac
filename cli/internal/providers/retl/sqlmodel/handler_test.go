@@ -1635,14 +1635,14 @@ func TestSQLModelHandler(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, "rid-1", r1.ID)
 			assert.Equal(t, namer.NewKebabCase().Name("Orders Model"), r1.ExternalID)
-			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r1.ExternalID), r1.Reference)
+			assert.Equal(t, fmt.Sprintf("#%s:%s", sqlmodel.ResourceKind, r1.ExternalID), r1.Reference)
 
 			// Validate second resource mapping
 			r2, ok := items["rid-2"]
 			require.True(t, ok)
 			assert.Equal(t, "rid-2", r2.ID)
 			assert.Equal(t, namer.NewKebabCase().Name("Users Model"), r2.ExternalID)
-			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r2.ExternalID), r2.Reference)
+			assert.Equal(t, fmt.Sprintf("#%s:%s", sqlmodel.ResourceKind, r2.ExternalID), r2.Reference)
 		})
 
 		t.Run("Success with empty list", func(t *testing.T) {

@@ -444,11 +444,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 			ID:         source.ID,
 			ExternalID: externalID,
 			Data:       &source,
-			Reference: fmt.Sprintf("#/%s/%s/%s",
-				ResourceKind,
-				MetadataName,
-				externalID,
-			),
+			Reference:  fmt.Sprintf("#%s:%s", ResourceKind, externalID),
 		}
 	}
 	collection.Set(ResourceType, resourceMap)

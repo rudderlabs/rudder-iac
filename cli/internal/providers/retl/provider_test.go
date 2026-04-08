@@ -864,12 +864,12 @@ func TestProviderLoadImportable(t *testing.T) {
 		s1, ok := collection.GetByID(sqlmodel.ResourceType, "source-1")
 		require.True(t, ok)
 		assert.Equal(t, "orders-model", s1.ExternalID)
-		assert.Equal(t, "#/retl-source-sql-model/retl-source-sql-model/orders-model", s1.Reference)
+		assert.Equal(t, "#retl-source-sql-model:orders-model", s1.Reference)
 
 		s2, ok := collection.GetByID(sqlmodel.ResourceType, "source-2")
 		require.True(t, ok)
 		assert.Equal(t, "users-model", s2.ExternalID)
-		assert.Equal(t, "#/retl-source-sql-model/retl-source-sql-model/users-model", s2.Reference)
+		assert.Equal(t, "#retl-source-sql-model:users-model", s2.Reference)
 	})
 
 	t.Run("Handler error surfaces with context", func(t *testing.T) {
