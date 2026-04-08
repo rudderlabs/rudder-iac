@@ -344,7 +344,7 @@ func TestProvider(t *testing.T) {
 			assert.Equal(t, writer.FormattableEntity{
 				RelativePath: "local-id.yaml",
 				Content: &specs.Spec{
-					Version: "rudder/v0.1",
+					Version: "rudder/v1",
 					Kind:    "retl-source-sql-model",
 					Metadata: map[string]any{
 						"name": "local-id",

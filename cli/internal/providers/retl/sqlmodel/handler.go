@@ -363,7 +363,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 
 	// Create the spec with the imported data
 	spec := &specs.Spec{
-		Version:  specs.SpecVersionV0_1Variant,
+		Version:  specs.SpecVersionV1,
 		Kind:     ResourceType,
 		Metadata: metadataMap,
 		Spec:     importedData,
