@@ -53,12 +53,7 @@ func NewCmdMigrate() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer func() {
-				telemetry.TrackCommand("migrate", err, []telemetry.KV{
-					{K: "location", V: location},
-					{K: "confirm", V: confirm},
-					{K: "from_version", V: specs.SpecVersionV0_1},
-					{K: "to_version", V: specs.SpecVersionV1},
-				}...)
+				telemetry.TrackCommand("migrate", err, migrateTelemetryExtras(location, confirm)...)
 			}()
 
 			m := migrator.New(proj, deps.CompositeProvider())
@@ -71,4 +66,14 @@ func NewCmdMigrate() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
 
 	return cmd
+}
+
+// migrateTelemetryExtras returns TrackCommand key-values for migrate (fixed from/to spec versions for this path).
+func migrateTelemetryExtras(location string, confirm bool) []telemetry.KV {
+	return []telemetry.KV{
+		{K: "location", V: location},
+		{K: "confirm", V: confirm},
+		{K: "from_version", V: specs.SpecVersionV0_1},
+		{K: "to_version", V: specs.SpecVersionV1},
+	}
 }
