@@ -359,7 +359,7 @@ func TestProvider(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote456",
 			ExternalID: "test-source-2",
-			Reference:  "#/event-stream-source/event-stream-source/test-source-2",
+			Reference:  "#event-stream-source:test-source-2",
 			Data: &sourceClient.EventStreamSource{
 				ID:      "remote456",
 				Name:    "Test Source 2",
@@ -371,7 +371,7 @@ func TestProvider(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote789",
 			ExternalID: "test-source-3",
-			Reference:  "#/event-stream-source/event-stream-source/test-source-3",
+			Reference:  "#event-stream-source:test-source-3",
 			Data: &sourceClient.EventStreamSource{
 				ID:      "remote789",
 				Name:    "Test Source 3",

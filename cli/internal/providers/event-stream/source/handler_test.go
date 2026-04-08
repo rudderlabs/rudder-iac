@@ -1480,7 +1480,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote456",
 			ExternalID: "test-source-2",
-			Reference:  "#/event-stream-source/event-stream-source/test-source-2",
+			Reference:  "#event-stream-source:test-source-2",
 			Data: &sourceClient.EventStreamSource{
 				ID:         "remote456",
 				ExternalID: "",
@@ -1495,7 +1495,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote789",
 			ExternalID: "test-source-3",
-			Reference:  "#/event-stream-source/event-stream-source/test-source-3",
+			Reference:  "#event-stream-source:test-source-3",
 			Data: &sourceClient.EventStreamSource{
 				ID:         "remote789",
 				ExternalID: "",
@@ -1580,7 +1580,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			spec, ok := entity.Content.(*specs.Spec)
 			require.True(t, ok)
 			assert.Equal(t, "event-stream-source", spec.Kind)
-			assert.Equal(t, "rudder/v0.1", spec.Version)
+			assert.Equal(t, specs.SpecVersionV1, spec.Version)
 			externalID := spec.Spec["id"].(string)
 			assert.Equal(t, filepath.Join("sources", fmt.Sprintf("%s.yaml", externalID)), entity.RelativePath)
 			entityMap[externalID] = spec
@@ -1656,8 +1656,8 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}, spec2.Metadata)
 	})
 
-	t.Run("v1SpecSupport", func(t *testing.T) {
-		t.Run("LoadImportable uses new ref format when enabled", func(t *testing.T) {
+	t.Run("v1SpecDefaults", func(t *testing.T) {
+		t.Run("LoadImportable uses compact ref format", func(t *testing.T) {
 			t.Parallel()
 			mockClient := source.NewMockSourceClient()
 			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
@@ -1671,7 +1671,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					},
 				}, nil
 			})
-			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+			handler := source.NewHandler(mockClient, importDir)
 
 			collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
 			require.NoError(t, err)
@@ -1682,10 +1682,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			assert.Equal(t, "#event-stream-source:test-source-2", resource.Reference)
 		})
 
-		t.Run("FormatForExport uses rudder/v1 when enabled", func(t *testing.T) {
+		t.Run("FormatForExport uses rudder/v1", func(t *testing.T) {
 			t.Parallel()
 			mockClient := source.NewMockSourceClient()
-			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+			handler := source.NewHandler(mockClient, importDir)
 			collection := resources.NewRemoteResources()
 			resourceMap := map[string]*resources.RemoteResource{
 				"remote123": {
@@ -1706,10 +1706,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		})
 
-		t.Run("GetResources uses new ref for file metadata when enabled", func(t *testing.T) {
+		t.Run("GetResources uses compact ref for file metadata", func(t *testing.T) {
 			t.Parallel()
 			mockClient := source.NewMockSourceClient()
-			handler := source.NewHandler(mockClient, importDir, source.WithV1SpecSupport())
+			handler := source.NewHandler(mockClient, importDir)
 			spec := &specs.Spec{
 				Version: specs.SpecVersionV0_1Variant,
 				Kind:    "event-stream-source",

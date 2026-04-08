@@ -27,11 +27,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_CONCURRENT_SYNCS",
 		},
 		{
-			name:     "v1SpecSupport",
-			flagName: "v1SpecSupport",
-			want:     "RUDDERSTACK_X_V1_SPEC_SUPPORT",
-		},
-		{
 			name:     "transformations",
 			flagName: "transformations",
 			want:     "RUDDERSTACK_X_TRANSFORMATIONS",

@@ -14,7 +14,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 )
 
@@ -60,7 +59,7 @@ func TestCustomTypeLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "ct2"))
 	})
 
-	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and compact reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockCustomTypeDataCatalog{
 			customTypes: []*catalog.CustomType{
 				{ID: "ct1", Name: "Address Type", Type: "object", WorkspaceId: "ws1"},
@@ -72,39 +71,6 @@ func TestCustomTypeLoadImportable(t *testing.T) {
 			client:   mockClient,
 			log:      *logger.New("test"),
 			filepath: "custom-types",
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.Nil(t, err)
-
-		customTypes := collection.GetAll(types.CustomTypeResourceType)
-		require.Equal(t, 2, len(customTypes))
-
-		ct1, ok := customTypes["ct1"]
-		require.True(t, ok)
-		assert.NotEmpty(t, ct1.ExternalID)
-		assert.Equal(t, ct1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, ct1.ExternalID))
-
-		ct2, ok := customTypes["ct2"]
-		require.True(t, ok)
-		assert.NotEmpty(t, ct2.ExternalID)
-		assert.Equal(t, ct2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, ct2.ExternalID))
-	})
-
-	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
-		mockClient := &mockCustomTypeDataCatalog{
-			customTypes: []*catalog.CustomType{
-				{ID: "ct1", Name: "Address Type", Type: "object", WorkspaceId: "ws1"},
-				{ID: "ct2", Name: "Product Type", Type: "object", WorkspaceId: "ws1"},
-			},
-		}
-
-		provider := &CustomTypeImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "custom-types",
-			v1SpecSupport: true,
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
@@ -166,6 +132,7 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		spec, ok := entity.Content.(*specs.Spec)
 		require.True(t, ok)
 
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "custom-types", spec.Kind)
 		assert.Equal(t, "custom-types", spec.Metadata["name"])
 		assert.NotNil(t, spec.Metadata["import"])
@@ -175,7 +142,7 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		assert.Equal(t, 2, len(customTypes))
 	})
 
-	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+	t.Run("export uses rudder/v1 and property refs", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{
 				types.PropertyResourceType: {
@@ -199,65 +166,9 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		}
 
 		provider := &CustomTypeImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: false,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.NoError(t, err)
-
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
-
-		spec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
-
-		customTypes, ok := spec.Spec["types"].([]map[string]any)
-		require.True(t, ok)
-		require.Len(t, customTypes, 1)
-
-		properties, ok := customTypes[0]["properties"].([]any)
-		require.True(t, ok)
-		require.Len(t, properties, 1)
-
-		propMap, ok := properties[0].(map[string]any)
-		require.True(t, ok)
-		assert.Contains(t, propMap, "$ref")
-	})
-
-	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
-		mockResolver := &mockResolver{
-			references: map[string]map[string]string{
-				types.PropertyResourceType: {
-					"prop1": "#property:street",
-				},
-			},
-		}
-
-		mockClient := &mockCustomTypeDataCatalog{
-			customTypes: []*catalog.CustomType{
-				{
-					ID:          "ct1",
-					Name:        "Address",
-					Type:        "object",
-					WorkspaceId: "ws1",
-					Properties: []catalog.CustomTypeProperty{
-						{ID: "prop1", Required: true},
-					},
-				},
-			},
-		}
-
-		provider := &CustomTypeImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: true,
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())

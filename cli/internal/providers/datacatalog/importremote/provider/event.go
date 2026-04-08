@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -29,18 +28,16 @@ var (
 )
 
 type EventImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *EventImportProvider {
 	return &EventImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, EventsRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, EventsRelativePath),
+		client:   client,
 	}
 }
 
@@ -104,10 +101,7 @@ func (p *EventImportProvider) idResources(
 		}
 
 		event.ExternalID = externalID
-		event.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindEvents, MetadataNameEvents, externalID)
-		if p.v1SpecSupport {
-			event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
-		}
+		event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
 	}
 	return nil
 }
@@ -128,10 +122,7 @@ func (p *EventImportProvider) FormatForExport(
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedEvents := make([]map[string]any, 0)
 	for _, event := range events {
@@ -149,15 +140,8 @@ func (p *EventImportProvider) FormatForExport(
 			RemoteID: event.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableEvent := &model.ImportableEventV1{}
-			formatted, err = importableEvent.ForExport(event.ExternalID, data, resolver)
-		} else {
-			importableEvent := &model.ImportableEvent{}
-			formatted, err = importableEvent.ForExport(event.ExternalID, data, resolver)
-		}
+		importableEvent := &model.ImportableEventV1{}
+		formatted, err := importableEvent.ForExport(event.ExternalID, data, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("formatting event: %w", err)
 		}

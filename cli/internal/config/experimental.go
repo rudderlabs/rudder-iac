@@ -16,8 +16,6 @@ type ExperimentalConfig struct {
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// NestedDiffs enables detailed diff reports for nested structures
 	NestedDiffs bool `mapstructure:"nestedDiffs"`
-	// V1SpecSupport enables support for v1 specs (rudder/v1)
-	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
 	// Transformations enables transformations provider and related features
 	Transformations bool `mapstructure:"transformations"`
 	// DataGraph enables data graph operations (sync, validate, import)

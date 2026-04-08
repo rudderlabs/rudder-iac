@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -29,18 +28,16 @@ var (
 )
 
 type PropertyImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *PropertyImportProvider {
 	return &PropertyImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, PropertiesRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, PropertiesRelativePath),
+		client:   client,
 	}
 }
 
@@ -97,10 +94,7 @@ func (p *PropertyImportProvider) idResources(
 		}
 
 		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, externalID)
-		if p.v1SpecSupport {
-			property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
-		}
+		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
 	}
 	return nil
 }
@@ -121,10 +115,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedProps := make([]map[string]any, 0)
 	for _, property := range properties {
@@ -142,15 +133,8 @@ func (p *PropertyImportProvider) FormatForExport(
 			RemoteID: property.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableProp := &model.ImportablePropertyV1{}
-			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
-		} else {
-			importableProp := &model.ImportableProperty{}
-			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
-		}
+		importableProp := &model.ImportablePropertyV1{}
+		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("formatting property: %w", err)
 		}

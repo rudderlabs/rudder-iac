@@ -352,7 +352,7 @@ func TestSQLModelHandler(t *testing.T) {
 			ordersSpec, _ := entities[idx].Content.(*specs.Spec)
 			require.NotNil(t, ordersSpec)
 			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
-			assert.Equal(t, specs.SpecVersionV0_1Variant, ordersSpec.Version)
+			assert.Equal(t, specs.SpecVersionV1, ordersSpec.Version)
 			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
 			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
 			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])
@@ -393,11 +393,11 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
 		})
 
-		t.Run("uses rudder/v1 when v1SpecSupport enabled", func(t *testing.T) {
+		t.Run("uses rudder/v1 for export", func(t *testing.T) {
 			t.Parallel()
 			s1 := mkSource("rid-1", "Orders Model", "orders-model", "ws-1", "postgres", "acc-1", true, "orders", "id", "SELECT * FROM orders")
 			mockClient := &mockRETLClient{}
-			h := sqlmodel.NewHandler(mockClient, "retl", sqlmodel.WithV1SpecSupport())
+			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
 			entities, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
@@ -1246,7 +1246,7 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Equal(t, writer.FormattableEntity{
 				RelativePath: "local-id.yaml",
 				Content: &specs.Spec{
-					Version: "rudder/v0.1",
+					Version: "rudder/v1",
 					Kind:    "retl-source-sql-model",
 					Metadata: map[string]any{
 						"name": "local-id",
@@ -1635,14 +1635,14 @@ func TestSQLModelHandler(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, "rid-1", r1.ID)
 			assert.Equal(t, namer.NewKebabCase().Name("Orders Model"), r1.ExternalID)
-			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r1.ExternalID), r1.Reference)
+			assert.Equal(t, fmt.Sprintf("#%s:%s", sqlmodel.ResourceKind, r1.ExternalID), r1.Reference)
 
 			// Validate second resource mapping
 			r2, ok := items["rid-2"]
 			require.True(t, ok)
 			assert.Equal(t, "rid-2", r2.ID)
 			assert.Equal(t, namer.NewKebabCase().Name("Users Model"), r2.ExternalID)
-			assert.Equal(t, fmt.Sprintf("#/%s/%s/%s", sqlmodel.ResourceKind, sqlmodel.MetadataName, r2.ExternalID), r2.Reference)
+			assert.Equal(t, fmt.Sprintf("#%s:%s", sqlmodel.ResourceKind, r2.ExternalID), r2.Reference)
 		})
 
 		t.Run("Success with empty list", func(t *testing.T) {
