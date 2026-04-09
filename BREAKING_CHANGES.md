@@ -327,6 +327,7 @@ rules:
     event:
       $ref: "#/events/api_tracking/api_tracking"
       allow_unplanned: false
+      identity_section: properties
 
 # After (v1)
 rules:
@@ -334,6 +335,7 @@ rules:
     id: login
     event: "#event:api_tracking"
     additional_properties: false
+    identity_section: properties
 ```
 
 - `event.$ref` → `event` (direct string)
