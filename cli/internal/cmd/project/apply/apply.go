@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -71,6 +72,9 @@ func NewCmdApply() *cobra.Command {
 				}...)
 			}()
 
+			spinner := ui.NewSpinner("Preparing to apply changes...")
+			spinner.Start()
+
 			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
@@ -97,6 +101,8 @@ func NewCmdApply() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			spinner.Stop()
 
 			// Apply the changes
 			err = s.Sync(context.Background(), graph)

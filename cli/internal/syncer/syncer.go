@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
@@ -118,6 +119,9 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
+	spinner := ui.NewSpinner("Preparing to apply changes...")
+	spinner.Start()
+
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return []error{err}
@@ -131,6 +135,8 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
+
+	spinner.Stop()
 
 	s.reporter.ReportPlan(plan)
 
