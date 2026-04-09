@@ -1,0 +1,31 @@
+{{- if .Comment }}
+/// {{ escapeComment .Comment }}
+{{- end }}
+{{- /*
+    Multi-type properties allow more than one JSON type (e.g. string, integer, null).
+    Each type becomes an enum case with an associated value.
+    The `value: Any` computed property extracts the underlying value for [String: Any] serialization.
+    Null is a special case — no associated value, returns NSNull() instead.
+*/}}
+public enum {{ .Name }} {
+{{- range .Cases }}
+{{- if .IsNull }}
+    case null
+{{- else }}
+    case {{ .Name }}({{ .AssociatedType }})
+{{- end }}
+{{- end }}
+
+    public var value: Any {
+        switch self {
+{{- range .Cases }}
+{{- if .IsNull }}
+        case .null: return NSNull()
+{{- else }}
+        case .{{ .Name }}(let v): return v
+{{- end }}
+{{- end }}
+        }
+    }
+}
+{{- "" -}}
