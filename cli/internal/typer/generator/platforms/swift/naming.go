@@ -7,7 +7,20 @@ import (
 )
 
 // tokenize splits a string into words by spaces, underscores, hyphens, dots,
-// and camelCase boundaries. Non-letter/digit characters are stripped.
+// and camelCase boundaries. Non-letter/digit characters are stripped from word
+// edges (but not from the middle of a token), and all tokens are lowercased.
+//
+// This is intentionally separate from core.SplitIntoWords for two reasons:
+//  1. Acronym splitting: core.SplitIntoWords splits runs of uppercase letters
+//     (e.g. "XMLParser" → ["XML", "Parser"]), which would change identifier
+//     output for any plan names that include acronyms. Swift conventions also
+//     capitalise only the first letter of acronyms in identifiers (XmlParser),
+//     so the core behaviour would be semantically wrong here anyway.
+//  2. Special-character handling: core does not strip special chars — Kotlin
+//     pre-processes with sanitizeForIdentifier (replacing them with spaces) so
+//     they become word boundaries. Swift instead trims them from token edges;
+//     characters in the middle of a token (e.g. "@") are preserved as-is, which
+//     can produce invalid identifiers for unusual inputs.
 func tokenize(s string) []string {
 	// Replace common separators (including dots for decimal numbers) with spaces
 	s = strings.NewReplacer("_", " ", "-", " ", ".", " ").Replace(s)
