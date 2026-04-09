@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +58,9 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 
-			project.PrintLegacySpecDeprecationIfNeeded(p.Specs())
+			if project.HasLegacySpecs(p.Specs()) {
+				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
+			}
 
 			return nil
 		},
