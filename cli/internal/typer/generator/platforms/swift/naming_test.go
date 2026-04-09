@@ -39,6 +39,10 @@ func TestFormatTypeName(t *testing.T) {
 		{"quotes around word", "", `"premium"`, "Premium"},
 		// @ in the middle stays — tokenizer only trims edge non-letter/digit chars
 		{"at in middle passes through", "", "user@event", "User@event"},
+		// PascalCase reserved words must be backtick-escaped
+		{"reserved word Any", "", "any", "`Any`"},
+		{"reserved word Self", "", "self", "`Self`"},
+		{"reserved word Type", "", "type", "`Type`"},
 	}
 
 	for _, tt := range tests {

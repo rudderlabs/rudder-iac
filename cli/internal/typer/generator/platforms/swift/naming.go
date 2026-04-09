@@ -52,7 +52,11 @@ func FormatTypeName(prefix, name string) string {
 		b.WriteRune(unicode.ToUpper(r[0]))
 		b.WriteString(string(r[1:]))
 	}
-	return b.String()
+	typeName := b.String()
+	if swiftReservedWords[typeName] {
+		return "`" + typeName + "`"
+	}
+	return typeName
 }
 
 // FormatPropertyName converts a string to camelCase for Swift property/variable names.
