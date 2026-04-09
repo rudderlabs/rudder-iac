@@ -119,7 +119,7 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
-	spinner := ui.NewSpinner("Preparing to apply changes...")
+	spinner := ui.NewSpinner("Loading state ...")
 	spinner.Start()
 
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
