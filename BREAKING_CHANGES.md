@@ -6,19 +6,25 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 ## Upcoming (unreleased)
 
-All changes below are part of the `rudder/v1` spec format rework.
+### Spec format upgrade: `rudder/0.1` → `rudder/v1`
+
+`rudder/v1` is a comprehensive redesign of the original `rudder/0.1` spec format. It improves consistency across resource kinds, replaces ambiguous field names, adopts snake_case conventions, and moves to compact URN-style references throughout. All changes below must be applied when upgrading from `rudder/0.1` to `rudder/v1`.
 
 To migrate automatically, run:
 
 ```bash
-rudder-cli migrate --location <path-to-project>
+$ rudder-cli migrate --location <path-to-project>
 ```
 
-This rewrites spec files in place — commit or back up your project before running.
+This rewrites spec files in place — **commit or back up your project before running.**
+
+
+Below sections enumerate the changes in the spec format one by one providing the reasoning for the change:
 
 ### 1. Version field
 
 **Scope:** spec
+
 **Why:** Standardizes the version identifier to a semver-style prefix, eliminating the ambiguous `0.1` / `v0.1` variants.
 
 All spec files must update the `version` field.
