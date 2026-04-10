@@ -41,6 +41,10 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
 
+			if project.HasLegacySpecs(p.Specs()) {
+				ui.PrintDeprecationWarning(project.ImportLegacySpecWarning)
+			}
+
 			_, err := os.Stat(filepath.Join(location, importer.ImportedDir))
 			if err == nil {
 				return fmt.Errorf("directory for import: %s already exists", filepath.Join(location, importer.ImportedDir))

@@ -7,7 +7,14 @@ import (
 // LegacySpecDeprecationWarning is shown when any loaded spec uses the v0.1 format.
 // Replace <migration-guide-url> when the upstream migration guide is published.
 const LegacySpecDeprecationWarning = `v0.1 spec format is deprecated and will be removed in a future release.
-         Run ` + "`rudder-cli migrate`" + ` to upgrade to v1.
+         Run ` + "`rudder-cli migrate`" + ` to upgrade existing specs to v1.
+         See: https://github.com/rudderlabs/rudder-iac/blob/main/BREAKING_CHANGES.md`
+
+// ImportLegacySpecWarning is shown during import when the project has existing v0.1 specs.
+// It informs users that newly imported resources will be in v1 format and nudges migration of existing specs.
+const ImportLegacySpecWarning = `Imported resources will be generated in v1 spec format.
+         v0.1 spec format is deprecated and will be removed in a future release.
+         Run ` + "`rudder-cli migrate`" + ` to upgrade existing specs to v1.
          See: https://github.com/rudderlabs/rudder-iac/blob/main/BREAKING_CHANGES.md`
 
 // HasLegacySpecs reports whether any spec in specMap uses a legacy (v0.1) version.
