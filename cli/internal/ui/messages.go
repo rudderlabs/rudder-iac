@@ -33,6 +33,13 @@ func PrintWarning(message string) {
 	fmt.Fprintln(uiWriter, Warning(message))
 }
 
+// PrintDeprecationWarning prints a multi-line deprecation message to stdout with surrounding blank lines.
+func PrintDeprecationWarning(message string) {
+	fmt.Fprintln(uiWriter, "")
+	fmt.Fprintln(uiWriter, Warning(message))
+	fmt.Fprintln(uiWriter, "")
+}
+
 // Failure returns a failure message string in a styled format, including a red "x" symbol.
 func Failure(message string) string {
 	return fmt.Sprintf("%s %s", Color("x", ColorRed), message)

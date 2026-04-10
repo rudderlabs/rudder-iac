@@ -61,6 +61,10 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("validating project: %w", err)
 			}
 
+			if project.HasLegacySpecs(p.Specs()) {
+				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
+			}
+
 			validateLog.Info("Project configuration is valid")
 			ui.PrintSuccess("Project configuration is valid")
 			return nil
