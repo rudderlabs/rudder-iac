@@ -35,8 +35,9 @@ func TestProjectApply(t *testing.T) {
 		// changes are reported if we re-apply the same project, therefore we dedicatedly
 		// test this scenario below
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-		// then we apply this project again and verify that even after migration,
-		// no changes are introduced in upstream resource state.
+		// then we apply this project again from scratch and verify no
+		// changes are reported in snapshot tests meaning after migration of the directory
+		// the upstream resources are created same
 		applyAndVerify(t, executor, migratedDir)
 	})
 }
