@@ -21,9 +21,6 @@ var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, 
 	return results
 }
 
-// validateDuplicateEventsV1 emits one error per occurrence of any event ref
-// that appears more than once across rules. V1 refs arrive already normalized
-// (`#event:<id>`) so raw-string equality is sufficient.
 func validateDuplicateEventsV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, rule := range spec.Rules {
@@ -42,9 +39,6 @@ func validateDuplicateEventsV1(spec localcatalog.TrackingPlanV1) []rules.Validat
 	return results
 }
 
-// validateDuplicatePropertiesV1 walks each rule and dedupes property refs at
-// every sibling scope: rule.Properties (recursively), variants[*].cases[*].properties,
-// and variants[*].default.properties.
 func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
@@ -53,11 +47,10 @@ func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.Val
 
 		results = append(results, checkDuplicateSiblingPropsV1(rule.Properties, ruleRef+"/properties")...)
 
-		// V1 variants[*].default is DefaultPropertiesV1 wrapping Properties, not a direct slice.
 		for v, variant := range rule.Variants {
-			for c, kase := range variant.Cases {
+			for c, vCase := range variant.Cases {
 				caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", ruleRef, v, c)
-				results = append(results, checkDuplicateVariantPropRefsV1(kase.Properties, caseRef)...)
+				results = append(results, checkDuplicateVariantPropRefsV1(vCase.Properties, caseRef)...)
 			}
 			defaultRef := fmt.Sprintf("%s/variants/%d/default/properties", ruleRef, v)
 			results = append(results, checkDuplicateVariantPropRefsV1(variant.Default.Properties, defaultRef)...)
@@ -67,8 +60,6 @@ func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.Val
 	return results
 }
 
-// checkDuplicateSiblingPropsV1 dedupes one list of TPRulePropertyV1 and
-// recurses into nested Properties. Each nested list is its own sibling scope.
 func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parentRef string) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, prop := range props {
@@ -91,8 +82,6 @@ func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parent
 	return results
 }
 
-// checkDuplicateVariantPropRefsV1 dedupes a flat list of variant property refs.
-// Variant property refs use PropertyReferenceV1 and do not recurse.
 func checkDuplicateVariantPropRefsV1(props []localcatalog.PropertyReferenceV1, parentRef string) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, prop := range props {
