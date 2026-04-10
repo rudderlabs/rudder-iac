@@ -25,13 +25,19 @@ func TestProjectApply(t *testing.T) {
 
 	projectDir := filepath.Join("testdata", "project")
 
-	t.Run("rudder/v0.1 specs", func(t *testing.T) {
+	t.Run("rudder specs", func(t *testing.T) {
 		applyAndVerify(t, executor, projectDir)
 	})
 
 	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
-		verifyNoDiffAfterMigration(t, executor, migratedDir)
+		// to make sure migration is applied correctly, we need to verify no
+		// changes are reported if we re-apply the same project, therefore we dedicatedly
+		// test this scenario below
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
+		// then we apply this project again from scratch and verify no
+		// changes are reported in snapshot tests meaning after migration of the directory
+		// the upstream resources are created same
 		applyAndVerify(t, executor, migratedDir)
 	})
 }
@@ -42,25 +48,45 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
 
+	var (
+		createDir = filepath.Join(projectDir, "create")
+		updateDir = filepath.Join(projectDir, "update")
+	)
+
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "create"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
 		verifyState(t, "create")
 	})
 
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "update"), "--confirm=false")
+
+		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
 	})
+
+	t.Run("applying on already applied project should not create any diff", func(t *testing.T) {
+		// If we reapply the update directory, we should
+		// not see any changes meaning double apply without any changes
+		// should report no changes to apply.
+		verifyNoChangesToApply(t, executor, updateDir)
+	})
 }
 
-func verifyNoDiffAfterMigration(t *testing.T, executor *CmdExecutor, migratedDir string) {
+func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	t.Helper()
 
 	// we only verify no diff after migration for the update directory, as the last apply was run on it
-	output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(migratedDir, "update"), "--dry-run", "--confirm=false")
+	output, err := executor.Execute(
+		cliBinPath,
+		"apply",
+		"-l",
+		path,
+		"--dry-run",
+		"--confirm=false",
+	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
 }
