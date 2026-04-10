@@ -22,5 +22,5 @@ func TestPrintDeprecationWarning(t *testing.T) {
 	assert.Contains(t, out, "Warning:")
 	assert.Contains(t, out, "line one")
 	assert.Contains(t, out, "line two")
-	assert.True(t, strings.HasSuffix(out, "\n\n") || strings.HasSuffix(out, "\n"), "expected trailing newline(s)")
+	assert.True(t, strings.HasSuffix(out, "\n"), "expected trailing blank line")
 }
