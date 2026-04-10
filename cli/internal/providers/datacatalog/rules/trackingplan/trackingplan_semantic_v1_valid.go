@@ -15,7 +15,99 @@ var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, 
 	results = append(results, validateTrackingPlanVariantsV1(spec, graph)...)
 	results = append(results, validatePropertyNestingV1(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV1(spec, graph)...)
+	results = append(results, validateDuplicateEventsV1(spec)...)
+	results = append(results, validateDuplicatePropertiesV1(spec)...)
 
+	return results
+}
+
+// validateDuplicateEventsV1 emits one error per occurrence of any event ref
+// that appears more than once across rules. V1 refs arrive already normalized
+// (`#event:<id>`) so raw-string equality is sufficient.
+func validateDuplicateEventsV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range spec.Rules {
+		counts[rule.Event]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range spec.Rules {
+		if counts[rule.Event] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/event", i),
+				Message:   fmt.Sprintf("duplicate event reference '%s' (appears %d times)", rule.Event, counts[rule.Event]),
+			})
+		}
+	}
+	return results
+}
+
+// validateDuplicatePropertiesV1 walks each rule and dedupes property refs at
+// every sibling scope: rule.Properties (recursively), variants[*].cases[*].properties,
+// and variants[*].default.properties.
+func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, rule := range spec.Rules {
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+
+		results = append(results, checkDuplicateSiblingPropsV1(rule.Properties, ruleRef+"/properties")...)
+
+		// V1 variants[*].default is DefaultPropertiesV1 wrapping Properties, not a direct slice.
+		for v, variant := range rule.Variants {
+			for c, kase := range variant.Cases {
+				caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", ruleRef, v, c)
+				results = append(results, checkDuplicateVariantPropRefsV1(kase.Properties, caseRef)...)
+			}
+			defaultRef := fmt.Sprintf("%s/variants/%d/default/properties", ruleRef, v)
+			results = append(results, checkDuplicateVariantPropRefsV1(variant.Default.Properties, defaultRef)...)
+		}
+	}
+
+	return results
+}
+
+// checkDuplicateSiblingPropsV1 dedupes one list of TPRulePropertyV1 and
+// recurses into nested Properties. Each nested list is its own sibling scope.
+func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Property]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Property] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
+				Message:   fmt.Sprintf("duplicate property reference '%s' (appears %d times)", prop.Property, counts[prop.Property]),
+			})
+		}
+		if len(prop.Properties) > 0 {
+			nestedRef := fmt.Sprintf("%s/%d/properties", parentRef, i)
+			results = append(results, checkDuplicateSiblingPropsV1(prop.Properties, nestedRef)...)
+		}
+	}
+	return results
+}
+
+// checkDuplicateVariantPropRefsV1 dedupes a flat list of variant property refs.
+// Variant property refs use PropertyReferenceV1 and do not recurse.
+func checkDuplicateVariantPropRefsV1(props []localcatalog.PropertyReferenceV1, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Property]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Property] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
+				Message:   fmt.Sprintf("duplicate property reference '%s' (appears %d times)", prop.Property, counts[prop.Property]),
+			})
+		}
+	}
 	return results
 }
 

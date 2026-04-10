@@ -116,6 +116,8 @@ var validateTrackingPlanSpecV1 = func(
 func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
+	results = append(results, validateDuplicateRuleIDsV0(tpRules)...)
+
 	for i, rule := range tpRules {
 		for j, prop := range rule.Properties {
 			if len(prop.Properties) == 0 {
@@ -137,6 +139,8 @@ func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
+	results = append(results, validateDuplicateRuleIDsV1(tpRules)...)
+
 	for i, rule := range tpRules {
 		for j, prop := range rule.Properties {
 			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
@@ -150,6 +154,46 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 		}
 	}
 
+	return results
+}
+
+// validateDuplicateRuleIDsV0 emits one error per occurrence of any rule id that
+// appears more than once within a single tracking plan. Comparison is
+// case-sensitive raw-string equality. Empty ids are not checked here — struct
+// tag `required` already rejects them.
+func validateDuplicateRuleIDsV0(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range tpRules {
+		counts[rule.LocalID]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range tpRules {
+		if counts[rule.LocalID] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/id", i),
+				Message:   fmt.Sprintf("duplicate rule id '%s' (appears %d times)", rule.LocalID, counts[rule.LocalID]),
+			})
+		}
+	}
+	return results
+}
+
+func validateDuplicateRuleIDsV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range tpRules {
+		counts[rule.LocalID]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range tpRules {
+		if counts[rule.LocalID] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/id", i),
+				Message:   fmt.Sprintf("duplicate rule id '%s' (appears %d times)", rule.LocalID, counts[rule.LocalID]),
+			})
+		}
+	}
 	return results
 }
 
