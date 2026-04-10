@@ -32,8 +32,8 @@ func TestProjectApply(t *testing.T) {
 	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
 		// to make sure migration is applied correctly, we need to verify no
-		// changes are introduced after we run it and hence
-		// we apply the same in migrated project
+		// changes are reported if we re-apply the same project, therefore we dedicatedly
+		// test this scenario below
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
 		// then we apply this project again and verify that even after migration,
 		// no changes are introduced in upstream resource state.
