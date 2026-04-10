@@ -116,6 +116,11 @@ var validateTrackingPlanSpecV1 = func(
 func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
+	results = append(
+		results,
+		validateDuplicateRuleIDs(tpRules, func(r *localcatalog.TPRule) string { return r.LocalID })...,
+	)
+
 	for i, rule := range tpRules {
 		for j, prop := range rule.Properties {
 			if len(prop.Properties) == 0 {
@@ -137,6 +142,11 @@ func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
+	results = append(
+		results,
+		validateDuplicateRuleIDs(tpRules, func(r *localcatalog.TPRuleV1) string { return r.LocalID })...,
+	)
+
 	for i, rule := range tpRules {
 		for j, prop := range rule.Properties {
 			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
@@ -150,6 +160,28 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 		}
 	}
 
+	return results
+}
+
+func validateDuplicateRuleIDs[T any](tpRules []T, idOf func(T) string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range tpRules {
+		id := idOf(rule)
+		if id == "" {
+			continue
+		}
+		counts[id]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range tpRules {
+		if counts[idOf(rule)] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/id", i),
+				Message:   "duplicate rule id in tracking plan rules",
+			})
+		}
+	}
 	return results
 }
 

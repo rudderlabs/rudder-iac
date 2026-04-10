@@ -1113,3 +1113,578 @@ func TestTrackingPlanSemanticValid_V1VariantDiscriminator(t *testing.T) {
 		assert.Empty(t, results, "custom type ref with valid underlying string type — no errors")
 	})
 }
+
+func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "r1", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+				{LocalID: "r2", Event: &localcatalog.TPRuleEvent{Ref: "#event:login"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("two rules share raw event ref — both reported", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "r1", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+				{LocalID: "r2", Event: &localcatalog.TPRuleEvent{Ref: "#event:login"}},
+				{LocalID: "r3", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/2/event/$ref", Message: "duplicate event reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("same id across different V0 group paths is not a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "r1", Event: &localcatalog.TPRuleEvent{Ref: "#/events/group-a/signup"}},
+				{LocalID: "r2", Event: &localcatalog.TPRuleEvent{Ref: "#/events/group-b/signup"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec)
+		assert.Empty(t, results)
+	})
+}
+
+func TestTrackingPlanSemanticValid_DuplicatePropertiesV0(t *testing.T) {
+	t.Parallel()
+
+	event := &localcatalog.TPRuleEvent{Ref: "#event:signup"}
+
+	t.Run("no duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{Ref: "#property:email"},
+						{Ref: "#property:name"},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate at top-level rule properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{Ref: "#property:email"},
+						{Ref: "#property:name"},
+						{Ref: "#property:email"},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/2/$ref", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("duplicate inside nested properties of same parent", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:address",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:city"},
+								{Ref: "#property:city"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/properties/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/0/properties/1/$ref", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("same ref at parent and child level is NOT a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:address",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:address"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("same ref across different sibling parents is NOT a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{
+							Ref: "#property:address_home",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:city"},
+							},
+						},
+						{
+							Ref: "#property:address_work",
+							Properties: []*localcatalog.TPRuleProperty{
+								{Ref: "#property:city"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate in variant case properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case 1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#property:email"},
+										{Ref: "#property:email"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/variants/0/cases/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/1/$ref", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("duplicate in variant default", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case 1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#property:email"},
+									},
+								},
+							},
+							Default: []localcatalog.PropertyReference{
+								{Ref: "#property:user_id"},
+								{Ref: "#property:user_id"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/variants/0/default/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/default/1/$ref", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("same ref in case properties and rule properties is NOT a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "r1",
+					Event:   event,
+					Properties: []*localcatalog.TPRuleProperty{
+						{Ref: "#property:email"},
+					},
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case 1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#property:email"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV0(spec)
+		assert.Empty(t, results)
+	})
+}
+
+func TestTrackingPlanSemanticValid_DuplicateEventsV1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{LocalID: "r1", Event: "#event:signup"},
+				{LocalID: "r2", Event: "#event:login"},
+			},
+		}
+
+		results := validateDuplicateEventsV1(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("three rules share event ref — all three reported", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{LocalID: "r1", Event: "#event:signup"},
+				{LocalID: "r2", Event: "#event:signup"},
+				{LocalID: "r3", Event: "#event:signup"},
+			},
+		}
+
+		results := validateDuplicateEventsV1(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/event", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/1/event", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/2/event", Message: "duplicate event reference in tracking plan rules"},
+		}, results)
+	})
+}
+
+func TestTrackingPlanSemanticValid_DuplicatePropertiesV1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:name"},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate at top-level rule properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:email"},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("duplicate inside nested properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{
+							Property: "#property:address",
+							Properties: []*localcatalog.TPRulePropertyV1{
+								{Property: "#property:city"},
+								{Property: "#property:city"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/properties/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("parent and nested share ref — NOT a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{
+							Property: "#property:address",
+							Properties: []*localcatalog.TPRulePropertyV1{
+								{Property: "#property:address"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate in variant case properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case 1",
+									Match:       []any{"a"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+										{Property: "#property:email"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/variants/0/cases/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("duplicate in variant default.properties", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case 1",
+									Match:       []any{"a"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+									},
+								},
+							},
+							Default: localcatalog.DefaultPropertiesV1{
+								Properties: []localcatalog.PropertyReferenceV1{
+									{Property: "#property:user_id"},
+									{Property: "#property:user_id"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/variants/0/default/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/default/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("case A vs case B with same ref — NOT a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					LocalID: "r1",
+					Event:   "#event:signup",
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case A",
+									Match:       []any{"a"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+									},
+								},
+								{
+									DisplayName: "Case B",
+									Match:       []any{"b"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateDuplicatePropertiesV1(spec)
+		assert.Empty(t, results)
+	})
+}

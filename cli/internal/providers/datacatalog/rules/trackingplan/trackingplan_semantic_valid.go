@@ -20,7 +20,94 @@ var validateTrackingPlanSemantic = func(_ string, _ string, _ map[string]any, sp
 	results = append(results, validateTrackingPlanVariants(spec, graph)...)
 	results = append(results, validatePropertyNestingV0(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV0(spec, graph)...)
+	results = append(results, validateDuplicateEventsV0(spec)...)
+	results = append(results, validateDuplicatePropertiesV0(spec)...)
 
+	return results
+}
+
+func validateDuplicateEventsV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range spec.Rules {
+		if rule.Event == nil {
+			continue
+		}
+		counts[rule.Event.Ref]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range spec.Rules {
+		if rule.Event == nil {
+			continue
+		}
+		if counts[rule.Event.Ref] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/event/$ref", i),
+				Message:   "duplicate event reference in tracking plan rules",
+			})
+		}
+	}
+	return results
+}
+
+func validateDuplicatePropertiesV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, rule := range spec.Rules {
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+
+		results = append(results, checkDuplicateSiblingPropsV0(rule.Properties, ruleRef+"/properties")...)
+
+		for v, variant := range rule.Variants {
+			for c, vCase := range variant.Cases {
+				caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", ruleRef, v, c)
+				results = append(results, checkDuplicateVariantPropRefsV0(vCase.Properties, caseRef)...)
+			}
+			defaultRef := fmt.Sprintf("%s/variants/%d/default", ruleRef, v)
+			results = append(results, checkDuplicateVariantPropRefsV0(variant.Default, defaultRef)...)
+		}
+	}
+
+	return results
+}
+
+func checkDuplicateSiblingPropsV0(props []*localcatalog.TPRuleProperty, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Ref]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Ref] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
+				Message:   "duplicate property reference in tracking plan rules",
+			})
+		}
+		if len(prop.Properties) > 0 {
+			nestedRef := fmt.Sprintf("%s/%d/properties", parentRef, i)
+			results = append(results, checkDuplicateSiblingPropsV0(prop.Properties, nestedRef)...)
+		}
+	}
+	return results
+}
+
+func checkDuplicateVariantPropRefsV0(props []localcatalog.PropertyReference, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Ref]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Ref] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
+				Message:   "duplicate property reference in tracking plan rules",
+			})
+		}
+	}
 	return results
 }
 
