@@ -1455,6 +1455,31 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
 		assert.Empty(t, results)
 	})
+
+	t.Run("empty ids report required errors, non-empty duplicates report dedup errors", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "", Event: event},
+				{Type: "event_rule", LocalID: "dup", Event: event},
+				{Type: "event_rule", LocalID: "", Event: event},
+				{Type: "event_rule", LocalID: "unique", Event: event},
+				{Type: "event_rule", LocalID: "dup", Event: event},
+			},
+		}
+
+		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
+
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "'id' is required"},
+			{Reference: "/rules/2/id", Message: "'id' is required"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/4/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
 }
 
 func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
@@ -1530,6 +1555,31 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 
 		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
 		assert.Empty(t, results)
+	})
+
+	t.Run("empty ids report required errors, non-empty duplicates report dedup errors", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test Plan",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "unique", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup"},
+			},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
+
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "'id' is required"},
+			{Reference: "/rules/2/id", Message: "'id' is required"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/4/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
 	})
 }
 

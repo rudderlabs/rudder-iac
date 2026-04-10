@@ -166,7 +166,11 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 func validateDuplicateRuleIDs[T any](tpRules []T, idOf func(T) string) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, rule := range tpRules {
-		counts[idOf(rule)]++
+		id := idOf(rule)
+		if id == "" {
+			continue
+		}
+		counts[id]++
 	}
 
 	var results []rules.ValidationResult
