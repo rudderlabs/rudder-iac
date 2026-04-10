@@ -40,11 +40,10 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan) []rules.Validatio
 		if rule.Event == nil {
 			continue
 		}
-		ref := rule.Event.Ref
-		if counts[ref] > 1 {
+		if counts[rule.Event.Ref] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/rules/%d/event/$ref", i),
-				Message:   fmt.Sprintf("duplicate event reference '%s' (appears %d times)", ref, counts[ref]),
+				Message:   "duplicate event reference in tracking plan rules",
 			})
 		}
 	}
@@ -83,7 +82,7 @@ func checkDuplicateSiblingPropsV0(props []*localcatalog.TPRuleProperty, parentRe
 		if counts[prop.Ref] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
-				Message:   fmt.Sprintf("duplicate property reference '%s' (appears %d times)", prop.Ref, counts[prop.Ref]),
+				Message:   "duplicate property reference in tracking plan rules",
 			})
 		}
 		if len(prop.Properties) > 0 {
@@ -105,7 +104,7 @@ func checkDuplicateVariantPropRefsV0(props []localcatalog.PropertyReference, par
 		if counts[prop.Ref] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
-				Message:   fmt.Sprintf("duplicate property reference '%s' (appears %d times)", prop.Ref, counts[prop.Ref]),
+				Message:   "duplicate property reference in tracking plan rules",
 			})
 		}
 	}

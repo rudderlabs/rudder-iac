@@ -1148,8 +1148,8 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 
 		results := validateDuplicateEventsV0(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference '#event:signup' (appears 2 times)"},
-			{Reference: "/rules/2/event/$ref", Message: "duplicate event reference '#event:signup' (appears 2 times)"},
+			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/2/event/$ref", Message: "duplicate event reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1218,8 +1218,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV0(t *testing.T) {
 
 		results := validateDuplicatePropertiesV0(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/properties/0/$ref", Message: "duplicate property reference '#property:email' (appears 2 times)"},
-			{Reference: "/rules/0/properties/2/$ref", Message: "duplicate property reference '#property:email' (appears 2 times)"},
+			{Reference: "/rules/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/2/$ref", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1248,8 +1248,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV0(t *testing.T) {
 
 		results := validateDuplicatePropertiesV0(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/properties/0/properties/0/$ref", Message: "duplicate property reference '#property:city' (appears 2 times)"},
-			{Reference: "/rules/0/properties/0/properties/1/$ref", Message: "duplicate property reference '#property:city' (appears 2 times)"},
+			{Reference: "/rules/0/properties/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/0/properties/1/$ref", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1342,8 +1342,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV0(t *testing.T) {
 
 		results := validateDuplicatePropertiesV0(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/variants/0/cases/0/properties/0/$ref", Message: "duplicate property reference '#property:email' (appears 2 times)"},
-			{Reference: "/rules/0/variants/0/cases/0/properties/1/$ref", Message: "duplicate property reference '#property:email' (appears 2 times)"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/1/$ref", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1381,8 +1381,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV0(t *testing.T) {
 
 		results := validateDuplicatePropertiesV0(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/variants/0/default/0/$ref", Message: "duplicate property reference '#property:user_id' (appears 2 times)"},
-			{Reference: "/rules/0/variants/0/default/1/$ref", Message: "duplicate property reference '#property:user_id' (appears 2 times)"},
+			{Reference: "/rules/0/variants/0/default/0/$ref", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/default/1/$ref", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1456,9 +1456,9 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV1(t *testing.T) {
 
 		results := validateDuplicateEventsV1(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/event", Message: "duplicate event reference '#event:signup' (appears 3 times)"},
-			{Reference: "/rules/1/event", Message: "duplicate event reference '#event:signup' (appears 3 times)"},
-			{Reference: "/rules/2/event", Message: "duplicate event reference '#event:signup' (appears 3 times)"},
+			{Reference: "/rules/0/event", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/1/event", Message: "duplicate event reference in tracking plan rules"},
+			{Reference: "/rules/2/event", Message: "duplicate event reference in tracking plan rules"},
 		}, results)
 	})
 }
@@ -1508,8 +1508,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV1(t *testing.T) {
 
 		results := validateDuplicatePropertiesV1(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/properties/0/property", Message: "duplicate property reference '#property:email' (appears 2 times)"},
-			{Reference: "/rules/0/properties/1/property", Message: "duplicate property reference '#property:email' (appears 2 times)"},
+			{Reference: "/rules/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1538,8 +1538,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV1(t *testing.T) {
 
 		results := validateDuplicatePropertiesV1(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/properties/0/properties/0/property", Message: "duplicate property reference '#property:city' (appears 2 times)"},
-			{Reference: "/rules/0/properties/0/properties/1/property", Message: "duplicate property reference '#property:city' (appears 2 times)"},
+			{Reference: "/rules/0/properties/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/properties/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1601,8 +1601,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV1(t *testing.T) {
 
 		results := validateDuplicatePropertiesV1(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/variants/0/cases/0/properties/0/property", Message: "duplicate property reference '#property:email' (appears 2 times)"},
-			{Reference: "/rules/0/variants/0/cases/0/properties/1/property", Message: "duplicate property reference '#property:email' (appears 2 times)"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/cases/0/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 
@@ -1643,8 +1643,8 @@ func TestTrackingPlanSemanticValid_DuplicatePropertiesV1(t *testing.T) {
 
 		results := validateDuplicatePropertiesV1(spec)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/variants/0/default/properties/0/property", Message: "duplicate property reference '#property:user_id' (appears 2 times)"},
-			{Reference: "/rules/0/variants/0/default/properties/1/property", Message: "duplicate property reference '#property:user_id' (appears 2 times)"},
+			{Reference: "/rules/0/variants/0/default/properties/0/property", Message: "duplicate property reference in tracking plan rules"},
+			{Reference: "/rules/0/variants/0/default/properties/1/property", Message: "duplicate property reference in tracking plan rules"},
 		}, results)
 	})
 

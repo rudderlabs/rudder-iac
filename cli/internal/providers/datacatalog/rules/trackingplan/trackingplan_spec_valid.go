@@ -171,11 +171,10 @@ func validateDuplicateRuleIDs[T any](tpRules []T, idOf func(T) string) []rules.V
 
 	var results []rules.ValidationResult
 	for i, rule := range tpRules {
-		id := idOf(rule)
-		if counts[id] > 1 {
+		if counts[idOf(rule)] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/rules/%d/id", i),
-				Message:   fmt.Sprintf("duplicate rule id '%s' (appears %d times)", id, counts[id]),
+				Message:   "duplicate rule id in tracking plan rules",
 			})
 		}
 	}

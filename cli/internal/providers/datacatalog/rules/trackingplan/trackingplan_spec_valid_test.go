@@ -1411,8 +1411,8 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
 		require.Len(t, results, 2)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/id", Message: "duplicate rule id 'dup_rule' (appears 2 times)"},
-			{Reference: "/rules/2/id", Message: "duplicate rule id 'dup_rule' (appears 2 times)"},
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/2/id", Message: "duplicate rule id in tracking plan rules"},
 		}, results)
 	})
 
@@ -1432,7 +1432,7 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
 		require.Len(t, results, 3)
 		for _, r := range results {
-			assert.Equal(t, "duplicate rule id 'dup' (appears 3 times)", r.Message)
+			assert.Equal(t, "duplicate rule id in tracking plan rules", r.Message)
 		}
 		assert.ElementsMatch(t,
 			[]string{"/rules/0/id", "/rules/1/id", "/rules/2/id"},
@@ -1491,8 +1491,8 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
 		require.Len(t, results, 2)
 		assert.Equal(t, []rules.ValidationResult{
-			{Reference: "/rules/0/id", Message: "duplicate rule id 'dup_rule' (appears 2 times)"},
-			{Reference: "/rules/1/id", Message: "duplicate rule id 'dup_rule' (appears 2 times)"},
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
 		}, results)
 	})
 
@@ -1512,7 +1512,7 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
 		require.Len(t, results, 3)
 		for _, r := range results {
-			assert.Equal(t, "duplicate rule id 'dup' (appears 3 times)", r.Message)
+			assert.Equal(t, "duplicate rule id in tracking plan rules", r.Message)
 		}
 	})
 
