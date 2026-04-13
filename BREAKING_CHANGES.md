@@ -252,7 +252,7 @@ spec:
 
 **Scope:** spec
 
-**Why:** `$ref` is a JSON Schema artifact that carries no semantic meaning in this context; `property` is clearer. Config keys follow the same snake_case convention as properties. The variant `default` restructuring removes an awkward array-of-objects pattern in favour of an explicit `properties` wrapper that matches the shape used in rules.
+**Why:** `$ref` is a JSON Schema artifact that carries no semantic meaning in this context; `property` is clearer. Config keys follow the same snake_case convention as properties.
 
 **a) `$ref` renamed to `property` in type properties**
 
@@ -290,32 +290,13 @@ config:
   max_length: 255
 ```
 
-**c) Variant `default` restructured from array to object**
-
-```yaml
-# Before (v0.1)
-variants:
-  - type: discriminator
-    default:
-      - $ref: "#/properties/group/prop_a"
-        required: true
-
-# After (v1)
-variants:
-  - type: discriminator
-    default:
-      properties:
-        - property: "#property:prop_a"
-          required: true
-```
-
 ### 6. Tracking plan rule changes
 
 **Scope:** spec
 
-**Why:** The event object wrapper was redundant — `event` now holds a direct reference string, consistent with how other references are expressed. `allow_unplanned` is renamed to `additional_properties` and moved to rule level for clarity. `$ref` is replaced by `property` for the same reasons as in custom types.
+**Why:** The event object wrapper was redundant — `event` now holds a direct reference string, consistent with how other references are expressed. `allow_unplanned` is renamed to `additional_properties` and moved to rule level for clarity. Rule property references follow the same `$ref` → `property` rename as custom types, using compact URNs.
 
-Three structural changes to tracking plan rules:
+Two structural changes to tracking plan rules:
 
 **a) `event` changes from object to direct reference string**
 
@@ -358,32 +339,6 @@ properties:
     required: true
   - property: "#property:password"
     required: true
-```
-
-**c) Variant discriminator and case properties follow the same `$ref` → `property` change**
-
-```yaml
-# Before (v0.1)
-variants:
-  - type: discriminator
-    discriminator: "#/properties/api_tracking/api_method"
-    cases:
-      - display_name: "Create Entity"
-        match: ["POST"]
-        properties:
-          - $ref: "#/properties/api_tracking/user_agent"
-            required: true
-
-# After (v1)
-variants:
-  - type: discriminator
-    discriminator: "#property:api_method"
-    cases:
-      - display_name: "Create Entity"
-        match: ["POST"]
-        properties:
-          - property: "#property:user_agent"
-            required: true
 ```
 
 **Full before/after example:**
@@ -431,7 +386,60 @@ spec:
           required: true
 ```
 
-### 7. Import metadata: `local_id` → `urn`
+### 7. Variant changes
+
+**Scope:** spec
+
+**Why:** Variants appear in both custom types and tracking plan rules. The `default` field is restructured from an array-of-objects pattern to an explicit `properties` wrapper that matches the shape used in rules. All `$ref` fields within variant discriminators and cases follow the same rename to `property` with compact URN references.
+
+Two changes to variant definitions:
+
+**a) Variant `default` restructured from array to object**
+
+```yaml
+# Before (v0.1)
+variants:
+  - type: discriminator
+    default:
+      - $ref: "#/properties/group/prop_a"
+        required: true
+
+# After (v1)
+variants:
+  - type: discriminator
+    default:
+      properties:
+        - property: "#property:prop_a"
+          required: true
+```
+
+**b) Variant discriminator and case properties: `$ref` → `property` with compact URN**
+
+```yaml
+# Before (v0.1)
+variants:
+  - type: discriminator
+    discriminator: "#/properties/api_tracking/api_method"
+    cases:
+      - display_name: "Create Entity"
+        match: ["POST"]
+        properties:
+          - $ref: "#/properties/api_tracking/user_agent"
+            required: true
+
+# After (v1)
+variants:
+  - type: discriminator
+    discriminator: "#property:api_method"
+    cases:
+      - display_name: "Create Entity"
+        match: ["POST"]
+        properties:
+          - property: "#property:user_agent"
+            required: true
+```
+
+### 8. Import metadata: `local_id` → `urn`
 
 **Scope:** spec, import
 
@@ -467,7 +475,7 @@ metadata:
 
 URN format is `<resource-type>:<local-id>`. Resource types include: `property`, `event`, `category`, `custom-type`, `tracking-plan`, `event-stream-source`, `retl-source-sql-model`.
 
-### 8. Event stream source: tracking plan reference
+### 9. Event stream source: tracking plan reference
 
 **Scope:** spec, event-stream
 
