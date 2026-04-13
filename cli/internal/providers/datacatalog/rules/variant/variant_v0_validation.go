@@ -49,13 +49,13 @@ func ValidateVariantSemanticV0(
 			caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", basePath, i, c)
 			results = append(
 				results,
-				CheckDuplicatePropertyRefsV0(vCase.Properties, caseRef)...)
+				checkDuplicatePropertyRefsV0(vCase.Properties, caseRef)...)
 		}
 
 		defaultRef := fmt.Sprintf("%s/variants/%d/default", basePath, i)
 		results = append(
 			results,
-			CheckDuplicatePropertyRefsV0(vt.Default, defaultRef)...)
+			checkDuplicatePropertyRefsV0(vt.Default, defaultRef)...)
 	}
 
 	return results
@@ -122,9 +122,9 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 	}
 }
 
-// CheckDuplicatePropertyRefsV0 dedupes a flat list of V0 variant property refs
+// checkDuplicatePropertyRefsV0 dedupes a flat list of V0 variant property refs
 // and emits one error per occurrence of any ref that appears more than once.
-func CheckDuplicatePropertyRefsV0(props []localcatalog.PropertyReference, parentRef string) []rules.ValidationResult {
+func checkDuplicatePropertyRefsV0(props []localcatalog.PropertyReference, parentRef string) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, prop := range props {
 		counts[prop.Ref]++

@@ -43,21 +43,21 @@ func ValidateVariantSemanticV1(
 			caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", basePath, i, c)
 			results = append(
 				results,
-				CheckDuplicatePropertyRefsV1(vCase.Properties, caseRef)...)
+				checkDuplicatePropertyRefsV1(vCase.Properties, caseRef)...)
 		}
 
 		defaultRef := fmt.Sprintf("%s/variants/%d/default/properties", basePath, i)
 		results = append(
 			results,
-			CheckDuplicatePropertyRefsV1(vt.Default.Properties, defaultRef)...)
+			checkDuplicatePropertyRefsV1(vt.Default.Properties, defaultRef)...)
 	}
 
 	return results
 }
 
-// CheckDuplicatePropertyRefsV1 dedupes a flat list of V1 variant property refs
+// checkDuplicatePropertyRefsV1 dedupes a flat list of V1 variant property refs
 // and emits one error per occurrence of any ref that appears more than once.
-func CheckDuplicatePropertyRefsV1(props []localcatalog.PropertyReferenceV1, parentRef string) []rules.ValidationResult {
+func checkDuplicatePropertyRefsV1(props []localcatalog.PropertyReferenceV1, parentRef string) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, prop := range props {
 		counts[prop.Property]++

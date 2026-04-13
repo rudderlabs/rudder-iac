@@ -316,7 +316,7 @@ func TestCheckDuplicatePropertyRefsV0(t *testing.T) {
 			{Ref: "#/properties/signup-props/name"},
 		}
 
-		results := CheckDuplicatePropertyRefsV0(props, "/rules/0/variants/0/cases/0/properties")
+		results := checkDuplicatePropertyRefsV0(props, "/rules/0/variants/0/cases/0/properties")
 		assert.Empty(t, results)
 	})
 
@@ -329,7 +329,7 @@ func TestCheckDuplicatePropertyRefsV0(t *testing.T) {
 			{Ref: "#/properties/signup-props/email"},
 		}
 
-		results := CheckDuplicatePropertyRefsV0(props, "/rules/0/variants/0/cases/0/properties")
+		results := checkDuplicatePropertyRefsV0(props, "/rules/0/variants/0/cases/0/properties")
 		require.Len(t, results, 2)
 		assert.Equal(t, "/rules/0/variants/0/cases/0/properties/0/$ref", results[0].Reference)
 		assert.Contains(t, results[0].Message, "duplicate property reference in tracking plan event rule")
