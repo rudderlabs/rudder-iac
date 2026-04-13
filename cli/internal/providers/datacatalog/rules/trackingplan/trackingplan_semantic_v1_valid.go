@@ -71,7 +71,7 @@ func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parent
 		if counts[prop.Property] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
-				Message:   "duplicate property reference in tracking plan rules",
+				Message:   "duplicate property reference in tracking plan event rule",
 			})
 		}
 		if len(prop.Properties) > 0 {
@@ -93,7 +93,7 @@ func checkDuplicateVariantPropRefsV1(props []localcatalog.PropertyReferenceV1, p
 		if counts[prop.Property] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
-				Message:   "duplicate property reference in tracking plan rules",
+				Message:   "duplicate property reference in tracking plan event rule",
 			})
 		}
 	}
