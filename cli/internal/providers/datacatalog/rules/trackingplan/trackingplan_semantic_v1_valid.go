@@ -44,17 +44,7 @@ func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.Val
 
 	for i, rule := range spec.Rules {
 		ruleRef := fmt.Sprintf("/rules/%d", i)
-
 		results = append(results, checkDuplicateSiblingPropsV1(rule.Properties, ruleRef+"/properties")...)
-
-		for v, variant := range rule.Variants {
-			for c, vCase := range variant.Cases {
-				caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", ruleRef, v, c)
-				results = append(results, checkDuplicateVariantPropRefsV1(vCase.Properties, caseRef)...)
-			}
-			defaultRef := fmt.Sprintf("%s/variants/%d/default/properties", ruleRef, v)
-			results = append(results, checkDuplicateVariantPropRefsV1(variant.Default.Properties, defaultRef)...)
-		}
 	}
 
 	return results
@@ -82,36 +72,21 @@ func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parent
 	return results
 }
 
-func checkDuplicateVariantPropRefsV1(props []localcatalog.PropertyReferenceV1, parentRef string) []rules.ValidationResult {
-	counts := make(map[string]int)
-	for _, prop := range props {
-		counts[prop.Property]++
-	}
-
-	var results []rules.ValidationResult
-	for i, prop := range props {
-		if counts[prop.Property] > 1 {
-			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
-				Message:   "duplicate property reference in tracking plan event rule",
-			})
-		}
-	}
-	return results
-}
-
 func validateTrackingPlanVariantsV1(spec localcatalog.TrackingPlanV1, graph *resources.Graph) []rules.ValidationResult {
 	var results []rules.ValidationResult
 	for i, rule := range spec.Rules {
 		if len(rule.Variants) == 0 {
 			continue
 		}
+
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+
 		ownRefs := make([]string, 0, len(rule.Properties))
 		for _, prop := range rule.Properties {
 			ownRefs = append(ownRefs, prop.Property)
 		}
-		results = append(results, variant.ValidateVariantDiscriminatorsV1(
-			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
+		results = append(results, variant.ValidateVariantSemanticV1(
+			rule.Variants, ownRefs, ruleRef, graph,
 		)...)
 	}
 	return results

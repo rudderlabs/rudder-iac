@@ -55,17 +55,7 @@ func validateDuplicatePropertiesV0(spec localcatalog.TrackingPlan) []rules.Valid
 
 	for i, rule := range spec.Rules {
 		ruleRef := fmt.Sprintf("/rules/%d", i)
-
 		results = append(results, checkDuplicateSiblingPropsV0(rule.Properties, ruleRef+"/properties")...)
-
-		for v, variant := range rule.Variants {
-			for c, vCase := range variant.Cases {
-				caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", ruleRef, v, c)
-				results = append(results, checkDuplicateVariantPropRefsV0(vCase.Properties, caseRef)...)
-			}
-			defaultRef := fmt.Sprintf("%s/variants/%d/default", ruleRef, v)
-			results = append(results, checkDuplicateVariantPropRefsV0(variant.Default, defaultRef)...)
-		}
 	}
 
 	return results
@@ -93,36 +83,21 @@ func checkDuplicateSiblingPropsV0(props []*localcatalog.TPRuleProperty, parentRe
 	return results
 }
 
-func checkDuplicateVariantPropRefsV0(props []localcatalog.PropertyReference, parentRef string) []rules.ValidationResult {
-	counts := make(map[string]int)
-	for _, prop := range props {
-		counts[prop.Ref]++
-	}
-
-	var results []rules.ValidationResult
-	for i, prop := range props {
-		if counts[prop.Ref] > 1 {
-			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
-				Message:   "duplicate property reference in tracking plan event rule",
-			})
-		}
-	}
-	return results
-}
-
 func validateTrackingPlanVariants(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
 	var results []rules.ValidationResult
 	for i, rule := range spec.Rules {
 		if len(rule.Variants) == 0 {
 			continue
 		}
+
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+
 		ownRefs := make([]string, 0, len(rule.Properties))
 		for _, prop := range rule.Properties {
 			ownRefs = append(ownRefs, prop.Ref)
 		}
-		results = append(results, variant.ValidateVariantDiscriminatorsV0(
-			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
+		results = append(results, variant.ValidateVariantSemanticV0(
+			rule.Variants, ownRefs, ruleRef, graph,
 		)...)
 	}
 

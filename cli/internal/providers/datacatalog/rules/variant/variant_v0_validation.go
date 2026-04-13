@@ -15,11 +15,11 @@ import (
 // validDiscriminatorTypes are the primitive types allowed for discriminator properties.
 var validDiscriminatorTypes = []string{"string", "integer", "boolean"}
 
-// ValidateVariantDiscriminators checks all variants' discriminators for:
-//  1. Type validity — discriminator property must be string, integer, or boolean.
-//     For custom type refs, the referenced custom type's own type is validated.
-//  2. Ownership — discriminator must reference a property in the parent's own properties.
-func ValidateVariantDiscriminatorsV0(
+// ValidateVariantSemanticV0 runs all semantic checks on V0 variants:
+//  1. Discriminator type validity — must be string, integer, or boolean.
+//  2. Discriminator ownership — must reference a property in the parent's own properties.
+//  3. Duplicate property refs — within each case and default property list.
+func ValidateVariantSemanticV0(
 	variants localcatalog.Variants,
 	ownPropertyRefs []string,
 	basePath string,
@@ -27,11 +27,10 @@ func ValidateVariantDiscriminatorsV0(
 ) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
-	for i, variant := range variants {
+	for i, vt := range variants {
 		discriminatorPath := fmt.Sprintf("%s/variants/%d/discriminator", basePath, i)
 
-		// discriminator must be in the parent's own properties
-		if !slices.Contains(ownPropertyRefs, variant.Discriminator) {
+		if !slices.Contains(ownPropertyRefs, vt.Discriminator) {
 			results = append(results, rules.ValidationResult{
 				Reference: discriminatorPath,
 				Message:   "discriminator must reference a property defined in the parent's own properties",
@@ -41,10 +40,22 @@ func ValidateVariantDiscriminatorsV0(
 		results = append(
 			results,
 			validateDiscriminatorType(
-				variant.Discriminator,
+				vt.Discriminator,
 				discriminatorPath,
 				graph,
 			)...)
+
+		for c, vCase := range vt.Cases {
+			caseRef := fmt.Sprintf("%s/variants/%d/cases/%d/properties", basePath, i, c)
+			results = append(
+				results,
+				CheckDuplicatePropertyRefsV0(vCase.Properties, caseRef)...)
+		}
+
+		defaultRef := fmt.Sprintf("%s/variants/%d/default", basePath, i)
+		results = append(
+			results,
+			CheckDuplicatePropertyRefsV0(vt.Default, defaultRef)...)
 	}
 
 	return results
@@ -109,6 +120,26 @@ func validateDiscriminatorType(discriminator, jsonPointer string, graph *resourc
 	default:
 		return nil
 	}
+}
+
+// CheckDuplicatePropertyRefsV0 dedupes a flat list of V0 variant property refs
+// and emits one error per occurrence of any ref that appears more than once.
+func CheckDuplicatePropertyRefsV0(props []localcatalog.PropertyReference, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Ref]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Ref] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/$ref", parentRef, i),
+				Message:   "duplicate property reference in tracking plan event rule",
+			})
+		}
+	}
+	return results
 }
 
 func isAllowedDiscriminatorType(input string) bool {
