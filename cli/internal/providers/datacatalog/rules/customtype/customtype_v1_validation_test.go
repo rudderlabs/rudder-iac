@@ -153,10 +153,10 @@ func TestCustomTypeSpecSyntaxValidRule_V1InvalidSpecs(t *testing.T) {
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{
 					{
-						LocalID: "ct1",
-						Name: "CT1",
-						Type: "array",
-						ItemType: "string",
+						LocalID:   "ct1",
+						Name:      "CT1",
+						Type:      "array",
+						ItemType:  "string",
 						ItemTypes: []string{"number"},
 					},
 				},
@@ -456,13 +456,12 @@ func TestCustomTypeSpecSyntaxValidRule_V1_ItemTypeValidation(t *testing.T) {
 	t.Run("mixed primitives and custom type refs", func(t *testing.T) {
 		t.Parallel()
 
-
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID:  "mixed_list",
-					Name:     "MixedList",
-					Type:     "array",
+					LocalID:   "mixed_list",
+					Name:      "MixedList",
+					Type:      "array",
 					ItemTypes: []string{"#custom-type:Address", "string"},
 				},
 			},
@@ -478,13 +477,12 @@ func TestCustomTypeSpecSyntaxValidRule_V1_ItemTypeValidation(t *testing.T) {
 	t.Run("custom type ref in item_types", func(t *testing.T) {
 		t.Parallel()
 
-
 		spec := localcatalog.CustomTypeSpecV1{
 			Types: []localcatalog.CustomTypeV1{
 				{
-					LocalID:  "mixed_list",
-					Name:     "MixedList",
-					Type:     "array",
+					LocalID:   "mixed_list",
+					Name:      "MixedList",
+					Type:      "array",
 					ItemTypes: []string{"#custom-type:Address"},
 				},
 			},
@@ -495,5 +493,112 @@ func TestCustomTypeSpecSyntaxValidRule_V1_ItemTypeValidation(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/item_types/0", results[0].Reference)
 		assert.Contains(t, results[0].Message, "must be one of [string number integer boolean null array object]")
+	})
+}
+
+func TestCustomTypeSemanticValid_V1_VariantDuplicateProperties(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate in variant case and default properties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("name", "Name", "string"))
+		graph.AddResource(propertyResourceWithType("method", "Method", "string"))
+		graph.AddResource(customTypeResource("ct1", "CT1"))
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "ct1",
+					Name:    "CT1",
+					Type:    "object",
+					Properties: []localcatalog.CustomTypePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:method"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case 1",
+									Match:       []any{"a"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+										{Property: "#property:name"},
+										{Property: "#property:email"},
+									},
+								},
+							},
+							Default: localcatalog.DefaultPropertiesV1{
+								Properties: []localcatalog.PropertyReferenceV1{
+									{Property: "#property:name"},
+									{Property: "#property:name"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+
+		refs := extractRefs(results)
+		msgs := extractMsgs(results)
+
+		assert.Contains(t, refs, "/types/0/variants/0/cases/0/properties/0/property")
+		assert.Contains(t, refs, "/types/0/variants/0/cases/0/properties/2/property")
+		assert.Contains(t, refs, "/types/0/variants/0/default/properties/0/property")
+		assert.Contains(t, refs, "/types/0/variants/0/default/properties/1/property")
+		assert.Contains(t, msgs, "duplicate property reference in tracking plan event rule")
+	})
+
+	t.Run("no duplicates in variant properties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("name", "Name", "string"))
+		graph.AddResource(propertyResourceWithType("method", "Method", "string"))
+		graph.AddResource(customTypeResource("ct1", "CT1"))
+
+		spec := localcatalog.CustomTypeSpecV1{
+			Types: []localcatalog.CustomTypeV1{
+				{
+					LocalID: "ct1",
+					Name:    "CT1",
+					Type:    "object",
+					Properties: []localcatalog.CustomTypePropertyV1{
+						{Property: "#property:email"},
+						{Property: "#property:method"},
+					},
+					Variants: localcatalog.VariantsV1{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCaseV1{
+								{
+									DisplayName: "Case 1",
+									Match:       []any{"a"},
+									Properties: []localcatalog.PropertyReferenceV1{
+										{Property: "#property:email"},
+										{Property: "#property:name"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemanticV1(localcatalog.KindCustomTypes, specs.SpecVersionV1, nil, spec, graph)
+		for _, r := range results {
+			assert.NotEqual(t, "duplicate property reference in tracking plan event rule", r.Message)
+		}
 	})
 }
