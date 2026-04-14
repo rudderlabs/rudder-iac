@@ -25,7 +25,7 @@ Below sections enumerate the changes in the spec format one by one providing the
 
 **Scope:** spec
 
-**Why:** Standardizes the version identifier to a semver-style prefix, eliminating the ambiguous `0.1` / `v0.1` variants.
+**Why:** The field-name, convention, and reference changes in `rudder/v1` break the existing spec contract. The version is bumped to signal the new contract, so tooling and validation can distinguish it from legacy `rudder/0.1`.
 
 All spec files must update the `version` field.
 
