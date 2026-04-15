@@ -63,11 +63,9 @@ typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 
 .PHONY: typer-kotlin-update-testdata
 typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
-	mkdir -p cli/internal/typer/generator/platforms/kotlin/testdata/main/kotlin/com/rudderstack/ruddertyper
-	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go > cli/internal/typer/generator/platforms/kotlin/testdata/validator/src/main/kotlin/com/rudderstack/ruddertyper/Main.kt
+	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go
 
 .PHONY: typer-swift-update-testdata
 typer-swift-update-testdata: ## Update test data for Swift code generation
 	go run cli/internal/typer/generator/platforms/swift/testutils/generate_reference_plan.go \
 	  > cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift
-	  

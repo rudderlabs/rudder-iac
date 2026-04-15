@@ -19,6 +19,9 @@ sealed class {{ .Name }} {
     {{- if $subclass.Comment }}
     /** {{ escapeComment $subclass.Comment }} */
     {{- end }}
+    {{- range $subclass.Annotations }}
+    @{{ . }}
+    {{- end }}
     {{ if $subclass.IsDataClass }}data {{ end }}class {{ $subclass.Name }}{{- if $subclass.Properties }}(
     {{- range $propIndex, $prop := $subclass.Properties }}{{- if $propIndex }},
 {{ end }}
