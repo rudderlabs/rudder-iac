@@ -75,4 +75,4 @@ typer-swift-validate: ## Validate generated Swift code against the RudderStack S
 	mkdir -p cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper
 	cp cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift \
 	   cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper/RudderTyper.swift
-	cd cli/internal/typer/generator/platforms/swift/testdata/validator && swift test
+	cd cli/internal/typer/generator/platforms/swift/testdata/validator && swift test --disable-swift-testing
