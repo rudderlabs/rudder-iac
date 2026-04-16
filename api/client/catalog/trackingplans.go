@@ -384,19 +384,34 @@ func (c *RudderDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context,
 		return nil, fmt.Errorf("decoding tracking plans response: %w", err)
 	}
 
-	// Convert to slice of pointers and fetch full details
-	result := make([]*TrackingPlanWithIdentifiers, len(trackingPlansResp.TrackingPlans))
+	tasks := make([]tasker.Task, len(trackingPlansResp.TrackingPlans))
 	for i := range trackingPlansResp.TrackingPlans {
-		// Get full tracking plan details with events
-		trackingPlan, err := c.GetTrackingPlanWithIdentifiers(
-			ctx,
+		tasks[i] = NewTrackingPlanWithIdentifiersFetchTask(
 			trackingPlansResp.TrackingPlans[i].ID,
 			options.RebuildSchemas,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("fetching tracking plan %s: %w", trackingPlansResp.TrackingPlans[i].ID, err)
+	}
+
+	results := tasker.NewResults[*TrackingPlanWithIdentifiers]()
+	errs := tasker.RunTasks(
+		ctx,
+		tasks,
+		c.concurrency,
+		false,
+		RunTrackingPlanWithIdentifiersFetchTask(ctx, c, results),
+	)
+
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("fetching tracking plans with identifiers: %w", errors.Join(errs...))
+	}
+
+	result := make([]*TrackingPlanWithIdentifiers, len(trackingPlansResp.TrackingPlans))
+	for i, tp := range trackingPlansResp.TrackingPlans {
+		plan, ok := results.Get(tp.ID)
+		if !ok {
+			return nil, fmt.Errorf("tracking plan %s not found in results", tp.ID)
 		}
-		result[i] = trackingPlan
+		result[i] = plan
 	}
 
 	return result, nil
