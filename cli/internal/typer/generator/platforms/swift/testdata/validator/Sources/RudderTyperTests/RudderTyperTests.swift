@@ -46,4 +46,54 @@ final class RudderTyperTests: XCTestCase {
             traits: ["active": false, "email": "jane.smith@example.com"]
         ))
     }
+
+    // MARK: - group
+
+    func testGroup() {
+        typer.group(
+            groupId: "company-xyz-789",
+            traits: GroupTraits(active: true)
+        )
+        analytics.flush()
+
+        validations.validateCount(1)
+        // Traits are routed through options.customContext, not onto GroupEvent.traits.
+        validations.validateNext(.group(groupId: "company-xyz-789", traits: [:]))
+    }
+
+    // MARK: - screen
+
+    func testScreen() {
+        typer.screen(
+            screenName: "Dashboard",
+            properties: ScreenProperties(
+                profile: CustomTypeUserProfile(
+                    email: "user@example.com",
+                    firstName: "Alice",
+                    lastName: "Johnson"
+                )
+            ),
+            category: "Main Navigation"
+        )
+        typer.screen(screenName: "Settings", properties: ScreenProperties())
+        analytics.flush()
+
+        validations.validateCount(2)
+        validations.validateNext(.screen(
+            screenName: "Dashboard",
+            properties: [
+                "profile": [
+                    "email": "user@example.com",
+                    "first_name": "Alice",
+                    "last_name": "Johnson",
+                ],
+                "name": "Dashboard",
+                "category": "Main Navigation",
+            ]
+        ))
+        validations.validateNext(.screen(
+            screenName: "Settings",
+            properties: ["name": "Settings"]
+        ))
+    }
 }
