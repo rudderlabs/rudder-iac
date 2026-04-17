@@ -2,6 +2,7 @@ package retl_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -20,6 +21,16 @@ import (
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// mustMarshalSQLModelConfig encodes a SQL model config into json.RawMessage,
+// panicking on failure. Only for use inside test fixtures.
+func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) json.RawMessage {
+	raw, err := retlClient.MarshalConfig(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("marshalling test SQL model config: %v", err))
+	}
+	return raw
+}
+
 // mockRETLStore mocks the RETL client for testing
 type mockRETLStore struct {
 	retlClient.RETLStore
@@ -29,7 +40,7 @@ type mockRETLStore struct {
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc  func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc  func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -65,9 +76,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx, hasExternalID)
+		return m.listRetlSourcesFunc(ctx, sourceType, hasExternalID)
 	}
 	return &retlClient.RETLSources{}, nil
 }
@@ -127,7 +138,7 @@ func newDefaultMockClient() *mockRETLStore {
 				AccountID:            "acc123",
 				IsEnabled:            true,
 				WorkspaceID:          "test-workspace-id",
-				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
+				Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"}),
 			}, nil
 		},
 		submitPreviewFunc: func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
@@ -406,7 +417,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return &retlClient.RETLSources{
 					Data: []retlClient.RETLSource{
 						{
@@ -416,11 +427,11 @@ func TestProviderList(t *testing.T) {
 							SourceType:           retlClient.ModelSourceType,
 							SourceDefinitionName: "postgres",
 							AccountID:            "account-1",
-							Config: retlClient.RETLSQLModelConfig{
+							Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 								Description: "Test description 1",
 								PrimaryKey:  "id",
 								Sql:         "SELECT * FROM table1",
-							},
+							}),
 						},
 					},
 				}, nil
@@ -446,7 +457,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				if !assert.True(t, *hasExternalID) {
 					return nil, fmt.Errorf("hasExternalID is not true")
 				}
@@ -461,11 +472,11 @@ func TestProviderList(t *testing.T) {
 							SourceDefinitionName: "postgres",
 							AccountID:            "account-1",
 							ExternalID:           externalId,
-							Config: retlClient.RETLSQLModelConfig{
+							Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 								Description: "Test description 1",
 								PrimaryKey:  "id",
 								Sql:         "SELECT * FROM table1",
-							},
+							}),
 						},
 					},
 				}, nil
@@ -484,7 +495,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock error from client that the handler will encounter
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 				return nil, fmt.Errorf("API error")
 			}
 
@@ -670,7 +681,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 
 		// Prepare two sources: one with ExternalID (should be included), one without (should be skipped)
 		externalID := "ext-123"
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 			if hasExternalID == nil || !*hasExternalID {
 				return nil, fmt.Errorf("expected hasExternalID=true filter")
 			}
@@ -683,11 +694,11 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						ExternalID:           externalID,
-						Config: retlClient.RETLSQLModelConfig{
+						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 							Description: "d1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT 1",
-						},
+						}),
 					},
 				},
 			}, nil
@@ -716,7 +727,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
 		provider := retl.New(mockClient)
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 			return nil, fmt.Errorf("API error")
 		}
 
@@ -745,11 +756,11 @@ func TestProviderMapRemoteToState(t *testing.T) {
 			AccountID:            "acc-1",
 			IsEnabled:            true,
 			ExternalID:           extID,
-			Config: retlClient.RETLSQLModelConfig{
+			Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 				Description: "desc-1",
 				PrimaryKey:  "id",
 				Sql:         "SELECT 1",
-			},
+			}),
 		}
 		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
@@ -814,7 +825,7 @@ func TestProviderLoadImportable(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Mock list to return sources that do NOT have ExternalID yet
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 			// Expect false for hasExternalID
 			require.NotNil(t, hasExternalID)
 			require.False(t, *hasExternalID)
@@ -827,11 +838,11 @@ func TestProviderLoadImportable(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						WorkspaceID:          "ws-1",
-						Config: retlClient.RETLSQLModelConfig{
+						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 							Description: "desc-1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT 1",
-						},
+						}),
 					},
 					{
 						ID:                   "source-2",
@@ -840,11 +851,11 @@ func TestProviderLoadImportable(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						WorkspaceID:          "ws-1",
-						Config: retlClient.RETLSQLModelConfig{
+						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 							Description: "desc-2",
 							PrimaryKey:  "user_id",
 							Sql:         "SELECT 2",
-						},
+						}),
 					},
 				},
 			}, nil
@@ -876,7 +887,7 @@ func TestProviderLoadImportable(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
 		provider := retl.New(mockClient)
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 			return nil, fmt.Errorf("API error")
 		}
 
@@ -911,11 +922,11 @@ func TestProviderFormatForExport(t *testing.T) {
 			AccountID:            "acc-1",
 			WorkspaceID:          "ws-1",
 			IsEnabled:            true,
-			Config: retlClient.RETLSQLModelConfig{
+			Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
 				Description: "desc-1",
 				PrimaryKey:  "id",
 				Sql:         "SELECT 1",
-			},
+			}),
 		}
 		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
