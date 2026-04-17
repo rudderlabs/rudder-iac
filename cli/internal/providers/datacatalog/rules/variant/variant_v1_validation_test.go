@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
+func TestValidateVariantSemanticV1_TypeCheck(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid discriminator type — string", func(t *testing.T) {
@@ -32,7 +32,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:signup_method"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:signup_method"}, "/types/0", graph)
 		assert.Empty(t, results, "string type should be valid for discriminator")
 	})
 
@@ -56,7 +56,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:level"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:level"}, "/types/0", graph)
 		assert.Empty(t, results, "integer type should be valid for discriminator")
 	})
 
@@ -80,7 +80,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:is_active"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:is_active"}, "/types/0", graph)
 		assert.Empty(t, results, "boolean type should be valid for discriminator")
 	})
 
@@ -104,7 +104,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:address"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:address"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -131,7 +131,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:tags"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:tags"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "discriminator property type 'array' must contain one of: string, integer, boolean")
@@ -161,7 +161,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:payment_method"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:payment_method"}, "/types/0", graph)
 		assert.Empty(t, results, "custom type ref with valid underlying type should be allowed")
 	})
 
@@ -189,7 +189,7 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:address_field"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:address_field"}, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -217,12 +217,12 @@ func TestValidateVariantDiscriminatorsV1_TypeCheck(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, []string{"#property:missing_prop"}, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, []string{"#property:missing_prop"}, "/types/0", graph)
 		assert.Empty(t, results, "missing ref should be skipped for type check — reported by ValidateReferences")
 	})
 }
 
-func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
+func TestValidateVariantSemanticV1_Ownership(t *testing.T) {
 	t.Parallel()
 
 	t.Run("discriminator exists in own properties", func(t *testing.T) {
@@ -246,7 +246,7 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 		}
 
 		ownRefs := []string{"#property:email", "#property:signup_method"}
-		results := ValidateVariantDiscriminatorsV1(variants, ownRefs, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, ownRefs, "/types/0", graph)
 		assert.Empty(t, results, "discriminator found in own properties — no error")
 	})
 
@@ -271,7 +271,7 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 		}
 
 		ownRefs := []string{"#property:email", "#property:phone"}
-		results := ValidateVariantDiscriminatorsV1(variants, ownRefs, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, ownRefs, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Equal(t, "/types/0/variants/0/discriminator", results[0].Reference)
@@ -298,9 +298,42 @@ func TestValidateVariantDiscriminatorsV1_Ownership(t *testing.T) {
 			},
 		}
 
-		results := ValidateVariantDiscriminatorsV1(variants, nil, "/types/0", graph)
+		results := ValidateVariantSemanticV1(variants, nil, "/types/0", graph)
 
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "must reference a property defined in the parent's own properties")
+	})
+}
+
+func TestCheckDuplicatePropertyRefsV1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no duplicates", func(t *testing.T) {
+		t.Parallel()
+
+		props := []localcatalog.PropertyReferenceV1{
+			{Property: "#property:email"},
+			{Property: "#property:name"},
+		}
+
+		results := checkDuplicatePropertyRefsV1(props, "/rules/0/variants/0/cases/0/properties")
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicates reported at every occurrence", func(t *testing.T) {
+		t.Parallel()
+
+		props := []localcatalog.PropertyReferenceV1{
+			{Property: "#property:email"},
+			{Property: "#property:name"},
+			{Property: "#property:email"},
+		}
+
+		results := checkDuplicatePropertyRefsV1(props, "/rules/0/variants/0/cases/0/properties")
+		require.Len(t, results, 2)
+		assert.Equal(t, "/rules/0/variants/0/cases/0/properties/0/property", results[0].Reference)
+		assert.Contains(t, results[0].Message, "duplicate property reference in tracking plan event rule")
+		assert.Equal(t, "/rules/0/variants/0/cases/0/properties/2/property", results[1].Reference)
+		assert.Contains(t, results[1].Message, "duplicate property reference in tracking plan event rule")
 	})
 }

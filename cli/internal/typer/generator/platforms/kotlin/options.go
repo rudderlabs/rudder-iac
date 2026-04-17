@@ -9,6 +9,7 @@ import (
 type KotlinOptions struct {
 	PackageName    string `mapstructure:"packageName" description:"Package name for generated Kotlin code (e.g., com.example.analytics)"`
 	OutputFileName string `mapstructure:"outputFileName" description:"Name of the generated Kotlin file (e.g., MyEvents.kt). Defaults to Main.kt"`
+	ComposeImmutable bool `mapstructure:"composeImmutable" description:"Add @androidx.compose.runtime.Immutable to generated data classes (and concrete sealed subclasses) so Jetpack Compose treats them as stable. Requires androidx.compose.runtime on the consuming module's classpath."`
 }
 
 // GetAvailableOptions returns metadata about all supported Kotlin options

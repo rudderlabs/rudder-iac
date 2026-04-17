@@ -13,6 +13,10 @@ import (
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 )
 
+// V0 specs are internally converted to V1 ref style before semantic validation runs.
+// Tests in this file use V1-style refs (e.g. #property:email) for V0 specs,
+// not the legacy format (e.g. #/properties/group/email).
+
 // customTypeResource creates a custom-type resource with name in its data.
 func customTypeResource(id, name string) *resources.Resource {
 	data := resources.ResourceData{"name": name}
@@ -658,5 +662,106 @@ func TestCustomTypeSemanticValid_VariantDiscriminator(t *testing.T) {
 
 		results := validateCustomTypeSemantic(localcatalog.KindCustomTypes, specs.SpecVersionV0_1, nil, spec, graph)
 		assert.Empty(t, results, "no variants means no variant errors")
+	})
+}
+
+func TestCustomTypeSemanticValid_VariantDuplicateProperties(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate in variant case and default properties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("name", "Name", "string"))
+		graph.AddResource(propertyResourceWithType("method", "Method", "string"))
+
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID: "ct1",
+					Name:    "CT1",
+					Type:    "object",
+					Properties: []localcatalog.CustomTypeProperty{
+						{Ref: "#property:email"},
+						{Ref: "#property:method"},
+					},
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case 1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#property:email"},
+										{Ref: "#property:name"},
+										{Ref: "#property:email"},
+									},
+								},
+							},
+							Default: []localcatalog.PropertyReference{
+								{Ref: "#property:name"},
+								{Ref: "#property:name"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemantic(localcatalog.KindCustomTypes, specs.SpecVersionV0_1, nil, spec, graph)
+
+		refs := extractRefs(results)
+		msgs := extractMsgs(results)
+
+		assert.Contains(t, refs, "/types/0/variants/0/cases/0/properties/0/$ref")
+		assert.Contains(t, refs, "/types/0/variants/0/cases/0/properties/2/$ref")
+		assert.Contains(t, refs, "/types/0/variants/0/default/0/$ref")
+		assert.Contains(t, refs, "/types/0/variants/0/default/1/$ref")
+		assert.Contains(t, msgs, "duplicate property reference in tracking plan event rule")
+	})
+
+	t.Run("no duplicates in variant properties", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(propertyResourceWithType("email", "Email", "string"))
+		graph.AddResource(propertyResourceWithType("name", "Name", "string"))
+		graph.AddResource(propertyResourceWithType("method", "Method", "string"))
+
+		spec := localcatalog.CustomTypeSpec{
+			Types: []localcatalog.CustomType{
+				{
+					LocalID: "ct1",
+					Name:    "CT1",
+					Type:    "object",
+					Properties: []localcatalog.CustomTypeProperty{
+						{Ref: "#property:email"},
+						{Ref: "#property:method"},
+					},
+					Variants: localcatalog.Variants{
+						{
+							Type:          "discriminator",
+							Discriminator: "#property:method",
+							Cases: []localcatalog.VariantCase{
+								{
+									DisplayName: "Case 1",
+									Properties: []localcatalog.PropertyReference{
+										{Ref: "#property:email"},
+										{Ref: "#property:name"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		results := validateCustomTypeSemantic(localcatalog.KindCustomTypes, specs.SpecVersionV0_1, nil, spec, graph)
+		for _, r := range results {
+			assert.NotEqual(t, "duplicate property reference in tracking plan event rule", r.Message)
+		}
 	})
 }
