@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.15.0](https://github.com/rudderlabs/rudder-iac/compare/v0.14.0...v0.15.0) (2026-04-17)
+
+
+### Features
+
+* **typer-kotlin:** support custom annotation or compose stability via composeStable option ([#461](https://github.com/rudderlabs/rudder-iac/issues/461)) ([4c39af5](https://github.com/rudderlabs/rudder-iac/commit/4c39af59053ddbd8ee4a0d1bbd42ca6dbb0163e9))
+
+
+### Bug Fixes
+
+* **typer/swift:** wrap multi-type union defaults in case constructors ([#514](https://github.com/rudderlabs/rudder-iac/issues/514)) ([475a159](https://github.com/rudderlabs/rudder-iac/commit/475a159e74afb95fc6504f28af2992519208da52))
+* **typer:** redirect testutils warnings to stderr ([#515](https://github.com/rudderlabs/rudder-iac/issues/515)) ([3350f71](https://github.com/rudderlabs/rudder-iac/commit/3350f719042e80b8aeb1e3375fc5a8860db076cf))
+
+
+### Miscellaneous
+
+* **vuln:** pin and bump action refs (SEC-171) ([#507](https://github.com/rudderlabs/rudder-iac/issues/507)) ([873bc05](https://github.com/rudderlabs/rudder-iac/commit/873bc059564e72076a8ee98d299240ac5ef974b8))
+
 ## [0.14.0](https://github.com/rudderlabs/rudder-iac/compare/v0.13.1...v0.14.0) (2026-04-14)
 
 
