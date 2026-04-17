@@ -17,6 +17,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
+// modelSourceTypeFilter is the sourceType query value passed to
+// ListRetlSources. The sqlmodel handler only cares about SQL model sources.
+const modelSourceTypeFilter = string(retlClient.ModelSourceType)
+
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
 	client    retlClient.RETLStore
@@ -184,9 +188,14 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
+	cfg := toRETLSQLModelConfig(data)
+	rawCfg, err := retlClient.MarshalConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("encoding SQL model config: %w", err)
+	}
 	source := &retlClient.RETLSourceCreateRequest{
 		Name:                 data[DisplayNameKey].(string),
-		Config:               toRETLSQLModelConfig(data),
+		Config:               rawCfg,
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
@@ -194,13 +203,12 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 		ExternalID:           ID,
 	}
 
-	// Call API to create RETL source
 	resp, err := h.client.CreateRetlSource(ctx, source)
 	if err != nil {
 		return nil, fmt.Errorf("creating RETL source: %w", err)
 	}
 
-	return toResourceData(resp), nil
+	return toResourceData(resp)
 }
 
 // Update updates an existing SQL Model resource
@@ -219,20 +227,24 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 }
 
 func (h *Handler) updateCall(ctx context.Context, sourceID string, data resources.ResourceData) (*resources.ResourceData, error) {
+	cfg := toRETLSQLModelConfig(data)
+	rawCfg, err := retlClient.MarshalConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("encoding SQL model config: %w", err)
+	}
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name:      data[DisplayNameKey].(string),
-		Config:    toRETLSQLModelConfig(data),
+		Config:    rawCfg,
 		IsEnabled: data[EnabledKey].(bool),
 		AccountID: data[AccountIDKey].(string),
 	}
 
-	// Call API to update RETL source
 	resp, err := h.client.UpdateRetlSource(ctx, sourceID, source)
 	if err != nil {
 		return nil, fmt.Errorf("updating RETL source: %w", err)
 	}
 
-	return toResourceData(resp), nil
+	return toResourceData(resp)
 }
 
 // Delete deletes an existing SQL Model resource
@@ -252,15 +264,19 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 }
 
 func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error) {
-	sources, err := h.client.ListRetlSources(ctx, hasExternalId)
+	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, hasExternalId)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
 	re := regexp.MustCompile(`\s+`)
 	var resourceData []resources.ResourceData
 	for _, source := range sources.Data {
+		cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](source.Config)
+		if err != nil {
+			return nil, fmt.Errorf("decoding SQL model config for source %s: %w", source.ID, err)
+		}
 		// Replace newlines with spaces and collapse multiple spaces into one
-		sql := re.ReplaceAllString(source.Config.Sql, " ")
+		sql := re.ReplaceAllString(cfg.Sql, " ")
 		resourceData = append(resourceData, resources.ResourceData{
 			IDKey:               source.ID,
 			"name":              source.Name,
@@ -269,9 +285,9 @@ func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.Re
 			CreatedAtKey:        source.CreatedAt,
 			UpdatedAtKey:        source.UpdatedAt,
 			"config": map[string]interface{}{
-				PrimaryKeyKey:  source.Config.PrimaryKey,
+				PrimaryKeyKey:  cfg.PrimaryKey,
 				SQLKey:         sql,
-				DescriptionKey: source.Config.Description,
+				DescriptionKey: cfg.Description,
 			},
 		})
 	}
@@ -290,22 +306,21 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("setting external ID for RETL source: %w", err)
 	}
 
+	existing, err := toResourceData(existingSource)
+	if err != nil {
+		return nil, err
+	}
+
 	existingState := &SQLModelResource{}
-	existingState.FromResourceData(*toResourceData(existingSource))
+	existingState.FromResourceData(*existing)
 
 	currentState := &SQLModelResource{}
 	currentState.FromResourceData(data)
 
-	changed := currentState.DiffUpstream(existingState)
-	result := toResourceData(existingSource)
-	if changed {
-		updatedData, err := h.updateCall(ctx, remoteId, data)
-		if err != nil {
-			return nil, fmt.Errorf("updating RETL source: %w", err)
-		}
-		result = updatedData
+	if currentState.DiffUpstream(existingState) {
+		return h.updateCall(ctx, remoteId, data)
 	}
-	return result, nil
+	return existing, nil
 }
 
 func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (writer.FormattableEntity, error) {
@@ -326,16 +341,21 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 		return writer.FormattableEntity{}, fmt.Errorf("source %s is not a SQL model (type: %s)", args.RemoteID, source.SourceType)
 	}
 
+	cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](source.Config)
+	if err != nil {
+		return writer.FormattableEntity{}, fmt.Errorf("decoding SQL model config for source %s: %w", args.RemoteID, err)
+	}
+
 	// Create the base resource data structure for the imported source
 	importedData := resources.ResourceData{
 		IDKey:               args.LocalID,
 		DisplayNameKey:      source.Name,
-		DescriptionKey:      source.Config.Description,
+		DescriptionKey:      cfg.Description,
 		AccountIDKey:        source.AccountID,
-		PrimaryKeyKey:       source.Config.PrimaryKey,
+		PrimaryKeyKey:       cfg.PrimaryKey,
 		SourceDefinitionKey: source.SourceDefinitionName,
 		EnabledKey:          source.IsEnabled,
-		SQLKey:              source.Config.Sql,
+		SQLKey:              cfg.Sql,
 	}
 
 	importMetadata := specs.Metadata{
@@ -379,7 +399,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	hasExternalID := true
-	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
+	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, &hasExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
@@ -403,17 +423,24 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to retl source")
 		}
+		cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](source.Config)
+		if err != nil {
+			return nil, fmt.Errorf("decoding SQL model config for source %s: %w", source.ID, err)
+		}
+		output, err := toResourceData(&source)
+		if err != nil {
+			return nil, err
+		}
 		input := resources.ResourceData{
 			DisplayNameKey:      source.Name,
-			DescriptionKey:      source.Config.Description,
+			DescriptionKey:      cfg.Description,
 			AccountIDKey:        source.AccountID,
-			PrimaryKeyKey:       source.Config.PrimaryKey,
-			SQLKey:              source.Config.Sql,
+			PrimaryKeyKey:       cfg.PrimaryKey,
+			SQLKey:              cfg.Sql,
 			EnabledKey:          source.IsEnabled,
 			SourceDefinitionKey: source.SourceDefinitionName,
 			LocalIDKey:          source.ExternalID,
 		}
-		output := toResourceData(&source)
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     source.ExternalID,
@@ -427,7 +454,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	hasExternalID := false
-	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)
+	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, &hasExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
@@ -465,6 +492,10 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to retl source")
 		}
+		cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](sourceData.Config)
+		if err != nil {
+			return nil, fmt.Errorf("decoding SQL model config for source %s: %w", sourceData.ID, err)
+		}
 		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
 		workspaceMetadata.Resources = []specs.ImportIds{
@@ -492,10 +523,10 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			Metadata: metadataMap,
 			Spec: map[string]interface{}{
 				DisplayNameKey:      sourceData.Name,
-				DescriptionKey:      sourceData.Config.Description,
+				DescriptionKey:      cfg.Description,
 				AccountIDKey:        sourceData.AccountID,
-				PrimaryKeyKey:       sourceData.Config.PrimaryKey,
-				SQLKey:              sourceData.Config.Sql,
+				PrimaryKeyKey:       cfg.PrimaryKey,
+				SQLKey:              cfg.Sql,
 				SourceDefinitionKey: sourceData.SourceDefinitionName,
 				EnabledKey:          sourceData.IsEnabled,
 				IDKey:               source.ExternalID,
@@ -509,13 +540,17 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 	return result, nil
 }
 
-func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
+func toResourceData(source *retlClient.RETLSource) (*resources.ResourceData, error) {
+	cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](source.Config)
+	if err != nil {
+		return nil, fmt.Errorf("decoding SQL model config for source %s: %w", source.ID, err)
+	}
 	result := resources.ResourceData{
 		DisplayNameKey:      source.Name,
-		DescriptionKey:      source.Config.Description,
+		DescriptionKey:      cfg.Description,
 		AccountIDKey:        source.AccountID,
-		PrimaryKeyKey:       source.Config.PrimaryKey,
-		SQLKey:              source.Config.Sql,
+		PrimaryKeyKey:       cfg.PrimaryKey,
+		SQLKey:              cfg.Sql,
 		IDKey:               source.ID,
 		SourceTypeKey:       source.SourceType,
 		EnabledKey:          source.IsEnabled,
@@ -528,7 +563,7 @@ func toResourceData(source *retlClient.RETLSource) *resources.ResourceData {
 	if source.UpdatedAt != nil {
 		result[UpdatedAtKey] = source.UpdatedAt
 	}
-	return &result
+	return &result, nil
 }
 
 func toRETLSQLModelConfig(data resources.ResourceData) retlClient.RETLSQLModelConfig {

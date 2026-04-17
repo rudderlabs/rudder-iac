@@ -26,8 +26,9 @@ type RETLSourceStore interface {
 	// GetRetlSource retrieves a RETL source by ID
 	GetRetlSource(ctx context.Context, id string) (*RETLSource, error)
 
-	// ListRetlSources lists all RETL sources
-	ListRetlSources(ctx context.Context, hasExternalId *bool) (*RETLSources, error)
+	// ListRetlSources lists RETL sources, optionally filtered by sourceType.
+	// Pass an empty sourceType to return sources of all types.
+	ListRetlSources(ctx context.Context, sourceType string, hasExternalId *bool) (*RETLSources, error)
 
 	// SetExternalId sets the external ID for a RETL source
 	SetExternalId(ctx context.Context, id string, externalId string) error
