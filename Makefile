@@ -69,3 +69,10 @@ typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
 typer-swift-update-testdata: ## Update test data for Swift code generation
 	go run cli/internal/typer/generator/platforms/swift/testutils/generate_reference_plan.go \
 	  > cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift
+
+.PHONY: typer-swift-validate
+typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
+	mkdir -p cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper
+	cp cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift \
+	   cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper/RudderTyper.swift
+	cd cli/internal/typer/generator/platforms/swift/testdata/validator && swift test --disable-swift-testing
