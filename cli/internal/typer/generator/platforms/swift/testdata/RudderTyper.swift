@@ -82,7 +82,7 @@ public enum CustomTypeFeatureConfig {
         /// User's age
         public let age: CustomTypeAge?
         /// Feature flag that can be boolean or string
-        public let featureFlag: PropertyFeatureFlag = true
+        public let featureFlag: PropertyFeatureFlag = .bool(true)
         public init(age: CustomTypeAge? = nil) {
             self.age = age
         }
@@ -99,7 +99,7 @@ public enum CustomTypeFeatureConfig {
     /// Feature disabled (boolean false)
     public struct CaseDisabled {
         /// Feature flag that can be boolean or string
-        public let featureFlag: PropertyFeatureFlag = false
+        public let featureFlag: PropertyFeatureFlag = .bool(false)
         /// User's first name
         public let firstName: PropertyFirstName?
         public init(firstName: PropertyFirstName? = nil) {
@@ -118,7 +118,7 @@ public enum CustomTypeFeatureConfig {
     /// Feature in beta (string 'beta')
     public struct CaseBeta {
         /// Feature flag that can be boolean or string
-        public let featureFlag: PropertyFeatureFlag = "beta"
+        public let featureFlag: PropertyFeatureFlag = .string("beta")
         /// User tags as array of strings
         public let tags: PropertyTags?
         public init(tags: PropertyTags? = nil) {
