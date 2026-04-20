@@ -732,7 +732,6 @@ func TestCreateRetlSourceS3TableWithoutPrimaryKey(t *testing.T) {
 	decodedConfig, err := retl.DecodeConfig[retl.RETLS3TableConfig](created.Config)
 	require.NoError(t, err)
 	assert.Equal(t, sourceConfig, decodedConfig)
-	assert.Empty(t, decodedConfig.PrimaryKey, "primaryKey should not be set on the S3 config round-trip")
 
 	httpClient.AssertNumberOfCalls()
 }

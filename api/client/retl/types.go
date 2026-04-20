@@ -69,7 +69,6 @@ type RETLTableConfig struct {
 // RETLS3TableConfig is the config shape for S3 TABLE sources
 // (sourceDefinitionName = s3). primaryKey is optional on S3.
 type RETLS3TableConfig struct {
-	PrimaryKey   string `json:"primaryKey,omitempty"`
 	BucketName   string `json:"bucketName"`
 	ObjectPrefix string `json:"objectPrefix,omitempty"`
 }
