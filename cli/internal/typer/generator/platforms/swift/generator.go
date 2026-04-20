@@ -615,6 +615,27 @@ func createMultiTypeEnum(name, comment string, types []plan.PropertyType) (*Swif
 	return &SwiftMultiTypeEnum{Name: name, Comment: comment, Cases: cases}, nil
 }
 
+// multiTypeLiteral formats a discriminator literal as a multi-type enum case
+// expression (e.g. `.bool(true)`, `.string("beta")`) so it type-checks against
+// the generated union enum.
+func multiTypeLiteral(value any) string {
+	if value == nil {
+		return ".null"
+	}
+	switch value.(type) {
+	case string:
+		return fmt.Sprintf(".string(%s)", FormatSwiftLiteral(value))
+	case int, int32, int64:
+		return fmt.Sprintf(".int(%s)", FormatSwiftLiteral(value))
+	case float32, float64:
+		return fmt.Sprintf(".double(%s)", FormatSwiftLiteral(value))
+	case bool:
+		return fmt.Sprintf(".bool(%s)", FormatSwiftLiteral(value))
+	default:
+		return FormatSwiftLiteral(value)
+	}
+}
+
 func primitiveToMultiTypeCase(t plan.PrimitiveType) (SwiftMultiTypeCase, error) {
 	switch t {
 	case plan.PrimitiveTypeString:
@@ -676,6 +697,10 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 					// must use enum case syntax (.post) rather than a string literal ("POST").
 					if strings.HasSuffix(prop.SerializeExpr, ".rawValue") {
 						prop.ConstantValue = "." + FormatEnumCaseName(matchStr)
+					} else if strings.HasSuffix(prop.SerializeExpr, ".value") {
+						// Multi-type union enum: wrap the literal in the matching
+						// case constructor so the default type-checks against the union.
+						prop.ConstantValue = multiTypeLiteral(vc.Match[0])
 					} else {
 						prop.ConstantValue = FormatSwiftLiteral(vc.Match[0])
 					}
