@@ -62,6 +62,14 @@ type Spec struct {
 	Kind     string         `yaml:"kind"`
 	Metadata map[string]any `yaml:"metadata"`
 	Spec     map[string]any `yaml:"spec"`
+
+	originalNode *yaml.Node
+}
+
+// OriginalNode returns the yaml.Node parsed from the spec's source bytes.
+// Used by the migrate write path to preserve the original key order in output.
+func (s *Spec) OriginalNode() *yaml.Node {
+	return s.originalNode
 }
 
 // IsLegacyVersion returns true if the spec version is a legacy version (rudder/0.1 or rudder/v0.1)
@@ -109,6 +117,13 @@ func New(data []byte) (*Spec, error) {
 
 	if err := decoder.Decode(&spec); err != nil {
 		return nil, fmt.Errorf("unmarshaling yaml: %w", err)
+	}
+
+	// Decode a second time as yaml.Node so downstream writers (e.g. migrate)
+	// can reorder output to match the original file's key order.
+	var node yaml.Node
+	if err := yaml.Unmarshal(data, &node); err == nil {
+		spec.originalNode = &node
 	}
 
 	return &spec, nil
