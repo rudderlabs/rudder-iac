@@ -1,0 +1,42 @@
+name: typer swift validate
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "cli/internal/typer/generator/platforms/swift/**"
+      - ".github/workflows/typer-swift-validate.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cli/internal/typer/generator/platforms/swift/**"
+      - ".github/workflows/typer-swift-validate.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typer-swift-validate:
+    name: validate generated Swift against RudderStack Swift SDK
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: swift version
+        run: swift --version
+
+      - name: run typer-swift-validate
+        run: make typer-swift-validate
