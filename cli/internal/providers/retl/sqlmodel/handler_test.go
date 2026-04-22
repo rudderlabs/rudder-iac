@@ -91,8 +91,8 @@ func createTestSpecMap(fields map[string]interface{}) *specs.Spec {
 }
 
 // mockListRetlSources creates a mock list function that returns the given sources
-func mockListRetlSources(sources ...retlClient.RETLSource) func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
-	return func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func mockListRetlSources(sources ...retlClient.RETLSource) func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+	return func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 		return &retlClient.RETLSources{Data: sources}, nil
 	}
 }
@@ -107,7 +107,7 @@ type mockRETLClient struct {
 	updateError                bool
 	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc        func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc        func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
 	getRetlSourceFunc          func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -175,9 +175,9 @@ func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) 
 	return nil
 }
 
-func (m *mockRETLClient) ListRetlSources(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx, sourceType, hasExternalID)
+		return m.listRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{
 		Data: []retlClient.RETLSource{
@@ -1216,7 +1216,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 			mockClient := &mockRETLClient{
 				sourceID: "src123",
-				listRetlSourcesFunc: func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+				listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 					return nil, fmt.Errorf("API error")
 				},
 			}
@@ -1488,7 +1488,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 
 			mockClient := &mockRETLClient{
-				listRetlSourcesFunc: func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+				listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 					return nil, fmt.Errorf("API error listing sources")
 				},
 			}
@@ -1672,7 +1672,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("API error", func(t *testing.T) {
 			t.Parallel()
-			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 				return nil, fmt.Errorf("api")
 			}}
 			h := sqlmodel.NewHandler(mockClient, "retl")

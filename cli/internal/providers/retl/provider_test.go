@@ -40,7 +40,7 @@ type mockRETLStore struct {
 	updateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc  func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc  func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -76,9 +76,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx, sourceType, hasExternalID)
+		return m.listRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{}, nil
 }
@@ -125,7 +125,6 @@ func newDefaultMockClient() *mockRETLStore {
 			return nil
 		},
 		getRetlSourceFunc: func(ctx context.Context, id string) (*retlClient.RETLSource, error) {
-
 			if id == "remote-id-not-found" {
 				return nil, fmt.Errorf("retl source not found")
 			}
@@ -417,7 +416,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 				return &retlClient.RETLSources{
 					Data: []retlClient.RETLSource{
 						{
@@ -457,8 +456,13 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock successful listing in the client that the handler will use
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
-				if !assert.True(t, *hasExternalID) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+				resolved := retlClient.ListRetlSourcesOptions{}
+				for _, opt := range opts {
+					opt(&resolved)
+				}
+				hasExternalID := resolved.HasExternalId
+				if !assert.NotNil(t, hasExternalID) || !assert.True(t, *hasExternalID) {
 					return nil, fmt.Errorf("hasExternalID is not true")
 				}
 				externalId := "ext-123"
@@ -495,7 +499,7 @@ func TestProviderList(t *testing.T) {
 			provider := retl.New(mockClient)
 
 			// Mock error from client that the handler will encounter
-			mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+			mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 				return nil, fmt.Errorf("API error")
 			}
 
@@ -681,7 +685,12 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 
 		// Prepare two sources: one with ExternalID (should be included), one without (should be skipped)
 		externalID := "ext-123"
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+			resolved := retlClient.ListRetlSourcesOptions{}
+			for _, opt := range opts {
+				opt(&resolved)
+			}
+			hasExternalID := resolved.HasExternalId
 			if hasExternalID == nil || !*hasExternalID {
 				return nil, fmt.Errorf("expected hasExternalID=true filter")
 			}
@@ -727,7 +736,7 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
 		provider := retl.New(mockClient)
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 			return nil, fmt.Errorf("API error")
 		}
 
@@ -825,8 +834,13 @@ func TestProviderLoadImportable(t *testing.T) {
 		provider := retl.New(mockClient)
 
 		// Mock list to return sources that do NOT have ExternalID yet
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 			// Expect false for hasExternalID
+			resolved := retlClient.ListRetlSourcesOptions{}
+			for _, opt := range opts {
+				opt(&resolved)
+			}
+			hasExternalID := resolved.HasExternalId
 			require.NotNil(t, hasExternalID)
 			require.False(t, *hasExternalID)
 			return &retlClient.RETLSources{
@@ -887,7 +901,7 @@ func TestProviderLoadImportable(t *testing.T) {
 		t.Parallel()
 		mockClient := newDefaultMockClient()
 		provider := retl.New(mockClient)
-		mockClient.listRetlSourcesFunc = func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+		mockClient.listRetlSourcesFunc = func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 			return nil, fmt.Errorf("API error")
 		}
 

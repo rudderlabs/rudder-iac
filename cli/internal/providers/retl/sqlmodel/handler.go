@@ -264,7 +264,7 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 }
 
 func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.ResourceData, error) {
-	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, hasExternalId)
+	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(modelSourceTypeFilter), retlClient.WithHasExternalId(hasExternalId))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
@@ -399,7 +399,7 @@ func (h *Handler) FetchImportData(ctx context.Context, args specs.ImportIds) (wr
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	hasExternalID := true
-	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, &hasExternalID)
+	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(modelSourceTypeFilter), retlClient.WithHasExternalId(&hasExternalID))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
@@ -454,7 +454,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	hasExternalID := false
-	sources, err := h.client.ListRetlSources(ctx, modelSourceTypeFilter, &hasExternalID)
+	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(modelSourceTypeFilter), retlClient.WithHasExternalId(&hasExternalID))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}

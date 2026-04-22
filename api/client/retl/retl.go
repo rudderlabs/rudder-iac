@@ -12,6 +12,25 @@ type RETLStore interface {
 	PreviewStore
 }
 
+type ListRetlSourcesOption func(*ListRetlSourcesOptions)
+
+func WithSourceType(sourceType string) ListRetlSourcesOption {
+	return func(o *ListRetlSourcesOptions) {
+		o.SourceType = sourceType
+	}
+}
+
+func WithHasExternalId(hasExternalId *bool) ListRetlSourcesOption {
+	return func(o *ListRetlSourcesOptions) {
+		o.HasExternalId = hasExternalId
+	}
+}
+
+type ListRetlSourcesOptions struct {
+	SourceType    string
+	HasExternalId *bool
+}
+
 // RETLSourceStore is the interface for RETL source operations
 type RETLSourceStore interface {
 	// CreateRetlSource creates a new RETL source
@@ -28,7 +47,7 @@ type RETLSourceStore interface {
 
 	// ListRetlSources lists RETL sources, optionally filtered by sourceType.
 	// Pass an empty sourceType to return sources of all types.
-	ListRetlSources(ctx context.Context, sourceType string, hasExternalId *bool) (*RETLSources, error)
+	ListRetlSources(ctx context.Context, opts ...ListRetlSourcesOption) (*RETLSources, error)
 
 	// SetExternalId sets the external ID for a RETL source
 	SetExternalId(ctx context.Context, id string, externalId string) error

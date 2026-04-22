@@ -227,7 +227,7 @@ func TestListRetlSources(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	sources, err := retlClient.ListRetlSources(context.Background(), "", nil)
+	sources, err := retlClient.ListRetlSources(context.Background())
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 2)
@@ -286,7 +286,11 @@ func TestListRetlSourcesWithExternalID(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	hasExternalID := true
-	sources, err := retlClient.ListRetlSources(context.Background(), string(retl.ModelSourceType), &hasExternalID)
+	sources, err := retlClient.ListRetlSources(
+		context.Background(),
+		retl.WithSourceType(string(retl.ModelSourceType)),
+		retl.WithHasExternalId(&hasExternalID),
+	)
 	require.NoError(t, err)
 
 	assert.Len(t, sources.Data, 1)
@@ -408,7 +412,7 @@ func TestListRetlSourcesAPIError(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background(), "", nil)
+	_, err = retlClient.ListRetlSources(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listing RETL sources")
 
@@ -456,7 +460,7 @@ func TestListRetlSourcesMalformedResponse(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background(), "", nil)
+	_, err = retlClient.ListRetlSources(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshalling response")
 
@@ -818,7 +822,7 @@ func TestListRetlSourcesFilterByTable(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background(), string(retl.TableSourceType), nil)
+	_, err = retlClient.ListRetlSources(context.Background(), retl.WithSourceType(string(retl.TableSourceType)))
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
@@ -842,7 +846,7 @@ func TestListRetlSourcesNoFilter(t *testing.T) {
 
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.ListRetlSources(context.Background(), "", nil)
+	_, err = retlClient.ListRetlSources(context.Background())
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
