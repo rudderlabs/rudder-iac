@@ -318,7 +318,11 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 	currentState.FromResourceData(data)
 
 	if currentState.DiffUpstream(existingState) {
-		return h.updateCall(ctx, remoteId, data)
+		updated, err := h.updateCall(ctx, remoteId, data)
+		if err != nil {
+			return nil, fmt.Errorf("importing RETL source: %w", err)
+		}
+		return updated, nil
 	}
 	return existing, nil
 }
