@@ -61,6 +61,8 @@ var sourceDefinitions = []string{
 	"node",
 	"ruby",
 	"unity",
+	"swift",
+	"kotlin",
 }
 
 // SourceSpec mirrors the YAML spec structure. JSON tags enable the typed rule engine's
@@ -69,7 +71,7 @@ var sourceDefinitions = []string{
 type SourceSpec struct {
 	LocalID          string                `json:"id"         mapstructure:"id"         validate:"required"`
 	Name             string                `json:"name"       mapstructure:"name"       validate:"required"`
-	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity"`
+	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin"`
 	Enabled          *bool                 `json:"enabled"    mapstructure:"enabled"`
 	Governance       *SourceGovernanceSpec `json:"governance" mapstructure:"governance"`
 }
