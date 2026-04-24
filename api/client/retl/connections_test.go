@@ -268,7 +268,7 @@ func TestListConnections_WithFiltersAndPaging(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestSetConnectionExternalID(t *testing.T) {
+func TestSetConnectionExternalId(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"externalId": "ext-123"}`
@@ -282,7 +282,7 @@ func TestSetConnectionExternalID(t *testing.T) {
 	require.NoError(t, err)
 	retlClient := retl.NewRudderRETLStore(c)
 
-	err = retlClient.SetConnectionExternalID(context.Background(), &retl.SetRETLConnectionExternalIDRequest{
+	err = retlClient.SetConnectionExternalId(context.Background(), &retl.SetRETLConnectionExternalIDRequest{
 		ID:         "conn-1",
 		ExternalID: "ext-123",
 	})
@@ -307,7 +307,7 @@ func TestConnection_EmptyIDErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection ID cannot be empty")
 
-	err = retlClient.SetConnectionExternalID(context.Background(), &retl.SetRETLConnectionExternalIDRequest{ID: "", ExternalID: "x"})
+	err = retlClient.SetConnectionExternalId(context.Background(), &retl.SetRETLConnectionExternalIDRequest{ID: "", ExternalID: "x"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection ID cannot be empty")
 }
@@ -349,6 +349,10 @@ func TestConnection_NilRequestErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "request cannot be nil")
 
 	_, err = retlClient.UpdateConnection(context.Background(), "conn-1", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "request cannot be nil")
+
+	err = retlClient.SetConnectionExternalId(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "request cannot be nil")
 }
@@ -431,7 +435,7 @@ func TestDeleteConnection_APIError(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestSetConnectionExternalID_APIError(t *testing.T) {
+func TestSetConnectionExternalId_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1/external-id", "")
@@ -444,7 +448,7 @@ func TestSetConnectionExternalID_APIError(t *testing.T) {
 	require.NoError(t, err)
 	retlClient := retl.NewRudderRETLStore(c)
 
-	err = retlClient.SetConnectionExternalID(context.Background(), &retl.SetRETLConnectionExternalIDRequest{
+	err = retlClient.SetConnectionExternalId(context.Background(), &retl.SetRETLConnectionExternalIDRequest{
 		ID:         "conn-1",
 		ExternalID: "ext-123",
 	})

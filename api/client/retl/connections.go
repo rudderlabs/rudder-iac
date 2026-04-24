@@ -147,9 +147,12 @@ func (r *RudderRETLStore) ListConnections(ctx context.Context, req *ListRETLConn
 	return &result, nil
 }
 
-// SetConnectionExternalID sets the external ID for a RETL connection.
-func (r *RudderRETLStore) SetConnectionExternalID(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error {
-	if req == nil || req.ID == "" {
+// SetConnectionExternalId sets the external ID for a RETL connection.
+func (r *RudderRETLStore) SetConnectionExternalId(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error {
+	if req == nil {
+		return fmt.Errorf("request cannot be nil")
+	}
+	if req.ID == "" {
 		return fmt.Errorf("connection ID cannot be empty")
 	}
 

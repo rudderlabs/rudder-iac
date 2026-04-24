@@ -30,8 +30,8 @@ type RETLConnectionStore interface {
 	// ListConnections returns a paginated list of RETL connections matching the provided filters.
 	ListConnections(ctx context.Context, req *ListRETLConnectionsRequest) (*RETLConnectionsPage, error)
 
-	// SetConnectionExternalID sets the external ID for a RETL connection.
-	SetConnectionExternalID(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
+	// SetConnectionExternalId sets the external ID for a RETL connection.
+	SetConnectionExternalId(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
 }
 
 // RETLSourceStore is the interface for RETL source operations

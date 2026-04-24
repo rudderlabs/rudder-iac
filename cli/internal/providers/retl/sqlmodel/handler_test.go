@@ -233,8 +233,8 @@ func (m *mockRETLClient) ListConnections(ctx context.Context, req *retlClient.Li
 	return nil, unexpectedConnectionCall("ListConnections")
 }
 
-func (m *mockRETLClient) SetConnectionExternalID(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
-	return unexpectedConnectionCall("SetConnectionExternalID")
+func (m *mockRETLClient) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
+	return unexpectedConnectionCall("SetConnectionExternalId")
 }
 
 func TestSQLModelHandler(t *testing.T) {

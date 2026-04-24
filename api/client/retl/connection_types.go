@@ -148,8 +148,8 @@ type ListRETLConnectionsRequest struct {
 // SetRETLConnectionExternalIDRequest is the request for setting a connection's
 // external ID.
 type SetRETLConnectionExternalIDRequest struct {
-	ID         string
-	ExternalID string
+	ID         string `json:"id,omitempty"`
+	ExternalID string `json:"externalId"`
 }
 
 // RETLConnectionsPage is the paginated response from GET /v2/retl-connections.
