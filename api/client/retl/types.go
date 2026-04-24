@@ -21,34 +21,34 @@ const (
 
 // RETLSource represents a RETL source in the API
 type RETLSource struct {
-	ID                   string          `json:"id"`
-	Name                 string          `json:"name"`
-	Config               json.RawMessage `json:"config"`
-	IsEnabled            bool            `json:"enabled"`
-	SourceType           SourceType      `json:"sourceType"`
-	SourceDefinitionName string          `json:"sourceDefinitionName"`
-	AccountID            string          `json:"accountId"`
-	CreatedAt            *time.Time      `json:"createdAt"`
-	UpdatedAt            *time.Time      `json:"updatedAt"`
-	WorkspaceID          string          `json:"workspaceId"`
-	ExternalID           string          `json:"externalId"`
+	ID                   string     `json:"id"`
+	Name                 string     `json:"name"`
+	Config               any        `json:"config"`
+	IsEnabled            bool       `json:"enabled"`
+	SourceType           SourceType `json:"sourceType"`
+	SourceDefinitionName string     `json:"sourceDefinitionName"`
+	AccountID            string     `json:"accountId"`
+	CreatedAt            *time.Time `json:"createdAt"`
+	UpdatedAt            *time.Time `json:"updatedAt"`
+	WorkspaceID          string     `json:"workspaceId"`
+	ExternalID           string     `json:"externalId"`
 }
 
 type RETLSourceCreateRequest struct {
-	Name                 string          `json:"name"`
-	Config               json.RawMessage `json:"config"`
-	SourceType           SourceType      `json:"sourceType"`
-	SourceDefinitionName string          `json:"sourceDefinitionName"`
-	AccountID            string          `json:"accountId"`
-	Enabled              bool            `json:"enabled"`
-	ExternalID           string          `json:"externalId"`
+	Name                 string     `json:"name"`
+	Config               any        `json:"config"`
+	SourceType           SourceType `json:"sourceType"`
+	SourceDefinitionName string     `json:"sourceDefinitionName"`
+	AccountID            string     `json:"accountId"`
+	Enabled              bool       `json:"enabled"`
+	ExternalID           string     `json:"externalId"`
 }
 
 type RETLSourceUpdateRequest struct {
-	Name      string          `json:"name"`
-	Config    json.RawMessage `json:"config"`
-	IsEnabled bool            `json:"enabled"`
-	AccountID string          `json:"accountId"`
+	Name      string `json:"name"`
+	Config    any    `json:"config"`
+	IsEnabled bool   `json:"enabled"`
+	AccountID string `json:"accountId"`
 }
 
 // RETLSQLModelConfig is the config shape for SQL MODEL sources.
@@ -90,13 +90,20 @@ func MarshalConfig[T ConfigType](cfg T) (json.RawMessage, error) {
 }
 
 // DecodeConfig decodes a RETLSource.Config into the caller-supplied typed config.
-// Empty input returns a zero-value T and no error.
-func DecodeConfig[T ConfigType](raw json.RawMessage) (T, error) {
+// Nil input returns a zero-value T and no error.
+func DecodeConfig[T ConfigType](raw any) (T, error) {
 	var cfg T
-	if len(raw) == 0 {
+	if raw == nil {
 		return cfg, nil
 	}
-	if err := json.Unmarshal(raw, &cfg); err != nil {
+	if typed, ok := raw.(T); ok {
+		return typed, nil
+	}
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		return cfg, fmt.Errorf("marshalling RETL config: %w", err)
+	}
+	if err := json.Unmarshal(buf, &cfg); err != nil {
 		return cfg, fmt.Errorf("unmarshalling RETL config: %w", err)
 	}
 	return cfg, nil

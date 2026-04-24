@@ -789,7 +789,7 @@ func TestUpdateRetlSourceTable(t *testing.T) {
 
 func TestDecodeConfigMalformed(t *testing.T) {
 	source := retl.RETLSource{
-		Config: json.RawMessage("{not-json"),
+		Config: "not-an-object",
 	}
 
 	_, err := retl.DecodeConfig[retl.RETLSQLModelConfig](source.Config)
