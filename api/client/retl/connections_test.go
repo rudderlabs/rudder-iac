@@ -303,6 +303,33 @@ func TestConnection_EmptyIDErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "connection ID cannot be empty")
 }
 
+func TestUpdateConnection_RequiresSchedule(t *testing.T) {
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	// Zero-value Schedule would otherwise serialize as {"schedule":{"type":""}}
+	// and fail server-side validation with a confusing enum error.
+	_, err = retlClient.UpdateConnection(context.Background(), "conn-1", &retl.UpdateRETLConnectionRequest{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schedule.type is required")
+}
+
+func TestCreateConnection_RequiresSchedule(t *testing.T) {
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	_, err = retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{
+		SourceID:      "retl-src-123",
+		DestinationID: "dest-456",
+		SyncBehaviour: retl.SyncBehaviourUpsert,
+		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schedule.type is required")
+}
+
 func TestCreateConnection_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -316,7 +343,9 @@ func TestCreateConnection_APIError(t *testing.T) {
 	require.NoError(t, err)
 	retlClient := retl.NewRudderRETLStore(c)
 
-	_, err = retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{})
+	_, err = retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{
+		Schedule: retl.Schedule{Type: retl.ScheduleTypeManual},
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "creating RETL connection")
 	httpClient.AssertNumberOfCalls()

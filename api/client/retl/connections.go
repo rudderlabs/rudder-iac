@@ -13,6 +13,12 @@ const retlConnectionsBasePath = "/v2/retl-connections"
 
 // CreateConnection creates a new RETL connection.
 func (r *RudderRETLStore) CreateConnection(ctx context.Context, req *CreateRETLConnectionRequest) (*RETLConnection, error) {
+	// Schedule is required server-side; guard here so callers get a clear
+	// error instead of a 400 complaining about an empty enum value.
+	if req == nil || req.Schedule.Type == "" {
+		return nil, fmt.Errorf("schedule.type is required")
+	}
+
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling connection: %w", err)
@@ -35,6 +41,11 @@ func (r *RudderRETLStore) CreateConnection(ctx context.Context, req *CreateRETLC
 func (r *RudderRETLStore) UpdateConnection(ctx context.Context, id string, req *UpdateRETLConnectionRequest) (*RETLConnection, error) {
 	if id == "" {
 		return nil, fmt.Errorf("connection ID cannot be empty")
+	}
+	// Schedule is required server-side; guard here so callers get a clear
+	// error instead of a 400 complaining about an empty enum value.
+	if req == nil || req.Schedule.Type == "" {
+		return nil, fmt.Errorf("schedule.type is required")
 	}
 
 	data, err := json.Marshal(req)
