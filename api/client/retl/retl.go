@@ -9,7 +9,29 @@ import (
 // RETLStore is the interface for RETL operations
 type RETLStore interface {
 	RETLSourceStore
+	RETLConnectionStore
 	PreviewStore
+}
+
+// RETLConnectionStore is the interface for RETL connection operations.
+type RETLConnectionStore interface {
+	// CreateConnection creates a new RETL connection.
+	CreateConnection(ctx context.Context, req *CreateRETLConnectionRequest) (*RETLConnection, error)
+
+	// UpdateConnection updates mutable fields of a RETL connection.
+	UpdateConnection(ctx context.Context, id string, req *UpdateRETLConnectionRequest) (*RETLConnection, error)
+
+	// DeleteConnection soft-deletes a RETL connection by ID.
+	DeleteConnection(ctx context.Context, id string) error
+
+	// GetConnection retrieves a RETL connection by ID.
+	GetConnection(ctx context.Context, id string) (*RETLConnection, error)
+
+	// ListConnections returns a paginated list of RETL connections matching the provided filters.
+	ListConnections(ctx context.Context, req *ListRETLConnectionsRequest) (*RETLConnectionsPage, error)
+
+	// SetConnectionExternalID sets the external ID for a RETL connection.
+	SetConnectionExternalID(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
 }
 
 // RETLSourceStore is the interface for RETL source operations
