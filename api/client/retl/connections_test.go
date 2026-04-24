@@ -16,6 +16,15 @@ func boolPtr(b bool) *bool { return &b }
 
 func intPtr(i int) *int { return &i }
 
+// assertCall validates an incoming mock HTTP request against the expected
+// method, URL, and JSON body. testutils.ValidateRequest currently ignores its
+// url argument, so we assert the URL here explicitly.
+func assertCall(t *testing.T, req *http.Request, method, url, body string) bool {
+	t.Helper()
+	return assert.Equal(t, url, req.URL.String()) &&
+		testutils.ValidateRequest(t, req, method, url, body)
+}
+
 func TestCreateConnection(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -29,7 +38,7 @@ func TestCreateConnection(t *testing.T) {
 				"mappings": [{"from": "name", "to": "first_name"}],
 				"event": {"type": "identify"}
 			}`
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", expected)
+			return assertCall(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -85,7 +94,7 @@ func TestUpdateConnection(t *testing.T) {
 				"schedule": {"type": "basic", "everyMinutes": 120},
 				"mappings": [{"from": "name", "to": "first_name"}]
 			}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1", expected)
+			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -122,7 +131,7 @@ func TestUpdateConnection(t *testing.T) {
 func TestGetConnection(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
+			return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -154,7 +163,7 @@ func TestGetConnection(t *testing.T) {
 func TestDeleteConnection(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
+			return assertCall(t, req, "DELETE", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
 		},
 		ResponseStatus: 204,
 		ResponseBody:   "",
@@ -171,7 +180,7 @@ func TestDeleteConnection(t *testing.T) {
 func TestListConnections_NoFilters(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections", "")
+			return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody: `{
@@ -263,7 +272,7 @@ func TestSetConnectionExternalID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
 			expected := `{"externalId": "ext-123"}`
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1/external-id", expected)
+			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1/external-id", expected)
 		},
 		ResponseStatus: 200,
 		ResponseBody:   `{"id": "conn-1", "externalId": "ext-123"}`,
@@ -333,7 +342,7 @@ func TestCreateConnection_RequiresSchedule(t *testing.T) {
 func TestCreateConnection_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", "")
+			return assertCall(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", "")
 		},
 		ResponseStatus: 400,
 		ResponseBody:   `{"error": "Bad Request"}`,
@@ -354,7 +363,7 @@ func TestCreateConnection_APIError(t *testing.T) {
 func TestGetConnection_MalformedResponse(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
+			return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
 		},
 		ResponseStatus: 200,
 		ResponseBody:   `{malformed`,
@@ -373,7 +382,7 @@ func TestGetConnection_MalformedResponse(t *testing.T) {
 func TestListConnections_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections", "")
+			return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections", "")
 		},
 		ResponseStatus: 500,
 		ResponseBody:   `{"error": "Internal Server Error"}`,
@@ -392,7 +401,7 @@ func TestListConnections_APIError(t *testing.T) {
 func TestDeleteConnection_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "DELETE", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
+			return assertCall(t, req, "DELETE", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
 		},
 		ResponseStatus: 500,
 		ResponseBody:   `{"error": "Internal Server Error"}`,
@@ -411,7 +420,7 @@ func TestDeleteConnection_APIError(t *testing.T) {
 func TestSetConnectionExternalID_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1/external-id", "")
+			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1/external-id", "")
 		},
 		ResponseStatus: 500,
 		ResponseBody:   `{"error": "Internal Server Error"}`,
