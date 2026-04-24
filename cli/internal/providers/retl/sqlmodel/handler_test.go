@@ -205,31 +205,36 @@ func (m *mockRETLClient) SetExternalId(ctx context.Context, sourceID string, ext
 	return nil
 }
 
-// RETL connection methods are unused by the sqlmodel handler; stubs satisfy
-// the combined RETLStore interface so this mock can be passed to NewHandler.
+// RETL connection methods are unused by the sqlmodel handler. Stubs fail fast
+// so that if the handler ever starts calling them, tests surface the change
+// instead of silently passing with nil responses.
+
+func unexpectedConnectionCall(method string) error {
+	return errors.New("unexpected call to mockRETLClient." + method)
+}
 
 func (m *mockRETLClient) CreateConnection(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-	return nil, nil
+	return nil, unexpectedConnectionCall("CreateConnection")
 }
 
 func (m *mockRETLClient) UpdateConnection(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-	return nil, nil
+	return nil, unexpectedConnectionCall("UpdateConnection")
 }
 
 func (m *mockRETLClient) DeleteConnection(ctx context.Context, id string) error {
-	return nil
+	return unexpectedConnectionCall("DeleteConnection")
 }
 
 func (m *mockRETLClient) GetConnection(ctx context.Context, id string) (*retlClient.RETLConnection, error) {
-	return nil, nil
+	return nil, unexpectedConnectionCall("GetConnection")
 }
 
 func (m *mockRETLClient) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
-	return nil, nil
+	return nil, unexpectedConnectionCall("ListConnections")
 }
 
 func (m *mockRETLClient) SetConnectionExternalID(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
-	return nil
+	return unexpectedConnectionCall("SetConnectionExternalID")
 }
 
 func TestSQLModelHandler(t *testing.T) {
