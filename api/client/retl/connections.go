@@ -13,9 +13,12 @@ const retlConnectionsBasePath = "/v2/retl-connections"
 
 // CreateConnection creates a new RETL connection.
 func (r *RudderRETLStore) CreateConnection(ctx context.Context, req *CreateRETLConnectionRequest) (*RETLConnection, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request cannot be nil")
+	}
 	// Schedule is required server-side; guard here so callers get a clear
 	// error instead of a 400 complaining about an empty enum value.
-	if req == nil || req.Schedule.Type == "" {
+	if req.Schedule.Type == "" {
 		return nil, fmt.Errorf("schedule.type is required")
 	}
 
@@ -42,9 +45,12 @@ func (r *RudderRETLStore) UpdateConnection(ctx context.Context, id string, req *
 	if id == "" {
 		return nil, fmt.Errorf("connection ID cannot be empty")
 	}
+	if req == nil {
+		return nil, fmt.Errorf("request cannot be nil")
+	}
 	// Schedule is required server-side; guard here so callers get a clear
 	// error instead of a 400 complaining about an empty enum value.
-	if req == nil || req.Schedule.Type == "" {
+	if req.Schedule.Type == "" {
 		return nil, fmt.Errorf("schedule.type is required")
 	}
 

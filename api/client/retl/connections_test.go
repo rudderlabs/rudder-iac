@@ -339,6 +339,20 @@ func TestCreateConnection_RequiresSchedule(t *testing.T) {
 	assert.Contains(t, err.Error(), "schedule.type is required")
 }
 
+func TestConnection_NilRequestErrors(t *testing.T) {
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	_, err = retlClient.CreateConnection(context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "request cannot be nil")
+
+	_, err = retlClient.UpdateConnection(context.Background(), "conn-1", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "request cannot be nil")
+}
+
 func TestCreateConnection_APIError(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
