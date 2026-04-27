@@ -1790,4 +1790,22 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 		err := handler.LoadSpec("test.yaml", spec)
 		require.NoError(t, err)
 	})
+
+	t.Run("Accepts valid event stream source spec with ocaml type", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		handler := source.NewHandler(mockClient, importDir)
+		spec := &specs.Spec{
+			Kind: "event-stream-source",
+			Spec: map[string]interface{}{
+				"id":   "test-source-ocaml",
+				"name": "OCaml Source",
+				"type": "ocaml",
+			},
+		}
+
+		err := handler.LoadSpec("test.yaml", spec)
+		require.NoError(t, err)
+	})
 }
