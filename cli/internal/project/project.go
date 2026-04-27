@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/project/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -31,6 +32,16 @@ type ProjectProvider interface {
 	provider.TypeProvider
 }
 
+// ImportManifestProvider owns the lifecycle of import-manifest specs:
+// parses them, aggregates entries, supplies validation rules, and exposes
+// the combined payload for broadcast to resource providers. It sits
+// parallel to the resource provider tree; the CompositeProvider never
+// sees the import-manifest kind.
+type ImportManifestProvider interface {
+	ProjectProvider
+	ImportManifest() *specs.WorkspacesImportMetadata
+}
+
 type Project interface {
 	Location() string
 	Load(location string) error
@@ -39,12 +50,13 @@ type Project interface {
 }
 
 type project struct {
-	location         string
-	provider         ProjectProvider
-	loader           Loader
-	specs            map[string]*specs.Spec
-	validationEngine validation.ValidationEngine
-	renderer         renderer.Renderer
+	location               string
+	provider               ProjectProvider
+	importManifestProvider ImportManifestProvider
+	loader                 Loader
+	specs                  map[string]*specs.Spec
+	validationEngine       validation.ValidationEngine
+	renderer               renderer.Renderer
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -63,8 +75,9 @@ func WithLoader(l Loader) ProjectOption {
 // By default, it uses a loader.Loader.
 func New(provider provider.Provider, opts ...ProjectOption) Project {
 	p := &project{
-		provider: provider,
-		specs:    make(map[string]*specs.Spec),
+		provider:               provider,
+		importManifestProvider: importmanifest.New(),
+		specs:                  make(map[string]*specs.Spec),
 	}
 
 	for _, opt := range opts {
@@ -95,6 +108,8 @@ func (p *project) Specs() map[string]*specs.Spec {
 
 func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	switch {
+	case spec.IsImportManifest():
+		return p.importManifestProvider.LoadSpec(path, spec)
 	case spec.IsLegacyVersion():
 		return p.provider.LoadLegacySpec(path, spec)
 	case spec.Version == specs.SpecVersionV1:
@@ -165,6 +180,18 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			rawSpec.Parsed(),
 		); err != nil {
 			return fmt.Errorf("loading spec %s: %w", path, err)
+		}
+	}
+
+	// Broadcast the aggregated import-manifest into the resource provider tree
+	// before graph construction, so handlers' ResourceGraph logic picks up
+	// ImportMetadata from the same map that inline metadata.import populates.
+	// Manifest wins on URN overlap because this runs after inline population.
+	if manifest := p.importManifestProvider.ImportManifest(); manifest != nil {
+		if consumer, ok := p.provider.(provider.ImportManifestConsumer); ok {
+			if err := consumer.LoadImportManifest(manifest); err != nil {
+				return fmt.Errorf("broadcasting import manifest: %w", err)
+			}
 		}
 	}
 
@@ -242,7 +269,16 @@ func (p *project) registry() (rules.Registry, error) {
 	// Active patterns become the source of truth for the
 	// validation pipeline to determine which unique kinds and versions
 	// are supported in the system.
-	activePatterns := p.provider.SupportedMatchPatterns()
+	//
+	// The import-manifest provider only contributes patterns + rules when the
+	// resource provider declares some of its own. An empty resource-side
+	// pattern set disables kind/version enforcement entirely (tests lean on
+	// this), and in that mode the manifest feature is dormant too.
+	resourcePatterns := p.provider.SupportedMatchPatterns()
+	activePatterns := resourcePatterns
+	if len(resourcePatterns) > 0 {
+		activePatterns = append(activePatterns, p.importManifestProvider.SupportedMatchPatterns()...)
+	}
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
@@ -255,6 +291,9 @@ func (p *project) registry() (rules.Registry, error) {
 		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
+	if len(resourcePatterns) > 0 {
+		syntactic = append(syntactic, p.importManifestProvider.SyntacticRules()...)
+	}
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -262,7 +301,11 @@ func (p *project) registry() (rules.Registry, error) {
 		}
 	}
 
-	for _, rule := range p.provider.SemanticRules() {
+	semantic := p.provider.SemanticRules()
+	if len(resourcePatterns) > 0 {
+		semantic = append(semantic, p.importManifestProvider.SemanticRules()...)
+	}
+	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}

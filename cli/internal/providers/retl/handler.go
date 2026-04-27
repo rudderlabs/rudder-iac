@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -23,6 +24,12 @@ type resourceHandler interface {
 	// The path parameter specifies the location of the spec file, and s contains
 	// the parsed spec data. Returns an error if the spec is invalid or cannot be loaded.
 	LoadSpec(path string, s *specs.Spec) error
+
+	// LoadImportMetadata populates the handler's internal import-metadata map
+	// from a central import-manifest file. Equivalent to inline metadata.import
+	// processing — the URN → remote-ID mapping is what marks resources as
+	// Importable during the apply cycle.
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 
 	// GetResources returns all resources managed by this handler.
 	// The returned resources will be added to the resource graph for
@@ -81,9 +88,9 @@ type resourceHandler interface {
 	// Returns a collection of resources or an error if loading fails.
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 
-	// FormatForExport formats the resources for export
-	// The idNamer is used to generate unique IDs for the resources.
-	// The inputResolver is used to resolve references to other resources.
-	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
+	// FormatForExport formats the resources for export. Returns entity files plus
+	// the ImportEntry rows that will populate the aggregated import-manifest.yaml.
+	// Handlers MUST NOT embed metadata.import into emitted specs — carry URN
+	// mappings via the returned ImportEntry slice instead.
+	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }

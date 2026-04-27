@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -177,8 +178,8 @@ func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resour
 	return nil, nil
 }
 
-func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
-	return nil, nil
+func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	return nil, nil, nil
 }
 
 func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {

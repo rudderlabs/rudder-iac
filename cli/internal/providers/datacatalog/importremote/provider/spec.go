@@ -11,18 +11,17 @@ const (
 	MetadataNameCustomTypes = "custom-types"
 )
 
+// toImportSpec builds a clean data-catalog spec. Import metadata no longer
+// lives inline on the spec — callers pair each spec with ImportEntry rows
+// that feed the aggregated import-manifest.yaml emitted by the importer.
 func toImportSpec(
 	version string,
 	kind string,
 	metadataName string,
-	workspaceMetadata specs.WorkspaceImportMetadata,
 	data map[string]any,
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: metadataName,
-		Import: &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
-		},
 	}
 
 	metadataMap, err := metadata.ToMap()

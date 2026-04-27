@@ -124,7 +124,7 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 		},
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, entries, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -145,23 +145,19 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, models, 2)
 
-	// Verify metadata has import block with URNs for all resources
+	// Import metadata travels via the ImportEntry slice — no inline metadata.import.
 	metadata, err := spec.CommonMetadata()
 	require.NoError(t, err)
-	require.NotNil(t, metadata.Import)
-	require.Len(t, metadata.Import.Workspaces, 1)
+	assert.Nil(t, metadata.Import, "emitted specs must not carry inline metadata.import")
 
-	ws := metadata.Import.Workspaces[0]
-	assert.Equal(t, "ws-123", ws.WorkspaceID)
-
-	// Should have 4 resources: 1 DG + 2 models + 1 valid relationship
+	// Should have 4 entries: 1 DG + 2 models + 1 valid relationship
 	// (the unresolvable-target relationship is excluded)
-	require.Len(t, ws.Resources, 4)
+	require.Len(t, entries, 4)
 
-	// Collect URNs for verification
 	urns := make(map[string]string) // URN -> RemoteID
-	for _, r := range ws.Resources {
-		urns[r.URN] = r.RemoteID
+	for _, e := range entries {
+		assert.Equal(t, "ws-123", e.WorkspaceID)
+		urns[e.URN] = e.RemoteID
 	}
 	assert.Equal(t, "dg-remote-1", urns[resources.URN("my-data-graph", dgHandler.HandlerMetadata.ResourceType)])
 	assert.Equal(t, "model-remote-1", urns[resources.URN("user", modelHandler.HandlerMetadata.ResourceType)])
@@ -209,7 +205,7 @@ func TestFormatForExport_DataGraphWithoutModels(t *testing.T) {
 		nil, nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, entries, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -218,10 +214,10 @@ func TestFormatForExport_DataGraphWithoutModels(t *testing.T) {
 	assert.Nil(t, spec.Spec["models"])
 	assert.Equal(t, "data-graphs/simple-dg.yaml", result[0].RelativePath)
 
-	// Verify import metadata has only the data graph
-	metadata, err := spec.CommonMetadata()
-	require.NoError(t, err)
-	require.Len(t, metadata.Import.Workspaces[0].Resources, 1)
+	// Import entries have only the data graph
+	require.Len(t, entries, 1)
+	assert.Equal(t, "ws-123", entries[0].WorkspaceID)
+	assert.Equal(t, resources.URN("simple-dg", dgHandler.HandlerMetadata.ResourceType), entries[0].URN)
 }
 
 func TestFormatForExport_MultipleDataGraphs(t *testing.T) {
@@ -256,7 +252,7 @@ func TestFormatForExport_MultipleDataGraphs(t *testing.T) {
 		nil, nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 
@@ -277,7 +273,7 @@ func TestFormatForExport_EmptyCollection(t *testing.T) {
 
 	collection := resources.NewRemoteResources()
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -335,7 +331,7 @@ func TestFormatForExport_SkipsUnmanagedModelsUnderManagedDataGraphs(t *testing.T
 		nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, entries, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -347,14 +343,10 @@ func TestFormatForExport_SkipsUnmanagedModelsUnderManagedDataGraphs(t *testing.T
 	require.Len(t, models, 1)
 	assert.Equal(t, "user", models[0].ID)
 
-	// Verify import metadata only contains resources from the importable DG
-	metadata, err := spec.CommonMetadata()
-	require.NoError(t, err)
-	ws := metadata.Import.Workspaces[0]
-
-	urnSet := make(map[string]bool)
-	for _, r := range ws.Resources {
-		urnSet[r.URN] = true
+	// Import entries only contain resources from the importable DG.
+	urnSet := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		urnSet[e.URN] = true
 	}
 
 	assert.True(t, urnSet[resources.URN("importable-dg", dgHandler.HandlerMetadata.ResourceType)])

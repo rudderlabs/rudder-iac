@@ -1051,7 +1051,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(map[string]*model.RemoteTransformation{}, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(map[string]*model.RemoteTransformation{}, namer, resolver)
 
 		require.NoError(t, err)
 		assert.Nil(t, result)
@@ -1080,7 +1080,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -1116,7 +1116,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -1148,7 +1148,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported language 'golang'")
@@ -1181,7 +1181,7 @@ func TestFormatForExport(t *testing.T) {
 		}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "generating file name for transformation")
@@ -1220,7 +1220,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 4) // 2 specs + 2 code files

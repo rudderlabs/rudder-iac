@@ -10,6 +10,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -305,10 +306,10 @@ func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	importableDataGraphs := collection.GetAll(datagraph.HandlerMetadata.ResourceType)
 	if len(importableDataGraphs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	lookups := p.groupResourcesByDataGraph(collection, importableDataGraphs)
@@ -322,16 +323,20 @@ func (p *Provider) FormatForExport(
 		return cmp.Compare(a.ExternalID, b.ExternalID)
 	})
 
-	var result []writer.FormattableEntity
+	var (
+		result  []writer.FormattableEntity
+		entries []importmanifest.ImportEntry
+	)
 	for _, dgResource := range sortedDGs {
-		entity, err := p.formatDataGraphSpec(dgResource, lookups)
+		entity, dgEntries, err := p.formatDataGraphSpec(dgResource, lookups)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		result = append(result, entity)
+		entries = append(entries, dgEntries...)
 	}
 
-	return result, nil
+	return result, entries, nil
 }
 
 // groupResourcesByDataGraph builds lookup indexes from the importable collection,
@@ -380,38 +385,32 @@ func (p *Provider) groupResourcesByDataGraph(
 	}
 }
 
-// formatDataGraphSpec produces a single FormattableEntity for one data graph and its children
+// formatDataGraphSpec produces a single FormattableEntity for one data graph and its children,
+// plus the set of ImportEntry rows that feed the aggregated import-manifest.
 func (p *Provider) formatDataGraphSpec(
 	dgResource *resources.RemoteResource,
 	lookups *exportLookups,
-) (writer.FormattableEntity, error) {
+) (writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	remoteDG := dgResource.Data.(*dgModel.RemoteDataGraph)
 
-	importResources := []specs.ImportIds{
+	entries := []importmanifest.ImportEntry{
 		{
-			URN:      resources.URN(dgResource.ExternalID, datagraph.HandlerMetadata.ResourceType),
-			RemoteID: remoteDG.ID,
+			WorkspaceID: remoteDG.WorkspaceID,
+			URN:         resources.URN(dgResource.ExternalID, datagraph.HandlerMetadata.ResourceType),
+			RemoteID:    remoteDG.ID,
 		},
 	}
 
-	modelSpecs, modelImports := p.buildInlineModelSpecs(remoteDG.ID, lookups)
-	importResources = append(importResources, modelImports...)
+	modelSpecs, modelEntries := p.buildInlineModelSpecs(remoteDG.ID, remoteDG.WorkspaceID, lookups)
+	entries = append(entries, modelEntries...)
 
 	metadata := specs.Metadata{
 		Name: datagraph.HandlerMetadata.SpecMetadataName,
-		Import: &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{
-				{
-					WorkspaceID: remoteDG.WorkspaceID,
-					Resources:   importResources,
-				},
-			},
-		},
 	}
 
 	metadataMap, err := metadata.ToMap()
 	if err != nil {
-		return writer.FormattableEntity{}, fmt.Errorf("converting metadata to map: %w", err)
+		return writer.FormattableEntity{}, nil, fmt.Errorf("converting metadata to map: %w", err)
 	}
 
 	specBody := map[string]any{
@@ -432,31 +431,33 @@ func (p *Provider) formatDataGraphSpec(
 	return writer.FormattableEntity{
 		Content:      spec,
 		RelativePath: filepath.Join("data-graphs", fmt.Sprintf("%s.yaml", dgResource.ExternalID)),
-	}, nil
+	}, entries, nil
 }
 
 // buildInlineModelSpecs builds model specs with inline relationships for a single data graph,
-// returning both the specs and the import metadata entries for all included resources
+// returning both the specs and the ImportEntry rows for all included child resources.
 func (p *Provider) buildInlineModelSpecs(
 	dataGraphID string,
+	workspaceID string,
 	lookups *exportLookups,
-) ([]dgModel.ModelSpec, []specs.ImportIds) {
+) ([]dgModel.ModelSpec, []importmanifest.ImportEntry) {
 	dgModels := lookups.modelsByDG[dataGraphID]
 	slices.SortFunc(dgModels, func(a, b *resources.RemoteResource) int {
 		return cmp.Compare(a.ExternalID, b.ExternalID)
 	})
 
 	var (
-		modelSpecs      []dgModel.ModelSpec
-		importResources []specs.ImportIds
+		modelSpecs []dgModel.ModelSpec
+		entries    []importmanifest.ImportEntry
 	)
 
 	for _, modelResource := range dgModels {
 		remoteModel := modelResource.Data.(*dgModel.RemoteModel)
 
-		importResources = append(importResources, specs.ImportIds{
-			URN:      resources.URN(modelResource.ExternalID, model.HandlerMetadata.ResourceType),
-			RemoteID: remoteModel.ID,
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: workspaceID,
+			URN:         resources.URN(modelResource.ExternalID, model.HandlerMetadata.ResourceType),
+			RemoteID:    remoteModel.ID,
 		})
 
 		// Sort relationships for this model by external ID
@@ -476,9 +477,10 @@ func (p *Provider) buildInlineModelSpecs(
 				continue
 			}
 
-			importResources = append(importResources, specs.ImportIds{
-				URN:      resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
-				RemoteID: remoteRel.ID,
+			entries = append(entries, importmanifest.ImportEntry{
+				WorkspaceID: workspaceID,
+				URN:         resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
+				RemoteID:    remoteRel.ID,
 			})
 
 			relSpecs = append(relSpecs, dgModel.RelationshipSpec{
@@ -504,7 +506,7 @@ func (p *Provider) buildInlineModelSpecs(
 		})
 	}
 
-	return modelSpecs, importResources
+	return modelSpecs, entries
 }
 
 // parseModelReference parses a model reference like '#data-graph-model:user' and returns the URN

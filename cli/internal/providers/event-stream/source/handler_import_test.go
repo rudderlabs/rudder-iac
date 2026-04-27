@@ -108,19 +108,6 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				},
 				Metadata: map[string]any{
 					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 		},
@@ -194,19 +181,6 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				},
 				Metadata: map[string]any{
 					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 		},
@@ -249,19 +223,6 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				},
 				Metadata: map[string]any{
 					"name": "event-stream-source",
-					"import": map[string]any{
-						"workspaces": []any{
-							map[string]any{
-								"workspace_id": "workspace-123",
-								"resources": []any{
-									map[string]any{
-										"urn":       "event-stream-source:test-source-1",
-										"remote_id": "remote123",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 		},
@@ -281,7 +242,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Graph:      graph,
 			}
 
-			entities, err := handler.FormatForExport(importable, &mockNamer{}, resolverImpl)
+			entities, _, err := handler.FormatForExport(importable, &mockNamer{}, resolverImpl)
 
 			if tt.expectedErrContains != "" {
 				require.Error(t, err)

@@ -390,31 +390,55 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 		return err
 	}
 
-	if metadata.Import != nil {
-		resourceType, ok := kindToResourceType[s.Kind]
-		if !ok {
-			return fmt.Errorf("unknown kind: %s", s.Kind)
-		}
-
-		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-			// For each resource within the workspace, load the import metadata
-			// which will be used during the creation of resourceGraph
-			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resource.URN != "" {
-					urn = resource.URN
-				} else {
-					urn = resources.URN(resource.LocalID, resourceType)
-				}
-				dc.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
-					WorkspaceID: workspace.WorkspaceID,
-					RemoteID:    resource.RemoteID,
-				}
-			})
-		})
+	if metadata.Import == nil {
+		return nil
 	}
 
+	resourceType, ok := kindToResourceType[s.Kind]
+	if !ok {
+		return fmt.Errorf("unknown kind: %s", s.Kind)
+	}
+
+	lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+		// For each resource within the workspace, load the import metadata
+		// which will be used during the creation of resourceGraph
+		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resource.URN != "" {
+				urn = resource.URN
+			} else {
+				urn = resources.URN(resource.LocalID, resourceType)
+			}
+			dc.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				WorkspaceID: workspace.WorkspaceID,
+				RemoteID:    resource.RemoteID,
+			}
+		})
+	})
+
+	return nil
+}
+
+// LoadImportManifest merges manifest-level import metadata into the catalog.
+// Manifest URNs are already fully qualified (resource-type:id) so no kind
+// translation is needed. Used by the datacatalog Provider to receive a
+// central import-manifest broadcast.
+func (dc *DataCatalog) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, workspace := range m.Workspaces {
+		for _, resource := range workspace.Resources {
+			if resource.URN == "" {
+				return fmt.Errorf("import-manifest entry in workspace %q is missing urn", workspace.WorkspaceID)
+			}
+			dc.ImportMetadata[resource.URN] = &WorkspaceRemoteIDMapping{
+				WorkspaceID: workspace.WorkspaceID,
+				RemoteID:    resource.RemoteID,
+			}
+		}
+	}
 	return nil
 }
 

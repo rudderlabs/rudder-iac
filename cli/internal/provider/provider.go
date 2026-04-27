@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -147,18 +148,31 @@ type LifecycleManager interface {
 // This is used during import operations to create spec files, and other related files, from existing remote resources.
 type Exporter interface {
 	// FormatForExport converts a resource collection into formattable entities that can be
-	// written as configuration files.
+	// written as configuration files, plus the set of import-manifest entries each resource
+	// contributes. Implementations MUST NOT embed metadata.import into the emitted specs —
+	// URN → remote-ID mappings travel via the returned ImportEntry slice so the importer
+	// can aggregate them into one import-manifest.yaml.
 	//
 	// The idNamer generates human-readable identifiers for resources in the generated files.
 	// The resolver handles reference resolution, converting remote IDs into local references
 	// where appropriate (e.g., referencing other imported or existing resources).
-	//
-	// Returns a slice of entities that can be formatted and written to disk.
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		resolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
+}
+
+// ImportManifestConsumer receives the aggregated workspace import metadata
+// after all manifest specs have been loaded. It is implemented by providers
+// that want to populate their internal import-metadata state from a central
+// import-manifest file (see docs/import-manifest-hld.md) rather than from
+// inline metadata.import blocks on resource specs.
+//
+// Implementations must be nil-safe: callers may pass a manifest with nil
+// Workspaces or invoke the method with nil.
+type ImportManifestConsumer interface {
+	LoadImportManifest(m *specs.WorkspacesImportMetadata) error
 }
 
 // SpecMigrator handles migration of project specifications from one version to another.

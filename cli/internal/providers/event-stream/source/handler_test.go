@@ -1566,7 +1566,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		collection.Set(types.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
+		entities, _, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				return "#/tp/tracking-plan/test-tp-456", nil
 			},
@@ -1595,22 +1595,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			"enabled": true,
 			"type":    "javascript",
 		}, spec1.Spec)
-		assert.Equal(t, map[string]any{
-			"name": "event-stream-source",
-			"import": map[string]any{
-				"workspaces": []any{
-					map[string]any{
-						"workspace_id": "workspace-123",
-						"resources": []any{
-							map[string]any{
-								"urn":       "event-stream-source:test-source-1",
-								"remote_id": "remote123",
-							},
-						},
-					},
-				},
-			},
-		}, spec1.Metadata)
+		assert.Equal(t, map[string]any{"name": "event-stream-source"}, spec1.Metadata)
 
 		// Verify second source with tracking plan
 		spec2, exists := entityMap["test-source-2"]
@@ -1638,22 +1623,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			},
 		}, spec2.Spec)
-		assert.Equal(t, map[string]any{
-			"name": "event-stream-source",
-			"import": map[string]any{
-				"workspaces": []any{
-					map[string]any{
-						"workspace_id": "workspace-123",
-						"resources": []any{
-							map[string]any{
-								"urn":       "event-stream-source:test-source-2",
-								"remote_id": "remote456",
-							},
-						},
-					},
-				},
-			},
-		}, spec2.Metadata)
+		assert.Equal(t, map[string]any{"name": "event-stream-source"}, spec2.Metadata)
 	})
 
 	t.Run("v1SpecDefaults", func(t *testing.T) {
@@ -1698,7 +1668,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(source.ResourceType, resourceMap)
 
-			entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{})
+			entities, _, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{})
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)

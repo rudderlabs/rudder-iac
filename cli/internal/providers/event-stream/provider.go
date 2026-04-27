@@ -6,6 +6,7 @@ import (
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -20,6 +21,7 @@ import (
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
@@ -34,7 +36,7 @@ type handler interface {
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 var _ provider.Provider = &Provider{}
@@ -200,6 +202,21 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return handler.Import(ctx, ID, data, remoteId)
 }
 
+// LoadImportManifest delegates the manifest to every registered handler so
+// URN → remote-ID mappings from a central import-manifest file populate the
+// same per-source ImportMetadata map that inline metadata.import blocks do.
+func (p *Provider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(m); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
+}
+
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
@@ -219,20 +236,22 @@ func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	result := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(
+		entities, handlerEntries, err := handler.FormatForExport(
 			collection,
 			idNamer,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler %w", err)
 		}
 		result = append(result, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {

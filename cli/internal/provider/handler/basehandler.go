@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -327,17 +328,17 @@ func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	all := collection.GetAll(h.metadata.ResourceType)
 	if len(all) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	remotes := make(map[string]*Remote, len(all))
 	for _, res := range all {
 		remote, ok := res.Data.(*Remote)
 		if !ok {
-			return nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
+			return nil, nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
 		}
 
 		remotes[res.ExternalID] = remote

@@ -115,7 +115,7 @@ func TestEventFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -132,7 +132,8 @@ func TestEventFormatForExport(t *testing.T) {
 		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "events", spec.Kind)
 		assert.Equal(t, "events", spec.Metadata["name"])
-		assert.NotNil(t, spec.Metadata["import"])
+		_, hasImport := spec.Metadata["import"]
+		assert.False(t, hasImport, "emitted specs must not carry inline metadata.import")
 
 		events, ok := spec.Spec["events"].([]map[string]any)
 		require.True(t, ok)
@@ -171,7 +172,7 @@ func TestEventFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.NoError(t, err)
 
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		result, _, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 

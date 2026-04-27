@@ -8,8 +8,8 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
@@ -232,22 +232,25 @@ func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteLib
 }
 
 // FormatForExport implements the export functionality for libraries during import.
-// It generates two FormattableEntity objects per library: a YAML spec and a code file.
+// It generates two FormattableEntity objects per library (YAML spec + code file)
+// plus an ImportEntry per library, which the importer aggregates into
+// import-manifest.yaml.
 func (h *HandlerImpl) FormatForExport(
 	remotes map[string]*model.RemoteLibrary,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	if len(remotes) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	formattables := make([]writer.FormattableEntity, 0)
+	entries := make([]importmanifest.ImportEntry, 0, len(remotes))
 
 	for externalID, remote := range remotes {
 		// Validate language
 		if remote.Language != handlers.JavaScript && remote.Language != handlers.Python {
-			return nil, fmt.Errorf("unsupported language '%s' for library %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
+			return nil, nil, fmt.Errorf("unsupported language '%s' for library %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
 		}
 
 		// Determine file extension and folder based on language
@@ -265,23 +268,10 @@ func (h *HandlerImpl) FormatForExport(
 		// For the actual file entity, we need just <language-folder>/<external-id>.<ext>
 		codeFilePath := filepath.Join(langFolder, externalID+ext)
 
-		// Build import metadata
-		urn := resources.URN(externalID, HandlerMetadata.ResourceType)
-		workspaceMetadata := specs.WorkspaceImportMetadata{
-			WorkspaceID: remote.WorkspaceID,
-			Resources: []specs.ImportIds{
-				{
-					URN:      urn,
-					RemoteID: remote.ID,
-				},
-			},
-		}
-
 		// Create spec with file reference and import_name
 		spec, err := handlers.ToImportSpec(
 			HandlerMetadata.SpecKind,
 			HandlerMetadata.SpecMetadataName,
-			workspaceMetadata,
 			map[string]any{
 				"id":          externalID,
 				"name":        remote.Name,
@@ -292,7 +282,7 @@ func (h *HandlerImpl) FormatForExport(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec for library %s: %w", remote.ID, err)
+			return nil, nil, fmt.Errorf("creating spec for library %s: %w", remote.ID, err)
 		}
 
 		// Generate unique filename for YAML spec
@@ -301,7 +291,7 @@ func (h *HandlerImpl) FormatForExport(
 			Scope: handlers.TransformationsDir,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
+			return nil, nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
 		}
 
 		// Add YAML spec entity
@@ -315,7 +305,13 @@ func (h *HandlerImpl) FormatForExport(
 			Content:      remote.Code,
 			RelativePath: filepath.Join(handlers.TransformationsDir, codeFilePath),
 		})
+
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: remote.WorkspaceID,
+			URN:         resources.URN(externalID, HandlerMetadata.ResourceType),
+			RemoteID:    remote.ID,
+		})
 	}
 
-	return formattables, nil
+	return formattables, entries, nil
 }

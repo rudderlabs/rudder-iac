@@ -11,6 +11,7 @@ import (
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -576,56 +577,48 @@ func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	workspaceMetadata := specs.WorkspaceImportMetadata{
-		Resources: make([]specs.ImportIds, 0),
-	}
-	var result []writer.FormattableEntity
+	var (
+		result  []writer.FormattableEntity
+		entries = make([]importmanifest.ImportEntry, 0, len(sources))
+	)
 	for _, source := range sources {
 		data, ok := source.Data.(*sourceClient.EventStreamSource)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
-		}
-		workspaceMetadata.WorkspaceID = data.WorkspaceID
-		urn := resources.URN(source.ExternalID, ResourceType)
-		workspaceMetadata.Resources = []specs.ImportIds{
-			{
-				URN:      urn,
-				RemoteID: source.ID,
-			},
+			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		spec, err := h.toImportSpec(
 			data,
 			source.ExternalID,
-			workspaceMetadata,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec: %w", err)
+			return nil, nil, fmt.Errorf("creating spec: %w", err)
 		}
 		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         resources.URN(source.ExternalID, ResourceType),
+			RemoteID:    source.ID,
+		})
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 func (p *Handler) toImportSpec(
 	source *sourceClient.EventStreamSource,
 	externalID string,
-	workspaceMetadata specs.WorkspaceImportMetadata,
 	resolver resolver.ReferenceResolver,
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: MetadataName,
-		Import: &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
-		},
 	}
 
 	metadataMap, err := metadata.ToMap()
@@ -673,22 +666,46 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 		return err
 	}
 
-	if metadata.Import != nil {
-		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resource.URN != "" {
-					urn = resource.URN
-				} else {
-					urn = resources.URN(resource.LocalID, ResourceType)
-				}
-				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
-					WorkspaceId: workspace.WorkspaceID,
-					RemoteId:    resource.RemoteID,
-				}
-			})
+	if metadata.Import == nil {
+		return nil
+	}
+	return srcResource.applyImportManifest(metadata.Import)
+}
+
+// applyImportManifest writes manifest entries into the source resource's
+// ImportMetadata map. Shared by the inline-metadata path and the central
+// import-manifest broadcast path.
+func (srcResource *sourceResource) applyImportManifest(m *specs.WorkspacesImportMetadata) error {
+	lo.ForEach(m.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resource.URN != "" {
+				urn = resource.URN
+			} else {
+				urn = resources.URN(resource.LocalID, ResourceType)
+			}
+			srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
 		})
+	})
+	return nil
+}
+
+// LoadImportMetadata receives a central import-manifest payload and fans it
+// out to every already-loaded source-resource. Each source only reads its
+// own URN from ImportMetadata (see GetResources), so replicating the full
+// manifest into every source is safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, srcResource := range h.resources {
+		if err := srcResource.applyImportManifest(m); err != nil {
+			return err
+		}
 	}
 	return nil
 }

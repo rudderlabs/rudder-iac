@@ -11,12 +11,9 @@ import (
 )
 
 func TestToImportSpec(t *testing.T) {
-	t.Run("creates valid spec with import metadata", func(t *testing.T) {
+	t.Run("creates clean spec without inline import metadata", func(t *testing.T) {
 		kind := "transformation"
 		metadataName := "my-transformation"
-		workspaceMetadata := specs.WorkspaceImportMetadata{
-			WorkspaceID: "workspace-123",
-		}
 		specData := map[string]any{
 			"id":       "trans-1",
 			"name":     "Test Transformation",
@@ -24,7 +21,7 @@ func TestToImportSpec(t *testing.T) {
 			"code":     "export function transformEvent(event) { return event; }",
 		}
 
-		result, err := handlers.ToImportSpec(kind, metadataName, workspaceMetadata, specData)
+		result, err := handlers.ToImportSpec(kind, metadataName, specData)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -34,15 +31,9 @@ func TestToImportSpec(t *testing.T) {
 		assert.Equal(t, specData, result.Spec)
 		assert.Equal(t, "my-transformation", result.Metadata["name"])
 
-		importMetadata, ok := result.Metadata["import"].(map[string]any)
-		require.True(t, ok)
-
-		workspaces, ok := importMetadata["workspaces"].([]any)
-		require.True(t, ok)
-		require.Len(t, workspaces, 1)
-
-		workspace, ok := workspaces[0].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "workspace-123", workspace["workspace_id"])
+		// Import metadata no longer lives inline; it travels via the ImportEntry
+		// slice returned from FormatForExport and is aggregated into import-manifest.yaml.
+		_, hasImport := result.Metadata["import"]
+		assert.False(t, hasImport, "emitted specs must not carry inline metadata.import")
 	})
 }

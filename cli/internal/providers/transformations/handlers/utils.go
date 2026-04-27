@@ -19,18 +19,16 @@ const (
 	ExtensionPY = ".py"
 )
 
-// toImportSpec creates a Spec with import metadata for a transformation resource.
+// ToImportSpec creates a clean Spec for a transformation-related resource.
+// Import metadata travels separately via importmanifest.ImportEntry slices
+// returned from FormatForExport — it is no longer embedded here.
 func ToImportSpec(
 	kind string,
 	metadataName string,
-	workspaceMetadata specs.WorkspaceImportMetadata,
 	specData map[string]any,
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: metadataName,
-		Import: &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{workspaceMetadata},
-		},
 	}
 
 	metadataMap, err := metadata.ToMap()

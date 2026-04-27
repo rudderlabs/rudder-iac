@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -17,6 +18,7 @@ type Handler interface {
 	ResourceType() string
 	SpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	Resources() ([]*resources.Resource, error)
 	Create(ctx context.Context, data any) (any, error)
@@ -30,7 +32,7 @@ type Handler interface {
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 // RuleHandler is an optional interface that handlers can implement
@@ -120,6 +122,21 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
 	// fallback to LoadSpec for now till we implement legacy spec loading for all providers
 	return p.LoadSpec(path, s)
+}
+
+// LoadImportManifest fans the manifest out to every handler so their internal
+// import-metadata maps are populated from a central manifest file, mirroring
+// what inline metadata.import blocks do during LoadSpec. Nil-safe.
+func (p *BaseProvider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(m); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *BaseProvider) ResourceGraph() (*resources.Graph, error) {
@@ -217,20 +234,22 @@ func (p *BaseProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	result := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(
+		entities, handlerEntries, err := handler.FormatForExport(
 			collection,
 			idNamer,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler: %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler: %w", err)
 		}
 		result = append(result, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 // GetHandler returns the handler for a given resource type

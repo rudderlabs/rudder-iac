@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -104,18 +105,16 @@ func (p *PropertyImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting properties for export to file")
 
 	properties := collection.GetAll(types.PropertyResourceType)
 	if len(properties) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	workspaceMetadata := specs.WorkspaceImportMetadata{
-		Resources: make([]specs.ImportIds, 0),
-	}
 	version := specs.SpecVersionV1
+	entries := make([]importmanifest.ImportEntry, 0, len(properties))
 
 	formattedProps := make([]map[string]any, 0)
 	for _, property := range properties {
@@ -123,20 +122,19 @@ func (p *PropertyImportProvider) FormatForExport(
 
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog property")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog property")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
-		urn := resources.URN(property.ExternalID, types.PropertyResourceType)
-		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
-			URN:      urn,
-			RemoteID: property.ID,
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceId,
+			URN:         resources.URN(property.ExternalID, types.PropertyResourceType),
+			RemoteID:    property.ID,
 		})
 
 		importableProp := &model.ImportablePropertyV1{}
 		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting property: %w", err)
+			return nil, nil, fmt.Errorf("formatting property: %w", err)
 		}
 		formattedProps = append(formattedProps, formatted)
 	}
@@ -145,12 +143,11 @@ func (p *PropertyImportProvider) FormatForExport(
 		version,
 		localcatalog.KindProperties,
 		MetadataNameProperties,
-		workspaceMetadata,
 		map[string]any{
 			"properties": formattedProps,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -158,5 +155,5 @@ func (p *PropertyImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, entries, nil
 }

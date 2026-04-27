@@ -337,7 +337,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -363,10 +363,11 @@ func TestSQLModelHandler(t *testing.T) {
 			assert.Equal(t, "orders-model", ordersSpec.Spec[sqlmodel.IDKey])
 			assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[idx].RelativePath)
 
-			// Metadata checks: presence and name
+			// Metadata checks: name only — import metadata no longer lives inline;
+			// it travels via the ImportEntry slice returned from FormatForExport.
 			assert.Equal(t, "orders-model", ordersSpec.Metadata["name"])
-			_, ok = ordersSpec.Metadata["import"].(map[string]any)
-			require.True(t, ok)
+			_, hasImport := ordersSpec.Metadata["import"]
+			assert.False(t, hasImport, "emitted specs must not carry inline metadata.import")
 		})
 
 		t.Run("Empty collection returns nil", func(t *testing.T) {
@@ -374,7 +375,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := resources.NewRemoteResources()
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
 		})
@@ -387,7 +388,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
@@ -399,7 +400,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)

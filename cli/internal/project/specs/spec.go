@@ -16,6 +16,10 @@ const (
 	SpecVersionV1          = "rudder/v1"
 )
 
+// KindImportManifest identifies specs that carry import-workspace URN → remote-ID
+// mappings instead of managed resources. See docs/import-manifest-hld.md.
+const KindImportManifest = "import-manifest"
+
 type RawSpec struct {
 	Data      []byte
 	parsed    *Spec
@@ -67,6 +71,11 @@ type Spec struct {
 // IsLegacyVersion returns true if the spec version is a legacy version (rudder/0.1 or rudder/v0.1)
 func (s *Spec) IsLegacyVersion() bool {
 	return s.Version == SpecVersionV0_1 || s.Version == SpecVersionV0_1Variant
+}
+
+// IsImportManifest returns true if the spec carries an import manifest rather than a managed resource.
+func (s *Spec) IsImportManifest() bool {
+	return s.Kind == KindImportManifest
 }
 
 func (s *Spec) Validate() error {

@@ -416,7 +416,7 @@ func TestProvider(t *testing.T) {
 		idNamer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		entities, err := provider.FormatForExport(collection, idNamer, resolver)
+		entities, _, err := provider.FormatForExport(collection, idNamer, resolver)
 		require.NoError(t, err)
 		assert.Len(t, entities, 2)
 

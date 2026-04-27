@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -15,6 +16,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
+
+const ImportManifestFile = "import-manifest.yaml"
 
 const (
 	ImportedDir = "imported"
@@ -79,7 +82,7 @@ func WorkspaceImport(
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
-	entities, err := p.FormatForExport(importable, idNamer, resolver)
+	entities, entries, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
 		return fmt.Errorf("normalizing for import: %w", err)
 	}
@@ -87,8 +90,22 @@ func WorkspaceImport(
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
-	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
+	outputDir := filepath.Join(location, ImportedDir)
+	if err := writer.Write(ctx, outputDir, formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
+	}
+
+	// Emit the aggregated import-manifest alongside the resource specs so
+	// URN → remote-ID mappings live in one queryable place instead of being
+	// scattered across every resource's inline metadata.import block.
+	if len(entries) > 0 {
+		manifestEntity := []writer.FormattableEntity{{
+			Content:      importmanifest.BuildSpec(entries),
+			RelativePath: ImportManifestFile,
+		}}
+		if err := writer.Write(ctx, outputDir, formatters, manifestEntity); err != nil {
+			return fmt.Errorf("writing import manifest: %w", err)
+		}
 	}
 
 	return nil

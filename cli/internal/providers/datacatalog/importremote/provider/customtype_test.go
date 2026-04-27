@@ -116,7 +116,7 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -135,7 +135,8 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "custom-types", spec.Kind)
 		assert.Equal(t, "custom-types", spec.Metadata["name"])
-		assert.NotNil(t, spec.Metadata["import"])
+		_, hasImport := spec.Metadata["import"]
+		assert.False(t, hasImport, "emitted specs must not carry inline metadata.import")
 
 		customTypes, ok := spec.Spec["types"].([]map[string]any)
 		require.True(t, ok)
@@ -175,7 +176,7 @@ func TestCustomTypeFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.NoError(t, err)
 
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		result, _, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 

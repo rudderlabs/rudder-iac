@@ -1043,7 +1043,7 @@ func TestFormatForExport(t *testing.T) {
 		idNamer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.NoError(t, err)
 		assert.Nil(t, result)
@@ -1075,7 +1075,7 @@ func TestFormatForExport(t *testing.T) {
 		}}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -1124,7 +1124,7 @@ func TestFormatForExport(t *testing.T) {
 		}}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -1157,7 +1157,7 @@ func TestFormatForExport(t *testing.T) {
 		idNamer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported language 'ruby'")
@@ -1184,7 +1184,7 @@ func TestFormatForExport(t *testing.T) {
 		}}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "generating file name")
@@ -1222,7 +1222,7 @@ func TestFormatForExport(t *testing.T) {
 		}}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, resolver)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)

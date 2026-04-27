@@ -3,7 +3,6 @@ package export_test
 import (
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +27,7 @@ func (h *testMultiSpecHandler) MapRemoteToSpec(
 	}, nil
 }
 
-func TestMultiSpecExportStrategy_FormatForExport_WritesURN(t *testing.T) {
+func TestMultiSpecExportStrategy_FormatForExport_ReturnsImportEntry(t *testing.T) {
 	t.Parallel()
 
 	strategy := &export.MultiSpecExportStrategy[map[string]any, testRemote]{
@@ -45,17 +44,12 @@ func TestMultiSpecExportStrategy_FormatForExport_WritesURN(t *testing.T) {
 		"local-id-1": {id: "remote-id-1", workspaceID: "ws-123"},
 	}
 
-	entities, err := strategy.FormatForExport(remotes, nil, nil)
+	entities, entries, err := strategy.FormatForExport(remotes, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, entities, 1)
 
-	spec, ok := entities[0].Content.(*specs.Spec)
-	require.True(t, ok)
-
-	importSection := spec.Metadata["import"].(map[string]any)
-	workspaces := importSection["workspaces"].([]any)
-	resource := workspaces[0].(map[string]any)["resources"].([]any)[0].(map[string]any)
-
-	assert.Equal(t, "my-resource-type:local-id-1", resource["urn"], "import metadata must use urn, not local_id")
-	assert.Empty(t, resource["local_id"], "local_id must not be set in exported metadata")
+	require.Len(t, entries, 1)
+	assert.Equal(t, "ws-123", entries[0].WorkspaceID)
+	assert.Equal(t, "my-resource-type:local-id-1", entries[0].URN, "import entry must use urn, not local_id")
+	assert.Equal(t, "remote-id-1", entries[0].RemoteID)
 }
