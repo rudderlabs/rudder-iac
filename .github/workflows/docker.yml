@@ -37,10 +37,12 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
+          CLIENT_PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [[ "$EVENT_NAME" == 'repository_dispatch' ]]; then
             # For repository_dispatch from release-please, use tag_name and strip v prefix
-            TAG_NAME="${{ github.event.client_payload.tag }}"
+            TAG_NAME="$CLIENT_PAYLOAD_TAG"
             echo "VERSION=${TAG_NAME#v}" >> $GITHUB_ENV
           elif [[ "$REF_TYPE" == 'tag' ]]; then
             # For version tags (v0.1.0), use version number (0.1.0)
@@ -48,7 +50,7 @@ jobs:
           else
             # For PR, use PR branch name
             if [[ "$EVENT_NAME" == 'pull_request' ]]; then
-              TAG="pr-${{ github.event.pull_request.number }}"
+              TAG="pr-$PR_NUMBER"
             else
               # For main branch push
               TAG=$GITHUB_REF_NAME
