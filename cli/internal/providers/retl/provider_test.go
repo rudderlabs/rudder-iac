@@ -20,12 +20,6 @@ import (
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// mustMarshalSQLModelConfig wraps a typed SQL model config as a
-// retlClient.ConfigType for use in test fixtures.
-func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) retlClient.ConfigType {
-	return cfg
-}
-
 // mockRETLStore mocks the RETL client for testing
 type mockRETLStore struct {
 	retlClient.RETLStore
@@ -132,7 +126,7 @@ func newDefaultMockClient() *mockRETLStore {
 				AccountID:            "acc123",
 				IsEnabled:            true,
 				WorkspaceID:          "test-workspace-id",
-				Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"}),
+				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
 			}, nil
 		},
 		submitPreviewFunc: func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
@@ -421,11 +415,11 @@ func TestProviderList(t *testing.T) {
 							SourceType:           retlClient.ModelSourceType,
 							SourceDefinitionName: "postgres",
 							AccountID:            "account-1",
-							Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+							Config: retlClient.RETLSQLModelConfig{
 								Description: "Test description 1",
 								PrimaryKey:  "id",
 								Sql:         "SELECT * FROM table1",
-							}),
+							},
 						},
 					},
 				}, nil
@@ -471,11 +465,11 @@ func TestProviderList(t *testing.T) {
 							SourceDefinitionName: "postgres",
 							AccountID:            "account-1",
 							ExternalID:           externalId,
-							Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+							Config: retlClient.RETLSQLModelConfig{
 								Description: "Test description 1",
 								PrimaryKey:  "id",
 								Sql:         "SELECT * FROM table1",
-							}),
+							},
 						},
 					},
 				}, nil
@@ -698,11 +692,11 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						ExternalID:           externalID,
-						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+						Config: retlClient.RETLSQLModelConfig{
 							Description: "d1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT 1",
-						}),
+						},
 					},
 				},
 			}, nil
@@ -760,11 +754,11 @@ func TestProviderMapRemoteToState(t *testing.T) {
 			AccountID:            "acc-1",
 			IsEnabled:            true,
 			ExternalID:           extID,
-			Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+			Config: retlClient.RETLSQLModelConfig{
 				Description: "desc-1",
 				PrimaryKey:  "id",
 				Sql:         "SELECT 1",
-			}),
+			},
 		}
 		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
@@ -847,11 +841,11 @@ func TestProviderLoadImportable(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						WorkspaceID:          "ws-1",
-						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+						Config: retlClient.RETLSQLModelConfig{
 							Description: "desc-1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT 1",
-						}),
+						},
 					},
 					{
 						ID:                   "source-2",
@@ -860,11 +854,11 @@ func TestProviderLoadImportable(t *testing.T) {
 						SourceDefinitionName: "postgres",
 						AccountID:            "acc-1",
 						WorkspaceID:          "ws-1",
-						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+						Config: retlClient.RETLSQLModelConfig{
 							Description: "desc-2",
 							PrimaryKey:  "user_id",
 							Sql:         "SELECT 2",
-						}),
+						},
 					},
 				},
 			}, nil
@@ -931,11 +925,11 @@ func TestProviderFormatForExport(t *testing.T) {
 			AccountID:            "acc-1",
 			WorkspaceID:          "ws-1",
 			IsEnabled:            true,
-			Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+			Config: retlClient.RETLSQLModelConfig{
 				Description: "desc-1",
 				PrimaryKey:  "id",
 				Sql:         "SELECT 1",
-			}),
+			},
 		}
 		collection := resources.NewRemoteResources()
 		collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{

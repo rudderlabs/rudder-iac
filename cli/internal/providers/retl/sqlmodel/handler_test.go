@@ -34,12 +34,6 @@ func createTestRETLSourceWithConfig(id, name, sourceDefn, accountID string, enab
 	}
 }
 
-// mustMarshalSQLModelConfig wraps a typed SQL model config as a
-// retlClient.ConfigType for use in test fixtures.
-func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) retlClient.ConfigType {
-	return cfg
-}
-
 // createTestResourceData creates test resource data with common defaults
 func createTestResourceData(id, displayName, description, sql string) resources.ResourceData {
 	return resources.ResourceData{
@@ -130,7 +124,7 @@ func (m *mockRETLClient) GetRetlSource(ctx context.Context, sourceID string) (*r
 	return &retlClient.RETLSource{
 		ID:                   sourceID,
 		Name:                 "Test Model",
-		Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{}),
+		Config:               retlClient.RETLSQLModelConfig{},
 		SourceType:           "model",
 		SourceDefinitionName: "postgres",
 		AccountID:            "acc123",
@@ -175,7 +169,7 @@ func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient
 			{
 				ID:                   m.sourceID,
 				Name:                 "Test Model",
-				Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{}),
+				Config:               retlClient.RETLSQLModelConfig{},
 				SourceType:           "model",
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
@@ -1234,7 +1228,7 @@ func TestSQLModelHandler(t *testing.T) {
 				return &retlClient.RETLSource{
 					ID:                   "remote-id",
 					Name:                 "Imported Model",
-					Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"}),
+					Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
 					SourceType:           retlClient.ModelSourceType,
 					SourceDefinitionName: "postgres",
 					AccountID:            "acc123",
@@ -1522,11 +1516,11 @@ func TestSQLModelHandler(t *testing.T) {
 						ExternalID:           "local-1",
 						CreatedAt:            &createdAt,
 						UpdatedAt:            &updatedAt,
-						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+						Config: retlClient.RETLSQLModelConfig{
 							Description: "desc 1",
 							PrimaryKey:  "id",
 							Sql:         "SELECT * FROM one",
-						}),
+						},
 					},
 				},
 				"remote-2": {
@@ -1541,11 +1535,11 @@ func TestSQLModelHandler(t *testing.T) {
 						IsEnabled:            false,
 						WorkspaceID:          "ws-2",
 						ExternalID:           "local-2",
-						Config: mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{
+						Config: retlClient.RETLSQLModelConfig{
 							Description: "desc 2",
 							PrimaryKey:  "pk",
 							Sql:         "SELECT * FROM two",
-						}),
+						},
 					},
 				},
 			}
@@ -1693,7 +1687,7 @@ func TestSQLModelHandler(t *testing.T) {
 			return &retlClient.RETLSource{
 				ID:                   "remote-id",
 				Name:                 "Imported Model",
-				Config:               mustMarshalSQLModelConfig(retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: sql}),
+				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: sql},
 				SourceType:           retlClient.ModelSourceType,
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
