@@ -16,6 +16,7 @@
 > **Warning**
 >
 > Please note that this tool is currently a work in progress. We are actively developing and improving it, and as such, there may be frequent changes and updates. We do not guarantee backwards compatibility at this stage.
+> Installation steps below are provided for convenience and may change between releases.
 
 ## Installation
 
