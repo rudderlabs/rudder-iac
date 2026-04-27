@@ -45,6 +45,7 @@ sudo mv rudder-cli /usr/local/bin/
 ### Docker
 
 You can run the CLI directly using Docker:
+For one-off runs, add `--rm` so the container is cleaned up after exit.
 
 ```sh
 docker run rudderlabs/rudder-cli
