@@ -13,8 +13,6 @@ type RETLStore interface {
 	PreviewStore
 }
 
-
-
 // RETLConnectionStore is the interface for RETL connection operations.
 type RETLConnectionStore interface {
 	// CreateConnection creates a new RETL connection.
