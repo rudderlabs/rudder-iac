@@ -115,7 +115,7 @@ func TestUpdateConnection(t *testing.T) {
 
 	req := &retl.UpdateRETLConnectionRequest{
 		Schedule: retl.Schedule{Type: retl.ScheduleTypeBasic, EveryMinutes: intPtr(120)},
-		Mappings: []retl.Mapping{{From: "name", To: "first_name"}},
+		Mappings: &[]retl.Mapping{{From: "name", To: "first_name"}},
 	}
 
 	updated, err := retlClient.UpdateConnection(context.Background(), "conn-1", req)
@@ -125,6 +125,35 @@ func TestUpdateConnection(t *testing.T) {
 	require.NotNil(t, updated.Schedule.EveryMinutes)
 	assert.Equal(t, 120, *updated.Schedule.EveryMinutes)
 
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateConnection_ExplicitEmptyMappingsAndConstants(t *testing.T) {
+	// Pointer-to-slice fields let callers send an empty array on the wire to
+	// clear existing values, distinct from omitting the field entirely.
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{
+				"schedule": {"type": "manual"},
+				"mappings": [],
+				"constants": []
+			}`
+			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"id":"conn-1","sourceId":"s","destinationId":"d","enabled":true,"schedule":{"type":"manual"},"syncBehaviour":"upsert","identifiers":[]}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	_, err = retlClient.UpdateConnection(context.Background(), "conn-1", &retl.UpdateRETLConnectionRequest{
+		Schedule:  retl.Schedule{Type: retl.ScheduleTypeManual},
+		Mappings:  &[]retl.Mapping{},
+		Constants: &[]retl.Constant{},
+	})
+	require.NoError(t, err)
 	httpClient.AssertNumberOfCalls()
 }
 

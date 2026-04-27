@@ -129,9 +129,12 @@ type UpdateRETLConnectionRequest struct {
 	Enabled      *bool         `json:"enabled,omitempty"`
 	Schedule     Schedule      `json:"schedule"`
 	SyncSettings *SyncSettings `json:"syncSettings,omitempty"`
-	Mappings     []Mapping     `json:"mappings,omitempty"`
-	Constants    []Constant    `json:"constants,omitempty"`
-	Identifiers  []Mapping     `json:"identifiers,omitempty"`
+	// Pointer-to-slice so callers can distinguish "not provided" (nil) from
+	// "explicitly empty" (pointer to empty slice) — needed to clear existing
+	// values via update.
+	Mappings    *[]Mapping  `json:"mappings,omitempty"`
+	Constants   *[]Constant `json:"constants,omitempty"`
+	Identifiers []Mapping   `json:"identifiers,omitempty"`
 }
 
 // ListRETLConnectionsRequest is the request for listing connections.
