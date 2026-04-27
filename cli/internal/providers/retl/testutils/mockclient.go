@@ -107,10 +107,6 @@ func NewDefaultMockClient() *mockRETLStore {
 				return nil, fmt.Errorf("retl source not found")
 			}
 
-			rawCfg, err := retlClient.MarshalConfig(retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"})
-			if err != nil {
-				return nil, fmt.Errorf("encoding mock SQL model config: %w", err)
-			}
 			return &retlClient.RETLSource{
 				ID:                   "remote-id",
 				Name:                 "Imported Model",
@@ -118,7 +114,7 @@ func NewDefaultMockClient() *mockRETLStore {
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
 				IsEnabled:            true,
-				Config:               rawCfg,
+				Config:               retlClient.RETLSQLModelConfig{Description: "desc", PrimaryKey: "id", Sql: "SELECT * FROM t"},
 			}, nil
 		},
 		SubmitPreviewFunc: func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {

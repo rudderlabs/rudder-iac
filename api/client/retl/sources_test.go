@@ -2,7 +2,6 @@ package retl_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -13,13 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mustMarshalConfig is a test helper that marshals a typed RETL config into
-// json.RawMessage via retl.MarshalConfig, panicking on failure.
-func mustMarshalConfig[T retl.ConfigType](t *testing.T, cfg T) json.RawMessage {
+// mustMarshalConfig wraps a typed RETL config as a retl.ConfigType for use
+// in test fixtures. Kept as a helper so call sites read consistently.
+func mustMarshalConfig[T retl.ConfigType](t *testing.T, cfg T) retl.ConfigType {
 	t.Helper()
-	raw, err := retl.MarshalConfig(cfg)
-	require.NoError(t, err)
-	return raw
+	return cfg
 }
 
 func TestCreateRetlSource(t *testing.T) {
@@ -787,14 +784,14 @@ func TestUpdateRetlSourceTable(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestDecodeConfigMalformed(t *testing.T) {
+func TestDecodeConfigTypeMismatch(t *testing.T) {
 	source := retl.RETLSource{
-		Config: "not-an-object",
+		Config: retl.RETLTableConfig{Schema: "s", Table: "t"},
 	}
 
 	_, err := retl.DecodeConfig[retl.RETLSQLModelConfig](source.Config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unmarshalling RETL config")
+	assert.Contains(t, err.Error(), "RETL config is")
 }
 
 func TestDecodeConfigEmpty(t *testing.T) {

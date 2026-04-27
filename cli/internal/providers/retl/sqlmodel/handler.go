@@ -188,14 +188,9 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 // Create creates a new SQL Model resource
 func (h *Handler) Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error) {
-	cfg := toRETLSQLModelConfig(data)
-	rawCfg, err := retlClient.MarshalConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("encoding SQL model config: %w", err)
-	}
 	source := &retlClient.RETLSourceCreateRequest{
 		Name:                 data[DisplayNameKey].(string),
-		Config:               rawCfg,
+		Config:               toRETLSQLModelConfig(data),
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: data[SourceDefinitionKey].(string),
 		AccountID:            data[AccountIDKey].(string),
@@ -227,14 +222,9 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 }
 
 func (h *Handler) updateCall(ctx context.Context, sourceID string, data resources.ResourceData) (*resources.ResourceData, error) {
-	cfg := toRETLSQLModelConfig(data)
-	rawCfg, err := retlClient.MarshalConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("encoding SQL model config: %w", err)
-	}
 	source := &retlClient.RETLSourceUpdateRequest{
 		Name:      data[DisplayNameKey].(string),
-		Config:    rawCfg,
+		Config:    toRETLSQLModelConfig(data),
 		IsEnabled: data[EnabledKey].(bool),
 		AccountID: data[AccountIDKey].(string),
 	}

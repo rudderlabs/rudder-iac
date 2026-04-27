@@ -22,12 +22,7 @@ import (
 )
 
 // createTestRETLSourceWithConfig creates a test RETL source with custom config.
-// The typed config is encoded into json.RawMessage via retlClient.MarshalConfig.
 func createTestRETLSourceWithConfig(id, name, sourceDefn, accountID string, enabled bool, config retlClient.RETLSQLModelConfig) retlClient.RETLSource {
-	raw, err := retlClient.MarshalConfig(config)
-	if err != nil {
-		panic(fmt.Sprintf("marshalling test SQL model config: %v", err))
-	}
 	return retlClient.RETLSource{
 		ID:                   id,
 		Name:                 name,
@@ -35,18 +30,14 @@ func createTestRETLSourceWithConfig(id, name, sourceDefn, accountID string, enab
 		SourceType:           retlClient.ModelSourceType,
 		SourceDefinitionName: sourceDefn,
 		AccountID:            accountID,
-		Config:               raw,
+		Config:               config,
 	}
 }
 
-// mustMarshalSQLModelConfig encodes a SQL model config into json.RawMessage,
-// panicking on failure. Only for use inside test fixtures.
-func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) json.RawMessage {
-	raw, err := retlClient.MarshalConfig(cfg)
-	if err != nil {
-		panic(fmt.Sprintf("marshalling test SQL model config: %v", err))
-	}
-	return raw
+// mustMarshalSQLModelConfig wraps a typed SQL model config as a
+// retlClient.ConfigType for use in test fixtures.
+func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) retlClient.ConfigType {
+	return cfg
 }
 
 // createTestResourceData creates test resource data with common defaults

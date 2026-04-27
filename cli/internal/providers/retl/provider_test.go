@@ -2,7 +2,6 @@ package retl_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -21,14 +20,10 @@ import (
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// mustMarshalSQLModelConfig encodes a SQL model config into json.RawMessage,
-// panicking on failure. Only for use inside test fixtures.
-func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) json.RawMessage {
-	raw, err := retlClient.MarshalConfig(cfg)
-	if err != nil {
-		panic(fmt.Sprintf("marshalling test SQL model config: %v", err))
-	}
-	return raw
+// mustMarshalSQLModelConfig wraps a typed SQL model config as a
+// retlClient.ConfigType for use in test fixtures.
+func mustMarshalSQLModelConfig(cfg retlClient.RETLSQLModelConfig) retlClient.ConfigType {
+	return cfg
 }
 
 // mockRETLStore mocks the RETL client for testing
