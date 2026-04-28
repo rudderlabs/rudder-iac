@@ -16,7 +16,7 @@ type mockRETLStore struct {
 	UpdateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	DeleteRetlSourceFunc func(ctx context.Context, id string) error
 	GetRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	ListRetlSourcesFunc  func(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error)
+	ListRetlSourcesFunc  func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error)
 	// Preview functions
 	SubmitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	GetPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -52,9 +52,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
 	if m.ListRetlSourcesFunc != nil {
-		return m.ListRetlSourcesFunc(ctx, hasExternalID)
+		return m.ListRetlSourcesFunc(ctx, sourceType, hasExternalID)
 	}
 	return &retlClient.RETLSources{}, nil
 }
