@@ -21,10 +21,10 @@ const (
 	Completed AsyncStatus = "completed"
 )
 
-// ConfigType is the sealed union of RETL source config shapes. Implementations
+// RETLConfig is the sealed union of RETL source config shapes. Implementations
 // are confined to this package via the unexported marker method, so the
 // dispatch in RETLSource.UnmarshalJSON stays exhaustive.
-type ConfigType interface {
+type RETLConfig interface {
 	isRETLConfig()
 }
 
@@ -60,7 +60,7 @@ func (RETLS3TableConfig) isRETLConfig() {}
 type RETLSource struct {
 	ID                   string     `json:"id"`
 	Name                 string     `json:"name"`
-	Config               ConfigType `json:"config"`
+	Config               RETLConfig `json:"config"`
 	IsEnabled            bool       `json:"enabled"`
 	SourceType           SourceType `json:"sourceType"`
 	SourceDefinitionName string     `json:"sourceDefinitionName"`
@@ -115,7 +115,7 @@ func (s *RETLSource) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func decodeConfigFor(sourceType SourceType, sourceDefinitionName string, raw json.RawMessage) (ConfigType, error) {
+func decodeConfigFor(sourceType SourceType, sourceDefinitionName string, raw json.RawMessage) (RETLConfig, error) {
 	switch sourceType {
 	case ModelSourceType:
 		var cfg RETLSQLModelConfig
@@ -143,7 +143,7 @@ func decodeConfigFor(sourceType SourceType, sourceDefinitionName string, raw jso
 
 type RETLSourceCreateRequest struct {
 	Name                 string     `json:"name"`
-	Config               ConfigType `json:"config"`
+	Config               RETLConfig `json:"config"`
 	SourceType           SourceType `json:"sourceType"`
 	SourceDefinitionName string     `json:"sourceDefinitionName"`
 	AccountID            string     `json:"accountId"`
@@ -153,7 +153,7 @@ type RETLSourceCreateRequest struct {
 
 type RETLSourceUpdateRequest struct {
 	Name      string     `json:"name"`
-	Config    ConfigType `json:"config"`
+	Config    RETLConfig `json:"config"`
 	IsEnabled bool       `json:"enabled"`
 	AccountID string     `json:"accountId"`
 }
@@ -161,7 +161,7 @@ type RETLSourceUpdateRequest struct {
 // DecodeConfig narrows a RETLSource.Config (held as the ConfigType interface)
 // to a specific config type. Returns the zero value and no error when the
 // interface is nil. Returns an error when the held concrete type doesn't match T.
-func DecodeConfig[T ConfigType](raw ConfigType) (T, error) {
+func DecodeConfig[T RETLConfig](raw RETLConfig) (T, error) {
 	var zero T
 	if raw == nil {
 		return zero, nil

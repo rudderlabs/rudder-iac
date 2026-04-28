@@ -14,7 +14,7 @@ import (
 
 // mustMarshalConfig wraps a typed RETL config as a retl.ConfigType for use
 // in test fixtures. Kept as a helper so call sites read consistently.
-func mustMarshalConfig[T retl.ConfigType](t *testing.T, cfg T) retl.ConfigType {
+func mustMarshalConfig[T retl.RETLConfig](t *testing.T, cfg T) retl.RETLConfig {
 	t.Helper()
 	return cfg
 }
