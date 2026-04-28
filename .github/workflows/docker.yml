@@ -34,18 +34,23 @@ jobs:
 
       - name: Set Docker Tag
         id: docker_tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          CLIENT_PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [[ ${{ github.event_name }} == 'repository_dispatch' ]]; then
+          if [[ "$EVENT_NAME" == 'repository_dispatch' ]]; then
             # For repository_dispatch from release-please, use tag_name and strip v prefix
-            TAG_NAME="${{ github.event.client_payload.tag }}"
+            TAG_NAME="$CLIENT_PAYLOAD_TAG"
             echo "VERSION=${TAG_NAME#v}" >> $GITHUB_ENV
-          elif [[ ${{ github.ref_type }} == 'tag' ]]; then
+          elif [[ "$REF_TYPE" == 'tag' ]]; then
             # For version tags (v0.1.0), use version number (0.1.0)
             echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           else
             # For PR, use PR branch name
-            if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-              TAG="pr-${{ github.event.pull_request.number }}"
+            if [[ "$EVENT_NAME" == 'pull_request' ]]; then
+              TAG="pr-$PR_NUMBER"
             else
               # For main branch push
               TAG=$GITHUB_REF_NAME
@@ -59,9 +64,11 @@ jobs:
         env:
           TELEMETRY_WRITE_KEY: ${{ vars.TELEMETRY_WRITE_KEY }}
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           make docker-build
-          if [[ ${{ github.event_name }} == 'repository_dispatch' ]] || [[ ${{ github.ref_type }} == 'tag' ]]; then
+          if [[ "$EVENT_NAME" == 'repository_dispatch' ]] || [[ "$REF_TYPE" == 'tag' ]]; then
             # For releases (repository_dispatch) or version tags, also push as latest
             docker tag rudderlabs/rudder-cli:$VERSION rudderlabs/rudder-cli:latest
             docker push rudderlabs/rudder-cli:$VERSION
