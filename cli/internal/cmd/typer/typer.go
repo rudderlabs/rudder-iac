@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	platformKotlin = "kotlin"
-	platformSwift  = "swift"
+	platformKotlin     = "kotlin"
+	platformSwift      = "swift"
+	platformTypeScript = "typescript"
 )
 
 func NewCmdTyper() *cobra.Command {
@@ -50,7 +51,7 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("tracking-plan-id is required")
 			}
 
-			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true}
+			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true, platformTypeScript: true}
 			if !validPlatforms[platform] {
 				supported := make([]string, 0, len(validPlatforms))
 				for p := range validPlatforms {
@@ -103,7 +104,7 @@ func newCmdGenerate() *cobra.Command {
 	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from")
 	cmd.MarkFlagRequired("tracking-plan-id")
 
-	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s)", platformKotlin, platformSwift))
+	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s, %s)", platformKotlin, platformSwift, platformTypeScript))
 	cmd.MarkFlagRequired("platform")
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")

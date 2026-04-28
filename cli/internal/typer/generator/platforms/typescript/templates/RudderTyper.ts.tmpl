@@ -1,0 +1,13 @@
+{{ template "disclaimer.tmpl" . }}
+import type { ApiOptions, RudderAnalytics } from "@rudderstack/analytics-js";
+{{- if .Interfaces }}
+
+// ===== Event Traits =====
+{{- range .Interfaces }}
+{{ template "interface.tmpl" . }}
+{{- end }}
+{{- end }}
+
+// ===== RudderTyper =====
+
+{{ template "ruddertyper.tmpl" . -}}
