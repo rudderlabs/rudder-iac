@@ -56,7 +56,7 @@ If you need to persist your configuration, or provide an external configuration 
 docker run -v ~/.rudder:/.rudder rudderlabs/rudder-cli
 ```
 
-To run commands with local catalog files, mount your files directory and use the `-l` flag. For example:
+To run commands with local catalog files, mount your local catalog directory and use the `-l` flag. For example:
 
 ```sh
 docker run -v ~/.rudder:/.rudder -v ~/my-catalog:/catalog rudderlabs/rudder-cli tp apply --dry-run -l /catalog
