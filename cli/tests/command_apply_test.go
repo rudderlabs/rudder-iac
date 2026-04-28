@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
+		assert.Contains(t, string(output), "Workspace: ", "Expected workspace header in apply output, got: %s", string(output))
 		verifyState(t, "create")
 	})
 
@@ -64,6 +66,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
+		assert.Contains(t, string(output), "Workspace: ", "Expected workspace header in apply output, got: %s", string(output))
 		verifyState(t, "update")
 	})
 
@@ -89,6 +92,14 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	assert.Contains(t, string(output), "Workspace: ", "Expected workspace header in apply output, got: %s", string(output))
+	assert.Less(
+		t,
+		strings.Index(string(output), "Workspace: "),
+		strings.Index(string(output), "No changes to apply"),
+		"Expected workspace header before no-changes line, got: %s",
+		string(output),
+	)
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
