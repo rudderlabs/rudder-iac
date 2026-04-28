@@ -59,6 +59,7 @@ var sourceDefinitions = []string{
 	"javascript",
 	"go",
 	"node",
+	"ocaml",
 	"ruby",
 	"unity",
 	"swift",
@@ -71,7 +72,7 @@ var sourceDefinitions = []string{
 type SourceSpec struct {
 	LocalID          string                `json:"id"         mapstructure:"id"         validate:"required"`
 	Name             string                `json:"name"       mapstructure:"name"       validate:"required"`
-	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin"`
+	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ocaml ruby unity swift kotlin"`
 	Enabled          *bool                 `json:"enabled"    mapstructure:"enabled"`
 	Governance       *SourceGovernanceSpec `json:"governance" mapstructure:"governance"`
 }
