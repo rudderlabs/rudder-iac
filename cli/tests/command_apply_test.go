@@ -29,6 +29,16 @@ func TestProjectApply(t *testing.T) {
 		applyAndVerify(t, executor, projectDir)
 	})
 
+	t.Run("rudder specs with v0 includes (no migrate)", func(t *testing.T) {
+		// TODO: Remove this dedicated apply path once migrate supports tracking-plan includes for v1 specs.
+		applyAndVerifySingleDir(
+			t,
+			executor,
+			filepath.Join(projectDir, "update_includes"),
+			"update_includes",
+		)
+	})
+
 	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
 		// to make sure migration is applied correctly, we need to verify no
@@ -89,6 +99,19 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+}
+
+func applyAndVerifySingleDir(t *testing.T, executor *CmdExecutor, dir, expectedSnapshotDir string) {
+	t.Helper()
+
+	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
+	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
+
+	output, err = executor.Execute(cliBinPath, "apply", "-l", dir, "--confirm=false")
+	require.NoError(t, err, "Apply command failed with output: %s", string(output))
+	verifyState(t, expectedSnapshotDir)
+
+	verifyNoChangesToApply(t, executor, dir)
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
@@ -216,6 +239,22 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].createdBy",
 			"events[2].updatedBy",
 			"events[2].categoryId",
+			"events[3].properties[0].id",
+			"events[3].id",
+			"events[3].createdAt",
+			"events[3].updatedAt",
+			"events[3].workspaceId",
+			"events[3].createdBy",
+			"events[3].updatedBy",
+			"events[3].categoryId",
+			"events[4].properties[0].id",
+			"events[4].id",
+			"events[4].createdAt",
+			"events[4].updatedAt",
+			"events[4].workspaceId",
+			"events[4].createdBy",
+			"events[4].updatedBy",
+			"events[4].categoryId",
 		},
 	)
 	err = upstreamTester.SnapshotTest(context.Background())

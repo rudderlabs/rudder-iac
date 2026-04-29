@@ -1,0 +1,100 @@
+version: "rudder/v0.1"
+kind: "tp"
+metadata:
+  name: "api_tracking"
+spec:
+  id: "api_tracking"
+  display_name: "API Tracking"
+  description: "Tracking plan for an e-commerce application."
+  rules:
+    - type: "event_rule"
+      id: "common-rules-include"
+      includes:
+        $ref: "#/tp/common_rules/event_rule/*"
+
+    - type: "event_rule"
+      id: "login"
+      event:
+        $ref: "#/events/api_tracking/api_tracking"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/api_tracking/api_method"
+          required: true
+        - $ref: "#/properties/api_tracking/api_path"
+          required: true
+        - $ref: "#/properties/api_tracking/user_mail"
+          required: true
+        - $ref: "#/properties/api_tracking/password"
+          required: true
+
+      variants:
+        - type: discriminator
+          discriminator: "#/properties/api_tracking/api_method"
+          cases:
+            - display_name: "Create Entity"
+              match:
+              - "POST"
+              description: "applies when creating a new entity"
+              properties:
+              - $ref: "#/properties/api_tracking/host"
+                required: false
+
+            - display_name: "Update Entity"
+              match:
+              - "PUT"
+              - "PATCH"
+              description: "applies when updating an existing entity"
+              properties:
+              - $ref: "#/properties/api_tracking/referrer"
+                required: true
+
+          default:
+            - $ref: "#/properties/api_tracking/user_agent"
+              required: false
+            - $ref: "#/properties/api_tracking/content_type"
+              required: true
+
+
+
+    - type: "event_rule"
+      id: "login_error"
+      event:
+        $ref: "#/events/api_tracking/api_error"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/api_tracking/api_method"
+          required: true
+        - $ref: "#/properties/api_tracking/api_path"
+          required: true
+        - $ref: "#/properties/api_tracking/http_retry_count"
+          required: false
+        - $ref: "#/properties/api_tracking/error_code"
+          required: true
+
+    - type: "event_rule"
+      id: "login_event"
+      event:
+        $ref: "#/events/api_tracking/login"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/api_tracking/user_mail"
+          required: true
+        - $ref: "#/properties/api_tracking/password"
+          required: true
+        - $ref: "#/properties/api_tracking/signin_info"
+          required: true
+          properties:
+            - $ref: "#/properties/api_tracking/remember_me_checkbox_clicked"
+              required: true
+            - $ref: "#/properties/api_tracking/captcha"
+              required: true
+              properties:
+                - $ref: "#/properties/api_tracking/captcha_solved"
+                  required: true
+                - $ref: "#/properties/api_tracking/captcha_info"
+                  required: true
+                  properties:
+                    - $ref: "#/properties/api_tracking/captcha_type"
+                      required: true
+                    - $ref: "#/properties/api_tracking/captcha_attempts"
+                      required: true

@@ -75,9 +75,9 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event" validate:"required"`
+	Event      *TPRuleEvent      `json:"event,omitempty" validate:"required_without=Includes,excluded_with=Includes"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
-	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
+	Includes   *TPRuleIncludes   `json:"includes,omitempty" validate:"required_without=Event,excluded_with=Event"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
@@ -95,7 +95,7 @@ type TPRuleProperty struct {
 }
 
 type TPRuleIncludes struct {
-	Ref string `json:"$ref"`
+	Ref string `json:"$ref" validate:"required,pattern=legacy_tp_include_ref"`
 }
 
 // ExpandRefs simply expands the references being held

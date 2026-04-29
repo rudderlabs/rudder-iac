@@ -2,6 +2,7 @@ package trackingplan
 
 import (
 	"fmt"
+	"reflect"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
@@ -83,7 +84,7 @@ var validateTrackingPlanSpec = func(
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors, nil)
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(Spec))
 
 	// validate the rules on the trackingplan spec
 	results = append(results, validateRules(Spec.Rules)...)
