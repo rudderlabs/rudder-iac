@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -80,6 +81,7 @@ func NewCmdApply() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+			fmt.Print(workspaceHeader(workspace))
 
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
@@ -124,4 +126,8 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 
 	return cmd
+}
+
+func workspaceHeader(workspace *client.Workspace) string {
+	return fmt.Sprintf("Workspace: %s (%s)\n", workspace.Name, workspace.ID)
 }
