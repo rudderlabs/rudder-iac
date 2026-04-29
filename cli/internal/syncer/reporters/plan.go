@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -16,11 +17,16 @@ import (
 )
 
 type planReporter struct {
-	Writer io.Writer
+	Writer    io.Writer
+	workspace *client.Workspace
 }
 
 func (r *planReporter) SetWriter(writer io.Writer) {
 	r.Writer = writer
+}
+
+func (r *planReporter) SetWorkspace(workspace *client.Workspace) {
+	r.workspace = workspace
 }
 
 func (r *planReporter) getWriter() io.Writer {
@@ -31,7 +37,24 @@ func (r *planReporter) getWriter() io.Writer {
 }
 
 func (r *planReporter) ReportPlan(plan *planner.Plan) {
-	fmt.Fprint(r.getWriter(), renderDiff(plan.Diff))
+	renderedDiff := renderDiff(plan.Diff)
+	if renderedDiff == "" {
+		return
+	}
+
+	if banner := r.renderWorkspaceBanner(); banner != "" {
+		fmt.Fprint(r.getWriter(), banner)
+	}
+
+	fmt.Fprint(r.getWriter(), renderedDiff)
+}
+
+func (r *planReporter) renderWorkspaceBanner() string {
+	if r.workspace == nil || r.workspace.Name == "" || r.workspace.ID == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("Workspace: %s (%s)\n\n", r.workspace.Name, r.workspace.ID)
 }
 
 func renderDiff(diff *differ.Diff) string {
