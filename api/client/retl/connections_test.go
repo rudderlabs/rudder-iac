@@ -16,6 +16,8 @@ func boolPtr(b bool) *bool { return &b }
 
 func intPtr(i int) *int { return &i }
 
+func stringPtr(s string) *string { return &s }
+
 // assertCall validates an incoming mock HTTP request against the expected
 // method, URL, and JSON body. testutils.ValidateRequest currently ignores its
 // url argument, so we assert the URL here explicitly.
@@ -483,5 +485,119 @@ func TestSetConnectionExternalId_APIError(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "setting external ID")
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestCreateConnection_CronSchedule(t *testing.T) {
+	// Cron schedules carry cronExpression on the wire in both directions; this
+	// guards the field's JSON tag and ensures it is not silently dropped during
+	// marshal/unmarshal.
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{
+				"sourceId": "retl-src-123",
+				"destinationId": "dest-456",
+				"schedule": {"type": "cron", "cronExpression": "0 */6 * * *"},
+				"syncBehaviour": "upsert",
+				"identifiers": [{"from": "email", "to": "user_id"}]
+			}`
+			return assertCall(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "conn-1",
+			"sourceId": "retl-src-123",
+			"destinationId": "dest-456",
+			"enabled": true,
+			"schedule": {"type": "cron", "cronExpression": "0 */6 * * *"},
+			"syncBehaviour": "upsert",
+			"identifiers": [{"from": "email", "to": "user_id"}]
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	created, err := retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{
+		SourceID:      "retl-src-123",
+		DestinationID: "dest-456",
+		Schedule:      retl.Schedule{Type: retl.ScheduleTypeCron, CronExpression: stringPtr("0 */6 * * *")},
+		SyncBehaviour: retl.SyncBehaviourUpsert,
+		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, retl.ScheduleTypeCron, created.Schedule.Type)
+	assert.Nil(t, created.Schedule.EveryMinutes)
+	require.NotNil(t, created.Schedule.CronExpression)
+	assert.Equal(t, "0 */6 * * *", *created.Schedule.CronExpression)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestGetConnection_CronSchedule(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/retl-connections/conn-1", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "conn-1",
+			"sourceId": "retl-src-123",
+			"destinationId": "dest-456",
+			"enabled": true,
+			"schedule": {"type": "cron", "cronExpression": "*/15 * * * *"},
+			"syncBehaviour": "upsert",
+			"identifiers": [{"from": "email", "to": "user_id"}]
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	got, err := retlClient.GetConnection(context.Background(), "conn-1")
+	require.NoError(t, err)
+
+	assert.Equal(t, retl.ScheduleTypeCron, got.Schedule.Type)
+	require.NotNil(t, got.Schedule.CronExpression)
+	assert.Equal(t, "*/15 * * * *", *got.Schedule.CronExpression)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestUpdateConnection_CronSchedule(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{
+				"schedule": {"type": "cron", "cronExpression": "0 0 * * *"}
+			}`
+			return assertCall(t, req, "PUT", "https://api.rudderstack.com/v2/retl-connections/conn-1", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "conn-1",
+			"sourceId": "s",
+			"destinationId": "d",
+			"enabled": true,
+			"schedule": {"type": "cron", "cronExpression": "0 0 * * *"},
+			"syncBehaviour": "upsert",
+			"identifiers": []
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	updated, err := retlClient.UpdateConnection(context.Background(), "conn-1", &retl.UpdateRETLConnectionRequest{
+		Schedule: retl.Schedule{Type: retl.ScheduleTypeCron, CronExpression: stringPtr("0 0 * * *")},
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, updated.Schedule.CronExpression)
+	assert.Equal(t, "0 0 * * *", *updated.Schedule.CronExpression)
+
 	httpClient.AssertNumberOfCalls()
 }
