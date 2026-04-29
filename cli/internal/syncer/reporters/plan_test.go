@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
@@ -107,6 +108,45 @@ func TestPlanReporter(t *testing.T) {
 		"\n"
 
 	assert.Equal(t, expectedOutput, buf.String())
+}
+
+func TestPlanReporter_WithWorkspace(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := &planReporter{}
+	r.SetWriter(&buf)
+	r.SetWorkspace(&client.Workspace{
+		ID:   "ws_123abc",
+		Name: "Production",
+	})
+
+	diff := &differ.Diff{
+		NewResources: []string{"resource_type:resource1"},
+	}
+
+	r.ReportPlan(&planner.Plan{Diff: diff})
+
+	expectedOutput := "Workspace: Production (ws_123abc)\n\n" +
+		"New resources:\n" +
+		"  - resource_type:resource1\n" +
+		"\n"
+
+	assert.Equal(t, expectedOutput, buf.String())
+}
+
+func TestPlanReporter_EmptyDiffDoesNotPrintWorkspace(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := &planReporter{}
+	r.SetWriter(&buf)
+	r.SetWorkspace(&client.Workspace{
+		ID:   "ws_123abc",
+		Name: "Production",
+	})
+
+	r.ReportPlan(&planner.Plan{Diff: &differ.Diff{}})
+
+	assert.Empty(t, buf.String())
 }
 
 func TestPlanReporter_NestedDiff(t *testing.T) {

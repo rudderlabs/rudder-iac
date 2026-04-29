@@ -2,8 +2,10 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +58,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
+		assertWorkspaceHeaderBeforePlan(t, string(output))
 		verifyState(t, "create")
 	})
 
@@ -64,6 +67,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
+		assertWorkspaceHeaderBeforePlan(t, string(output))
 		verifyState(t, "update")
 	})
 
@@ -89,6 +93,13 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	assert.NotContains(
+		t,
+		string(output),
+		expectedWorkspaceHeader(t),
+		"Workspace header should not be shown when there is no diff: %s",
+		string(output),
+	)
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
@@ -110,14 +121,7 @@ func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir strin
 }
 
 func verifyState(t *testing.T, dir string) {
-	config.InitConfig(config.DefaultConfigFile())
-	apiClient, err := client.New(
-		config.GetConfig().Auth.AccessToken,
-		client.WithBaseURL(config.GetConfig().APIURL),
-		client.WithUserAgent("rudder-cli-test"),
-	)
-
-	require.NoError(t, err)
+	apiClient := newAPIClient(t)
 	dataCatalog, err := catalog.NewRudderDataCatalog(
 		apiClient,
 		catalog.WithConcurrency(concurrencyForTest),
@@ -220,4 +224,62 @@ func verifyState(t *testing.T, dir string) {
 	)
 	err = upstreamTester.SnapshotTest(context.Background())
 	assert.NoError(t, err, "Upstream state verification failed")
+}
+
+func assertWorkspaceHeaderBeforePlan(t *testing.T, output string) {
+	t.Helper()
+
+	headerIndex := strings.Index(output, expectedWorkspaceHeader(t))
+	require.NotEqual(t, -1, headerIndex, "Expected workspace header in output: %s", output)
+
+	planIndex := firstPlanSectionIndex(output)
+	require.NotEqual(t, -1, planIndex, "Expected plan output in apply command output: %s", output)
+
+	assert.Less(t, headerIndex, planIndex, "Workspace header should be displayed before the plan: %s", output)
+}
+
+func expectedWorkspaceHeader(t *testing.T) string {
+	t.Helper()
+
+	workspace, err := newAPIClient(t).Workspaces.GetByAuthToken(context.Background())
+	require.NoError(t, err)
+
+	return fmt.Sprintf("Workspace: %s (%s)", workspace.Name, workspace.ID)
+}
+
+func newAPIClient(t *testing.T) *client.Client {
+	t.Helper()
+
+	config.InitConfig(config.DefaultConfigFile())
+
+	apiClient, err := client.New(
+		config.GetConfig().Auth.AccessToken,
+		client.WithBaseURL(config.GetConfig().APIURL),
+		client.WithUserAgent("rudder-cli-test"),
+	)
+	require.NoError(t, err)
+
+	return apiClient
+}
+
+func firstPlanSectionIndex(output string) int {
+	sections := []string{
+		"Importable resources:",
+		"New resources:",
+		"Updated resources:",
+		"Removed resources:",
+	}
+
+	firstIndex := -1
+	for _, section := range sections {
+		index := strings.Index(output, section)
+		if index == -1 {
+			continue
+		}
+		if firstIndex == -1 || index < firstIndex {
+			firstIndex = index
+		}
+	}
+
+	return firstIndex
 }
