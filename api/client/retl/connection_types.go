@@ -35,8 +35,9 @@ const (
 
 // Schedule defines when a RETL connection syncs.
 type Schedule struct {
-	Type         ScheduleType `json:"type"`
-	EveryMinutes *int         `json:"everyMinutes,omitempty"`
+	Type           ScheduleType `json:"type"`
+	EveryMinutes   *int         `json:"everyMinutes,omitempty"`
+	CronExpression *string      `json:"cronExpression,omitempty"`
 }
 
 // Event represents the CDP event configuration for a JSON Mapper flow.
