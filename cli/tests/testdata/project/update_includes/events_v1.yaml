@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: app_events
+spec:
+  events:
+    - id: page_view
+      event_type: page
+      description: "Triggered when a user loads a new page."
+
+    - id: signup
+      name: Signup
+      event_type: track
+      description: "Triggered when a new user registers."
+      category: "#category:user_actions"
+
+    - id: checkout
+      name: Checkout
+      event_type: track
+      description: "Triggered when a user completes the checkout process."

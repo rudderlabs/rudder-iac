@@ -1,0 +1,119 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: "api_tracking"
+spec:
+  properties:
+    - id: "api_method"
+      name: "API Method"
+      type: "string"
+      description: "http method of the api called"
+      propConfig:
+        enum:
+          - "GET"
+          - "PUT"
+          - "POST"
+          - "DELETE"
+          - "PATCH"
+          - "HEAD"
+
+    - id: "api_path"
+      name: "API Path"
+      type: "string"
+      description: "subpath of the api requested"
+
+    - id: "http_retry_count"
+      name: "HTTP Retry Count"
+      type: "integer"
+      description: "Number of times to retry the API call"
+      propConfig:
+        minimum: 0
+        maximum: 10
+        multipleOf: 2
+
+    - id: "user_mail"
+      name: "User Email"
+      description: "User's email address"
+      type: "#/custom-types/login_elements/email_type"
+
+    - id: "error_code"
+      name: "Error Code"
+      type: "integer"
+      description: "The HTTP error code." 
+      propConfig:
+        enum:
+          - 400
+          - 401
+          - 404
+          - 500
+
+    - id: "password"
+      name: "Password"
+      description: "Password for the API"
+      type: "string"
+      propConfig:
+        minLength: 10
+        maxLength: 64
+
+    - id: "signin_info"
+      name: "Signin Info"
+      description: "Signin info"
+      type: "object"
+
+    - id: "remember_me_checkbox_clicked"
+      name: "Remember Me Checkbox Clicked"
+      description: "Remember me checkbox clicked"
+      type: "boolean"
+
+    - id: "captcha"
+      name: "Captcha"
+      description: "Captcha"
+      type: "object"
+
+    - id: "captcha_info"
+      name: "Captcha Info"
+      description: "Captcha info"
+      type: "object"
+
+    - id: "captcha_solved"
+      name: "Captcha Solved"
+      description: "Captcha solved"
+      type: "boolean"
+    
+    - id: "captcha_type"
+      name: "Captcha Type"
+      description: "Captcha type"
+      type: "string"
+      propConfig:
+        enum:
+          - "image"
+          - "audio"
+    
+    - id: "captcha_attempts"
+      name: "Captcha Attempts"
+      description: "Captcha attempts"
+      type: "integer"
+      propConfig:
+        minimum: 0
+        maximum: 10
+  
+    - id: "user_agent"
+      name: "User Agent"
+      description: "User agent of the API Request"
+      type: "string"
+
+    - id: "host"
+      name: "Host"
+      description: "Host of the API Request"
+      type: "string"
+
+    - id: "referrer"
+      name: "Referrer"
+      description: "Referrer of the API Request"
+      type: "string"
+
+    - id: "content_type"
+      name: "Content Type"
+      description: "Content type of the API Request"
+      type: "string"
+ 

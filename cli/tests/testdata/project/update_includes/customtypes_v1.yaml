@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: api_tracking_custom_types
+spec:
+  types:
+    - id: email_string
+      name: EmailString
+      description: "Custom type for email validation"
+      type: string
+      config:
+        format: email
+        min_length: 3
+        max_length: 255
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+    - id: percentage
+      name: Percentage
+      description: "A percentage value between 0 and 100"
+      type: integer
+      config:
+        minimum: 0
+        maximum: 100

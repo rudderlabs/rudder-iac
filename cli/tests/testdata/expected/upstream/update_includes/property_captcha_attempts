@@ -1,0 +1,18 @@
+{
+    "propConfig": {
+        "maximum": 10,
+        "minimum": 0
+    },
+    "id": "prop_31TTGwC0dfUC5dtHRhT9CoKdJW5",
+    "externalId": "captcha_attempts",
+    "name": "Captcha Attempts",
+    "description": "Captcha attempts",
+    "type": "integer",
+    "workspaceId": "2ycnk5YEnH69oHpC4xwPFvPrEly",
+    "createdBy": "2ygL397Dvlstu4zm73aRIb1lwX7",
+    "updatedBy": null,
+    "createdAt": "2025-08-18T19:56:10.540Z",
+    "updatedAt": "2025-08-18T19:56:10.540Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}
