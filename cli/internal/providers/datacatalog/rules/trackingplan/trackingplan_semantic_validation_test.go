@@ -33,7 +33,7 @@ func trackingPlanResource(id, name string) *resources.Resource {
 func TestTrackingPlanSemanticValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewTrackingPlanSemanticValidRule()
+	rule := NewTrackingPlanSemanticValidRule(false)
 
 	assert.Equal(t, "datacatalog/tracking-plans/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
@@ -1133,7 +1133,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec, resources.NewGraph())
+		results := validateDuplicateEventsV0(spec, resources.NewGraph(), false)
 		assert.Empty(t, results)
 	})
 
@@ -1150,7 +1150,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec, resources.NewGraph())
+		results := validateDuplicateEventsV0(spec, resources.NewGraph(), false)
 		assert.Equal(t, []rules.ValidationResult{
 			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
 			{Reference: "/rules/2/event/$ref", Message: "duplicate event reference in tracking plan rules"},
@@ -1169,7 +1169,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec, resources.NewGraph())
+		results := validateDuplicateEventsV0(spec, resources.NewGraph(), false)
 		assert.Empty(t, results)
 	})
 
@@ -1206,7 +1206,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec, graph)
+		results := validateDuplicateEventsV0(spec, graph, true)
 		assert.Equal(t, []rules.ValidationResult{
 			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
 			{
@@ -1214,6 +1214,36 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 				Message:   "event 'signup' included from 'common_rules' is also defined directly on this tracking plan",
 			},
 		}, results)
+	})
+
+	t.Run("duplicate event across direct rule and includes is ignored when flag disabled", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("common_rules", "tracking-plan", resources.ResourceData{
+			"name": "Common Rules",
+			"events": []map[string]any{
+				{
+					"localId": "signup",
+					"id": resources.PropertyRef{
+						URN:      "event:signup",
+						Property: "id",
+					},
+				},
+			},
+		}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "direct_signup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+				{LocalID: "include_common", Includes: &localcatalog.TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/*"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, graph, false)
+		assert.Empty(t, results)
 	})
 
 	t.Run("includes with disjoint events does not report duplicates", func(t *testing.T) {
@@ -1242,8 +1272,92 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec, graph)
+		results := validateDuplicateEventsV0(spec, graph, true)
 		assert.Empty(t, results)
+	})
+
+	t.Run("specific rule include does not count events from other rules", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("common_rules", "tracking-plan", resources.ResourceData{
+			"name": "Common Rules",
+			"events": []map[string]any{
+				{
+					"localId":     "signup",
+					"ruleLocalId": "signup_rule",
+					"id": resources.PropertyRef{
+						URN:      "event:signup",
+						Property: "id",
+					},
+				},
+				{
+					"localId":     "checkout",
+					"ruleLocalId": "checkout_rule",
+					"id": resources.PropertyRef{
+						URN:      "event:checkout",
+						Property: "id",
+					},
+				},
+			},
+		}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "direct_signup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+				{LocalID: "include_checkout_only", Includes: &localcatalog.TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/checkout_rule"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, graph, true)
+		assert.Empty(t, results)
+	})
+
+	t.Run("specific rule include still reports duplicate when same event is included", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("common_rules", "tracking-plan", resources.ResourceData{
+			"name": "Common Rules",
+			"events": []map[string]any{
+				{
+					"localId":     "signup",
+					"ruleLocalId": "signup_rule",
+					"id": resources.PropertyRef{
+						URN:      "event:signup",
+						Property: "id",
+					},
+				},
+				{
+					"localId":     "checkout",
+					"ruleLocalId": "checkout_rule",
+					"id": resources.PropertyRef{
+						URN:      "event:checkout",
+						Property: "id",
+					},
+				},
+			},
+		}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRule{
+				{LocalID: "direct_signup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+				{LocalID: "include_signup_rule", Includes: &localcatalog.TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/signup_rule"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, graph, true)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
+			{
+				Reference: "/rules/1/includes/$ref",
+				Message:   "event 'signup' included from 'common_rules' is also defined directly on this tracking plan",
+			},
+		}, results)
 	})
 }
 

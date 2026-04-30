@@ -16,7 +16,7 @@ import (
 )
 
 func TestTrackingPlanSpecSyntaxValidRule_Metadata(t *testing.T) {
-	rule := NewTrackingPlanSpecSyntaxValidRule()
+	rule := NewTrackingPlanSpecSyntaxValidRule(false)
 
 	assert.Equal(t, "datacatalog/tracking-plans/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
@@ -231,22 +231,6 @@ func TestTrackingPlanSpecSyntaxValidRule_ValidEventAndPropertyRefs(t *testing.T)
 				},
 			},
 		},
-		{
-			name: "rule with includes only",
-			spec: localcatalog.TrackingPlan{
-				LocalID: "test_tp",
-				Name:    "Test TP",
-				Rules: []*localcatalog.TPRule{
-					{
-						Type:    "event_rule",
-						LocalID: "rule1",
-						Includes: &localcatalog.TPRuleIncludes{
-							Ref: "#/tp/common_rules/event_rule/*",
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -314,11 +298,8 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
-			expectedMsgs: []string{
-				"'event' is required when 'includes' is not specified",
-				"'includes' is required when 'event' is not specified",
-			},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{"'event' is required"},
 		},
 		{
 			name: "rule with both event and includes",
@@ -338,14 +319,11 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
-			expectedMsgs: []string{
-				"'event' and 'includes' cannot be specified together",
-				"'includes' and 'event' cannot be specified together",
-			},
+			expectedRefs: []string{"/rules/0/includes"},
+			expectedMsgs: []string{"'includes' is not supported"},
 		},
 		{
-			name: "rule with malformed include ref",
+			name: "rule with includes only while flag disabled",
 			spec: localcatalog.TrackingPlan{
 				LocalID: "test_tp",
 				Name:    "Test TP",
@@ -359,8 +337,10 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/includes/$ref"},
-			expectedMsgs: []string{"'$ref' is not valid: must be of pattern #/tp/<group>/event_rule/<id-or-*>"},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{
+				"'event' is required",
+			},
 		},
 		{
 			name: "event ref missing",
@@ -519,6 +499,116 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 
 			assert.ElementsMatch(t, tt.expectedRefs, actualRefs, "References don't match")
 			assert.ElementsMatch(t, tt.expectedMsgs, actualMsgs, "Messages don't match")
+		})
+	}
+}
+
+func TestTrackingPlanSpecSyntaxValidRule_EventRuleIncludesEnabledV0(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		spec         localcatalog.TrackingPlan
+		expectedRefs []string
+		expectedMsgs []string
+	}{
+		{
+			name: "includes-only event rule is valid",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/event_rule/*",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "missing event and includes",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0"},
+			expectedMsgs: []string{"event or includes is required"},
+		},
+		{
+			name: "event and includes together",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref: "#/events/user-events/signup",
+						},
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0"},
+			expectedMsgs: []string{"event and includes cannot be specified together"},
+		},
+		{
+			name: "include ref missing",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/includes/$ref"},
+			expectedMsgs: []string{"'$ref' is required"},
+		},
+		{
+			name: "include ref malformed",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/not_event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/includes/$ref"},
+			expectedMsgs: []string{"'$ref' is not valid: must be of pattern #/tp/<group>/event_rule/<id-or-*>"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := validateTrackingPlanSpecWithEventRuleIncludes(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, tt.spec, true)
+
+			assert.Len(t, results, len(tt.expectedRefs))
+			assert.ElementsMatch(t, tt.expectedRefs, extractRefs(results))
+			assert.ElementsMatch(t, tt.expectedMsgs, extractMsgs(results))
 		})
 	}
 }
@@ -1289,6 +1379,98 @@ func TestTrackingPlanSpecSyntaxValidRule_V1InvalidFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, tt.spec)
+
+			assert.Len(t, results, len(tt.expectedRefs))
+			assert.ElementsMatch(t, tt.expectedRefs, extractRefs(results))
+			assert.ElementsMatch(t, tt.expectedMsgs, extractMsgs(results))
+		})
+	}
+}
+
+func TestTrackingPlanSpecSyntaxValidRule_EventRuleIncludesEnabledV1(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		spec         localcatalog.TrackingPlanV1
+		expectedRefs []string
+		expectedMsgs []string
+	}{
+		{
+			name: "includes-only event rule is invalid",
+			spec: localcatalog.TrackingPlanV1{
+				LocalID: "tp_v1",
+				Name:    "Test Plan",
+				Rules: []*localcatalog.TPRuleV1{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
+			expectedMsgs: []string{"'event' is required", "includes is not supported for tracking-plan v1 event rules"},
+		},
+		{
+			name: "missing event and includes",
+			spec: localcatalog.TrackingPlanV1{
+				LocalID: "tp_v1",
+				Name:    "Test Plan",
+				Rules: []*localcatalog.TPRuleV1{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{"'event' is required"},
+		},
+		{
+			name: "event and includes together",
+			spec: localcatalog.TrackingPlanV1{
+				LocalID: "tp_v1",
+				Name:    "Test Plan",
+				Rules: []*localcatalog.TPRuleV1{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Event:   "#event:signup",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/includes"},
+			expectedMsgs: []string{"includes is not supported for tracking-plan v1 event rules"},
+		},
+		{
+			name: "include ref malformed",
+			spec: localcatalog.TrackingPlanV1{
+				LocalID: "tp_v1",
+				Name:    "Test Plan",
+				Rules: []*localcatalog.TPRuleV1{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/common_rules/not_event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
+			expectedMsgs: []string{"'event' is required", "includes is not supported for tracking-plan v1 event rules"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := validateTrackingPlanSpecV1WithEventRuleIncludes(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, tt.spec, true)
 
 			assert.Len(t, results, len(tt.expectedRefs))
 			assert.ElementsMatch(t, tt.expectedRefs, extractRefs(results))
