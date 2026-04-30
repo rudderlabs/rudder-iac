@@ -1,0 +1,5 @@
+node_modules/
+coverage/
+.vitest-cache/
+*.log
+src/RudderTyper/*.ts
