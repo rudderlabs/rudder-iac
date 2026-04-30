@@ -13,30 +13,43 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+type duplicateOrigin struct {
+	reference string
+	message   string
+}
+
 var validateTrackingPlanSemantic = func(_ string, _ string, _ map[string]any, spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
+	return validateTrackingPlanSemanticWithEventRuleIncludes("", "", nil, spec, graph, false)
+}
+
+func validateTrackingPlanSemanticWithEventRuleIncludes(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec localcatalog.TrackingPlan,
+	graph *resources.Graph,
+	eventRuleIncludesEnabled bool,
+) []rules.ValidationResult {
 	results := funcs.ValidateReferences(spec, graph)
 
 	// Variant discriminator validation, property nesting, and name uniqueness checks
 	results = append(results, validateTrackingPlanVariants(spec, graph)...)
 	results = append(results, validatePropertyNestingV0(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV0(spec, graph)...)
-	results = append(results, validateDuplicateEventsV0(spec, graph)...)
+	results = append(results, validateDuplicateEventsV0(spec, graph, eventRuleIncludesEnabled)...)
 	results = append(results, validateDuplicatePropertiesV0(spec)...)
 
 	return results
 }
 
-func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
-	type duplicateOrigin struct {
-		reference string
-		message   string
-	}
-
+// validateDuplicateEventsV0 validates duplicate events in a tracking plan present directly
+// and indirectly through includes ( if the experimental flag is enabled )
+func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.Graph, eventRuleIncludesEnabled bool) []rules.ValidationResult {
 	eventOrigins := make(map[string][]duplicateOrigin)
 
 	for i, rule := range spec.Rules {
 		if rule.Event != nil {
-			eventID, ok := eventLocalIDFromRef(rule.Event.Ref)
+			eventID, ok := directEventLocalID(rule.Event.Ref)
 			if ok {
 				eventOrigins[eventID] = append(eventOrigins[eventID], duplicateOrigin{
 					reference: fmt.Sprintf("/rules/%d/event/$ref", i),
@@ -45,27 +58,32 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.
 			}
 		}
 
-		if rule.Includes == nil {
+		if !eventRuleIncludesEnabled || rule.Includes == nil {
 			continue
 		}
 
+		// #/tp/<tp-id>/event_rule/(* | <rule-id>)
 		matches := localcatalog.IncludeRegex.FindStringSubmatch(rule.Includes.Ref)
 		if len(matches) != 3 {
 			continue
 		}
 
 		includeTPID := matches[1]
-		includedResource, exists := graph.GetResource(resources.URN(includeTPID, types.TrackingPlanResourceType))
-		if !exists {
+		includeRuleSegment := matches[2]
+		includedTP, ok := graph.GetResource(resources.URN(
+			includeTPID,
+			types.TrackingPlanResourceType,
+		))
+		if !ok {
 			continue
 		}
 
-		for _, includedEventID := range eventIDsFromIncludedResource(includedResource.Data()) {
-			eventOrigins[includedEventID] = append(eventOrigins[includedEventID], duplicateOrigin{
+		for _, eventLocalID := range includedEventLocalIDs(includedTP.Data(), includeRuleSegment) {
+			eventOrigins[eventLocalID] = append(eventOrigins[eventLocalID], duplicateOrigin{
 				reference: fmt.Sprintf("/rules/%d/includes/$ref", i),
 				message: fmt.Sprintf(
 					"event '%s' included from '%s' is also defined directly on this tracking plan",
-					includedEventID,
+					eventLocalID,
 					includeTPID,
 				),
 			})
@@ -89,7 +107,7 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.
 	return results
 }
 
-func eventLocalIDFromRef(ref string) (string, bool) {
+func directEventLocalID(ref string) (string, bool) {
 	if strings.HasPrefix(ref, "#/events/") {
 		// Keep legacy group-qualified refs distinct to preserve current behavior.
 		return ref, true
@@ -103,23 +121,79 @@ func eventLocalIDFromRef(ref string) (string, bool) {
 	return "", false
 }
 
-func eventIDsFromIncludedResource(resourceData resources.ResourceData) []string {
-	events, ok := resourceData["events"].([]map[string]any)
-	if !ok {
+func trackingPlanEventMaps(trackingPlan resources.ResourceData) []map[string]any {
+	raw, ok := trackingPlan["events"]
+	if !ok || raw == nil {
 		return nil
 	}
 
-	eventIDs := make([]string, 0, len(events))
+	switch ev := raw.(type) {
+	case []map[string]any:
+		return ev
+	case []any:
+		out := make([]map[string]any, 0, len(ev))
+		for _, item := range ev {
+			if m, ok := item.(map[string]any); ok {
+				out = append(out, m)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func allEventLocalIDs(events []map[string]any) []string {
+	localIDs := make([]string, 0, len(events))
 	for _, event := range events {
-		eventID, _ := event["localId"].(string)
-		if eventID == "" {
+		localID, ok := event["localId"].(string)
+		if !ok || localID == "" {
 			continue
 		}
+		localIDs = append(localIDs, localID)
+	}
+	return localIDs
+}
 
-		eventIDs = append(eventIDs, eventID)
+func eventsHaveRuleLocalID(events []map[string]any) bool {
+	for _, event := range events {
+		if rl, ok := event["ruleLocalId"].(string); ok && rl != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// includedEventLocalIDs returns event local IDs from another tracking-plan resource in the graph that are in scope
+// for duplicate detection against this include ref's rule segment (* = all rules; otherwise match ruleLocalId metadata).
+// When no ruleLocalId metadata exists on any row (e.g. legacy remote state), behavior matches legacy wildcard semantics.
+func includedEventLocalIDs(trackingPlan resources.ResourceData, includeRuleSegment string) []string {
+	events := trackingPlanEventMaps(trackingPlan)
+	if len(events) == 0 {
+		return nil
 	}
 
-	return eventIDs
+	if includeRuleSegment == "*" {
+		return allEventLocalIDs(events)
+	}
+
+	if !eventsHaveRuleLocalID(events) {
+		return allEventLocalIDs(events)
+	}
+
+	localIDs := make([]string, 0)
+	for _, event := range events {
+		ruleID, _ := event["ruleLocalId"].(string)
+		if ruleID != includeRuleSegment {
+			continue
+		}
+		localID, ok := event["localId"].(string)
+		if !ok || localID == "" {
+			continue
+		}
+		localIDs = append(localIDs, localID)
+	}
+	return localIDs
 }
 
 func validateDuplicatePropertiesV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
@@ -323,7 +397,7 @@ func nestingAllowed(propertyType string, config map[string]any) bool {
 	return false
 }
 
-func NewTrackingPlanSemanticValidRule() rules.Rule {
+func NewTrackingPlanSemanticValidRule(eventRuleIncludesEnabled bool) rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/semantic-valid",
 		rules.Error,
@@ -331,7 +405,9 @@ func NewTrackingPlanSemanticValidRule() rules.Rule {
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
-			validateTrackingPlanSemantic,
+			func(kind string, version string, metadata map[string]any, spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
+				return validateTrackingPlanSemanticWithEventRuleIncludes(kind, version, metadata, spec, graph, eventRuleIncludesEnabled)
+			},
 		),
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1),

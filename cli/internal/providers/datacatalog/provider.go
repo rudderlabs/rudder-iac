@@ -11,8 +11,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	categoryRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/category"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
@@ -345,6 +345,8 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
+	eventRuleIncludesEnabled := config.GetConfig().ExperimentalFlags.EventRuleIncludes
+
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
 		propertyRules.NewPropertyConfigValidRule(),
@@ -352,18 +354,20 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 		customtypeRules.NewCustomTypeConfigValidRule(),
 		eventRules.NewEventSpecSyntaxValidRule(),
 		categoryRules.NewCategorySpecSyntaxValidRule(),
-		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(),
+		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(eventRuleIncludesEnabled),
 	}
 
 	return syntactic
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
+	eventRuleIncludesEnabled := config.GetConfig().ExperimentalFlags.EventRuleIncludes
+
 	return []rules.Rule{
 		propertyRules.NewPropertySemanticValidRule(),
 		eventRules.NewEventSemanticValidRule(),
 		categoryRules.NewCategorySemanticValidRule(),
 		customtypeRules.NewCustomTypeSemanticValidRule(),
-		trackingplanRules.NewTrackingPlanSemanticValidRule(),
+		trackingplanRules.NewTrackingPlanSemanticValidRule(eventRuleIncludesEnabled),
 	}
 }

@@ -3,6 +3,7 @@ package trackingplan
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
@@ -11,6 +12,18 @@ import (
 )
 
 const maxNestingDepth = 3
+
+const (
+	eventRequiredMessage             = "'event' is required"
+	eventOrIncludesRequiredMessage   = "event or includes is required"
+	eventAndIncludesExclusiveMessage = "event and includes cannot be specified together"
+	includesNotSupportedV0Message    = "'includes' is not supported"
+	v1IncludesUnsupportedMessage     = "includes is not supported for tracking-plan v1 event rules"
+	includesReferenceRequiredMessage = "'$ref' is required"
+	includesReferencePatternMessage  = "'$ref' is not valid: must be of pattern #/tp/<group>/event_rule/<id-or-*>"
+)
+
+var tpIncludesReferenceRegexp = regexp.MustCompile(`^#/tp/[a-zA-Z0-9_-]+/event_rule/([a-zA-Z0-9_-]+|\*)$`)
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -70,10 +83,20 @@ var validateTrackingPlanSpec = func(
 	Metadata map[string]any,
 	Spec localcatalog.TrackingPlan,
 ) []rules.ValidationResult {
+	return validateTrackingPlanSpecWithEventRuleIncludes(Kind, Version, Metadata, Spec, false)
+}
+
+func validateTrackingPlanSpecWithEventRuleIncludes(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec localcatalog.TrackingPlan,
+	eventRuleIncludesEnabled bool,
+) []rules.ValidationResult {
 	// validate the spec using struct tags through go-playground/validator
 	// majority of the validation is done here, remaining spec validation
 	// will be done in subsequent steps.
-	validationErrors, err := rules.ValidateStruct(Spec, "")
+	validationErrors, err := rules.ValidateStruct(spec, "")
 
 	if err != nil {
 		return []rules.ValidationResult{
@@ -84,10 +107,10 @@ var validateTrackingPlanSpec = func(
 		}
 	}
 
-	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(Spec))
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
 
 	// validate the rules on the trackingplan spec
-	results = append(results, validateRules(Spec.Rules)...)
+	results = append(results, validateRules(spec.Rules, eventRuleIncludesEnabled)...)
 
 	return results
 }
@@ -97,6 +120,16 @@ var validateTrackingPlanSpecV1 = func(
 	_ string,
 	_ map[string]any,
 	spec localcatalog.TrackingPlanV1,
+) []rules.ValidationResult {
+	return validateTrackingPlanSpecV1WithEventRuleIncludes("", "", nil, spec, false)
+}
+
+func validateTrackingPlanSpecV1WithEventRuleIncludes(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec localcatalog.TrackingPlanV1,
+	eventRuleIncludesEnabled bool,
 ) []rules.ValidationResult {
 	validationErrors, err := rules.ValidateStruct(spec, "")
 	if err != nil {
@@ -109,12 +142,12 @@ var validateTrackingPlanSpecV1 = func(
 	}
 
 	results := funcs.ParseValidationErrors(validationErrors, nil)
-	results = append(results, validateRulesV1(spec.Rules)...)
+	results = append(results, validateRulesV1(spec.Rules, eventRuleIncludesEnabled)...)
 
 	return results
 }
 
-func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
+func validateRules(tpRules []*localcatalog.TPRule, eventRuleIncludesEnabled bool) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	results = append(
@@ -123,6 +156,8 @@ func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 	)
 
 	for i, rule := range tpRules {
+		results = append(results, validateEventRuleShapeV0(rule, i, eventRuleIncludesEnabled)...)
+
 		for j, prop := range rule.Properties {
 			if len(prop.Properties) == 0 {
 				continue
@@ -140,7 +175,7 @@ func validateRules(tpRules []*localcatalog.TPRule) []rules.ValidationResult {
 	return results
 }
 
-func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
+func validateRulesV1(tpRules []*localcatalog.TPRuleV1, eventRuleIncludesEnabled bool) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	results = append(
@@ -149,6 +184,8 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 	)
 
 	for i, rule := range tpRules {
+		results = append(results, validateEventRuleIncludesUnsupportedV1(rule, i)...)
+
 		for j, prop := range rule.Properties {
 			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
 			if len(prop.Properties) > 0 {
@@ -162,6 +199,102 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 	}
 
 	return results
+}
+
+func validateEventRuleShapeV0(rule *localcatalog.TPRule, index int, eventRuleIncludesEnabled bool) []rules.ValidationResult {
+	hasEvent := rule.Event != nil
+	return validateEventRuleShape(hasEvent, rule.Includes, index, eventRuleIncludesEnabled)
+}
+
+func validateEventRuleIncludesUnsupportedV1(rule *localcatalog.TPRuleV1, index int) []rules.ValidationResult {
+	if rule.Includes == nil {
+		return nil
+	}
+
+	return []rules.ValidationResult{{
+		Reference: fmt.Sprintf("/rules/%d/includes", index),
+		Message:   v1IncludesUnsupportedMessage,
+	}}
+}
+
+func validateEventRuleShape(
+	hasEvent bool,
+	includes *localcatalog.TPRuleIncludes,
+	index int,
+	eventRuleIncludesEnabled bool,
+) []rules.ValidationResult {
+	hasIncludes := includes != nil
+
+	if !eventRuleIncludesEnabled {
+		return validateEventRuleShapeWithoutIncludes(hasEvent, hasIncludes, index)
+	}
+
+	return validateEventRuleShapeWithIncludes(hasEvent, includes, index)
+}
+
+func validateEventRuleShapeWithoutIncludes(hasEvent, hasIncludes bool, index int) []rules.ValidationResult {
+	var results []rules.ValidationResult
+	if !hasEvent {
+		results = append(results, rules.ValidationResult{
+			Reference: fmt.Sprintf("/rules/%d/event", index),
+			Message:   eventRequiredMessage,
+		})
+	}
+
+	// When includes is present with a direct event, report a single clear error; when includes is
+	// present without event, only the missing event error above is reported (no second error).
+	if hasEvent && hasIncludes {
+		results = append(results, rules.ValidationResult{
+			Reference: fmt.Sprintf("/rules/%d/includes", index),
+			Message:   includesNotSupportedV0Message,
+		})
+	}
+
+	return results
+}
+
+func validateEventRuleShapeWithIncludes(
+	hasEvent bool,
+	includes *localcatalog.TPRuleIncludes,
+	index int,
+) []rules.ValidationResult {
+	hasIncludes := includes != nil
+	ruleRef := fmt.Sprintf("/rules/%d", index)
+
+	switch {
+	case !hasEvent && !hasIncludes:
+		return []rules.ValidationResult{{
+			Reference: ruleRef,
+			Message:   eventOrIncludesRequiredMessage,
+		}}
+	case hasEvent && hasIncludes:
+		return []rules.ValidationResult{{
+			Reference: ruleRef,
+			Message:   eventAndIncludesExclusiveMessage,
+		}}
+	case hasIncludes:
+		return validateIncludesRef(includes.Ref, ruleRef+"/includes/$ref")
+	default:
+		return nil
+	}
+}
+
+func validateIncludesRef(ref, reference string) []rules.ValidationResult {
+	if ref == "" {
+		return []rules.ValidationResult{{
+			Reference: reference,
+			Message:   includesReferenceRequiredMessage,
+		}}
+	}
+
+	if !tpIncludesReferenceRegexp.MatchString(ref) {
+		return []rules.ValidationResult{{
+			Reference: reference,
+			Message:   includesReferencePatternMessage,
+		}}
+	}
+
+	return nil
 }
 
 func validateDuplicateRuleIDs[T any](tpRules []T, idOf func(T) string) []rules.ValidationResult {
@@ -252,7 +385,7 @@ func validateAdditionalPropertiesV1(prop *localcatalog.TPRulePropertyV1, ref str
 
 // NewTrackingPlanSpecSyntaxValidRule creates a spec syntax validation rule
 // for tracking plans across supported spec versions.
-func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
+func NewTrackingPlanSpecSyntaxValidRule(eventRuleIncludesEnabled bool) rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/spec-syntax-valid",
 		rules.Error,
@@ -260,11 +393,15 @@ func NewTrackingPlanSpecSyntaxValidRule() rules.Rule {
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
-			validateTrackingPlanSpec,
+			func(kind string, version string, metadata map[string]any, spec localcatalog.TrackingPlan) []rules.ValidationResult {
+				return validateTrackingPlanSpecWithEventRuleIncludes(kind, version, metadata, spec, eventRuleIncludesEnabled)
+			},
 		),
 		prules.NewPatternValidator(
 			prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1),
-			validateTrackingPlanSpecV1,
+			func(kind string, version string, metadata map[string]any, spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
+				return validateTrackingPlanSpecV1WithEventRuleIncludes(kind, version, metadata, spec, eventRuleIncludesEnabled)
+			},
 		),
 	)
 }

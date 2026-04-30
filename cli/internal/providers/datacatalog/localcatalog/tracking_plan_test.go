@@ -50,6 +50,7 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		assert.Equal(t, "track", tp.EventProps[0].Type)
 		assert.Equal(t, "properties", tp.EventProps[0].IdentitySection)
 		assert.False(t, tp.EventProps[0].AllowUnplanned)
+		assert.Equal(t, "signup-rule", tp.EventProps[0].RuleLocalID)
 	})
 
 	t.Run("expands multiple rules with event refs", func(t *testing.T) {
@@ -179,6 +180,7 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, tp.EventProps, 1)
 		assert.Equal(t, "checkout", tp.EventProps[0].LocalID)
+		assert.Equal(t, "checkout_rule", tp.EventProps[0].RuleLocalID)
 	})
 
 	t.Run("single-level include behavior ignores nested include rules", func(t *testing.T) {

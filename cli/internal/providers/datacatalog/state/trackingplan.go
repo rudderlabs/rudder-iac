@@ -229,8 +229,10 @@ func diffEventArgs(local []*TrackingPlanEventArgs, upstream []*catalog.TrackingP
 }
 
 type TrackingPlanEventArgs struct {
-	ID              any
-	LocalID         string
+	ID      any
+	LocalID string
+	// RuleLocalID ties this expanded event row back to a tracking-plan event_rule id (CLI-internal metadata).
+	RuleLocalID     string
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TrackingPlanPropertyArgs
@@ -617,6 +619,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 				Property: "id",
 			},
 			LocalID:         event.LocalID,
+			RuleLocalID:     event.RuleLocalID,
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: identitySection,
 			Properties:      properties,
@@ -676,6 +679,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		eventProps[idx] = &TrackingPlanEventArgs{
 			ID:              MustString(event, "id"),
 			LocalID:         MustString(event, "localId"),
+			RuleLocalID:     String(event, "ruleLocalId", ""),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
@@ -718,14 +722,18 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			properties = append(properties, property.ToResourceData())
 		}
 
-		events = append(events, map[string]interface{}{
+		evMap := map[string]interface{}{
 			"id":              event.ID,
 			"localId":         event.LocalID,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
 			"variants":        event.Variants.ToResourceData(),
-		})
+		}
+		if event.RuleLocalID != "" {
+			evMap["ruleLocalId"] = event.RuleLocalID
+		}
+		events = append(events, evMap)
 	}
 
 	return resources.ResourceData{

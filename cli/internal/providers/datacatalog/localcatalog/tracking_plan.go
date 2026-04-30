@@ -39,8 +39,10 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name            string
-	LocalID         string
+	Name    string
+	LocalID string
+	// RuleLocalID is the tracking-plan event_rule id this row was expanded from (direct rule or included rule).
+	RuleLocalID     string
 	Ref             string
 	Description     string
 	CategoryRef     *string
@@ -75,9 +77,9 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event,omitempty" validate:"required_without=Includes,excluded_with=Includes"`
+	Event      *TPRuleEvent      `json:"event,omitempty"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
-	Includes   *TPRuleIncludes   `json:"includes,omitempty" validate:"required_without=Event,excluded_with=Event"`
+	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
@@ -95,11 +97,7 @@ type TPRuleProperty struct {
 }
 
 type TPRuleIncludes struct {
-	// NOTE: pattern name in pattern=tp_includes doesn't include _ref
-	// in the end as that way it will be treated as a URN and needs to be
-	// present in the graph because earlier where there was a reference
-	// it was supposed to be in the graph. With includes, this assumption changed.
-	Ref string `json:"$ref" validate:"required,pattern=tp_includes"`
+	Ref string `json:"$ref"`
 }
 
 // ExpandRefs simply expands the references being held
@@ -219,6 +217,7 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
+		RuleLocalID:     rule.LocalID,
 		Ref:             rule.Event,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
