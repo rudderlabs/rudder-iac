@@ -81,6 +81,8 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
+			fmt.Fprintln(cmd.OutOrStdout(), workspaceBanner(workspace.Name, workspace.ID))
+
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
 			if err != nil {
@@ -124,4 +126,8 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 
 	return cmd
+}
+
+func workspaceBanner(workspaceName, workspaceID string) string {
+	return fmt.Sprintf("Workspace: %s (%s)", workspaceName, workspaceID)
 }
