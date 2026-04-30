@@ -486,7 +486,11 @@ func buildIdentifyMethod(rule *plan.EventRule, nr *core.NameRegistry) (*TSAnalyt
 			Comment:  "The traits to include with this event",
 			Optional: true,
 		})
-		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "traits"})
+		// Cast to any at the SDK boundary: the SDK's IdentifyTraits parameter has
+		// an index signature, which our strictly-typed generated interface lacks.
+		// The public method surface stays type-safe; only this one hop into the
+		// SDK is loosened so strict-mode compilation passes.
+		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "traits as any"})
 	} else {
 		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "undefined"})
 	}

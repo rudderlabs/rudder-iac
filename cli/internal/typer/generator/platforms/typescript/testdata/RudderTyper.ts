@@ -56,7 +56,7 @@ export class RudderTyper {
     ): void {
         this.analytics.identify(
             userId,
-            traits,
+            traits as any,
             this.withRudderTyperContext(options),
         );
     }
