@@ -23,6 +23,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -305,6 +306,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				localcatalog.KindTrackingPlans,
 				tp.LocalID,
 			)),
+			resources.WithAdditionalMetadata(map[string]any{
+				"ruleIdToEventId": lo.SliceToMap(tp.Rules, func(rule *localcatalog.TPRuleV1) (string, string) {
+					return rule.LocalID, rule.Event
+				}),
+			}),
 		)
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))

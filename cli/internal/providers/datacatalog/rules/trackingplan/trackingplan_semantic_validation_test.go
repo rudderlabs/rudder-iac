@@ -1195,7 +1195,12 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 					},
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAdditionalMetadata(map[string]any{
+			"ruleIdToEventId": map[string]string{
+				"rule_signup":   "signup",
+				"rule_checkout": "checkout",
+			},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "tp1",
@@ -1231,7 +1236,11 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 					},
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAdditionalMetadata(map[string]any{
+			"ruleIdToEventId": map[string]string{
+				"rule_signup": "signup",
+			},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "tp1",
@@ -1261,7 +1270,11 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 					},
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAdditionalMetadata(map[string]any{
+			"ruleIdToEventId": map[string]string{
+				"rule_checkout": "checkout",
+			},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "tp1",
@@ -1300,7 +1313,12 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 					},
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAdditionalMetadata(map[string]any{
+			"ruleIdToEventId": map[string]string{
+				"signup_rule":   "signup",
+				"checkout_rule": "checkout",
+			},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "tp1",
@@ -1339,7 +1357,12 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 					},
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAdditionalMetadata(map[string]any{
+			"ruleIdToEventId": map[string]string{
+				"signup_rule":   "signup",
+				"checkout_rule": "checkout",
+			},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "tp1",
