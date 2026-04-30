@@ -740,9 +740,6 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			"properties":      properties,
 			"variants":        event.Variants.ToResourceData(),
 		}
-		if event.RuleLocalID != "" {
-			evMap["ruleLocalId"] = event.RuleLocalID
-		}
 		events = append(events, evMap)
 	}
 

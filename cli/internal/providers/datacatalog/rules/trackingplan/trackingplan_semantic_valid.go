@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 type duplicateOrigin struct {
@@ -69,7 +70,7 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.
 		}
 
 		includeTPID := matches[1]
-		includeRuleSegment := matches[2]
+		includeEventRule := matches[2]
 		includedTP, ok := graph.GetResource(resources.URN(
 			includeTPID,
 			types.TrackingPlanResourceType,
@@ -78,7 +79,7 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.
 			continue
 		}
 
-		for _, eventLocalID := range includedEventLocalIDs(includedTP.Data(), includeRuleSegment) {
+		for _, eventLocalID := range includedEventLocalIDs(includedTP.AdditionalMetadata(), includeEventRule) {
 			eventOrigins[eventLocalID] = append(eventOrigins[eventLocalID], duplicateOrigin{
 				reference: fmt.Sprintf("/rules/%d/includes/$ref", i),
 				message: fmt.Sprintf(
@@ -121,79 +122,23 @@ func directEventLocalID(ref string) (string, bool) {
 	return "", false
 }
 
-func trackingPlanEventMaps(trackingPlan resources.ResourceData) []map[string]any {
-	raw, ok := trackingPlan["events"]
-	if !ok || raw == nil {
-		return nil
-	}
-
-	switch ev := raw.(type) {
-	case []map[string]any:
-		return ev
-	case []any:
-		out := make([]map[string]any, 0, len(ev))
-		for _, item := range ev {
-			if m, ok := item.(map[string]any); ok {
-				out = append(out, m)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-func allEventLocalIDs(events []map[string]any) []string {
-	localIDs := make([]string, 0, len(events))
-	for _, event := range events {
-		localID, ok := event["localId"].(string)
-		if !ok || localID == "" {
-			continue
-		}
-		localIDs = append(localIDs, localID)
-	}
-	return localIDs
-}
-
-func eventsHaveRuleLocalID(events []map[string]any) bool {
-	for _, event := range events {
-		if rl, ok := event["ruleLocalId"].(string); ok && rl != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// includedEventLocalIDs returns event local IDs from another tracking-plan resource in the graph that are in scope
-// for duplicate detection against this include ref's rule segment (* = all rules; otherwise match ruleLocalId metadata).
-// When no ruleLocalId metadata exists on any row (e.g. legacy remote state), behavior matches legacy wildcard semantics.
-func includedEventLocalIDs(trackingPlan resources.ResourceData, includeRuleSegment string) []string {
-	events := trackingPlanEventMaps(trackingPlan)
-	if len(events) == 0 {
+func includedEventLocalIDs(additionalMetadata map[string]any, includeRuleSegment string) []string {
+	ruleIDToEventID, ok := additionalMetadata["ruleIdToEventId"].(map[string]string)
+	if !ok {
 		return nil
 	}
 
 	if includeRuleSegment == "*" {
-		return allEventLocalIDs(events)
+		return lo.Values(ruleIDToEventID)
 	}
 
-	if !eventsHaveRuleLocalID(events) {
-		return allEventLocalIDs(events)
+	eventID, ok := ruleIDToEventID[includeRuleSegment]
+	if !ok {
+		return nil
 	}
 
-	localIDs := make([]string, 0)
-	for _, event := range events {
-		ruleID, _ := event["ruleLocalId"].(string)
-		if ruleID != includeRuleSegment {
-			continue
-		}
-		localID, ok := event["localId"].(string)
-		if !ok || localID == "" {
-			continue
-		}
-		localIDs = append(localIDs, localID)
-	}
-	return localIDs
+	return []string{eventID}
+
 }
 
 func validateDuplicatePropertiesV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
