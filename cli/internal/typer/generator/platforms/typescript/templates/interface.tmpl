@@ -1,0 +1,17 @@
+{{- if .Comment }}
+/** {{ escapeComment .Comment }} */
+{{- end }}
+export interface {{ .Name }} {
+{{- range .Properties }}
+{{- if .Comment }}
+    /** {{ escapeComment .Comment }} */
+{{- end }}
+{{- if .QuotedName }}
+    "{{ escapeString .Name }}"{{ if .Optional }}?{{ end }}: {{ .Type }};
+{{- else }}
+    {{ .Name }}{{ if .Optional }}?{{ end }}: {{ .Type }};
+{{- end }}
+{{- end }}
+}
+{{- "" -}}
+

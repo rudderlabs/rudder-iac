@@ -6,11 +6,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/swift"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/typescript"
 )
 
 var platforms = map[string]core.Generator{
-	"kotlin": &kotlin.Generator{},
-	"swift":  &swift.Generator{},
+	"kotlin":     &kotlin.Generator{},
+	"swift":      &swift.Generator{},
+	"typescript": &typescript.Generator{},
 }
 
 func GeneratorForPlatform(platform string) (core.Generator, error) {

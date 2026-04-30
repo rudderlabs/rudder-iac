@@ -1,0 +1,65 @@
+/**
+ * Type-safe wrappers for RudderStack tracking based on your Tracking Plan.
+ *
+ * Tracking Plan: {{ if .TrackingPlanURL }}{{ .TrackingPlanName }} ({{ .TrackingPlanURL }}){{ else }}{{ .TrackingPlanName }}{{ end }}
+ * - ID: {{ .TrackingPlanID }}
+ * - Version: {{ .TrackingPlanVersion }}
+ *
+ * @example
+ * ```ts
+ * import { RudderAnalytics } from "@rudderstack/analytics-js";
+ * import { RudderTyper } from "./RudderTyper";
+ *
+ * const analytics = new RudderAnalytics();
+ * analytics.load("YOUR_WRITE_KEY", "YOUR_DATA_PLANE_URL");
+ * const rudderTyper = new RudderTyper(analytics);
+ * ```
+ */
+export class RudderTyper {
+    private readonly analytics: RudderAnalytics;
+
+    constructor(analytics: RudderAnalytics) {
+        this.analytics = analytics;
+    }
+{{ range .AnalyticsMethods }}
+    /**
+{{- if .Comment }}
+     * {{ escapeComment .Comment }}
+     *
+{{- end }}
+{{- range .MethodArguments }}
+     * @param {{ .Name }}{{ if .Comment }} - {{ escapeComment .Comment }}{{ end }}
+{{- end }}
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public {{ .Name }}(
+{{- range $i, $arg := .MethodArguments }}
+        {{ $arg.Name }}{{ if $arg.Optional }}?{{ end }}: {{ $arg.Type }},
+{{- end }}
+        options?: ApiOptions,
+    ): void {
+        this.analytics.{{ .SDKMethodName }}(
+{{- range .SDKArguments }}
+            {{ .Value }},
+{{- end }}
+            this.withRudderTyperContext(options),
+        );
+    }
+{{ end }}
+    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
+        const rudderTyperContext = {
+            ruddertyper: {
+{{- range $key, $value := .EventContext }}
+                "{{ escapeString $key }}": {{ $value }},
+{{- end }}
+            },
+        };
+        return {
+            ...(options ?? {}),
+            context: {
+                ...((options?.context ?? {}) as Record<string, unknown>),
+                ...rudderTyperContext,
+            },
+        };
+    }
+}
