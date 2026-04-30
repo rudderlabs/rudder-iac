@@ -37,8 +37,8 @@ const (
 	trackingPlanLegacyReferenceMessage = "must be of pattern #/tp/<group>/<id>"
 	trackingPlanReferenceMessage       = "must be of pattern #tracking-plan:<id>"
 
-	tpIncludeLegacyReferenceTag     = "legacy_tp_include_ref"
-	tpIncludeLegacyReferenceMessage = "must be of pattern #/tp/<group>/event_rule/<id-or-*>"
+	tpIncludesReferenceTag     = "tp_includes"
+	tpIncludesReferenceMessage = "must be of pattern #/tp/<group>/event_rule/<id-or-*>"
 
 	// display_name is a shared pattern for human-readable names across resource types
 	// (e.g., category name, tracking plan display_name)
@@ -98,7 +98,7 @@ var (
 		localcatalog.KindTrackingPlansV1,
 	)
 
-	TPIncludeLegacyReferenceRegex = `^#/tp/[a-zA-Z0-9_-]+/event_rule/([a-zA-Z0-9_-]+|\*)$`
+	TPIncludesReferenceRegex = `^#/tp/[a-zA-Z0-9_-]+/event_rule/([a-zA-Z0-9_-]+|\*)$`
 
 	ValidPrimitiveTypes = []string{
 		"string", "number", "integer", "boolean", "null", "array", "object",
@@ -190,9 +190,9 @@ func init() {
 
 	// #/tp/<group>/event_rule/<id-or-*>
 	funcs.NewPattern(
-		tpIncludeLegacyReferenceTag,
-		TPIncludeLegacyReferenceRegex,
-		tpIncludeLegacyReferenceMessage,
+		tpIncludesReferenceTag,
+		TPIncludesReferenceRegex,
+		tpIncludesReferenceMessage,
 	)
 
 	// Shared display name pattern for human-readable resource names

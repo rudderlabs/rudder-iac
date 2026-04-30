@@ -95,7 +95,11 @@ type TPRuleProperty struct {
 }
 
 type TPRuleIncludes struct {
-	Ref string `json:"$ref" validate:"required,pattern=legacy_tp_include_ref"`
+	// NOTE: pattern name in pattern=tp_includes doesn't include _ref
+	// in the end as that way it will be treated as a URN and needs to be
+	// present in the graph because earlier where there was a reference
+	// it was supposed to be in the graph. With includes, this assumption changed.
+	Ref string `json:"$ref" validate:"required,pattern=tp_includes"`
 }
 
 // ExpandRefs simply expands the references being held
