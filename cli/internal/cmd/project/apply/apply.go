@@ -56,6 +56,18 @@ func NewCmdApply() *cobra.Command {
 			$ rudder-cli apply --provider retl --provider eventstream
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			cfg := config.GetConfig()
+
+			// Check if experimental flag is enabled for non-default options
+			if !cfg.ExperimentalFlags.ApplyOptions {
+				if noDelete {
+					return fmt.Errorf("--no-delete flag requires experimental feature 'applyOptions' to be enabled. Run: rudder-cli experimental enable applyOptions")
+				}
+				if len(providers) > 0 {
+					return fmt.Errorf("--provider flag requires experimental feature 'applyOptions' to be enabled. Run: rudder-cli experimental enable applyOptions")
+				}
+			}
+
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
